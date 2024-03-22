@@ -138,8 +138,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         private int responseStatus;
         private SdkShapeBuilder<?> shapeBuilder;
 
-        private Builder() {
-        }
+        private Builder() {}
 
         @Override
         public HttpBindingDeserializer build() {

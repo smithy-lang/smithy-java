@@ -64,8 +64,7 @@ public final class TypeRegistry {
 
         private Map<ShapeId, Entry<?>> supplierMap = new HashMap<>();
 
-        private Builder() {
-        }
+        private Builder() {}
 
         @Override
         public TypeRegistry build() {

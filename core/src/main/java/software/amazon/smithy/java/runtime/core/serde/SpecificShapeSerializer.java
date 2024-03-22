@@ -27,8 +27,7 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
     protected abstract RuntimeException throwForInvalidState(SdkSchema schema);
 
     @Override
-    public void flush() {
-    }
+    public void flush() {}
 
     @Override
     public StructSerializer beginStruct(SdkSchema schema) {

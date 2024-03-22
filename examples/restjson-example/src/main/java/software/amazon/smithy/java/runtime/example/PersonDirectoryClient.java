@@ -199,8 +199,7 @@ public final class PersonDirectoryClient implements PersonDirectory {
         private EndpointProvider endpointProvider;
         private ClientInterceptor interceptor;
 
-        private Builder() {
-        }
+        private Builder() {}
 
         /**
          * Set the protocol to use to call the service.

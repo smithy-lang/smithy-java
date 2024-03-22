@@ -20,8 +20,7 @@ public final class ResponseDeserializer {
     private SdkShapeBuilder<?> outputShapeBuilder;
     private SdkShapeBuilder<? extends ModeledSdkException> errorShapeBuilder;
 
-    ResponseDeserializer() {
-    }
+    ResponseDeserializer() {}
 
     /**
      * Codec to use in the payload of responses.

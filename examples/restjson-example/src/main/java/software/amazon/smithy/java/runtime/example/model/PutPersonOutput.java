@@ -92,8 +92,7 @@ public final class PutPersonOutput implements SerializableShape {
         private String favoriteColor;
         private int status;
 
-        private Builder() {
-        }
+        private Builder() {}
 
         @Override
         public PutPersonOutput build() {

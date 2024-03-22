@@ -77,8 +77,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void flush() {
-    }
+    public void flush() {}
 
     @Override
     public String toString() {

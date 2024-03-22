@@ -10,8 +10,7 @@ package software.amazon.smithy.java.runtime.http.binding;
  */
 public final class HttpBinding {
 
-    private HttpBinding() {
-    }
+    private HttpBinding() {}
 
     /**
      * Create an HTTP binding request serializer.

@@ -40,6 +40,5 @@ final class SharedSchemas {
                     SdkSchema.memberBuilder(1, "value", SharedSchemas.LIST_OF_STRING))
             .build();
 
-    private SharedSchemas() {
-    }
+    private SharedSchemas() {}
 }

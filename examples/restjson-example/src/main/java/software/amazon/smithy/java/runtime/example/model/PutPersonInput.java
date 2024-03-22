@@ -118,8 +118,7 @@ public final class PutPersonInput implements SerializableShape {
         private byte[] binary;
         private Map<String, List<String>> queryParams = Collections.emptyMap();
 
-        private Builder() {
-        }
+        private Builder() {}
 
         @Override
         public PutPersonInput build() {

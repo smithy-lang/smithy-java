@@ -63,8 +63,7 @@ public interface SmithyHttpRequest extends SmithyHttpMessage, AutoCloseable {
         HttpHeaders headers;
         SmithyHttpVersion httpVersion = SmithyHttpVersion.HTTP_1_1;
 
-        private Builder() {
-        }
+        private Builder() {}
 
         public Builder httpVersion(SmithyHttpVersion httpVersion) {
             this.httpVersion = httpVersion;

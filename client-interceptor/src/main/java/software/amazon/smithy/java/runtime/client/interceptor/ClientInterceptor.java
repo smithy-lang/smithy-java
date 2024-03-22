@@ -18,67 +18,55 @@ public interface ClientInterceptor {
         return new ClientInterceptorChain(interceptors);
     }
 
-    default void readBeforeExecution(Context context) {
-    }
+    default void readBeforeExecution(Context context) {}
 
     default <I extends SerializableShape> I modifyInputBeforeSerialization(I input, Context context) {
         return input;
     }
 
-    default void readBeforeSerialization(Context context) {
-    }
+    default void readBeforeSerialization(Context context) {}
 
-    default void readAfterSerialization(Context context) {
-    }
+    default void readAfterSerialization(Context context) {}
 
     default <T> T modifyRequestBeforeRetryLoop(Context context, T request) {
         return request;
     }
 
-    default void readBeforeAttempt(Context context) {
-    }
+    default void readBeforeAttempt(Context context) {}
 
     default <T> T modifyRequestBeforeSigning(Context context, T request) {
         return request;
     }
 
-    default void readBeforeSigning(Context context) {
-    }
+    default void readBeforeSigning(Context context) {}
 
-    default void readAfterSigning(Context context) {
-    }
+    default void readAfterSigning(Context context) {}
 
     default <T> T modifyRequestBeforeTransmit(Context context, T request) {
         return request;
     }
 
-    default void readBeforeTransmit(Context context) {
-    }
+    default void readBeforeTransmit(Context context) {}
 
-    default void readAfterTransmit(Context context) {
-    }
+    default void readAfterTransmit(Context context) {}
 
     default <T> T modifyResponseBeforeDeserialization(Context context, T response) {
         return response;
     }
 
-    default void readResponseBeforeDeserialization(Context context) {
-    }
+    default void readResponseBeforeDeserialization(Context context) {}
 
-    default void readAfterDeserialization(Context context) {
-    }
+    default void readAfterDeserialization(Context context) {}
 
     default <O extends SerializableShape> O modifyOutputBeforeAttemptCompletion(O output, Context context) {
         return output;
     }
 
-    default void readAfterAttempt(Context context) {
-    }
+    default void readAfterAttempt(Context context) {}
 
     default <O extends SerializableShape> O modifyOutputBeforeCompletion(O output, Context context) {
         return output;
     }
 
-    default void readAfterExecution(Context context) {
-    }
+    default void readAfterExecution(Context context) {}
 }

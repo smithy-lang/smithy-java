@@ -19,6 +19,5 @@ public final class HttpRequestOptions {
      */
     public static final Constant<Duration> REQUEST_TIMEOUT = new Constant<>(Duration.class, "HTTP.RequestTimeout");
 
-    private HttpRequestOptions() {
-    }
+    private HttpRequestOptions() {}
 }

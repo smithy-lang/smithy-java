@@ -28,8 +28,7 @@ public final class RequestSerializer {
     private DataStream payload;
     private final BindingMatcher bindingMatcher = BindingMatcher.requestMatcher();
 
-    RequestSerializer() {
-    }
+    RequestSerializer() {}
 
     /**
      * Schema of the operation to serialize.

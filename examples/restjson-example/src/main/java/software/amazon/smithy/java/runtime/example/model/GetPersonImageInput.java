@@ -53,8 +53,7 @@ public final class GetPersonImageInput implements SerializableShape {
 
         private String name;
 
-        private Builder() {
-        }
+        private Builder() {}
 
         @Override
         public GetPersonImageInput build() {
