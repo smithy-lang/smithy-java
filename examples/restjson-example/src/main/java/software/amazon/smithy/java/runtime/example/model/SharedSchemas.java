@@ -20,11 +20,17 @@ final class SharedSchemas {
 
     static final SdkSchema INTEGER = SdkSchema.builder().type(ShapeType.INTEGER).id("smithy.api#Integer").build();
 
-    static final SdkSchema BIRTHDAY = SdkSchema.builder().type(ShapeType.TIMESTAMP).id("smithy.example#Birthday")
-            .traits(new SensitiveTrait()).build();
+    static final SdkSchema BIRTHDAY = SdkSchema.builder()
+            .type(ShapeType.TIMESTAMP)
+            .id("smithy.example#Birthday")
+            .traits(new SensitiveTrait())
+            .build();
 
-    static final SdkSchema STREAM = SdkSchema.builder().type(ShapeType.BLOB).id("smithy.example#Stream")
-            .traits(new StreamingTrait()).build();
+    static final SdkSchema STREAM = SdkSchema.builder()
+            .type(ShapeType.BLOB)
+            .id("smithy.example#Stream")
+            .traits(new StreamingTrait())
+            .build();
 
     static final SdkSchema BLOB = SdkSchema.builder().type(ShapeType.BLOB).id("smithy.api#Blob").build();
 
@@ -32,10 +38,15 @@ final class SharedSchemas {
 
     static final ShapeId LIST_OF_STRING_ID = ShapeId.from("smithy.api#ListOfString");
 
-    static final SdkSchema LIST_OF_STRING = SdkSchema.builder().type(ShapeType.LIST).id(LIST_OF_STRING_ID)
-            .members(SdkSchema.memberBuilder(0, "member", SharedSchemas.STRING)).build();
+    static final SdkSchema LIST_OF_STRING = SdkSchema.builder()
+            .type(ShapeType.LIST)
+            .id(LIST_OF_STRING_ID)
+            .members(SdkSchema.memberBuilder(0, "member", SharedSchemas.STRING))
+            .build();
 
-    static final SdkSchema MAP_LIST_STRING = SdkSchema.builder().type(ShapeType.MAP).id(MAP_LIST_STRING_ID)
+    static final SdkSchema MAP_LIST_STRING = SdkSchema.builder()
+            .type(ShapeType.MAP)
+            .id(MAP_LIST_STRING_ID)
             .members(SdkSchema.memberBuilder(0, "key", SharedSchemas.STRING),
                     SdkSchema.memberBuilder(1, "value", SharedSchemas.LIST_OF_STRING))
             .build();

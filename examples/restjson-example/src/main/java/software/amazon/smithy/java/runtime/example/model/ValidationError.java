@@ -18,9 +18,13 @@ public final class ValidationError extends ModeledSdkException {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#ValidationError");
 
-    private static final SdkSchema SCHEMA_MESSAGE = SdkSchema.memberBuilder(0, "message", SharedSchemas.STRING).id(ID)
+    private static final SdkSchema SCHEMA_MESSAGE = SdkSchema.memberBuilder(0, "message", SharedSchemas.STRING)
+            .id(ID)
             .build();
-    static final SdkSchema SCHEMA = SdkSchema.builder().id(ID).type(ShapeType.STRUCTURE).members(SCHEMA_MESSAGE)
+    static final SdkSchema SCHEMA = SdkSchema.builder()
+            .id(ID)
+            .type(ShapeType.STRUCTURE)
+            .members(SCHEMA_MESSAGE)
             .build();
 
     private ValidationError(Builder builder) {

@@ -16,16 +16,22 @@ import software.amazon.smithy.model.traits.HttpTrait;
 
 public final class GetPersonImage implements SdkOperation<GetPersonImageInput, GetPersonImageOutput> {
 
-    private static final SdkSchema SCHEMA = SdkSchema.builder().id(ShapeId.from("smithy.example#GetPerson"))
-            .type(ShapeType.OPERATION).traits(HttpTrait.builder().method("GET").uri(UriPattern.parse("/anything"))// ("/persons/{name}"))
-                    .code(200).build())
+    private static final SdkSchema SCHEMA = SdkSchema.builder()
+            .id(ShapeId.from("smithy.example#GetPerson"))
+            .type(ShapeType.OPERATION)
+            .traits(HttpTrait.builder()
+                    .method("GET")
+                    .uri(UriPattern.parse("/anything"))// ("/persons/{name}"))
+                    .code(200)
+                    .build())
             .build();
 
     // Each operation maintains a type registry of the input, output, and errors it can throw.
     private final TypeRegistry typeRegistry = TypeRegistry.builder()
             .putType(GetPersonImageInput.ID, GetPersonImageInput.class, GetPersonImageInput::builder)
             .putType(GetPersonImageOutput.ID, GetPersonImageOutput.class, GetPersonImageOutput::builder)
-            .putType(ValidationError.ID, ValidationError.class, ValidationError::builder).build();
+            .putType(ValidationError.ID, ValidationError.class, ValidationError::builder)
+            .build();
 
     @Override
     public SdkShapeBuilder<GetPersonImageInput> inputBuilder() {

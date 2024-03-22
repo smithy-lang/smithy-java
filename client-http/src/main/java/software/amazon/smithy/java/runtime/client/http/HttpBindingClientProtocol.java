@@ -40,7 +40,10 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
     protected <I extends SerializableShape, O extends SerializableShape> void deserializeHttpResponse(
             ClientCall<I, O> call, Codec codec, SmithyHttpRequest request, SmithyHttpResponse response,
             SdkShapeBuilder<O> builder) {
-        HttpBinding.responseDeserializer().payloadCodec(codec).outputShapeBuilder(builder).response(response)
+        HttpBinding.responseDeserializer()
+                .payloadCodec(codec)
+                .outputShapeBuilder(builder)
+                .response(response)
                 .deserialize();
     }
 

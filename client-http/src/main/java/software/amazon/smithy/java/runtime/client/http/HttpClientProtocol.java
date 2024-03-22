@@ -175,7 +175,10 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
     private ModeledSdkException createModeledException(SmithyHttpResponse response,
             SdkShapeBuilder<ModeledSdkException> error) {
         // Deserialize the error response.
-        HttpBinding.responseDeserializer().payloadCodec(codec).errorShapeBuilder(error).response(response)
+        HttpBinding.responseDeserializer()
+                .payloadCodec(codec)
+                .errorShapeBuilder(error)
+                .response(response)
                 .deserialize();
         return error.errorCorrection().build();
     }
@@ -198,7 +201,9 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
         writeHeaders(message, response.headers());
         message.append(System.lineSeparator());
 
-        String contentType = response.headers().firstValue("Content-Type").orElse("application/octet-stream")
+        String contentType = response.headers()
+                .firstValue("Content-Type")
+                .orElse("application/octet-stream")
                 .toLowerCase(Locale.ENGLISH);
 
         if (!isText(contentType)) {

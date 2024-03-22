@@ -30,7 +30,11 @@ public class SerdeBenchmarks {
 
     @Setup
     public void prepare() {
-        input = PutPersonInput.builder().name("Michael").age(999).favoriteColor("Green").birthday(Instant.now())
+        input = PutPersonInput.builder()
+                .name("Michael")
+                .age(999)
+                .favoriteColor("Green")
+                .birthday(Instant.now())
                 .build();
         codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
         inputAsAny = Any.of(input);

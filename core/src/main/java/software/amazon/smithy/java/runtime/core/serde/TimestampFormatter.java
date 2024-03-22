@@ -190,7 +190,9 @@ public interface TimestampFormatter {
         };
 
         private static final DateTimeFormatter HTTP_DATE_FORMAT = DateTimeFormatter
-                .ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'").withZone(ZoneId.of("UTC")).withLocale(Locale.US);
+                .ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'")
+                .withZone(ZoneId.of("UTC"))
+                .withLocale(Locale.US);
 
         @Override
         public String toString() {

@@ -18,11 +18,18 @@ public class URIBuilderTest {
     @Test
     public void buildsUri() {
 
-        String path = new PathBuilder().addSegment("foo bar").addSegment("baz+bam").addSegment("-._~").addSegment("*")
-                .addSegment("%%").build();
+        String path = new PathBuilder().addSegment("foo bar")
+                .addSegment("baz+bam")
+                .addSegment("-._~")
+                .addSegment("*")
+                .addSegment("%%")
+                .build();
 
-        URI uri = new URIBuilder().scheme("https").host("example.com").path(path)
-                .query("how&does=it&do=it%20I%20wonder?").build();
+        URI uri = new URIBuilder().scheme("https")
+                .host("example.com")
+                .path(path)
+                .query("how&does=it&do=it%20I%20wonder?")
+                .build();
 
         assertThat(uri.toString(),
                 equalTo("https://example.com/foo%20bar/baz%2Bbam/-._~/%2A/%25%25?how&does=it&do=it%20I%20wonder?"));
