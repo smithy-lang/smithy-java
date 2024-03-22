@@ -89,7 +89,10 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
      * @return the response.
      */
     abstract SmithyHttpResponse sendHttpRequest(
-            ClientCall<?, ?> call, SmithyHttpClient client, SmithyHttpRequest request);
+            ClientCall<?, ?> call,
+            SmithyHttpClient client,
+            SmithyHttpRequest request
+    );
 
     /**
      * Deserializes the HTTP response and returns the updated output stream.
@@ -107,7 +110,8 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
             Codec codec,
             SmithyHttpRequest request,
             SmithyHttpResponse response,
-            SdkShapeBuilder<O> builder);
+            SdkShapeBuilder<O> builder
+    );
 
     @Override
     public final SmithyHttpRequest createRequest(ClientCall<?, ?> call, URI endpoint) {
@@ -129,24 +133,21 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
 
     @Override
     public final <I extends SerializableShape, O extends SerializableShape> O deserializeResponse(
-            ClientCall<I, O> call, SmithyHttpRequest request, SmithyHttpResponse response) {
+            ClientCall<I, O> call,
+            SmithyHttpRequest request,
+            SmithyHttpResponse response
+    ) {
         if (isSuccess(call, response)) {
-            LOGGER.log(
-                    System.Logger.Level.TRACE,
-                    "Deserializing successful response with " + getClass().getName());
-            var outputBuilder = call.createOutputBuilder(
-                    call.context(), call.operation().outputSchema().id().toString());
+            LOGGER.log(System.Logger.Level.TRACE, "Deserializing successful response with " + getClass().getName());
+            var outputBuilder = call.createOutputBuilder(call.context(),
+                                                         call.operation().outputSchema().id().toString());
             deserializeHttpResponse(call, codec, request, response, outputBuilder);
-            LOGGER.log(
-                    System.Logger.Level.TRACE,
-                    "Deserialized HTTP response with " + getClass().getName() + " into "
-                            + outputBuilder.getClass().getName());
+            LOGGER.log(System.Logger.Level.TRACE, "Deserialized HTTP response with " + getClass().getName()
+                                                  + " into " + outputBuilder.getClass().getName());
             O output = outputBuilder.errorCorrection().build();
             // TODO: error handling from the builder.
-            LOGGER.log(
-                    System.Logger.Level.TRACE,
-                    "Successfully built " + output + " from HTTP response with "
-                            + getClass().getName());
+            LOGGER.log(System.Logger.Level.TRACE, "Successfully built " + output
+                                                  + " from HTTP response with " + getClass().getName());
             return output;
         } else {
             throw createError(call, response);
@@ -166,7 +167,8 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
      * @return Returns the deserialized error.
      */
     protected SdkException createError(ClientCall<?, ?> call, SmithyHttpResponse response) {
-        return response.headers()
+        return response
+                .headers()
                 // Grab the error ID from the header first.
                 .firstValue(X_AMZN_ERROR_TYPE)
                 // If not in the header, check the payload for __type.
@@ -176,13 +178,15 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
                 })
                 // Attempt to match the extracted error ID to a modeled error type.
                 .flatMap(errorId -> call.createExceptionBuilder(call.context(), errorId)
-                        .<SdkException>map(error -> createModeledException(response, error)))
+                        .<SdkException> map(error -> createModeledException(response, error)))
                 // If no error was matched, then create an error from protocol hints.
                 .orElseGet(() -> createErrorFromHints(call, response));
     }
 
     private ModeledSdkException createModeledException(
-            SmithyHttpResponse response, SdkShapeBuilder<ModeledSdkException> error) {
+            SmithyHttpResponse response,
+            SdkShapeBuilder<ModeledSdkException> error
+    ) {
         // Deserialize the error response.
         HttpBinding.responseDeserializer()
                 .payloadCodec(codec)
@@ -193,27 +197,20 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
     }
 
     private SdkException createErrorFromHints(ClientCall<?, ?> call, SmithyHttpResponse response) {
-        LOGGER.log(
-                System.Logger.Level.WARNING,
-                () -> "Unknown " + response.statusCode() + " error response from "
-                        + call.operation().schema().id());
+        LOGGER.log(System.Logger.Level.WARNING, () -> "Unknown " + response.statusCode() + " error response from "
+                                                      + call.operation().schema().id());
 
         SdkException.Fault fault = determineFault(response.statusCode());
         StringBuilder message = new StringBuilder();
-        message.append(
-                switch (fault) {
-                    case CLIENT -> "Client error ";
-                    case SERVER -> "Server error ";
-                    default -> "Unknown error ";
-                });
+        message.append(switch (fault) {
+            case CLIENT -> "Client error ";
+            case SERVER -> "Server error ";
+            default -> "Unknown error ";
+        });
 
-        message.append("encountered from operation ")
-                .append(call.operation().schema().id());
+        message.append("encountered from operation ").append(call.operation().schema().id());
         message.append(System.lineSeparator());
-        message.append(response.httpVersion())
-                .append(' ')
-                .append(response.statusCode())
-                .append(System.lineSeparator());
+        message.append(response.httpVersion()).append(' ').append(response.statusCode()).append(System.lineSeparator());
         writeHeaders(message, response.headers());
         message.append(System.lineSeparator());
 

@@ -9,6 +9,7 @@ public enum SmithyHttpVersion {
     HTTP_1_1,
     HTTP_2;
 
+
     @Override
     public String toString() {
         return switch (this) {

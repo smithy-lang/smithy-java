@@ -79,13 +79,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 case PAYLOAD -> {
                     if (member.memberTarget().type() == ShapeType.STRUCTURE) {
                         // Read the payload into a byte buffer to deserialize a shape in the body.
-                        LOGGER.log(
-                                System.Logger.Level.TRACE,
-                                () -> "Reading " + schema + " body to bytes for structure payload");
+                        LOGGER.log(System.Logger.Level.TRACE, () -> "Reading " + schema
+                                                                    + " body to bytes for structure payload");
                         var bytes = body.readToBytes(maxInMemoryPayload);
-                        LOGGER.log(
-                                System.Logger.Level.TRACE,
-                                () -> "Deserializing the payload of " + schema + " via " + payloadCodec.getMediaType());
+                        LOGGER.log(System.Logger.Level.TRACE, () -> "Deserializing the payload of " + schema
+                                                                    + " via " + payloadCodec.getMediaType());
                         eachEntry.accept(member, payloadCodec.createDeserializer(bytes));
                     } else if (member.memberTarget().type() == ShapeType.BLOB) {
                         // Set the payload on shape builder directly. This will fail for misconfigured shapes.
@@ -101,17 +99,14 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         // Now parse members in the payload of body.
         if (!bodyMembers.isEmpty()) {
             // Extract from the payload codec and exclude members from other locations.
-            SdkSchema payloadOnly = schema.withFilteredMembers(
-                    member -> !bodyMembers.contains(member.id().getName()));
+            SdkSchema payloadOnly = schema.withFilteredMembers(member -> !bodyMembers.contains(member.id().getName()));
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
             var bytes = readPayloadBytes();
-            LOGGER.log(
-                    System.Logger.Level.TRACE,
-                    () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType());
+            LOGGER.log(System.Logger.Level.TRACE, () -> "Deserializing the structured body of " + schema
+                                                        + " via " + payloadCodec.getMediaType());
             payloadCodec.createDeserializer(bytes).readStruct(payloadOnly, eachEntry);
-            LOGGER.log(
-                    System.Logger.Level.TRACE,
-                    () -> "Deserialized the structured body of " + schema + " via " + payloadCodec.getMediaType());
+            LOGGER.log(System.Logger.Level.TRACE, () -> "Deserialized the structured body of " + schema
+                                                        + " via " + payloadCodec.getMediaType());
         }
     }
 
@@ -119,13 +114,13 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         // Validate the media-type matches the codec.
         String contentType = headers.firstValue("content-type").orElse("");
         if (!contentType.equals(payloadCodec.getMediaType())) {
-            throw new SdkSerdeException(
-                    "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec.toString());
+            throw new SdkSerdeException("Unexpected Content-Type '"
+                                        + contentType + "' for protocol "
+                                        + payloadCodec.toString());
         }
 
         // Ensure the content-length is in the allowable range.
-        var contentLength =
-                headers.firstValue("content-length").map(Long::valueOf).orElse(0L);
+        var contentLength = headers.firstValue("content-length").map(Long::valueOf).orElse(0L);
         if (contentLength > maxInMemoryPayload) {
             throw new SdkSerdeException("Content-Length too large " + contentLength);
         }

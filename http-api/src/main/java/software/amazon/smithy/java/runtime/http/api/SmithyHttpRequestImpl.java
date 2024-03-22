@@ -85,11 +85,8 @@ final class SmithyHttpRequestImpl implements SmithyHttpRequest {
             pathAndQuery += "?" + uri.getRawQuery();
         }
         // Add the start line.
-        result.append(method)
-                .append(' ')
-                .append(pathAndQuery)
-                .append(' ')
-                .append(httpVersion)
+        result.append(method).append(' ').append(pathAndQuery)
+                .append(' ').append(httpVersion)
                 .append(System.lineSeparator());
         // Append host header if not present.
         if (!headers.firstValue("host").isPresent()) {
@@ -100,10 +97,9 @@ final class SmithyHttpRequestImpl implements SmithyHttpRequest {
             result.append("Host: ").append(host).append(System.lineSeparator());
         }
         // Add other headers.
-        headers.map()
-                .forEach((field, values) -> values.forEach(value -> {
-                    result.append(field).append(": ").append(value).append(System.lineSeparator());
-                }));
+        headers.map().forEach((field, values) -> values.forEach(value -> {
+            result.append(field).append(": ").append(value).append(System.lineSeparator());
+        }));
         result.append(System.lineSeparator());
 
         return result.toString();

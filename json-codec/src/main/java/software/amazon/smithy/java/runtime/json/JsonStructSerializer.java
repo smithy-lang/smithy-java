@@ -70,9 +70,10 @@ class JsonStructSerializer implements StructSerializer {
             startMember(member);
             // Throw if a value isn't written.
             RequiredWriteSerializer.assertWrite(
-                    parent,
-                    () -> new SdkException("Structure member did not write a value for " + member),
-                    memberWriter);
+                parent,
+                () -> new SdkException("Structure member did not write a value for " + member),
+                memberWriter
+            );
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

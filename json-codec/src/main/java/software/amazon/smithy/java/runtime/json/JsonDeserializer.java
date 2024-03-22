@@ -29,7 +29,11 @@ final class JsonDeserializer implements ShapeDeserializer {
     private final boolean useTimestampFormat;
 
     JsonDeserializer(
-            byte[] source, boolean useJsonName, TimestampFormatter defaultTimestampFormat, boolean useTimestampFormat) {
+            byte[] source,
+            boolean useJsonName,
+            TimestampFormatter defaultTimestampFormat,
+            boolean useTimestampFormat
+    ) {
         this.useJsonName = useJsonName;
         this.useTimestampFormat = useTimestampFormat;
         this.defaultTimestampFormat = defaultTimestampFormat;

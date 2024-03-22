@@ -28,7 +28,10 @@ public final class RequiredWriteSerializer implements ShapeSerializer {
     }
 
     public static void assertWrite(
-            ShapeSerializer delegate, Supplier<RuntimeException> errorSupplier, Consumer<ShapeSerializer> consumer) {
+            ShapeSerializer delegate,
+            Supplier<RuntimeException> errorSupplier,
+            Consumer<ShapeSerializer> consumer
+    ) {
         RequiredWriteSerializer serializer = new RequiredWriteSerializer(delegate);
         consumer.accept(serializer);
         if (!serializer.wroteSomething) {

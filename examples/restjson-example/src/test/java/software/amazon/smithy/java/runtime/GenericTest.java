@@ -60,8 +60,7 @@ public class GenericTest {
                 .protocol(new RestJsonClientProtocol(new JavaHttpClient(httpClient)))
                 .endpointProvider(EndpointProvider.staticEndpoint("https://httpbin.org"))
                 .build();
-        GetPersonImageInput input =
-                GetPersonImageInput.builder().name("Michael").build();
+        GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
         GetPersonImageOutput output = client.getPersonImage(input);
         try (InputStream is = output.image().inputStream()) {
             System.out.println(new String(is.readAllBytes(), StandardCharsets.UTF_8));
@@ -86,8 +85,10 @@ public class GenericTest {
 
     @Test
     public void testAny() {
-        Codec codec =
-                JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
+        Codec codec = JsonCodec.builder()
+                .useJsonName(true)
+                .useTimestampFormat(true)
+                .build();
 
         PutPersonInput input = PutPersonInput.builder()
                 .name("Michael")
@@ -132,8 +133,7 @@ public class GenericTest {
                 .birthday(Instant.now())
                 .build();
 
-        JsonCodec codec =
-                JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
+        JsonCodec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
 
         // Use a helper to serialize the shape into string.
         String jsonString = codec.serializeToString(input);

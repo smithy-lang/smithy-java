@@ -20,10 +20,10 @@ public final class GetPersonImage implements SdkOperation<GetPersonImageInput, G
             .id(ShapeId.from("smithy.example#GetPerson"))
             .type(ShapeType.OPERATION)
             .traits(HttpTrait.builder()
-                    .method("GET")
-                    .uri(UriPattern.parse("/anything")) // ("/persons/{name}"))
-                    .code(200)
-                    .build())
+                            .method("GET")
+                            .uri(UriPattern.parse("/anything"))//("/persons/{name}"))
+                            .code(200)
+                            .build())
             .build();
 
     // Each operation maintains a type registry of the input, output, and errors it can throw.

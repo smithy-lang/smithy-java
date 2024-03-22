@@ -22,8 +22,7 @@ public interface SdkShapeBuilder<T extends SerializableShape> extends SmithyBuil
      * @throws UnsupportedOperationException if the shape has no stream.
      */
     default void setDataStream(DataStream stream) {
-        throw new UnsupportedOperationException(
-                "This shape does not have a stream: " + getClass().getName());
+        throw new UnsupportedOperationException("This shape does not have a stream: " + getClass().getName());
     }
 
     /**
@@ -35,8 +34,7 @@ public interface SdkShapeBuilder<T extends SerializableShape> extends SmithyBuil
      * @throws UnsupportedOperationException if the shape has not event stream.
      */
     default void setEventStream(Object eventStream) {
-        throw new UnsupportedOperationException(
-                "This shape does not have an event stream: " + getClass().getName());
+        throw new UnsupportedOperationException("This shape does not have an event stream: " + getClass().getName());
     }
 
     /**

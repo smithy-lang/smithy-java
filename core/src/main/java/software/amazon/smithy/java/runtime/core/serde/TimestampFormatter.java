@@ -1,8 +1,3 @@
-/*
- * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
- */
-
 package software.amazon.smithy.java.runtime.core.serde;
 
 import java.time.Instant;
@@ -126,8 +121,8 @@ public interface TimestampFormatter {
             @Override
             public Instant parseFromString(String value, boolean strict) {
                 if (strict) {
-                    throw new IllegalArgumentException(
-                            "Expected a numeric value for a " + getIdentifier() + " timestamp, but found a string");
+                    throw new IllegalArgumentException("Expected a numeric value for a " + getIdentifier()
+                                                       + " timestamp, but found a string");
                 }
                 return Instant.ofEpochMilli((long) (Double.parseDouble(value) * 1000));
             }
@@ -144,8 +139,8 @@ public interface TimestampFormatter {
                     return Instant.ofEpochMilli((long) (f * 1000f));
                 } else {
                     throw new IllegalArgumentException("Expected numeric value for epoch-seconds to be an "
-                            + "integer, long, float, or double, but found "
-                            + value.getClass().getName());
+                                                       + "integer, long, float, or double, but found "
+                                                       + value.getClass().getName());
                 }
             }
 
@@ -190,8 +185,8 @@ public interface TimestampFormatter {
             }
         };
 
-        private static final DateTimeFormatter HTTP_DATE_FORMAT = DateTimeFormatter.ofPattern(
-                        "EEE, dd MMM yyyy HH:mm:ss 'GMT'")
+        private static final DateTimeFormatter HTTP_DATE_FORMAT = DateTimeFormatter
+                .ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'")
                 .withZone(ZoneId.of("UTC"))
                 .withLocale(Locale.US);
 
@@ -207,8 +202,8 @@ public interface TimestampFormatter {
 
         @Override
         public Instant createFromNumber(Number value) {
-            throw new IllegalStateException(
-                    "Expected a string value for a " + getIdentifier() + " timestamp, but found a number");
+            throw new IllegalStateException("Expected a string value for a " + getIdentifier()
+                                            + " timestamp, but found a number");
         }
     }
 }

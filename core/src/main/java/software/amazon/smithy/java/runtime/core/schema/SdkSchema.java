@@ -158,8 +158,8 @@ public class SdkSchema {
      * @throws NoSuchElementException if the value does not exist.
      */
     public final <T extends Trait> T expectTrait(Class<T> trait) {
-        return getTrait(trait)
-                .orElseThrow(() -> new NoSuchElementException("Expected trait not found: " + trait.getName()));
+        return getTrait(trait).orElseThrow(() -> new NoSuchElementException(
+                "Expected trait not found: " + trait.getName()));
     }
 
     /**
@@ -239,7 +239,10 @@ public class SdkSchema {
      * @return Returns the created builder.
      */
     public Builder toBuilder() {
-        Builder b = builder().id(id).traits(traits).type(type);
+        Builder b = builder()
+                .id(id)
+                .traits(traits)
+                .type(type);
         b.memberIndex = memberIndex;
         b.memberName = memberName;
         b.memberTarget = memberTarget;

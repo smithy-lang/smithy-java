@@ -17,16 +17,7 @@ import software.amazon.smithy.model.traits.HttpResponseCodeTrait;
 
 final class BindingMatcher {
 
-    enum Binding {
-        HEADER,
-        QUERY,
-        PAYLOAD,
-        BODY,
-        LABEL,
-        STATUS,
-        PREFIX_HEADERS,
-        QUERY_PARAMS
-    }
+    enum Binding { HEADER, QUERY, PAYLOAD, BODY, LABEL, STATUS, PREFIX_HEADERS, QUERY_PARAMS }
 
     private final boolean isRequest;
     private HttpHeaderTrait header;
@@ -93,7 +84,6 @@ final class BindingMatcher {
     }
 
     String prefixHeaders() {
-        return Objects.requireNonNull(prefixHeaders, "Not a prefix headers binding")
-                .getValue();
+        return Objects.requireNonNull(prefixHeaders, "Not a prefix headers binding").getValue();
     }
 }
