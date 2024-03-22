@@ -42,8 +42,7 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
             Codec codec,
             SmithyHttpRequest request,
             SmithyHttpResponse response,
-            SdkShapeBuilder<O> builder
-    ) {
+            SdkShapeBuilder<O> builder) {
         HttpBinding.responseDeserializer()
                 .payloadCodec(codec)
                 .outputShapeBuilder(builder)

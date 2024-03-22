@@ -29,7 +29,6 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
     }
 
     @Override
-
     public byte readByte(SdkSchema schema) {
         throw throwForInvalidState(schema);
     }

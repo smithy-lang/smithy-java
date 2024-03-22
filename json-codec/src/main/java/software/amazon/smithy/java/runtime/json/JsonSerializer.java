@@ -35,8 +35,7 @@ final class JsonSerializer implements ShapeSerializer {
             OutputStream sink,
             boolean useJsonName,
             TimestampFormatter defaultTimestampFormat,
-            boolean useTimestampFormat
-    ) {
+            boolean useTimestampFormat) {
         this.useJsonName = useJsonName;
         this.stream = new JsonStream(sink, 2048);
         this.useTimestampFormat = useTimestampFormat;
@@ -151,8 +150,8 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeTimestamp(SdkSchema schema, Instant value) {
         var format = useTimestampFormat
                 ? schema.getTrait(TimestampFormatTrait.class)
-                             .map(TimestampFormatter::of)
-                             .orElse(defaultTimestampFormat)
+                        .map(TimestampFormatter::of)
+                        .orElse(defaultTimestampFormat)
                 : defaultTimestampFormat;
         format.serializeToUnderlyingFormat(schema, value, this);
     }

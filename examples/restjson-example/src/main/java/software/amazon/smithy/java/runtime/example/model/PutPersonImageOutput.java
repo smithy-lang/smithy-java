@@ -18,7 +18,8 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public final class PutPersonImageOutput implements SerializableShape {
 
     static final ShapeId ID = ShapeId.from("smithy.example#PutPersonImageOutput");
-    static final SdkSchema SCHEMA = SdkSchema.builder().id(ID).type(ShapeType.STRUCTURE).build();
+    static final SdkSchema SCHEMA =
+            SdkSchema.builder().id(ID).type(ShapeType.STRUCTURE).build();
 
     private PutPersonImageOutput(Builder builder) {}
 

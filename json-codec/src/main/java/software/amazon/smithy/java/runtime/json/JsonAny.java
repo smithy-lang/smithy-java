@@ -34,8 +34,7 @@ final class JsonAny implements Any {
             com.jsoniter.any.Any any,
             boolean useJsonName,
             TimestampFormatter defaultTimestampFormat,
-            boolean useTimestampFormat
-    ) {
+            boolean useTimestampFormat) {
         this.schema = schema;
         this.any = any;
         this.useJsonName = useJsonName;
@@ -116,9 +115,7 @@ final class JsonAny implements Any {
 
     @Override
     public byte[] asBlob() {
-        return any.valueType() == ValueType.STRING
-               ? Base64.getDecoder().decode(any.toString())
-               : Any.super.asBlob();
+        return any.valueType() == ValueType.STRING ? Base64.getDecoder().decode(any.toString()) : Any.super.asBlob();
     }
 
     @Override
@@ -126,15 +123,18 @@ final class JsonAny implements Any {
         TimestampFormatter format = defaultTimestampFormat;
 
         if (useTimestampFormat) {
-            format = getSchema().getTrait(TimestampFormatTrait.class).map(TimestampFormatter::of).orElse(format);
+            format = getSchema()
+                    .getTrait(TimestampFormatTrait.class)
+                    .map(TimestampFormatter::of)
+                    .orElse(format);
         }
 
         return switch (any.valueType()) {
             case NUMBER -> format.createFromNumber(any.toDouble());
             case STRING -> format.parseFromString(any.toString(), true);
             default -> {
-                throw new IllegalStateException("Expected a string or number value for a timestamp, but found "
-                                                + any.valueType());
+                throw new IllegalStateException(
+                        "Expected a string or number value for a timestamp, but found " + any.valueType());
             }
         };
     }
@@ -163,10 +163,15 @@ final class JsonAny implements Any {
             SdkSchema keyMember = schema.member("key", Any.SCHEMA);
             SdkSchema valueMember = schema.member("value", Any.SCHEMA);
             for (var entry : any.asMap().entrySet()) {
-                result.put(new JsonAny(keyMember, entry.getValue(), useJsonName,
-                                       defaultTimestampFormat, useTimestampFormat),
-                           new JsonAny(valueMember, entry.getValue(), useJsonName,
-                                       defaultTimestampFormat, useTimestampFormat));
+                result.put(
+                        new JsonAny(
+                                keyMember, entry.getValue(), useJsonName, defaultTimestampFormat, useTimestampFormat),
+                        new JsonAny(
+                                valueMember,
+                                entry.getValue(),
+                                useJsonName,
+                                defaultTimestampFormat,
+                                useTimestampFormat));
             }
             return result;
         }
@@ -177,8 +182,10 @@ final class JsonAny implements Any {
         SdkSchema member = schema.member(memberName, Any.SCHEMA);
         if (any.valueType() == ValueType.OBJECT) {
             String jsonName = !useJsonName
-                              ? memberName
-                              : member.getTrait(JsonNameTrait.class).map(JsonNameTrait::getValue).orElse(memberName);
+                    ? memberName
+                    : member.getTrait(JsonNameTrait.class)
+                            .map(JsonNameTrait::getValue)
+                            .orElse(memberName);
             var result = any.get(jsonName);
             if (result != null) {
                 return new JsonAny(member, result, useJsonName, defaultTimestampFormat, useTimestampFormat);

@@ -63,10 +63,9 @@ public final class SigV4 {
             String accessKeyId,
             String secretKey,
             InputStream payload,
-            boolean isStreaming
-    ) {
-        return createSignedHeaders(method, uri, httpHeaders, accessKeyId, secretKey, payload,
-                                   isStreaming, Instant.now());
+            boolean isStreaming) {
+        return createSignedHeaders(
+                method, uri, httpHeaders, accessKeyId, secretKey, payload, isStreaming, Instant.now());
     }
 
     /**
@@ -85,8 +84,7 @@ public final class SigV4 {
             String secretKey,
             InputStream payload,
             boolean isStreaming,
-            Instant now
-    ) {
+            Instant now) {
         var headers = httpHeaders.map();
 
         // AWS4 requires that we sign the Host header, so we have to have it in the request by the time we sign.
@@ -108,18 +106,23 @@ public final class SigV4 {
 
         // Build canonicalRequest
         var canonicalRequest = method + "\n"
-                               + uri.getRawPath() + "\n"
-                               + getCanonicalizedQueryString(uri) + "\n"
-                               + getCanonicalizedHeaderString(httpHeaders) + "\n"
-                               + getSignedHeaders(httpHeaders) + "\n"
-                               + payloadHash;
+                + uri.getRawPath() + "\n"
+                + getCanonicalizedQueryString(uri) + "\n"
+                + getCanonicalizedHeaderString(httpHeaders) + "\n"
+                + getSignedHeaders(httpHeaders) + "\n"
+                + payloadHash;
 
         LOGGER.log(System.Logger.Level.TRACE, () -> "AWS4 Canonical Request: '" + canonicalRequest + "'");
 
         var scope = dateStamp + '/' + regionName + '/' + serviceName + '/' + TERMINATOR;
         var signingCredentials = accessKeyId + '/' + scope;
-        var stringToSign = ALGORITHM + '\n' + dateTime + '\n' + scope + '\n'
-                              + HexFormat.of().formatHex(hash(canonicalRequest));
+        var stringToSign = ALGORITHM
+                + '\n'
+                + dateTime
+                + '\n'
+                + scope
+                + '\n'
+                + HexFormat.of().formatHex(hash(canonicalRequest));
 
         LOGGER.log(System.Logger.Level.TRACE, () -> "AWS4 String to Sign: '\"" + stringToSign + "\"");
 
@@ -137,9 +140,9 @@ public final class SigV4 {
         var signatureAuthorizationHeader = "Signature=" + HexFormat.of().formatHex(signature);
 
         var authorizationHeader = ALGORITHM + ' '
-                                  + credentialsAuthorizationHeader + ", "
-                                  + signedHeadersAuthorizationHeader + ", "
-                                  + signatureAuthorizationHeader;
+                + credentialsAuthorizationHeader + ", "
+                + signedHeadersAuthorizationHeader + ", "
+                + signatureAuthorizationHeader;
 
         LOGGER.log(System.Logger.Level.TRACE, () -> "Authorization: " + authorizationHeader);
 

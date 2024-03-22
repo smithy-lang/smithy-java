@@ -28,9 +28,10 @@ public final class SmithyHttpResponseImpl implements SmithyHttpResponse {
     public String toString() {
         StringBuilder result = new StringBuilder();
         result.append(httpVersion).append(' ').append(statusCode).append(System.lineSeparator());
-        headers.map().forEach((field, values) -> values.forEach(value -> {
-            result.append(field).append(": ").append(value).append(System.lineSeparator());
-        }));
+        headers.map()
+                .forEach((field, values) -> values.forEach(value -> {
+                    result.append(field).append(": ").append(value).append(System.lineSeparator());
+                }));
         result.append(System.lineSeparator());
         return result.toString();
     }

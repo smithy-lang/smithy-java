@@ -65,11 +65,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     };
 
     HttpBindingSerializer(
-            HttpTrait httpTrait,
-            Codec payloadCodec,
-            BindingMatcher bindingMatcher,
-            DataStream httpPayload
-    ) {
+            HttpTrait httpTrait, Codec payloadCodec, BindingMatcher bindingMatcher, DataStream httpPayload) {
         uriPattern = httpTrait.getUri();
         responseStatus = httpTrait.getCode();
         this.payloadCodec = payloadCodec;
@@ -103,17 +99,15 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     void setHttpPayload(SdkSchema schema, DataStream value) {
         httpPayload = value;
-        String contentType = value
-                .contentType()
-                .orElseGet(() -> schema.getTrait(MediaTypeTrait.class)
-                    .map(MediaTypeTrait::getValue)
-                    .orElseGet(() -> {
-                        if (schema.type() == ShapeType.BLOB) {
-                            return DEFAULT_BLOB_CONTENT_TYPE;
-                        } else {
-                            return DEFAULT_STRING_CONTENT_TYPE;
-                        }
-                    }));
+        String contentType = value.contentType().orElseGet(() -> schema.getTrait(MediaTypeTrait.class)
+                .map(MediaTypeTrait::getValue)
+                .orElseGet(() -> {
+                    if (schema.type() == ShapeType.BLOB) {
+                        return DEFAULT_BLOB_CONTENT_TYPE;
+                    } else {
+                        return DEFAULT_STRING_CONTENT_TYPE;
+                    }
+                }));
         headers.put("Content-Type", List.of(contentType));
     }
 

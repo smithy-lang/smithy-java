@@ -33,7 +33,9 @@ public class URIBuilderTest {
                 .query("how&does=it&do=it%20I%20wonder?")
                 .build();
 
-        assertThat(uri.toString(), equalTo("https://example.com/foo%20bar/baz%2Bbam/-._~/%2A/%25%25?how&does=it&do=it%20I%20wonder?"));
+        assertThat(
+                uri.toString(),
+                equalTo("https://example.com/foo%20bar/baz%2Bbam/-._~/%2A/%25%25?how&does=it&do=it%20I%20wonder?"));
         assertThat(uri.getScheme(), equalTo("https"));
         assertThat(uri.getHost(), equalTo("example.com"));
         assertThat(uri.getRawPath(), equalTo("/foo%20bar/baz%2Bbam/-._~/%2A/%25%25"));
