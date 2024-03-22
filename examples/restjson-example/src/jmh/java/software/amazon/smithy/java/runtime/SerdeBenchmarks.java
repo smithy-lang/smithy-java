@@ -11,7 +11,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.infra.Blackhole;
 import software.amazon.smithy.java.runtime.core.serde.any.Any;
-import software.amazon.smithy.java.runtime.core.serde.json.JsonCodec;
+import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.java.runtime.example.model.PutPersonInput;
 
 @State(Scope.Benchmark)

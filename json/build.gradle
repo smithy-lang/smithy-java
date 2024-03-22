@@ -1,28 +1,15 @@
 plugins {
-    id "java-library"
+    id 'smithy-java.module-conventions'
 }
 
-group = "software.amazon.smithy"
-version = "0.1"
+description = "This module provides json functionality"
 
-repositories {
-    mavenCentral()
+ext {
+    displayName = "Smithy :: Java :: JSON"
+    moduleName = "software.amazon.smithy.smithy-java.json"
 }
 
 dependencies {
-    api project(":core")
-    api "com.jsoniter:jsoniter:0.9.19"
-
-    testImplementation platform("org.junit:junit-bom:5.9.1")
-    testImplementation "org.junit.jupiter:junit-jupiter"
-}
-
-test {
-    useJUnitPlatform()
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
+    api(project(":core"))
+    api(libs.jsoniter)
 }

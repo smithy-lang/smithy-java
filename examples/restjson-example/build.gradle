@@ -1,34 +1,22 @@
 plugins {
-    id "java-library"
-    id "me.champeau.jmh" version "0.7.2"
-}
-
-repositories {
-    mavenCentral()
+    id "smithy-java.java-conventions"
+    alias(libs.plugins.jmh)
 }
 
 dependencies {
-    implementation project(":json")
-    implementation project(":http-binding")
-    implementation project(":client-http")
-
-    testImplementation "org.junit.jupiter:junit-jupiter:5.10.0"
-    testImplementation "org.junit.jupiter:junit-jupiter-params:5.10.0"
-    testImplementation "org.hamcrest:hamcrest:2.1"
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
-}
-
-tasks.named("test") {
-    useJUnitPlatform()
+    api(project(":json"))
+    api(project(":http-binding"))
+    api(project(":client-http"))
 }
 
 jmh {
     warmupIterations = 2
     iterations = 3
     fork = 1
+}
+
+// TODO: eventually re-enable
+// Disable spotbugs
+tasks.named("spotbugsMain") {
+    enabled = false
 }

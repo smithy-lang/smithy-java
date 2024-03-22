@@ -10,6 +10,5 @@ ext {
 }
 
 dependencies {
-    implementation(libs.jsoniter)
-    implementation(libs.smithy.model)
+    api(libs.smithy.model)
 }

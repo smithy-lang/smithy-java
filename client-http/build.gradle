@@ -10,10 +10,8 @@ ext {
 }
 
 dependencies {
-    implementation(libs.smithy.model)
-    implementation(project(":core"))
-    implementation(project(":http"))
-    implementation(project(":http-binding"))
-    implementation(project(":client-core"))
-    implementation(project(":endpoint-provider"))
+    api(project(":http-binding"))
+    api(project(":client-core"))
+    api(project(":endpoint-provider"))
+    api(project(":json")) // remove?
 }

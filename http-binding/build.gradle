@@ -10,7 +10,5 @@ ext {
 }
 
 dependencies {
-    implementation(project(":core"))
-    implementation(project(":http"))
-    implementation(libs.smithy.model)
+    api(project(":http"))
 }

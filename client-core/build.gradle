@@ -10,7 +10,7 @@ ext {
 }
 
 dependencies {
-    implementation(project(":core"))
-    implementation(project(":client-interceptor"))
-    implementation(project(":endpoint-provider"))
+    api(project(":core"))
+    api(project(":client-interceptor"))
+    api(project(":endpoint-provider"))
 }
