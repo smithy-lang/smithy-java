@@ -1,28 +1,14 @@
 plugins {
-    id "java-library"
+    id 'smithy-java.module-conventions'
 }
 
-group = "software.amazon.smithy"
-version = "0.1"
+description = "This module provides endpoint provider functionality"
 
-repositories {
-    mavenCentral()
+ext {
+    displayName = "Smithy :: Java :: Endpoint Provider"
+    moduleName = "software.amazon.smithy.smithy-java.endpoint-provider"
 }
 
 dependencies {
-    api project(":core")
-
-    testImplementation platform("org.junit:junit-bom:5.9.1")
-    testImplementation "org.junit.jupiter:junit-jupiter"
-    testImplementation "org.hamcrest:hamcrest:2.1"
-}
-
-test {
-    useJUnitPlatform()
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
+    implementation(project(":core"))
 }

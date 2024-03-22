@@ -1,25 +1,10 @@
 plugins {
-    id "java"
+    id 'smithy-java.module-conventions'
 }
 
-group = "software.amazon.smithy"
-version = "0.1"
+description = "This module provides SigV4 signing functionality"
 
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    testImplementation platform("org.junit:junit-bom:5.9.1")
-    testImplementation "org.junit.jupiter:junit-jupiter"
-}
-
-test {
-    useJUnitPlatform()
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
+ext {
+    displayName = "Smithy :: Java :: SigV4"
+    moduleName = "software.amazon.smithy.smithy-java.sigv4"
 }

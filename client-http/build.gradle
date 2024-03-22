@@ -1,30 +1,19 @@
 plugins {
-    id "java-library"
+    id 'smithy-java.module-conventions'
 }
 
-group = "software.amazon.smithy"
-version = "0.1"
+description = "This module provides client http functionality"
 
-repositories {
-    mavenCentral()
+ext {
+    displayName = "Smithy :: Java :: Client Http"
+    moduleName = "software.amazon.smithy.smithy-java.client-http"
 }
 
 dependencies {
-    api project(":http-binding")
-    api project(":client-core")
-    api project(":endpoint-provider")
-    api project(":json") // remove?
-
-    testImplementation platform("org.junit:junit-bom:5.9.1")
-    testImplementation "org.junit.jupiter:junit-jupiter"
-}
-
-test {
-    useJUnitPlatform()
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
+    implementation(libs.smithy.model)
+    implementation(project(":core"))
+    implementation(project(":http"))
+    implementation(project(":http-binding"))
+    implementation(project(":client-core"))
+    implementation(project(":endpoint-provider"))
 }

@@ -1,0 +1,21 @@
+[versions]
+junit5 = "5.10.2"
+hamcrest = "2.1"
+smithy = "1.45.0"
+jmh = "0.7.2"
+jsoniter = "0.9.23"
+
+[libraries]
+smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
+jsoniter = { module = "com.jsoniter:jsoniter", version.ref = "jsoniter"}
+
+# Test dependencies
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit5" }
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit5" }
+junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit5" }
+junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit5" }
+hamcrest = { module = "org.hamcrest:hamcrest", version.ref = "hamcrest" }
+
+
+[plugins]
+jmh = { id = "me.champeau.jmh", version.ref = "jmh" }

@@ -46,7 +46,7 @@ public final class QueryStringBuilder {
     }
 
     /**
-     * Get the query string as a percent-encoded query string (e.g., "foo=bar&baz=test%20test").
+     * Get the query string as a percent-encoded query string (e.g., {@code "foo=bar&baz=test%20test"}).
      *
      * @return Returns the percent-encoded query string.
      */

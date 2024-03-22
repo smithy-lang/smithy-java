@@ -1,28 +1,15 @@
 plugins {
-    id "java-library"
+    id 'smithy-java.module-conventions'
 }
 
-group = 'software.amazon.smithy'
-version = '0.1'
+description = "This module provides the core functionality for Smithy java"
 
-repositories {
-    mavenCentral()
+ext {
+    displayName = "Smithy :: Java :: Core"
+    moduleName = "software.amazon.smithy.smithy-java.core"
 }
 
 dependencies {
-    api "software.amazon.smithy:smithy-model:1.45.0"
-
-    testImplementation platform('org.junit:junit-bom:5.9.1')
-    testImplementation 'org.junit.jupiter:junit-jupiter'
-    testImplementation "org.hamcrest:hamcrest:2.1"
-}
-
-test {
-    useJUnitPlatform()
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
+    implementation(libs.jsoniter)
+    implementation(libs.smithy.model)
 }

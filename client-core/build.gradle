@@ -1,29 +1,16 @@
 plugins {
-    id "java-library"
+    id 'smithy-java.module-conventions'
 }
 
-group = "software.amazon.smithy"
-version = "0.1"
+description = "This module provides the core client functionality"
 
-repositories {
-    mavenCentral()
+ext {
+    displayName = "Smithy :: Java :: Client Core"
+    moduleName = "software.amazon.smithy.smithy-java.client-core"
 }
 
 dependencies {
-    api project(":core")
-    api project(":client-interceptor")
-    api project(":endpoint-provider")
-
-    testImplementation platform("org.junit:junit-bom:5.9.1")
-    testImplementation "org.junit.jupiter:junit-jupiter"
-}
-
-test {
-    useJUnitPlatform()
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
+    implementation(project(":core"))
+    implementation(project(":client-interceptor"))
+    implementation(project(":endpoint-provider"))
 }

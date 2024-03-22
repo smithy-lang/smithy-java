@@ -1,0 +1,22 @@
+plugins {
+    alias(libs.plugins.jmh)
+    id 'smithy-java.java-conventions'
+}
+
+dependencies {
+    implementation(project(":core"))
+    implementation(project(":http"))
+    implementation(project(":http-binding"))
+    implementation(project(":client-core"))
+    implementation(project(":client-http"))
+    implementation(project(":client-interceptor"))
+    implementation(project(":endpoint-provider"))
+    implementation(libs.smithy.model)
+    implementation(libs.jsoniter)
+}
+
+jmh {
+    warmupIterations = 2
+    iterations = 3
+    fork = 1
+}

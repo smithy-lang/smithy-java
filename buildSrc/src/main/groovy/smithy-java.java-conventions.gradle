@@ -1,0 +1,71 @@
+import com.github.spotbugs.snom.Effort
+
+plugins {
+    id 'java-library'
+    id 'com.adarshr.test-logger'
+    id 'com.github.spotbugs'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+/*
+ * Common test configuration
+ * ===============================
+ */
+dependencies {
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter.api)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testImplementation(libs.junit.jupiter.params)
+    testImplementation(libs.hamcrest)
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+testlogger {
+    showExceptions = true
+    showStackTraces = true
+    showFullStackTraces = false
+    showCauses = true
+    showSummary = true
+    showPassed = true
+    showSkipped = true
+    showFailed = true
+    showOnlySlow = false
+    showStandardStreams = true
+    showPassedStandardStreams = false
+    showSkippedStandardStreams = false
+    showFailedStandardStreams = true
+    logLevel = LogLevel.LIFECYCLE
+}
+
+/*
+ * Spotbugs
+ * ====================================================
+ *
+ * Run spotbugs against source files and configure suppressions.
+ */
+// Configure the spotbugs extension.
+spotbugs {
+    effort = Effort.MAX
+    excludeFilter = file("${project.rootDir}/config/spotbugs/filter.xml")
+}
+
+// We don't need to lint tests.
+tasks["spotbugsTest"].enabled = false
+
+
+/*
+ * Repositories
+ * ================================
+ */
+repositories {
+    mavenLocal()
+    mavenCentral()
+}

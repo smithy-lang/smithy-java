@@ -1,28 +1,16 @@
 plugins {
-    id "java-library"
+    id 'smithy-java.module-conventions'
 }
 
-group = "software.amazon.smithy"
-version = "0.1"
+description = "This module provides http-binding functionality"
 
-repositories {
-    mavenCentral()
+ext {
+    displayName = "Smithy :: Java :: Http Binding"
+    moduleName = "software.amazon.smithy.smithy-java.http-binding"
 }
 
 dependencies {
-    api project(":http")
-
-    testImplementation platform("org.junit:junit-bom:5.9.1")
-    testImplementation "org.junit.jupiter:junit-jupiter"
-    testImplementation "org.hamcrest:hamcrest:2.1"
-}
-
-test {
-    useJUnitPlatform()
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
+    implementation(project(":core"))
+    implementation(project(":http"))
+    implementation(libs.smithy.model)
 }

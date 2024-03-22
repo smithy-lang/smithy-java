@@ -1,0 +1,16 @@
+plugins {
+    id 'groovy-gradle-plugin'
+}
+
+repositories {
+    mavenCentral()
+    gradlePluginPortal()
+}
+
+dependencies {
+    // Cannot currently use version catalog correctly with
+    // convention plugins
+    // see: https://github.com/gradle/gradle/issues/17963
+    implementation 'com.adarshr:gradle-test-logger-plugin:4.0.0'
+    implementation 'com.github.spotbugs.snom:spotbugs-gradle-plugin:6.0.9'
+}
