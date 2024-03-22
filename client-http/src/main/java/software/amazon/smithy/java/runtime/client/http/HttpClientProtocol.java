@@ -88,7 +88,8 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
      * @param request Request to send.
      * @return the response.
      */
-    abstract SmithyHttpResponse sendHttpRequest(ClientCall<?, ?> call, SmithyHttpClient client,
+    abstract SmithyHttpResponse sendHttpRequest(ClientCall<?, ?> call,
+            SmithyHttpClient client,
             SmithyHttpRequest request);
 
     /**
@@ -103,7 +104,10 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
      * @param <O> Output shape.
      */
     protected abstract <I extends SerializableShape, O extends SerializableShape> void deserializeHttpResponse(
-            ClientCall<I, O> call, Codec codec, SmithyHttpRequest request, SmithyHttpResponse response,
+            ClientCall<I, O> call,
+            Codec codec,
+            SmithyHttpRequest request,
+            SmithyHttpResponse response,
             SdkShapeBuilder<O> builder);
 
     @Override
@@ -126,7 +130,8 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
 
     @Override
     public final <I extends SerializableShape, O extends SerializableShape> O deserializeResponse(ClientCall<I, O> call,
-            SmithyHttpRequest request, SmithyHttpResponse response) {
+            SmithyHttpRequest request,
+            SmithyHttpResponse response) {
         if (isSuccess(call, response)) {
             LOGGER.log(System.Logger.Level.TRACE, "Deserializing successful response with " + getClass().getName());
             var outputBuilder = call.createOutputBuilder(call.context(),

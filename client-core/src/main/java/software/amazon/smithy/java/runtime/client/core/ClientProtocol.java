@@ -70,5 +70,6 @@ public interface ClientProtocol<RequestT, ResponseT> {
      * @throws SdkException if an error occurs, including deserialized modeled errors and protocol errors.
      */
     <I extends SerializableShape, O extends SerializableShape> O deserializeResponse(ClientCall<I, O> call,
-            RequestT request, ResponseT response);
+            RequestT request,
+            ResponseT response);
 }

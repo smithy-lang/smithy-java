@@ -29,7 +29,10 @@ final class JsonAny implements Any {
     private final boolean useJsonName;
     private final boolean useTimestampFormat;
 
-    JsonAny(SdkSchema schema, com.jsoniter.any.Any any, boolean useJsonName, TimestampFormatter defaultTimestampFormat,
+    JsonAny(SdkSchema schema,
+            com.jsoniter.any.Any any,
+            boolean useJsonName,
+            TimestampFormatter defaultTimestampFormat,
             boolean useTimestampFormat) {
         this.schema = schema;
         this.any = any;

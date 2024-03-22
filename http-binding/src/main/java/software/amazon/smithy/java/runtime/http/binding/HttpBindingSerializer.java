@@ -64,7 +64,9 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         headers.computeIfAbsent(field, f -> new ArrayList<>()).add(value);
     };
 
-    HttpBindingSerializer(HttpTrait httpTrait, Codec payloadCodec, BindingMatcher bindingMatcher,
+    HttpBindingSerializer(HttpTrait httpTrait,
+            Codec payloadCodec,
+            BindingMatcher bindingMatcher,
             DataStream httpPayload) {
         uriPattern = httpTrait.getUri();
         responseStatus = httpTrait.getCode();

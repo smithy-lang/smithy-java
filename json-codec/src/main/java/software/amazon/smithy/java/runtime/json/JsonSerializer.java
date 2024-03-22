@@ -31,7 +31,9 @@ final class JsonSerializer implements ShapeSerializer {
     private final TimestampFormatter defaultTimestampFormat;
     private final boolean useTimestampFormat;
 
-    JsonSerializer(OutputStream sink, boolean useJsonName, TimestampFormatter defaultTimestampFormat,
+    JsonSerializer(OutputStream sink,
+            boolean useJsonName,
+            TimestampFormatter defaultTimestampFormat,
             boolean useTimestampFormat) {
         this.useJsonName = useJsonName;
         this.stream = new JsonStream(sink, 2048);
