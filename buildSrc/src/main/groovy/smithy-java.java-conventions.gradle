@@ -1,4 +1,5 @@
 import com.github.spotbugs.snom.Effort
+import java.util.regex.Pattern
 
 plugins {
     id 'java-library'
@@ -55,13 +56,19 @@ spotless {
     java {
         // Enforce a common license header on all files
         licenseHeaderFile("${project.rootDir}/config/spotless/license-header.txt")
+        indentWithSpaces()
+        endWithNewline()
+
+        eclipse().configFile("${project.rootDir}/config/spotless/formatting.xml")
+
+        // Fixes for some strange formatting applied by eclipse:
+        // see: https://github.com/kamkie/demo-spring-jsf/blob/bcacb9dc90273a5f8d2569470c5bf67b171c7d62/build.gradle.kts#L159
+        custom("Lambda fix") { it.replace("} )", "})").replace("} ,", "},") }
+        custom("Long literal fix") { Pattern.compile("([0-9_]+) [Ll]").matcher(it).replaceAll("\$1L") }
+
         // Static first, then everything else alphabetically
         removeUnusedImports()
-
-        palantirJavaFormat()
-
         importOrder('\\#', '')
-        endWithNewline()
     }
 }
 

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<profiles version="12">
+    <profile kind="CodeFormatterProfile" name="CM-TeamP-Formatter" version="12">
+        <!-- Compiler settings -->
+        <setting id="org.eclipse.jdt.core.compiler.source" value="21"/>
+
+        <!-- line length -->
+        <setting id="org.eclipse.jdt.core.formatter.lineSplit" value="120"/>
+        <setting id="org.eclipse.jdt.core.formatter.comment.line_length" value="120"/>
+
+        <!-- blank lines -->
+        <setting id="org.eclipse.jdt.core.formatter.blank_lines_between_import_groups" value="1"/>
+        <setting id="org.eclipse.jdt.core.formatter.blank_lines_after_package" value="1"/>
+
+        <!-- new lines -->
+        <setting id="org.eclipse.jdt.core.formatter.insert_new_line_after_type_annotation" value="do not insert"/>
+
+        <!-- indentation -->
+        <setting id="org.eclipse.jdt.core.formatter.indent_empty_lines" value="false"/>
+        <setting id="org.eclipse.jdt.core.formatter.use_tabs_only_for_leading_indentations" value="false"/>
+        <setting id="org.eclipse.jdt.core.formatter.tabulation.char" value="space"/>
+        <setting id="org.eclipse.jdt.core.formatter.tabulation.size" value="4"/>
+
+        <!-- comments and javadocs -->
+        <setting id="org.eclipse.jdt.core.formatter.comment.indent_parameter_description" value="false"/>
+        <setting id="org.eclipse.jdt.core.formatter.comment.format_javadoc_comments" value="false"/>
+
+        <!-- alignment -->
+        <setting id="org.eclipse.jdt.core.formatter.alignment_for_enum_constants" value="16"/>
+        <setting id="org.eclipse.jdt.core.formatter.alignment_for_parameters_in_constructor_declaration" value="16"/>
+        <setting id="org.eclipse.jdt.core.formatter.alignment_for_parameters_in_constructor_declaration.count_dependent" value="16|3|80"/>
+        <setting id="org.eclipse.jdt.core.formatter.alignment_for_parameters_in_method_declaration" value="16"/>
+        <setting id="org.eclipse.jdt.core.formatter.alignment_for_parameters_in_method_declaration.count_dependent" value="16|3|80"/>
+        <setting id="org.eclipse.jdt.core.formatter.alignment_for_superinterfaces_in_type_declaration" value="16"/>
+        <setting id="org.eclipse.jdt.core.formatter.alignment_for_superinterfaces_in_type_declaration.count_dependent" value="16|4|48"/>
+
+    </profile>
+</profiles>
