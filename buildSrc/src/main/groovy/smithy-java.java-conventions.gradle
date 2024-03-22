@@ -58,7 +58,9 @@ spotbugs {
 }
 
 // We don't need to lint tests.
-tasks["spotbugsTest"].enabled = false
+tasks.named("spotbugsTest") {
+    enabled = false
+}
 
 
 /*

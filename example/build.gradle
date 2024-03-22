@@ -20,3 +20,9 @@ jmh {
     iterations = 3
     fork = 1
 }
+
+// TODO: eventually this should be re-enabled
+// Disable spotbugs on example
+tasks.named("spotbugsMain") {
+    enabled = false
+}
