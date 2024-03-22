@@ -26,23 +26,16 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class PutPersonImageInput implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#PutPersonInput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema
-            .memberBuilder(0, "name", SharedSchemas.STRING)
-            .id(ID).traits(new HttpLabelTrait(), new RequiredTrait()).build();
-    private static final SdkSchema SCHEMA_TAGS = SdkSchema
-            .memberBuilder(1, "tags", SharedSchemas.STRING)
-            .id(ID).traits(new HttpHeaderTrait("Tags")).build();
-    private static final SdkSchema SCHEMA_MORE_TAGS = SdkSchema
-            .memberBuilder(2, "moreTags", SharedSchemas.STRING)
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", SharedSchemas.STRING).id(ID)
+            .traits(new HttpLabelTrait(), new RequiredTrait()).build();
+    private static final SdkSchema SCHEMA_TAGS = SdkSchema.memberBuilder(1, "tags", SharedSchemas.STRING).id(ID)
+            .traits(new HttpHeaderTrait("Tags")).build();
+    private static final SdkSchema SCHEMA_MORE_TAGS = SdkSchema.memberBuilder(2, "moreTags", SharedSchemas.STRING)
             .id(ID).traits(new HttpQueryTrait("MoreTags")).build();
-    private static final SdkSchema SCHEMA_IMAGE = SdkSchema
-            .memberBuilder(3, "image", SharedSchemas.STREAM)
-            .id(ID).traits(new HttpPayloadTrait()).build();
-    static final SdkSchema SCHEMA = SdkSchema.builder()
-            .id(ID)
-            .type(ShapeType.STRUCTURE)
-            .members(SCHEMA_NAME, SCHEMA_TAGS, SCHEMA_MORE_TAGS, SCHEMA_IMAGE)
-            .build();
+    private static final SdkSchema SCHEMA_IMAGE = SdkSchema.memberBuilder(3, "image", SharedSchemas.STREAM).id(ID)
+            .traits(new HttpPayloadTrait()).build();
+    static final SdkSchema SCHEMA = SdkSchema.builder().id(ID).type(ShapeType.STRUCTURE)
+            .members(SCHEMA_NAME, SCHEMA_TAGS, SCHEMA_MORE_TAGS, SCHEMA_IMAGE).build();
 
     private final String name;
     private final List<String> tags;
@@ -101,7 +94,8 @@ public final class PutPersonImageInput implements SerializableShape {
         private List<String> moreTags = new ArrayList<>();
         private DataStream image = DataStream.ofEmpty();
 
-        private Builder() {}
+        private Builder() {
+        }
 
         @Override
         public PutPersonImageInput build() {

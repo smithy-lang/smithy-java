@@ -38,8 +38,7 @@ public final class JavaHttpClient implements SmithyHttpClient {
         var bodyPublisher = HttpRequest.BodyPublishers.ofInputStream(request.body()::inputStream);
 
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder()
-                .version(smithyToHttpVersion(request.httpVersion()))
-                .method(request.method(), bodyPublisher)
+                .version(smithyToHttpVersion(request.httpVersion())).method(request.method(), bodyPublisher)
                 .uri(request.uri());
 
         Duration requestTimeout = properties.get(HttpProperty.REQUEST_TIMEOUT);

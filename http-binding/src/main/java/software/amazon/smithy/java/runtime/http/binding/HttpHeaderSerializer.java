@@ -35,12 +35,12 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
 
     @Override
     public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-        consumer.accept(new ListSerializer(this, () -> {}));
+        consumer.accept(new ListSerializer(this, () -> {
+        }));
     }
 
     void writeHeader(SdkSchema schema, Supplier<String> supplier) {
-        String field = schema.getTrait(HttpHeaderTrait.class)
-                .map(HttpHeaderTrait::getValue)
+        String field = schema.getTrait(HttpHeaderTrait.class).map(HttpHeaderTrait::getValue)
                 .orElse(schema.memberName());
         headerWriter.accept(field, supplier.get());
     }
@@ -102,9 +102,7 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeTimestamp(SdkSchema schema, Instant value) {
-        writeHeader(schema, () -> schema.getTrait(TimestampFormatTrait.class)
-                .map(TimestampFormatter::of)
-                .orElse(TimestampFormatter.Prelude.HTTP_DATE)
-                .formatToString(value));
+        writeHeader(schema, () -> schema.getTrait(TimestampFormatTrait.class).map(TimestampFormatter::of)
+                .orElse(TimestampFormatter.Prelude.HTTP_DATE).formatToString(value));
     }
 }

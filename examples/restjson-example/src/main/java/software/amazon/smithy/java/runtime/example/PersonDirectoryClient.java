@@ -90,16 +90,10 @@ public final class PersonDirectoryClient implements PersonDirectory {
      * @param <I> Input shape.
      * @param <O> Output shape.
      */
-    private <I extends SerializableShape, O extends SerializableShape> O call(
-            I input,
-            DataStream inputStream,
-            Object eventStream,
-            SdkOperation<I, O> operation,
-            Context context
-    ) {
+    private <I extends SerializableShape, O extends SerializableShape> O call(I input, DataStream inputStream,
+            Object eventStream, SdkOperation<I, O> operation, Context context) {
         // Create a copy of the type registry that adds the errors this operation can encounter.
-        TypeRegistry operationRegistry = TypeRegistry.builder()
-                .putAllTypes(typeRegistry, operation.typeRegistry())
+        TypeRegistry operationRegistry = TypeRegistry.builder().putAllTypes(typeRegistry, operation.typeRegistry())
                 .build();
 
         // TODO: this is just to test.
@@ -205,7 +199,8 @@ public final class PersonDirectoryClient implements PersonDirectory {
         private EndpointProvider endpointProvider;
         private ClientInterceptor interceptor;
 
-        private Builder() {}
+        private Builder() {
+        }
 
         /**
          * Set the protocol to use to call the service.

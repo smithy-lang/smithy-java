@@ -16,23 +16,17 @@ import software.amazon.smithy.model.traits.HttpTrait;
 
 public final class PutPersonImage implements SdkOperation<PutPersonImageInput, PutPersonImageOutput> {
 
-    private static final SdkSchema SCHEMA = SdkSchema.builder()
-            .id(ShapeId.from("smithy.example#PutPersonImage"))
-            .type(ShapeType.OPERATION)
-            .traits(HttpTrait.builder()
-                            .method("PUT")
-                            // TODO: implement proper label handling
-                            .uri(UriPattern.parse("/persons/{name}/images"))
-                            .code(200)
-                            .build())
+    private static final SdkSchema SCHEMA = SdkSchema.builder().id(ShapeId.from("smithy.example#PutPersonImage"))
+            .type(ShapeType.OPERATION).traits(HttpTrait.builder().method("PUT")
+                    // TODO: implement proper label handling
+                    .uri(UriPattern.parse("/persons/{name}/images")).code(200).build())
             .build();
 
     // Each operation maintains a type registry of the input, output, and errors it can throw.
     private final TypeRegistry typeRegistry = TypeRegistry.builder()
             .putType(PutPersonImageInput.ID, PutPersonImageInput.class, PutPersonImageInput::builder)
             .putType(PutPersonImageOutput.ID, PutPersonImageOutput.class, PutPersonImageOutput::builder)
-            .putType(ValidationError.ID, ValidationError.class, ValidationError::builder)
-            .build();
+            .putType(ValidationError.ID, ValidationError.class, ValidationError::builder).build();
 
     @Override
     public SdkShapeBuilder<PutPersonImageInput> inputBuilder() {

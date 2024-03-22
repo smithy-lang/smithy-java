@@ -30,11 +30,9 @@ final class JsonMapSerializer implements MapSerializer {
         try {
             beforeWrite();
             stream.writeObjectField(key);
-            RequiredWriteSerializer.assertWrite(
-                parent,
-                () -> new IllegalStateException("Map member value was not written for key: " + key),
-                valueSerializer
-            );
+            RequiredWriteSerializer.assertWrite(parent,
+                    () -> new IllegalStateException("Map member value was not written for key: " + key),
+                    valueSerializer);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

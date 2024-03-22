@@ -88,11 +88,8 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
      * @param request Request to send.
      * @return the response.
      */
-    abstract SmithyHttpResponse sendHttpRequest(
-            ClientCall<?, ?> call,
-            SmithyHttpClient client,
-            SmithyHttpRequest request
-    );
+    abstract SmithyHttpResponse sendHttpRequest(ClientCall<?, ?> call, SmithyHttpClient client,
+            SmithyHttpRequest request);
 
     /**
      * Deserializes the HTTP response and returns the updated output stream.
@@ -106,12 +103,8 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
      * @param <O> Output shape.
      */
     protected abstract <I extends SerializableShape, O extends SerializableShape> void deserializeHttpResponse(
-            ClientCall<I, O> call,
-            Codec codec,
-            SmithyHttpRequest request,
-            SmithyHttpResponse response,
-            SdkShapeBuilder<O> builder
-    );
+            ClientCall<I, O> call, Codec codec, SmithyHttpRequest request, SmithyHttpResponse response,
+            SdkShapeBuilder<O> builder);
 
     @Override
     public final SmithyHttpRequest createRequest(ClientCall<?, ?> call, URI endpoint) {
@@ -132,22 +125,19 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
     }
 
     @Override
-    public final <I extends SerializableShape, O extends SerializableShape> O deserializeResponse(
-            ClientCall<I, O> call,
-            SmithyHttpRequest request,
-            SmithyHttpResponse response
-    ) {
+    public final <I extends SerializableShape, O extends SerializableShape> O deserializeResponse(ClientCall<I, O> call,
+            SmithyHttpRequest request, SmithyHttpResponse response) {
         if (isSuccess(call, response)) {
             LOGGER.log(System.Logger.Level.TRACE, "Deserializing successful response with " + getClass().getName());
             var outputBuilder = call.createOutputBuilder(call.context(),
-                                                         call.operation().outputSchema().id().toString());
+                    call.operation().outputSchema().id().toString());
             deserializeHttpResponse(call, codec, request, response, outputBuilder);
-            LOGGER.log(System.Logger.Level.TRACE, "Deserialized HTTP response with " + getClass().getName()
-                                                  + " into " + outputBuilder.getClass().getName());
+            LOGGER.log(System.Logger.Level.TRACE, "Deserialized HTTP response with " + getClass().getName() + " into "
+                    + outputBuilder.getClass().getName());
             O output = outputBuilder.errorCorrection().build();
             // TODO: error handling from the builder.
-            LOGGER.log(System.Logger.Level.TRACE, "Successfully built " + output
-                                                  + " from HTTP response with " + getClass().getName());
+            LOGGER.log(System.Logger.Level.TRACE,
+                    "Successfully built " + output + " from HTTP response with " + getClass().getName());
             return output;
         } else {
             throw createError(call, response);
@@ -167,8 +157,7 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
      * @return Returns the deserialized error.
      */
     protected SdkException createError(ClientCall<?, ?> call, SmithyHttpResponse response) {
-        return response
-                .headers()
+        return response.headers()
                 // Grab the error ID from the header first.
                 .firstValue(X_AMZN_ERROR_TYPE)
                 // If not in the header, check the payload for __type.
@@ -178,27 +167,22 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
                 })
                 // Attempt to match the extracted error ID to a modeled error type.
                 .flatMap(errorId -> call.createExceptionBuilder(call.context(), errorId)
-                        .<SdkException> map(error -> createModeledException(response, error)))
+                        .<SdkException>map(error -> createModeledException(response, error)))
                 // If no error was matched, then create an error from protocol hints.
                 .orElseGet(() -> createErrorFromHints(call, response));
     }
 
-    private ModeledSdkException createModeledException(
-            SmithyHttpResponse response,
-            SdkShapeBuilder<ModeledSdkException> error
-    ) {
+    private ModeledSdkException createModeledException(SmithyHttpResponse response,
+            SdkShapeBuilder<ModeledSdkException> error) {
         // Deserialize the error response.
-        HttpBinding.responseDeserializer()
-                .payloadCodec(codec)
-                .errorShapeBuilder(error)
-                .response(response)
+        HttpBinding.responseDeserializer().payloadCodec(codec).errorShapeBuilder(error).response(response)
                 .deserialize();
         return error.errorCorrection().build();
     }
 
     private SdkException createErrorFromHints(ClientCall<?, ?> call, SmithyHttpResponse response) {
-        LOGGER.log(System.Logger.Level.WARNING, () -> "Unknown " + response.statusCode() + " error response from "
-                                                      + call.operation().schema().id());
+        LOGGER.log(System.Logger.Level.WARNING,
+                () -> "Unknown " + response.statusCode() + " error response from " + call.operation().schema().id());
 
         SdkException.Fault fault = determineFault(response.statusCode());
         StringBuilder message = new StringBuilder();
@@ -214,9 +198,7 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
         writeHeaders(message, response.headers());
         message.append(System.lineSeparator());
 
-        String contentType = response.headers()
-                .firstValue("Content-Type")
-                .orElse("application/octet-stream")
+        String contentType = response.headers().firstValue("Content-Type").orElse("application/octet-stream")
                 .toLowerCase(Locale.ENGLISH);
 
         if (!isText(contentType)) {
@@ -233,11 +215,8 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
     }
 
     private boolean isText(String contentType) {
-        return contentType.startsWith("text/")
-                || contentType.contains("charset=utf-8")
-                || contentType.endsWith("+json")
-                || contentType.endsWith("+xml")
-                || TEXT_CONTENT_TYPES.contains(contentType);
+        return contentType.startsWith("text/") || contentType.contains("charset=utf-8") || contentType.endsWith("+json")
+                || contentType.endsWith("+xml") || TEXT_CONTENT_TYPES.contains(contentType);
     }
 
     private SdkException.Fault determineFault(int statusCode) {

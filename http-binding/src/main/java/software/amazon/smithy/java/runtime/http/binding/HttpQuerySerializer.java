@@ -35,12 +35,12 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-        consumer.accept(new ListSerializer(this, () -> {}));
+        consumer.accept(new ListSerializer(this, () -> {
+        }));
     }
 
     void writeQuery(SdkSchema schema, Supplier<String> supplier) {
-        schema.getTrait(HttpQueryTrait.class)
-                .map(HttpQueryTrait::getValue)
+        schema.getTrait(HttpQueryTrait.class).map(HttpQueryTrait::getValue)
                 .ifPresent(name -> queryWriter.accept(name, supplier.get()));
     }
 
@@ -101,9 +101,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeTimestamp(SdkSchema schema, Instant value) {
-        writeQuery(schema, () -> schema.getTrait(TimestampFormatTrait.class)
-                .map(TimestampFormatter::of)
-                .orElse(TimestampFormatter.Prelude.DATE_TIME)
-                .formatToString(value));
+        writeQuery(schema, () -> schema.getTrait(TimestampFormatTrait.class).map(TimestampFormatter::of)
+                .orElse(TimestampFormatter.Prelude.DATE_TIME).formatToString(value));
     }
 }

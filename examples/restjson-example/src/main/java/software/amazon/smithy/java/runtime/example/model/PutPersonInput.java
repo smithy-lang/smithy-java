@@ -29,31 +29,22 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class PutPersonInput implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#PutPersonInput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema
-            .memberBuilder(0, "name", SharedSchemas.STRING)
-            .id(ID).traits(new HttpLabelTrait(), new RequiredTrait()).build();
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", SharedSchemas.STRING).id(ID)
+            .traits(new HttpLabelTrait(), new RequiredTrait()).build();
     private static final SdkSchema SCHEMA_FAVORITE_COLOR = SdkSchema
-            .memberBuilder(1, "favoriteColor", SharedSchemas.STRING)
-            .id(ID).traits(new HttpQueryTrait("favoriteColor")).build();
-    private static final SdkSchema SCHEMA_AGE = SdkSchema
-            .memberBuilder(2, "age", SharedSchemas.INTEGER)
-            .id(ID).traits(new JsonNameTrait("Age")).build();
-    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema
-            .memberBuilder(3, "birthday", SharedSchemas.BIRTHDAY)
+            .memberBuilder(1, "favoriteColor", SharedSchemas.STRING).id(ID).traits(new HttpQueryTrait("favoriteColor"))
+            .build();
+    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder(2, "age", SharedSchemas.INTEGER).id(ID)
+            .traits(new JsonNameTrait("Age")).build();
+    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder(3, "birthday", SharedSchemas.BIRTHDAY)
             .id(ID).build();
-    private static final SdkSchema SCHEMA_BINARY = SdkSchema
-            .memberBuilder(4, "binary", SharedSchemas.BLOB).id(ID).build();
+    private static final SdkSchema SCHEMA_BINARY = SdkSchema.memberBuilder(4, "binary", SharedSchemas.BLOB).id(ID)
+            .build();
     private static final SdkSchema SCHEMA_QUERY_PARAMS = SdkSchema
-            .memberBuilder(5, "queryParams", SharedSchemas.MAP_LIST_STRING)
-            .id(ID)
-            .traits(new HttpQueryParamsTrait())
+            .memberBuilder(5, "queryParams", SharedSchemas.MAP_LIST_STRING).id(ID).traits(new HttpQueryParamsTrait())
             .build();
-    static final SdkSchema SCHEMA = SdkSchema.builder()
-            .id(ID)
-            .type(ShapeType.STRUCTURE)
-            .members(SCHEMA_NAME, SCHEMA_FAVORITE_COLOR, SCHEMA_AGE, SCHEMA_BIRTHDAY, SCHEMA_BINARY,
-                     SCHEMA_QUERY_PARAMS)
-            .build();
+    static final SdkSchema SCHEMA = SdkSchema.builder().id(ID).type(ShapeType.STRUCTURE).members(SCHEMA_NAME,
+            SCHEMA_FAVORITE_COLOR, SCHEMA_AGE, SCHEMA_BIRTHDAY, SCHEMA_BINARY, SCHEMA_QUERY_PARAMS).build();
 
     private final String name;
     private final int age;
@@ -127,7 +118,8 @@ public final class PutPersonInput implements SerializableShape {
         private byte[] binary;
         private Map<String, List<String>> queryParams = Collections.emptyMap();
 
-        private Builder() {}
+        private Builder() {
+        }
 
         @Override
         public PutPersonInput build() {

@@ -24,7 +24,8 @@ public final class ResponseSerializer {
     private final BindingMatcher bindingMatcher = BindingMatcher.responseMatcher();
     private DataStream payload;
 
-    ResponseSerializer() {}
+    ResponseSerializer() {
+    }
 
     /**
      * Schema of the operation response to serialize.

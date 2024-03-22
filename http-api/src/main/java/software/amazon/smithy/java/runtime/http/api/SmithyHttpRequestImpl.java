@@ -85,8 +85,7 @@ final class SmithyHttpRequestImpl implements SmithyHttpRequest {
             pathAndQuery += "?" + uri.getRawQuery();
         }
         // Add the start line.
-        result.append(method).append(' ').append(pathAndQuery)
-                .append(' ').append(httpVersion)
+        result.append(method).append(' ').append(pathAndQuery).append(' ').append(httpVersion)
                 .append(System.lineSeparator());
         // Append host header if not present.
         if (!headers.firstValue("host").isPresent()) {

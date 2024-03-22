@@ -18,7 +18,8 @@ import software.amazon.smithy.utils.SmithyBuilder;
  */
 public final class TypeRegistry {
 
-    public record Entry<T extends SerializableShape>(Class<T> type, Supplier<SdkShapeBuilder<T>> supplier) {};
+    public record Entry<T extends SerializableShape>(Class<T> type, Supplier<SdkShapeBuilder<T>> supplier) {
+    };
 
     private final Map<ShapeId, Entry<?>> supplierMap;
 
@@ -44,12 +45,8 @@ public final class TypeRegistry {
     }
 
     @SuppressWarnings("unchecked")
-    public <T> Optional<SmithyBuilder<T>> create(
-            ShapeId shapeId,
-            Class<T> type,
-            SdkSchema knownSchema,
-            Supplier<SmithyBuilder<T>> supplier
-    ) {
+    public <T> Optional<SmithyBuilder<T>> create(ShapeId shapeId, Class<T> type, SdkSchema knownSchema,
+            Supplier<SmithyBuilder<T>> supplier) {
         if (shapeId.equals(knownSchema.id())) {
             return Optional.of(supplier.get());
         }
@@ -67,18 +64,16 @@ public final class TypeRegistry {
 
         private Map<ShapeId, Entry<?>> supplierMap = new HashMap<>();
 
-        private Builder() {}
+        private Builder() {
+        }
 
         @Override
         public TypeRegistry build() {
             return new TypeRegistry(this);
         }
 
-        public <T extends SerializableShape> Builder putType(
-                ShapeId shapeId,
-                Class<T> type,
-                Supplier<SdkShapeBuilder<T>> supplier
-        ) {
+        public <T extends SerializableShape> Builder putType(ShapeId shapeId, Class<T> type,
+                Supplier<SdkShapeBuilder<T>> supplier) {
             supplierMap.put(shapeId, new Entry<>(type, supplier));
             return this;
         }

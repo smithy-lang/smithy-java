@@ -19,10 +19,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
 
 public interface Any extends SerializableShape {
 
-    SdkSchema SCHEMA = SdkSchema.builder()
-            .id(ShapeId.from("smithy.api#Document"))
-            .type(ShapeType.INTEGER)
-            .build();
+    SdkSchema SCHEMA = SdkSchema.builder().id(ShapeId.from("smithy.api#Document")).type(ShapeType.INTEGER).build();
 
     static Any of(boolean value) {
         return of(value, SCHEMA);

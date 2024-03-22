@@ -21,17 +21,12 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class GetPersonImageOutput implements SerializableShape {
 
     static final ShapeId ID = ShapeId.from("smithy.example#GetPersonImageOutput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema
-            .memberBuilder(0, "name", SharedSchemas.STRING)
-            .id(ID).traits(new HttpHeaderTrait("Person-Name"), new RequiredTrait()).build();
-    private static final SdkSchema SCHEMA_IMAGE = SdkSchema
-            .memberBuilder(1, "image", SharedSchemas.STREAM)
-            .id(ID).traits(new HttpPayloadTrait()).build();
-    static final SdkSchema SCHEMA = SdkSchema.builder()
-            .id(ID)
-            .type(ShapeType.STRUCTURE)
-            .members(SCHEMA_NAME, SCHEMA_IMAGE)
-            .build();
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", SharedSchemas.STRING).id(ID)
+            .traits(new HttpHeaderTrait("Person-Name"), new RequiredTrait()).build();
+    private static final SdkSchema SCHEMA_IMAGE = SdkSchema.memberBuilder(1, "image", SharedSchemas.STREAM).id(ID)
+            .traits(new HttpPayloadTrait()).build();
+    static final SdkSchema SCHEMA = SdkSchema.builder().id(ID).type(ShapeType.STRUCTURE)
+            .members(SCHEMA_NAME, SCHEMA_IMAGE).build();
 
     private final String name;
     private final DataStream image;
@@ -70,7 +65,8 @@ public final class GetPersonImageOutput implements SerializableShape {
         private String name;
         private DataStream image = DataStream.ofEmpty();
 
-        private Builder() {}
+        private Builder() {
+        }
 
         @Override
         public GetPersonImageOutput build() {

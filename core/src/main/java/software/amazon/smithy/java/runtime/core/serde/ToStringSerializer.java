@@ -34,7 +34,8 @@ public final class ToStringSerializer implements ShapeSerializer {
     private ToStringSerializer append(SdkSchema schema, String value) {
         if (value == null) {
             append("null");
-        } if (schema.getTrait(SensitiveTrait.class).isPresent()) {
+        }
+        if (schema.getTrait(SensitiveTrait.class).isPresent()) {
             builder.append("(redacted)");
         } else {
             append(value);
@@ -76,7 +77,8 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void flush() {}
+    public void flush() {
+    }
 
     @Override
     public String toString() {
@@ -97,11 +99,8 @@ public final class ToStringSerializer implements ShapeSerializer {
             public void member(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
                 append(member.memberName()).append(": ");
                 // Throw if a value isn't written.
-                RequiredWriteSerializer.assertWrite(
-                    ToStringSerializer.this,
-                    () -> new SdkException("Structure member did not write a value for " + schema),
-                    memberWriter
-                );
+                RequiredWriteSerializer.assertWrite(ToStringSerializer.this,
+                        () -> new SdkException("Structure member did not write a value for " + schema), memberWriter);
                 append(System.lineSeparator());
             }
         };

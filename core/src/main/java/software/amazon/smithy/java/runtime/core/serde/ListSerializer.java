@@ -32,7 +32,8 @@ public final class ListSerializer implements ShapeSerializer {
      * @param betweenValues Method to invoke between each value.
      */
     public ListSerializer(ShapeSerializer delegate, ThrowableRunnable betweenValues) {
-        this(delegate, betweenValues, () -> {});
+        this(delegate, betweenValues, () -> {
+        });
     }
 
     /**

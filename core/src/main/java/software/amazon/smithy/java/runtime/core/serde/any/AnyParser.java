@@ -57,7 +57,8 @@ final class AnyParser implements ShapeSerializer {
     public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         List<Any> elements = new ArrayList<>();
         AnyParser elementParser = new AnyParser();
-        ListSerializer serializer = new ListSerializer(this, () -> {}, () -> {
+        ListSerializer serializer = new ListSerializer(this, () -> {
+        }, () -> {
             elements.add(elementParser.result);
             elementParser.result = null;
         });

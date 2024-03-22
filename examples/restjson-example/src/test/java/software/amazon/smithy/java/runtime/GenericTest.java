@@ -42,14 +42,9 @@ public class GenericTest {
         HttpClient httpClient = HttpClient.newBuilder().build();
         PersonDirectory client = PersonDirectoryClient.builder()
                 .protocol(new RestJsonClientProtocol(new JavaHttpClient(httpClient)))
-                .endpointProvider(EndpointProvider.staticEndpoint("https://httpbin.org/anything"))
-                .build();
-        PutPersonInput input = PutPersonInput.builder()
-                .name("Michael")
-                .age(999)
-                .favoriteColor("Green")
-                .birthday(Instant.now())
-                .build();
+                .endpointProvider(EndpointProvider.staticEndpoint("https://httpbin.org/anything")).build();
+        PutPersonInput input = PutPersonInput.builder().name("Michael").age(999).favoriteColor("Green")
+                .birthday(Instant.now()).build();
         PutPersonOutput output = client.putPerson(input);
     }
 
@@ -58,8 +53,7 @@ public class GenericTest {
         HttpClient httpClient = HttpClient.newBuilder().build();
         PersonDirectory client = PersonDirectoryClient.builder()
                 .protocol(new RestJsonClientProtocol(new JavaHttpClient(httpClient)))
-                .endpointProvider(EndpointProvider.staticEndpoint("https://httpbin.org"))
-                .build();
+                .endpointProvider(EndpointProvider.staticEndpoint("https://httpbin.org")).build();
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
         GetPersonImageOutput output = client.getPersonImage(input);
         try (InputStream is = output.image().inputStream()) {
@@ -72,31 +66,18 @@ public class GenericTest {
         HttpClient httpClient = HttpClient.newBuilder().build();
         PersonDirectory client = PersonDirectoryClient.builder()
                 .protocol(new RestJsonClientProtocol(new JavaHttpClient(httpClient)))
-                .endpointProvider(EndpointProvider.staticEndpoint("https://example.com"))
-                .build();
-        PutPersonImageInput input = PutPersonImageInput.builder()
-                .name("Michael")
-                .tags(List.of("Foo", "Bar"))
-                .moreTags(List.of("Abc", "one two"))
-                .image(DataStream.ofString("image..."))
-                .build();
+                .endpointProvider(EndpointProvider.staticEndpoint("https://example.com")).build();
+        PutPersonImageInput input = PutPersonImageInput.builder().name("Michael").tags(List.of("Foo", "Bar"))
+                .moreTags(List.of("Abc", "one two")).image(DataStream.ofString("image...")).build();
         PutPersonImageOutput output = client.putPersonImage(input);
     }
 
     @Test
     public void testAny() {
-        Codec codec = JsonCodec.builder()
-                .useJsonName(true)
-                .useTimestampFormat(true)
-                .build();
+        Codec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
 
-        PutPersonInput input = PutPersonInput.builder()
-                .name("Michael")
-                .age(999)
-                .favoriteColor("Green")
-                .birthday(Instant.now())
-                .binary("Hello".getBytes(StandardCharsets.UTF_8))
-                .build();
+        PutPersonInput input = PutPersonInput.builder().name("Michael").age(999).favoriteColor("Green")
+                .birthday(Instant.now()).binary("Hello".getBytes(StandardCharsets.UTF_8)).build();
 
         // Serialize directly to JSON.
         System.out.println(codec.serializeToString(input));
@@ -116,22 +97,16 @@ public class GenericTest {
     public void testTypeRegistry() {
         TypeRegistry registry = TypeRegistry.builder()
                 .putType(PutPersonInput.ID, PutPersonInput.class, PutPersonInput::builder)
-                .putType(ValidationError.ID, ValidationError.class, ValidationError::builder)
-                .build();
+                .putType(ValidationError.ID, ValidationError.class, ValidationError::builder).build();
 
-        registry.create(ValidationError.ID, ModeledSdkException.class)
-                .map(SdkShapeBuilder::build)
+        registry.create(ValidationError.ID, ModeledSdkException.class).map(SdkShapeBuilder::build)
                 .ifPresent(System.out::println);
     }
 
     @Test
     public void serde() {
-        PutPersonInput input = PutPersonInput.builder()
-                .name("Michael")
-                .age(999)
-                .favoriteColor("Green")
-                .birthday(Instant.now())
-                .build();
+        PutPersonInput input = PutPersonInput.builder().name("Michael").age(999).favoriteColor("Green")
+                .birthday(Instant.now()).build();
 
         JsonCodec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
 
