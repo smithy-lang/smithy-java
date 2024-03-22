@@ -4,6 +4,7 @@ plugins {
     id 'java-library'
     id 'com.adarshr.test-logger'
     id 'com.github.spotbugs'
+    id 'com.diffplug.spotless'
 }
 
 java {
@@ -46,6 +47,25 @@ testlogger {
 }
 
 /*
+ * Formatting
+ * ==================
+ * see: https://github.com/diffplug/spotless/blob/main/plugin-gradle/README.md#java
+ */
+spotless {
+    java {
+        // Enforce a common license header on all files
+        licenseHeaderFile("${project.rootDir}/config/spotless/license-header.txt")
+        // Static first, then everything else alphabetically
+        removeUnusedImports()
+
+        palantirJavaFormat()
+
+        importOrder('\\#', '')
+        endWithNewline()
+    }
+}
+
+/*
  * Spotbugs
  * ====================================================
  *
@@ -61,7 +81,6 @@ spotbugs {
 tasks.named("spotbugsTest") {
     enabled = false
 }
-
 
 /*
  * Repositories
