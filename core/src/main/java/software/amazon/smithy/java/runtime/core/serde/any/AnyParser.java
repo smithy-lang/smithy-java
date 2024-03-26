@@ -15,12 +15,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.StructSerializer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 
 /**
  * Responsible for turning a shape into an Any using it's serializeShape method.
@@ -57,7 +57,8 @@ final class AnyParser implements ShapeSerializer {
     public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         List<Any> elements = new ArrayList<>();
         AnyParser elementParser = new AnyParser();
-        ListSerializer serializer = new ListSerializer(this, () -> {}, () -> {
+        ListSerializer serializer = new ListSerializer(this, () -> {
+        }, () -> {
             elements.add(elementParser.result);
             elementParser.result = null;
         });

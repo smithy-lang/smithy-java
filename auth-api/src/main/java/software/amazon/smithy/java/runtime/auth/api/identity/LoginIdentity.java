@@ -33,8 +33,7 @@ public interface LoginIdentity extends Identity {
      * @return the login identity.
      */
     static LoginIdentity create(String username, String password) {
-        return new LoginIdentityRecord(
-                Objects.requireNonNull(username, "username is null"),
+        return new LoginIdentityRecord(Objects.requireNonNull(username, "username is null"),
                 Objects.requireNonNull(password, "password is null"));
     }
 }

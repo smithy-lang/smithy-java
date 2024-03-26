@@ -7,8 +7,6 @@ package software.amazon.smithy.java.runtime.auth.api.scheme;
 
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 
-record AuthSchemeOptionRecord(
-        String schemeId,
-        AuthProperties identityProperties,
-        AuthProperties signerProperties
-) implements AuthSchemeOption {}
+record AuthSchemeOptionRecord(String schemeId, AuthProperties identityProperties,
+        AuthProperties signerProperties) implements AuthSchemeOption {
+}

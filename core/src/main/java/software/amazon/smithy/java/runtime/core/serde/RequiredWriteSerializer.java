@@ -11,9 +11,9 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.any.Any;
 
 /**
  * Ensures that a value is written to a serializer when required (e.g., when writing structure members).
@@ -27,11 +27,9 @@ public final class RequiredWriteSerializer implements ShapeSerializer {
         this.delegate = delegate;
     }
 
-    public static void assertWrite(
-            ShapeSerializer delegate,
+    public static void assertWrite(ShapeSerializer delegate,
             Supplier<RuntimeException> errorSupplier,
-            Consumer<ShapeSerializer> consumer
-    ) {
+            Consumer<ShapeSerializer> consumer) {
         RequiredWriteSerializer serializer = new RequiredWriteSerializer(delegate);
         consumer.accept(serializer);
         if (!serializer.wroteSomething) {

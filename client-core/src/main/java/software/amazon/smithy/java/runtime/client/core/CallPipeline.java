@@ -118,8 +118,8 @@ public final class CallPipeline<RequestT, ResponseT> {
 
     @SuppressWarnings("unchecked")
     private <I extends SerializableShape, O extends SerializableShape> ResolvedScheme<?, RequestT> resolveIdentity(
-            ClientCall<I, O> call, RequestT request
-    ) {
+            ClientCall<I, O> call,
+            RequestT request) {
         var params = AuthSchemeResolver.paramsBuilder()
                 .protocolId(protocol.id())
                 .operationName(call.operation().schema().id().getName())
@@ -133,7 +133,8 @@ public final class CallPipeline<RequestT, ResponseT> {
                 if (supportedAuthScheme.schemeId().equals(authSchemeOption.schemeId())) {
                     if (supportedAuthScheme.requestType().isAssignableFrom(request.getClass())) {
                         AuthScheme<RequestT, ?> castAuthScheme = (AuthScheme<RequestT, ?>) supportedAuthScheme;
-                        var resolved = createResolvedSchema(call.identityResolvers(), castAuthScheme, authSchemeOption).orElse(null);
+                        var resolved = createResolvedSchema(call.identityResolvers(), castAuthScheme, authSchemeOption)
+                                .orElse(null);
                         if (resolved != null) {
                             return resolved;
                         }
@@ -146,67 +147,64 @@ public final class CallPipeline<RequestT, ResponseT> {
         throw new SdkException("No auth scheme could be resolved for " + call.operation().schema().id());
     }
 
-    private <IdentityT extends Identity> Optional<ResolvedScheme<IdentityT, RequestT>> createResolvedSchema(IdentityResolvers identityResolvers, AuthScheme<RequestT, IdentityT> authScheme, AuthSchemeOption option) {
+    private <IdentityT extends Identity> Optional<ResolvedScheme<IdentityT, RequestT>> createResolvedSchema(
+            IdentityResolvers identityResolvers,
+            AuthScheme<RequestT, IdentityT> authScheme,
+            AuthSchemeOption option) {
         return authScheme.identityResolver(identityResolvers).map(identityResolver -> {
             IdentityT identity = identityResolver.resolveIdentity(option.identityProperties());
             return new ResolvedScheme<>(option, authScheme, identity, authScheme.signer());
         });
     }
 
-    private record ResolvedScheme<IdentityT extends Identity, RequestT>(
-            AuthSchemeOption option,
-            AuthScheme<RequestT, IdentityT> authScheme,
-            IdentityT identity,
-            Signer<RequestT, IdentityT> signer
-    ) {
+    private record ResolvedScheme<IdentityT extends Identity, RequestT>(AuthSchemeOption option,
+            AuthScheme<RequestT, IdentityT> authScheme, IdentityT identity, Signer<RequestT, IdentityT> signer) {
         public RequestT sign(RequestT request) {
             return signer.sign(request, identity, option.signerProperties());
         }
     }
-    private <I extends SerializableShape, O extends SerializableShape> O deserialize(
-            ClientCall<I, O> call,
+    private <I extends SerializableShape, O extends SerializableShape> O deserialize(ClientCall<I, O> call,
             RequestT request,
             ResponseT response,
-            ClientInterceptor interceptor
-    ) {
+            ClientInterceptor interceptor) {
         var input = call.input();
         var requestKey = protocol.requestKey();
         var responseKey = protocol.responseKey();
-        LOGGER.log(System.Logger.Level.TRACE, () -> "Deserializing response with "
-                                                    + protocol.getClass()
-                                                    + " for " + request + ": " + response);
+        LOGGER.log(System.Logger.Level.TRACE,
+                () -> "Deserializing response with " + protocol.getClass() + " for " + request + ": " + response);
 
         Context context = call.context();
 
         interceptor.readAfterTransmit(context, input, Context.value(requestKey, request),
-                                      Context.value(responseKey, response));
+                Context.value(responseKey, response));
 
-        ResponseT modifiedResponse = interceptor.modifyBeforeDeserialization(
-                        context, input, Context.value(requestKey, request), Context.value(responseKey, response))
+        ResponseT modifiedResponse = interceptor
+                .modifyBeforeDeserialization(context, input, Context.value(requestKey, request),
+                        Context.value(responseKey, response))
                 .value();
 
         interceptor.readBeforeDeserialization(context, input, Context.value(requestKey, request),
-                                              Context.value(responseKey, response));
+                Context.value(responseKey, response));
 
         var shape = protocol.deserializeResponse(call, request, modifiedResponse);
         context.put(CallContext.OUTPUT, shape);
         Either<O, SdkException> result = Either.left(shape);
 
         interceptor.readAfterDeserialization(context, input, Context.value(requestKey, request),
-                                             Context.value(responseKey, response), result);
+                Context.value(responseKey, response), result);
 
         result = interceptor.modifyBeforeAttemptCompletion(context, input, Context.value(requestKey, request),
-                                                           Context.value(responseKey, response), result);
+                Context.value(responseKey, response), result);
 
         interceptor.readAfterAttempt(context, input, Context.value(requestKey, request),
-                                     Context.value(responseKey, response), result);
+                Context.value(responseKey, response), result);
 
         // End of retry loop
         result = interceptor.modifyBeforeCompletion(context, input, Context.value(requestKey, request),
-                                                    Context.value(responseKey, response), result);
+                Context.value(responseKey, response), result);
 
         interceptor.readAfterExecution(context, input, Context.value(requestKey, request),
-                                       Context.value(responseKey, response), result);
+                Context.value(responseKey, response), result);
 
         if (result.isLeft()) {
             return shape;
@@ -218,9 +216,7 @@ public final class CallPipeline<RequestT, ResponseT> {
     // TODO: Add more parameters here somehow from the caller.
     private <I extends SerializableShape, O extends SerializableShape> Endpoint resolveEndpoint(ClientCall<I, O> call) {
         var operation = call.operation().schema();
-        var request = EndpointProviderRequest.builder()
-                .operationName(operation.id().getName())
-                .build();
+        var request = EndpointProviderRequest.builder().operationName(operation.id().getName()).build();
         return call.endpointProvider().resolveEndpoint(request);
     }
 }

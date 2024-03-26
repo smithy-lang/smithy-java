@@ -249,8 +249,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
          * @return Returns the builder.
          */
         public Builder<I, O> errorCreator(
-                BiFunction<Context, String, Optional<SdkShapeBuilder<ModeledSdkException>>> errorCreator
-        ) {
+                BiFunction<Context, String, Optional<SdkShapeBuilder<ModeledSdkException>>> errorCreator) {
             this.errorCreator = errorCreator;
             return this;
         }

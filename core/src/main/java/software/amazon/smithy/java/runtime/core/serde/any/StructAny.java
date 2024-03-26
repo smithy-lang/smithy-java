@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.runtime.core.serde.any;
 
 import java.util.Map;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class StructAny implements Any {
@@ -39,10 +39,8 @@ final class StructAny implements Any {
     public void serialize(ShapeSerializer encoder) {
         encoder.beginStruct(schema, structSerializer -> {
             for (var entry : value.entrySet()) {
-                structSerializer.member(
-                    entry.getValue().getSchema(),
-                    valueWriter -> entry.getValue().serialize(valueWriter)
-                );
+                structSerializer.member(entry.getValue().getSchema(),
+                        valueWriter -> entry.getValue().serialize(valueWriter));
             }
         });
     }

@@ -15,6 +15,6 @@ import software.amazon.smithy.java.runtime.json.JsonCodec;
 public final class RestJsonClientProtocol extends HttpBindingClientProtocol {
     public RestJsonClientProtocol(SmithyHttpClient client) {
         super("aws.protocols#restJson1", client,
-              JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build());
+                JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build());
     }
 }

@@ -11,9 +11,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.any.Any;
 
 /**
  * Helper class that can be used to serialize content between values.
@@ -32,7 +32,8 @@ public final class ListSerializer implements ShapeSerializer {
      * @param betweenValues Method to invoke between each value.
      */
     public ListSerializer(ShapeSerializer delegate, ThrowableRunnable betweenValues) {
-        this(delegate, betweenValues, () -> {});
+        this(delegate, betweenValues, () -> {
+        });
     }
 
     /**

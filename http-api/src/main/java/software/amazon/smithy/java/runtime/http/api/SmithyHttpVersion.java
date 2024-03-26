@@ -6,9 +6,7 @@
 package software.amazon.smithy.java.runtime.http.api;
 
 public enum SmithyHttpVersion {
-    HTTP_1_1,
-    HTTP_2;
-
+    HTTP_1_1, HTTP_2;
 
     @Override
     public String toString() {

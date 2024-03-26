@@ -59,8 +59,8 @@ public final class JavaHttpClient implements SmithyHttpClient {
 
         try {
             var response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
-            LOGGER.log(System.Logger.Level.TRACE, () -> "Got response: " + response
-                                                        + "; headers: " + response.headers().map());
+            LOGGER.log(System.Logger.Level.TRACE,
+                    () -> "Got response: " + response + "; headers: " + response.headers().map());
             return SmithyHttpResponse.builder()
                     .httpVersion(javaToSmithyVersion(response.version()))
                     .statusCode(response.statusCode())

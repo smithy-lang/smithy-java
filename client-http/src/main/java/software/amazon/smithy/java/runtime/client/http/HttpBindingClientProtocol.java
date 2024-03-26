@@ -42,8 +42,7 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
             Codec codec,
             SmithyHttpRequest request,
             SmithyHttpResponse response,
-            SdkShapeBuilder<O> builder
-    ) {
+            SdkShapeBuilder<O> builder) {
         HttpBinding.responseDeserializer()
                 .payloadCodec(codec)
                 .outputShapeBuilder(builder)
@@ -54,8 +53,8 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
     @Override
     SmithyHttpResponse sendHttpRequest(ClientCall<?, ?> call, SmithyHttpClient client, SmithyHttpRequest request) {
         return client.send(HttpClientCall.builder()
-                                   .request(request)
-                                   .properties(call.context().get(HttpContext.HTTP_PROPERTIES))
-                                   .build());
+                .request(request)
+                .properties(call.context().get(HttpContext.HTTP_PROPERTIES))
+                .build());
     }
 }

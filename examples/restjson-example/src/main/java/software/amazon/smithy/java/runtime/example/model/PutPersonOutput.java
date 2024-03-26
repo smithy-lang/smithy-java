@@ -6,12 +6,12 @@
 package software.amazon.smithy.java.runtime.example.model;
 
 import java.time.Instant;
-import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.HttpHeaderTrait;
@@ -24,22 +24,24 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
 public final class PutPersonOutput implements SerializableShape {
 
     static final ShapeId ID = ShapeId.from("smithy.example#PutPersonOutput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema
-            .memberBuilder(0, "name", SharedSchemas.STRING)
-            .id(ID).traits(new RequiredTrait()).build();
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", SharedSchemas.STRING)
+            .id(ID)
+            .traits(new RequiredTrait())
+            .build();
     private static final SdkSchema SCHEMA_FAVORITE_COLOR = SdkSchema
             .memberBuilder(1, "favoriteColor", SharedSchemas.STRING)
-            .id(ID).traits(new HttpHeaderTrait("X-Favorite-Color")).build();
-    private static final SdkSchema SCHEMA_AGE = SdkSchema
-            .memberBuilder(2, "age", SharedSchemas.INTEGER)
-            .id(ID).traits(new JsonNameTrait("Age")).build();
-    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema
-            .memberBuilder(3, "birthday", SharedSchemas.BIRTHDAY)
+            .id(ID)
+            .traits(new HttpHeaderTrait("X-Favorite-Color"))
+            .build();
+    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder(2, "age", SharedSchemas.INTEGER)
+            .id(ID)
+            .traits(new JsonNameTrait("Age"))
+            .build();
+    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder(3, "birthday", SharedSchemas.BIRTHDAY)
             .id(ID)
             .traits(new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
             .build();
-    private static final SdkSchema SCHEMA_STATUS = SdkSchema
-            .memberBuilder(4, "status", SharedSchemas.INTEGER)
+    private static final SdkSchema SCHEMA_STATUS = SdkSchema.memberBuilder(4, "status", SharedSchemas.INTEGER)
             .id(ID)
             .traits(new HttpResponseCodeTrait())
             .build();

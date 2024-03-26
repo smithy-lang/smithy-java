@@ -5,12 +5,12 @@
 
 package software.amazon.smithy.java.runtime.example.model;
 
-import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -19,7 +19,8 @@ public final class ValidationError extends ModeledSdkException {
     public static final ShapeId ID = ShapeId.from("smithy.example#ValidationError");
 
     private static final SdkSchema SCHEMA_MESSAGE = SdkSchema.memberBuilder(0, "message", SharedSchemas.STRING)
-            .id(ID).build();
+            .id(ID)
+            .build();
     static final SdkSchema SCHEMA = SdkSchema.builder()
             .id(ID)
             .type(ShapeType.STRUCTURE)

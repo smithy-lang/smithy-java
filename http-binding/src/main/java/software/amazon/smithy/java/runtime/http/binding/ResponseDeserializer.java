@@ -40,8 +40,7 @@ public final class ResponseDeserializer {
      * @return Returns the deserializer.
      */
     public ResponseDeserializer response(SmithyHttpResponse response) {
-        deserBuilder
-                .headers(response.headers())
+        deserBuilder.headers(response.headers())
                 .responseStatus(response.statusCode())
                 .body(DataStream.ofInputStream(response.body()))
                 .shapeBuilder(outputShapeBuilder);

@@ -27,7 +27,7 @@ import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
  * @param <IdentityT> The {@link Identity} used by this authentication scheme.
  * @param <RequestT>  The request to sign.
  */
-public interface AuthScheme<RequestT, IdentityT extends Identity>  {
+public interface AuthScheme<RequestT, IdentityT extends Identity> {
     /**
      * Retrieve the authentication scheme ID, a unique identifier for the authentication scheme (e.g., aws.auth#sigv4).
      */

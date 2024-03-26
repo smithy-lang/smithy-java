@@ -47,8 +47,9 @@ public interface AuthSchemeOption {
      * @param signerProperties   Signer properties.
      * @return the created auth scheme option.
      */
-    static AuthSchemeOption create(
-            String schemeId, AuthProperties identityProperties, AuthProperties signerProperties) {
+    static AuthSchemeOption create(String schemeId,
+            AuthProperties identityProperties,
+            AuthProperties signerProperties) {
         return new AuthSchemeOptionRecord(schemeId, identityProperties, signerProperties);
     }
 }

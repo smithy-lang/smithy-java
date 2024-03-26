@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.runtime.core.serde.any;
 
 import java.math.BigInteger;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class BigIntegerAny implements Any {

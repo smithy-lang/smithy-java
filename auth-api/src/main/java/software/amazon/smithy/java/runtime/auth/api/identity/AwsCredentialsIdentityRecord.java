@@ -7,8 +7,6 @@ package software.amazon.smithy.java.runtime.auth.api.identity;
 
 import java.util.Optional;
 
-record AwsCredentialsIdentityRecord(
-        String accessKeyId,
-        String secretAccessKey,
-        Optional<String> sessionToken
-) implements AwsCredentialsIdentity {}
+record AwsCredentialsIdentityRecord(String accessKeyId, String secretAccessKey,
+        Optional<String> sessionToken) implements AwsCredentialsIdentity {
+}

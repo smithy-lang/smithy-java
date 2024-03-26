@@ -19,11 +19,7 @@ public final class PutPerson implements SdkOperation<PutPersonInput, PutPersonOu
     private static final SdkSchema SCHEMA = SdkSchema.builder()
             .id(ShapeId.from("smithy.example#PutPerson"))
             .type(ShapeType.OPERATION)
-            .traits(HttpTrait.builder()
-                            .method("PUT")
-                            .uri(UriPattern.parse("/persons/{name}"))
-                            .code(200)
-                            .build())
+            .traits(HttpTrait.builder().method("PUT").uri(UriPattern.parse("/persons/{name}")).code(200).build())
             .build();
 
     // Each operation maintains a type registry of the input, output, and errors it can throw.

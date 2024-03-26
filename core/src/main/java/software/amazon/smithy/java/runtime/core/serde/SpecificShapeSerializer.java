@@ -9,9 +9,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.any.Any;
 
 /**
  * Expects to serialize a specific kind of shape and fails if other shapes are serialized.

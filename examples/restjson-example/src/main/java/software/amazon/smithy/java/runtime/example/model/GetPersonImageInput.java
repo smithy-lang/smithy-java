@@ -5,12 +5,12 @@
 
 package software.amazon.smithy.java.runtime.example.model;
 
-import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.HttpHeaderTrait;
@@ -19,14 +19,11 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class GetPersonImageInput implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#GetPersonImageInput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema
-            .memberBuilder(0, "name", SharedSchemas.STRING)
-            .id(ID).traits(new HttpHeaderTrait("X-Name"), new RequiredTrait()).build();
-    static final SdkSchema SCHEMA = SdkSchema.builder()
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", SharedSchemas.STRING)
             .id(ID)
-            .type(ShapeType.STRUCTURE)
-            .members(SCHEMA_NAME)
+            .traits(new HttpHeaderTrait("X-Name"), new RequiredTrait())
             .build();
+    static final SdkSchema SCHEMA = SdkSchema.builder().id(ID).type(ShapeType.STRUCTURE).members(SCHEMA_NAME).build();
 
     private final String name;
 

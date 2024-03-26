@@ -90,13 +90,11 @@ public final class PersonDirectoryClient implements PersonDirectory {
      * @param <I> Input shape.
      * @param <O> Output shape.
      */
-    private <I extends SerializableShape, O extends SerializableShape> O call(
-            I input,
+    private <I extends SerializableShape, O extends SerializableShape> O call(I input,
             DataStream inputStream,
             Object eventStream,
             SdkOperation<I, O> operation,
-            Context context
-    ) {
+            Context context) {
         // Create a copy of the type registry that adds the errors this operation can encounter.
         TypeRegistry operationRegistry = TypeRegistry.builder()
                 .putAllTypes(typeRegistry, operation.typeRegistry())
@@ -147,43 +145,41 @@ public final class PersonDirectoryClient implements PersonDirectory {
         var authSchemeResolver = new AuthSchemeResolver() {
             @Override
             public List<AuthSchemeOption> resolveAuthScheme(Params params) {
-                return List.of(
-                        new AuthSchemeOption() {
-                            @Override
-                            public String schemeId() {
-                                return "smithy.api#bearerAuth";
-                            }
+                return List.of(new AuthSchemeOption() {
+                    @Override
+                    public String schemeId() {
+                        return "smithy.api#bearerAuth";
+                    }
 
-                            @Override
-                            public AuthProperties identityProperties() {
-                                return AuthProperties.builder().build();
-                            }
+                    @Override
+                    public AuthProperties identityProperties() {
+                        return AuthProperties.builder().build();
+                    }
 
-                            @Override
-                            public AuthProperties signerProperties() {
-                                return AuthProperties.builder().build();
-                            }
-                        }
-                );
+                    @Override
+                    public AuthProperties signerProperties() {
+                        return AuthProperties.builder().build();
+                    }
+                });
             }
         };
 
-        return pipeline.send(ClientCall.<I, O> builder()
-                                     .input(input)
-                                     .operation(operation)
-                                     .endpointProvider(endpointProvider)
-                                     .context(context)
-                                     .requestInputStream(inputStream)
-                                     .requestEventStream(eventStream)
-                                     .interceptor(interceptor)
-                                     .addSupportedAuthScheme(supportedAuthScheme)
-                                     .authSchemeResolver(authSchemeResolver)
-                                     .identityResolvers(identityResolvers)
-                                     .errorCreator((c, id) -> {
-                                         ShapeId shapeId = ShapeId.from(id);
-                                         return operationRegistry.create(shapeId, ModeledSdkException.class);
-                                     })
-                                     .build());
+        return pipeline.send(ClientCall.<I, O>builder()
+                .input(input)
+                .operation(operation)
+                .endpointProvider(endpointProvider)
+                .context(context)
+                .requestInputStream(inputStream)
+                .requestEventStream(eventStream)
+                .interceptor(interceptor)
+                .addSupportedAuthScheme(supportedAuthScheme)
+                .authSchemeResolver(authSchemeResolver)
+                .identityResolvers(identityResolvers)
+                .errorCreator((c, id) -> {
+                    ShapeId shapeId = ShapeId.from(id);
+                    return operationRegistry.create(shapeId, ModeledSdkException.class);
+                })
+                .build());
     }
 
     // TODO: move this.

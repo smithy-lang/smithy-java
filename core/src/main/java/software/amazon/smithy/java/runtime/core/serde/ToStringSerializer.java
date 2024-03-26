@@ -11,10 +11,10 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Objects;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
 import software.amazon.smithy.java.runtime.core.schema.SdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.any.Any;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 
 /**
@@ -34,7 +34,8 @@ public final class ToStringSerializer implements ShapeSerializer {
     private ToStringSerializer append(SdkSchema schema, String value) {
         if (value == null) {
             append("null");
-        } if (schema.getTrait(SensitiveTrait.class).isPresent()) {
+        }
+        if (schema.getTrait(SensitiveTrait.class).isPresent()) {
             builder.append("(redacted)");
         } else {
             append(value);
@@ -97,11 +98,8 @@ public final class ToStringSerializer implements ShapeSerializer {
             public void member(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
                 append(member.memberName()).append(": ");
                 // Throw if a value isn't written.
-                RequiredWriteSerializer.assertWrite(
-                    ToStringSerializer.this,
-                    () -> new SdkException("Structure member did not write a value for " + schema),
-                    memberWriter
-                );
+                RequiredWriteSerializer.assertWrite(ToStringSerializer.this,
+                        () -> new SdkException("Structure member did not write a value for " + schema), memberWriter);
                 append(System.lineSeparator());
             }
         };
