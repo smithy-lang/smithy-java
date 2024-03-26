@@ -104,7 +104,7 @@ public final class CallPipeline<RequestT, ResponseT> {
 
         // TODO: what to do with supportedAuthSchemes of an endpoint?
         Endpoint endpoint = resolveEndpoint(call);
-        request = protocol.updateRequest(request, endpoint.uri());
+        request = protocol.setServiceEndpoint(request, endpoint);
 
         request = resolvedIdentity.sign(request);
 

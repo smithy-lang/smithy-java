@@ -188,8 +188,4 @@ public interface StructSerializer {
     default void mapMember(SdkSchema member, Consumer<MapSerializer> consumer) {
         member(member, writer -> writer.beginMap(member, consumer));
     }
-
-    default void structMember(SdkSchema member, Consumer<StructSerializer> consumer) {
-        member(member, writer -> writer.beginStruct(member, consumer));
-    }
 }

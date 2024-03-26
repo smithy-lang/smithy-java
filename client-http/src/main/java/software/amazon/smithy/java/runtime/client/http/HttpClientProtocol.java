@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import software.amazon.smithy.java.runtime.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.core.ClientCall;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.core.Context;
@@ -62,11 +63,33 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
 
     // TODO: Figure out a better name and approach for this.
     @Override
-    public SmithyHttpRequest updateRequest(SmithyHttpRequest request, URI endpoint) {
+    public SmithyHttpRequest setServiceEndpoint(SmithyHttpRequest request, Endpoint endpoint) {
+        var uri = endpoint.uri();
         URIBuilder builder = URIBuilder.of(request.uri());
-        builder.scheme(endpoint.getScheme());
-        builder.host(endpoint.getHost());
-        builder.port(endpoint.getPort());
+
+        if (uri.getScheme() != null) {
+            builder.scheme(uri.getScheme());
+        }
+
+        if (uri.getHost() != null) {
+            builder.host(uri.getHost());
+        }
+
+        if (uri.getPort() > -1) {
+            builder.port(uri.getPort());
+        }
+
+        // If a path is set on the service endpoint, concatenate it with the path of the request.
+        if (uri.getRawPath() != null && !uri.getRawPath().isEmpty()) {
+            builder.path(uri.getRawPath());
+            builder.concatPath(request.uri().getPath());
+        }
+
+        // Merge in any HTTP headers found on the endpoint.
+        if (endpoint.endpointAttribute(HttpEndpointKeys.HTTP_HEADERS) != null) {
+            request = request.withAddedHeaders(endpoint.endpointAttribute(HttpEndpointKeys.HTTP_HEADERS));
+        }
+
         return request.withUri(builder.build());
     }
 

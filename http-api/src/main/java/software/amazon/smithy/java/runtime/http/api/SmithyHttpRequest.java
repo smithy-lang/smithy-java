@@ -25,11 +25,19 @@ public interface SmithyHttpRequest extends SmithyHttpMessage, AutoCloseable {
     SmithyHttpRequest withBody(ContentStream stream);
 
     @Override
-    SmithyHttpMessage withHeaders(HttpHeaders headers);
+    SmithyHttpRequest withHttpVersion(SmithyHttpVersion version);
 
     @Override
-    default SmithyHttpRequest withHeaders(String... fieldAndValues) {
-        return (SmithyHttpRequest) SmithyHttpMessage.super.withHeaders(fieldAndValues);
+    SmithyHttpRequest withHeaders(HttpHeaders headers);
+
+    @Override
+    default SmithyHttpRequest withAddedHeaders(HttpHeaders headers) {
+        return (SmithyHttpRequest) SmithyHttpMessage.super.withAddedHeaders(headers);
+    }
+
+    @Override
+    default SmithyHttpRequest withAddedHeaders(String... fieldAndValues) {
+        return (SmithyHttpRequest) SmithyHttpMessage.super.withAddedHeaders(fieldAndValues);
     }
 
     /**

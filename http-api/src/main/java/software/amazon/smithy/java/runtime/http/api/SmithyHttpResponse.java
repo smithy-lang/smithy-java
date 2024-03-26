@@ -21,6 +21,22 @@ public interface SmithyHttpResponse extends SmithyHttpMessage, AutoCloseable {
 
     SmithyHttpResponse withStatusCode(int statusCode);
 
+    @Override
+    SmithyHttpResponse withHttpVersion(SmithyHttpVersion version);
+
+    @Override
+    SmithyHttpResponse withHeaders(HttpHeaders headers);
+
+    @Override
+    default SmithyHttpResponse withAddedHeaders(HttpHeaders headers) {
+        return (SmithyHttpResponse) SmithyHttpMessage.super.withAddedHeaders(headers);
+    }
+
+    @Override
+    default SmithyHttpResponse withAddedHeaders(String... fieldAndValues) {
+        return (SmithyHttpResponse) SmithyHttpMessage.super.withAddedHeaders(fieldAndValues);
+    }
+
     /**
      * Get the body of the response.
      *

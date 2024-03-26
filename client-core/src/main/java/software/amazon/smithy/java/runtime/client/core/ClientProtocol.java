@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.client.core;
 
 import java.net.URI;
+import software.amazon.smithy.java.runtime.api.Endpoint;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.SdkException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
@@ -43,13 +44,18 @@ public interface ClientProtocol<RequestT, ResponseT> {
     RequestT createRequest(ClientCall<?, ?> call, URI endpoint);
 
     /**
-     * Updates the underlying transport request with the given URI.
+     * Updates the underlying transport request to use the service endpoint.
+     *
+     * <p>The service endpoint should be considered the root of the endpoint, and any existing endpoint information
+     * on the request should be combined with the service endpoint. The actual behavior of how the endpoint is
+     * combined is protocol-specific. For example, with HTTP protocols, any path found on the request
+     * should be concatenated to the end of the service endpoint's path, if any.
      *
      * @param request  Request to update.
      * @param endpoint Where to send the request.
      * @return Returns the request to send.
      */
-    RequestT updateRequest(RequestT request, URI endpoint);
+    RequestT setServiceEndpoint(RequestT request, Endpoint endpoint);
 
     /**
      * Sends the underlying transport request and returns the response.

@@ -30,7 +30,7 @@ public class EndpointKey<T> {
      * @return the created key.
      * @param <T> the value to store in the key.
      */
-    static <T> EndpointKey<T> of(String name) {
+    public static <T> EndpointKey<T> of(String name) {
         return new EndpointKey<>(name);
     }
 
