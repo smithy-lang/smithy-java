@@ -38,13 +38,14 @@ final class AnySerializer {
             case MAP -> encoder.beginMap(schema, mapSerializer -> {
                 for (var entry : value.asMap().entrySet()) {
                     switch (entry.getKey().getType()) {
-                        case INTEGER, INT_ENUM ->
-                            mapSerializer.entry(entry.getKey().asInteger(), c -> entry.getValue().serialize(c));
-                        case LONG -> mapSerializer.entry(entry.getKey().asLong(), c -> entry.getValue().serialize(c));
-                        case STRING, ENUM ->
-                            mapSerializer.entry(entry.getKey().asString(), c -> entry.getValue().serialize(c));
-                        default -> throw new UnsupportedOperationException(
-                                "Unsupported document type map key: " + entry.getKey().getType());
+                        case INTEGER, INT_ENUM -> mapSerializer.entry(entry.getKey().asInteger(),
+                                                                      c -> entry.getValue().serialize(c));
+                        case LONG -> mapSerializer.entry(entry.getKey().asLong(),
+                                                         c -> entry.getValue().serialize(c));
+                        case STRING, ENUM -> mapSerializer.entry(entry.getKey().asString(),
+                                                                 c -> entry.getValue().serialize(c));
+                        default -> throw new UnsupportedOperationException("Unsupported document type map key: "
+                                                                           + entry.getKey().getType());
                     }
                 }
             });

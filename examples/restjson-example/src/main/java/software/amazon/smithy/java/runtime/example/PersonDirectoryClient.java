@@ -90,11 +90,13 @@ public final class PersonDirectoryClient implements PersonDirectory {
      * @param <I> Input shape.
      * @param <O> Output shape.
      */
-    private <I extends SerializableShape, O extends SerializableShape> O call(I input,
+    private <I extends SerializableShape, O extends SerializableShape> O call(
+            I input,
             DataStream inputStream,
             Object eventStream,
             SdkOperation<I, O> operation,
-            Context context) {
+            Context context
+    ) {
         // Create a copy of the type registry that adds the errors this operation can encounter.
         TypeRegistry operationRegistry = TypeRegistry.builder()
                 .putAllTypes(typeRegistry, operation.typeRegistry())

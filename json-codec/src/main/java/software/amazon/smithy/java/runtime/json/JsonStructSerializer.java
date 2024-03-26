@@ -32,7 +32,9 @@ class JsonStructSerializer implements StructSerializer {
 
     private String getMemberName(SdkSchema member) {
         if (useJsonName) {
-            return member.getTrait(JsonNameTrait.class).map(JsonNameTrait::getValue).orElseGet(member::memberName);
+            return member.getTrait(JsonNameTrait.class)
+                    .map(JsonNameTrait::getValue)
+                    .orElseGet(member::memberName);
         } else {
             return member.memberName();
         }
@@ -67,8 +69,11 @@ class JsonStructSerializer implements StructSerializer {
         try {
             startMember(member);
             // Throw if a value isn't written.
-            RequiredWriteSerializer.assertWrite(parent,
-                    () -> new SdkException("Structure member did not write a value for " + member), memberWriter);
+            RequiredWriteSerializer.assertWrite(
+                parent,
+                () -> new SdkException("Structure member did not write a value for " + member),
+                memberWriter
+            );
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

@@ -1,8 +1,3 @@
-/*
- * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
- */
-
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.math.BigDecimal;
@@ -46,7 +41,7 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
             return Base64.getDecoder().decode(value.getBytes(StandardCharsets.UTF_8));
         } catch (IllegalArgumentException e) {
             throw new IllegalStateException("Expected header for " + schema.id() + " to be a blob, but the "
-                    + "value does not contain valid base64 encoded data");
+                                            + "value does not contain valid base64 encoded data");
         }
     }
 
@@ -105,8 +100,7 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
         return schema.getTrait(TimestampFormatTrait.class)
                 .map(TimestampFormatter::of)
                 .orElse(TimestampFormatter.Prelude.HTTP_DATE)
-                .parseFromString(value, false); // headers always are
-                                                // strings.
+                .parseFromString(value, false); // headers always are strings.
     }
 
     @Override

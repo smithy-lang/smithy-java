@@ -163,7 +163,6 @@ public final class CallPipeline<RequestT, ResponseT> {
             return signer.sign(request, identity, option.signerProperties());
         }
     }
-
     private <I extends SerializableShape, O extends SerializableShape> O deserialize(
             ClientCall<I, O> call,
             RequestT request,

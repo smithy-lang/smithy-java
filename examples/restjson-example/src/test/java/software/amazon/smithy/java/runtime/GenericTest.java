@@ -85,7 +85,10 @@ public class GenericTest {
 
     @Test
     public void testAny() {
-        Codec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
+        Codec codec = JsonCodec.builder()
+                .useJsonName(true)
+                .useTimestampFormat(true)
+                .build();
 
         PutPersonInput input = PutPersonInput.builder()
                 .name("Michael")

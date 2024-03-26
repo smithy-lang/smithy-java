@@ -11,8 +11,7 @@ import software.amazon.smithy.java.runtime.core.shapes.SerializableShape;
 
 public interface ClientInterceptor {
 
-    ClientInterceptor NOOP = new ClientInterceptor() {
-    };
+    ClientInterceptor NOOP = new ClientInterceptor() {};
 
     static ClientInterceptor chain(List<ClientInterceptor> interceptors) {
         return new ClientInterceptorChain(interceptors);
