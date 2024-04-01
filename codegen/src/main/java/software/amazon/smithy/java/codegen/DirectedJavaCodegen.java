@@ -14,21 +14,25 @@ public class DirectedJavaCodegen implements
         DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
     @Override
     public SymbolProvider createSymbolProvider(
-            CreateSymbolProviderDirective<JavaCodegenSettings> createSymbolProviderDirective
+            CreateSymbolProviderDirective<JavaCodegenSettings> directive
     ) {
-        return null;
+        return new JavaSymbolProvider(
+                directive.model(),
+                directive.service(),
+                directive.settings().packageNamespace()
+        );
     }
 
     @Override
     public CodeGenerationContext createContext(
-            CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> createContextDirective
+            CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive
     ) {
         return new CodeGenerationContext(
-                createContextDirective.model(),
-                createContextDirective.settings(),
-                createContextDirective.symbolProvider(),
-                createContextDirective.fileManifest(),
-                createContextDirective.integrations()
+                directive.model(),
+                directive.settings(),
+                directive.symbolProvider(),
+                directive.fileManifest(),
+                directive.integrations()
         );
     }
 
