@@ -66,7 +66,9 @@ public interface ClientProtocol<RequestT, ResponseT> {
      * @return the deserialized output shape.
      * @throws SdkException if an error occurs, including deserialized modeled errors and protocol errors.
      */
-    <I extends SerializableShape, O extends SerializableShape> O deserializeResponse(ClientCall<I, O> call,
+    <I extends SerializableShape, O extends SerializableShape> O deserializeResponse(
+            ClientCall<I, O> call,
             RequestT request,
-            ResponseT response);
+            ResponseT response
+    );
 }

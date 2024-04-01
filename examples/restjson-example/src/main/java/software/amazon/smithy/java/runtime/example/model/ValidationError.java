@@ -51,7 +51,8 @@ public final class ValidationError extends ModeledSdkException {
 
         private String message;
 
-        private Builder() {}
+        private Builder() {
+        }
 
         @Override
         public ValidationError build() {

@@ -105,7 +105,8 @@ public final class PutPersonImageInput implements SerializableShape {
         private List<String> moreTags = new ArrayList<>();
         private DataStream image = DataStream.ofEmpty();
 
-        private Builder() {}
+        private Builder() {
+        }
 
         @Override
         public PutPersonImageInput build() {

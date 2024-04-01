@@ -85,10 +85,12 @@ public interface AuthScheme<RequestT, IdentityT extends Identity> {
      * @param <RequestT> Request type.
      * @param <IdentityT> Identity type.
      */
-    static <RequestT, IdentityT extends Identity> AuthScheme<RequestT, IdentityT> of(String schemeId,
+    static <RequestT, IdentityT extends Identity> AuthScheme<RequestT, IdentityT> of(
+            String schemeId,
             Class<RequestT> requestClass,
             Class<IdentityT> identityClass,
-            Signer<RequestT, IdentityT> signer) {
+            Signer<RequestT, IdentityT> signer
+    ) {
         return new AuthSchemeRecord<>(schemeId, requestClass, identityClass, signer);
     }
 }

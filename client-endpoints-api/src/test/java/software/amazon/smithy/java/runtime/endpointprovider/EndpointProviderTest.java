@@ -18,7 +18,9 @@ public class EndpointProviderTest {
         EndpointProvider provider = EndpointProvider
                 .staticEndpoint(Endpoint.builder().uri("https://example.com").build());
 
-        MatcherAssert.assertThat(provider.resolveEndpoint(EndpointProviderRequest.builder().build()).uri().toString(),
-                Matchers.equalTo("https://example.com"));
+        MatcherAssert.assertThat(
+                provider.resolveEndpoint(EndpointProviderRequest.builder().build()).uri().toString(),
+                Matchers.equalTo("https://example.com")
+        );
     }
 }

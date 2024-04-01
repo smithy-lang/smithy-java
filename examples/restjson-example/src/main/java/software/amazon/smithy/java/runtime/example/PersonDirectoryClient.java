@@ -59,13 +59,15 @@ public final class PersonDirectoryClient implements PersonDirectory {
 
         // TODO: Better defaults? Require these?
         this.authSchemeResolver = Objects.requireNonNullElseGet(builder.authSchemeResolver, () -> params -> List.of());
-        this.identityResolvers = Objects.requireNonNullElseGet(builder.identityResolvers,
+        this.identityResolvers = Objects.requireNonNullElseGet(
+                builder.identityResolvers,
                 () -> new IdentityResolvers() {
                     @Override
                     public <T extends Identity> IdentityResolver<T> identityResolver(Class<T> identityType) {
                         return null;
                     }
-                });
+                }
+        );
 
         // Here is where you would register errors bound to the service on the registry.
         // ...
@@ -103,32 +105,36 @@ public final class PersonDirectoryClient implements PersonDirectory {
      * @param <I> Input shape.
      * @param <O> Output shape.
      */
-    private <I extends SerializableShape, O extends SerializableShape> O call(I input,
+    private <I extends SerializableShape, O extends SerializableShape> O call(
+            I input,
             DataStream inputStream,
             Object eventStream,
             SdkOperation<I, O> operation,
-            Context context) {
+            Context context
+    ) {
         // Create a copy of the type registry that adds the errors this operation can encounter.
         TypeRegistry operationRegistry = TypeRegistry.builder()
                 .putAllTypes(typeRegistry, operation.typeRegistry())
                 .build();
 
-        return transport.send(ClientCall.<I, O>builder()
-                .input(input)
-                .operation(operation)
-                .endpointProvider(endpointProvider)
-                .context(context)
-                .requestInputStream(inputStream)
-                .requestEventStream(eventStream)
-                .interceptor(interceptor)
-                .supportedAuthSchemes(supportedAuthSchemes)
-                .authSchemeResolver(authSchemeResolver)
-                .identityResolvers(identityResolvers)
-                .errorCreator((c, id) -> {
-                    ShapeId shapeId = ShapeId.from(id);
-                    return operationRegistry.create(shapeId, ModeledSdkException.class);
-                })
-                .build());
+        return transport.send(
+                ClientCall.<I, O>builder()
+                        .input(input)
+                        .operation(operation)
+                        .endpointProvider(endpointProvider)
+                        .context(context)
+                        .requestInputStream(inputStream)
+                        .requestEventStream(eventStream)
+                        .interceptor(interceptor)
+                        .supportedAuthSchemes(supportedAuthSchemes)
+                        .authSchemeResolver(authSchemeResolver)
+                        .identityResolvers(identityResolvers)
+                        .errorCreator((c, id) -> {
+                            ShapeId shapeId = ShapeId.from(id);
+                            return operationRegistry.create(shapeId, ModeledSdkException.class);
+                        })
+                        .build()
+        );
     }
 
     public static final class Builder {
@@ -140,7 +146,8 @@ public final class PersonDirectoryClient implements PersonDirectory {
         private AuthSchemeResolver authSchemeResolver;
         private IdentityResolvers identityResolvers;
 
-        private Builder() {}
+        private Builder() {
+        }
 
         /**
          * Set the protocol and transport to when calling the service.

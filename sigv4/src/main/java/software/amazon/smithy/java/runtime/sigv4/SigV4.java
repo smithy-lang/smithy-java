@@ -56,15 +56,25 @@ public final class SigV4 {
      * @param payload
      * @param isStreaming
      */
-    public Map<String, List<String>> createSignedHeaders(String method,
+    public Map<String, List<String>> createSignedHeaders(
+            String method,
             URI uri,
             HttpHeaders httpHeaders,
             String accessKeyId,
             String secretKey,
             InputStream payload,
-            boolean isStreaming) {
-        return createSignedHeaders(method, uri, httpHeaders, accessKeyId, secretKey, payload, isStreaming,
-                Instant.now());
+            boolean isStreaming
+    ) {
+        return createSignedHeaders(
+                method,
+                uri,
+                httpHeaders,
+                accessKeyId,
+                secretKey,
+                payload,
+                isStreaming,
+                Instant.now()
+        );
     }
 
     /**
@@ -75,14 +85,16 @@ public final class SigV4 {
      * @param isStreaming
      * @param now The timestamp to use for the current time.
      */
-    public Map<String, List<String>> createSignedHeaders(String method,
+    public Map<String, List<String>> createSignedHeaders(
+            String method,
             URI uri,
             HttpHeaders httpHeaders,
             String accessKeyId,
             String secretKey,
             InputStream payload,
             boolean isStreaming,
-            Instant now) {
+            Instant now
+    ) {
         var headers = httpHeaders.map();
 
         // AWS4 requires that we sign the Host header, so we have to have it in the request by the time we sign.

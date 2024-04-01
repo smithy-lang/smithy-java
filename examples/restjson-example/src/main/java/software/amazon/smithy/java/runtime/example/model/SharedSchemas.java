@@ -47,9 +47,12 @@ final class SharedSchemas {
     static final SdkSchema MAP_LIST_STRING = SdkSchema.builder()
             .type(ShapeType.MAP)
             .id(MAP_LIST_STRING_ID)
-            .members(SdkSchema.memberBuilder(0, "key", SharedSchemas.STRING),
-                    SdkSchema.memberBuilder(1, "value", SharedSchemas.LIST_OF_STRING))
+            .members(
+                    SdkSchema.memberBuilder(0, "key", SharedSchemas.STRING),
+                    SdkSchema.memberBuilder(1, "value", SharedSchemas.LIST_OF_STRING)
+            )
             .build();
 
-    private SharedSchemas() {}
+    private SharedSchemas() {
+    }
 }

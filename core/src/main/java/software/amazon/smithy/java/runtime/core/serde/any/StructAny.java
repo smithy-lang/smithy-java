@@ -39,8 +39,10 @@ final class StructAny implements Any {
     public void serialize(ShapeSerializer encoder) {
         encoder.beginStruct(schema, structSerializer -> {
             for (var entry : value.entrySet()) {
-                structSerializer.member(entry.getValue().getSchema(),
-                        valueWriter -> entry.getValue().serialize(valueWriter));
+                structSerializer.member(
+                        entry.getValue().getSchema(),
+                        valueWriter -> entry.getValue().serialize(valueWriter)
+                );
             }
         });
     }

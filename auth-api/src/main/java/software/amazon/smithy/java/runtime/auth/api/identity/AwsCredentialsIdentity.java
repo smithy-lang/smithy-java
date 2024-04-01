@@ -52,7 +52,10 @@ public interface AwsCredentialsIdentity extends Identity {
      * @param sessionToken The AWS session token, used for authenticating temporary access some resource.
      */
     static AwsCredentialsIdentity create(String accessKeyId, String secretAccessKey, String sessionToken) {
-        return new AwsCredentialsIdentityRecord(Objects.requireNonNull(accessKeyId, "accessKeyId is null"),
-                Objects.requireNonNull(secretAccessKey, "secretAccessKey is null"), Optional.ofNullable(sessionToken));
+        return new AwsCredentialsIdentityRecord(
+                Objects.requireNonNull(accessKeyId, "accessKeyId is null"),
+                Objects.requireNonNull(secretAccessKey, "secretAccessKey is null"),
+                Optional.ofNullable(sessionToken)
+        );
     }
 }

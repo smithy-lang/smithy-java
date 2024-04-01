@@ -20,7 +20,8 @@ public final class PutPersonImageOutput implements SerializableShape {
     static final ShapeId ID = ShapeId.from("smithy.example#PutPersonImageOutput");
     static final SdkSchema SCHEMA = SdkSchema.builder().id(ID).type(ShapeType.STRUCTURE).build();
 
-    private PutPersonImageOutput(Builder builder) {}
+    private PutPersonImageOutput(Builder builder) {
+    }
 
     public static Builder builder() {
         return new Builder();
@@ -39,7 +40,8 @@ public final class PutPersonImageOutput implements SerializableShape {
 
     public static final class Builder implements SdkShapeBuilder<PutPersonImageOutput> {
 
-        private Builder() {}
+        private Builder() {
+        }
 
         @Override
         public PutPersonImageOutput build() {

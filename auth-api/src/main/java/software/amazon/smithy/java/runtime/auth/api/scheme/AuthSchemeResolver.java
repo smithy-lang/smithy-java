@@ -85,7 +85,8 @@ public interface AuthSchemeResolver {
             private AuthProperties properties;
             private String operationName;
 
-            private Builder() {}
+            private Builder() {
+            }
 
             public Params build() {
                 return new Params(this);

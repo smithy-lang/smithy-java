@@ -79,8 +79,10 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
     private SmithyHttpResponse sendRequest(HttpRequest request) {
         try {
             var response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            LOGGER.log(System.Logger.Level.TRACE,
-                    () -> "Got response: " + response + "; headers: " + response.headers().map());
+            LOGGER.log(
+                    System.Logger.Level.TRACE,
+                    () -> "Got response: " + response + "; headers: " + response.headers().map()
+            );
             return createSmithyResponse(response);
         } catch (IOException | InterruptedException e) {
             LOGGER.log(System.Logger.Level.ERROR, "Error sending request: " + request + "; " + e.getMessage(), e);
@@ -89,8 +91,10 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
     }
 
     private SmithyHttpResponse createSmithyResponse(HttpResponse<InputStream> response) {
-        LOGGER.log(System.Logger.Level.TRACE,
-                () -> "Got response: " + response + "; headers: " + response.headers().map());
+        LOGGER.log(
+                System.Logger.Level.TRACE,
+                () -> "Got response: " + response + "; headers: " + response.headers().map()
+        );
         return SmithyHttpResponse.builder()
                 .httpVersion(javaToSmithyVersion(response.version()))
                 .statusCode(response.statusCode())

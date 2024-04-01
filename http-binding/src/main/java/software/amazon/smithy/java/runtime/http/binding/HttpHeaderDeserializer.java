@@ -45,8 +45,10 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
         try {
             return Base64.getDecoder().decode(value.getBytes(StandardCharsets.UTF_8));
         } catch (IllegalArgumentException e) {
-            throw new IllegalStateException("Expected header for " + schema.id() + " to be a blob, but the "
-                    + "value does not contain valid base64 encoded data");
+            throw new IllegalStateException(
+                    "Expected header for " + schema.id() + " to be a blob, but the "
+                            + "value does not contain valid base64 encoded data"
+            );
         }
     }
 

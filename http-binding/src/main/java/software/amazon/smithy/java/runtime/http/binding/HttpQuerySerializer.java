@@ -102,10 +102,12 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeTimestamp(SdkSchema schema, Instant value) {
-        writeQuery(schema,
+        writeQuery(
+                schema,
                 () -> schema.getTrait(TimestampFormatTrait.class)
                         .map(TimestampFormatter::of)
                         .orElse(TimestampFormatter.Prelude.DATE_TIME)
-                        .formatToString(value));
+                        .formatToString(value)
+        );
     }
 }

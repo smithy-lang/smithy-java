@@ -19,12 +19,14 @@ public final class PutPersonImage implements SdkOperation<PutPersonImageInput, P
     private static final SdkSchema SCHEMA = SdkSchema.builder()
             .id(ShapeId.from("smithy.example#PutPersonImage"))
             .type(ShapeType.OPERATION)
-            .traits(HttpTrait.builder()
-                    .method("PUT")
-                    // TODO: implement proper label handling
-                    .uri(UriPattern.parse("/persons/{name}/images"))
-                    .code(200)
-                    .build())
+            .traits(
+                    HttpTrait.builder()
+                            .method("PUT")
+                            // TODO: implement proper label handling
+                            .uri(UriPattern.parse("/persons/{name}/images"))
+                            .code(200)
+                            .build()
+            )
             .build();
 
     // Each operation maintains a type registry of the input, output, and errors it can throw.

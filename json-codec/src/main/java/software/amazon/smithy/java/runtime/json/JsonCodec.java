@@ -59,7 +59,8 @@ public final class JsonCodec implements Codec {
         private boolean useTimestampFormat = false;
         private TimestampFormatter defaultTimestampFormat = TimestampFormatter.Prelude.EPOCH_SECONDS;
 
-        private Builder() {}
+        private Builder() {
+        }
 
         public JsonCodec build() {
             return new JsonCodec(this);

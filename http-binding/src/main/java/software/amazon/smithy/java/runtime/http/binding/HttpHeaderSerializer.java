@@ -103,10 +103,12 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeTimestamp(SdkSchema schema, Instant value) {
-        writeHeader(schema,
+        writeHeader(
+                schema,
                 () -> schema.getTrait(TimestampFormatTrait.class)
                         .map(TimestampFormatter::of)
                         .orElse(TimestampFormatter.Prelude.HTTP_DATE)
-                        .formatToString(value));
+                        .formatToString(value)
+        );
     }
 }

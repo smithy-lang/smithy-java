@@ -56,8 +56,14 @@ public final class PutPersonInput implements SerializableShape {
     static final SdkSchema SCHEMA = SdkSchema.builder()
             .id(ID)
             .type(ShapeType.STRUCTURE)
-            .members(SCHEMA_NAME, SCHEMA_FAVORITE_COLOR, SCHEMA_AGE, SCHEMA_BIRTHDAY, SCHEMA_BINARY,
-                    SCHEMA_QUERY_PARAMS)
+            .members(
+                    SCHEMA_NAME,
+                    SCHEMA_FAVORITE_COLOR,
+                    SCHEMA_AGE,
+                    SCHEMA_BIRTHDAY,
+                    SCHEMA_BINARY,
+                    SCHEMA_QUERY_PARAMS
+            )
             .build();
 
     private final String name;
@@ -132,7 +138,8 @@ public final class PutPersonInput implements SerializableShape {
         private byte[] binary;
         private Map<String, List<String>> queryParams = Collections.emptyMap();
 
-        private Builder() {}
+        private Builder() {
+        }
 
         @Override
         public PutPersonInput build() {

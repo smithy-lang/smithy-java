@@ -11,7 +11,8 @@ import software.amazon.smithy.java.runtime.api.EndpointProvider;
 
 public final class HttpEndpointKeys {
 
-    private HttpEndpointKeys() {}
+    private HttpEndpointKeys() {
+    }
 
     /**
      * Custom HTTP headers returned from an {@link EndpointProvider} to use with a request.

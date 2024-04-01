@@ -73,5 +73,6 @@ public final class CallContext {
      */
     public static final Context.Key<Identity> IDENTITY = Context.key("Identity of the caller");
 
-    private CallContext() {}
+    private CallContext() {
+    }
 }

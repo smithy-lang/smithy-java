@@ -148,16 +148,20 @@ public class GenericTest {
     public void supportsInterceptors() throws Exception {
         var interceptor = new ClientInterceptor() {
             @Override
-            public <I extends SerializableShape, RequestT> void readBeforeTransmit(Context context,
+            public <I extends SerializableShape, RequestT> void readBeforeTransmit(
+                    Context context,
                     I input,
-                    Context.Value<RequestT> request) {
+                    Context.Value<RequestT> request
+            ) {
                 System.out.println("Sending request: " + input);
             }
 
             @Override
-            public <I extends SerializableShape, RequestT> Context.Value<RequestT> modifyBeforeTransmit(Context context,
+            public <I extends SerializableShape, RequestT> Context.Value<RequestT> modifyBeforeTransmit(
+                    Context context,
                     I input,
-                    Context.Value<RequestT> request) {
+                    Context.Value<RequestT> request
+            ) {
                 return request.mapIf(HttpContext.HTTP_REQUEST, r -> r.withAddedHeaders("X-Foo", "Bar"));
             }
         };

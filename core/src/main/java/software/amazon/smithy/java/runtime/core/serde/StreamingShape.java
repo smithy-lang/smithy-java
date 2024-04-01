@@ -38,8 +38,10 @@ public interface StreamingShape<ShapeT extends SerializableShape, StreamT> {
      * @param <ShapeT> Shape type.
      * @param <StreamT> Stream result type.
      */
-    static <ShapeT extends SerializableShape, StreamT> StreamingShape<ShapeT, StreamT> of(ShapeT shape,
-            StreamT stream) {
+    static <ShapeT extends SerializableShape, StreamT> StreamingShape<ShapeT, StreamT> of(
+            ShapeT shape,
+            StreamT stream
+    ) {
         return new StreamingShape<>() {
             @Override
             public ShapeT shape() {

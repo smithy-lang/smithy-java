@@ -72,7 +72,8 @@ public final class GetPersonImageOutput implements SerializableShape {
         private String name;
         private DataStream image = DataStream.ofEmpty();
 
-        private Builder() {}
+        private Builder() {
+        }
 
         @Override
         public GetPersonImageOutput build() {

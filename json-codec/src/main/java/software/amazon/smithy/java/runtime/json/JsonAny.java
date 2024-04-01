@@ -29,11 +29,13 @@ final class JsonAny implements Any {
     private final boolean useJsonName;
     private final boolean useTimestampFormat;
 
-    JsonAny(SdkSchema schema,
+    JsonAny(
+            SdkSchema schema,
             com.jsoniter.any.Any any,
             boolean useJsonName,
             TimestampFormatter defaultTimestampFormat,
-            boolean useTimestampFormat) {
+            boolean useTimestampFormat
+    ) {
         this.schema = schema;
         this.any = any;
         this.useJsonName = useJsonName;
@@ -130,7 +132,8 @@ final class JsonAny implements Any {
             case STRING -> format.parseFromString(any.toString(), true);
             default -> {
                 throw new IllegalStateException(
-                        "Expected a string or number value for a timestamp, but found " + any.valueType());
+                        "Expected a string or number value for a timestamp, but found " + any.valueType()
+                );
             }
         };
     }
@@ -160,10 +163,21 @@ final class JsonAny implements Any {
             SdkSchema valueMember = schema.member("value", Any.SCHEMA);
             for (var entry : any.asMap().entrySet()) {
                 result.put(
-                        new JsonAny(keyMember, entry.getValue(), useJsonName, defaultTimestampFormat,
-                                useTimestampFormat),
-                        new JsonAny(valueMember, entry.getValue(), useJsonName, defaultTimestampFormat,
-                                useTimestampFormat));
+                        new JsonAny(
+                                keyMember,
+                                entry.getValue(),
+                                useJsonName,
+                                defaultTimestampFormat,
+                                useTimestampFormat
+                        ),
+                        new JsonAny(
+                                valueMember,
+                                entry.getValue(),
+                                useJsonName,
+                                defaultTimestampFormat,
+                                useTimestampFormat
+                        )
+                );
             }
             return result;
         }
