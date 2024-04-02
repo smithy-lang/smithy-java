@@ -37,4 +37,9 @@ public record JavaCodegenSettings(
                 settingsNode.expectStringMember(NAMESPACE).getValue()
         );
     }
+
+    // TODO: actually have this return lines, not placeholder
+    public List<String> headerLines() {
+        return List.of("Header Line 1", "Header Line 2");
+    }
 }

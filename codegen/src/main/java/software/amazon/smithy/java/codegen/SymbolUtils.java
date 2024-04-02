@@ -12,9 +12,11 @@ import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.CaseUtils;
+import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
-final class SymbolUtils {
+@SmithyInternalApi
+public final class SymbolUtils {
     public static final URL RESERVED_WORDS_FILE = SymbolUtils.class.getResource("reserved-words.txt");
 
     public static final ReservedWords SHAPE_ESCAPER = new ReservedWordsBuilder()
