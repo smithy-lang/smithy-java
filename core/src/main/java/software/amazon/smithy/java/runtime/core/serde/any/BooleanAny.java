@@ -19,8 +19,8 @@ final class BooleanAny implements Any {
     BooleanAny(boolean value, SdkSchema schema) {
         if (!(schema.type() == ShapeType.DOCUMENT || schema.type() == ShapeType.BOOLEAN)) {
             throw new SdkSerdeException(
-                    "Expected boolean Any to have a boolean or document schema, but found "
-                            + schema
+                "Expected boolean Any to have a boolean or document schema, but found "
+                    + schema
             );
         }
 

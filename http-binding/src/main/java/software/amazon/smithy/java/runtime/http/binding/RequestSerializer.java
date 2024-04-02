@@ -118,10 +118,10 @@ public final class RequestSerializer {
         var targetEndpoint = uriBuilder.build();
 
         return SmithyHttpRequest.builder()
-                .method(httpTrait.getMethod())
-                .uri(targetEndpoint)
-                .headers(serializer.getHeaders())
-                .body(new ContentStreamAdapter(serializer.getBody()))
-                .build();
+            .method(httpTrait.getMethod())
+            .uri(targetEndpoint)
+            .headers(serializer.getHeaders())
+            .body(new ContentStreamAdapter(serializer.getBody()))
+            .build();
     }
 }

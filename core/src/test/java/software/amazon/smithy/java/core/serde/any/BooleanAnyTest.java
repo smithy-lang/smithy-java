@@ -39,12 +39,12 @@ public class BooleanAnyTest {
     @Test
     public void createsAnyWithSchema() {
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.BOOLEAN)
-                .id(ShapeId.from("smithy.example#Shape"))
-                .build();
+            .type(ShapeType.BOOLEAN)
+            .id(ShapeId.from("smithy.example#Shape"))
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(targetSchema.id())
-                .build();
+            .id(targetSchema.id())
+            .build();
         var any = Any.of(true, schema);
 
         assertThat(any.type(), equalTo(ShapeType.BOOLEAN));
@@ -56,12 +56,12 @@ public class BooleanAnyTest {
     @Test
     public void serializesShape() {
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.BOOLEAN)
-                .id(ShapeId.from("smithy.example#Shape"))
-                .build();
+            .type(ShapeType.BOOLEAN)
+            .id(ShapeId.from("smithy.example#Shape"))
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(targetSchema.id())
-                .build();
+            .id(targetSchema.id())
+            .build();
 
         var any = Any.of(true, schema);
 

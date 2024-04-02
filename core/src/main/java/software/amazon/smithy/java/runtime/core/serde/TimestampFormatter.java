@@ -127,7 +127,7 @@ public interface TimestampFormatter {
             public Instant parseFromString(String value, boolean strict) {
                 if (strict) {
                     throw new IllegalArgumentException(
-                            "Expected a numeric value for a " + getIdentifier() + " timestamp, but found a string"
+                        "Expected a numeric value for a " + getIdentifier() + " timestamp, but found a string"
                     );
                 }
                 return Instant.ofEpochMilli((long) (Double.parseDouble(value) * 1000));
@@ -145,8 +145,8 @@ public interface TimestampFormatter {
                     return Instant.ofEpochMilli((long) (f * 1000f));
                 } else {
                     throw new IllegalArgumentException(
-                            "Expected numeric value for epoch-seconds to be an "
-                                    + "integer, long, float, or double, but found " + value.getClass().getName()
+                        "Expected numeric value for epoch-seconds to be an "
+                            + "integer, long, float, or double, but found " + value.getClass().getName()
                     );
                 }
             }
@@ -193,9 +193,9 @@ public interface TimestampFormatter {
         };
 
         private static final DateTimeFormatter HTTP_DATE_FORMAT = DateTimeFormatter
-                .ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'")
-                .withZone(ZoneId.of("UTC"))
-                .withLocale(Locale.US);
+            .ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'")
+            .withZone(ZoneId.of("UTC"))
+            .withLocale(Locale.US);
 
         @Override
         public String toString() {
@@ -210,7 +210,7 @@ public interface TimestampFormatter {
         @Override
         public Instant createFromNumber(Number value) {
             throw new IllegalStateException(
-                    "Expected a string value for a " + getIdentifier() + " timestamp, but found a number"
+                "Expected a string value for a " + getIdentifier() + " timestamp, but found a number"
             );
         }
     }

@@ -40,12 +40,12 @@ public class StringAnyTest {
     @Test
     public void createsAnyWithSchema() {
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.STRING)
-                .id(ShapeId.from("smithy.example#Shape"))
-                .build();
+            .type(ShapeType.STRING)
+            .id(ShapeId.from("smithy.example#Shape"))
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(targetSchema.id())
-                .build();
+            .id(targetSchema.id())
+            .build();
         var any = Any.of("hi", schema);
 
         assertThat(any.type(), equalTo(ShapeType.STRING));
@@ -57,12 +57,12 @@ public class StringAnyTest {
     @Test
     public void serializesShape() {
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.STRING)
-                .id(ShapeId.from("smithy.example#Shape"))
-                .build();
+            .type(ShapeType.STRING)
+            .id(ShapeId.from("smithy.example#Shape"))
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(targetSchema.id())
-                .build();
+            .id(targetSchema.id())
+            .build();
 
         var any = Any.of("hi", schema);
 

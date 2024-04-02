@@ -113,8 +113,8 @@ public class SdkSchema {
             return memberName;
         }
         throw new UnsupportedOperationException(
-                "Attempted to get the member name of a schema that is not a member: "
-                        + this
+            "Attempted to get the member name of a schema that is not a member: "
+                + this
         );
     }
 
@@ -162,7 +162,7 @@ public class SdkSchema {
      */
     public final <T extends Trait> T expectTrait(Class<T> trait) {
         return getTrait(trait)
-                .orElseThrow(() -> new NoSuchElementException("Expected trait not found: " + trait.getName()));
+            .orElseThrow(() -> new NoSuchElementException("Expected trait not found: " + trait.getName()));
     }
 
     /**
@@ -280,9 +280,9 @@ public class SdkSchema {
         }
         SdkSchema sdkSchema = (SdkSchema) o;
         return memberIndex == sdkSchema.memberIndex && Objects.equals(id, sdkSchema.id) && type == sdkSchema.type
-                && Objects.equals(traits, sdkSchema.traits) && Objects.equals(members, sdkSchema.members)
-                && Objects.equals(memberName, sdkSchema.memberName)
-                && Objects.equals(memberTarget, sdkSchema.memberTarget);
+            && Objects.equals(traits, sdkSchema.traits) && Objects.equals(members, sdkSchema.members)
+            && Objects.equals(memberName, sdkSchema.memberName)
+            && Objects.equals(memberTarget, sdkSchema.memberTarget);
     }
 
     @Override

@@ -56,19 +56,19 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
     public String toString() {
         putNameContext();
         return format(
-                """
-                        $L
+            """
+                $L
 
-                        package $L;
+                package $L;
 
-                        $L
+                $L
 
-                        $L
-                        """,
-                getHeader(),
-                packageNamespace,
-                getImportContainer(),
-                super.toString()
+                $L
+                """,
+            getHeader(),
+            packageNamespace,
+            getImportContainer(),
+            super.toString()
         );
     }
 
@@ -87,13 +87,13 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         while (matcher.find()) {
             // write all contents up to the match.
             writeInlineWithNoFormatting(
-                    StringUtils.wrap(
-                            contents.substring(lastMatchPos, matcher.start())
-                                    .replace("\n", "\n * "),
-                            MAX_LINE_LENGTH - 8,
-                            getNewline() + " * ",
-                            false
-                    )
+                StringUtils.wrap(
+                    contents.substring(lastMatchPos, matcher.start())
+                        .replace("\n", "\n * "),
+                    MAX_LINE_LENGTH - 8,
+                    getNewline() + " * ",
+                    false
+                )
             );
             // write match contents
             writeInlineWithNoFormatting(contents.substring(matcher.start(), matcher.end()).replace("\n", "\n * "));
@@ -101,25 +101,25 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         }
         // Write out all remaining contents
         writeWithNoFormatting(
-                StringUtils.wrap(
-                        contents.substring(lastMatchPos).replace("\n", "\n * "),
-                        MAX_LINE_LENGTH - 8,
-                        getNewline() + " * ",
-                        false
-                )
+            StringUtils.wrap(
+                contents.substring(lastMatchPos).replace("\n", "\n * "),
+                MAX_LINE_LENGTH - 8,
+                getNewline() + " * ",
+                false
+            )
         );
     }
 
     public void writeDocStringContents(String contents, Object... args) {
         writeInlineWithNoFormatting(" * ");
         write(
-                StringUtils.wrap(
-                        contents.replace("\n", "\n * "),
-                        MAX_LINE_LENGTH - 8,
-                        getNewline() + " * ",
-                        false
-                ),
-                args
+            StringUtils.wrap(
+                contents.replace("\n", "\n * "),
+                MAX_LINE_LENGTH - 8,
+                getNewline() + " * ",
+                false
+            ),
+            args
         );
     }
 
@@ -190,8 +190,8 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
                 case Class<?> c -> SymbolUtils.fromClass(c);
                 case SymbolReference r -> r.getSymbol();
                 default -> throw new IllegalArgumentException(
-                        "Invalid type provided for $T. Expected a Symbol or Class"
-                                + " but found: `" + type + "`."
+                    "Invalid type provided for $T. Expected a Symbol or Class"
+                        + " but found: `" + type + "`."
                 );
             };
 
@@ -202,8 +202,8 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
             // Add type references as type references (ex. `Map<KeyType, ValueType>`)
             putContext("refs", typeSymbol.getReferences());
             String output = format(
-                    "$L<${#refs}${value:T}${^key.last}, ${/key.last}${/refs}>",
-                    getPlaceholder(typeSymbol)
+                "$L<${#refs}${value:T}${^key.last}, ${/key.last}${/refs}>",
+                getPlaceholder(typeSymbol)
             );
             removeContext("refs");
             return output;

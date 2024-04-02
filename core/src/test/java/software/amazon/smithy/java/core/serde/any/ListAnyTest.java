@@ -46,21 +46,21 @@ public class ListAnyTest {
     @Test
     public void createsAnyWithSchema() {
         SdkSchema stringShape = SdkSchema.builder()
-                .type(ShapeType.STRING)
-                .id(ShapeId.from("smithy.api#String"))
-                .build();
+            .type(ShapeType.STRING)
+            .id(ShapeId.from("smithy.api#String"))
+            .build();
         ShapeId listShapeId = ShapeId.from("smithy.example#ListShape");
         SdkSchema listMember = SdkSchema.memberBuilder(0, "member", stringShape)
-                .id(listShapeId)
-                .build();
+            .id(listShapeId)
+            .build();
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.LIST)
-                .id(listShapeId)
-                .members(listMember)
-                .build();
+            .type(ShapeType.LIST)
+            .id(listShapeId)
+            .members(listMember)
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(ShapeId.from("smithy.example#Foo"))
-                .build();
+            .id(ShapeId.from("smithy.example#Foo"))
+            .build();
         List<Any> values = List.of(Any.of("a", listMember), Any.of("b", listMember));
         var any = Any.of(values, schema);
 
@@ -73,57 +73,57 @@ public class ListAnyTest {
     @Test
     public void validatesListMemberSchemaConsistency() {
         SdkSchema stringShape = SdkSchema.builder()
-                .type(ShapeType.STRING)
-                .id(ShapeId.from("smithy.api#String"))
-                .build();
+            .type(ShapeType.STRING)
+            .id(ShapeId.from("smithy.api#String"))
+            .build();
         SdkSchema integerShape = SdkSchema.builder()
-                .type(ShapeType.INTEGER)
-                .id(ShapeId.from("smithy.api#Integer"))
-                .build();
+            .type(ShapeType.INTEGER)
+            .id(ShapeId.from("smithy.api#Integer"))
+            .build();
         ShapeId listShapeId = ShapeId.from("smithy.example#ListShape");
         SdkSchema listMember1 = SdkSchema.memberBuilder(0, "member", stringShape)
-                .id(listShapeId)
-                .build();
+            .id(listShapeId)
+            .build();
         SdkSchema listMember2 = SdkSchema.memberBuilder(0, "member", integerShape)
-                .id(listShapeId)
-                .build();
+            .id(listShapeId)
+            .build();
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.LIST)
-                .id(listShapeId)
-                .members(listMember1)
-                .build();
+            .type(ShapeType.LIST)
+            .id(listShapeId)
+            .members(listMember1)
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(ShapeId.from("smithy.example#Foo"))
-                .build();
+            .id(ShapeId.from("smithy.example#Foo"))
+            .build();
         List<Any> values = List.of(Any.of("a", listMember1), Any.of(1, listMember2));
 
         var e = Assertions.assertThrows(SdkSerdeException.class, () -> Any.of(values, schema));
 
         assertThat(e.getMessage(), containsString("""
-                Every member of a list Any must use the same exact Schema. Expected element 1 of the list to be \
-                SdkSchema{id='smithy.example#ListShape$member', type=string}, but found \
-                SdkSchema{id='smithy.example#ListShape$member', type=integer} in the list for \
-                SdkSchema{id='smithy.example#Foo$mymember', type=list}"""));
+            Every member of a list Any must use the same exact Schema. Expected element 1 of the list to be \
+            SdkSchema{id='smithy.example#ListShape$member', type=string}, but found \
+            SdkSchema{id='smithy.example#ListShape$member', type=integer} in the list for \
+            SdkSchema{id='smithy.example#Foo$mymember', type=list}"""));
     }
 
     @Test
     public void serializesShape() {
         SdkSchema stringShape = SdkSchema.builder()
-                .type(ShapeType.STRING)
-                .id(ShapeId.from("smithy.api#String"))
-                .build();
+            .type(ShapeType.STRING)
+            .id(ShapeId.from("smithy.api#String"))
+            .build();
         ShapeId listShapeId = ShapeId.from("smithy.example#ListShape");
         SdkSchema listMember = SdkSchema.memberBuilder(0, "member", stringShape)
-                .id(listShapeId)
-                .build();
+            .id(listShapeId)
+            .build();
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.LIST)
-                .id(listShapeId)
-                .members(listMember)
-                .build();
+            .type(ShapeType.LIST)
+            .id(listShapeId)
+            .members(listMember)
+            .build();
         var listSchema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(ShapeId.from("smithy.example#Foo"))
-                .build();
+            .id(ShapeId.from("smithy.example#Foo"))
+            .build();
         List<Any> values = List.of(Any.of("a", listMember), Any.of("b", listMember));
         var any = Any.of(values, listSchema);
 

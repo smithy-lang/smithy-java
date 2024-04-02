@@ -36,8 +36,8 @@ final class MapAny implements Any {
                     case STRING, ENUM, INTEGER, INT_ENUM, LONG -> {
                     }
                     default -> throw new SdkSerdeException(
-                            "Map keys must be a string, enum, integer, intEnum, or long, "
-                                    + "but found " + entry.getKey()
+                        "Map keys must be a string, enum, integer, intEnum, or long, "
+                            + "but found " + entry.getKey()
                     );
                 }
                 // If it's the entry, then validate that the key and value members are correct. These member schemas
@@ -47,35 +47,35 @@ final class MapAny implements Any {
                     firstValue = valueSchema;
                     if (keySchema.isMember() && !keySchema.memberName().equals("key")) {
                         throw new SdkSerdeException(
-                                "Map Any key member has a member name of '" + keySchema.memberName() + "', "
-                                        + "but map key members must be named 'key': " + entry.getKey()
+                            "Map Any key member has a member name of '" + keySchema.memberName() + "', "
+                                + "but map key members must be named 'key': " + entry.getKey()
                         );
                     } else if (!keySchema.isMember() && keySchema.type() != ShapeType.DOCUMENT) {
                         throw new SdkSerdeException(
-                                "Key members of a map Any must be a member or a document schema, "
-                                        + "but found " + entry.getKey()
+                            "Key members of a map Any must be a member or a document schema, "
+                                + "but found " + entry.getKey()
                         );
                     }
                     if (valueSchema.isMember() && !valueSchema.memberName().equals("value")) {
                         throw new SdkSerdeException(
-                                "Map Any value member has a member name of '" + valueSchema.memberName() + "', "
-                                        + "but map value members must be named 'value': " + firstValue
+                            "Map Any value member has a member name of '" + valueSchema.memberName() + "', "
+                                + "but map value members must be named 'value': " + firstValue
                         );
                     } else if (!valueSchema.isMember() && valueSchema.type() != ShapeType.DOCUMENT) {
                         throw new SdkSerdeException(
-                                "Value members of a map Any must be a member or a document schema, "
-                                        + "but found " + entry.getValue()
+                            "Value members of a map Any must be a member or a document schema, "
+                                + "but found " + entry.getValue()
                         );
                     }
                 } else if (!keySchema.equals(firstKey)) {
                     throw new SdkSerdeException(
-                            "Every Any map key member must use the same schema. Expected "
-                                    + firstKey + ", but found " + entry.getKey()
+                        "Every Any map key member must use the same schema. Expected "
+                            + firstKey + ", but found " + entry.getKey()
                     );
                 } else if (!valueSchema.equals(firstValue)) {
                     throw new SdkSerdeException(
-                            "Every Any map value member must use the same schema. Expected "
-                                    + firstValue + ", but found " + entry.getValue()
+                        "Every Any map value member must use the same schema. Expected "
+                            + firstValue + ", but found " + entry.getValue()
                     );
                 }
             }

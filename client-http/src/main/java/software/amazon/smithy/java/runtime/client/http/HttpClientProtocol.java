@@ -106,9 +106,9 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
         message.append(System.lineSeparator());
 
         String contentType = response.headers()
-                .firstValue("Content-Type")
-                .orElse("application/octet-stream")
-                .toLowerCase(Locale.ENGLISH);
+            .firstValue("Content-Type")
+            .orElse("application/octet-stream")
+            .toLowerCase(Locale.ENGLISH);
 
         if (!isText(contentType)) {
             return new SdkException(message.toString(), fault);
@@ -125,6 +125,6 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
 
     private static boolean isText(String contentType) {
         return contentType.startsWith("text/") || contentType.contains("charset=utf-8") || contentType.endsWith("+json")
-                || contentType.endsWith("+xml") || TEXT_CONTENT_TYPES.contains(contentType);
+            || contentType.endsWith("+xml") || TEXT_CONTENT_TYPES.contains(contentType);
     }
 }

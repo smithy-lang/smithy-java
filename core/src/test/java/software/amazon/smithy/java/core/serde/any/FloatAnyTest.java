@@ -40,12 +40,12 @@ public class FloatAnyTest {
     @Test
     public void createsAnyWithSchema() {
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.FLOAT)
-                .id(ShapeId.from("smithy.example#Shape"))
-                .build();
+            .type(ShapeType.FLOAT)
+            .id(ShapeId.from("smithy.example#Shape"))
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(targetSchema.id())
-                .build();
+            .id(targetSchema.id())
+            .build();
         var any = Any.of(1.0f, schema);
 
         assertThat(any.type(), equalTo(ShapeType.FLOAT));
@@ -57,12 +57,12 @@ public class FloatAnyTest {
     @Test
     public void serializesShape() {
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.FLOAT)
-                .id(ShapeId.from("smithy.example#Shape"))
-                .build();
+            .type(ShapeType.FLOAT)
+            .id(ShapeId.from("smithy.example#Shape"))
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(targetSchema.id())
-                .build();
+            .id(targetSchema.id())
+            .build();
 
         var any = Any.of(1.0f, schema);
 

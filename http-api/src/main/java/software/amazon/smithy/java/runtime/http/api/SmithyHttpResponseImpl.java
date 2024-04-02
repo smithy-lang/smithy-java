@@ -85,7 +85,7 @@ public final class SmithyHttpResponseImpl implements SmithyHttpResponse {
         }
         SmithyHttpResponseImpl that = (SmithyHttpResponseImpl) o;
         return statusCode == that.statusCode && httpVersion == that.httpVersion && Objects.equals(body, that.body)
-                && Objects.equals(headers, that.headers);
+            && Objects.equals(headers, that.headers);
     }
 
     @Override

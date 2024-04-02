@@ -64,9 +64,9 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, RequestT> void readAfterSerialization(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
         for (var interceptor : interceptors) {
             interceptor.readAfterSerialization(context, input, request);
@@ -75,9 +75,9 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, RequestT> Value<RequestT> modifyBeforeRetryLoop(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
         for (var interceptor : interceptors) {
             request = interceptor.modifyBeforeRetryLoop(context, input, request);
@@ -87,18 +87,18 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, RequestT> void readBeforeAttempt(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
         applyToEachThrowLastError(interceptor -> interceptor.readBeforeAttempt(context, input, request));
     }
 
     @Override
     public <I extends SerializableShape, RequestT> Value<RequestT> modifyBeforeSigning(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
         for (var interceptor : interceptors) {
             request = interceptor.modifyBeforeSigning(context, input, request);
@@ -108,9 +108,9 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, RequestT> void readBeforeSigning(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
         for (var interceptor : interceptors) {
             interceptor.readBeforeSigning(context, input, request);
@@ -119,9 +119,9 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, RequestT> void readAfterSigning(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
         for (var interceptor : interceptors) {
             interceptor.readAfterSigning(context, input, request);
@@ -130,9 +130,9 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, RequestT> Value<RequestT> modifyBeforeTransmit(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
         for (var interceptor : interceptors) {
             request = interceptor.modifyBeforeTransmit(context, input, request);
@@ -142,9 +142,9 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, RequestT> void readBeforeTransmit(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
         for (var interceptor : interceptors) {
             interceptor.readBeforeTransmit(context, input, request);
@@ -153,10 +153,10 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, RequestT, ResponseT> void readAfterTransmit(
-            Context context,
-            I input,
-            Value<RequestT> request,
-            Value<ResponseT> response
+        Context context,
+        I input,
+        Value<RequestT> request,
+        Value<ResponseT> response
     ) {
         for (var interceptor : interceptors) {
             interceptor.readAfterTransmit(context, input, request, response);
@@ -165,10 +165,10 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, RequestT, ResponseT> Value<ResponseT> modifyBeforeDeserialization(
-            Context context,
-            I input,
-            Value<RequestT> request,
-            Value<ResponseT> response
+        Context context,
+        I input,
+        Value<RequestT> request,
+        Value<ResponseT> response
     ) {
         for (var interceptor : interceptors) {
             response = interceptor.modifyBeforeDeserialization(context, input, request, response);
@@ -178,10 +178,10 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, RequestT, ResponseT> void readBeforeDeserialization(
-            Context context,
-            I input,
-            Value<RequestT> request,
-            Value<ResponseT> response
+        Context context,
+        I input,
+        Value<RequestT> request,
+        Value<ResponseT> response
     ) {
         for (var interceptor : interceptors) {
             interceptor.readBeforeDeserialization(context, input, request, response);
@@ -190,11 +190,11 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> void readAfterDeserialization(
-            Context context,
-            I input,
-            Value<RequestT> request,
-            Value<ResponseT> response,
-            Either<SdkException, O> result
+        Context context,
+        I input,
+        Value<RequestT> request,
+        Value<ResponseT> response,
+        Either<SdkException, O> result
     ) {
         for (var interceptor : interceptors) {
             interceptor.readAfterDeserialization(context, input, request, response, result);
@@ -203,11 +203,11 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> Either<SdkException, O> modifyBeforeAttemptCompletion(
-            Context context,
-            I input,
-            Value<RequestT> request,
-            Value<ResponseT> response,
-            Either<SdkException, O> result
+        Context context,
+        I input,
+        Value<RequestT> request,
+        Value<ResponseT> response,
+        Either<SdkException, O> result
     ) {
         for (var interceptor : interceptors) {
             result = interceptor.modifyBeforeAttemptCompletion(context, input, request, response, result);
@@ -217,32 +217,32 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> void readAfterAttempt(
-            Context context,
-            I input,
-            Value<RequestT> request,
-            Value<ResponseT> responseIfAvailable,
-            Either<SdkException, O> result
+        Context context,
+        I input,
+        Value<RequestT> request,
+        Value<ResponseT> responseIfAvailable,
+        Either<SdkException, O> result
     ) {
         applyToEachThrowLastError(
-                interceptor -> interceptor.readAfterAttempt(context, input, request, responseIfAvailable, result)
+            interceptor -> interceptor.readAfterAttempt(context, input, request, responseIfAvailable, result)
         );
     }
 
     @Override
     public <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> Either<SdkException, O> modifyBeforeCompletion(
-            Context context,
-            I input,
-            Value<RequestT> requestIfAvailable,
-            Value<ResponseT> responseIfAvailable,
-            Either<SdkException, O> result
+        Context context,
+        I input,
+        Value<RequestT> requestIfAvailable,
+        Value<ResponseT> responseIfAvailable,
+        Either<SdkException, O> result
     ) {
         for (var interceptor : interceptors) {
             result = interceptor.modifyBeforeCompletion(
-                    context,
-                    input,
-                    requestIfAvailable,
-                    responseIfAvailable,
-                    result
+                context,
+                input,
+                requestIfAvailable,
+                responseIfAvailable,
+                result
             );
         }
         return result;
@@ -250,20 +250,20 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> void readAfterExecution(
-            Context context,
-            I input,
-            Value<RequestT> requestIfAvailable,
-            Value<ResponseT> responseIfAvailable,
-            Either<SdkException, O> result
+        Context context,
+        I input,
+        Value<RequestT> requestIfAvailable,
+        Value<ResponseT> responseIfAvailable,
+        Either<SdkException, O> result
     ) {
         applyToEachThrowLastError(
-                interceptor -> interceptor.readAfterExecution(
-                        context,
-                        input,
-                        requestIfAvailable,
-                        responseIfAvailable,
-                        result
-                )
+            interceptor -> interceptor.readAfterExecution(
+                context,
+                input,
+                requestIfAvailable,
+                responseIfAvailable,
+                result
+            )
         );
     }
 }

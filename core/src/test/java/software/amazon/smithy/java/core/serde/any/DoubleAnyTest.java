@@ -40,12 +40,12 @@ public class DoubleAnyTest {
     @Test
     public void createsAnyWithSchema() {
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.DOUBLE)
-                .id(ShapeId.from("smithy.example#Shape"))
-                .build();
+            .type(ShapeType.DOUBLE)
+            .id(ShapeId.from("smithy.example#Shape"))
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(targetSchema.id())
-                .build();
+            .id(targetSchema.id())
+            .build();
         var any = Any.of(1.0, schema);
 
         assertThat(any.type(), equalTo(ShapeType.DOUBLE));
@@ -57,12 +57,12 @@ public class DoubleAnyTest {
     @Test
     public void serializesShape() {
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.DOUBLE)
-                .id(ShapeId.from("smithy.example#Shape"))
-                .build();
+            .type(ShapeType.DOUBLE)
+            .id(ShapeId.from("smithy.example#Shape"))
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(targetSchema.id())
-                .build();
+            .id(targetSchema.id())
+            .build();
 
         var any = Any.of(1.0, schema);
 

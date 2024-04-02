@@ -29,10 +29,10 @@ final class JsonDeserializer implements ShapeDeserializer {
     private final boolean useTimestampFormat;
 
     JsonDeserializer(
-            byte[] source,
-            boolean useJsonName,
-            TimestampFormatter defaultTimestampFormat,
-            boolean useTimestampFormat
+        byte[] source,
+        boolean useJsonName,
+        TimestampFormatter defaultTimestampFormat,
+        boolean useTimestampFormat
     ) {
         this.useJsonName = useJsonName;
         this.useTimestampFormat = useTimestampFormat;
@@ -156,7 +156,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     public Instant readTimestamp(SdkSchema schema) {
         try {
             return new JsonAny(schema, iter.readAny(), useJsonName, defaultTimestampFormat, useTimestampFormat)
-                    .asTimestamp();
+                .asTimestamp();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -192,10 +192,10 @@ final class JsonDeserializer implements ShapeDeserializer {
         if (useJsonName) {
             // TODO: Precompute and cache this.
             member = schema.findMember(
-                    m -> m.getTrait(JsonNameTrait.class)
-                            .map(JsonNameTrait::getValue)
-                            .filter(n -> n.equals(field))
-                            .isPresent()
+                m -> m.getTrait(JsonNameTrait.class)
+                    .map(JsonNameTrait::getValue)
+                    .filter(n -> n.equals(field))
+                    .isPresent()
             );
         }
 

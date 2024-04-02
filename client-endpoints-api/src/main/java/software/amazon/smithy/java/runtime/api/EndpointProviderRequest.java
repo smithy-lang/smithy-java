@@ -71,7 +71,7 @@ public final class EndpointProviderRequest {
         }
         EndpointProviderRequest request = (EndpointProviderRequest) o;
         return Objects.equals(operationName, request.operationName)
-                && Objects.equals(immutableMap, request.immutableMap);
+            && Objects.equals(immutableMap, request.immutableMap);
     }
 
     @Override

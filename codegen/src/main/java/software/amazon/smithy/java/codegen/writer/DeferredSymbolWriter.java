@@ -10,7 +10,7 @@ import software.amazon.smithy.codegen.core.SymbolWriter;
 
 
 public abstract class DeferredSymbolWriter<W extends SymbolWriter<W, I>, I extends ImportContainer> extends
-        SymbolWriter<W, I> {
+    SymbolWriter<W, I> {
 
 
     public DeferredSymbolWriter(I importContainer) {

@@ -57,23 +57,23 @@ public final class SigV4 {
      * @param isStreaming
      */
     public Map<String, List<String>> createSignedHeaders(
-            String method,
-            URI uri,
-            HttpHeaders httpHeaders,
-            String accessKeyId,
-            String secretKey,
-            InputStream payload,
-            boolean isStreaming
+        String method,
+        URI uri,
+        HttpHeaders httpHeaders,
+        String accessKeyId,
+        String secretKey,
+        InputStream payload,
+        boolean isStreaming
     ) {
         return createSignedHeaders(
-                method,
-                uri,
-                httpHeaders,
-                accessKeyId,
-                secretKey,
-                payload,
-                isStreaming,
-                Instant.now()
+            method,
+            uri,
+            httpHeaders,
+            accessKeyId,
+            secretKey,
+            payload,
+            isStreaming,
+            Instant.now()
         );
     }
 
@@ -86,14 +86,14 @@ public final class SigV4 {
      * @param now The timestamp to use for the current time.
      */
     public Map<String, List<String>> createSignedHeaders(
-            String method,
-            URI uri,
-            HttpHeaders httpHeaders,
-            String accessKeyId,
-            String secretKey,
-            InputStream payload,
-            boolean isStreaming,
-            Instant now
+        String method,
+        URI uri,
+        HttpHeaders httpHeaders,
+        String accessKeyId,
+        String secretKey,
+        InputStream payload,
+        boolean isStreaming,
+        Instant now
     ) {
         var headers = httpHeaders.map();
 
@@ -116,14 +116,14 @@ public final class SigV4 {
 
         // Build canonicalRequest
         var canonicalRequest = method + "\n" + uri.getRawPath() + "\n" + getCanonicalizedQueryString(uri) + "\n"
-                + getCanonicalizedHeaderString(httpHeaders) + "\n" + getSignedHeaders(httpHeaders) + "\n" + payloadHash;
+            + getCanonicalizedHeaderString(httpHeaders) + "\n" + getSignedHeaders(httpHeaders) + "\n" + payloadHash;
 
         LOGGER.log(System.Logger.Level.TRACE, () -> "AWS4 Canonical Request: '" + canonicalRequest + "'");
 
         var scope = dateStamp + '/' + regionName + '/' + serviceName + '/' + TERMINATOR;
         var signingCredentials = accessKeyId + '/' + scope;
         var stringToSign = ALGORITHM + '\n' + dateTime + '\n' + scope + '\n'
-                + HexFormat.of().formatHex(hash(canonicalRequest));
+            + HexFormat.of().formatHex(hash(canonicalRequest));
 
         LOGGER.log(System.Logger.Level.TRACE, () -> "AWS4 String to Sign: '\"" + stringToSign + "\"");
 
@@ -141,7 +141,7 @@ public final class SigV4 {
         var signatureAuthorizationHeader = "Signature=" + HexFormat.of().formatHex(signature);
 
         var authorizationHeader = ALGORITHM + ' ' + credentialsAuthorizationHeader + ", "
-                + signedHeadersAuthorizationHeader + ", " + signatureAuthorizationHeader;
+            + signedHeadersAuthorizationHeader + ", " + signatureAuthorizationHeader;
 
         LOGGER.log(System.Logger.Level.TRACE, () -> "Authorization: " + authorizationHeader);
 

@@ -20,8 +20,8 @@ final class BigDecimalAny implements Any {
     BigDecimalAny(BigDecimal value, SdkSchema schema) {
         if (!(schema.type() == ShapeType.DOCUMENT || schema.type() == ShapeType.BIG_DECIMAL)) {
             throw new SdkSerdeException(
-                    "Expected bigDecimal Any to have a bigDecimal or document schema, but found "
-                            + schema
+                "Expected bigDecimal Any to have a bigDecimal or document schema, but found "
+                    + schema
             );
         }
 

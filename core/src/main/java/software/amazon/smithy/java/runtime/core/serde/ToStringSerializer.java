@@ -100,9 +100,9 @@ public final class ToStringSerializer implements ShapeSerializer {
                 append(member.memberName()).append(": ");
                 // Throw if a value isn't written.
                 RequiredWriteSerializer.assertWrite(
-                        ToStringSerializer.this,
-                        () -> new SdkException("Structure member did not write a value for " + schema),
-                        memberWriter
+                    ToStringSerializer.this,
+                    () -> new SdkException("Structure member did not write a value for " + schema),
+                    memberWriter
                 );
                 append(System.lineSeparator());
             }

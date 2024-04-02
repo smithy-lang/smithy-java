@@ -42,9 +42,9 @@ public final class ResponseDeserializer {
      */
     public ResponseDeserializer response(SmithyHttpResponse response) {
         deserBuilder.headers(response.headers())
-                .responseStatus(response.statusCode())
-                .body(DataStream.ofInputStream(response.body()))
-                .shapeBuilder(outputShapeBuilder);
+            .responseStatus(response.statusCode())
+            .body(DataStream.ofInputStream(response.body()))
+            .shapeBuilder(outputShapeBuilder);
         return this;
     }
 

@@ -57,9 +57,9 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
         var bodyPublisher = HttpRequest.BodyPublishers.ofInputStream(request.body()::inputStream);
 
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder()
-                .version(smithyToHttpVersion(request.httpVersion()))
-                .method(request.method(), bodyPublisher)
-                .uri(request.uri());
+            .version(smithyToHttpVersion(request.httpVersion()))
+            .method(request.method(), bodyPublisher)
+            .uri(request.uri());
 
         Duration requestTimeout = context.get(HttpContext.HTTP_REQUEST_TIMEOUT);
 
@@ -80,8 +80,8 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
         try {
             var response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
             LOGGER.log(
-                    System.Logger.Level.TRACE,
-                    () -> "Got response: " + response + "; headers: " + response.headers().map()
+                System.Logger.Level.TRACE,
+                () -> "Got response: " + response + "; headers: " + response.headers().map()
             );
             return createSmithyResponse(response);
         } catch (IOException | InterruptedException e) {
@@ -92,15 +92,15 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
 
     private SmithyHttpResponse createSmithyResponse(HttpResponse<InputStream> response) {
         LOGGER.log(
-                System.Logger.Level.TRACE,
-                () -> "Got response: " + response + "; headers: " + response.headers().map()
+            System.Logger.Level.TRACE,
+            () -> "Got response: " + response + "; headers: " + response.headers().map()
         );
         return SmithyHttpResponse.builder()
-                .httpVersion(javaToSmithyVersion(response.version()))
-                .statusCode(response.statusCode())
-                .headers(response.headers())
-                .body(response.body())
-                .build();
+            .httpVersion(javaToSmithyVersion(response.version()))
+            .statusCode(response.statusCode())
+            .headers(response.headers())
+            .body(response.body())
+            .build();
     }
 
     private static HttpClient.Version smithyToHttpVersion(SmithyHttpVersion version) {

@@ -31,11 +31,11 @@ public class SerdeBenchmarks {
     @Setup
     public void prepare() {
         input = PutPersonInput.builder()
-                .name("Michael")
-                .age(999)
-                .favoriteColor("Green")
-                .birthday(Instant.now())
-                .build();
+            .name("Michael")
+            .age(999)
+            .favoriteColor("Green")
+            .birthday(Instant.now())
+            .build();
         codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
         inputAsAny = Any.of(input);
     }
@@ -48,7 +48,7 @@ public class SerdeBenchmarks {
     @Benchmark
     public void jsonToShape(Blackhole bh) {
         String json = "{\"name\":\"Michael\",\"Age\":999,\"birthday\":1709591329,"
-                + "\"favoriteColor\":\"Green\",\"binary\":\"SGVsbG8=\"}";
+            + "\"favoriteColor\":\"Green\",\"binary\":\"SGVsbG8=\"}";
         bh.consume(codec.deserializeShape(json, PutPersonInput.builder()));
     }
 

@@ -40,16 +40,16 @@ public class GenericTest {
     public void putPerson() {
         // Create a generated client using rest-json and a fixed endpoint.
         PersonDirectory client = PersonDirectoryClient.builder()
-                .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
-                .endpoint("https://httpbin.org/anything")
-                .build();
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
+            .endpoint("https://httpbin.org/anything")
+            .build();
 
         PutPersonInput input = PutPersonInput.builder()
-                .name("Michael")
-                .age(999)
-                .favoriteColor("Green")
-                .birthday(Instant.now())
-                .build();
+            .name("Michael")
+            .age(999)
+            .favoriteColor("Green")
+            .birthday(Instant.now())
+            .build();
 
         PutPersonOutput output = client.putPerson(input);
     }
@@ -57,9 +57,9 @@ public class GenericTest {
     @Test
     public void getPersonImage() throws Exception {
         PersonDirectory client = PersonDirectoryClient.builder()
-                .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
-                .endpoint("https://httpbin.org")
-                .build();
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
+            .endpoint("https://httpbin.org")
+            .build();
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
         GetPersonImageOutput output = client.getPersonImage(input);
@@ -72,16 +72,16 @@ public class GenericTest {
     @Test
     public void streamingRequestPayload() {
         PersonDirectory client = PersonDirectoryClient.builder()
-                .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
-                .endpoint("https://httpbin.org")
-                .build();
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
+            .endpoint("https://httpbin.org")
+            .build();
 
         PutPersonImageInput input = PutPersonImageInput.builder()
-                .name("Michael")
-                .tags(List.of("Foo", "Bar"))
-                .moreTags(List.of("Abc", "one two"))
-                .image(DataStream.ofString("image..."))
-                .build();
+            .name("Michael")
+            .tags(List.of("Foo", "Bar"))
+            .moreTags(List.of("Abc", "one two"))
+            .image(DataStream.ofString("image..."))
+            .build();
         PutPersonImageOutput output = client.putPersonImage(input);
     }
 
@@ -90,12 +90,12 @@ public class GenericTest {
         Codec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
 
         PutPersonInput input = PutPersonInput.builder()
-                .name("Michael")
-                .age(999)
-                .favoriteColor("Green")
-                .birthday(Instant.now())
-                .binary("Hello".getBytes(StandardCharsets.UTF_8))
-                .build();
+            .name("Michael")
+            .age(999)
+            .favoriteColor("Green")
+            .birthday(Instant.now())
+            .binary("Hello".getBytes(StandardCharsets.UTF_8))
+            .build();
 
         // Serialize directly to JSON.
         System.out.println(codec.serializeToString(input));
@@ -114,23 +114,23 @@ public class GenericTest {
     @Test
     public void testTypeRegistry() {
         TypeRegistry registry = TypeRegistry.builder()
-                .putType(PutPersonInput.ID, PutPersonInput.class, PutPersonInput::builder)
-                .putType(ValidationError.ID, ValidationError.class, ValidationError::builder)
-                .build();
+            .putType(PutPersonInput.ID, PutPersonInput.class, PutPersonInput::builder)
+            .putType(ValidationError.ID, ValidationError.class, ValidationError::builder)
+            .build();
 
         registry.create(ValidationError.ID, ModeledSdkException.class)
-                .map(SdkShapeBuilder::build)
-                .ifPresent(System.out::println);
+            .map(SdkShapeBuilder::build)
+            .ifPresent(System.out::println);
     }
 
     @Test
     public void serde() {
         PutPersonInput input = PutPersonInput.builder()
-                .name("Michael")
-                .age(999)
-                .favoriteColor("Green")
-                .birthday(Instant.now())
-                .build();
+            .name("Michael")
+            .age(999)
+            .favoriteColor("Green")
+            .birthday(Instant.now())
+            .build();
 
         JsonCodec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
 
@@ -149,28 +149,28 @@ public class GenericTest {
         var interceptor = new ClientInterceptor() {
             @Override
             public <I extends SerializableShape, RequestT> void readBeforeTransmit(
-                    Context context,
-                    I input,
-                    Context.Value<RequestT> request
+                Context context,
+                I input,
+                Context.Value<RequestT> request
             ) {
                 System.out.println("Sending request: " + input);
             }
 
             @Override
             public <I extends SerializableShape, RequestT> Context.Value<RequestT> modifyBeforeTransmit(
-                    Context context,
-                    I input,
-                    Context.Value<RequestT> request
+                Context context,
+                I input,
+                Context.Value<RequestT> request
             ) {
                 return request.mapIf(HttpContext.HTTP_REQUEST, r -> r.withAddedHeaders("X-Foo", "Bar"));
             }
         };
 
         PersonDirectory client = PersonDirectoryClient.builder()
-                .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
-                .endpoint("https://httpbin.org")
-                .addInterceptor(interceptor)
-                .build();
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
+            .endpoint("https://httpbin.org")
+            .addInterceptor(interceptor)
+            .build();
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
         GetPersonImageOutput output = client.getPersonImage(input);

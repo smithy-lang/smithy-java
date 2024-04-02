@@ -40,12 +40,12 @@ public class LongAnyTest {
     @Test
     public void createsAnyWithSchema() {
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.LONG)
-                .id(ShapeId.from("smithy.example#Shape"))
-                .build();
+            .type(ShapeType.LONG)
+            .id(ShapeId.from("smithy.example#Shape"))
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(targetSchema.id())
-                .build();
+            .id(targetSchema.id())
+            .build();
         var any = Any.of(10L, schema);
 
         assertThat(any.type(), equalTo(ShapeType.LONG));
@@ -57,12 +57,12 @@ public class LongAnyTest {
     @Test
     public void serializesShape() {
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.LONG)
-                .id(ShapeId.from("smithy.example#Shape"))
-                .build();
+            .type(ShapeType.LONG)
+            .id(ShapeId.from("smithy.example#Shape"))
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(targetSchema.id())
-                .build();
+            .id(targetSchema.id())
+            .build();
 
         var any = Any.of(10L, schema);
 

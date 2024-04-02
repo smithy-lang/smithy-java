@@ -86,11 +86,11 @@ final class SmithyHttpRequestImpl implements SmithyHttpRequest {
         }
         // Add the start line.
         result.append(method)
-                .append(' ')
-                .append(pathAndQuery)
-                .append(' ')
-                .append(httpVersion)
-                .append(System.lineSeparator());
+            .append(' ')
+            .append(pathAndQuery)
+            .append(' ')
+            .append(httpVersion)
+            .append(System.lineSeparator());
         // Append host header if not present.
         if (!headers.firstValue("host").isPresent()) {
             String host = uri.getHost();
@@ -118,7 +118,7 @@ final class SmithyHttpRequestImpl implements SmithyHttpRequest {
         }
         SmithyHttpRequestImpl that = (SmithyHttpRequestImpl) o;
         return httpVersion == that.httpVersion && method.equals(that.method) && uri.equals(that.uri)
-                && body.equals(that.body) && headers.equals(that.headers);
+            && body.equals(that.body) && headers.equals(that.headers);
     }
 
     @Override

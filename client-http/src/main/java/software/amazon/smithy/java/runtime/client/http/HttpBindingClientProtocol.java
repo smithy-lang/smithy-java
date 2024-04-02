@@ -38,19 +38,19 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
     @Override
     public SmithyHttpRequest createRequest(ClientCall<?, ?> call, URI endpoint) {
         return HttpBinding.requestSerializer()
-                .operation(call.operation().schema())
-                .payload(call.requestInputStream().orElse(null))
-                .payloadCodec(codec)
-                .shapeValue(call.input())
-                .endpoint(endpoint)
-                .serializeRequest();
+            .operation(call.operation().schema())
+            .payload(call.requestInputStream().orElse(null))
+            .payloadCodec(codec)
+            .shapeValue(call.input())
+            .endpoint(endpoint)
+            .serializeRequest();
     }
 
     @Override
     public <I extends SerializableShape, O extends SerializableShape> O deserializeResponse(
-            ClientCall<I, O> call,
-            SmithyHttpRequest request,
-            SmithyHttpResponse response
+        ClientCall<I, O> call,
+        SmithyHttpRequest request,
+        SmithyHttpResponse response
     ) {
         if (!isSuccess(response)) {
             throw createError(call, response);
@@ -60,17 +60,17 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
 
         var outputBuilder = call.createOutputBuilder(call.context(), call.operation().outputSchema().id().toString());
         HttpBinding.responseDeserializer()
-                .payloadCodec(codec)
-                .outputShapeBuilder(outputBuilder)
-                .response(response)
-                .deserialize();
+            .payloadCodec(codec)
+            .outputShapeBuilder(outputBuilder)
+            .response(response)
+            .deserialize();
 
         O output = outputBuilder.errorCorrection().build();
 
         // TODO: error handling from the builder.
         LOGGER.log(
-                System.Logger.Level.TRACE,
-                () -> "Successfully built " + output + " from HTTP response with " + getClass().getName()
+            System.Logger.Level.TRACE,
+            () -> "Successfully built " + output + " from HTTP response with " + getClass().getName()
         );
 
         return outputBuilder.errorCorrection().build();
@@ -90,35 +90,35 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
      */
     protected SdkException createError(ClientCall<?, ?> call, SmithyHttpResponse response) {
         return response.headers()
-                // Grab the error ID from the header first.
-                .firstValue(X_AMZN_ERROR_TYPE)
-                // If not in the header, check the payload for __type.
-                .or(() -> {
-                    // TODO: check payload for type.
-                    return Optional.empty();
-                })
-                // Attempt to match the extracted error ID to a modeled error type.
-                .flatMap(
-                        errorId -> call.createExceptionBuilder(call.context(), errorId)
-                                .<SdkException>map(error -> createModeledException(codec, response, error))
-                )
-                // If no error was matched, then create an error from protocol hints.
-                .orElseGet(() -> {
-                    String operationId = call.operation().schema().id().toString();
-                    return HttpClientProtocol.createErrorFromHints(operationId, response);
-                });
+            // Grab the error ID from the header first.
+            .firstValue(X_AMZN_ERROR_TYPE)
+            // If not in the header, check the payload for __type.
+            .or(() -> {
+                // TODO: check payload for type.
+                return Optional.empty();
+            })
+            // Attempt to match the extracted error ID to a modeled error type.
+            .flatMap(
+                errorId -> call.createExceptionBuilder(call.context(), errorId)
+                    .<SdkException>map(error -> createModeledException(codec, response, error))
+            )
+            // If no error was matched, then create an error from protocol hints.
+            .orElseGet(() -> {
+                String operationId = call.operation().schema().id().toString();
+                return HttpClientProtocol.createErrorFromHints(operationId, response);
+            });
     }
 
     private ModeledSdkException createModeledException(
-            Codec codec,
-            SmithyHttpResponse response,
-            SdkShapeBuilder<ModeledSdkException> error
+        Codec codec,
+        SmithyHttpResponse response,
+        SdkShapeBuilder<ModeledSdkException> error
     ) {
         HttpBinding.responseDeserializer()
-                .payloadCodec(codec)
-                .errorShapeBuilder(error)
-                .response(response)
-                .deserialize();
+            .payloadCodec(codec)
+            .errorShapeBuilder(error)
+            .response(response)
+            .deserialize();
         return error.errorCorrection().build();
     }
 }

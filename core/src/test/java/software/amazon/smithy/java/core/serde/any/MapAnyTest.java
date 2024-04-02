@@ -33,11 +33,11 @@ public class MapAnyTest {
         var e = Assertions.assertThrows(SdkSerdeException.class, () -> Any.of(entries));
 
         assertThat(
-                e.getMessage(),
-                containsString(
-                        "Map keys must be a string, enum, integer, intEnum, or long, but "
-                                + "found BooleanAny"
-                )
+            e.getMessage(),
+            containsString(
+                "Map keys must be a string, enum, integer, intEnum, or long, but "
+                    + "found BooleanAny"
+            )
         );
     }
 
@@ -50,11 +50,11 @@ public class MapAnyTest {
         var e = Assertions.assertThrows(SdkSerdeException.class, () -> Any.of(entries));
 
         assertThat(
-                e.getMessage(),
-                containsString(
-                        "Map Any key member has a member name of 'member', but map key "
-                                + "members must be named 'key': StringAny"
-                )
+            e.getMessage(),
+            containsString(
+                "Map Any key member has a member name of 'member', but map key "
+                    + "members must be named 'key': StringAny"
+            )
         );
     }
 
@@ -63,10 +63,10 @@ public class MapAnyTest {
         var stringSchema = SdkSchema.builder().type(ShapeType.STRING).id("smithy.api#String").build();
         var keyMember = SdkSchema.memberBuilder(0, "key", stringSchema).id("smithy.example#Foo").build();
         Map<Any, Any> entries = Map.of(
-                Any.of("a", keyMember),
-                Any.of(1),
-                Any.of("b"),
-                Any.of(2)
+            Any.of("a", keyMember),
+            Any.of(1),
+            Any.of("b"),
+            Any.of(2)
         );
 
         var e = Assertions.assertThrows(SdkSerdeException.class, () -> Any.of(entries));
@@ -83,11 +83,11 @@ public class MapAnyTest {
         var e = Assertions.assertThrows(SdkSerdeException.class, () -> Any.of(entries));
 
         assertThat(
-                e.getMessage(),
-                containsString(
-                        "Map Any value member has a member name of 'foo', but map value "
-                                + "members must be named 'value'"
-                )
+            e.getMessage(),
+            containsString(
+                "Map Any value member has a member name of 'foo', but map value "
+                    + "members must be named 'value'"
+            )
         );
     }
 
@@ -96,10 +96,10 @@ public class MapAnyTest {
         var stringSchema = SdkSchema.builder().type(ShapeType.STRING).id("smithy.api#String").build();
         var valueMember = SdkSchema.memberBuilder(0, "value", stringSchema).id("smithy.example#Foo").build();
         Map<Any, Any> entries = Map.of(
-                Any.of("a"),
-                Any.of("a", valueMember),
-                Any.of("b"),
-                Any.of("b")
+            Any.of("a"),
+            Any.of("a", valueMember),
+            Any.of("b"),
+            Any.of("b")
         );
 
         var e = Assertions.assertThrows(SdkSerdeException.class, () -> Any.of(entries));
@@ -110,10 +110,10 @@ public class MapAnyTest {
     @Test
     public void createsAnyWithoutSchema() {
         Map<Any, Any> entries = Map.of(
-                Any.of("a"),
-                Any.of(true),
-                Any.of("b"),
-                Any.of(false)
+            Any.of("a"),
+            Any.of(true),
+            Any.of("b"),
+            Any.of(false)
         );
         var map = Any.of(entries);
 
@@ -130,16 +130,16 @@ public class MapAnyTest {
         var keyMember = SdkSchema.memberBuilder(0, "key", stringSchema).id("smithy.example#Foo").build();
         var valueMember = SdkSchema.memberBuilder(1, "value", integerSchema).id("smithy.example#Foo").build();
         var mapSchema = SdkSchema.builder()
-                .id("smithy.example#Foo")
-                .type(ShapeType.MAP)
-                .members(keyMember, valueMember)
-                .build();
+            .id("smithy.example#Foo")
+            .type(ShapeType.MAP)
+            .members(keyMember, valueMember)
+            .build();
 
         Map<Any, Any> entries = Map.of(
-                Any.of("a", keyMember),
-                Any.of(1, valueMember),
-                Any.of("b", keyMember),
-                Any.of(2, valueMember)
+            Any.of("a", keyMember),
+            Any.of(1, valueMember),
+            Any.of("b", keyMember),
+            Any.of(2, valueMember)
         );
         var map = Any.of(entries, mapSchema);
 

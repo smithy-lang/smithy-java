@@ -46,10 +46,10 @@ public final class TypeRegistry {
 
     @SuppressWarnings("unchecked")
     public <T> Optional<SmithyBuilder<T>> create(
-            ShapeId shapeId,
-            Class<T> type,
-            SdkSchema knownSchema,
-            Supplier<SmithyBuilder<T>> supplier
+        ShapeId shapeId,
+        Class<T> type,
+        SdkSchema knownSchema,
+        Supplier<SmithyBuilder<T>> supplier
     ) {
         if (shapeId.equals(knownSchema.id())) {
             return Optional.of(supplier.get());
@@ -77,9 +77,9 @@ public final class TypeRegistry {
         }
 
         public <T extends SerializableShape> Builder putType(
-                ShapeId shapeId,
-                Class<T> type,
-                Supplier<SdkShapeBuilder<T>> supplier
+            ShapeId shapeId,
+            Class<T> type,
+            Supplier<SdkShapeBuilder<T>> supplier
         ) {
             supplierMap.put(shapeId, new Entry<>(type, supplier));
             return this;

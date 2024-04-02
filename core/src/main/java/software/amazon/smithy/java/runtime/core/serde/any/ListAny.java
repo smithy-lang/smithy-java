@@ -29,8 +29,8 @@ final class ListAny implements Any {
             var first = value.getFirst();
             if (first.schema().isMember() && !first.schema().memberName().equals("member")) {
                 throw new SdkSerdeException(
-                        "List Any member at position 0 has a member name of '" + first.schema().memberName() + "', "
-                                + "but list members must be named 'member': " + first
+                    "List Any member at position 0 has a member name of '" + first.schema().memberName() + "', "
+                        + "but list members must be named 'member': " + first
                 );
             } else if (!first.schema().isMember() && first.schema().type() != ShapeType.DOCUMENT) {
                 throw new SdkSerdeException("Members of a list Any must be a member or a document, but found " + first);
@@ -39,9 +39,9 @@ final class ListAny implements Any {
                 var current = value.get(i);
                 if (!first.schema().equals(current.schema())) {
                     throw new SdkSerdeException(
-                            "Every member of a list Any must use the same exact Schema. Expected element " + i
-                                    + " of the list to be " + first.schema() + ", but found " + current.schema()
-                                    + " in the list for " + schema
+                        "Every member of a list Any must use the same exact Schema. Expected element " + i
+                            + " of the list to be " + first.schema() + ", but found " + current.schema()
+                            + " in the list for " + schema
                     );
                 }
             }

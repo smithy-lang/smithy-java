@@ -20,8 +20,8 @@ final class StructAny implements Any {
     StructAny(Map<String, Any> value, SdkSchema schema) {
         if (!(schema.type() == ShapeType.DOCUMENT || schema.type() == ShapeType.STRUCTURE)) {
             throw new SdkSerdeException(
-                    "Expected struct Any to have a structure or document schema, but found "
-                            + schema
+                "Expected struct Any to have a structure or document schema, but found "
+                    + schema
             );
         }
 

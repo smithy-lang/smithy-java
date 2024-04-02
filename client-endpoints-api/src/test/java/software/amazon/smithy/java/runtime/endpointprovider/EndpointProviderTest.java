@@ -16,11 +16,11 @@ public class EndpointProviderTest {
     @Test
     public void returnsStaticEndpoint() {
         EndpointProvider provider = EndpointProvider
-                .staticEndpoint(Endpoint.builder().uri("https://example.com").build());
+            .staticEndpoint(Endpoint.builder().uri("https://example.com").build());
 
         MatcherAssert.assertThat(
-                provider.resolveEndpoint(EndpointProviderRequest.builder().build()).uri().toString(),
-                Matchers.equalTo("https://example.com")
+            provider.resolveEndpoint(EndpointProviderRequest.builder().build()).uri().toString(),
+            Matchers.equalTo("https://example.com")
         );
     }
 }

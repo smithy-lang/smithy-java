@@ -13,8 +13,8 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
 public record JavaCodegenSettings(
-        ShapeId service,
-        String packageNamespace
+    ShapeId service,
+    String packageNamespace
 ) {
     private static final String SERVICE = "service";
     private static final String NAMESPACE = "namespace";
@@ -33,8 +33,8 @@ public record JavaCodegenSettings(
     public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
         settingsNode.warnIfAdditionalProperties(List.of(SERVICE));
         return new JavaCodegenSettings(
-                settingsNode.expectStringMember(SERVICE).expectShapeId(),
-                settingsNode.expectStringMember(NAMESPACE).getValue()
+            settingsNode.expectStringMember(SERVICE).expectShapeId(),
+            settingsNode.expectStringMember(NAMESPACE).getValue()
         );
     }
 

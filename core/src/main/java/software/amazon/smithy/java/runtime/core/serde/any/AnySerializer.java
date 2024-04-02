@@ -44,7 +44,7 @@ final class AnySerializer {
                         case STRING, ENUM ->
                             mapSerializer.entry(entry.getKey().asString(), c -> entry.getValue().serialize(c));
                         default -> throw new UnsupportedOperationException(
-                                "Unsupported document type map key: " + entry.getKey().type()
+                            "Unsupported document type map key: " + entry.getKey().type()
                         );
                     }
                 }

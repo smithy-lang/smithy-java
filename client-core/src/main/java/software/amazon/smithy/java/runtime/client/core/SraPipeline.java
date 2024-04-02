@@ -56,9 +56,9 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     private final Function<RequestT, ResponseT> wireTransport;
 
     private SraPipeline(
-            ClientCall<I, O> call,
-            ClientProtocol<RequestT, ResponseT> protocol,
-            Function<RequestT, ResponseT> wireTransport
+        ClientCall<I, O> call,
+        ClientProtocol<RequestT, ResponseT> protocol,
+        Function<RequestT, ResponseT> wireTransport
     ) {
         this.call = call;
         this.protocol = protocol;
@@ -68,9 +68,9 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     }
 
     public static <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> O send(
-            ClientCall<I, O> call,
-            ClientProtocol<RequestT, ResponseT> protocol,
-            Function<RequestT, ResponseT> wireTransport
+        ClientCall<I, O> call,
+        ClientProtocol<RequestT, ResponseT> protocol,
+        Function<RequestT, ResponseT> wireTransport
     ) {
         return new SraPipeline<>(call, protocol, wireTransport).send();
     }
@@ -124,14 +124,14 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
 
     @SuppressWarnings("unchecked")
     private <I extends SerializableShape, O extends SerializableShape> ResolvedScheme<?, RequestT> resolveIdentity(
-            ClientCall<I, O> call,
-            RequestT request
+        ClientCall<I, O> call,
+        RequestT request
     ) {
         var params = AuthSchemeResolver.paramsBuilder()
-                .protocolId(protocol.id())
-                .operationName(call.operation().schema().id().getName())
-                // TODO: .properties(?)
-                .build();
+            .protocolId(protocol.id())
+            .operationName(call.operation().schema().id().getName())
+            // TODO: .properties(?)
+            .build();
         var authSchemeOptions = call.authSchemeResolver().resolveAuthScheme(params);
 
         // Determine if the auth scheme option is actually supported.
@@ -141,7 +141,7 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
                     if (supportedAuthScheme.requestClass().isAssignableFrom(request.getClass())) {
                         AuthScheme<RequestT, ?> castAuthScheme = (AuthScheme<RequestT, ?>) supportedAuthScheme;
                         var resolved = createResolvedSchema(call.identityResolvers(), castAuthScheme, authSchemeOption)
-                                .orElse(null);
+                            .orElse(null);
                         if (resolved != null) {
                             return resolved;
                         }
@@ -156,9 +156,9 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     }
 
     private <IdentityT extends Identity> Optional<ResolvedScheme<IdentityT, RequestT>> createResolvedSchema(
-            IdentityResolvers identityResolvers,
-            AuthScheme<RequestT, IdentityT> authScheme,
-            AuthSchemeOption option
+        IdentityResolvers identityResolvers,
+        AuthScheme<RequestT, IdentityT> authScheme,
+        AuthSchemeOption option
     ) {
         return authScheme.identityResolver(identityResolvers).map(identityResolver -> {
             IdentityT identity = identityResolver.resolveIdentity(option.identityProperties());
@@ -167,8 +167,8 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     }
 
     private record ResolvedScheme<IdentityT extends Identity, RequestT>(
-            AuthSchemeOption option,
-            AuthScheme<RequestT, IdentityT> authScheme, IdentityT identity, Signer<RequestT, IdentityT> signer
+        AuthSchemeOption option,
+        AuthScheme<RequestT, IdentityT> authScheme, IdentityT identity, Signer<RequestT, IdentityT> signer
     ) {
         public RequestT sign(RequestT request) {
             return signer.sign(request, identity, option.signerProperties());
@@ -176,40 +176,40 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     }
 
     private <I extends SerializableShape, O extends SerializableShape> O deserialize(
-            ClientCall<I, O> call,
-            RequestT request,
-            ResponseT response,
-            ClientInterceptor interceptor
+        ClientCall<I, O> call,
+        RequestT request,
+        ResponseT response,
+        ClientInterceptor interceptor
     ) {
         var input = call.input();
         LOGGER.log(
-                System.Logger.Level.TRACE,
-                () -> "Deserializing response with " + protocol.getClass() + " for " + request + ": " + response
+            System.Logger.Level.TRACE,
+            () -> "Deserializing response with " + protocol.getClass() + " for " + request + ": " + response
         );
 
         Context context = call.context();
 
         interceptor.readAfterTransmit(
-                context,
-                input,
-                Context.value(requestKey, request),
-                Context.value(responseKey, response)
+            context,
+            input,
+            Context.value(requestKey, request),
+            Context.value(responseKey, response)
         );
 
         ResponseT modifiedResponse = interceptor
-                .modifyBeforeDeserialization(
-                        context,
-                        input,
-                        Context.value(requestKey, request),
-                        Context.value(responseKey, response)
-                )
-                .value();
-
-        interceptor.readBeforeDeserialization(
+            .modifyBeforeDeserialization(
                 context,
                 input,
                 Context.value(requestKey, request),
                 Context.value(responseKey, response)
+            )
+            .value();
+
+        interceptor.readBeforeDeserialization(
+            context,
+            input,
+            Context.value(requestKey, request),
+            Context.value(responseKey, response)
         );
 
         var shape = protocol.deserializeResponse(call, request, modifiedResponse);
@@ -217,44 +217,44 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
         Either<SdkException, O> result = Either.right(shape);
 
         interceptor.readAfterDeserialization(
-                context,
-                input,
-                Context.value(requestKey, request),
-                Context.value(responseKey, response),
-                result
+            context,
+            input,
+            Context.value(requestKey, request),
+            Context.value(responseKey, response),
+            result
         );
 
         result = interceptor.modifyBeforeAttemptCompletion(
-                context,
-                input,
-                Context.value(requestKey, request),
-                Context.value(responseKey, response),
-                result
+            context,
+            input,
+            Context.value(requestKey, request),
+            Context.value(responseKey, response),
+            result
         );
 
         interceptor.readAfterAttempt(
-                context,
-                input,
-                Context.value(requestKey, request),
-                Context.value(responseKey, response),
-                result
+            context,
+            input,
+            Context.value(requestKey, request),
+            Context.value(responseKey, response),
+            result
         );
 
         // End of retry loop
         result = interceptor.modifyBeforeCompletion(
-                context,
-                input,
-                Context.value(requestKey, request),
-                Context.value(responseKey, response),
-                result
+            context,
+            input,
+            Context.value(requestKey, request),
+            Context.value(responseKey, response),
+            result
         );
 
         interceptor.readAfterExecution(
-                context,
-                input,
-                Context.value(requestKey, request),
-                Context.value(responseKey, response),
-                result
+            context,
+            input,
+            Context.value(requestKey, request),
+            Context.value(responseKey, response),
+            result
         );
 
         if (result.isRight()) {

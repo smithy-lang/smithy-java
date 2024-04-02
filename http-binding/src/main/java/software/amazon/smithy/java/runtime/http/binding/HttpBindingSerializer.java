@@ -65,10 +65,10 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     };
 
     HttpBindingSerializer(
-            HttpTrait httpTrait,
-            Codec payloadCodec,
-            BindingMatcher bindingMatcher,
-            DataStream httpPayload
+        HttpTrait httpTrait,
+        Codec payloadCodec,
+        BindingMatcher bindingMatcher,
+        DataStream httpPayload
     ) {
         uriPattern = httpTrait.getUri();
         responseStatus = httpTrait.getCode();
@@ -104,13 +104,13 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     void setHttpPayload(SdkSchema schema, DataStream value) {
         httpPayload = value;
         String contentType = value.contentType()
-                .orElseGet(() -> schema.getTrait(MediaTypeTrait.class).map(MediaTypeTrait::getValue).orElseGet(() -> {
-                    if (schema.type() == ShapeType.BLOB) {
-                        return DEFAULT_BLOB_CONTENT_TYPE;
-                    } else {
-                        return DEFAULT_STRING_CONTENT_TYPE;
-                    }
-                }));
+            .orElseGet(() -> schema.getTrait(MediaTypeTrait.class).map(MediaTypeTrait::getValue).orElseGet(() -> {
+                if (schema.type() == ShapeType.BLOB) {
+                    return DEFAULT_BLOB_CONTENT_TYPE;
+                } else {
+                    return DEFAULT_STRING_CONTENT_TYPE;
+                }
+            }));
         headers.put("Content-Type", List.of(contentType));
     }
 
@@ -213,7 +213,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                 case BODY -> forward().member(member, memberWriter);
                 case STATUS -> memberWriter.accept(new ResponseStatusSerializer(i -> responseStatus = i));
                 case PREFIX_HEADERS -> memberWriter
-                        .accept(new HttpPrefixHeadersSerializer(bindingMatcher.prefixHeaders(), headerConsumer));
+                    .accept(new HttpPrefixHeadersSerializer(bindingMatcher.prefixHeaders(), headerConsumer));
                 case QUERY_PARAMS -> memberWriter.accept(new HttpQueryParamsSerializer(queryStringParams::put));
             }
         }

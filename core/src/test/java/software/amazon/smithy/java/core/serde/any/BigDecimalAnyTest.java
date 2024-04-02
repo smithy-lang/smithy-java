@@ -41,12 +41,12 @@ public class BigDecimalAnyTest {
     @Test
     public void createsAnyWithSchema() {
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.BIG_DECIMAL)
-                .id(ShapeId.from("smithy.example#Shape"))
-                .build();
+            .type(ShapeType.BIG_DECIMAL)
+            .id(ShapeId.from("smithy.example#Shape"))
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(targetSchema.id())
-                .build();
+            .id(targetSchema.id())
+            .build();
         var any = Any.of(new BigDecimal(10), schema);
 
         assertThat(any.type(), equalTo(ShapeType.BIG_DECIMAL));
@@ -58,12 +58,12 @@ public class BigDecimalAnyTest {
     @Test
     public void serializesShape() {
         var targetSchema = SdkSchema.builder()
-                .type(ShapeType.BIG_DECIMAL)
-                .id(ShapeId.from("smithy.example#Shape"))
-                .build();
+            .type(ShapeType.BIG_DECIMAL)
+            .id(ShapeId.from("smithy.example#Shape"))
+            .build();
         var schema = SdkSchema.memberBuilder(0, "mymember", targetSchema)
-                .id(targetSchema.id())
-                .build();
+            .id(targetSchema.id())
+            .build();
 
         var any = Any.of(new BigDecimal(10), schema);
 

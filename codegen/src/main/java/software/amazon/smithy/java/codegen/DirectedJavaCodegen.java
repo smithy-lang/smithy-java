@@ -11,34 +11,34 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
 public class DirectedJavaCodegen implements
-        DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
+    DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
     @Override
     public SymbolProvider createSymbolProvider(
-            CreateSymbolProviderDirective<JavaCodegenSettings> directive
+        CreateSymbolProviderDirective<JavaCodegenSettings> directive
     ) {
         return new JavaSymbolProvider(
-                directive.model(),
-                directive.service(),
-                directive.settings().packageNamespace()
+            directive.model(),
+            directive.service(),
+            directive.settings().packageNamespace()
         );
     }
 
     @Override
     public CodeGenerationContext createContext(
-            CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive
+        CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive
     ) {
         return new CodeGenerationContext(
-                directive.model(),
-                directive.settings(),
-                directive.symbolProvider(),
-                directive.fileManifest(),
-                directive.integrations()
+            directive.model(),
+            directive.settings(),
+            directive.symbolProvider(),
+            directive.fileManifest(),
+            directive.integrations()
         );
     }
 
     @Override
     public void generateService(
-            GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> generateServiceDirective
+        GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> generateServiceDirective
     ) {
         // TODO
     }
@@ -50,35 +50,35 @@ public class DirectedJavaCodegen implements
 
     @Override
     public void generateStructure(
-            GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> generateStructureDirective
+        GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> generateStructureDirective
     ) {
         // TODO
     }
 
     @Override
     public void generateError(
-            GenerateErrorDirective<CodeGenerationContext, JavaCodegenSettings> generateErrorDirective
+        GenerateErrorDirective<CodeGenerationContext, JavaCodegenSettings> generateErrorDirective
     ) {
         // TODO
     }
 
     @Override
     public void generateUnion(
-            GenerateUnionDirective<CodeGenerationContext, JavaCodegenSettings> generateUnionDirective
+        GenerateUnionDirective<CodeGenerationContext, JavaCodegenSettings> generateUnionDirective
     ) {
         // TODO
     }
 
     @Override
     public void generateEnumShape(
-            GenerateEnumDirective<CodeGenerationContext, JavaCodegenSettings> generateEnumDirective
+        GenerateEnumDirective<CodeGenerationContext, JavaCodegenSettings> generateEnumDirective
     ) {
         // TODO
     }
 
     @Override
     public void generateIntEnumShape(
-            GenerateIntEnumDirective<CodeGenerationContext, JavaCodegenSettings> generateIntEnumDirective
+        GenerateIntEnumDirective<CodeGenerationContext, JavaCodegenSettings> generateIntEnumDirective
     ) {
         // TODO
     }

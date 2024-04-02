@@ -19,7 +19,7 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  */
 @SmithyUnstableApi
 public class CodeGenerationContext
-        implements CodegenContext<JavaCodegenSettings, JavaWriter, JavaCodegenIntegration> {
+    implements CodegenContext<JavaCodegenSettings, JavaWriter, JavaCodegenIntegration> {
 
     private final Model model;
     private final JavaCodegenSettings settings;
@@ -29,11 +29,11 @@ public class CodeGenerationContext
     private final WriterDelegator<JavaWriter> writerDelegator;
 
     CodeGenerationContext(
-            Model model,
-            JavaCodegenSettings settings,
-            SymbolProvider symbolProvider,
-            FileManifest fileManifest,
-            List<JavaCodegenIntegration> integrations
+        Model model,
+        JavaCodegenSettings settings,
+        SymbolProvider symbolProvider,
+        FileManifest fileManifest,
+        List<JavaCodegenIntegration> integrations
     ) {
         this.model = model;
         this.settings = settings;

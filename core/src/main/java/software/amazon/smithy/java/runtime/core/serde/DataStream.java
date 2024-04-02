@@ -301,9 +301,9 @@ public interface DataStream extends AutoCloseable {
                         return true;
                     } catch (IOException e) {
                         LOGGER.log(
-                                System.Logger.Level.WARNING,
-                                "Unable to rewind file data stream for " + file + ": " + e.getMessage(),
-                                e
+                            System.Logger.Level.WARNING,
+                            "Unable to rewind file data stream for " + file + ": " + e.getMessage(),
+                            e
                         );
                         return false;
                     }

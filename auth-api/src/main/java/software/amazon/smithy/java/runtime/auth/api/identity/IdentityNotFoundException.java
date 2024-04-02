@@ -16,9 +16,9 @@ public class IdentityNotFoundException extends AuthException {
     private final Class<? extends Identity> identityClass;
 
     public IdentityNotFoundException(
-            String message,
-            Class<? extends IdentityResolver<?>> identityResolverClass,
-            Class<? extends Identity> identityClass
+        String message,
+        Class<? extends IdentityResolver<?>> identityResolverClass,
+        Class<? extends Identity> identityClass
     ) {
         super(message);
         this.identityClass = identityClass;

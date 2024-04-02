@@ -46,8 +46,8 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
             return Base64.getDecoder().decode(value.getBytes(StandardCharsets.UTF_8));
         } catch (IllegalArgumentException e) {
             throw new IllegalStateException(
-                    "Expected header for " + schema.id() + " to be a blob, but the "
-                            + "value does not contain valid base64 encoded data"
+                "Expected header for " + schema.id() + " to be a blob, but the "
+                    + "value does not contain valid base64 encoded data"
             );
         }
     }
@@ -105,9 +105,9 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
     @Override
     public Instant readTimestamp(SdkSchema schema) {
         return schema.getTrait(TimestampFormatTrait.class)
-                .map(TimestampFormatter::of)
-                .orElse(TimestampFormatter.Prelude.HTTP_DATE)
-                .parseFromString(value, false); // headers always are strings.
+            .map(TimestampFormatter::of)
+            .orElse(TimestampFormatter.Prelude.HTTP_DATE)
+            .parseFromString(value, false); // headers always are strings.
     }
 
     @Override

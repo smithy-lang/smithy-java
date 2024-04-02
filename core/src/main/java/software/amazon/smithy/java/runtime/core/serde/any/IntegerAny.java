@@ -19,8 +19,8 @@ final class IntegerAny implements Any {
     IntegerAny(int value, SdkSchema schema) {
         if (!(schema.type() == ShapeType.DOCUMENT || schema.type() == ShapeType.INTEGER)) {
             throw new SdkSerdeException(
-                    "Expected integer Any to have an integer or document schema, but found "
-                            + schema
+                "Expected integer Any to have an integer or document schema, but found "
+                    + schema
             );
         }
 

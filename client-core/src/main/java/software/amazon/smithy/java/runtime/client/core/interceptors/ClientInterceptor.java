@@ -147,9 +147,9 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      */
     default <I extends SerializableShape, RequestT> void readAfterSerialization(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
     }
 
@@ -172,9 +172,9 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      */
     default <I extends SerializableShape, RequestT> Value<RequestT> modifyBeforeRetryLoop(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
         return request;
     }
@@ -200,9 +200,9 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      */
     default <I extends SerializableShape, RequestT> void readBeforeAttempt(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
     }
 
@@ -227,9 +227,9 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      */
     default <I extends SerializableShape, RequestT> Value<RequestT> modifyBeforeSigning(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
         return request;
     }
@@ -253,9 +253,9 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      */
     default <I extends SerializableShape, RequestT> void readBeforeSigning(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
     }
 
@@ -278,9 +278,9 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      */
     default <I extends SerializableShape, RequestT> void readAfterSigning(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
     }
 
@@ -307,9 +307,9 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      */
     default <I extends SerializableShape, RequestT> Value<RequestT> modifyBeforeTransmit(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
         return request;
     }
@@ -334,9 +334,9 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      */
     default <I extends SerializableShape, RequestT> void readBeforeTransmit(
-            Context context,
-            I input,
-            Value<RequestT> request
+        Context context,
+        I input,
+        Value<RequestT> request
     ) {
     }
 
@@ -364,10 +364,10 @@ public interface ClientInterceptor {
      * @param <ResponseT> Protocol-specific response type.
      */
     default <I extends SerializableShape, RequestT, ResponseT> void readAfterTransmit(
-            Context context,
-            I input,
-            Value<RequestT> request,
-            Value<ResponseT> response
+        Context context,
+        I input,
+        Value<RequestT> request,
+        Value<ResponseT> response
     ) {
     }
 
@@ -396,10 +396,10 @@ public interface ClientInterceptor {
      * @param <ResponseT> Protocol-specific response type.
      */
     default <I extends SerializableShape, RequestT, ResponseT> Value<ResponseT> modifyBeforeDeserialization(
-            Context context,
-            I input,
-            Value<RequestT> request,
-            Value<ResponseT> response
+        Context context,
+        I input,
+        Value<RequestT> request,
+        Value<ResponseT> response
     ) {
         return response;
     }
@@ -427,10 +427,10 @@ public interface ClientInterceptor {
      * @param <ResponseT> Protocol-specific response type.
      */
     default <I extends SerializableShape, RequestT, ResponseT> void readBeforeDeserialization(
-            Context context,
-            I input,
-            Value<RequestT> request,
-            Value<ResponseT> response
+        Context context,
+        I input,
+        Value<RequestT> request,
+        Value<ResponseT> response
     ) {
     }
 
@@ -458,11 +458,11 @@ public interface ClientInterceptor {
      * @param <ResponseT> Protocol-specific response type.
      */
     default <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> void readAfterDeserialization(
-            Context context,
-            I input,
-            Value<RequestT> request,
-            Value<ResponseT> response,
-            Either<SdkException, O> result
+        Context context,
+        I input,
+        Value<RequestT> request,
+        Value<ResponseT> response,
+        Either<SdkException, O> result
     ) {
     }
 
@@ -490,11 +490,11 @@ public interface ClientInterceptor {
      * @param <ResponseT> Protocol-specific response type.
      */
     default <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> Either<SdkException, O> modifyBeforeAttemptCompletion(
-            Context context,
-            I input,
-            Value<RequestT> request,
-            Value<ResponseT> response,
-            Either<SdkException, O> result
+        Context context,
+        I input,
+        Value<RequestT> request,
+        Value<ResponseT> response,
+        Either<SdkException, O> result
     ) {
         return result;
     }
@@ -524,11 +524,11 @@ public interface ClientInterceptor {
      * @param <ResponseT> Protocol-specific response type.
      */
     default <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> void readAfterAttempt(
-            Context context,
-            I input,
-            Value<RequestT> request,
-            Value<ResponseT> responseIfAvailable,
-            Either<SdkException, O> result
+        Context context,
+        I input,
+        Value<RequestT> request,
+        Value<ResponseT> responseIfAvailable,
+        Either<SdkException, O> result
     ) {
     }
 
@@ -557,11 +557,11 @@ public interface ClientInterceptor {
      * @param <ResponseT> Protocol-specific response type.
      */
     default <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> Either<SdkException, O> modifyBeforeCompletion(
-            Context context,
-            I input,
-            Value<RequestT> requestIfAvailable,
-            Value<ResponseT> responseIfAvailable,
-            Either<SdkException, O> result
+        Context context,
+        I input,
+        Value<RequestT> requestIfAvailable,
+        Value<ResponseT> responseIfAvailable,
+        Either<SdkException, O> result
     ) {
         return result;
     }
@@ -591,11 +591,11 @@ public interface ClientInterceptor {
      * @param <ResponseT> Protocol-specific response type.
      */
     default <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> void readAfterExecution(
-            Context context,
-            I input,
-            Value<RequestT> requestIfAvailable,
-            Value<ResponseT> responseIfAvailable,
-            Either<SdkException, O> result
+        Context context,
+        I input,
+        Value<RequestT> requestIfAvailable,
+        Value<ResponseT> responseIfAvailable,
+        Either<SdkException, O> result
     ) {
     }
 }

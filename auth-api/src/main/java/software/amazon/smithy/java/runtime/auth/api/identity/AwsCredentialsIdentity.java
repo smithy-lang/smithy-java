@@ -53,9 +53,9 @@ public interface AwsCredentialsIdentity extends Identity {
      */
     static AwsCredentialsIdentity create(String accessKeyId, String secretAccessKey, String sessionToken) {
         return new AwsCredentialsIdentityRecord(
-                Objects.requireNonNull(accessKeyId, "accessKeyId is null"),
-                Objects.requireNonNull(secretAccessKey, "secretAccessKey is null"),
-                Optional.ofNullable(sessionToken)
+            Objects.requireNonNull(accessKeyId, "accessKeyId is null"),
+            Objects.requireNonNull(secretAccessKey, "secretAccessKey is null"),
+            Optional.ofNullable(sessionToken)
         );
     }
 }

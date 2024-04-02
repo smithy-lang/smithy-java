@@ -20,11 +20,11 @@ public final class SymbolUtils {
     public static final URL RESERVED_WORDS_FILE = SymbolUtils.class.getResource("reserved-words.txt");
 
     public static final ReservedWords SHAPE_ESCAPER = new ReservedWordsBuilder()
-            .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Shape")
-            .build();
+        .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Shape")
+        .build();
     public static final ReservedWords MEMBER_ESCAPER = new ReservedWordsBuilder()
-            .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Member")
-            .build();
+        .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Member")
+        .build();
 
     private SymbolUtils() {
         // Utility class should not be instantiated
@@ -38,10 +38,10 @@ public final class SymbolUtils {
      */
     public static Symbol fromClass(Class<?> clazz) {
         return Symbol.builder()
-                .name(clazz.getSimpleName())
-                .namespace(clazz.getCanonicalName().replace("." + clazz.getSimpleName(), ""), ".")
-                .putProperty(SymbolProperties.PRIMITIVE, clazz.isPrimitive())
-                .build();
+            .name(clazz.getSimpleName())
+            .namespace(clazz.getCanonicalName().replace("." + clazz.getSimpleName(), ""), ".")
+            .putProperty(SymbolProperties.PRIMITIVE, clazz.isPrimitive())
+            .build();
     }
 
     /**
@@ -52,8 +52,8 @@ public final class SymbolUtils {
      */
     public static Symbol fromBoxedClass(Class<?> boxed, Class<?> unboxed) {
         return fromClass(boxed).toBuilder()
-                .putProperty(SymbolProperties.UNBOXED, fromClass(unboxed))
-                .build();
+            .putProperty(SymbolProperties.UNBOXED, fromClass(unboxed))
+            .build();
     }
 
     /**

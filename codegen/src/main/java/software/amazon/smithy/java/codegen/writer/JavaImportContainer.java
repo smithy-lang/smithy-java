@@ -29,8 +29,8 @@ final class JavaImportContainer implements ImportContainer {
         // Do not import primitive types, java.lang standard library imports,
         // or any symbols already in the same namespace.
         if (symbol.expectProperty(SymbolProperties.PRIMITIVE, Boolean.class)
-                || symbol.getNamespace().startsWith("java.lang")
-                || symbol.getNamespace().equals(namespace)
+            || symbol.getNamespace().startsWith("java.lang")
+            || symbol.getNamespace().equals(namespace)
         ) {
             return;
         }
@@ -56,10 +56,10 @@ final class JavaImportContainer implements ImportContainer {
      */
     private Set<String> getSortedAndFilteredImports() {
         return imports.values()
-                .stream()
-                .filter(s -> s.size() == 1)
-                .map(s -> s.iterator().next())
-                .map(Symbol::getFullName)
-                .collect(Collectors.toCollection(TreeSet::new));
+            .stream()
+            .filter(s -> s.size() == 1)
+            .map(s -> s.iterator().next())
+            .map(Symbol::getFullName)
+            .collect(Collectors.toCollection(TreeSet::new));
     }
 }

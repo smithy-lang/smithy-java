@@ -65,18 +65,18 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
     @Override
     public Symbol listShape(ListShape listShape) {
         return SymbolUtils.fromClass(List.class)
-                .toBuilder()
-                .addReference(listShape.getMember().accept(this))
-                .build();
+            .toBuilder()
+            .addReference(listShape.getMember().accept(this))
+            .build();
     }
 
     @Override
     public Symbol mapShape(MapShape mapShape) {
         return SymbolUtils.fromClass(Map.class)
-                .toBuilder()
-                .addReference(mapShape.getKey().accept(this))
-                .addReference(mapShape.getValue().accept(this))
-                .build();
+            .toBuilder()
+            .addReference(mapShape.getKey().accept(this))
+            .addReference(mapShape.getValue().accept(this))
+            .build();
     }
 
     @Override
@@ -142,13 +142,13 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
     @Override
     public Symbol memberShape(MemberShape memberShape) {
         return toSymbol(
-                model.getShape(memberShape.getTarget())
-                        .orElseThrow(
-                                () -> new CodegenException(
-                                        "Could not find shape " + memberShape.getTarget() + " targeted by "
-                                                + memberShape
-                                )
-                        )
+            model.getShape(memberShape.getTarget())
+                .orElseThrow(
+                    () -> new CodegenException(
+                        "Could not find shape " + memberShape.getTarget() + " targeted by "
+                            + memberShape
+                    )
+                )
         );
     }
 
@@ -187,9 +187,9 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
     private Symbol getJavaClassSymbol(Shape shape) {
         String name = SymbolUtils.getDefaultName(shape, service);
         return Symbol.builder()
-                .name(name)
-                .namespace(format("%s.model", packageNamespace), ".")
-                .declarationFile(format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name))
-                .build();
+            .name(name)
+            .namespace(format("%s.model", packageNamespace), ".")
+            .declarationFile(format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name))
+            .build();
     }
 }

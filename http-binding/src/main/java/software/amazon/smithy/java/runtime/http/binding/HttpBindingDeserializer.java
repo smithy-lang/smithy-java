@@ -74,19 +74,19 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 case LABEL -> throw new UnsupportedOperationException("httpLabel binding not supported yet");
                 case QUERY -> throw new UnsupportedOperationException("httpQuery binding not supported yet");
                 case HEADER -> headers.firstValue(bindingMatcher.header())
-                        .ifPresent(headerValue -> eachEntry.accept(member, new HttpHeaderDeserializer(headerValue)));
+                    .ifPresent(headerValue -> eachEntry.accept(member, new HttpHeaderDeserializer(headerValue)));
                 case BODY -> bodyMembers.add(member.id().getName());
                 case PAYLOAD -> {
                     if (member.memberTarget().type() == ShapeType.STRUCTURE) {
                         // Read the payload into a byte buffer to deserialize a shape in the body.
                         LOGGER.log(
-                                System.Logger.Level.TRACE,
-                                () -> "Reading " + schema + " body to bytes for structure payload"
+                            System.Logger.Level.TRACE,
+                            () -> "Reading " + schema + " body to bytes for structure payload"
                         );
                         var bytes = body.readToBytes(maxInMemoryPayload);
                         LOGGER.log(
-                                System.Logger.Level.TRACE,
-                                () -> "Deserializing the payload of " + schema + " via " + payloadCodec.getMediaType()
+                            System.Logger.Level.TRACE,
+                            () -> "Deserializing the payload of " + schema + " via " + payloadCodec.getMediaType()
                         );
                         eachEntry.accept(member, payloadCodec.createDeserializer(bytes));
                     } else if (member.memberTarget().type() == ShapeType.BLOB) {
@@ -107,13 +107,13 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
             var bytes = readPayloadBytes();
             LOGGER.log(
-                    System.Logger.Level.TRACE,
-                    () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
+                System.Logger.Level.TRACE,
+                () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
             );
             payloadCodec.createDeserializer(bytes).readStruct(payloadOnly, eachEntry);
             LOGGER.log(
-                    System.Logger.Level.TRACE,
-                    () -> "Deserialized the structured body of " + schema + " via " + payloadCodec.getMediaType()
+                System.Logger.Level.TRACE,
+                () -> "Deserialized the structured body of " + schema + " via " + payloadCodec.getMediaType()
             );
         }
     }
@@ -123,7 +123,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         String contentType = headers.firstValue("content-type").orElse("");
         if (!contentType.equals(payloadCodec.getMediaType())) {
             throw new SdkSerdeException(
-                    "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec.toString()
+                "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec.toString()
             );
         }
 

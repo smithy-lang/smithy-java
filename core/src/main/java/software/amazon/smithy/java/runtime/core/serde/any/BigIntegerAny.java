@@ -20,8 +20,8 @@ final class BigIntegerAny implements Any {
     BigIntegerAny(BigInteger value, SdkSchema schema) {
         if (!(schema.type() == ShapeType.DOCUMENT || schema.type() == ShapeType.BIG_INTEGER)) {
             throw new SdkSerdeException(
-                    "Expected bigInteger Any to have a bigInteger or document schema, but found "
-                            + schema
+                "Expected bigInteger Any to have a bigInteger or document schema, but found "
+                    + schema
             );
         }
 

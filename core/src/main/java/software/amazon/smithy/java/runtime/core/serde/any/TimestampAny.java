@@ -20,8 +20,8 @@ final class TimestampAny implements Any {
     TimestampAny(Instant value, SdkSchema schema) {
         if (!(schema.type() == ShapeType.DOCUMENT || schema.type() == ShapeType.TIMESTAMP)) {
             throw new SdkSerdeException(
-                    "Expected timestamp Any to have a timestamp or document schema, but found "
-                            + schema
+                "Expected timestamp Any to have a timestamp or document schema, but found "
+                    + schema
             );
         }
 

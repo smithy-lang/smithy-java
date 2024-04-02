@@ -50,7 +50,7 @@ public final class ApiCallTimeoutTransport implements ClientTransport {
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
             if (e.getCause() != null) {
                 String message = "Error calling " + call.operation().schema().id().getName() + ": "
-                        + e.getCause().getMessage();
+                    + e.getCause().getMessage();
                 throw new SdkException(message, e.getCause());
             } else {
                 throw new RuntimeException(e);

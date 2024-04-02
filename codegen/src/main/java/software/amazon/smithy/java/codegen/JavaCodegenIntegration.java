@@ -9,7 +9,7 @@ import software.amazon.smithy.codegen.core.SmithyIntegration;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 
 public class JavaCodegenIntegration
-        implements SmithyIntegration<JavaCodegenSettings, JavaWriter, CodeGenerationContext> {
+    implements SmithyIntegration<JavaCodegenSettings, JavaWriter, CodeGenerationContext> {
 
 
 }
