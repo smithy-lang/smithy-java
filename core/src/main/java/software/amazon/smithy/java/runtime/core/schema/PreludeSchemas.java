@@ -41,7 +41,8 @@ public final class PreludeSchemas {
         .type(ShapeType.BIG_DECIMAL)
         .id("smithy.api#BigDecimal")
         .build();
-
+    public static final SdkSchema DOCUMENT = SdkSchema.builder().type(ShapeType.DOCUMENT).id("smithy.api#Document").build();
+    
     // Primitive types
     public static final SdkSchema PRIMITIVE_BOOLEAN = SdkSchema.builder()
         .type(ShapeType.BOOLEAN)
