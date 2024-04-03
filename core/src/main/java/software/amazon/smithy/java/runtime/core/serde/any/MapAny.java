@@ -33,8 +33,7 @@ final class MapAny implements Any {
                 var valueSchema = entry.getValue().schema();
                 // Every key must resolve to a valid map key type.
                 switch (entry.getKey().type()) {
-                    case STRING, ENUM, INTEGER, INT_ENUM, LONG -> {
-                    }
+                    case STRING, ENUM, INTEGER, INT_ENUM, LONG -> {}
                     default -> throw new SdkSerdeException(
                         "Map keys must be a string, enum, integer, intEnum, or long, "
                             + "but found " + entry.getKey()

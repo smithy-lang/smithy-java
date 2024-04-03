@@ -31,6 +31,5 @@ public final class HttpContext {
      */
     public static final Context.Key<Duration> HTTP_REQUEST_TIMEOUT = Context.key("HTTP.RequestTimeout");
 
-    private HttpContext() {
-    }
+    private HttpContext() {}
 }

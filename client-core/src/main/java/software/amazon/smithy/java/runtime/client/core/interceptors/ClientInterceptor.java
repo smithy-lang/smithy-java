@@ -40,8 +40,7 @@ public interface ClientInterceptor {
     /**
      * An interceptor that does nothing.
      */
-    ClientInterceptor NOOP = new ClientInterceptor() {
-    };
+    ClientInterceptor NOOP = new ClientInterceptor() {};
 
     /**
      * Combines multiple interceptors into a single interceptor.
@@ -78,8 +77,7 @@ public interface ClientInterceptor {
      * @param input The modeled input of the call.
      * @param <I> Input type.
      */
-    default <I extends SerializableShape> void readBeforeExecution(Context context, I input) {
-    }
+    default <I extends SerializableShape> void readBeforeExecution(Context context, I input) {}
 
     /**
      * A hook called before the input message is serialized into a transport message.
@@ -124,8 +122,7 @@ public interface ClientInterceptor {
      * @param input The modeled input of the call.
      * @param <I> Input type.
      */
-    default <I extends SerializableShape> void readBeforeSerialization(Context context, I input) {
-    }
+    default <I extends SerializableShape> void readBeforeSerialization(Context context, I input) {}
 
     /**
      * A hook called after the input message is marshalled into a protocol-specific request.
@@ -150,8 +147,7 @@ public interface ClientInterceptor {
         Context context,
         I input,
         Value<RequestT> request
-    ) {
-    }
+    ) {}
 
     /**
      * A hook called before the retry loop is entered that can be used to modify and return a new request.
@@ -203,8 +199,7 @@ public interface ClientInterceptor {
         Context context,
         I input,
         Value<RequestT> request
-    ) {
-    }
+    ) {}
 
     /**
      * A hook called before the request is signed; this method can modify and return a new request of the same type.
@@ -256,8 +251,7 @@ public interface ClientInterceptor {
         Context context,
         I input,
         Value<RequestT> request
-    ) {
-    }
+    ) {}
 
     /**
      * A hook called after the transport request message is signed.
@@ -281,8 +275,7 @@ public interface ClientInterceptor {
         Context context,
         I input,
         Value<RequestT> request
-    ) {
-    }
+    ) {}
 
     /**
      * A hook called before the transport request message is sent to the service.
@@ -337,8 +330,7 @@ public interface ClientInterceptor {
         Context context,
         I input,
         Value<RequestT> request
-    ) {
-    }
+    ) {}
 
     /**
      * A hook called after the transport request message is sent to the service and a transport response message is
@@ -368,8 +360,7 @@ public interface ClientInterceptor {
         I input,
         Value<RequestT> request,
         Value<ResponseT> response
-    ) {
-    }
+    ) {}
 
     /**
      * A hook called before the response is deserialized.
@@ -431,8 +422,7 @@ public interface ClientInterceptor {
         I input,
         Value<RequestT> request,
         Value<ResponseT> response
-    ) {
-    }
+    ) {}
 
     /**
      * A hook called after the transport response message is deserialized.
@@ -463,8 +453,7 @@ public interface ClientInterceptor {
         Value<RequestT> request,
         Value<ResponseT> response,
         Either<SdkException, O> result
-    ) {
-    }
+    ) {}
 
     /**
      * A hook called when an attempt is completed. This method can modify and return a new output or error matching
@@ -529,8 +518,7 @@ public interface ClientInterceptor {
         Value<RequestT> request,
         Value<ResponseT> responseIfAvailable,
         Either<SdkException, O> result
-    ) {
-    }
+    ) {}
 
     /**
      * A hook called when an execution is completed.
@@ -596,6 +584,5 @@ public interface ClientInterceptor {
         Value<RequestT> requestIfAvailable,
         Value<ResponseT> responseIfAvailable,
         Either<SdkException, O> result
-    ) {
-    }
+    ) {}
 }

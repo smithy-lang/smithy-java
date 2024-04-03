@@ -18,8 +18,7 @@ import software.amazon.smithy.utils.SmithyBuilder;
  */
 public final class TypeRegistry {
 
-    public record Entry<T extends SerializableShape>(Class<T> type, Supplier<SdkShapeBuilder<T>> supplier) {
-    };
+    public record Entry<T extends SerializableShape>(Class<T> type, Supplier<SdkShapeBuilder<T>> supplier) {}
 
     private final Map<ShapeId, Entry<?>> supplierMap;
 

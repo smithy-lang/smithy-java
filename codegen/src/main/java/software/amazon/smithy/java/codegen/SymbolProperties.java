@@ -12,6 +12,5 @@ public final class SymbolProperties {
     // TODO: Docs
     public static final String PRIMITIVE = "primitive";
 
-    private SymbolProperties() {
-    }
+    private SymbolProperties() {}
 }
