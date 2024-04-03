@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.example.model;
 
 import java.time.Instant;
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
@@ -24,16 +25,16 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
 public final class PutPersonOutput implements SerializableShape {
 
     static final ShapeId ID = ShapeId.from("smithy.example#PutPersonOutput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", SharedSchemas.STRING)
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
         .id(ID)
         .traits(new RequiredTrait())
         .build();
     private static final SdkSchema SCHEMA_FAVORITE_COLOR = SdkSchema
-        .memberBuilder(1, "favoriteColor", SharedSchemas.STRING)
+        .memberBuilder(1, "favoriteColor", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpHeaderTrait("X-Favorite-Color"))
         .build();
-    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder(2, "age", SharedSchemas.INTEGER)
+    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder(2, "age", PreludeSchemas.INTEGER)
         .id(ID)
         .traits(new JsonNameTrait("Age"))
         .build();
@@ -41,7 +42,7 @@ public final class PutPersonOutput implements SerializableShape {
         .id(ID)
         .traits(new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
         .build();
-    private static final SdkSchema SCHEMA_STATUS = SdkSchema.memberBuilder(4, "status", SharedSchemas.INTEGER)
+    private static final SdkSchema SCHEMA_STATUS = SdkSchema.memberBuilder(4, "status", PreludeSchemas.INTEGER)
         .id(ID)
         .traits(new HttpResponseCodeTrait())
         .build();

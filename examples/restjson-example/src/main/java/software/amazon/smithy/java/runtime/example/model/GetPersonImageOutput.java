@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.example.model;
 
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
@@ -21,7 +22,7 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class GetPersonImageOutput implements SerializableShape {
 
     static final ShapeId ID = ShapeId.from("smithy.example#GetPersonImageOutput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", SharedSchemas.STRING)
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpHeaderTrait("Person-Name"), new RequiredTrait())
         .build();

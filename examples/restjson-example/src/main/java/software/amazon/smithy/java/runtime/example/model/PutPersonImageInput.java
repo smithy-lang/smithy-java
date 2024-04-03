@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.example.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
@@ -26,15 +27,15 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class PutPersonImageInput implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#PutPersonInput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", SharedSchemas.STRING)
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpLabelTrait(), new RequiredTrait())
         .build();
-    private static final SdkSchema SCHEMA_TAGS = SdkSchema.memberBuilder(1, "tags", SharedSchemas.STRING)
+    private static final SdkSchema SCHEMA_TAGS = SdkSchema.memberBuilder(1, "tags", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpHeaderTrait("Tags"))
         .build();
-    private static final SdkSchema SCHEMA_MORE_TAGS = SdkSchema.memberBuilder(2, "moreTags", SharedSchemas.STRING)
+    private static final SdkSchema SCHEMA_MORE_TAGS = SdkSchema.memberBuilder(2, "moreTags", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpQueryTrait("MoreTags"))
         .build();
