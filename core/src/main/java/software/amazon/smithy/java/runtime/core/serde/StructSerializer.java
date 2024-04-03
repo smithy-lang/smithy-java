@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
  * Drives structure serialization.
@@ -171,11 +171,11 @@ public interface StructSerializer {
         }
     }
 
-    default void documentMember(SdkSchema member, Any value) {
+    default void documentMember(SdkSchema member, Document value) {
         member(member, writer -> writer.writeDocument(value));
     }
 
-    default void documentMemberIf(SdkSchema member, Any value) {
+    default void documentMemberIf(SdkSchema member, Document value) {
         if (value != null) {
             documentMember(member, value);
         }

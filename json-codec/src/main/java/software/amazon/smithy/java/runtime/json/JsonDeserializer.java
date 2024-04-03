@@ -17,7 +17,6 @@ import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
 import software.amazon.smithy.model.traits.JsonNameTrait;
 
 final class JsonDeserializer implements ShapeDeserializer {
@@ -144,9 +143,9 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public Any readDocument(SdkSchema schema) {
+    public JsonDocument readDocument() {
         try {
-            return new JsonAny(schema, iter.readAny(), useJsonName, defaultTimestampFormat, useTimestampFormat);
+            return new JsonDocument(iter.readAny(), useJsonName, defaultTimestampFormat, useTimestampFormat);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -154,12 +153,7 @@ final class JsonDeserializer implements ShapeDeserializer {
 
     @Override
     public Instant readTimestamp(SdkSchema schema) {
-        try {
-            return new JsonAny(schema, iter.readAny(), useJsonName, defaultTimestampFormat, useTimestampFormat)
-                .asTimestamp();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return readDocument().asTimestamp();
     }
 
     @Override
@@ -181,7 +175,6 @@ final class JsonDeserializer implements ShapeDeserializer {
     private SdkSchema resolveMember(SdkSchema schema, String field) {
         SdkSchema member = null;
         if (useJsonName) {
-            // TODO: Precompute and cache this.
             member = schema.findMember(
                 m -> m.getTrait(JsonNameTrait.class)
                     .map(JsonNameTrait::getValue)

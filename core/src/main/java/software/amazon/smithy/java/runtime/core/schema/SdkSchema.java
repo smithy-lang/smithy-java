@@ -54,6 +54,17 @@ public class SdkSchema {
     /**
      * Create a builder for a member.
      *
+     * @param memberName   Name of the member.
+     * @param memberTarget Schema the member targets.
+     * @return Returns the member builder.
+     */
+    public static Builder memberBuilder(String memberName, SdkSchema memberTarget) {
+        return memberBuilder(-1, memberName, memberTarget);
+    }
+
+    /**
+     * Create a builder for a member.
+     *
      * @param index        Index of the code generated member.
      * @param memberName   Name of the member.
      * @param memberTarget Schema the member targets.
@@ -203,6 +214,32 @@ public class SdkSchema {
      */
     public final SdkSchema member(String memberName) {
         return member(memberName, null);
+    }
+
+    /**
+     * Get a member from this shape by name, or generate a synthetic member that uses the given name, targets
+     * {@link PreludeSchemas#DOCUMENT}, and is a member of DOCUMENT.
+     *
+     * @param memberName Member to get or synthesize.
+     * @return the member.
+     */
+    public final SdkSchema documentMember(String memberName) {
+        return documentMember(memberName, PreludeSchemas.DOCUMENT);
+    }
+
+    /**
+     * Get a member from this shape by name, or generate a synthetic member that uses the given name, targets
+     * {@link PreludeSchemas#DOCUMENT}, and is a member of DOCUMENT.
+     *
+     * @param memberName Member to get or synthesize.
+     * @return the member.
+     */
+    public final SdkSchema documentMember(String memberName, SdkSchema targetSchema) {
+        var result = member(memberName);
+        if (result == null) {
+            result = SdkSchema.memberBuilder(memberName, targetSchema).id(PreludeSchemas.DOCUMENT.id()).build();
+        }
+        return result;
     }
 
     /**

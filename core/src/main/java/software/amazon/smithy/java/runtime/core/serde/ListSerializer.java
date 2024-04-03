@@ -12,8 +12,7 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
  * Helper class that can be used to serialize content between values.
@@ -202,14 +201,7 @@ public final class ListSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeShape(SerializableShape value) {
-        beforeWrite();
-        delegate.writeShape(value);
-        afterWrite(null);
-    }
-
-    @Override
-    public void writeDocument(Any value) {
+    public void writeDocument(Document value) {
         beforeWrite();
         delegate.writeDocument(value);
         afterWrite(null);

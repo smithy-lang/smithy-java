@@ -142,7 +142,10 @@ public final class PutPersonImageInput implements SerializableShape {
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, (member, de) -> {
-                switch (member.memberIndex()) {
+                int index = member.memberIndex() == -1
+                    ? SCHEMA.member(member.memberName()).memberIndex()
+                    : member.memberIndex();
+                switch (index) {
                     case 0 -> name(de.readString(member));
                     case 1 -> de.readList(SCHEMA_TAGS, ser -> tags.add(ser.readString(SCHEMA_TAGS)));
                     case 2 -> de.readList(SCHEMA_MORE_TAGS, ser -> moreTags.add(ser.readString(SCHEMA_MORE_TAGS)));

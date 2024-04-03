@@ -22,7 +22,7 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PersonDirectory;
@@ -100,7 +100,7 @@ public class GenericTest {
         System.out.println(codec.serializeToString(input));
 
         // Convert to an Any and then serialize to JSON.
-        Any any = Any.of(input);
+        Document any = Document.ofStruct(input);
         System.out.println(codec.serializeToString(any));
 
         // Send the Any to a person builder.

@@ -14,7 +14,7 @@ import software.amazon.smithy.model.traits.UnitTypeTrait;
  * {@link SdkSchema} definitions for the Smithy prelude
  */
 public final class PreludeSchemas {
-    public static final SdkSchema BLOB = SdkSchema.builder().type(ShapeType.BLOB).id("smithy.api#String").build();
+    public static final SdkSchema BLOB = SdkSchema.builder().type(ShapeType.BLOB).id("smithy.api#Blob").build();
     public static final SdkSchema BOOLEAN = SdkSchema.builder()
         .type(ShapeType.BOOLEAN)
         .id("smithy.api#Boolean")
@@ -41,8 +41,11 @@ public final class PreludeSchemas {
         .type(ShapeType.BIG_DECIMAL)
         .id("smithy.api#BigDecimal")
         .build();
-    public static final SdkSchema DOCUMENT = SdkSchema.builder().type(ShapeType.DOCUMENT).id("smithy.api#Document").build();
-    
+    public static final SdkSchema DOCUMENT = SdkSchema.builder()
+        .type(ShapeType.DOCUMENT)
+        .id("smithy.api#Document")
+        .build();
+
     // Primitive types
     public static final SdkSchema PRIMITIVE_BOOLEAN = SdkSchema.builder()
         .type(ShapeType.BOOLEAN)
@@ -87,5 +90,35 @@ public final class PreludeSchemas {
 
     private PreludeSchemas() {
         // Class should not be instantiated.
+    }
+
+    /**
+     * Returns the most appropriate prelude schema based on the given type.
+     *
+     * <p>Numeric and boolean types return the nullable value
+     * (e.g., {@link #INTEGER and not {@link #PRIMITIVE_INTEGER}).
+     *
+     * <p>Types with no corresponding prelude schema (e.g., LIST, STRUCTURE, UNION), are returned as a
+     * {@link #DOCUMENT} schema.
+     *
+     * @param type Type to compute a schema from.
+     * @return the schema type.
+     */
+    public static SdkSchema getSchemaForType(ShapeType type) {
+        return switch (type) {
+            case BOOLEAN -> PreludeSchemas.BOOLEAN;
+            case BYTE -> PreludeSchemas.BYTE;
+            case SHORT -> PreludeSchemas.SHORT;
+            case INTEGER, INT_ENUM -> PreludeSchemas.INTEGER;
+            case LONG -> PreludeSchemas.LONG;
+            case FLOAT -> PreludeSchemas.FLOAT;
+            case DOUBLE -> PreludeSchemas.DOUBLE;
+            case BIG_INTEGER -> PreludeSchemas.BIG_INTEGER;
+            case BIG_DECIMAL -> PreludeSchemas.BIG_DECIMAL;
+            case STRING, ENUM -> PreludeSchemas.STRING;
+            case BLOB -> PreludeSchemas.BLOB;
+            case TIMESTAMP -> PreludeSchemas.TIMESTAMP;
+            default -> PreludeSchemas.DOCUMENT;
+        };
     }
 }

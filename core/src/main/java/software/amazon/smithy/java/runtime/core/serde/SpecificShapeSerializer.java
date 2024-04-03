@@ -9,9 +9,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.Consumer;
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
  * Expects to serialize a specific kind of shape and fails if other shapes are serialized.
@@ -34,6 +34,13 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
     @Override
     public StructSerializer beginStruct(SdkSchema schema) {
         throw throwForInvalidState(schema);
+    }
+
+    // You can only override the method that returns a struct serializer. This ensures that implementations only
+    // need to implement a single method to support both structure calling patterns.
+    @Override
+    public final void beginStruct(SdkSchema schema, Consumer<StructSerializer> structSerializerConsumer) {
+        ShapeSerializer.super.beginStruct(schema, structSerializerConsumer);
     }
 
     @Override
@@ -107,12 +114,7 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeShape(SerializableShape value) {
-        throw throwForInvalidState(null);
-    }
-
-    @Override
-    public void writeDocument(Any value) {
-        throw throwForInvalidState(value.schema());
+    public void writeDocument(Document value) {
+        throw throwForInvalidState(PreludeSchemas.DOCUMENT);
     }
 }

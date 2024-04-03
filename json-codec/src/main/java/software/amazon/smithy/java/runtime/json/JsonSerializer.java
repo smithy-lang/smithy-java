@@ -15,13 +15,11 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.StructSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class JsonSerializer implements ShapeSerializer {
@@ -153,16 +151,6 @@ final class JsonSerializer implements ShapeSerializer {
             ? schema.getTrait(TimestampFormatTrait.class).map(TimestampFormatter::of).orElse(defaultTimestampFormat)
             : defaultTimestampFormat;
         format.serializeToUnderlyingFormat(schema, value, this);
-    }
-
-    @Override
-    public void writeShape(SerializableShape value) {
-        value.serialize(this);
-    }
-
-    @Override
-    public void writeDocument(Any value) {
-        value.serialize(this);
     }
 
     @Override

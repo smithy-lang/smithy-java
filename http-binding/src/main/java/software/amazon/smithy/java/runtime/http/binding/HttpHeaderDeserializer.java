@@ -15,7 +15,7 @@ import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class HttpHeaderDeserializer implements ShapeDeserializer {
@@ -93,7 +93,7 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public Any readDocument(SdkSchema schema) {
+    public Document readDocument() {
         throw new UnsupportedOperationException("Documents are not supported in HTTP header bindings");
     }
 

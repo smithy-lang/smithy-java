@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.example.model;
+package software.amazon.smithy.java.runtime.core.serde.document;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -20,46 +20,33 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.HttpLabelTrait;
-import software.amazon.smithy.model.traits.HttpQueryParamsTrait;
-import software.amazon.smithy.model.traits.HttpQueryTrait;
 import software.amazon.smithy.model.traits.JsonNameTrait;
-import software.amazon.smithy.model.traits.RequiredTrait;
 
-// Example of a potentially generated shape.
-public final class PutPersonInput implements SerializableShape {
+class Person implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#PutPersonInput");
     private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
         .id(ID)
-        .traits(new HttpLabelTrait(), new RequiredTrait())
         .build();
-    private static final SdkSchema SCHEMA_FAVORITE_COLOR = SdkSchema
-        .memberBuilder(1, "favoriteColor", PreludeSchemas.STRING)
-        .id(ID)
-        .traits(new HttpQueryTrait("favoriteColor"))
-        .build();
-    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder(2, "age", PreludeSchemas.INTEGER)
+    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder(1, "age", PreludeSchemas.INTEGER)
         .id(ID)
         .traits(new JsonNameTrait("Age"))
         .build();
-    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder(3, "birthday", SharedSchemas.BIRTHDAY)
+    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder(2, "birthday", SharedSchemas.BIRTHDAY)
         .id(ID)
         .build();
-    private static final SdkSchema SCHEMA_BINARY = SdkSchema.memberBuilder(4, "binary", PreludeSchemas.BLOB)
+    private static final SdkSchema SCHEMA_BINARY = SdkSchema.memberBuilder(3, "binary", PreludeSchemas.BLOB)
         .id(ID)
         .build();
     private static final SdkSchema SCHEMA_QUERY_PARAMS = SdkSchema
-        .memberBuilder(5, "queryParams", SharedSchemas.MAP_LIST_STRING)
+        .memberBuilder(4, "tags", SharedSchemas.MAP_LIST_STRING)
         .id(ID)
-        .traits(new HttpQueryParamsTrait())
         .build();
     static final SdkSchema SCHEMA = SdkSchema.builder()
         .id(ID)
         .type(ShapeType.STRUCTURE)
         .members(
             SCHEMA_NAME,
-            SCHEMA_FAVORITE_COLOR,
             SCHEMA_AGE,
             SCHEMA_BIRTHDAY,
             SCHEMA_BINARY,
@@ -70,17 +57,15 @@ public final class PutPersonInput implements SerializableShape {
     private final String name;
     private final int age;
     private final Instant birthday;
-    private final String favoriteColor;
     private final byte[] binary;
-    private final Map<String, List<String>> queryParams;
+    private final Map<String, List<String>> tags;
 
-    private PutPersonInput(Builder builder) {
+    private Person(Builder builder) {
         this.name = builder.name;
         this.age = builder.age;
         this.birthday = builder.birthday;
-        this.favoriteColor = builder.favoriteColor;
         this.binary = builder.binary;
-        this.queryParams = builder.queryParams;
+        this.tags = builder.tags;
     }
 
     public static Builder builder() {
@@ -103,8 +88,8 @@ public final class PutPersonInput implements SerializableShape {
         return binary;
     }
 
-    public Map<String, List<String>> queryParams() {
-        return queryParams;
+    public Map<String, List<String>> tags() {
+        return tags;
     }
 
     @Override
@@ -118,11 +103,10 @@ public final class PutPersonInput implements SerializableShape {
             st.stringMember(SCHEMA_NAME, name);
             st.integerMember(SCHEMA_AGE, age);
             st.timestampMemberIf(SCHEMA_BIRTHDAY, birthday);
-            st.stringMemberIf(SCHEMA_FAVORITE_COLOR, favoriteColor);
             st.blobMemberIf(SCHEMA_BINARY, binary);
-            if (!queryParams.isEmpty()) {
+            if (!tags.isEmpty()) {
                 st.mapMember(SCHEMA_QUERY_PARAMS, m -> {
-                    queryParams.forEach((k, v) -> m.entry(k, mv -> {
+                    tags.forEach((k, v) -> m.entry(k, mv -> {
                         mv.beginList(SharedSchemas.MAP_LIST_STRING.member("value"), mvl -> {
                             v.forEach(value -> mvl.writeString(SharedSchemas.LIST_OF_STRING.member("member"), value));
                         });
@@ -132,21 +116,20 @@ public final class PutPersonInput implements SerializableShape {
         });
     }
 
-    public static final class Builder implements SdkShapeBuilder<PutPersonInput> {
+    public static final class Builder implements SdkShapeBuilder<Person> {
 
         private String name;
         private int age = 0;
         private Instant birthday;
-        private String favoriteColor;
         private byte[] binary;
-        private Map<String, List<String>> queryParams = Collections.emptyMap();
+        private Map<String, List<String>> tags = Collections.emptyMap();
 
         private Builder() {
         }
 
         @Override
-        public PutPersonInput build() {
-            return new PutPersonInput(this);
+        public Person build() {
+            return new Person(this);
         }
 
         public Builder age(int age) {
@@ -164,18 +147,13 @@ public final class PutPersonInput implements SerializableShape {
             return this;
         }
 
-        public Builder favoriteColor(String favoriteColor) {
-            this.favoriteColor = favoriteColor;
-            return this;
-        }
-
         public Builder binary(byte[] binary) {
             this.binary = binary;
             return this;
         }
 
-        public Builder queryParams(Map<String, List<String>> queryParams) {
-            this.queryParams = queryParams;
+        public Builder tags(Map<String, List<String>> tags) {
+            this.tags = tags;
             return this;
         }
 
@@ -187,11 +165,10 @@ public final class PutPersonInput implements SerializableShape {
                     : member.memberIndex();
                 switch (index) {
                     case 0 -> name(de.readString(member));
-                    case 1 -> favoriteColor(de.readString(member));
-                    case 2 -> age(de.readInteger(member));
-                    case 3 -> birthday(de.readTimestamp(member));
-                    case 4 -> binary(de.readBlob(member));
-                    case 5 -> {
+                    case 1 -> age(de.readInteger(member));
+                    case 2 -> birthday(de.readTimestamp(member));
+                    case 3 -> binary(de.readBlob(member));
+                    case 4 -> {
                         Map<String, List<String>> result = new LinkedHashMap<>();
                         de.readStringMap(SCHEMA_QUERY_PARAMS, (key, v) -> {
                             v.readList(SharedSchemas.MAP_LIST_STRING.member("member"), list -> {
@@ -199,7 +176,7 @@ public final class PutPersonInput implements SerializableShape {
                                     .add(list.readString(SharedSchemas.LIST_OF_STRING.member("member")));
                             });
                         });
-                        queryParams(result);
+                        tags(result);
                     }
                 }
             });

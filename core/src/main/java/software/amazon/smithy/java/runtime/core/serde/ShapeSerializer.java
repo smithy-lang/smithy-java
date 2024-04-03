@@ -12,7 +12,7 @@ import java.time.Instant;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
  * Serializes a shape by receiving the Smithy data model and writing output to a receiver owned by the serializer.
@@ -162,14 +162,16 @@ public interface ShapeSerializer extends Flushable {
      *
      * @param value Shape to serialize.
      */
-    void writeShape(SerializableShape value);
+    default void writeShape(SerializableShape value) {
+        value.serialize(this);
+    }
 
     /**
      * Serialize a document shape.
      *
      * @param value  Value to serialize.
      */
-    default void writeDocument(Any value) {
+    default void writeDocument(Document value) {
         writeShape(value);
     }
 }

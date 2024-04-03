@@ -12,8 +12,7 @@ import java.time.Instant;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
  * Ensures that a value is written to a serializer when required (e.g., when writing structure members).
@@ -136,13 +135,7 @@ public final class RequiredWriteSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeShape(SerializableShape value) {
-        delegate.writeShape(value);
-        wroteSomething = true;
-    }
-
-    @Override
-    public void writeDocument(Any value) {
+    public void writeDocument(Document value) {
         delegate.writeDocument(value);
         wroteSomething = true;
     }
