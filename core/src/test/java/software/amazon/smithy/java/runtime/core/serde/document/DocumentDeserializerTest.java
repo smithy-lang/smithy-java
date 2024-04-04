@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.runtime.core.testmodels.Person;
 
 public class DocumentDeserializerTest {
     @Test

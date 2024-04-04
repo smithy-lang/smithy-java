@@ -29,6 +29,7 @@ import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
+import software.amazon.smithy.java.runtime.core.testmodels.Person;
 
 public class DocumentTest {
     @Test

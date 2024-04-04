@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.core.serde.document;
+package software.amazon.smithy.java.runtime.core.testmodels;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -22,9 +22,9 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.JsonNameTrait;
 
-class Person implements SerializableShape {
+public final class Person implements SerializableShape {
 
-    public static final ShapeId ID = ShapeId.from("smithy.example#PutPersonInput");
+    public static final ShapeId ID = ShapeId.from("smithy.example#Person");
     private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
         .id(ID)
         .build();
