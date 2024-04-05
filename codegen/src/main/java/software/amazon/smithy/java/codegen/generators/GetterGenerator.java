@@ -5,20 +5,17 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-import java.util.Collection;
 import java.util.Collections;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.BlobShape;
 import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeVisitor;
 import software.amazon.smithy.model.traits.ErrorTrait;
-import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.utils.StringUtils;
 
 /**
@@ -89,17 +86,17 @@ final class GetterGenerator implements Runnable {
         @Override
         public Void listShape(ListShape shape) {
             writer.pushState(new GetterSection(member))
-                    .write(
-                            """
-                                public $1T $2L() {
-                                    return $2L != null ? $2L : $3T.emptyList();
-                                }
-                                """,
-                            symbolProvider.toSymbol(shape),
-                            symbolProvider.toMemberName(member),
-                            Collections.class
-                    )
-                    .popState();
+                .write(
+                    """
+                        public $1T $2L() {
+                            return $2L != null ? $2L : $3T.emptyList();
+                        }
+                        """,
+                    symbolProvider.toSymbol(shape),
+                    symbolProvider.toMemberName(member),
+                    Collections.class
+                )
+                .popState();
             writeHasCollection();
             return null;
         }
@@ -107,17 +104,17 @@ final class GetterGenerator implements Runnable {
         @Override
         public Void mapShape(MapShape shape) {
             writer.pushState(new GetterSection(member))
-                    .write(
-                            """
-                                public $1T $2L() {
-                                    return $2L != null ? $2L : $3T.emptyMap();
-                                }
-                                """,
-                            symbolProvider.toSymbol(shape),
-                            symbolProvider.toMemberName(member),
-                            Collections.class
-                    )
-                    .popState();
+                .write(
+                    """
+                        public $1T $2L() {
+                            return $2L != null ? $2L : $3T.emptyMap();
+                        }
+                        """,
+                    symbolProvider.toSymbol(shape),
+                    symbolProvider.toMemberName(member),
+                    Collections.class
+                )
+                .popState();
             writeHasCollection();
             return null;
         }
