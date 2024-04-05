@@ -19,13 +19,13 @@ public final class Bird implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Bird");
     private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
-            .id(ID)
-            .build();
+        .id(ID)
+        .build();
     static final SdkSchema SCHEMA = SdkSchema.builder()
-            .id(ID)
-            .type(ShapeType.STRUCTURE)
-            .members(SCHEMA_NAME)
-            .build();
+        .id(ID)
+        .type(ShapeType.STRUCTURE)
+        .members(SCHEMA_NAME)
+        .build();
 
     private final String name;
 
@@ -73,8 +73,8 @@ public final class Bird implements SerializableShape {
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, (member, de) -> {
                 int index = member.memberIndex() == -1
-                            ? SCHEMA.member(member.memberName()).memberIndex()
-                            : member.memberIndex();
+                    ? SCHEMA.member(member.memberName()).memberIndex()
+                    : member.memberIndex();
                 switch (index) {
                     case 0 -> name(de.readString(member));
                 }

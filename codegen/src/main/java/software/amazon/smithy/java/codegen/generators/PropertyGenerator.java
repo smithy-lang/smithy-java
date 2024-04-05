@@ -33,11 +33,15 @@ final class PropertyGenerator implements Runnable {
             if (shape.hasTrait(ErrorTrait.class) && memberName.equals("message")) {
                 continue;
             }
+            // TODO: handle default case
+            writer.pushState();
+            writer.putContext("isRequired", member.isRequired());
             writer.write(
-                    "private final $T $L;",
-                    symbolProvider.toSymbol(member),
-                    memberName
+                "private final ${?isRequired}$1T${/isRequired}${^isRequired}$1B${/isRequired} $2L;",
+                symbolProvider.toSymbol(member),
+                memberName
             );
+            writer.popState();
         }
     }
 }

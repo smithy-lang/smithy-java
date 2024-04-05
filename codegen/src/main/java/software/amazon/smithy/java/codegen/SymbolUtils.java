@@ -52,9 +52,9 @@ public final class SymbolUtils {
      * @param unboxed Unboxed variant of class
      * @return Symbol representing java class
      */
-    public static Symbol fromBoxedClass(Class<?> boxed, Class<?> unboxed) {
-        return fromClass(boxed).toBuilder()
-            .putProperty(SymbolProperties.UNBOXED, fromClass(unboxed))
+    public static Symbol fromBoxedClass(Class<?> unboxed, Class<?> boxed) {
+        return fromClass(unboxed).toBuilder()
+            .putProperty(SymbolProperties.BOXED_TYPE, fromClass(boxed))
             .build();
     }
 

@@ -7,7 +7,7 @@ package software.amazon.smithy.java.codegen;
 
 public final class SymbolProperties {
     // TODO: Docs
-    public static final String UNBOXED = "unboxed";
+    public static final String BOXED_TYPE = "boxed-type";
 
     // TODO: Docs
     public static final String PRIMITIVE = "primitive";

@@ -34,35 +34,35 @@ final class ConstructorGenerator implements Runnable {
     @Override
     public void run() {
         writer.openBlock(
-                "private $T(Builder builder) {",
-                "}",
-                symbolProvider.toSymbol(shape),
-                () -> {
-                    if (shape.hasTrait(ErrorTrait.class)) {
-                        writer.write("super(ID, builder.message);");
-                    }
-
-                    for (var member : shape.members()) {
-                        var memberName = symbolProvider.toMemberName(member);
-                        // Special case for error builders. Message is passed to
-                        // the super constructor. No initializer is created.
-                        // TODO: should this have a validator?
-                        if (shape.hasTrait(ErrorTrait.class) && memberName.equals("message")) {
-                            continue;
-                        }
-                        writeMemberInitializer(member, memberName);
-                    }
+            "private $T(Builder builder) {",
+            "}",
+            symbolProvider.toSymbol(shape),
+            () -> {
+                if (shape.hasTrait(ErrorTrait.class)) {
+                    writer.write("super(ID, builder.message);");
                 }
+
+                for (var member : shape.members()) {
+                    var memberName = symbolProvider.toMemberName(member);
+                    // Special case for error builders. Message is passed to
+                    // the super constructor. No initializer is created.
+                    // TODO: should this have a validator?
+                    if (shape.hasTrait(ErrorTrait.class) && memberName.equals("message")) {
+                        continue;
+                    }
+                    writeMemberInitializer(member, memberName);
+                }
+            }
         );
     }
 
     private void writeMemberInitializer(MemberShape member, String memberName) {
         if (member.isRequired()) {
             writer.write(
-                    "this.$1L = $2T.requiredState($1S, $3L);",
-                    memberName,
-                    SmithyBuilder.class,
-                    getBuilderValue(member, memberName)
+                "this.$1L = $2T.requiredState($1S, $3L);",
+                memberName,
+                SmithyBuilder.class,
+                getBuilderValue(member, memberName)
             );
         } else {
             writer.write("this.$L = $L;", memberName, getBuilderValue(member, memberName));

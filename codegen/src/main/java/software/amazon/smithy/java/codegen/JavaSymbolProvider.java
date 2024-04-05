@@ -75,7 +75,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
         Shape containerShape = model.expectShape(shape.getContainer());
         if (containerShape.isEnumShape() || containerShape.isIntEnumShape()) {
             return CaseUtils.toSnakeCase(SymbolUtils.MEMBER_ESCAPER.escape(shape.getMemberName()))
-                    .toUpperCase(Locale.ROOT);
+                .toUpperCase(Locale.ROOT);
         }
 
         // If a member name contains an underscore, convert to camel case
@@ -91,14 +91,15 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
         if (blobShape.hasTrait(StreamingTrait.class)) {
             return SymbolUtils.fromClass(DataStream.class);
         }
-        return SymbolUtils.fromClass(byte[].class).toBuilder()
-                .putProperty(SymbolProperties.PRIMITIVE, true)
-                .build();
+        return SymbolUtils.fromClass(byte[].class)
+            .toBuilder()
+            .putProperty(SymbolProperties.PRIMITIVE, true)
+            .build();
     }
 
     @Override
     public Symbol booleanShape(BooleanShape booleanShape) {
-        return SymbolUtils.fromBoxedClass(Boolean.class, boolean.class);
+        return SymbolUtils.fromBoxedClass(boolean.class, Boolean.class);
     }
 
     @Override
@@ -122,17 +123,17 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
     @Override
     public Symbol byteShape(ByteShape byteShape) {
-        return SymbolUtils.fromBoxedClass(Byte.class, byte.class);
+        return SymbolUtils.fromBoxedClass(byte.class, Byte.class);
     }
 
     @Override
     public Symbol shortShape(ShortShape shortShape) {
-        return SymbolUtils.fromBoxedClass(Short.class, short.class);
+        return SymbolUtils.fromBoxedClass(short.class, Short.class);
     }
 
     @Override
     public Symbol integerShape(IntegerShape integerShape) {
-        return SymbolUtils.fromBoxedClass(Integer.class, int.class);
+        return SymbolUtils.fromBoxedClass(int.class, Integer.class);
     }
 
     @Override
@@ -142,12 +143,12 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
     @Override
     public Symbol longShape(LongShape longShape) {
-        return SymbolUtils.fromBoxedClass(Long.class, long.class);
+        return SymbolUtils.fromBoxedClass(long.class, Long.class);
     }
 
     @Override
     public Symbol floatShape(FloatShape floatShape) {
-        return SymbolUtils.fromBoxedClass(Float.class, float.class);
+        return SymbolUtils.fromBoxedClass(float.class, Float.class);
     }
 
     @Override
@@ -157,7 +158,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
     @Override
     public Symbol doubleShape(DoubleShape doubleShape) {
-        return SymbolUtils.fromBoxedClass(Double.class, double.class);
+        return SymbolUtils.fromBoxedClass(double.class, Double.class);
     }
 
     @Override

@@ -16,6 +16,7 @@ import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolReference;
 import software.amazon.smithy.codegen.core.SymbolWriter;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 import software.amazon.smithy.utils.StringUtils;
@@ -45,6 +46,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
 
         // Formatters
         putFormatter('T', new JavaTypeFormatter());
+        putFormatter('B', new BoxedTypeFormatter());
     }
 
     // Java does not support aliases, so just import normally
@@ -135,7 +137,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         for (String line : settings.headerLines()) {
             builder.append(" * ").append(line).append(getNewline());
         }
-        builder.append(" */").append(getNewline());
+        builder.append(" */");
         return builder.toString();
     }
 
@@ -205,7 +207,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
             // Add type references as type references (ex. `Map<KeyType, ValueType>`)
             putContext("refs", typeSymbol.getReferences());
             String output = format(
-                "$L<${#refs}${value:T}${^key.last}, ${/key.last}${/refs}>",
+                "$L<${#refs}${value:B}${^key.last}, ${/key.last}${/refs}>",
                 getPlaceholder(typeSymbol)
             );
             removeContext("refs");
@@ -223,6 +225,32 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
             // Return a placeholder value that will be filled when toString is called
             // [] is replaced with "Array" to ensure array types dont break formatter.
             return format("$${$L:L}", symbol.getFullName().replace("[]", "Array"));
+        }
+    }
+
+    /**
+     * Implements a formatter for {@code $B} that formats Java types, preferring a boxed version of a type if available.
+     */
+    private final class BoxedTypeFormatter implements BiFunction<Object, String, String> {
+        private final JavaTypeFormatter javaTypeFormatter = new JavaTypeFormatter();
+
+        @Override
+        public String apply(Object type, String indent) {
+            Symbol typeSymbol = switch (type) {
+                case Symbol s -> s;
+                case Class<?> c -> SymbolUtils.fromClass(c);
+                case SymbolReference r -> r.getSymbol();
+                default -> throw new IllegalArgumentException(
+                    "Invalid type provided for $B. Expected a Symbol or Class"
+                        + " but found: `" + type + "`."
+                );
+            };
+
+            if (typeSymbol.getProperty(SymbolProperties.BOXED_TYPE).isPresent()) {
+                typeSymbol = typeSymbol.expectProperty(SymbolProperties.BOXED_TYPE, Symbol.class);
+            }
+
+            return javaTypeFormatter.apply(typeSymbol, indent);
         }
     }
 }

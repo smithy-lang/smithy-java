@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-import java.util.Optional;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -18,6 +17,7 @@ import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeVisitor;
 import software.amazon.smithy.model.traits.ErrorTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
+import software.amazon.smithy.utils.StringUtils;
 
 /**
  * Generates getters for a shape.
@@ -52,7 +52,12 @@ final class GetterGenerator implements Runnable {
         private final Model model;
         private final MemberShape member;
 
-        private GetterGeneratorVisitor(JavaWriter writer, SymbolProvider symbolProvider, Model model, MemberShape member) {
+        private GetterGeneratorVisitor(
+            JavaWriter writer,
+            SymbolProvider symbolProvider,
+            Model model,
+            MemberShape member
+        ) {
             this.writer = writer;
             this.symbolProvider = symbolProvider;
             this.model = model;
@@ -61,23 +66,21 @@ final class GetterGenerator implements Runnable {
 
         @Override
         protected Void getDefault(Shape shape) {
-            // If the member is required then do not wrap return in an Optional
-            if (member.isRequired()) {
-                writeRequiredGetter(shape);
-            } else {
-                writer.pushState(new GetterSection(member))
-                        .write(
-                                """
-                                    public $1T<$2T> $3L() {
-                                        return $1T.ofNullable($3L);
-                                    }
-                                    """,
-                                Optional.class,
-                                symbolProvider.toSymbol(shape),
-                                symbolProvider.toMemberName(member)
-                        )
-                        .popState();
-            }
+            // TODO: Account for defaults in nullability
+            // If the member is not required then prefer the boxed type
+            writer.pushState(new GetterSection(member));
+            writer.putContext("isRequired", member.isRequired());
+            writer.write(
+                """
+                    public ${?isRequired}$1T${/isRequired}${^isRequired}$1B${/isRequired} $2L() {
+                        return $2L;
+                    }
+                    """,
+                symbolProvider.toSymbol(shape),
+                symbolProvider.toMemberName(member)
+            );
+            writer.popState();
+
             return null;
         }
 
@@ -113,29 +116,30 @@ final class GetterGenerator implements Runnable {
 
         private void writeRequiredGetter(Shape shape) {
             writer.pushState(new GetterSection(member))
-                    .write(
-                            """
-                                public $1T $2L() {
-                                    return $2L;
-                                }
-                                """,
-                            symbolProvider.toSymbol(shape),
-                            symbolProvider.toMemberName(member)
-                    )
-                    .popState();
-        }
-
-        private void writeOrElseEmptyMethod(Shape shape) {
-            // If the member targets a collection shape and is optional then generate an unwrapped
-            // getter as a convenience method as well.
-            writer.write(
+                .write(
                     """
-                        public $1T $2LOrEmpty() {
+                        public $1T $2L() {
                             return $2L;
                         }
                         """,
                     symbolProvider.toSymbol(shape),
                     symbolProvider.toMemberName(member)
+                )
+                .popState();
+        }
+
+        private void writeOrElseEmptyMethod(Shape shape) {
+            // If the member targets a collection shape and is optional then generate an unwrapped
+            // getter as a convenience method as well.
+            var memberName = symbolProvider.toMemberName(member);
+            writer.write(
+                """
+                    public boolean has$L() {
+                        return $L != null;
+                    }
+                    """,
+                StringUtils.capitalize(memberName),
+                memberName
             );
         }
     }

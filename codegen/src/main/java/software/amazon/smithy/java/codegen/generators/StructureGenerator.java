@@ -22,7 +22,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
 public final class StructureGenerator<T extends ShapeDirective<StructureShape, CodeGenerationContext, JavaCodegenSettings>>
-        implements Consumer<T> {
+    implements Consumer<T> {
 
     @Override
     public void accept(T directive) {
@@ -41,34 +41,34 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             }
 
             writer.write(
-                    """
-                        public final class $T ${?isError}extends${/isError}${^isError}implements${/isError} ${baseClass:T} {
-                            ${C|}
-    
-                            ${C|}
-    
-                            ${C|}
-    
-                            ${C|}
-    
-                            ${C|}
-    
-                            ${C|}
-    
-                            ${C|}
-    
-                            ${C|}
-                        }
-                        """,
-                    directive.symbol(),
-                    (Runnable) () -> writeIdString(writer, shape),
-                    new SchemaGenerator(),
-                    new PropertyGenerator(writer, shape, directive.symbolProvider()),
-                    new ConstructorGenerator(writer, shape, directive.symbolProvider()),
-                    new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()),
-                    (Runnable) () -> writeToString(writer),
-                    new SerializerGenerator(writer),
-                    new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model())
+                """
+                    public final class $T ${?isError}extends${/isError}${^isError}implements${/isError} ${baseClass:T} {
+                        ${C|}
+
+                        ${C|}
+
+                        ${C|}
+
+                        ${C|}
+
+                        ${C|}
+
+                        ${C|}
+
+                        ${C|}
+
+                        ${C|}
+                    }
+                    """,
+                directive.symbol(),
+                (Runnable) () -> writeIdString(writer, shape),
+                new SchemaGenerator(),
+                new PropertyGenerator(writer, shape, directive.symbolProvider()),
+                new ConstructorGenerator(writer, shape, directive.symbolProvider()),
+                new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()),
+                (Runnable) () -> writeToString(writer),
+                new SerializerGenerator(writer),
+                new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model())
             );
             writer.popState();
         });
@@ -77,9 +77,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
 
     private static void writeIdString(JavaWriter writer, Shape shape) {
         writer.write(
-                "public static final $1T ID = $1T.from($2S);",
-                ShapeId.class,
-                shape.getId()
+            "public static final $1T ID = $1T.from($2S);",
+            ShapeId.class,
+            shape.getId()
         );
     }
 

@@ -38,81 +38,86 @@ public class BuilderGenerator implements Runnable {
     @Override
     public void run() {
         writer.write(
-                """
-                    public static Builder builder() {
-                        return new Builder();
+            """
+                public static Builder builder() {
+                    return new Builder();
+                }
+
+                /**
+                 * Builder for {@link $1T}.
+                 */
+                public static final class Builder implements $2T<$1T> {
+                    ${3C|}
+
+                    private Builder() {}
+
+                    ${4C|}
+
+                    @Override
+                    public $1T build() {
+                        return new $1T(this);
                     }
-    
-                    /**
-                     * Builder for {@link $1T}.
-                     */
-                    public static final class Builder implements $2T<$1T> {
-                        ${3C|}
-    
-                        private Builder() {}
-    
-                        ${4C|}
-    
-                        @Override
-                        public $1T build() {
-                            return new $1T(this);
-                        }
-    
-                        ${5C|}
-                    }""",
-                symbolProvider.toSymbol(shape),
-                SdkShapeBuilder.class,
-                (Runnable) this::builderProperties,
-                (Runnable) this::builderSetters,
-                (Runnable) this::deserializer
+
+                    ${5C|}
+                }""",
+            symbolProvider.toSymbol(shape),
+            SdkShapeBuilder.class,
+            (Runnable) this::builderProperties,
+            (Runnable) this::builderSetters,
+            (Runnable) this::deserializer
         );
     }
 
     // TODO: Implement deserializer
     private void deserializer() {
         writer.write(
-                """
-                    @Override
-                    public Builder deserialize($T decoder) {
-                        // PLACEHOLDER. Needs implementation
-                        return this;
-                    }""",
-                ShapeDeserializer.class);
+            """
+                @Override
+                public Builder deserialize($T decoder) {
+                    // PLACEHOLDER. Needs implementation
+                    return this;
+                }""",
+            ShapeDeserializer.class
+        );
     }
 
     // Adds builder properties and initializers
     private void builderProperties() {
         for (var member : shape.members()) {
             Optional<String> builderRefOptional = symbolProvider.toSymbol(member)
-                    .getProperty(SymbolProperties.BUILDER_REF_INITIALIZER, String.class);
+                .getProperty(SymbolProperties.BUILDER_REF_INITIALIZER, String.class);
             if (builderRefOptional.isPresent()) {
                 writer.write(
-                        "private final $1T<$2T> $3L = $1T.$4L;",
-                        BuilderRef.class,
-                        symbolProvider.toSymbol(member),
-                        symbolProvider.toMemberName(member),
-                        builderRefOptional.orElseThrow(RuntimeException::new)
+                    "private final $1T<$2T> $3L = $1T.$4L;",
+                    BuilderRef.class,
+                    symbolProvider.toSymbol(member),
+                    symbolProvider.toMemberName(member),
+                    builderRefOptional.orElseThrow(RuntimeException::new)
                 );
             } else if (SymbolUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {
                 // Streaming blobs need a custom initializer
                 writer.write(
-                        "private $1T $2L = $1T.ofEmpty();",
-                        DataStream.class,
-                        symbolProvider.toMemberName(member)
+                    "private $1T $2L = $1T.ofEmpty();",
+                    DataStream.class,
+                    symbolProvider.toMemberName(member)
                 );
             } else {
+                // TODO: handle
+                writer.pushState();
+                writer.putContext("isRequired", member.isRequired());
                 writer.write(
-                        "private $T $L;",
-                        symbolProvider.toSymbol(member),
-                        symbolProvider.toMemberName(member)
+                    "private ${?isRequired}$1T${/isRequired}${^isRequired}$1B${/isRequired} $2L;",
+                    symbolProvider.toSymbol(member),
+                    symbolProvider.toMemberName(member)
                 );
+                writer.popState();
             }
         }
     }
 
     private void builderSetters() {
         shape.members()
-                .forEach(memberShape -> memberShape.accept(new SetterVisitor(symbolProvider.toMemberName(memberShape))));
+            .forEach(memberShape -> memberShape.accept(new SetterVisitor(symbolProvider.toMemberName(memberShape))));
     }
 
     /**
@@ -127,14 +132,15 @@ public class BuilderGenerator implements Runnable {
 
         @Override
         protected Void getDefault(Shape shape) {
-            writer.write("""
+            writer.write(
+                """
                     public Builder $1L($2T $1L) {
                         this.$1L = $1L;
                         return this;
                     }
                     """,
-                    memberName,
-                    symbolProvider.toSymbol(shape)
+                memberName,
+                symbolProvider.toSymbol(shape)
             );
             return null;
         }
@@ -147,53 +153,56 @@ public class BuilderGenerator implements Runnable {
             // operation to set on builder.
             if (SymbolUtils.isStreamingBlob(shape)) {
                 writer.write("""
-                        @Override
-                        public void setDataStream($T stream) {
-                            $L(stream);
-                        }
-                        """, DataStream.class, memberName);
+                    @Override
+                    public void setDataStream($T stream) {
+                        $L(stream);
+                    }
+                    """, DataStream.class, memberName);
             }
             return null;
         }
 
         @Override
         public Void listShape(ListShape shape) {
-            writer.write("""
+            writer.write(
+                """
                     public Builder $1L($2T $1L) {
                         clear$3L();
                         this.$1L.get().addAll($1L);
                         return this;
                     }
                     """,
-                    memberName,
-                    symbolProvider.toSymbol(shape),
-                    StringUtils.capitalize(memberName)
+                memberName,
+                symbolProvider.toSymbol(shape),
+                StringUtils.capitalize(memberName)
             );
 
             clearCollection();
 
             // Set one
-            writer.write("""
+            writer.write(
+                """
                     public Builder add$L($T value) {
                         $L.get().add(value);
                         return this;
                     }
                     """,
-                    StringUtils.capitalize(memberName),
-                    symbolProvider.toSymbol(shape.getMember()),
-                    memberName
+                StringUtils.capitalize(memberName),
+                symbolProvider.toSymbol(shape.getMember()),
+                memberName
             );
 
             // Remove one
-            writer.write("""
+            writer.write(
+                """
                     public Builder remove$L($T value) {
                         $L.get().remove(value);
                         return this;
                     }
                     """,
-                    StringUtils.capitalize(memberName),
-                    symbolProvider.toSymbol(shape.getMember()),
-                    memberName
+                StringUtils.capitalize(memberName),
+                symbolProvider.toSymbol(shape.getMember()),
+                memberName
             );
             return null;
         }
@@ -201,56 +210,60 @@ public class BuilderGenerator implements Runnable {
         @Override
         public Void mapShape(MapShape shape) {
             // Set all
-            writer.write("""
+            writer.write(
+                """
                     public Builder $1L($2T $1L) {
                         clear$3L();
                         this.$1L.get().putAll($1L);
                         return this;
                     }
                     """,
-                    memberName,
-                    symbolProvider.toSymbol(shape),
-                    StringUtils.capitalize(memberName)
+                memberName,
+                symbolProvider.toSymbol(shape),
+                StringUtils.capitalize(memberName)
             );
 
             clearCollection();
 
             // Set one
-            writer.write("""
-                     public Builder put$L($T key, $T value) {
-                        this.$L.get().put(key, value);
-                        return this;
-                     }
-                     """,
-                    StringUtils.capitalize(memberName),
-                    symbolProvider.toSymbol(shape.getKey()),
-                    symbolProvider.toSymbol(shape.getValue()),
-                    memberName
+            writer.write(
+                """
+                    public Builder put$L($T key, $T value) {
+                       this.$L.get().put(key, value);
+                       return this;
+                    }
+                    """,
+                StringUtils.capitalize(memberName),
+                symbolProvider.toSymbol(shape.getKey()),
+                symbolProvider.toSymbol(shape.getValue()),
+                memberName
             );
 
             // Remove one
-            writer.write("""
+            writer.write(
+                """
                     public Builder remove$1L($2T $3L) {
                         this.$3L.get().remove($3L);
                         return this;
                     }
                     """,
-                    StringUtils.capitalize(memberName),
-                    symbolProvider.toSymbol(shape.getKey()),
-                    memberName
+                StringUtils.capitalize(memberName),
+                symbolProvider.toSymbol(shape.getKey()),
+                memberName
             );
             return null;
         }
 
         private void clearCollection() {
-            writer.write("""
+            writer.write(
+                """
                     public Builder clear$L() {
                         $L.get().clear();
                         return this;
                     }
                     """,
-                    StringUtils.capitalize(memberName),
-                    memberName
+                StringUtils.capitalize(memberName),
+                memberName
             );
         }
 

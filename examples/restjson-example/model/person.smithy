@@ -31,6 +31,13 @@ operation PutPerson {
         binary: Blob
 
         @notProperty
+        notRequiredBool: Boolean
+
+        @required
+        @notProperty
+        requiredBool: Boolean
+
+        @notProperty
         @httpQueryParams
         queryParams: MapListString
     }
@@ -50,5 +57,8 @@ operation PutPerson {
         @notProperty
         @httpResponseCode
         status: Integer
+
+        @notProperty
+        list: ListOfString
     }
 }
