@@ -117,7 +117,7 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
         try {
             message.append(new String(response.body().readNBytes(16384), StandardCharsets.UTF_8));
         } catch (IOException e) {
-            LOGGER.log(System.Logger.Level.TRACE, () -> "Unable to append exception response body for " + operationId);
+            LOGGER.log(System.Logger.Level.TRACE, "Unable to append exception response body for %s", operationId);
         }
 
         return new SdkException(message.toString(), fault);

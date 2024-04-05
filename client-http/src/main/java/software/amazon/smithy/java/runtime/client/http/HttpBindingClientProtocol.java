@@ -56,7 +56,7 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
             throw createError(call, response);
         }
 
-        LOGGER.log(System.Logger.Level.TRACE, () -> "Deserializing successful response with " + getClass().getName());
+        LOGGER.log(System.Logger.Level.TRACE, "Deserializing successful response with %s", getClass().getName());
 
         var outputBuilder = call.createOutputBuilder(call.context(), call.operation().outputSchema().id().toString());
         HttpBinding.responseDeserializer()

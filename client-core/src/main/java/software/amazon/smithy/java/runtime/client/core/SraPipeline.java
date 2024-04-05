@@ -184,7 +184,10 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
         var input = call.input();
         LOGGER.log(
             System.Logger.Level.TRACE,
-            () -> "Deserializing response with " + protocol.getClass() + " for " + request + ": " + response
+            "Deserializing response with %s for %s: %s",
+            protocol.getClass(),
+            request,
+            response
         );
 
         Context context = call.context();

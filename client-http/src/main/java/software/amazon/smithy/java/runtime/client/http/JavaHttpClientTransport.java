@@ -44,10 +44,10 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
     @Override
     public <I extends SerializableShape, O extends SerializableShape> O send(ClientCall<I, O> call) {
         return SraPipeline.send(call, protocol, request -> {
-            LOGGER.log(System.Logger.Level.TRACE, () -> "Sending HTTP request: " + request.startLine());
+            LOGGER.log(System.Logger.Level.TRACE, "Sending HTTP request: %s", request.startLine());
             var javaRequest = createJavaRequest(call.context(), request);
             var response = sendRequest(javaRequest);
-            LOGGER.log(System.Logger.Level.TRACE, () -> "Got HTTP response: " + response.startLine());
+            LOGGER.log(System.Logger.Level.TRACE, "Got HTTP response: %s", response.startLine());
             call.context().put(HttpContext.HTTP_RESPONSE, response);
             return response;
         });
@@ -81,11 +81,13 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
             var response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
             LOGGER.log(
                 System.Logger.Level.TRACE,
-                () -> "Got response: " + response + "; headers: " + response.headers().map()
+                "Got response: %s; headers: %s",
+                response,
+                response.headers().map()
             );
             return createSmithyResponse(response);
         } catch (IOException | InterruptedException e) {
-            LOGGER.log(System.Logger.Level.ERROR, "Error sending request: " + request + "; " + e.getMessage(), e);
+            LOGGER.log(System.Logger.Level.ERROR, "Error sending request: %sl %s", request, e.getMessage());
             throw new RuntimeException(e); // TODO: Networking related error handling.
         }
     }
@@ -93,7 +95,9 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
     private SmithyHttpResponse createSmithyResponse(HttpResponse<InputStream> response) {
         LOGGER.log(
             System.Logger.Level.TRACE,
-            () -> "Got response: " + response + "; headers: " + response.headers().map()
+            "Got response: %s; headers: %s",
+            response,
+            response.headers().map()
         );
         return SmithyHttpResponse.builder()
             .httpVersion(javaToSmithyVersion(response.version()))

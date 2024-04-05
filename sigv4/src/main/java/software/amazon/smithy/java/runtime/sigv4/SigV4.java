@@ -118,14 +118,14 @@ public final class SigV4 {
         var canonicalRequest = method + "\n" + uri.getRawPath() + "\n" + getCanonicalizedQueryString(uri) + "\n"
             + getCanonicalizedHeaderString(httpHeaders) + "\n" + getSignedHeaders(httpHeaders) + "\n" + payloadHash;
 
-        LOGGER.log(System.Logger.Level.TRACE, () -> "AWS4 Canonical Request: '" + canonicalRequest + "'");
+        LOGGER.log(System.Logger.Level.TRACE, "AWS4 Canonical Request: '%s'", canonicalRequest);
 
         var scope = dateStamp + '/' + regionName + '/' + serviceName + '/' + TERMINATOR;
         var signingCredentials = accessKeyId + '/' + scope;
         var stringToSign = ALGORITHM + '\n' + dateTime + '\n' + scope + '\n'
             + HexFormat.of().formatHex(hash(canonicalRequest));
 
-        LOGGER.log(System.Logger.Level.TRACE, () -> "AWS4 String to Sign: '\"" + stringToSign + "\"");
+        LOGGER.log(System.Logger.Level.TRACE, "AWS4 String to Sign: '\"%s\"", stringToSign);
 
         // AWS4 uses a series of derived keys, formed by hashing different pieces of data
         var kSecret = ("AWS4" + secretKey).getBytes(StandardCharsets.UTF_8);
@@ -143,7 +143,7 @@ public final class SigV4 {
         var authorizationHeader = ALGORITHM + ' ' + credentialsAuthorizationHeader + ", "
             + signedHeadersAuthorizationHeader + ", " + signatureAuthorizationHeader;
 
-        LOGGER.log(System.Logger.Level.TRACE, () -> "Authorization: " + authorizationHeader);
+        LOGGER.log(System.Logger.Level.TRACE, "Authorization: %s", authorizationHeader);
 
         headers.put("Authorization", List.of(authorizationHeader));
 

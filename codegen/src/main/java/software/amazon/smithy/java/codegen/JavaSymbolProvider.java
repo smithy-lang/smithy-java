@@ -63,7 +63,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
     @Override
     public Symbol toSymbol(Shape shape) {
         Symbol symbol = shape.accept(this);
-        LOGGER.log(System.Logger.Level.TRACE, () -> format("Creating symbol from %s: %s", shape, symbol));
+        LOGGER.log(System.Logger.Level.TRACE, "Creating symbol from %s: %s", shape, symbol);
         return symbol;
 
     }
