@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.example.model;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,6 +25,8 @@ import software.amazon.smithy.model.traits.HttpLabelTrait;
 import software.amazon.smithy.model.traits.HttpQueryParamsTrait;
 import software.amazon.smithy.model.traits.HttpQueryTrait;
 import software.amazon.smithy.model.traits.JsonNameTrait;
+import software.amazon.smithy.model.traits.LengthTrait;
+import software.amazon.smithy.model.traits.RangeTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
 
 // Example of a potentially generated shape.
@@ -32,7 +35,7 @@ public final class PutPersonInput implements SerializableShape {
     public static final ShapeId ID = ShapeId.from("smithy.example#PutPersonInput");
     private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
         .id(ID)
-        .traits(new HttpLabelTrait(), new RequiredTrait())
+        .traits(new HttpLabelTrait(), new RequiredTrait(), LengthTrait.builder().max(7L).build())
         .build();
     private static final SdkSchema SCHEMA_FAVORITE_COLOR = SdkSchema
         .memberBuilder(1, "favoriteColor", PreludeSchemas.STRING)
@@ -41,7 +44,7 @@ public final class PutPersonInput implements SerializableShape {
         .build();
     private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder(2, "age", PreludeSchemas.INTEGER)
         .id(ID)
-        .traits(new JsonNameTrait("Age"))
+        .traits(new JsonNameTrait("Age"), RangeTrait.builder().max(BigDecimal.valueOf(150)).build())
         .build();
     private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder(3, "birthday", SharedSchemas.BIRTHDAY)
         .id(ID)

@@ -176,10 +176,7 @@ final class JsonDeserializer implements ShapeDeserializer {
         SdkSchema member = null;
         if (useJsonName) {
             member = schema.findMember(
-                m -> m.getTrait(JsonNameTrait.class)
-                    .map(JsonNameTrait::getValue)
-                    .filter(n -> n.equals(field))
-                    .isPresent()
+                m -> m.hasTrait(JsonNameTrait.class) && m.getTrait(JsonNameTrait.class).getValue().equals(field)
             );
         }
 

@@ -80,12 +80,10 @@ final class HttpLabelSerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeTimestamp(SdkSchema schema, Instant value) {
-        labelReceiver.accept(
-            schema.memberName(),
-            schema.getTrait(TimestampFormatTrait.class)
-                .map(TimestampFormatter::of)
-                .orElse(TimestampFormatter.Prelude.DATE_TIME)
-                .formatToString(value)
-        );
+        var trait = schema.getTrait(TimestampFormatTrait.class);
+        TimestampFormatter formatter = trait != null
+            ? TimestampFormatter.of(trait)
+            : TimestampFormatter.Prelude.DATE_TIME;
+        labelReceiver.accept(schema.memberName(), formatter.formatToString(value));
     }
 }

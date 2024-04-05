@@ -258,9 +258,9 @@ final class JsonDocument implements Document {
         @Override
         public void readStruct(SdkSchema schema, BiConsumer<SdkSchema, ShapeDeserializer> eachEntry) {
             for (var member : schema.members()) {
-                var jsonName = member.getTrait(JsonNameTrait.class)
-                    .map(JsonNameTrait::getValue)
-                    .orElse(member.memberName());
+                var jsonName = member.hasTrait(JsonNameTrait.class)
+                    ? member.getTrait(JsonNameTrait.class).getValue()
+                    : member.memberName();
                 var value = getMember(jsonName);
                 if (value != null) {
                     eachEntry.accept(member, new DocumentDeserializer(value));
@@ -272,8 +272,8 @@ final class JsonDocument implements Document {
         public Instant readTimestamp(SdkSchema schema) {
             TimestampFormatter format = defaultTimestampFormat;
 
-            if (useTimestampFormat) {
-                format = schema.getTrait(TimestampFormatTrait.class).map(TimestampFormatter::of).orElse(format);
+            if (useTimestampFormat && schema.hasTrait(TimestampFormatTrait.class)) {
+                format = TimestampFormatter.of(schema.getTrait(TimestampFormatTrait.class));
             }
 
             return switch (any.valueType()) {

@@ -99,10 +99,11 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
 
     @Override
     public Instant readTimestamp(SdkSchema schema) {
-        return schema.getTrait(TimestampFormatTrait.class)
-            .map(TimestampFormatter::of)
-            .orElse(TimestampFormatter.Prelude.HTTP_DATE)
-            .parseFromString(value, false); // headers always are strings.
+        var trait = schema.getTrait(TimestampFormatTrait.class);
+        TimestampFormatter formatter = trait != null
+            ? TimestampFormatter.of(trait)
+            : TimestampFormatter.Prelude.HTTP_DATE;
+        return formatter.parseFromString(value, false); // headers always are strings.
     }
 
     @Override

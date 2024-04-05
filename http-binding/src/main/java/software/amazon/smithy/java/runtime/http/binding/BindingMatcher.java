@@ -51,36 +51,36 @@ final class BindingMatcher {
 
     Binding match(SdkSchema member) {
         if (isRequest) {
-            label = member.getTrait(HttpLabelTrait.class).orElse(null);
+            label = member.getTrait(HttpLabelTrait.class);
             if (label != null) {
                 return Binding.LABEL;
             }
-            query = member.getTrait(HttpQueryTrait.class).orElse(null);
+            query = member.getTrait(HttpQueryTrait.class);
             if (query != null) {
                 return Binding.QUERY;
             }
-            queryParams = member.getTrait(HttpQueryParamsTrait.class).orElse(null);
+            queryParams = member.getTrait(HttpQueryParamsTrait.class);
             if (queryParams != null) {
                 return Binding.QUERY_PARAMS;
             }
         } else {
-            responseCode = member.getTrait(HttpResponseCodeTrait.class).orElse(null);
+            responseCode = member.getTrait(HttpResponseCodeTrait.class);
             if (responseCode != null) {
                 return Binding.STATUS;
             }
         }
 
-        header = member.getTrait(HttpHeaderTrait.class).orElse(null);
+        header = member.getTrait(HttpHeaderTrait.class);
         if (header != null) {
             return Binding.HEADER;
         }
 
-        prefixHeaders = member.getTrait(HttpPrefixHeadersTrait.class).orElse(null);
+        prefixHeaders = member.getTrait(HttpPrefixHeadersTrait.class);
         if (prefixHeaders != null) {
             return Binding.PREFIX_HEADERS;
         }
 
-        payload = member.getTrait(HttpPayloadTrait.class).orElse(null);
+        payload = member.getTrait(HttpPayloadTrait.class);
         if (payload != null) {
             return Binding.PAYLOAD;
         }

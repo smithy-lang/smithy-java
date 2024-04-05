@@ -35,7 +35,7 @@ public final class ToStringSerializer implements ShapeSerializer {
         if (value == null) {
             append("null");
         }
-        if (schema != null && schema.getTrait(SensitiveTrait.class).isPresent()) {
+        if (schema != null && schema.hasTrait(SensitiveTrait.class)) {
             builder.append("(redacted)");
         } else {
             append(value);

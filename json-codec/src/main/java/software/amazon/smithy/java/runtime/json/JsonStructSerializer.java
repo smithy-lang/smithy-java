@@ -31,8 +31,8 @@ class JsonStructSerializer implements StructSerializer {
     }
 
     private String getMemberName(SdkSchema member) {
-        if (useJsonName) {
-            return member.getTrait(JsonNameTrait.class).map(JsonNameTrait::getValue).orElseGet(member::memberName);
+        if (useJsonName && member.hasTrait(JsonNameTrait.class)) {
+            return member.getTrait(JsonNameTrait.class).getValue();
         } else {
             return member.memberName();
         }

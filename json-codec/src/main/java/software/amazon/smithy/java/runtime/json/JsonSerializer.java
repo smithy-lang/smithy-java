@@ -147,10 +147,10 @@ final class JsonSerializer implements ShapeSerializer {
 
     @Override
     public void writeTimestamp(SdkSchema schema, Instant value) {
-        var format = useTimestampFormat
-            ? schema.getTrait(TimestampFormatTrait.class).map(TimestampFormatter::of).orElse(defaultTimestampFormat)
+        var formatter = schema.hasTrait(TimestampFormatTrait.class)
+            ? TimestampFormatter.of(schema.getTrait(TimestampFormatTrait.class))
             : defaultTimestampFormat;
-        format.serializeToUnderlyingFormat(schema, value, this);
+        formatter.serializeToUnderlyingFormat(schema, value, this);
     }
 
     @Override

@@ -7,12 +7,15 @@ package software.amazon.smithy.java.runtime.core.schema;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -26,8 +29,8 @@ public class SdkSchema {
 
     private final ShapeId id;
     private final ShapeType type;
-    private final List<Trait> traits;
-    private final List<SdkSchema> members;
+    private final Map<Class<? extends Trait>, Trait> traits;
+    private final Map<String, SdkSchema> members;
     private final String memberName;
     private final SdkSchema memberTarget;
     private final int memberIndex;
@@ -35,8 +38,8 @@ public class SdkSchema {
     private SdkSchema(Builder builder) {
         this.id = Objects.requireNonNull(builder.id, "id is null");
         this.type = Objects.requireNonNull(builder.type, "type is null");
-        this.traits = builder.traits;
-        this.members = builder.members;
+        this.traits = builder.traits == null ? Collections.emptyMap() : builder.traits;
+        this.members = builder.members == null ? Collections.emptyMap() : builder.members;
         this.memberIndex = builder.memberIndex;
         this.memberName = builder.memberName;
         this.memberTarget = builder.memberTarget;
@@ -149,18 +152,27 @@ public class SdkSchema {
      * Get a trait if present.
      *
      * @param trait Trait to get.
-     * @return Returns the optionally found trait.
+     * @return Returns the trait, or null if not found.
      * @param <T> Trait type to get.
      */
     @SuppressWarnings("unchecked")
-    public <T extends Trait> Optional<T> getTrait(Class<T> trait) {
-        for (Trait t : traits) {
-            if (trait == t.getClass()) {
-                return Optional.of((T) t);
-            }
+    public <T extends Trait> T getTrait(Class<T> trait) {
+        var t = (T) traits.get(trait);
+        if (t == null && isMember()) {
+            return memberTarget.getTrait(trait);
         }
+        return t;
+    }
 
-        return isMember() ? memberTarget().getTrait(trait) : Optional.empty();
+    /**
+     * Check if the schema has a trait.
+     *
+     * @param trait Trait to check for.
+     * @return true if the trait is found.
+     * @param <T> Trait type.
+     */
+    public <T extends Trait> boolean hasTrait(Class<T> trait) {
+        return traits.containsKey(trait) || (isMember() && memberTarget.hasTrait(trait));
     }
 
     /**
@@ -172,8 +184,11 @@ public class SdkSchema {
      * @throws NoSuchElementException if the value does not exist.
      */
     public final <T extends Trait> T expectTrait(Class<T> trait) {
-        return getTrait(trait)
-            .orElseThrow(() -> new NoSuchElementException("Expected trait not found: " + trait.getName()));
+        var t = getTrait(trait);
+        if (t == null) {
+            throw new NoSuchElementException("Expected trait not found: " + trait.getName());
+        }
+        return t;
     }
 
     /**
@@ -181,20 +196,8 @@ public class SdkSchema {
      *
      * @return Returns the contained member names.
      */
-    public final Iterable<String> memberNames() {
-        return () -> new Iterator<>() {
-            private int position = 0;
-
-            @Override
-            public boolean hasNext() {
-                return position < members.size();
-            }
-
-            @Override
-            public String next() {
-                return members.get(position++).memberName();
-            }
-        };
+    public final Set<String> memberNames() {
+        return isMember() ? memberTarget.memberNames() : members.keySet();
     }
 
     /**
@@ -202,8 +205,8 @@ public class SdkSchema {
      *
      * @return Returns the members.
      */
-    public final List<SdkSchema> members() {
-        return Collections.unmodifiableList(members);
+    public final Collection<SdkSchema> members() {
+        return Collections.unmodifiableCollection(members.values());
     }
 
     /**
@@ -250,13 +253,10 @@ public class SdkSchema {
      * @return Returns the found member or null if not found.
      */
     public final SdkSchema member(String memberName, SdkSchema defaultValue) {
-        for (SdkSchema memberSchema : members) {
-            if (memberSchema.memberName().equals(memberName)) {
-                return memberSchema;
-            }
-        }
-        // Delegate to the member target members if it's a member.
-        if (memberTarget != null) {
+        var m = members.get(memberName);
+        if (m != null) {
+            return m;
+        } else if (isMember()) {
             return memberTarget.member(memberName, defaultValue);
         } else {
             return defaultValue;
@@ -270,7 +270,7 @@ public class SdkSchema {
      * @return Returns the found member or null if none matched.
      */
     public final SdkSchema findMember(Predicate<SdkSchema> predicate) {
-        for (SdkSchema memberSchema : members) {
+        for (SdkSchema memberSchema : members.values()) {
             if (predicate.test(memberSchema)) {
                 return memberSchema;
             }
@@ -299,7 +299,7 @@ public class SdkSchema {
      */
     public SdkSchema withFilteredMembers(Predicate<SdkSchema> memberPredicate) {
         List<SdkSchema> filtered = new ArrayList<>(members.size());
-        for (SdkSchema member : members) {
+        for (SdkSchema member : members.values()) {
             if (!memberPredicate.test(member)) {
                 filtered.add(member);
             }
@@ -331,8 +331,8 @@ public class SdkSchema {
 
         private ShapeId id;
         private ShapeType type;
-        private List<Trait> traits = Collections.emptyList();
-        private List<SdkSchema> members = Collections.emptyList();
+        private Map<Class<? extends Trait>, Trait> traits = null;
+        private Map<String, SdkSchema> members = null;
         private String memberName;
         private SdkSchema memberTarget;
         private int memberIndex = -1;
@@ -391,6 +391,17 @@ public class SdkSchema {
          * @param traits Traits to set.
          * @return Returns the builder.
          */
+        public Builder traits(Map<Class<? extends Trait>, Trait> traits) {
+            traits(traits.values());
+            return this;
+        }
+
+        /**
+         * Set traits on the shape.
+         *
+         * @param traits Traits to set.
+         * @return Returns the builder.
+         */
         public Builder traits(Trait... traits) {
             return traits(Arrays.asList(traits));
         }
@@ -401,8 +412,13 @@ public class SdkSchema {
          * @param traits Traits to set.
          * @return Returns the builder.
          */
-        public Builder traits(List<Trait> traits) {
-            this.traits = traits;
+        public Builder traits(Iterable<Trait> traits) {
+            if (this.traits == null) {
+                this.traits = new HashMap<>();
+            }
+            for (Trait trait : traits) {
+                this.traits.put(trait.getClass(), trait);
+            }
             return this;
         }
 
@@ -443,7 +459,12 @@ public class SdkSchema {
             if (memberTarget != null) {
                 throw new IllegalStateException("Cannot add members to a member");
             }
-            this.members = members;
+            if (this.members == null) {
+                this.members = new LinkedHashMap<>();
+            }
+            for (SdkSchema member : members) {
+                this.members.put(member.memberName(), member);
+            }
             return this;
         }
     }

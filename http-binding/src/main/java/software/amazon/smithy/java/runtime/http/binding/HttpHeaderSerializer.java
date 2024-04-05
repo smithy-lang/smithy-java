@@ -40,9 +40,8 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
     }
 
     void writeHeader(SdkSchema schema, Supplier<String> supplier) {
-        String field = schema.getTrait(HttpHeaderTrait.class)
-            .map(HttpHeaderTrait::getValue)
-            .orElse(schema.memberName());
+        var headerTrait = schema.getTrait(HttpHeaderTrait.class);
+        var field = headerTrait != null ? headerTrait.getValue() : schema.memberName();
         headerWriter.accept(field, supplier.get());
     }
 
@@ -105,10 +104,13 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
     public void writeTimestamp(SdkSchema schema, Instant value) {
         writeHeader(
             schema,
-            () -> schema.getTrait(TimestampFormatTrait.class)
-                .map(TimestampFormatter::of)
-                .orElse(TimestampFormatter.Prelude.HTTP_DATE)
-                .formatToString(value)
+            () -> {
+                var trait = schema.getTrait(TimestampFormatTrait.class);
+                TimestampFormatter formatter = trait != null
+                    ? TimestampFormatter.of(trait)
+                    : TimestampFormatter.Prelude.HTTP_DATE;
+                return formatter.formatToString(value);
+            }
         );
     }
 }
