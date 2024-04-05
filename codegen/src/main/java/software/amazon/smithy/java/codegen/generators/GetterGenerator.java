@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.Collection;
+import java.util.Collections;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -85,27 +87,38 @@ final class GetterGenerator implements Runnable {
         }
 
         @Override
-        public Void blobShape(BlobShape shape) {
-            // Streaming blobs can never be optional returns
-            if (shape.hasTrait(StreamingTrait.class)) {
-                writeRequiredGetter(shape);
-                return null;
-            }
-            getDefault(shape);
-            return null;
-        }
-
-        @Override
         public Void listShape(ListShape shape) {
-            getDefault(shape);
-            writeOrElseEmptyMethod(shape);
+            writer.pushState(new GetterSection(member))
+                    .write(
+                            """
+                                public $1T $2L() {
+                                    return $2L != null ? $2L : $3T.emptyList();
+                                }
+                                """,
+                            symbolProvider.toSymbol(shape),
+                            symbolProvider.toMemberName(member),
+                            Collections.class
+                    )
+                    .popState();
+            writeHasCollection();
             return null;
         }
 
         @Override
         public Void mapShape(MapShape shape) {
-            getDefault(shape);
-            writeOrElseEmptyMethod(shape);
+            writer.pushState(new GetterSection(member))
+                    .write(
+                            """
+                                public $1T $2L() {
+                                    return $2L != null ? $2L : $3T.emptyMap();
+                                }
+                                """,
+                            symbolProvider.toSymbol(shape),
+                            symbolProvider.toMemberName(member),
+                            Collections.class
+                    )
+                    .popState();
+            writeHasCollection();
             return null;
         }
 
@@ -114,21 +127,7 @@ final class GetterGenerator implements Runnable {
             return model.expectShape(shape.getTarget()).accept(this);
         }
 
-        private void writeRequiredGetter(Shape shape) {
-            writer.pushState(new GetterSection(member))
-                .write(
-                    """
-                        public $1T $2L() {
-                            return $2L;
-                        }
-                        """,
-                    symbolProvider.toSymbol(shape),
-                    symbolProvider.toMemberName(member)
-                )
-                .popState();
-        }
-
-        private void writeOrElseEmptyMethod(Shape shape) {
+        private void writeHasCollection() {
             // If the member targets a collection shape and is optional then generate an unwrapped
             // getter as a convenience method as well.
             var memberName = symbolProvider.toMemberName(member);
