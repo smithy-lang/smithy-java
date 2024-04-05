@@ -31,7 +31,7 @@ import software.amazon.smithy.utils.SmithyBuilder;
 final class HttpBindingDeserializer extends SpecificShapeDeserializer implements ShapeDeserializer {
 
     private static final System.Logger LOGGER = System.getLogger(HttpBindingDeserializer.class.getName());
-
+    private static final int MAX_IN_MEMORY_PAYLOAD = 134_217_728; // 128 MB.
     private final Codec payloadCodec;
     private final HttpHeaders headers;
     private final String requestRawQueryString;
@@ -39,7 +39,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private final String requestPath;
     private final Map<String, String> requestPathLabels;
     private final BindingMatcher bindingMatcher;
-    private final int maxInMemoryPayload = 134_217_728; // 128 MB.
     private final DataStream body;
     private final SdkShapeBuilder<?> shapeBuilder;
 
@@ -83,7 +82,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                             System.Logger.Level.TRACE,
                             () -> "Reading " + schema + " body to bytes for structure payload"
                         );
-                        var bytes = body.readToBytes(maxInMemoryPayload);
+                        var bytes = body.readToBytes(MAX_IN_MEMORY_PAYLOAD);
                         LOGGER.log(
                             System.Logger.Level.TRACE,
                             () -> "Deserializing the payload of " + schema + " via " + payloadCodec.getMediaType()
@@ -129,11 +128,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
 
         // Ensure the content-length is in the allowable range.
         var contentLength = headers.firstValue("content-length").map(Long::valueOf).orElse(0L);
-        if (contentLength > maxInMemoryPayload) {
+        if (contentLength > MAX_IN_MEMORY_PAYLOAD) {
             throw new SdkSerdeException("Content-Length too large " + contentLength);
         }
 
-        return body.readToBytes(maxInMemoryPayload);
+        return body.readToBytes(MAX_IN_MEMORY_PAYLOAD);
     }
 
     static final class Builder implements SmithyBuilder<HttpBindingDeserializer> {

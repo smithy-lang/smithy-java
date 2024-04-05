@@ -139,7 +139,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
      * @return the optionally present input event stream.
      */
     public Optional<Object> requestEventStream() {
-        return Optional.ofNullable(requestEventStream());
+        return Optional.empty();
     }
 
     /**
