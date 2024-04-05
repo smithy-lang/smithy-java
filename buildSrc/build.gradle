@@ -7,11 +7,15 @@ repositories {
     gradlePluginPortal()
 }
 
+configurations {
+    implementation {
+        exclude module: 'groovy-all'
+    }
+}
+
 dependencies {
-    // Cannot currently use version catalog correctly with
-    // convention plugins
-    // see: https://github.com/gradle/gradle/issues/17963
-    implementation 'com.adarshr:gradle-test-logger-plugin:4.0.0'
-    implementation 'com.github.spotbugs.snom:spotbugs-gradle-plugin:6.0.9'
-    implementation 'com.diffplug.spotless:spotless-plugin-gradle:6.25.0'
+    implementation(libs.test.logger.plugin)
+    implementation(libs.spotbugs)
+    implementation(libs.spotless)
+    implementation(libs.smithy.gradle.base)
 }

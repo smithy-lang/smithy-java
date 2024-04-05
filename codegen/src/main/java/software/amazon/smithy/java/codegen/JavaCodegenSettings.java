@@ -31,7 +31,7 @@ public record JavaCodegenSettings(
      * @return Parsed settings
      */
     public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
-        settingsNode.warnIfAdditionalProperties(List.of(SERVICE));
+        settingsNode.warnIfAdditionalProperties(List.of(SERVICE, NAMESPACE));
         return new JavaCodegenSettings(
             settingsNode.expectStringMember(SERVICE).expectShapeId(),
             settingsNode.expectStringMember(NAMESPACE).getValue()

@@ -1,0 +1,25 @@
+plugins {
+    id 'smithy-java.java-conventions'
+    id "smithy-java.integ-test-conventions"
+    id 'software.amazon.smithy.gradle.smithy-base'
+}
+
+dependencies {
+    smithyBuild(project(":codegen"))
+}
+
+// Add generated Java sources to the main sourceset
+afterEvaluate {
+    var outputPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen")
+    sourceSets {
+        main {
+            java {
+                srcDir(outputPath)
+            }
+        }
+    }
+}
+
+tasks.named("compileJava") {
+    dependsOn("smithyBuild")
+}

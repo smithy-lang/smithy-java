@@ -178,12 +178,14 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
     @Override
     public Symbol operationShape(OperationShape operationShape) {
+        // TODO: Implement
         return null;
     }
 
     @Override
     public Symbol resourceShape(ResourceShape resourceShape) {
-        throw new UnsupportedOperationException("Resource shapes do not generate Java types.");
+        // Resource shapes do not generate a Java type
+        return null;
     }
 
     @Override
