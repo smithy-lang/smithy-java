@@ -7,6 +7,7 @@ package software.amazon.smithy.java.codegen;
 
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.*;
+import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -37,9 +38,7 @@ public class DirectedJavaCodegen implements
     }
 
     @Override
-    public void generateService(
-        GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> generateServiceDirective
-    ) {
+    public void generateService(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // TODO
     }
 
@@ -49,37 +48,28 @@ public class DirectedJavaCodegen implements
     }
 
     @Override
-    public void generateStructure(
-        GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> generateStructureDirective
-    ) {
+    public void generateStructure(GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        new StructureGenerator<>().accept(directive);
+
+    }
+
+    @Override
+    public void generateError(GenerateErrorDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        new StructureGenerator<>().accept(directive);
+    }
+
+    @Override
+    public void generateUnion(GenerateUnionDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // TODO
     }
 
     @Override
-    public void generateError(
-        GenerateErrorDirective<CodeGenerationContext, JavaCodegenSettings> generateErrorDirective
-    ) {
+    public void generateEnumShape(GenerateEnumDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // TODO
     }
 
     @Override
-    public void generateUnion(
-        GenerateUnionDirective<CodeGenerationContext, JavaCodegenSettings> generateUnionDirective
-    ) {
-        // TODO
-    }
-
-    @Override
-    public void generateEnumShape(
-        GenerateEnumDirective<CodeGenerationContext, JavaCodegenSettings> generateEnumDirective
-    ) {
-        // TODO
-    }
-
-    @Override
-    public void generateIntEnumShape(
-        GenerateIntEnumDirective<CodeGenerationContext, JavaCodegenSettings> generateIntEnumDirective
-    ) {
+    public void generateIntEnumShape(GenerateIntEnumDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // TODO
     }
 }

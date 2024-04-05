@@ -8,6 +8,5 @@ package software.amazon.smithy.java.codegen.generators;
 public class SchemaGenerator implements Runnable {
     @Override
     public void run() {
-
     }
 }

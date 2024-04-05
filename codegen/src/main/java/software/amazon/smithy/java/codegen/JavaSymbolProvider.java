@@ -9,6 +9,7 @@ import static java.lang.String.format;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -42,6 +43,7 @@ import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.StreamingTrait;
+import software.amazon.smithy.utils.CaseUtils;
 
 /**
  * Maps Smithy types to Java Symbols
@@ -70,7 +72,18 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
     @Override
     public String toMemberName(MemberShape shape) {
-        return SymbolProvider.super.toMemberName(shape);
+        Shape containerShape = model.expectShape(shape.getContainer());
+        if (containerShape.isEnumShape() || containerShape.isIntEnumShape()) {
+            return CaseUtils.toSnakeCase(SymbolUtils.MEMBER_ESCAPER.escape(shape.getMemberName()))
+                    .toUpperCase(Locale.ROOT);
+        }
+
+        // If a member name contains an underscore, convert to camel case
+        if (shape.getMemberName().contains("_")) {
+            return SymbolUtils.MEMBER_ESCAPER.escape(CaseUtils.toCamelCase(shape.getMemberName()));
+        }
+
+        return SymbolUtils.MEMBER_ESCAPER.escape(shape.getMemberName());
     }
 
     @Override
@@ -78,7 +91,9 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
         if (blobShape.hasTrait(StreamingTrait.class)) {
             return SymbolUtils.fromClass(DataStream.class);
         }
-        return SymbolUtils.fromClass(byte[].class);
+        return SymbolUtils.fromClass(byte[].class).toBuilder()
+                .putProperty(SymbolProperties.PRIMITIVE, true)
+                .build();
     }
 
     @Override
@@ -90,6 +105,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
     public Symbol listShape(ListShape listShape) {
         return SymbolUtils.fromClass(List.class)
             .toBuilder()
+            .putProperty(SymbolProperties.BUILDER_REF_INITIALIZER, "forList()")
             .addReference(listShape.getMember().accept(this))
             .build();
     }
@@ -98,6 +114,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
     public Symbol mapShape(MapShape mapShape) {
         return SymbolUtils.fromClass(Map.class)
             .toBuilder()
+            .putProperty(SymbolProperties.BUILDER_REF_INITIALIZER, "forOrderedMap()")
             .addReference(mapShape.getKey().accept(this))
             .addReference(mapShape.getValue().accept(this))
             .build();
@@ -214,6 +231,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
         String name = SymbolUtils.getDefaultName(shape, service);
         return Symbol.builder()
             .name(name)
+            .putProperty(SymbolProperties.PRIMITIVE, false)
             .namespace(format("%s.model", packageNamespace), ".")
             .declarationFile(format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name))
             .build();

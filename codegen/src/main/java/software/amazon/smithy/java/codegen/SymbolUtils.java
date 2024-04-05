@@ -11,6 +11,7 @@ import software.amazon.smithy.codegen.core.ReservedWordsBuilder;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.utils.CaseUtils;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
@@ -45,10 +46,11 @@ public final class SymbolUtils {
     }
 
     /**
-     * TODO: update
-     * @param boxed
-     * @param unboxed
-     * @return
+     * Gets a Symbol for a class with both a boxed and unboxed variant
+     *
+     * @param boxed Boxed variant of class
+     * @param unboxed Unboxed variant of class
+     * @return Symbol representing java class
      */
     public static Symbol fromBoxedClass(Class<?> boxed, Class<?> unboxed) {
         return fromClass(boxed).toBuilder()
@@ -78,5 +80,13 @@ public final class SymbolUtils {
         return SHAPE_ESCAPER.escape(unescaped);
     }
 
-
+    /**
+     * Determines if a shape is a streaming blob
+     *
+     * @param shape shape to check
+     * @return returns true if the shape is a streaming blob
+     */
+    public static boolean isStreamingBlob(Shape shape) {
+        return shape.isBlobShape() && shape.hasTrait(StreamingTrait.class);
+    }
 }

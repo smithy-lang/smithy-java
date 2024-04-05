@@ -12,5 +12,8 @@ public final class SymbolProperties {
     // TODO: Docs
     public static final String PRIMITIVE = "primitive";
 
+    // TODO: Docs
+    public static final String BUILDER_REF_INITIALIZER = "builder-ref-init";
+
     private SymbolProperties() {}
 }

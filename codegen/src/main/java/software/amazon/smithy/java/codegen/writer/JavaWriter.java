@@ -77,6 +77,9 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         pushState().writeWithNoFormatting("/**");
     }
 
+    public void newLine() {
+        writeInlineWithNoFormatting(getNewline());
+    }
 
     public void writeDocStringContents(String contents) {
         // Split out any HTML-tag wrapped sections as we do not want to wrap
@@ -144,7 +147,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
                 duplicates.forEach(dupe -> putContext(dupe.getFullName(), deduplicate(dupe)));
             } else {
                 Symbol symbol = duplicates.iterator().next();
-                putContext(symbol.getFullName(), symbol.getName());
+                putContext(symbol.getFullName().replace("[]", "Array"), symbol.getName());
             }
         }
     }
@@ -218,7 +221,8 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
             nameSet.add(symbol);
 
             // Return a placeholder value that will be filled when toString is called
-            return format("$${$L:L}", symbol.getFullName());
+            // [] is replaced with "Array" to ensure array types dont break formatter.
+            return format("$${$L:L}", symbol.getFullName().replace("[]", "Array"));
         }
     }
 }
