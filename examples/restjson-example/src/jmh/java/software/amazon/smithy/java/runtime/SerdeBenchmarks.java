@@ -15,7 +15,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.infra.Blackhole;
-import software.amazon.smithy.java.runtime.core.serde.any.Any;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.example.model.PutPersonInput;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 
@@ -26,7 +26,7 @@ public class SerdeBenchmarks {
 
     private PutPersonInput input;
     private JsonCodec codec;
-    private Any inputAsAny;
+    private Document inputAsDocument;
 
     @Setup
     public void prepare() {
@@ -37,7 +37,7 @@ public class SerdeBenchmarks {
             .birthday(Instant.now())
             .build();
         codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
-        inputAsAny = Any.of(input);
+        inputAsDocument = Document.ofValue(input);
     }
 
     @Benchmark
@@ -59,11 +59,11 @@ public class SerdeBenchmarks {
 
     @Benchmark
     public void shapeToAny(Blackhole bh) {
-        bh.consume(Any.of(input));
+        bh.consume(Document.ofValue(input));
     }
 
     @Benchmark
     public void anyToShape(Blackhole bh) {
-        bh.consume(inputAsAny.asShape(PutPersonInput.builder()));
+        bh.consume(inputAsDocument.asShape(PutPersonInput.builder()));
     }
 }
