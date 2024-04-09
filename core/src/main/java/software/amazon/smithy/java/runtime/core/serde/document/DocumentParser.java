@@ -53,10 +53,12 @@ final class DocumentParser implements ShapeSerializer {
     public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         List<Document> elements = new ArrayList<>();
         var elementParser = new DocumentParser();
-        ListSerializer serializer = new ListSerializer(elementParser, () -> {
-            elements.add(elementParser.result);
-            elementParser.result = null;
-        }, () -> {});
+        ListSerializer serializer = new ListSerializer(elementParser, position -> {
+            if (position > 0) {
+                elements.add(elementParser.result);
+                elementParser.result = null;
+            }
+        });
         consumer.accept(serializer);
         if (elementParser.result != null) {
             elements.add(elementParser.result);

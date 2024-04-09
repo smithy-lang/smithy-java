@@ -147,7 +147,7 @@ final class JsonSerializer implements ShapeSerializer {
 
     @Override
     public void writeTimestamp(SdkSchema schema, Instant value) {
-        var formatter = schema.hasTrait(TimestampFormatTrait.class)
+        var formatter = useTimestampFormat && schema.hasTrait(TimestampFormatTrait.class)
             ? TimestampFormatter.of(schema.getTrait(TimestampFormatTrait.class))
             : defaultTimestampFormat;
         formatter.serializeToUnderlyingFormat(schema, value, this);
@@ -167,10 +167,20 @@ final class JsonSerializer implements ShapeSerializer {
     public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         try {
             stream.writeArrayStart();
-            consumer.accept(new ListSerializer(this, stream::writeMore));
+            consumer.accept(new ListSerializer(this, this::writeComma));
             stream.writeArrayEnd();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    private void writeComma(int position) {
+        if (position > 0) {
+            try {
+                stream.writeMore();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 

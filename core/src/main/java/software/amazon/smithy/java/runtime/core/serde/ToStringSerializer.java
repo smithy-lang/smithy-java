@@ -111,8 +111,14 @@ public final class ToStringSerializer implements ShapeSerializer {
     @Override
     public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         indent();
-        consumer.accept(new ListSerializer(this, () -> append(',').append(System.lineSeparator())));
+        consumer.accept(new ListSerializer(this, this::writeComma));
         dedent();
+    }
+
+    private void writeComma(int position) {
+        if (position > 0) {
+            append(',').append(System.lineSeparator());
+        }
     }
 
     @Override
