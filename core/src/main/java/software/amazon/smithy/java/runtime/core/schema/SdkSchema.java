@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -31,6 +32,8 @@ public class SdkSchema {
     private final ShapeType type;
     private final Map<Class<? extends Trait>, Trait> traits;
     private final Map<String, SdkSchema> members;
+    private final Set<String> stringEnumValues;
+    private final Set<Integer> intEnumValues;
     private final String memberName;
     private final SdkSchema memberTarget;
     private final int memberIndex;
@@ -43,6 +46,8 @@ public class SdkSchema {
         this.memberIndex = builder.memberIndex;
         this.memberName = builder.memberName;
         this.memberTarget = builder.memberTarget;
+        this.stringEnumValues = builder.stringEnumValues;
+        this.intEnumValues = builder.intEnumValues;
     }
 
     /**
@@ -307,6 +312,24 @@ public class SdkSchema {
         return toBuilder().members(filtered).build();
     }
 
+    /**
+     * Get the allowed values of the string.
+     *
+     * @return allowed string values (only relevant if not empty).
+     */
+    public Set<String> stringEnumValues() {
+        return stringEnumValues;
+    }
+
+    /**
+     * Get the allowed integer values of an integer.
+     *
+     * @return allowed integer values (only relevant if not empty).
+     */
+    public Set<Integer> intEnumValues() {
+        return intEnumValues;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -316,15 +339,29 @@ public class SdkSchema {
             return false;
         }
         SdkSchema sdkSchema = (SdkSchema) o;
-        return memberIndex == sdkSchema.memberIndex && Objects.equals(id, sdkSchema.id) && type == sdkSchema.type
-            && Objects.equals(traits, sdkSchema.traits) && Objects.equals(members, sdkSchema.members)
+        return memberIndex == sdkSchema.memberIndex && Objects.equals(id, sdkSchema.id)
+            && type == sdkSchema.type
+            && Objects.equals(traits, sdkSchema.traits)
+            && Objects.equals(members, sdkSchema.members)
+            && Objects.equals(stringEnumValues, sdkSchema.stringEnumValues)
+            && Objects.equals(intEnumValues, sdkSchema.intEnumValues)
             && Objects.equals(memberName, sdkSchema.memberName)
             && Objects.equals(memberTarget, sdkSchema.memberTarget);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, type, traits, members, memberName, memberTarget, memberIndex);
+        return Objects.hash(
+            id,
+            type,
+            traits,
+            members,
+            stringEnumValues,
+            intEnumValues,
+            memberName,
+            memberTarget,
+            memberIndex
+        );
     }
 
     public static final class Builder implements SmithyBuilder<SdkSchema> {
@@ -336,6 +373,8 @@ public class SdkSchema {
         private String memberName;
         private SdkSchema memberTarget;
         private int memberIndex = -1;
+        private Set<String> stringEnumValues = Collections.emptySet();
+        private Set<Integer> intEnumValues = Collections.emptySet();
 
         @Override
         public SdkSchema build() {
@@ -466,6 +505,72 @@ public class SdkSchema {
                 this.members.put(member.memberName(), member);
             }
             return this;
+        }
+
+        /**
+         * Set the allowed string enum values of an ENUM shape.
+         *
+         * <p>Enum values are stored on the schema in this way rather than as separate members to unify the enum trait
+         * and enum shapes, to simplify the Smithy data model and represent enums as strings, and to reduce the amount
+         * of complexity involved in validating string values against enums (for example, no need to iterate over enum
+         * members to determine if a member has a matching value).
+         *
+         * @param stringEnumValues Allowed string values.
+         * @return the builder.
+         * @throws SdkException if type has not been set or is not equal to ENUM or STRING.
+         */
+        public Builder stringEnumValues(Set<String> stringEnumValues) {
+            if (type != ShapeType.STRING && type != ShapeType.ENUM) {
+                throw new SdkException("Can only set enum values for STRING or ENUM types");
+            }
+            this.stringEnumValues = Objects.requireNonNull(stringEnumValues);
+            return this;
+        }
+
+        /**
+         * Set the allowed string enum values of a STRING or ENUM shape.
+         *
+         * @param stringEnumValues Allowed string values.
+         * @return the builder.
+         * @throws SdkException if type has not been set or is not equal to ENUM or STRING.
+         */
+        public Builder stringEnumValues(String... stringEnumValues) {
+            Set<String> values = new LinkedHashSet<>(stringEnumValues.length);
+            Collections.addAll(values, stringEnumValues);
+            return stringEnumValues(values);
+        }
+
+        /**
+         * Set the allowed intEnum values of an INT_ENUM shape.
+         *
+         * <p>IntEnum values are stored on the schema in this way rather than as separate members to simplify the
+         * Smithy data model and represent intEnums as integers, and to reduce the amount of complexity involved in
+         * validating number values against int enum values (for example, no need to iterate over members to determine
+         * if a member has a matching value).
+         *
+         * @param intEnumValues Allowed int values.
+         * @return the builder.
+         * @throws SdkException if type has not been set or is not equal to INT_ENUM.
+         */
+        public Builder intEnumValues(Set<Integer> intEnumValues) {
+            if (type != ShapeType.INT_ENUM) {
+                throw new SdkException("Can only set intEnum values for INT_ENUM types");
+            }
+            this.intEnumValues = Objects.requireNonNull(intEnumValues);
+            return this;
+        }
+
+        /**
+         * Set the allowed intEnum values of an INT_ENUM shape.
+         *
+         * @param intEnumValues Allowed int values.
+         * @return the builder.
+         * @throws SdkException if type has not been set or is not equal to INT_ENUM.
+         */
+        public Builder intEnumValues(Integer... intEnumValues) {
+            Set<Integer> values = new LinkedHashSet<>(intEnumValues.length);
+            Collections.addAll(values, intEnumValues);
+            return intEnumValues(values);
         }
     }
 }
