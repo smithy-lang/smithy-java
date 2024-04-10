@@ -61,12 +61,12 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                     }
                     """,
                 directive.symbol(),
-                (Runnable) () -> writeIdString(writer, shape),
-                new SchemaGenerator(),
+                writer.consumer(w -> writeIdString(w, shape)),
+                new SchemaGenerator(writer, directive.shape(), directive.symbolProvider(), directive.model()),
                 new PropertyGenerator(writer, shape, directive.symbolProvider()),
                 new ConstructorGenerator(writer, shape, directive.symbolProvider()),
                 new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()),
-                (Runnable) () -> writeToString(writer),
+                writer.consumer(StructureGenerator::writeToString),
                 new SerializerGenerator(writer),
                 new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model())
             );

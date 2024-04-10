@@ -146,8 +146,7 @@ public final class PersonDirectoryClient implements PersonDirectory {
         private AuthSchemeResolver authSchemeResolver;
         private IdentityResolvers identityResolvers;
 
-        private Builder() {
-        }
+        private Builder() {}
 
         /**
          * Set the protocol and transport to when calling the service.

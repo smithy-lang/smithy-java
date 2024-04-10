@@ -7,6 +7,7 @@ package software.amazon.smithy.java.codegen;
 
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.*;
+import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
@@ -35,6 +36,13 @@ public class DirectedJavaCodegen implements
             directive.fileManifest(),
             directive.integrations()
         );
+    }
+
+    @Override
+    public void customizeBeforeShapeGeneration(
+        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive
+    ) {
+        new SharedSchemasGenerator().accept(directive);
     }
 
     @Override
