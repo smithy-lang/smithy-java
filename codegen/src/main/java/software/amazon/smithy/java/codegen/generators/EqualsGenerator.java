@@ -12,7 +12,6 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
-import software.amazon.smithy.model.traits.ErrorTrait;
 
 final class EqualsGenerator implements Runnable {
     private final JavaWriter writer;
@@ -27,11 +26,6 @@ final class EqualsGenerator implements Runnable {
 
     @Override
     public void run() {
-        if (shape.hasTrait(ErrorTrait.class)) {
-            // Do not implement equals for error classes.
-            return;
-        }
-
         writer.write(
             """
                 @Override
