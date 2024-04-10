@@ -46,7 +46,7 @@ public final class ExceptionGenerator
                 directive.symbol(),
                 ModeledSdkException.class,
                 writer.consumer(w -> w.writeIdString(shape)),
-                new SchemaGenerator(),
+                new SchemaGenerator(writer, directive.shape(), directive.symbolProvider(), directive.model()),
                 new PropertyGenerator(writer, shape, directive.symbolProvider()),
                 new ConstructorGenerator(writer, shape, directive.symbolProvider()),
                 new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()),
