@@ -5,7 +5,11 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-record TypeRegistryGenerator() implements Runnable {
+
+import software.amazon.smithy.model.shapes.Shape;
+
+record EqualsGenerator(Shape shape) implements Runnable {
+
     @Override
     public void run() {
 

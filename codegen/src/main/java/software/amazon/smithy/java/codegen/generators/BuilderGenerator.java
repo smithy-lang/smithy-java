@@ -21,19 +21,7 @@ import software.amazon.smithy.utils.StringUtils;
 /**
  * Generates a static nested {@code Builder} class for a Java class.
  */
-public class BuilderGenerator implements Runnable {
-
-    private final JavaWriter writer;
-    private final Shape shape;
-    private final SymbolProvider symbolProvider;
-    private final Model model;
-
-    public BuilderGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) {
-        this.writer = writer;
-        this.shape = shape;
-        this.symbolProvider = symbolProvider;
-        this.model = model;
-    }
+record BuilderGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) implements Runnable {
 
     @Override
     public void run() {

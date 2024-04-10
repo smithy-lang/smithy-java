@@ -13,12 +13,7 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
  * {@link software.amazon.smithy.java.runtime.core.schema.SerializableShape#serialize(ShapeSerializer)}
  * method for a class.
  */
-public class SerializerGenerator implements Runnable {
-    private final JavaWriter writer;
-
-    public SerializerGenerator(JavaWriter writer) {
-        this.writer = writer;
-    }
+record SerializerGenerator(JavaWriter writer) implements Runnable {
 
     @Override
     public void run() {
