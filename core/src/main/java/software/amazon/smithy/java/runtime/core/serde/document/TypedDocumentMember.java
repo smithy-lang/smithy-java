@@ -47,7 +47,7 @@ final class TypedDocumentMember implements Document {
     }
 
     @Override
-    public void serialize(ShapeSerializer encoder) {
+    public void serializeContents(ShapeSerializer encoder) {
         memberWriter.accept(encoder);
     }
 

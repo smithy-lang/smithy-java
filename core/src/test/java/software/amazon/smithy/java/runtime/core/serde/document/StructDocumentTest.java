@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -62,9 +63,24 @@ public class StructDocumentTest {
         entries.put("b", Document.of(1));
         var document = Document.ofStruct(entries);
 
+        document.serialize(new SpecificShapeSerializer() {
+            @Override
+            public void writeDocument(Document value) {
+                assertThat(value, is(document));
+            }
+        });
+    }
+
+    @Test
+    public void serializesContent() {
+        Map<String, Document> entries = new LinkedHashMap<>();
+        entries.put("a", Document.of("a"));
+        entries.put("b", Document.of(1));
+        var document = Document.ofStruct(entries);
+
         List<String> actions = new ArrayList<>();
 
-        document.serialize(new SpecificShapeSerializer() {
+        document.serializeContents(new SpecificShapeSerializer() {
             @Override
             public StructSerializer beginStruct(SdkSchema schema) {
                 assertThat(schema, equalTo(PreludeSchemas.DOCUMENT));

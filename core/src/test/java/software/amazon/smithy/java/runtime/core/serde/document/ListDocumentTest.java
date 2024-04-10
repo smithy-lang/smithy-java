@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,18 @@ public class ListDocumentTest {
 
     @Test
     public void serializesShape() {
+        var document = Document.of(List.of(Document.of("a"), Document.of("b")));
+
+        document.serialize(new SpecificShapeSerializer() {
+            @Override
+            public void writeDocument(Document value) {
+                assertThat(value, is(document));
+            }
+        });
+    }
+
+    @Test
+    public void serializesContents() {
         List<Document> values = List.of(Document.of("a"), Document.of("b"));
         var document = Document.of(values);
 
@@ -52,7 +65,7 @@ public class ListDocumentTest {
             }
         };
 
-        document.serialize(serializer);
+        document.serializeContents(serializer);
 
         assertThat(writtenStrings, contains("a", "b"));
     }

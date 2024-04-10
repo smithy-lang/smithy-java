@@ -11,34 +11,50 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import javax.xml.validation.Schema;
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
  * A Smithy document type, representing untyped data from the Smithy data model.
  *
+ * <h3>Documents and the Smithy data model</h3>
+ *
  * <p>The Smithy data model consists of:
+ *
  * <ul>
  *     <li>Numbers: byte, short, integer, long, float, double, bigInteger, bigDecimal. IntEnum shapes are
  *         represented as integers in the Smithy data model.</li>
  *     <li>boolean</li>
  *     <li>blob</li>
  *     <li>string: enum shapes are represented as strings in the Smithy data model</li>
- *     <li>timestamp</li>
+ *     <li>timestamp: Represented as an {@link Instant}</li>
  *     <li>list: list of Documents</li>
- *     <li>map: map of int|long|string to Document values</li>
+ *     <li>map: map of int|long|string keys to Document values</li>
  *     <li>struct: structure or union</li>
  * </ul>
  *
- * <p>A document type implements {@link SerializableShape} and emits the Smithy data model. Documents can store
- * numbers, booleans, strings, blobs, timestamps, lists, maps, and structures.
+ * <h3>Serializing documents and their contents</h3>
  *
- * <p>Document types are a protocol-agnostic view of untyped data. Protocol codecs must make every effort to smooth
- * over protocol incompatibilities with the Smithy data model. So, for example, if a JSON protocol serializes a blob
- * as a base64 encoded string, then calling {@link #asBlob()} should automatically base64 decode the value and return
- * the underlying bytes.
+ * <p>A document type implements {@link SerializableShape} and implementations must always call
+ * {@link ShapeSerializer#writeDocument}. Shape serializers can access the contents of the document using
+ * {@link #serializeContents}, which emits the Smithy data model based on the contents of the document.
+ * The first shape written with {@link #serializeContents} must not be a document because doing so would cause
+ * infinite recursion in serializers.
+ *
+ * <h3>Protocol smoothing, string and blob interop</h3>
+ *
+ * <p>Document types are a protocol-agnostic view of untyped data. Protocol codecs should attempt to smooth over
+ * protocol incompatibilities with the Smithy data model. If a protocol serializes a blob as a base64 encoded string,
+ * then calling {@link #asBlob()} should automatically base64 decode the value and return the underlying bytes.
+ * Conversely, if a document contains binary encoded data and {@link #asString()} is called, the document should
+ * automatically attempt to return a UTF-8 string from the bytes.
+ *
+ * <h3>Typed documents</h3>
  *
  * <p>Document types can be combined with a typed schema using {@link #ofStruct(SerializableShape)}. This kind of
  * document type allows (but does not require) codecs to serialize or deserialize the document exactly as if the shape
@@ -46,14 +62,67 @@ import software.amazon.smithy.model.shapes.ShapeType;
  */
 public interface Document extends SerializableShape {
     /**
-     * Get the Smithy data model document type.
+     * Get the Smithy data model type for the underlying contents of the document.
      *
-     * <p>Enum and intEnum values are represented as their deconstructed {@link ShapeType#INTEGER} and
-     * {@link ShapeType#STRING} corollaries.
+     * <p>The type can be used to know the appropriate "as" method to call to get the underlying data of the document.
+     *
+     * <p>The type returned from this method will differ from the type and schema emitted from
+     * {@link #serialize(ShapeSerializer)}, which always writes the document as {@link ShapeSerializer#writeDocument}.
+     * However, the type returned from this method should correspond to the type emitted from
+     * {@link #serializeContents(ShapeSerializer)}.
+     *
+     * <ul>
+     *     <li>enum shapes: Enum shapes are treated as a {@link ShapeType#STRING}, and variants can be found in
+     *     the corresponding schema emitted from {@link #serializeContents(ShapeSerializer)}.</li>
+     *     <li>intEnum shapes: Enum shapes are treated as an {@link ShapeType#INTEGER}, and variants can be found in
+     *     the corresponding schema emitted from {@link #serializeContents(ShapeSerializer)}.</li>
+     * </ul>
      *
      * @return the Smithy data model type.
      */
     ShapeType type();
+
+    /**
+     * Serializes the Document as a document value in the Smithy data model.
+     *
+     * <p>All implementations of a document type are expected to follow the same behavior as this method when writing
+     * to a {@link ShapeSerializer}; the document is always written with {@link ShapeSerializer#writeDocument(Document)}
+     * and receivers are free to query the underlying contents of the document using
+     * {@link #serializeContents(ShapeSerializer)}.
+     *
+     * @param serializer Where to send the document to {@link ShapeSerializer#writeDocument(Document)}.
+     */
+    @Override
+    default void serialize(ShapeSerializer serializer) {
+        serializer.writeDocument(this);
+    }
+
+    /**
+     * Serialize the contents of the document using the Smithy data model and an appropriate {@link Schema}.
+     *
+     * <p>While {@link #serialize(ShapeSerializer)} always emits document values as
+     * {@link ShapeSerializer#writeDocument(Document)}, this method emits the contents of the document itself.
+     * {@code ShapeSerializer} implementations that receive a {@link Document} via {@code writeDocument} can get the
+     * inner contents of the document using this method.
+     *
+     * <p>When implementing this method, each call to the serializer must provide the most appropriate schema
+     * possible to capture the underlying document value. Documents that are not typed to a specific shape should use
+     * schemas from {@link PreludeSchemas}. For example, a string document should use {@link PreludeSchemas#STRING},
+     * and an integer document should use {@link PreludeSchemas#INTEGER}.
+     *
+     * <p>Structure, list, and map documents that are not typed to a specific shape should use
+     * {@link PreludeSchemas#DOCUMENT}. Members emitted for these shapes must include an appropriate member name
+     * and target shape. For example, to represent the value of a map entry, the value must be emitted as a member
+     * schema (even a synthetic member) with a member name of "value" and the document value target
+     * (e.g., {@code smithy.api#Document$value}). In doing so, receivers of the document's data model do not need to
+     * implement special-cased logic to account for synthetic document type members vs actual modeled members
+     *
+     * <p>Implementations must not write the conents of the document as {@link ShapeSerializer#writeDocument(Document)},
+     * because that could result in infinite recursion for serializers that want access to the contents of a document.
+     *
+     * @param serializer Serializer to write the underlying data of the document to.
+     */
+    void serializeContents(ShapeSerializer serializer);
 
     /**
      * Get the boolean value of the Document if it is a boolean.

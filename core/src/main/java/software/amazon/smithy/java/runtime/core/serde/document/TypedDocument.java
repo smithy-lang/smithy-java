@@ -21,10 +21,6 @@ import software.amazon.smithy.utils.Pair;
 final class TypedDocument implements Document {
 
     public static Document of(SerializableShape shape) {
-        return of((Consumer<ShapeSerializer>) shape::serialize);
-    }
-
-    public static Document of(Consumer<ShapeSerializer> writer) {
         // Ensure the given serializer is for a document, get the schema, and get all members.
         var ser = new SpecificShapeSerializer() {
             private SdkSchema documentSchema;
@@ -50,7 +46,7 @@ final class TypedDocument implements Document {
             }
         };
 
-        writer.accept(ser);
+        shape.serialize(ser);
 
         if (ser.documentSchema == null) {
             throw new SdkSerdeException(
@@ -59,28 +55,28 @@ final class TypedDocument implements Document {
             );
         }
 
-        return new TypedDocument(writer, ser.documentSchema, ser.members);
+        return new TypedDocument(shape, ser.documentSchema, ser.members);
     }
 
     private final SdkSchema documentSchema;
     private final Map<String, Pair<SdkSchema, Consumer<ShapeSerializer>>> members;
-    private final Consumer<ShapeSerializer> serializer;
+    private final SerializableShape shape;
     private volatile Document equalityValue;
     private volatile int computedHashCode;
 
     private TypedDocument(
-        Consumer<ShapeSerializer> serializer,
+        SerializableShape shape,
         SdkSchema documentSchema,
         Map<String, Pair<SdkSchema, Consumer<ShapeSerializer>>> members
     ) {
-        this.serializer = serializer;
+        this.shape = shape;
         this.documentSchema = documentSchema;
         this.members = members;
     }
 
     @Override
-    public void serialize(ShapeSerializer encoder) {
-        serializer.accept(encoder);
+    public void serializeContents(ShapeSerializer encoder) {
+        shape.serialize(encoder);
     }
 
     @Override

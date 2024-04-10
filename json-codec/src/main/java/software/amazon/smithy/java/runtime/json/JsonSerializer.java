@@ -20,6 +20,7 @@ import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.StructSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class JsonSerializer implements ShapeSerializer {
@@ -194,5 +195,11 @@ final class JsonSerializer implements ShapeSerializer {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    @Override
+    public void writeDocument(Document value) {
+        // Document values in JSON are serialized inline by receiving the data model contents of the document.
+        value.serializeContents(this);
     }
 }

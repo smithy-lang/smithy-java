@@ -155,5 +155,10 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
+    public void writeDocument(Document value) {
+        value.serializeContents(this);
+    }
+
+    @Override
     public void flush() {}
 }

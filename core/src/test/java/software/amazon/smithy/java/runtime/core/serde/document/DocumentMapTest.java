@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 
 import java.util.HashMap;
 import java.util.List;
@@ -23,10 +24,10 @@ import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 public class DocumentMapTest {
     @ParameterizedTest
     @MethodSource("mapProvider")
-    public void serializesMaps(Map<Document, Document> mapOfXtoString) {
+    public void serializesMapContents(Map<Document, Document> mapOfXtoString) {
         var document = Document.ofMap(mapOfXtoString);
         Map<Document, Document> received = new HashMap<>();
-        document.serialize(new SpecificShapeSerializer() {
+        document.serializeContents(new SpecificShapeSerializer() {
             @Override
             public void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
                 consumer.accept(new MapSerializer() {
@@ -63,7 +64,16 @@ public class DocumentMapTest {
             }
         });
 
+        // Ensure the contents were serialized as expected.
         assertThat(received, equalTo(mapOfXtoString));
+
+        // Ensure documents are always serialized as a document.
+        document.serialize(new SpecificShapeSerializer() {
+            @Override
+            public void writeDocument(Document value) {
+                assertThat(value, is(document));
+            }
+        });
     }
 
     public static List<Arguments> mapProvider() {

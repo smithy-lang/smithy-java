@@ -48,8 +48,26 @@ public class MapDocumentTest {
         );
         var map = Document.ofMap(entries);
 
-        var keys = new ArrayList<>();
         map.serialize(new SpecificShapeSerializer() {
+            @Override
+            public void writeDocument(Document value) {
+                assertThat(value, is(map));
+            }
+        });
+    }
+
+    @Test
+    public void serializesContent() {
+        Map<Document, Document> entries = Map.of(
+            Document.of("a"),
+            Document.of(1),
+            Document.of("b"),
+            Document.of(2)
+        );
+        var map = Document.ofMap(entries);
+
+        var keys = new ArrayList<>();
+        map.serializeContents(new SpecificShapeSerializer() {
             @Override
             public void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
                 assertThat(schema, equalTo(PreludeSchemas.DOCUMENT));

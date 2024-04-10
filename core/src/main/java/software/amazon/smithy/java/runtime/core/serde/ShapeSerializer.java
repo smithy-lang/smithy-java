@@ -169,9 +169,9 @@ public interface ShapeSerializer extends Flushable {
     /**
      * Serialize a document shape.
      *
+     * <p>The underlying contents of the document can be serialized using {@link Document#serializeContents}.
+     *
      * @param value  Value to serialize.
      */
-    default void writeDocument(Document value) {
-        writeShape(value);
-    }
+    void writeDocument(Document value);
 }

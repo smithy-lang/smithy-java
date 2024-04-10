@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
@@ -30,6 +31,18 @@ public class StringDocumentTest {
     public void serializesShape() {
         var document = Document.of("hi");
 
+        document.serialize(new SpecificShapeSerializer() {
+            @Override
+            public void writeDocument(Document value) {
+                assertThat(value, is(document));
+            }
+        });
+    }
+
+    @Test
+    public void serializesContent() {
+        var document = Document.of("hi");
+
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
             public void writeString(SdkSchema schema, String value) {
@@ -38,6 +51,6 @@ public class StringDocumentTest {
             }
         };
 
-        document.serialize(serializer);
+        document.serializeContents(serializer);
     }
 }

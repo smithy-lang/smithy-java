@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 
@@ -17,6 +18,7 @@ import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 public class TypedDocumentTest {
@@ -38,7 +40,7 @@ public class TypedDocumentTest {
     }
 
     @Test
-    public void wrapsStructWithTypeAndSchema() {
+    public void wrapsStructContentWithTypeAndSchema() {
         SerializableShape serializableShape = encoder -> {
             var s = encoder.beginStruct(PreludeSchemas.DOCUMENT);
             var aMember = SdkSchema.memberBuilder("a", PreludeSchemas.STRING).id(PreludeSchemas.DOCUMENT.id()).build();
@@ -72,6 +74,14 @@ public class TypedDocumentTest {
         assertThat(result, not(equalTo("X")));
         assertThat(result, equalTo(Document.ofStruct(serializableShape)));
         assertThat(result.hashCode(), equalTo(Document.ofStruct(serializableShape).hashCode()));
+
+        // Writes as document unless getting contents.
+        result.serialize(new SpecificShapeSerializer() {
+            @Override
+            public void writeDocument(Document value) {
+                assertThat(value, is(result));
+            }
+        });
 
         var copy1 = Document.ofValue(result);
         var copy2 = Document.ofValue(result);

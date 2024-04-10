@@ -35,7 +35,7 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.writeBoolean(PreludeSchemas.BOOLEAN, value);
         }
     }
@@ -87,7 +87,7 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.writeByte(PreludeSchemas.BYTE, value);
         }
     }
@@ -139,7 +139,7 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.writeShort(PreludeSchemas.SHORT, value);
         }
     }
@@ -191,7 +191,7 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.writeInteger(PreludeSchemas.INTEGER, value);
         }
     }
@@ -243,7 +243,7 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.writeLong(PreludeSchemas.LONG, value);
         }
     }
@@ -295,7 +295,7 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.writeFloat(PreludeSchemas.FLOAT, value);
         }
     }
@@ -347,7 +347,7 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.writeDouble(PreludeSchemas.DOUBLE, value);
         }
     }
@@ -399,7 +399,7 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.writeBigInteger(PreludeSchemas.BIG_INTEGER, value);
         }
     }
@@ -451,7 +451,7 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, value);
         }
     }
@@ -468,7 +468,7 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.writeString(PreludeSchemas.STRING, value);
         }
     }
@@ -485,7 +485,7 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.writeBlob(PreludeSchemas.BLOB, value);
         }
 
@@ -520,7 +520,7 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.writeTimestamp(PreludeSchemas.TIMESTAMP, value);
         }
     }
@@ -537,8 +537,12 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
-            serializer.beginList(PreludeSchemas.DOCUMENT, ser -> values().forEach(value -> value.serialize(ser)));
+        public void serializeContents(ShapeSerializer serializer) {
+            serializer.beginList(PreludeSchemas.DOCUMENT, ser -> {
+                for (var element : values) {
+                    element.serializeContents(ser);
+                }
+            });
         }
     }
 
@@ -565,11 +569,11 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer serializer) {
+        public void serializeContents(ShapeSerializer serializer) {
             serializer.beginMap(PreludeSchemas.DOCUMENT, s -> {
                 for (var entry : members.entrySet()) {
                     Document key = entry.getKey();
-                    Consumer<ShapeSerializer> valueSer = ser -> entry.getValue().serialize(ser);
+                    Consumer<ShapeSerializer> valueSer = ser -> entry.getValue().serializeContents(ser);
                     switch (key.type()) {
                         case STRING, ENUM -> s.entry(entry.getKey().asString(), valueSer);
                         case INTEGER, INT_ENUM -> s.entry(entry.getKey().asInteger(), valueSer);
@@ -602,11 +606,10 @@ final class Documents {
         }
 
         @Override
-        public void serialize(ShapeSerializer encoder) {
+        public void serializeContents(ShapeSerializer encoder) {
             var structSerializer = encoder.beginStruct(PreludeSchemas.DOCUMENT);
-            var i = 0;
             for (var entry : members.entrySet()) {
-                structSerializer.member(syntheticMember(entry.getKey()), entry.getValue()::serialize);
+                structSerializer.member(syntheticMember(entry.getKey()), entry.getValue()::serializeContents);
             }
             structSerializer.endStruct();
         }

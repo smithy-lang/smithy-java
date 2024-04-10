@@ -190,7 +190,7 @@ final class JsonDocument implements Document {
     }
 
     @Override
-    public void serialize(ShapeSerializer encoder) {
+    public void serializeContents(ShapeSerializer encoder) {
         switch (type()) {
             case BOOLEAN -> encoder.writeBoolean(schema, asBoolean());
             case BYTE -> encoder.writeByte(schema, asByte());

@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,18 @@ public class BlobDocumentTest {
     public void serializesShape() {
         var document = Document.of("hi".getBytes(StandardCharsets.UTF_8));
 
+        document.serialize(new SpecificShapeSerializer() {
+            @Override
+            public void writeDocument(Document value) {
+                assertThat(value, is(document));
+            }
+        });
+    }
+
+    @Test
+    public void serializesContents() {
+        var document = Document.of("hi".getBytes(StandardCharsets.UTF_8));
+
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
             public void writeBlob(SdkSchema schema, byte[] value) {
@@ -39,6 +52,6 @@ public class BlobDocumentTest {
             }
         };
 
-        document.serialize(serializer);
+        document.serializeContents(serializer);
     }
 }

@@ -217,9 +217,10 @@ public final class ToStringSerializer implements ShapeSerializer {
 
     @Override
     public void writeDocument(Document value) {
-        append("Document (" + value.type()).append(") :");
-        append(System.lineSeparator());
+        append("Document (" + value.type()).append("):");
         indent();
-        value.serialize(this);
+        append(System.lineSeparator());
+        value.serializeContents(this);
+        dedent();
     }
 }

@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 
 import java.math.BigInteger;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,18 @@ public class BigIntegerDocumentTest {
     public void serializesShape() {
         var document = Document.of(BigInteger.valueOf(10));
 
+        document.serialize(new SpecificShapeSerializer() {
+            @Override
+            public void writeDocument(Document value) {
+                assertThat(value, is(document));
+            }
+        });
+    }
+
+    @Test
+    public void serializesContent() {
+        var document = Document.of(BigInteger.valueOf(10));
+
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
             public void writeBigInteger(SdkSchema schema, BigInteger value) {
@@ -39,6 +52,6 @@ public class BigIntegerDocumentTest {
             }
         };
 
-        document.serialize(serializer);
+        document.serializeContents(serializer);
     }
 }
