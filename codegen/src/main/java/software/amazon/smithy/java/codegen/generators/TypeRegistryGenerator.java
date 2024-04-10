@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-record TypeRegistryGenerator() implements Runnable {
+public class TypeRegistryGenerator implements Runnable {
     @Override
     public void run() {
 

@@ -19,7 +19,17 @@ import software.amazon.smithy.utils.SmithyBuilder;
  * <p>The constructor expects to take only one argument, a static {@code Builder} class
  * Use the {@link BuilderGenerator} class to generate this static builder.
  */
-record ConstructorGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements Runnable {
+final class ConstructorGenerator implements Runnable {
+
+    private final JavaWriter writer;
+    private final Shape shape;
+    private final SymbolProvider symbolProvider;
+
+    ConstructorGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) {
+        this.writer = writer;
+        this.shape = shape;
+        this.symbolProvider = symbolProvider;
+    }
 
     @Override
     public void run() {

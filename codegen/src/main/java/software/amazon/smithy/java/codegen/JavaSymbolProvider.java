@@ -93,6 +93,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
         }
         return SymbolUtils.fromClass(byte[].class)
             .toBuilder()
+            .putProperty(SymbolProperties.IS_JAVA_ARRAY, true)
             .putProperty(SymbolProperties.PRIMITIVE, true)
             .build();
     }

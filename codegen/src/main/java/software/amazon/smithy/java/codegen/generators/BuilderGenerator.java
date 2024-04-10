@@ -21,7 +21,19 @@ import software.amazon.smithy.utils.StringUtils;
 /**
  * Generates a static nested {@code Builder} class for a Java class.
  */
-record BuilderGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) implements Runnable {
+public class BuilderGenerator implements Runnable {
+
+    private final JavaWriter writer;
+    private final Shape shape;
+    private final SymbolProvider symbolProvider;
+    private final Model model;
+
+    public BuilderGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) {
+        this.writer = writer;
+        this.shape = shape;
+        this.symbolProvider = symbolProvider;
+        this.model = model;
+    }
 
     @Override
     public void run() {
@@ -90,7 +102,7 @@ record BuilderGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolPro
                     symbolProvider.toMemberName(member)
                 );
             } else {
-                // TODO: handle
+                // TODO: handle defaults
                 writer.pushState();
                 writer.putContext("isRequired", member.isRequired());
                 writer.write(

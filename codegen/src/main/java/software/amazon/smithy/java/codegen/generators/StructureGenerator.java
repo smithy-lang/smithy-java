@@ -58,6 +58,8 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                         ${C|}
 
                         ${C|}
+
+                        ${C|}
                     }
                     """,
                 directive.symbol(),
@@ -67,6 +69,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 new ConstructorGenerator(writer, shape, directive.symbolProvider()),
                 new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()),
                 (Runnable) () -> writeToString(writer),
+                new EqualsGenerator(writer, directive.shape(), directive.symbolProvider()),
                 new SerializerGenerator(writer),
                 new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model())
             );

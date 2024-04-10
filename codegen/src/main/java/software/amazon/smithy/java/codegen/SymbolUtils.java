@@ -46,7 +46,7 @@ public final class SymbolUtils {
     }
 
     /**
-     * Gets a Symbol for a class with both a boxed and unboxed variant
+     * Gets a Symbol for a class with both a boxed and unboxed variant.
      *
      * @param boxed Boxed variant of class
      * @param unboxed Unboxed variant of class
@@ -81,12 +81,22 @@ public final class SymbolUtils {
     }
 
     /**
-     * Determines if a shape is a streaming blob
+     * Determines if a shape is a streaming blob.
      *
      * @param shape shape to check
      * @return returns true if the shape is a streaming blob
      */
     public static boolean isStreamingBlob(Shape shape) {
         return shape.isBlobShape() && shape.hasTrait(StreamingTrait.class);
+    }
+
+    /**
+     * Checks if a symbol resolves to a Java Array type.
+     *
+     * @param symbol symbol to check
+     * @return true if symbol resolves to a Java Array
+     */
+    public static boolean isJavaArray(Symbol symbol) {
+        return symbol.getProperty(SymbolProperties.IS_JAVA_ARRAY).isPresent();
     }
 }

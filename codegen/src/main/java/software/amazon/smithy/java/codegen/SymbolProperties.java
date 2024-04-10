@@ -15,5 +15,7 @@ public final class SymbolProperties {
     // TODO: Docs
     public static final String BUILDER_REF_INITIALIZER = "builder-ref-init";
 
+    public static final String IS_JAVA_ARRAY = "is-java-array";
+
     private SymbolProperties() {}
 }
