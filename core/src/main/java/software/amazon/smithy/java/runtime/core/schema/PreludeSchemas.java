@@ -96,7 +96,7 @@ public final class PreludeSchemas {
      * Returns the most appropriate prelude schema based on the given type.
      *
      * <p>Numeric and boolean types return the nullable value
-     * (e.g., {@link #INTEGER and not {@link #PRIMITIVE_INTEGER}).
+     * (e.g., {@link #INTEGER} and not {@link #PRIMITIVE_INTEGER}).
      *
      * <p>Types with no corresponding prelude schema (e.g., LIST, STRUCTURE, UNION), are returned as a
      * {@link #DOCUMENT} schema.
