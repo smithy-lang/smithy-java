@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.SequencedSet;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
@@ -43,6 +44,7 @@ import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.StreamingTrait;
+import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.utils.CaseUtils;
 
 /**
@@ -105,6 +107,14 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
     @Override
     public Symbol listShape(ListShape listShape) {
+        // Lists with unique Items are treated as Sequenced Sets
+        if (listShape.hasTrait(UniqueItemsTrait.class)) {
+            return SymbolUtils.fromClass(SequencedSet.class)
+                .toBuilder()
+                .putProperty(SymbolProperties.BUILDER_REF_INITIALIZER, "forOrderedSet()")
+                .addReference(listShape.getMember().accept(this))
+                .build();
+        }
         return SymbolUtils.fromClass(List.class)
             .toBuilder()
             .putProperty(SymbolProperties.BUILDER_REF_INITIALIZER, "forList()")
