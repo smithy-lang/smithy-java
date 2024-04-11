@@ -75,7 +75,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
         Shape containerShape = model.expectShape(shape.getContainer());
         if (containerShape.isEnumShape() || containerShape.isIntEnumShape()) {
             return CaseUtils.toSnakeCase(SymbolUtils.MEMBER_ESCAPER.escape(shape.getMemberName()))
-                .toUpperCase(Locale.ROOT);
+                .toUpperCase(Locale.ENGLISH);
         }
 
         // If a member name contains an underscore, convert to camel case

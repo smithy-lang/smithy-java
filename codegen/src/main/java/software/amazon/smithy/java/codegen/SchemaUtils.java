@@ -27,7 +27,7 @@ public final class SchemaUtils {
      * @return name to use for static schema property
      */
     public static String toMemberSchemaName(String memberName) {
-        return "SCHEMA_" + CaseUtils.toSnakeCase(memberName).toUpperCase(Locale.ROOT);
+        return "SCHEMA_" + CaseUtils.toSnakeCase(memberName).toUpperCase(Locale.ENGLISH);
     }
 
     /**
@@ -37,7 +37,7 @@ public final class SchemaUtils {
      * @return name to use for static schema property
      */
     public static String toSchemaName(ToShapeId toShapeId) {
-        return CaseUtils.toSnakeCase(toShapeId.toShapeId().getName()).toUpperCase(Locale.ROOT);
+        return CaseUtils.toSnakeCase(toShapeId.toShapeId().getName()).toUpperCase(Locale.ENGLISH);
     }
 
     /**
