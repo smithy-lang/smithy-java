@@ -85,7 +85,7 @@ public class GenericTest {
     }
 
     @Test
-    public void testAny() {
+    public void testDocument() {
         Codec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
 
         PutPersonInput input = PutPersonInput.builder()
@@ -99,12 +99,12 @@ public class GenericTest {
         // Serialize directly to JSON.
         System.out.println(codec.serializeToString(input));
 
-        // Convert to an Any and then serialize to JSON.
-        Document any = Document.ofStruct(input);
-        System.out.println(codec.serializeToString(any));
+        // Convert to a Document and then serialize to JSON.
+        Document document = Document.ofStruct(input);
+        System.out.println(codec.serializeToString(document));
 
-        // Send the Any to a person builder.
-        PutPersonInput inputCopy = any.asShape(PutPersonInput.builder());
+        // Send the Document to a person builder.
+        PutPersonInput inputCopy = document.asShape(PutPersonInput.builder());
 
         // Now serialize that to see that it round-trips.
         System.out.println(codec.serializeToString(inputCopy));
