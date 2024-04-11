@@ -195,8 +195,10 @@ public class BuilderGenerator implements Runnable {
             // Remove one
             writer.write(
                 """
-                    public Builder remove$L($T value) {
-                        $L.get().remove(value);
+                    public Builder remove$1L($2T value) {
+                        if (this.$3L.hasValue()) {
+                            $3L.get().remove(value);
+                        }
                         return this;
                     }
                     """,
@@ -243,7 +245,9 @@ public class BuilderGenerator implements Runnable {
             writer.write(
                 """
                     public Builder remove$1L($2T $3L) {
-                        this.$3L.get().remove($3L);
+                        if (this.$3L.hasValue()) {
+                            this.$3L.get().remove($3L);
+                        }
                         return this;
                     }
                     """,
@@ -257,8 +261,10 @@ public class BuilderGenerator implements Runnable {
         private void clearCollection() {
             writer.write(
                 """
-                    public Builder clear$L() {
-                        $L.get().clear();
+                    public Builder clear$1L() {
+                        if ($2L.hasValue()) {
+                            $2L.get().clear();
+                        }
                         return this;
                     }
                     """,
