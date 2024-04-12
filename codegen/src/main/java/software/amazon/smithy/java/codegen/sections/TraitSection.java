@@ -7,10 +7,12 @@ package software.amazon.smithy.java.codegen.sections;
 
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.CodeSection;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
- * Injected section used to populate trait values for SdkSchemas
+ * Injects Trait definitions for a Smithy Shape.
  *
- * @param shape Shape traits are a attached to.
+ * @param shape Smithy shape to inject trait definitions for.
  */
-public record SchemaTraitSection(Shape shape) implements CodeSection {}
+@SmithyInternalApi
+public record TraitSection(Shape shape) implements CodeSection {}
