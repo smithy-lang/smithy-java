@@ -24,7 +24,6 @@ import software.amazon.smithy.utils.StringUtils;
 
 /**
  * Writer for java code generation
- *
  * TODO: update docs
  */
 @SmithyUnstableApi

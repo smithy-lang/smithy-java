@@ -6,6 +6,7 @@ namespace smithy.example
 blob Stream
 
 @sensitive
+@timestampFormat("date-time")
 timestamp Birthday
 
 map MapListString {

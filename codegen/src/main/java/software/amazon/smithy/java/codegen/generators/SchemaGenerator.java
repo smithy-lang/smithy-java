@@ -7,7 +7,7 @@ package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.SchemaUtils;
-import software.amazon.smithy.java.codegen.sections.SchemaTraitSection;
+import software.amazon.smithy.java.codegen.sections.TraitSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.model.Model;
@@ -62,8 +62,7 @@ final class SchemaGenerator implements Runnable {
                 """
                     static final $1T $2L = $1T.builder()
                         .type($3T.$4L)
-                        .id($5S)
-                        ${6C|}
+                        .id($5S)${6C}
                         .build();
                     """,
                 SdkSchema.class,
@@ -71,7 +70,7 @@ final class SchemaGenerator implements Runnable {
                 ShapeType.class,
                 shape.getType().name(),
                 shape.toShapeId(),
-                writer.consumer(w -> writeSchemaTraitBlock(w, shape))
+                writer.consumer(w -> w.injectSection(new TraitSection(shape)))
             );
             return null;
         }
@@ -83,8 +82,7 @@ final class SchemaGenerator implements Runnable {
                 """
                     static final $1T $2L = $1T.builder()
                             .type($3T.LIST)
-                            .id($4S)
-                            ${5C|}
+                            .id($4S)${5C}
                             .members(SdkSchema.memberBuilder(0, "member", $6C))
                             .build();
                     """,
@@ -92,7 +90,7 @@ final class SchemaGenerator implements Runnable {
                 SchemaUtils.toSchemaName(shape),
                 ShapeType.class,
                 shape.toShapeId(),
-                writer.consumer(w -> writeSchemaTraitBlock(w, shape)),
+                writer.consumer(w -> w.injectSection(new TraitSection(shape))),
                 writer.consumer(w -> SchemaUtils.writeSchemaType(w, target))
             );
 
@@ -107,8 +105,7 @@ final class SchemaGenerator implements Runnable {
                 """
                     static final $1T $2L = $1T.builder()
                         .type($3T.MAP)
-                        .id($4S)
-                        ${5C}
+                        .id($4S)${5C}
                         .members(
                                 $1T.memberBuilder(0, "key", $6C),
                                 $1T.memberBuilder(1, "value", $7C)
@@ -119,7 +116,7 @@ final class SchemaGenerator implements Runnable {
                 SchemaUtils.toSchemaName(shape),
                 ShapeType.class,
                 shape.toShapeId(),
-                writer.consumer(w -> writeSchemaTraitBlock(w, shape)),
+                writer.consumer(w -> w.injectSection(new TraitSection(shape))),
                 writer.consumer(w -> SchemaUtils.writeSchemaType(w, keyShape)),
                 writer.consumer(w -> SchemaUtils.writeSchemaType(w, valueShape))
             );
@@ -146,8 +143,7 @@ final class SchemaGenerator implements Runnable {
                 """
                     static final $1T SCHEMA = $1T.builder()
                         .id(ID)
-                        .type($2T.$3L)
-                        ${4C|}
+                        .type($2T.$3L)${4C}
                         ${?memberSchemas}.members(${#memberSchemas}
                             ${value:L}${^key.last},${/key.last}${/memberSchemas}
                         )
@@ -156,7 +152,7 @@ final class SchemaGenerator implements Runnable {
                 SdkSchema.class,
                 ShapeType.class,
                 shape.getType().toString().toUpperCase(),
-                writer.consumer(w -> writeSchemaTraitBlock(w, shape))
+                writer.consumer(w -> w.injectSection(new TraitSection(shape)))
             );
             writer.popState();
 
@@ -174,8 +170,7 @@ final class SchemaGenerator implements Runnable {
             writer.write(
                 """
                     private static final $1T $2L = $1T.memberBuilder($3L, $4S, $5C)
-                        .id(ID)
-                        ${6C|}
+                        .id(ID)${6C}
                         .build();
                     """,
                 SdkSchema.class,
@@ -183,18 +178,7 @@ final class SchemaGenerator implements Runnable {
                 idx,
                 memberName,
                 writer.consumer(w -> SchemaUtils.writeSchemaType(w, target)),
-                writer.consumer(w -> writeSchemaTraitBlock(w, member))
-            );
-        }
-
-        private static void writeSchemaTraitBlock(JavaWriter writer, Shape shape) {
-            if (shape.getAllTraits().isEmpty()) {
-                return;
-            }
-            writer.openBlock(
-                ".traits(",
-                ")",
-                () -> writer.injectSection(new SchemaTraitSection(shape)).newLine()
+                writer.consumer(w -> w.injectSection(new TraitSection(member)))
             );
         }
     }

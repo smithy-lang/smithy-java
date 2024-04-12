@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.codegen;
 
+import java.util.Collections;
+import java.util.List;
 import software.amazon.smithy.codegen.core.SmithyIntegration;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 
@@ -13,4 +15,14 @@ import software.amazon.smithy.java.codegen.writer.JavaWriter;
  * adding custom code, etc.
  */
 public interface JavaCodegenIntegration
-    extends SmithyIntegration<JavaCodegenSettings, JavaWriter, CodeGenerationContext> {}
+    extends SmithyIntegration<JavaCodegenSettings, JavaWriter, CodeGenerationContext> {
+
+    /**
+     * Gets a list of trait initializers to use when initializing traits for schemas.
+     *
+     * @return Returns the list of {@link TraitInitializer}'s.
+     */
+    default List<TraitInitializer> traitInitializers() {
+        return Collections.emptyList();
+    }
+}
