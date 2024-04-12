@@ -23,7 +23,7 @@ public interface TraitInitializer extends BiConsumer<JavaWriter, TraitSection> {
     record AnnotationTraitInitializer(Class<? extends AnnotationTrait> traitClass) implements TraitInitializer {
         @Override
         public void accept(JavaWriter writer, TraitSection section) {
-            writer.write("new $T()", traitClass);
+            writer.writeInline("new $T()", traitClass);
         }
     }
 
