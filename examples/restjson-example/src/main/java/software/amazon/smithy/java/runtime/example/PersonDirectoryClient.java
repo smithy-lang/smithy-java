@@ -245,6 +245,9 @@ public final class PersonDirectoryClient implements PersonDirectory {
             return this;
         }
 
+        // TODO: I think IdentityResolvers itself doesn't need to be configurable. It's basically a map/collection
+        //  like authSchemes, so a method to add individual IdentitiyResolvers should suffice.
+        //  Hmm, would we want to be able to remove an IdentityResolver, depending on if defaults are configured.
         /**
          * Set the identity resolvers supported by the client.
          *

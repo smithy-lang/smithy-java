@@ -19,7 +19,7 @@ import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
  * <ol>
  *     <li>A scheme ID - A unique identifier for the authentication scheme.</li>
  *     <li>An identity provider - An API that can be queried to acquire the customer's identity.</li>
- *     <li>A signer - An API that can be used to sign HTTP requests.</li>
+ *     <li>A signer - An API that can be used to sign requests.</li>
  * </ol>
  *
  * See example auth schemes defined <a href="https://smithy.io/2.0/spec/authentication-traits.html">here</a>.
@@ -30,6 +30,8 @@ import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
 public interface AuthScheme<RequestT, IdentityT extends Identity> {
     /**
      * Retrieve the authentication scheme ID, a unique identifier for the authentication scheme (e.g., aws.auth#sigv4).
+     *
+     * @return the scheme ID.
      */
     String schemeId();
 

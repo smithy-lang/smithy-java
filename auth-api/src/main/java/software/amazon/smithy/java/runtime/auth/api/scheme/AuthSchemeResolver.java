@@ -39,6 +39,8 @@ public interface AuthSchemeResolver {
      */
     final class Params {
 
+        // Q: Is the idea that the selected protocol can influence the resolution? How would that work? Model driven?
+        //    We don't have that today, so wondering that's the vision here.
         private final String protocolId;
         private final String operationName;
         private final AuthProperties properties;
@@ -59,15 +61,6 @@ public interface AuthSchemeResolver {
         }
 
         /**
-         * Properties to query when resolving the endpoint.
-         *
-         * @return properties.
-         */
-        public AuthProperties properties() {
-            return properties;
-        }
-
-        /**
          * Get the name of the operation to resolve.
          *
          * @return the operation name.
@@ -77,13 +70,22 @@ public interface AuthSchemeResolver {
         }
 
         /**
+         * Properties to query when resolving the endpoint.
+         *
+         * @return properties.
+         */
+        public AuthProperties properties() {
+            return properties;
+        }
+
+        /**
          * Builder used to create Params.
          */
         public static final class Builder {
 
             private String protocolId;
-            private AuthProperties properties;
             private String operationName;
+            private AuthProperties properties;
 
             private Builder() {
             }
@@ -97,13 +99,13 @@ public interface AuthSchemeResolver {
                 return this;
             }
 
-            public Builder properties(AuthProperties properties) {
-                this.properties = properties;
+            public Builder operationName(String operationName) {
+                this.operationName = operationName;
                 return this;
             }
 
-            public Builder operationName(String operationName) {
-                this.operationName = operationName;
+            public Builder properties(AuthProperties properties) {
+                this.properties = properties;
                 return this;
             }
         }

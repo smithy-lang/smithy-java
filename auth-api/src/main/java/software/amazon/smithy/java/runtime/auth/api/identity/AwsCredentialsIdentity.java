@@ -19,22 +19,28 @@ import java.util.Optional;
 public interface AwsCredentialsIdentity extends Identity {
     /**
      * Retrieve the AWS access key, used to identify the user interacting with services.
+     *
+     * @return the access key.
      */
     String accessKeyId();
 
     /**
      * Retrieve the AWS secret access key, used to authenticate the user interacting with services.
+     *
+     * @return the secret access key.
      */
     String secretAccessKey();
 
     /**
      * Retrieve the AWS session token. This token is retrieved from an AWS token service, and is used for authenticating that this
      * user has received temporary permission to access some resource.
+     *
+     * @return the optional session token.
      */
     Optional<String> sessionToken();
 
     /**
-     * Constructs a new session credentials object, with the specified AWS access key and secret key.
+     * Constructs a new credentials object, with the specified AWS access key and secret key.
      *
      * @param accessKeyId The AWS access key, used to identify the user interacting with services.
      * @param secretAccessKey The AWS secret access key, used to authenticate the user interacting with services.
@@ -45,11 +51,12 @@ public interface AwsCredentialsIdentity extends Identity {
     }
 
     /**
-     * Constructs a new session credentials object, with the specified AWS access key, secret key, and session token.
+     * Constructs a new credentials object, with the specified AWS access key, secret key, and session token.
      *
      * @param accessKeyId The AWS access key, used to identify the user interacting with services.
      * @param secretAccessKey The AWS secret access key, used to authenticate the user interacting with services.
      * @param sessionToken The AWS session token, used for authenticating temporary access some resource.
+     * @return the created identity.
      */
     static AwsCredentialsIdentity create(String accessKeyId, String secretAccessKey, String sessionToken) {
         return new AwsCredentialsIdentityRecord(

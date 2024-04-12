@@ -17,6 +17,8 @@ import java.util.Objects;
 public interface TokenIdentity extends Identity {
     /**
      * Retrieves string field representing the literal token string.
+     *
+     * @return the token.
      */
     String token();
 
