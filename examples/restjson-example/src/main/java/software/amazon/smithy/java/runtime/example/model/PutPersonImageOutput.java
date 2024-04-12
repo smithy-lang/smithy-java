@@ -33,8 +33,7 @@ public final class PutPersonImageOutput implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.beginStruct(SCHEMA, st -> {
-        });
+        serializer.beginStruct(SCHEMA).endStruct();
     }
 
     public static final class Builder implements SdkShapeBuilder<PutPersonImageOutput> {

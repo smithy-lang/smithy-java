@@ -39,12 +39,6 @@ public final class RequiredWriteSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void beginStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
-        delegate.beginStruct(schema, consumer);
-        wroteSomething = true;
-    }
-
-    @Override
     public StructSerializer beginStruct(SdkSchema schema) {
         wroteSomething = true;
         return delegate.beginStruct(schema);

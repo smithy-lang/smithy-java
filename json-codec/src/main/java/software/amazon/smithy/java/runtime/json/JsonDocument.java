@@ -224,7 +224,8 @@ final class JsonDocument implements Document {
                     entry.serialize(c);
                 }
             });
-            case STRUCTURE, UNION -> encoder.beginStruct(schema, structSerializer -> {
+            case STRUCTURE, UNION -> {
+                var structSerializer = encoder.beginStruct(schema);
                 for (var entry : any.asMap().entrySet()) {
                     var k = entry.getKey();
                     var v = new JsonDocument(entry.getValue(), useJsonName, defaultTimestampFormat, useTimestampFormat);
@@ -232,7 +233,8 @@ final class JsonDocument implements Document {
                     var member = SdkSchema.memberBuilder(k, v.schema).id(PreludeSchemas.DOCUMENT.id()).build();
                     structSerializer.member(member, v::serialize);
                 }
-            });
+                structSerializer.endStruct();
+            }
             default -> throw new SdkSerdeException("Cannot serialize unexpected JSON value: " + any);
         }
     }

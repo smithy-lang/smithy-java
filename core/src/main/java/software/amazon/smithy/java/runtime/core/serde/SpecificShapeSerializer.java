@@ -36,13 +36,6 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
         throw throwForInvalidState(schema);
     }
 
-    // You can only override the method that returns a struct serializer. This ensures that implementations only
-    // need to implement a single method to support both structure calling patterns.
-    @Override
-    public final void beginStruct(SdkSchema schema, Consumer<StructSerializer> structSerializerConsumer) {
-        ShapeSerializer.super.beginStruct(schema, structSerializerConsumer);
-    }
-
     @Override
     public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         throw throwForInvalidState(schema);

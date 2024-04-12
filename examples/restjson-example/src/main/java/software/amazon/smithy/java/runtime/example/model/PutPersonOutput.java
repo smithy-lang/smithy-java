@@ -89,13 +89,13 @@ public final class PutPersonOutput implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.beginStruct(SCHEMA, st -> {
-            st.stringMemberIf(SCHEMA_NAME, name);
-            st.integerMember(SCHEMA_AGE, age);
-            st.timestampMemberIf(SCHEMA_BIRTHDAY, birthday);
-            st.stringMemberIf(SCHEMA_FAVORITE_COLOR, favoriteColor);
-            st.integerMember(SCHEMA_STATUS, status);
-        });
+        var st = serializer.beginStruct(SCHEMA);
+        st.stringMemberIf(SCHEMA_NAME, name);
+        st.integerMember(SCHEMA_AGE, age);
+        st.timestampMemberIf(SCHEMA_BIRTHDAY, birthday);
+        st.stringMemberIf(SCHEMA_FAVORITE_COLOR, favoriteColor);
+        st.integerMember(SCHEMA_STATUS, status);
+        st.endStruct();
     }
 
     public static final class Builder implements SdkShapeBuilder<PutPersonOutput> {

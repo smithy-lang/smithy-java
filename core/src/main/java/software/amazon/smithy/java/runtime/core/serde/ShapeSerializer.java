@@ -20,21 +20,6 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 public interface ShapeSerializer extends Flushable {
 
     /**
-     * Writes a structure or union inside the given consumer.
-     *
-     * <p>Closing the structure is handled automatically; consumers must not call
-     * {@link StructSerializer#endStruct()}.
-     *
-     * @param schema   Schema to write.
-     * @param consumer Consumer that accepts the created serializer and writes members.
-     */
-    default void beginStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
-        StructSerializer serializer = beginStruct(schema);
-        consumer.accept(serializer);
-        serializer.endStruct();
-    }
-
-    /**
      * Creates a structure serializer that is closed externally.
      *
      * <p>{@link StructSerializer#endStruct()} must be called when finished or else the serializer will be in an
