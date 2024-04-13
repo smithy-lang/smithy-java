@@ -54,21 +54,21 @@ public final class ListSerializer implements ShapeSerializer {
     }
 
     @Override
-    public StructSerializer beginStruct(SdkSchema schema) {
+    public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
         beforeWrite();
-        return delegate.beginStruct(schema);
+        delegate.writeStruct(schema, consumer);
     }
 
     @Override
-    public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         beforeWrite();
-        delegate.beginList(schema, consumer);
+        delegate.writeList(schema, consumer);
     }
 
     @Override
-    public void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
         beforeWrite();
-        delegate.beginMap(schema, consumer);
+        delegate.writeMap(schema, consumer);
     }
 
     @Override

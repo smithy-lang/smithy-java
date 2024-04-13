@@ -88,15 +88,15 @@ public final class PutPersonImageInput implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        var st = serializer.beginStruct(SCHEMA);
-        st.stringMember(SCHEMA_NAME, name);
-        st.listMember(SCHEMA_TAGS, ser -> {
-            tags.forEach(tag -> ser.writeString(SCHEMA_TAGS, tag));
+        serializer.writeStruct(SCHEMA, st -> {
+            st.stringMember(SCHEMA_NAME, name);
+            st.listMember(SCHEMA_TAGS, ser -> {
+                tags.forEach(tag -> ser.writeString(SCHEMA_TAGS, tag));
+            });
+            st.listMember(SCHEMA_MORE_TAGS, ser -> {
+                moreTags.forEach(tag -> ser.writeString(SCHEMA_MORE_TAGS, tag));
+            });
         });
-        st.listMember(SCHEMA_MORE_TAGS, ser -> {
-            moreTags.forEach(tag -> ser.writeString(SCHEMA_MORE_TAGS, tag));
-        });
-        st.endStruct();
     }
 
     public static final class Builder implements SdkShapeBuilder<PutPersonImageInput> {

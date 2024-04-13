@@ -29,28 +29,21 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public StructSerializer beginStruct(SdkSchema schema) {
+    public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
         result = null;
         Map<String, Document> members = new LinkedHashMap<>();
-        return new StructSerializer() {
-            @Override
-            public void endStruct() {
-                result = Document.ofStruct(members);
-            }
-
-            @Override
-            public void member(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
-                String memberName = member.memberName();
-                DocumentParser parser = new DocumentParser();
-                memberWriter.accept(parser);
-                var result = parser.result;
-                members.put(memberName, result);
-            }
-        };
+        consumer.accept((member, memberWriter) -> {
+            String memberName = member.memberName();
+            DocumentParser parser = new DocumentParser();
+            memberWriter.accept(parser);
+            var result = parser.result;
+            members.put(memberName, result);
+        });
+        result = Document.ofStruct(members);
     }
 
     @Override
-    public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         List<Document> elements = new ArrayList<>();
         var elementParser = new DocumentParser();
         ListSerializer serializer = new ListSerializer(elementParser, position -> {
@@ -67,7 +60,7 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
         Map<Document, Document> entries = new LinkedHashMap<>();
         consumer.accept(new MapSerializer() {
             @Override

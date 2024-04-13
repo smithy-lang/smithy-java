@@ -99,21 +99,21 @@ public final class Person implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        var st = serializer.beginStruct(SCHEMA);
-        st.stringMember(SCHEMA_NAME, name);
-        st.integerMember(SCHEMA_AGE, age);
-        st.timestampMemberIf(SCHEMA_BIRTHDAY, birthday);
-        st.blobMemberIf(SCHEMA_BINARY, binary);
-        if (!tags.isEmpty()) {
-            st.mapMember(SCHEMA_QUERY_PARAMS, m -> {
-                tags.forEach((k, v) -> m.entry(k, mv -> {
-                    mv.beginList(SharedSchemas.MAP_LIST_STRING.member("value"), mvl -> {
-                        v.forEach(value -> mvl.writeString(SharedSchemas.LIST_OF_STRING.member("member"), value));
-                    });
-                }));
-            });
-        }
-        st.endStruct();
+        serializer.writeStruct(SCHEMA, st -> {
+            st.stringMember(SCHEMA_NAME, name);
+            st.integerMember(SCHEMA_AGE, age);
+            st.timestampMemberIf(SCHEMA_BIRTHDAY, birthday);
+            st.blobMemberIf(SCHEMA_BINARY, binary);
+            if (!tags.isEmpty()) {
+                st.mapMember(SCHEMA_QUERY_PARAMS, m -> {
+                    tags.forEach((k, v) -> m.entry(k, mv -> {
+                        mv.writeList(SharedSchemas.MAP_LIST_STRING.member("value"), mvl -> {
+                            v.forEach(value -> mvl.writeString(SharedSchemas.LIST_OF_STRING.member("member"), value));
+                        });
+                    }));
+                });
+            }
+        });
     }
 
     public static final class Builder implements SdkShapeBuilder<Person> {

@@ -11,7 +11,6 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Objects;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -85,31 +84,18 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public StructSerializer beginStruct(SdkSchema schema) {
+    public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
         append(schema.id().toString()).append(':').indent().append(System.lineSeparator());
-
-        return new StructSerializer() {
-            @Override
-            public void endStruct() {
-                dedent().append(System.lineSeparator());
-            }
-
-            @Override
-            public void member(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
-                append(member.memberName()).append(": ");
-                // Throw if a value isn't written.
-                RequiredWriteSerializer.assertWrite(
-                    ToStringSerializer.this,
-                    () -> new SdkException("Structure member did not write a value for " + schema),
-                    memberWriter
-                );
-                append(System.lineSeparator());
-            }
-        };
+        consumer.accept((member, memberWriter) -> {
+            append(member.memberName()).append(": ");
+            memberWriter.accept(this);
+            append(System.lineSeparator());
+        });
+        dedent().append(System.lineSeparator());
     }
 
     @Override
-    public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         indent();
         consumer.accept(new ListSerializer(this, this::writeComma));
         dedent();
@@ -122,7 +108,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
         indent();
         append(System.lineSeparator());
 

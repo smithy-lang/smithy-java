@@ -32,11 +32,11 @@ public class TypedDocumentMemberTest {
     @Test
     public void equalityAndHashTest() {
         SerializableShape serializableShape = encoder -> {
-            var s = encoder.beginStruct(PreludeSchemas.DOCUMENT);
-            var schema = PreludeSchemas.getSchemaForType(ShapeType.STRING);
-            var member = schema.documentMember("foo");
-            s.member(member, c -> c.writeString(PreludeSchemas.STRING, "Hi"));
-            s.endStruct();
+            encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
+                var schema = PreludeSchemas.getSchemaForType(ShapeType.STRING);
+                var member = schema.documentMember("foo");
+                s.member(member, c -> c.writeString(PreludeSchemas.STRING, "Hi"));
+            });
         };
 
         var document = Document.ofStruct(serializableShape);
@@ -55,19 +55,19 @@ public class TypedDocumentMemberTest {
     @Test
     public void inEqualityAndHashTest() {
         var document1 = Document.ofStruct(encoder -> {
-            var s = encoder.beginStruct(PreludeSchemas.DOCUMENT);
-            var schema = PreludeSchemas.getSchemaForType(ShapeType.STRING);
-            var member = schema.documentMember("foo", PreludeSchemas.STRING);
-            s.member(member, c -> c.writeString(PreludeSchemas.STRING, "Hi"));
-            s.endStruct();
+            encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
+                var schema = PreludeSchemas.getSchemaForType(ShapeType.STRING);
+                var member = schema.documentMember("foo", PreludeSchemas.STRING);
+                s.member(member, c -> c.writeString(PreludeSchemas.STRING, "Hi"));
+            });
         });
 
         var document2 = Document.ofStruct(encoder -> {
-            var s = encoder.beginStruct(PreludeSchemas.DOCUMENT);
-            var schema = PreludeSchemas.getSchemaForType(ShapeType.STRING);
-            var member = schema.documentMember("foo", PreludeSchemas.INTEGER);
-            s.member(member, c -> c.writeInteger(PreludeSchemas.INTEGER, 1));
-            s.endStruct();
+            encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
+                var schema = PreludeSchemas.getSchemaForType(ShapeType.STRING);
+                var member = schema.documentMember("foo", PreludeSchemas.INTEGER);
+                s.member(member, c -> c.writeInteger(PreludeSchemas.INTEGER, 1));
+            });
         });
 
         assertThat(document1.getMember("foo"), not(equalTo(null)));
@@ -83,11 +83,11 @@ public class TypedDocumentMemberTest {
         Function<Document, Object> extractor
     ) {
         SerializableShape serializableShape = encoder -> {
-            var s = encoder.beginStruct(PreludeSchemas.DOCUMENT);
-            var schema = PreludeSchemas.getSchemaForType(type);
-            var aMember = SdkSchema.memberBuilder("a", schema).id(PreludeSchemas.DOCUMENT.id()).build();
-            s.member(aMember, writer);
-            s.endStruct();
+            encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
+                var schema = PreludeSchemas.getSchemaForType(type);
+                var aMember = SdkSchema.memberBuilder("a", schema).id(PreludeSchemas.DOCUMENT.id()).build();
+                s.member(aMember, writer);
+            });
         };
         var document = Document.ofStruct(serializableShape);
 
@@ -530,7 +530,7 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.DOCUMENT,
                 List.of(Document.of(1)),
-                (Consumer<ShapeSerializer>) s -> s.beginList(
+                (Consumer<ShapeSerializer>) s -> s.writeList(
                     PreludeSchemas.DOCUMENT,
                     c -> c.writeInteger(PreludeSchemas.INTEGER, 1)
                 ),
@@ -541,7 +541,7 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.DOCUMENT,
                 Map.of(Document.of("a"), Document.of(1)),
-                (Consumer<ShapeSerializer>) s -> s.beginMap(
+                (Consumer<ShapeSerializer>) s -> s.writeMap(
                     PreludeSchemas.DOCUMENT,
                     m -> m.entry("a", c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
                 ),
@@ -554,7 +554,7 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.DOCUMENT,
                 Map.of(Document.of(1), Document.of(1)),
-                (Consumer<ShapeSerializer>) s -> s.beginMap(
+                (Consumer<ShapeSerializer>) s -> s.writeMap(
                     PreludeSchemas.DOCUMENT,
                     m -> m.entry(1, c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
                 ),
@@ -567,7 +567,7 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.DOCUMENT,
                 Map.of(Document.of(1L), Document.of(1)),
-                (Consumer<ShapeSerializer>) s -> s.beginMap(
+                (Consumer<ShapeSerializer>) s -> s.writeMap(
                     PreludeSchemas.DOCUMENT,
                     m -> m.entry(1L, c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
                 ),
@@ -580,7 +580,7 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.DOCUMENT,
                 Document.of(1),
-                (Consumer<ShapeSerializer>) s -> s.beginMap(
+                (Consumer<ShapeSerializer>) s -> s.writeMap(
                     PreludeSchemas.DOCUMENT,
                     m -> m.entry("a", c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
                 ),
@@ -592,16 +592,16 @@ public class TypedDocumentMemberTest {
                 ShapeType.DOCUMENT,
                 Document.of("b"),
                 (Consumer<ShapeSerializer>) s -> {
-                    var ser = s.beginStruct(PreludeSchemas.DOCUMENT);
-                    ser.member(
-                        PreludeSchemas.DOCUMENT.documentMember("foo"),
-                        c -> c.writeString(PreludeSchemas.STRING, "a")
-                    );
-                    ser.member(
-                        PreludeSchemas.DOCUMENT.documentMember("bar"),
-                        c -> c.writeString(PreludeSchemas.STRING, "b")
-                    );
-                    ser.endStruct();
+                    s.writeStruct(PreludeSchemas.DOCUMENT, ser -> {
+                        ser.member(
+                            PreludeSchemas.DOCUMENT.documentMember("foo"),
+                            c -> c.writeString(PreludeSchemas.STRING, "a")
+                        );
+                        ser.member(
+                            PreludeSchemas.DOCUMENT.documentMember("bar"),
+                            c -> c.writeString(PreludeSchemas.STRING, "b")
+                        );
+                    });
                 },
                 (Function<Document, Object>) d -> Document.ofValue(d.getMember("bar"))
             )

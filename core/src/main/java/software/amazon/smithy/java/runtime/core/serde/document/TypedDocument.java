@@ -32,17 +32,11 @@ final class TypedDocument implements Document {
             }
 
             @Override
-            public StructSerializer beginStruct(SdkSchema schema) {
+            public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
                 this.documentSchema = schema;
-                return new StructSerializer() {
-                    @Override
-                    public void endStruct() {}
-
-                    @Override
-                    public void member(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
-                        members.put(member.memberName(), Pair.of(member, memberWriter));
-                    }
-                };
+                consumer.accept((member, memberWriter) -> {
+                    members.put(member.memberName(), Pair.of(member, memberWriter));
+                });
             }
         };
 

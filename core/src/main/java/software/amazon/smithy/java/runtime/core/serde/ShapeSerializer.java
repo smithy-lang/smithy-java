@@ -18,17 +18,13 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
  * Serializes a shape by receiving the Smithy data model and writing output to a receiver owned by the serializer.
  */
 public interface ShapeSerializer extends Flushable {
-
     /**
-     * Creates a structure serializer that is closed externally.
+     * Writes a structure or union.
      *
-     * <p>{@link StructSerializer#endStruct()} must be called when finished or else the serializer will be in an
-     * undefined state.
-     *
-     * @param schema Schema to serialize.
-     * @return Returns the created serializer.
+     * @param schema   Schema to serialize.
+     * @param consumer Receives the struct serializer and writes members.
      */
-    StructSerializer beginStruct(SdkSchema schema);
+    void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer);
 
     /**
      * Begin a list and write zero or more values into it using the provided serializer.
@@ -36,7 +32,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema   List schema.
      * @param consumer Received in the context of the list and writes zero or more values.
      */
-    void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer);
+    void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer);
 
     /**
      * Begin a map and write zero or more entries into it using the provided serializer.
@@ -44,7 +40,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema   List schema.
      * @param consumer Received in the context of the map and writes zero or more entries.
      */
-    void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer);
+    void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer);
 
     /**
      * Serialize a boolean.

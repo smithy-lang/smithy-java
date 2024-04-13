@@ -42,12 +42,16 @@ public class TypedDocumentTest {
     @Test
     public void wrapsStructContentWithTypeAndSchema() {
         SerializableShape serializableShape = encoder -> {
-            var s = encoder.beginStruct(PreludeSchemas.DOCUMENT);
-            var aMember = SdkSchema.memberBuilder("a", PreludeSchemas.STRING).id(PreludeSchemas.DOCUMENT.id()).build();
-            s.member(aMember, c -> c.writeString(PreludeSchemas.STRING, "1"));
-            var bMember = SdkSchema.memberBuilder("b", PreludeSchemas.STRING).id(PreludeSchemas.DOCUMENT.id()).build();
-            s.member(bMember, c -> c.writeString(PreludeSchemas.STRING, "2"));
-            s.endStruct();
+            encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
+                var aMember = SdkSchema.memberBuilder("a", PreludeSchemas.STRING)
+                    .id(PreludeSchemas.DOCUMENT.id())
+                    .build();
+                s.member(aMember, c -> c.writeString(PreludeSchemas.STRING, "1"));
+                var bMember = SdkSchema.memberBuilder("b", PreludeSchemas.STRING)
+                    .id(PreludeSchemas.DOCUMENT.id())
+                    .build();
+                s.member(bMember, c -> c.writeString(PreludeSchemas.STRING, "2"));
+            });
         };
 
         var result = Document.ofStruct(serializableShape);

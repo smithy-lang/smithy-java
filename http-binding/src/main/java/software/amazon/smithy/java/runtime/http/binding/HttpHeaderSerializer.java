@@ -34,7 +34,7 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         consumer.accept(new ListSerializer(this, position -> {}));
     }
 

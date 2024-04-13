@@ -32,17 +32,17 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
     public void flush() {}
 
     @Override
-    public StructSerializer beginStruct(SdkSchema schema) {
+    public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
         throw throwForInvalidState(schema);
     }
 

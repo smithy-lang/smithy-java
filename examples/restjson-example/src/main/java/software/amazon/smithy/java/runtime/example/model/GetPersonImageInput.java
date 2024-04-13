@@ -47,9 +47,9 @@ public final class GetPersonImageInput implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        var st = serializer.beginStruct(SCHEMA);
-        st.stringMember(SCHEMA_NAME, name);
-        st.endStruct();
+        serializer.writeStruct(SCHEMA, st -> {
+            st.stringMember(SCHEMA_NAME, name);
+        });
     }
 
     public static final class Builder implements SdkShapeBuilder<GetPersonImageInput> {

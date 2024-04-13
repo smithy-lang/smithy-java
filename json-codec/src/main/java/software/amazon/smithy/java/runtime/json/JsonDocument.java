@@ -205,7 +205,7 @@ final class JsonDocument implements Document {
             case BLOB -> encoder.writeBlob(schema, asBlob());
             case TIMESTAMP -> encoder.writeTimestamp(schema, asTimestamp());
             case DOCUMENT -> encoder.writeDocument(this);
-            case MAP -> encoder.beginMap(schema, mapSerializer -> {
+            case MAP -> encoder.writeMap(schema, mapSerializer -> {
                 for (var entry : asMap().entrySet()) {
                     switch (entry.getKey().type()) {
                         case INTEGER, INT_ENUM ->
@@ -219,21 +219,26 @@ final class JsonDocument implements Document {
                     }
                 }
             });
-            case LIST -> encoder.beginList(schema, c -> {
+            case LIST -> encoder.writeList(schema, c -> {
                 for (Document entry : asList()) {
                     entry.serialize(c);
                 }
             });
             case STRUCTURE, UNION -> {
-                var structSerializer = encoder.beginStruct(schema);
-                for (var entry : any.asMap().entrySet()) {
-                    var k = entry.getKey();
-                    var v = new JsonDocument(entry.getValue(), useJsonName, defaultTimestampFormat, useTimestampFormat);
-                    // Create a synthetic member schema.
-                    var member = SdkSchema.memberBuilder(k, v.schema).id(PreludeSchemas.DOCUMENT.id()).build();
-                    structSerializer.member(member, v::serialize);
-                }
-                structSerializer.endStruct();
+                encoder.writeStruct(schema, structSerializer -> {
+                    for (var entry : any.asMap().entrySet()) {
+                        var k = entry.getKey();
+                        var v = new JsonDocument(
+                            entry.getValue(),
+                            useJsonName,
+                            defaultTimestampFormat,
+                            useTimestampFormat
+                        );
+                        // Create a synthetic member schema.
+                        var member = SdkSchema.memberBuilder(k, v.schema).id(PreludeSchemas.DOCUMENT.id()).build();
+                        structSerializer.member(member, v::serialize);
+                    }
+                });
             }
             default -> throw new SdkSerdeException("Cannot serialize unexpected JSON value: " + any);
         }

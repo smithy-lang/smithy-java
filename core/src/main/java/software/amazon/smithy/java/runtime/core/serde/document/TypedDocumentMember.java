@@ -561,7 +561,7 @@ final class TypedDocumentMember implements Document {
             private final List<Document> values = new ArrayList<>();
 
             @Override
-            public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+            public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
                 values.add(new TypedDocumentMember(schema.documentMember("member"), consumer));
             }
         };
@@ -575,7 +575,7 @@ final class TypedDocumentMember implements Document {
             private final Map<Document, Document> values = new LinkedHashMap<>();
 
             @Override
-            public void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+            public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
                 var valueMember = schema.documentMember("value");
                 consumer.accept(new MapSerializer() {
                     @Override
@@ -617,7 +617,7 @@ final class TypedDocumentMember implements Document {
             private Document result;
 
             @Override
-            public void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+            public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
                 consumer.accept(new MapSerializer() {
                     @Override
                     public void entry(String key, Consumer<ShapeSerializer> valueSerializer) {
@@ -636,18 +636,12 @@ final class TypedDocumentMember implements Document {
             }
 
             @Override
-            public StructSerializer beginStruct(SdkSchema schema) {
-                return new StructSerializer() {
-                    @Override
-                    public void endStruct() {}
-
-                    @Override
-                    public void member(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
-                        if (member.memberName().equals(memberName)) {
-                            result = new TypedDocumentMember(member, memberWriter);
-                        }
+            public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
+                consumer.accept((member, memberWriter) -> {
+                    if (member.memberName().equals(memberName)) {
+                        result = new TypedDocumentMember(member, memberWriter);
                     }
-                };
+                });
             }
         };
         memberWriter.accept(expect);

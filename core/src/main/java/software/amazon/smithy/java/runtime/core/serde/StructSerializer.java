@@ -19,22 +19,12 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
  * <p>Each serialization method requires an SdkSchema that is a member and should handle writing member names and
  * values on each write.
  */
+@FunctionalInterface
 public interface StructSerializer {
-
-    /**
-     * Explicitly ends the struct.
-     *
-     * <p>Calling this method should only be called when struct serialization is externally driven by
-     * {@link ShapeSerializer#beginStruct(SdkSchema)}. Calling this method in other contexts will cause undefined
-     * behavior.
-     */
-    void endStruct();
-
     /**
      * The primary method that handles writing members to a shape serializer.
      *
-     * <p>Implementations should use {@link RequiredWriteSerializer} to ensure the consumer writes something when
-     * called. If this assertion is not made, the serialization process can enter an undefined state.
+     * <p>A caller must write something to the ShapeSerializer sent to the memberWriter.
      *
      * @param member       Member schema to write.
      * @param memberWriter Consumer that writes. The consumer is required to write something.
@@ -182,10 +172,10 @@ public interface StructSerializer {
     }
 
     default void listMember(SdkSchema member, Consumer<ShapeSerializer> consumer) {
-        member(member, writer -> writer.beginList(member, consumer));
+        member(member, writer -> writer.writeList(member, consumer));
     }
 
     default void mapMember(SdkSchema member, Consumer<MapSerializer> consumer) {
-        member(member, writer -> writer.beginMap(member, consumer));
+        member(member, writer -> writer.writeMap(member, consumer));
     }
 }

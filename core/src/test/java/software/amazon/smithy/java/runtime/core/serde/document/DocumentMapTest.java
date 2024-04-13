@@ -29,7 +29,7 @@ public class DocumentMapTest {
         Map<Document, Document> received = new HashMap<>();
         document.serializeContents(new SpecificShapeSerializer() {
             @Override
-            public void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+            public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
                 consumer.accept(new MapSerializer() {
                     @Override
                     public void entry(String key, Consumer<ShapeSerializer> valueSerializer) {

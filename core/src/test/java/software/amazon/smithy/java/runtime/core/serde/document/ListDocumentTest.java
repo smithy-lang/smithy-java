@@ -53,7 +53,7 @@ public class ListDocumentTest {
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
-            public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+            public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
                 assertThat(schema, equalTo(PreludeSchemas.DOCUMENT));
                 consumer.accept(new SpecificShapeSerializer() {
                     @Override

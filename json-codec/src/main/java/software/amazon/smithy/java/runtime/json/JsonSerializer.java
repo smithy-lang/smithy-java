@@ -155,17 +155,18 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public StructSerializer beginStruct(SdkSchema schema) {
+    public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
         try {
             stream.writeObjectStart();
-            return new JsonStructSerializer(this, stream, useJsonName);
+            consumer.accept(new JsonStructSerializer(this, stream, useJsonName));
+            stream.writeObjectEnd();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     @Override
-    public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         try {
             stream.writeArrayStart();
             consumer.accept(new ListSerializer(this, this::writeComma));
@@ -186,7 +187,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
         try {
             stream.writeObjectStart();
             var keySchema = schema.member("key");

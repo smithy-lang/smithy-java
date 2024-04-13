@@ -29,7 +29,7 @@ final class HttpQueryParamsSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
         consumer.accept(new MapSerializer() {
             @Override
             public void entry(String key, Consumer<ShapeSerializer> valueSerializer) {
@@ -45,7 +45,7 @@ final class HttpQueryParamsSerializer extends SpecificShapeSerializer {
                     }
 
                     @Override
-                    public void beginList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+                    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
                         consumer.accept(new SpecificShapeSerializer() {
                             @Override
                             protected RuntimeException throwForInvalidState(SdkSchema schema) {

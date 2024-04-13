@@ -22,7 +22,6 @@ class JsonStructSerializer implements StructSerializer {
     private final ShapeSerializer parent;
     private final JsonStream stream;
     private boolean wroteValues = false;
-    private boolean isClosed;
 
     JsonStructSerializer(ShapeSerializer parent, JsonStream stream, boolean useJsonName) {
         this.parent = parent;
@@ -39,10 +38,6 @@ class JsonStructSerializer implements StructSerializer {
     }
 
     void startMember(SdkSchema member) throws IOException {
-        if (isClosed) {
-            throw new IllegalStateException("Attempted to write to a closed JSON structure");
-        }
-
         // Write commas when needed.
         if (wroteValues) {
             stream.writeMore();
@@ -50,16 +45,6 @@ class JsonStructSerializer implements StructSerializer {
             wroteValues = true;
         }
         stream.writeObjectField(getMemberName(member));
-    }
-
-    @Override
-    public void endStruct() {
-        try {
-            isClosed = true;
-            stream.writeObjectEnd();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 
     @Override

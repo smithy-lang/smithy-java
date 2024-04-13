@@ -18,7 +18,6 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.StructSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -82,33 +81,26 @@ public class StructDocumentTest {
 
         document.serializeContents(new SpecificShapeSerializer() {
             @Override
-            public StructSerializer beginStruct(SdkSchema schema) {
+            public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
                 assertThat(schema, equalTo(PreludeSchemas.DOCUMENT));
                 actions.add("beginStruct");
-                return new StructSerializer() {
-                    @Override
-                    public void endStruct() {
-                        actions.add("endStruct");
-                    }
+                consumer.accept((member, memberWriter) -> {
+                    actions.add("member:" + member.memberName());
+                    memberWriter.accept(new SpecificShapeSerializer() {
+                        @Override
+                        public void writeString(SdkSchema schema1, String value) {
+                            assertThat(schema1, equalTo(PreludeSchemas.STRING));
+                            actions.add("value:string:" + value);
+                        }
 
-                    @Override
-                    public void member(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
-                        actions.add("member:" + member.memberName());
-                        memberWriter.accept(new SpecificShapeSerializer() {
-                            @Override
-                            public void writeString(SdkSchema schema, String value) {
-                                assertThat(schema, equalTo(PreludeSchemas.STRING));
-                                actions.add("value:string:" + value);
-                            }
-
-                            @Override
-                            public void writeInteger(SdkSchema schema, int value) {
-                                assertThat(schema, equalTo(PreludeSchemas.INTEGER));
-                                actions.add("value:integer:" + value);
-                            }
-                        });
-                    }
-                };
+                        @Override
+                        public void writeInteger(SdkSchema schema1, int value) {
+                            assertThat(schema1, equalTo(PreludeSchemas.INTEGER));
+                            actions.add("value:integer:" + value);
+                        }
+                    });
+                });
+                actions.add("endStruct");
             }
         });
 

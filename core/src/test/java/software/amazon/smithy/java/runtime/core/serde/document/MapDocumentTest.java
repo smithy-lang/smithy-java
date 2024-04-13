@@ -69,7 +69,7 @@ public class MapDocumentTest {
         var keys = new ArrayList<>();
         map.serializeContents(new SpecificShapeSerializer() {
             @Override
-            public void beginMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+            public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
                 assertThat(schema, equalTo(PreludeSchemas.DOCUMENT));
                 consumer.accept(new MapSerializer() {
                     @Override
