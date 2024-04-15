@@ -45,6 +45,16 @@ final class JsonDocument implements Document {
         TimestampFormatter defaultTimestampFormat,
         boolean useTimestampFormat
     ) {
+        this(any, useJsonName, defaultTimestampFormat, useTimestampFormat, null);
+    }
+
+    private JsonDocument(
+        com.jsoniter.any.Any any,
+        boolean useJsonName,
+        TimestampFormatter defaultTimestampFormat,
+        boolean useTimestampFormat,
+        SdkSchema schema
+    ) {
         this.any = any;
         this.useJsonName = useJsonName;
         this.defaultTimestampFormat = defaultTimestampFormat;
@@ -67,7 +77,7 @@ final class JsonDocument implements Document {
             default -> ShapeType.DOCUMENT;
         };
 
-        this.schema = PreludeSchemas.getSchemaForType(type);
+        this.schema = schema == null ? PreludeSchemas.getSchemaForType(type) : schema;
     }
 
     @Override
@@ -228,15 +238,18 @@ final class JsonDocument implements Document {
                 encoder.writeStruct(schema, structSerializer -> {
                     for (var entry : any.asMap().entrySet()) {
                         var k = entry.getKey();
+                        // Create a synthetic member schema for the key.
+                        var member = SdkSchema.memberBuilder(k, PreludeSchemas.DOCUMENT)
+                            .id(PreludeSchemas.DOCUMENT.id())
+                            .build();
                         var v = new JsonDocument(
                             entry.getValue(),
                             useJsonName,
                             defaultTimestampFormat,
-                            useTimestampFormat
+                            useTimestampFormat,
+                            member // use the synthetic member when serializing the value.
                         );
-                        // Create a synthetic member schema.
-                        var member = SdkSchema.memberBuilder(k, v.schema).id(PreludeSchemas.DOCUMENT.id()).build();
-                        structSerializer.member(member, v::serialize);
+                        v.serialize(structSerializer);
                     }
                 });
             }

@@ -8,108 +8,100 @@ package software.amazon.smithy.java.runtime.core.serde;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
-/**
- * Expects to serialize a specific kind of shape and fails if other shapes are serialized.
- */
-public abstract class SpecificShapeSerializer implements ShapeSerializer {
+final class ConsolidatedSerializer implements ShapeSerializer {
 
-    /**
-     * Invoked when an unexpected shape is encountered.
-     *
-     * @param schema Unexpected encountered schema.
-     * @return Returns an exception to throw.
-     */
-    protected RuntimeException throwForInvalidState(SdkSchema schema) {
-        throw new SdkSerdeException("Unexpected schema type: " + schema);
+    private final BiConsumer<SdkSchema, Consumer<ShapeSerializer>> delegate;
+
+    ConsolidatedSerializer(BiConsumer<SdkSchema, Consumer<ShapeSerializer>> delegate) {
+        this.delegate = delegate;
+    }
+
+    private void write(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+        delegate.accept(schema, consumer);
     }
 
     @Override
     public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeStruct(schema, consumer));
     }
 
     @Override
     public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeList(schema, consumer));
     }
 
     @Override
     public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeMap(schema, consumer));
     }
 
     @Override
     public void writeBoolean(SdkSchema schema, boolean value) {
-        throw throwForInvalidState(schema);
-    }
-
-    @Override
-    public void writeShort(SdkSchema schema, short value) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeBoolean(schema, value));
     }
 
     @Override
     public void writeByte(SdkSchema schema, byte value) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeByte(schema, value));
+    }
+
+    @Override
+    public void writeShort(SdkSchema schema, short value) {
+        write(schema, ser -> ser.writeShort(schema, value));
     }
 
     @Override
     public void writeInteger(SdkSchema schema, int value) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeInteger(schema, value));
     }
 
     @Override
     public void writeLong(SdkSchema schema, long value) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeLong(schema, value));
     }
 
     @Override
     public void writeFloat(SdkSchema schema, float value) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeFloat(schema, value));
     }
 
     @Override
     public void writeDouble(SdkSchema schema, double value) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeDouble(schema, value));
     }
 
     @Override
     public void writeBigInteger(SdkSchema schema, BigInteger value) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeBigInteger(schema, value));
     }
 
     @Override
     public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeBigDecimal(schema, value));
     }
 
     @Override
     public void writeString(SdkSchema schema, String value) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeString(schema, value));
     }
 
     @Override
     public void writeBlob(SdkSchema schema, byte[] value) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeBlob(schema, value));
     }
 
     @Override
     public void writeTimestamp(SdkSchema schema, Instant value) {
-        throw throwForInvalidState(schema);
+        write(schema, ser -> ser.writeTimestamp(schema, value));
     }
 
     @Override
     public void writeDocument(SdkSchema schema, Document value) {
-        throw throwForInvalidState(schema);
-    }
-
-    // Delegates to writing with a schema. Only override writing a document with a schema.
-    @Override
-    public final void writeDocument(Document value) {
-        ShapeSerializer.super.writeDocument(value);
+        write(schema, ser -> ser.writeDocument(schema, value));
     }
 }

@@ -9,7 +9,9 @@ import java.io.Flushable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
@@ -17,13 +19,30 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
  * Serializes a shape by receiving the Smithy data model and writing output to a receiver owned by the serializer.
  */
 public interface ShapeSerializer extends Flushable {
+
+    /**
+     * Create a ShapeSerializer that sends all write calls to a singular consumer that can delegate and replay writes.
+     *
+     * @param delegatingConsumer Consumer that receives each schema and a consumer that will write if invoked.
+     * @return the created ShapeSerializer.
+     */
+    static ShapeSerializer ofDelegatingConsumer(BiConsumer<SdkSchema, Consumer<ShapeSerializer>> delegatingConsumer) {
+        return new ConsolidatedSerializer(delegatingConsumer);
+    }
+
+    @Override
+    default void flush() {}
+
     /**
      * Writes a structure or union.
+     *
+     * <p>Each shape written to the given consumer <em>must</em> use a schema that has a member name.
+     * The member name is used to write field names.
      *
      * @param schema   Schema to serialize.
      * @param consumer Receives the struct serializer and writes members.
      */
-    void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer);
+    void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer);
 
     /**
      * Begin a list and write zero or more values into it using the provided serializer.
@@ -142,7 +161,196 @@ public interface ShapeSerializer extends Flushable {
      *
      * <p>The underlying contents of the document can be serialized using {@link Document#serializeContents}.
      *
+     * @param schema Schema of the shape. Generally this is {@link PreludeSchemas#DOCUMENT} unless the document
+     *               wraps a modeled shape.
      * @param value  Value to serialize.
      */
-    void writeDocument(Document value);
+    void writeDocument(SdkSchema schema, Document value);
+
+    /**
+     * Serialize a document shape using the schema {@link PreludeSchemas#DOCUMENT}.
+     *
+     * <p>This method is simply a shorter way to call:
+     *
+     * <pre>
+     * serializer.writeDocument(PreludeSchemas.DOCUMENT, value);
+     * </pre>
+     *
+     * <p>This method should not be used when writing structures because member names are used when writing
+     * structures, and the prelude schema for documents has no member name.
+     *
+     * @param value  Value to serialize.
+     */
+    default void writeDocument(Document value) {
+        writeDocument(PreludeSchemas.DOCUMENT, value);
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Boolean value) {
+        if (value != null) {
+            serializer.writeBoolean(schema, value);
+        }
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Byte value) {
+        if (value != null) {
+            serializer.writeByte(schema, value);
+        }
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Short value) {
+        if (value != null) {
+            serializer.writeShort(schema, value);
+        }
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Integer value) {
+        if (value != null) {
+            serializer.writeInteger(schema, value);
+        }
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Long value) {
+        if (value != null) {
+            serializer.writeLong(schema, value);
+        }
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Float value) {
+        if (value != null) {
+            serializer.writeFloat(schema, value);
+        }
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Double value) {
+        if (value != null) {
+            serializer.writeDouble(schema, value);
+        }
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, BigInteger value) {
+        if (value != null) {
+            serializer.writeBigInteger(schema, value);
+        }
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, BigDecimal value) {
+        if (value != null) {
+            serializer.writeBigDecimal(schema, value);
+        }
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, byte[] value) {
+        if (value != null) {
+            serializer.writeBlob(schema, value);
+        }
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, String value) {
+        if (value != null) {
+            serializer.writeString(schema, value);
+        }
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Instant value) {
+        if (value != null) {
+            serializer.writeTimestamp(schema, value);
+        }
+    }
+
+    /**
+     * Write to the serializer if the given value is not null.
+     *
+     * @param serializer Serializer to conditionally write to.
+     * @param schema     Schema to write if not null.
+     * @param value      Value to write if not null.
+     */
+    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Document value) {
+        if (value != null) {
+            serializer.writeDocument(schema, value);
+        }
+    }
 }

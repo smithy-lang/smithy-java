@@ -50,7 +50,7 @@ public class MapDocumentTest {
 
         map.serialize(new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(Document value) {
+            public void writeDocument(SdkSchema schema, Document value) {
                 assertThat(value, is(map));
             }
         });

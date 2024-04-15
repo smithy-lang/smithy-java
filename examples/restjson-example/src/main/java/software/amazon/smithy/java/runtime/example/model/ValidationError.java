@@ -44,7 +44,7 @@ public final class ValidationError extends ModeledSdkException {
     @Override
     public void serialize(ShapeSerializer serializer) {
         serializer.writeStruct(SCHEMA, st -> {
-            st.stringMember(SCHEMA_MESSAGE, getMessage());
+            st.writeString(SCHEMA_MESSAGE, getMessage());
         });
     }
 

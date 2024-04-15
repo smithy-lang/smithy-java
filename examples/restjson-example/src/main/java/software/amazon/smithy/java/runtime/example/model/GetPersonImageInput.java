@@ -48,7 +48,7 @@ public final class GetPersonImageInput implements SerializableShape {
     @Override
     public void serialize(ShapeSerializer serializer) {
         serializer.writeStruct(SCHEMA, st -> {
-            st.stringMember(SCHEMA_NAME, name);
+            st.writeString(SCHEMA_NAME, name);
         });
     }
 

@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.core.serde;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
@@ -35,11 +34,6 @@ public final class ListSerializer implements ShapeSerializer {
         this.beforeEachValue = Objects.requireNonNull(beforeEachValue, "beforeEachValue is null");
     }
 
-    @Override
-    public void flush() throws IOException {
-        delegate.flush();
-    }
-
     private void beforeWrite() {
         beforeEachValue.accept(position++);
     }
@@ -54,7 +48,7 @@ public final class ListSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
+    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         beforeWrite();
         delegate.writeStruct(schema, consumer);
     }
@@ -144,8 +138,8 @@ public final class ListSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeDocument(Document value) {
+    public void writeDocument(SdkSchema schema, Document value) {
         beforeWrite();
-        delegate.writeDocument(value);
+        delegate.writeDocument(schema, value);
     }
 }

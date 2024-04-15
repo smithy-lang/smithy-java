@@ -90,11 +90,11 @@ public final class PutPersonOutput implements SerializableShape {
     @Override
     public void serialize(ShapeSerializer serializer) {
         serializer.writeStruct(SCHEMA, st -> {
-            st.stringMemberIf(SCHEMA_NAME, name);
-            st.integerMember(SCHEMA_AGE, age);
-            st.timestampMemberIf(SCHEMA_BIRTHDAY, birthday);
-            st.stringMemberIf(SCHEMA_FAVORITE_COLOR, favoriteColor);
-            st.integerMember(SCHEMA_STATUS, status);
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_NAME, name);
+            st.writeInteger(SCHEMA_AGE, age);
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_BIRTHDAY, birthday);
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_FAVORITE_COLOR, favoriteColor);
+            st.writeInteger(SCHEMA_STATUS, status);
         });
     }
 

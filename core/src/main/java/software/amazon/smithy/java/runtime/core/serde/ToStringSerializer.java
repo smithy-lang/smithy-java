@@ -76,21 +76,18 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void flush() {}
-
-    @Override
     public String toString() {
         return builder.toString().trim();
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
+    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         append(schema.id().toString()).append(':').indent().append(System.lineSeparator());
-        consumer.accept((member, memberWriter) -> {
+        consumer.accept(ShapeSerializer.ofDelegatingConsumer((member, memberWriter) -> {
             append(member.memberName()).append(": ");
             memberWriter.accept(this);
             append(System.lineSeparator());
-        });
+        }));
         dedent().append(System.lineSeparator());
     }
 
@@ -202,7 +199,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeDocument(Document value) {
+    public void writeDocument(SdkSchema schema, Document value) {
         append("Document (" + value.type()).append("):");
         indent();
         append(System.lineSeparator());

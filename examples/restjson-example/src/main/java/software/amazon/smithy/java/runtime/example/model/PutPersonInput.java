@@ -118,13 +118,13 @@ public final class PutPersonInput implements SerializableShape {
     @Override
     public void serialize(ShapeSerializer serializer) {
         serializer.writeStruct(SCHEMA, st -> {
-            st.stringMember(SCHEMA_NAME, name);
-            st.integerMember(SCHEMA_AGE, age);
-            st.timestampMemberIf(SCHEMA_BIRTHDAY, birthday);
-            st.stringMemberIf(SCHEMA_FAVORITE_COLOR, favoriteColor);
-            st.blobMemberIf(SCHEMA_BINARY, binary);
+            st.writeString(SCHEMA_NAME, name);
+            st.writeInteger(SCHEMA_AGE, age);
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_BIRTHDAY, birthday);
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_FAVORITE_COLOR, favoriteColor);
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_BINARY, binary);
             if (!queryParams.isEmpty()) {
-                st.mapMember(SCHEMA_QUERY_PARAMS, m -> {
+                st.writeMap(SCHEMA_QUERY_PARAMS, m -> {
                     queryParams.forEach((k, v) -> m.entry(k, mv -> {
                         mv.writeList(SharedSchemas.MAP_LIST_STRING.member("value"), mvl -> {
                             v.forEach(value -> mvl.writeString(SharedSchemas.LIST_OF_STRING.member("member"), value));

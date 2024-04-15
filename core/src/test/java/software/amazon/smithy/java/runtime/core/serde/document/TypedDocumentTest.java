@@ -46,11 +46,11 @@ public class TypedDocumentTest {
                 var aMember = SdkSchema.memberBuilder("a", PreludeSchemas.STRING)
                     .id(PreludeSchemas.DOCUMENT.id())
                     .build();
-                s.member(aMember, c -> c.writeString(PreludeSchemas.STRING, "1"));
+                s.writeString(aMember, "1");
                 var bMember = SdkSchema.memberBuilder("b", PreludeSchemas.STRING)
                     .id(PreludeSchemas.DOCUMENT.id())
                     .build();
-                s.member(bMember, c -> c.writeString(PreludeSchemas.STRING, "2"));
+                s.writeString(bMember, "2");
             });
         };
 
@@ -82,7 +82,7 @@ public class TypedDocumentTest {
         // Writes as document unless getting contents.
         result.serialize(new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(Document value) {
+            public void writeDocument(SdkSchema schema, Document value) {
                 assertThat(value, is(result));
             }
         });

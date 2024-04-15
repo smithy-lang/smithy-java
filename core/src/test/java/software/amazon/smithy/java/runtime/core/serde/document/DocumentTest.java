@@ -142,7 +142,9 @@ public class DocumentTest {
     @ParameterizedTest
     @MethodSource("ofValueProvider")
     public void documentFromValue(Document value, Object expected, Function<Document, Object> extractor) {
-        assertThat(extractor.apply(Document.ofValue(value)), equalTo(expected));
+        var document = Document.ofValue(value);
+        var extracted = extractor.apply(document);
+        assertThat(extracted, equalTo(expected));
     }
 
     public static List<Arguments> ofValueProvider() {

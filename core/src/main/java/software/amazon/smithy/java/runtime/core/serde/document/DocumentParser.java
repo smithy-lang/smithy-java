@@ -18,7 +18,6 @@ import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.runtime.core.serde.StructSerializer;
 
 final class DocumentParser implements ShapeSerializer {
 
@@ -29,16 +28,16 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
+    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         result = null;
         Map<String, Document> members = new LinkedHashMap<>();
-        consumer.accept((member, memberWriter) -> {
+        consumer.accept(ShapeSerializer.ofDelegatingConsumer((member, memberWriter) -> {
             String memberName = member.memberName();
             DocumentParser parser = new DocumentParser();
             memberWriter.accept(parser);
             var result = parser.result;
             members.put(memberName, result);
-        });
+        }));
         result = Document.ofStruct(members);
     }
 
@@ -148,10 +147,7 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public void writeDocument(Document value) {
+    public void writeDocument(SdkSchema schema, Document value) {
         value.serializeContents(this);
     }
-
-    @Override
-    public void flush() {}
 }

@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.core.serde;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
@@ -39,7 +38,7 @@ public final class RequiredWriteSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
+    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         delegate.writeStruct(schema, consumer);
         wroteSomething = true;
     }
@@ -129,13 +128,8 @@ public final class RequiredWriteSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeDocument(Document value) {
-        delegate.writeDocument(value);
+    public void writeDocument(SdkSchema schema, Document value) {
+        delegate.writeDocument(schema, value);
         wroteSomething = true;
-    }
-
-    @Override
-    public void flush() throws IOException {
-        delegate.flush();
     }
 }

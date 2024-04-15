@@ -6,8 +6,6 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.http.HttpHeaders;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -22,7 +20,6 @@ import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
-import software.amazon.smithy.java.runtime.core.serde.StructSerializer;
 import software.amazon.smithy.java.runtime.core.uri.QueryStringBuilder;
 import software.amazon.smithy.java.runtime.core.uri.URLEncoding;
 import software.amazon.smithy.model.pattern.SmithyPattern;
@@ -85,7 +82,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
+    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         boolean foundBody = false;
         for (var member : schema.members()) {
             if (bindingMatcher.match(member) == BindingMatcher.Binding.BODY) {
@@ -98,22 +95,18 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             shapeBodyOutput = new ByteArrayOutputStream();
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
             shapeBodySerializer.writeStruct(schema, delegateStruct -> {
-                consumer.accept(new HttpBindingStructSerializer(delegateStruct));
+                consumer.accept(createHttpBindingStructSerializer(delegateStruct));
             });
             headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
         } else {
-            consumer.accept(new HttpBindingStructSerializer(null));
+            consumer.accept(createHttpBindingStructSerializer(null));
         }
     }
 
     @Override
     public void flush() {
         if (shapeBodySerializer != null) {
-            try {
-                shapeBodySerializer.flush();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
+            shapeBodySerializer.flush();
         }
     }
 
@@ -197,38 +190,30 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         return responseStatus;
     }
 
-    private final class HttpBindingStructSerializer implements StructSerializer {
-
-        private final StructSerializer bodyStructSerializer;
-
-        HttpBindingStructSerializer(StructSerializer bodyStructSerializer) {
-            this.bodyStructSerializer = bodyStructSerializer;
-        }
-
-        @Override
-        public void member(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
+    private ShapeSerializer createHttpBindingStructSerializer(ShapeSerializer bodyStructSerializer) {
+        return ShapeSerializer.ofDelegatingConsumer((member, memberWriter) -> {
             switch (bindingMatcher.match(member)) {
                 case HEADER -> memberWriter.accept(headerSerializer);
                 case QUERY -> memberWriter.accept(querySerializer);
                 case LABEL -> memberWriter.accept(labelSerializer);
                 case PAYLOAD -> handleStructurePayload(member, memberWriter);
-                case BODY -> bodyStructSerializer.member(member, memberWriter);
+                case BODY -> memberWriter.accept(bodyStructSerializer);
                 case STATUS -> memberWriter.accept(new ResponseStatusSerializer(i -> responseStatus = i));
                 case PREFIX_HEADERS -> memberWriter
                     .accept(new HttpPrefixHeadersSerializer(bindingMatcher.prefixHeaders(), headerConsumer));
                 case QUERY_PARAMS -> memberWriter.accept(new HttpQueryParamsSerializer(queryStringParams::put));
             }
-        }
+        });
+    }
 
-        private void handleStructurePayload(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
-            if (member.memberTarget().type() == ShapeType.STRUCTURE) {
-                // Deserialize a structure bound to the payload.
-                headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
-                ByteArrayOutputStream output = new ByteArrayOutputStream();
-                memberWriter.accept(payloadCodec.createSerializer(output));
-                var byteArray = output.toByteArray();
-                setHttpPayload(member, DataStream.ofBytes(byteArray, payloadCodec.getMediaType()));
-            }
+    private void handleStructurePayload(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
+        if (member.memberTarget().type() == ShapeType.STRUCTURE) {
+            // Deserialize a structure bound to the payload.
+            headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            memberWriter.accept(payloadCodec.createSerializer(output));
+            var byteArray = output.toByteArray();
+            setHttpPayload(member, DataStream.ofBytes(byteArray, payloadCodec.getMediaType()));
         }
     }
 }

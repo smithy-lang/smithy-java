@@ -89,11 +89,11 @@ public final class PutPersonImageInput implements SerializableShape {
     @Override
     public void serialize(ShapeSerializer serializer) {
         serializer.writeStruct(SCHEMA, st -> {
-            st.stringMember(SCHEMA_NAME, name);
-            st.listMember(SCHEMA_TAGS, ser -> {
+            st.writeString(SCHEMA_NAME, name);
+            st.writeList(SCHEMA_TAGS, ser -> {
                 tags.forEach(tag -> ser.writeString(SCHEMA_TAGS, tag));
             });
-            st.listMember(SCHEMA_MORE_TAGS, ser -> {
+            st.writeList(SCHEMA_MORE_TAGS, ser -> {
                 moreTags.forEach(tag -> ser.writeString(SCHEMA_MORE_TAGS, tag));
             });
         });

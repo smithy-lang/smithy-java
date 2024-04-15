@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -608,22 +609,107 @@ final class Documents {
         @Override
         public void serializeContents(ShapeSerializer encoder) {
             encoder.writeStruct(PreludeSchemas.DOCUMENT, structSerializer -> {
+                var rewriter = new StructMemberRewriter(structSerializer);
                 for (var entry : members.entrySet()) {
-                    structSerializer.member(syntheticMember(entry.getKey()), entry.getValue()::serializeContents);
+                    rewriter.memberName = entry.getKey();
+                    entry.getValue().serializeContents(rewriter);
                 }
             });
         }
     }
 
-    /**
-     * Create a synthetic SdkSchema member so that serde consumers don't need to special case documents.
-     *
-     * @param name  Name of the member.
-     * @return the created member schema.
-     */
-    private static SdkSchema syntheticMember(String name) {
-        return SdkSchema.memberBuilder(name, PreludeSchemas.DOCUMENT)
-            .id(PreludeSchemas.DOCUMENT.id())
-            .build();
+    // Rewrites document members to use the right member name.
+    private static final class StructMemberRewriter implements ShapeSerializer {
+
+        private final ShapeSerializer structWriter;
+        private String memberName;
+
+        StructMemberRewriter(ShapeSerializer structWriter) {
+            this.structWriter = structWriter;
+        }
+
+        @Override
+        public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+            structWriter.writeStruct(syntheticMember(memberName, schema), consumer);
+        }
+
+        @Override
+        public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+            structWriter.writeList(syntheticMember(memberName, schema), consumer);
+        }
+
+        @Override
+        public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+            structWriter.writeMap(syntheticMember(memberName, schema), consumer);
+        }
+
+        @Override
+        public void writeBoolean(SdkSchema schema, boolean value) {
+            structWriter.writeBoolean(syntheticMember(memberName, schema), value);
+        }
+
+        @Override
+        public void writeByte(SdkSchema schema, byte value) {
+            structWriter.writeByte(syntheticMember(memberName, schema), value);
+        }
+
+        @Override
+        public void writeShort(SdkSchema schema, short value) {
+            structWriter.writeShort(syntheticMember(memberName, schema), value);
+        }
+
+        @Override
+        public void writeInteger(SdkSchema schema, int value) {
+            structWriter.writeInteger(syntheticMember(memberName, schema), value);
+        }
+
+        @Override
+        public void writeLong(SdkSchema schema, long value) {
+            structWriter.writeLong(syntheticMember(memberName, schema), value);
+        }
+
+        @Override
+        public void writeFloat(SdkSchema schema, float value) {
+            structWriter.writeFloat(syntheticMember(memberName, schema), value);
+        }
+
+        @Override
+        public void writeDouble(SdkSchema schema, double value) {
+            structWriter.writeDouble(syntheticMember(memberName, schema), value);
+        }
+
+        @Override
+        public void writeBigInteger(SdkSchema schema, BigInteger value) {
+            structWriter.writeBigInteger(syntheticMember(memberName, schema), value);
+        }
+
+        @Override
+        public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+            structWriter.writeBigDecimal(syntheticMember(memberName, schema), value);
+        }
+
+        @Override
+        public void writeString(SdkSchema schema, String value) {
+            structWriter.writeString(syntheticMember(memberName, schema), value);
+        }
+
+        @Override
+        public void writeBlob(SdkSchema schema, byte[] value) {
+            structWriter.writeBlob(syntheticMember(memberName, schema), value);
+        }
+
+        @Override
+        public void writeTimestamp(SdkSchema schema, Instant value) {
+            structWriter.writeTimestamp(syntheticMember(memberName, schema), value);
+        }
+
+        @Override
+        public void writeDocument(SdkSchema schema, Document value) {
+            structWriter.writeDocument(syntheticMember(memberName, schema), value);
+        }
+
+        private static SdkSchema syntheticMember(String name, SdkSchema target) {
+            return SdkSchema.memberBuilder(name, target).id(PreludeSchemas.DOCUMENT.id()).build();
+        }
     }
 }

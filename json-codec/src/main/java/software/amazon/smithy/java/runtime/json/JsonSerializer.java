@@ -18,7 +18,6 @@ import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.runtime.core.serde.StructSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
@@ -43,8 +42,12 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void flush() throws IOException {
-        stream.flush();
+    public void flush() {
+        try {
+            stream.flush();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override
@@ -155,7 +158,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
+    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         try {
             stream.writeObjectStart();
             consumer.accept(new JsonStructSerializer(this, stream, useJsonName));
@@ -199,7 +202,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeDocument(Document value) {
+    public void writeDocument(SdkSchema schema, Document value) {
         // Document values in JSON are serialized inline by receiving the data model contents of the document.
         value.serializeContents(this);
     }

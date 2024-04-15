@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,9 +33,9 @@ public class TypedDocumentMemberTest {
     public void equalityAndHashTest() {
         SerializableShape serializableShape = encoder -> {
             encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
-                var schema = PreludeSchemas.getSchemaForType(ShapeType.STRING);
-                var member = schema.documentMember("foo");
-                s.member(member, c -> c.writeString(PreludeSchemas.STRING, "Hi"));
+                var target = PreludeSchemas.getSchemaForType(ShapeType.STRING);
+                var member = PreludeSchemas.DOCUMENT.documentMember("foo", target);
+                s.writeString(member, "Hi");
             });
         };
 
@@ -56,17 +56,17 @@ public class TypedDocumentMemberTest {
     public void inEqualityAndHashTest() {
         var document1 = Document.ofStruct(encoder -> {
             encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
-                var schema = PreludeSchemas.getSchemaForType(ShapeType.STRING);
-                var member = schema.documentMember("foo", PreludeSchemas.STRING);
-                s.member(member, c -> c.writeString(PreludeSchemas.STRING, "Hi"));
+                var target = PreludeSchemas.getSchemaForType(ShapeType.STRING);
+                var member = PreludeSchemas.DOCUMENT.documentMember("foo", target);
+                s.writeString(member, "Hi");
             });
         });
 
         var document2 = Document.ofStruct(encoder -> {
             encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
-                var schema = PreludeSchemas.getSchemaForType(ShapeType.STRING);
-                var member = schema.documentMember("foo", PreludeSchemas.INTEGER);
-                s.member(member, c -> c.writeInteger(PreludeSchemas.INTEGER, 1));
+                var target = PreludeSchemas.getSchemaForType(ShapeType.INTEGER);
+                var member = PreludeSchemas.DOCUMENT.documentMember("foo", target);
+                s.writeInteger(member, 1);
             });
         });
 
@@ -79,14 +79,14 @@ public class TypedDocumentMemberTest {
     public void convertsMember(
         ShapeType type,
         Object value,
-        Consumer<ShapeSerializer> writer,
+        BiConsumer<SdkSchema, ShapeSerializer> writer,
         Function<Document, Object> extractor
     ) {
         SerializableShape serializableShape = encoder -> {
             encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
-                var schema = PreludeSchemas.getSchemaForType(type);
-                var aMember = SdkSchema.memberBuilder("a", schema).id(PreludeSchemas.DOCUMENT.id()).build();
-                s.member(aMember, writer);
+                var target = PreludeSchemas.getSchemaForType(type);
+                var aMember = SdkSchema.memberBuilder("a", target).id(PreludeSchemas.DOCUMENT.id()).build();
+                writer.accept(aMember, s);
             });
         };
         var document = Document.ofStruct(serializableShape);
@@ -99,37 +99,43 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.BOOLEAN,
                 true,
-                (Consumer<ShapeSerializer>) s -> s.writeBoolean(PreludeSchemas.BOOLEAN, true),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBoolean(schema, true),
                 (Function<Document, Object>) Document::asBoolean
             ),
             Arguments.of(
                 ShapeType.STRING,
                 "a",
-                (Consumer<ShapeSerializer>) s -> s.writeString(PreludeSchemas.STRING, "a"),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeString(schema, "a"),
                 (Function<Document, Object>) Document::asString
             ),
             Arguments.of(
                 ShapeType.STRING,
                 "a".getBytes(StandardCharsets.UTF_8),
-                (Consumer<ShapeSerializer>) s -> s.writeString(PreludeSchemas.STRING, "a"),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeString(schema, "a"),
                 (Function<Document, Object>) Document::asBlob
             ),
             Arguments.of(
                 ShapeType.BLOB,
                 "a",
-                (Consumer<ShapeSerializer>) s -> s.writeBlob(PreludeSchemas.BLOB, "a".getBytes(StandardCharsets.UTF_8)),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBlob(
+                    schema,
+                    "a".getBytes(StandardCharsets.UTF_8)
+                ),
                 (Function<Document, Object>) Document::asString
             ),
             Arguments.of(
                 ShapeType.BLOB,
                 "a".getBytes(StandardCharsets.UTF_8),
-                (Consumer<ShapeSerializer>) s -> s.writeBlob(PreludeSchemas.BLOB, "a".getBytes(StandardCharsets.UTF_8)),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBlob(
+                    schema,
+                    "a".getBytes(StandardCharsets.UTF_8)
+                ),
                 (Function<Document, Object>) Document::asBlob
             ),
             Arguments.of(
                 ShapeType.TIMESTAMP,
                 Instant.EPOCH,
-                (Consumer<ShapeSerializer>) s -> s.writeTimestamp(PreludeSchemas.TIMESTAMP, Instant.EPOCH),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeTimestamp(schema, Instant.EPOCH),
                 (Function<Document, Object>) Document::asTimestamp
             ),
 
@@ -137,392 +143,392 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.BYTE,
                 (byte) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeByte(PreludeSchemas.BYTE, (byte) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeByte(schema, (byte) 1),
                 (Function<Document, Object>) Document::asByte
             ),
             Arguments.of(
                 ShapeType.BYTE,
                 (short) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeByte(PreludeSchemas.BYTE, (byte) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeByte(schema, (byte) 1),
                 (Function<Document, Object>) Document::asShort
             ),
             Arguments.of(
                 ShapeType.BYTE,
                 1,
-                (Consumer<ShapeSerializer>) s -> s.writeByte(PreludeSchemas.BYTE, (byte) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeByte(schema, (byte) 1),
                 (Function<Document, Object>) Document::asInteger
             ),
             Arguments.of(
                 ShapeType.BYTE,
                 1L,
-                (Consumer<ShapeSerializer>) s -> s.writeByte(PreludeSchemas.BYTE, (byte) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeByte(schema, (byte) 1),
                 (Function<Document, Object>) Document::asLong
             ),
             Arguments.of(
                 ShapeType.BYTE,
                 1f,
-                (Consumer<ShapeSerializer>) s -> s.writeByte(PreludeSchemas.BYTE, (byte) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeByte(schema, (byte) 1),
                 (Function<Document, Object>) Document::asFloat
             ),
             Arguments.of(
                 ShapeType.BYTE,
                 1.0,
-                (Consumer<ShapeSerializer>) s -> s.writeByte(PreludeSchemas.BYTE, (byte) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeByte(schema, (byte) 1),
                 (Function<Document, Object>) Document::asDouble
             ),
             Arguments.of(
                 ShapeType.BYTE,
                 BigInteger.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeByte(PreludeSchemas.BYTE, (byte) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeByte(schema, (byte) 1),
                 (Function<Document, Object>) Document::asBigInteger
             ),
             Arguments.of(
                 ShapeType.BYTE,
                 BigDecimal.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeByte(PreludeSchemas.BYTE, (byte) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeByte(schema, (byte) 1),
                 (Function<Document, Object>) Document::asBigDecimal
             ),
 
             Arguments.of(
                 ShapeType.SHORT,
                 (byte) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeShort(PreludeSchemas.SHORT, (short) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeShort(schema, (short) 1),
                 (Function<Document, Object>) Document::asByte
             ),
             Arguments.of(
                 ShapeType.SHORT,
                 (short) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeShort(PreludeSchemas.SHORT, (short) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeShort(schema, (short) 1),
                 (Function<Document, Object>) Document::asShort
             ),
             Arguments.of(
                 ShapeType.SHORT,
                 1,
-                (Consumer<ShapeSerializer>) s -> s.writeShort(PreludeSchemas.SHORT, (short) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeShort(schema, (short) 1),
                 (Function<Document, Object>) Document::asInteger
             ),
             Arguments.of(
                 ShapeType.SHORT,
                 1L,
-                (Consumer<ShapeSerializer>) s -> s.writeShort(PreludeSchemas.SHORT, (short) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeShort(schema, (short) 1),
                 (Function<Document, Object>) Document::asLong
             ),
             Arguments.of(
                 ShapeType.SHORT,
                 1f,
-                (Consumer<ShapeSerializer>) s -> s.writeShort(PreludeSchemas.SHORT, (short) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeShort(schema, (short) 1),
                 (Function<Document, Object>) Document::asFloat
             ),
             Arguments.of(
                 ShapeType.SHORT,
                 1.0,
-                (Consumer<ShapeSerializer>) s -> s.writeShort(PreludeSchemas.SHORT, (short) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeShort(schema, (short) 1),
                 (Function<Document, Object>) Document::asDouble
             ),
             Arguments.of(
                 ShapeType.SHORT,
                 BigInteger.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeShort(PreludeSchemas.SHORT, (short) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeShort(schema, (short) 1),
                 (Function<Document, Object>) Document::asBigInteger
             ),
             Arguments.of(
                 ShapeType.SHORT,
                 BigDecimal.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeShort(PreludeSchemas.SHORT, (short) 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeShort(schema, (short) 1),
                 (Function<Document, Object>) Document::asBigDecimal
             ),
 
             Arguments.of(
                 ShapeType.INTEGER,
                 (byte) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeInteger(PreludeSchemas.INTEGER, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeInteger(schema, 1),
                 (Function<Document, Object>) Document::asByte
             ),
             Arguments.of(
                 ShapeType.INTEGER,
                 (short) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeInteger(PreludeSchemas.INTEGER, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeInteger(schema, 1),
                 (Function<Document, Object>) Document::asShort
             ),
             Arguments.of(
                 ShapeType.INTEGER,
                 1,
-                (Consumer<ShapeSerializer>) s -> s.writeInteger(PreludeSchemas.INTEGER, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeInteger(schema, 1),
                 (Function<Document, Object>) Document::asInteger
             ),
             Arguments.of(
                 ShapeType.INTEGER,
                 1L,
-                (Consumer<ShapeSerializer>) s -> s.writeInteger(PreludeSchemas.INTEGER, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeInteger(schema, 1),
                 (Function<Document, Object>) Document::asLong
             ),
             Arguments.of(
                 ShapeType.INTEGER,
                 1f,
-                (Consumer<ShapeSerializer>) s -> s.writeInteger(PreludeSchemas.INTEGER, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeInteger(schema, 1),
                 (Function<Document, Object>) Document::asFloat
             ),
             Arguments.of(
                 ShapeType.INTEGER,
                 1.0,
-                (Consumer<ShapeSerializer>) s -> s.writeInteger(PreludeSchemas.INTEGER, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeInteger(schema, 1),
                 (Function<Document, Object>) Document::asDouble
             ),
             Arguments.of(
                 ShapeType.INTEGER,
                 BigInteger.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeInteger(PreludeSchemas.INTEGER, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeInteger(schema, 1),
                 (Function<Document, Object>) Document::asBigInteger
             ),
             Arguments.of(
                 ShapeType.INTEGER,
                 BigDecimal.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeInteger(PreludeSchemas.INTEGER, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeInteger(schema, 1),
                 (Function<Document, Object>) Document::asBigDecimal
             ),
 
             Arguments.of(
                 ShapeType.LONG,
                 (byte) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeLong(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeLong(schema, 1),
                 (Function<Document, Object>) Document::asByte
             ),
             Arguments.of(
                 ShapeType.LONG,
                 (short) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeLong(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeLong(schema, 1),
                 (Function<Document, Object>) Document::asShort
             ),
             Arguments.of(
                 ShapeType.LONG,
                 1,
-                (Consumer<ShapeSerializer>) s -> s.writeLong(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeLong(schema, 1),
                 (Function<Document, Object>) Document::asInteger
             ),
             Arguments.of(
                 ShapeType.LONG,
                 1L,
-                (Consumer<ShapeSerializer>) s -> s.writeLong(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeLong(schema, 1),
                 (Function<Document, Object>) Document::asLong
             ),
             Arguments.of(
                 ShapeType.LONG,
                 1f,
-                (Consumer<ShapeSerializer>) s -> s.writeLong(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeLong(schema, 1),
                 (Function<Document, Object>) Document::asFloat
             ),
             Arguments.of(
                 ShapeType.LONG,
                 1.0,
-                (Consumer<ShapeSerializer>) s -> s.writeLong(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeLong(schema, 1),
                 (Function<Document, Object>) Document::asDouble
             ),
             Arguments.of(
                 ShapeType.LONG,
                 BigInteger.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeLong(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeLong(schema, 1),
                 (Function<Document, Object>) Document::asBigInteger
             ),
             Arguments.of(
                 ShapeType.LONG,
                 BigDecimal.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeLong(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeLong(schema, 1),
                 (Function<Document, Object>) Document::asBigDecimal
             ),
 
             Arguments.of(
                 ShapeType.FLOAT,
                 (byte) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeFloat(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeFloat(schema, 1),
                 (Function<Document, Object>) Document::asByte
             ),
             Arguments.of(
                 ShapeType.FLOAT,
                 (short) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeFloat(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeFloat(schema, 1),
                 (Function<Document, Object>) Document::asShort
             ),
             Arguments.of(
                 ShapeType.FLOAT,
                 1,
-                (Consumer<ShapeSerializer>) s -> s.writeFloat(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeFloat(schema, 1),
                 (Function<Document, Object>) Document::asInteger
             ),
             Arguments.of(
                 ShapeType.FLOAT,
                 1L,
-                (Consumer<ShapeSerializer>) s -> s.writeFloat(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeFloat(schema, 1),
                 (Function<Document, Object>) Document::asLong
             ),
             Arguments.of(
                 ShapeType.FLOAT,
                 1f,
-                (Consumer<ShapeSerializer>) s -> s.writeFloat(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeFloat(schema, 1),
                 (Function<Document, Object>) Document::asFloat
             ),
             Arguments.of(
                 ShapeType.FLOAT,
                 1.0,
-                (Consumer<ShapeSerializer>) s -> s.writeFloat(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeFloat(schema, 1),
                 (Function<Document, Object>) Document::asDouble
             ),
             Arguments.of(
                 ShapeType.FLOAT,
                 BigInteger.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeFloat(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeFloat(schema, 1),
                 (Function<Document, Object>) Document::asBigInteger
             ),
             Arguments.of(
                 ShapeType.FLOAT,
                 BigDecimal.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeFloat(PreludeSchemas.LONG, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeFloat(schema, 1),
                 (Function<Document, Object>) Document::asBigDecimal
             ),
 
             Arguments.of(
                 ShapeType.DOUBLE,
                 (byte) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeDouble(PreludeSchemas.DOUBLE, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeDouble(schema, 1),
                 (Function<Document, Object>) Document::asByte
             ),
             Arguments.of(
                 ShapeType.DOUBLE,
                 (short) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeDouble(PreludeSchemas.DOUBLE, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeDouble(schema, 1),
                 (Function<Document, Object>) Document::asShort
             ),
             Arguments.of(
                 ShapeType.DOUBLE,
                 1,
-                (Consumer<ShapeSerializer>) s -> s.writeDouble(PreludeSchemas.DOUBLE, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeDouble(schema, 1),
                 (Function<Document, Object>) Document::asInteger
             ),
             Arguments.of(
                 ShapeType.DOUBLE,
                 1L,
-                (Consumer<ShapeSerializer>) s -> s.writeDouble(PreludeSchemas.DOUBLE, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeDouble(schema, 1),
                 (Function<Document, Object>) Document::asLong
             ),
             Arguments.of(
                 ShapeType.DOUBLE,
                 1f,
-                (Consumer<ShapeSerializer>) s -> s.writeDouble(PreludeSchemas.DOUBLE, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeDouble(schema, 1),
                 (Function<Document, Object>) Document::asFloat
             ),
             Arguments.of(
                 ShapeType.DOUBLE,
                 1.0,
-                (Consumer<ShapeSerializer>) s -> s.writeDouble(PreludeSchemas.DOUBLE, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeDouble(schema, 1),
                 (Function<Document, Object>) Document::asDouble
             ),
             Arguments.of(
                 ShapeType.DOUBLE,
                 BigInteger.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeDouble(PreludeSchemas.DOUBLE, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeDouble(schema, 1),
                 (Function<Document, Object>) Document::asBigInteger
             ),
             Arguments.of(
                 ShapeType.DOUBLE,
                 BigDecimal.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeDouble(PreludeSchemas.DOUBLE, 1),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeDouble(schema, 1),
                 (Function<Document, Object>) Document::asBigDecimal
             ),
 
             Arguments.of(
                 ShapeType.BIG_INTEGER,
                 (byte) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeBigInteger(PreludeSchemas.BIG_INTEGER, BigInteger.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigInteger(schema, BigInteger.ONE),
                 (Function<Document, Object>) Document::asByte
             ),
             Arguments.of(
                 ShapeType.BIG_INTEGER,
                 (short) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeBigInteger(PreludeSchemas.BIG_INTEGER, BigInteger.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigInteger(schema, BigInteger.ONE),
                 (Function<Document, Object>) Document::asShort
             ),
             Arguments.of(
                 ShapeType.BIG_INTEGER,
                 1,
-                (Consumer<ShapeSerializer>) s -> s.writeBigInteger(PreludeSchemas.BIG_INTEGER, BigInteger.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigInteger(schema, BigInteger.ONE),
                 (Function<Document, Object>) Document::asInteger
             ),
             Arguments.of(
                 ShapeType.BIG_INTEGER,
                 1L,
-                (Consumer<ShapeSerializer>) s -> s.writeBigInteger(PreludeSchemas.BIG_INTEGER, BigInteger.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigInteger(schema, BigInteger.ONE),
                 (Function<Document, Object>) Document::asLong
             ),
             Arguments.of(
                 ShapeType.BIG_INTEGER,
                 1f,
-                (Consumer<ShapeSerializer>) s -> s.writeBigInteger(PreludeSchemas.BIG_INTEGER, BigInteger.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigInteger(schema, BigInteger.ONE),
                 (Function<Document, Object>) Document::asFloat
             ),
             Arguments.of(
                 ShapeType.BIG_INTEGER,
                 1.0,
-                (Consumer<ShapeSerializer>) s -> s.writeBigInteger(PreludeSchemas.BIG_INTEGER, BigInteger.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigInteger(schema, BigInteger.ONE),
                 (Function<Document, Object>) Document::asDouble
             ),
             Arguments.of(
                 ShapeType.BIG_INTEGER,
                 BigInteger.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeBigInteger(PreludeSchemas.BIG_INTEGER, BigInteger.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigInteger(schema, BigInteger.ONE),
                 (Function<Document, Object>) Document::asBigInteger
             ),
             Arguments.of(
                 ShapeType.BIG_INTEGER,
                 BigDecimal.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeBigInteger(PreludeSchemas.BIG_INTEGER, BigInteger.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigInteger(schema, BigInteger.ONE),
                 (Function<Document, Object>) Document::asBigDecimal
             ),
 
             Arguments.of(
                 ShapeType.BIG_DECIMAL,
                 (byte) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, BigDecimal.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigDecimal(schema, BigDecimal.ONE),
                 (Function<Document, Object>) Document::asByte
             ),
             Arguments.of(
                 ShapeType.BIG_DECIMAL,
                 (short) 1,
-                (Consumer<ShapeSerializer>) s -> s.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, BigDecimal.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigDecimal(schema, BigDecimal.ONE),
                 (Function<Document, Object>) Document::asShort
             ),
             Arguments.of(
                 ShapeType.BIG_DECIMAL,
                 1,
-                (Consumer<ShapeSerializer>) s -> s.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, BigDecimal.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigDecimal(schema, BigDecimal.ONE),
                 (Function<Document, Object>) Document::asInteger
             ),
             Arguments.of(
                 ShapeType.BIG_DECIMAL,
                 1L,
-                (Consumer<ShapeSerializer>) s -> s.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, BigDecimal.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigDecimal(schema, BigDecimal.ONE),
                 (Function<Document, Object>) Document::asLong
             ),
             Arguments.of(
                 ShapeType.BIG_DECIMAL,
                 1f,
-                (Consumer<ShapeSerializer>) s -> s.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, BigDecimal.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigDecimal(schema, BigDecimal.ONE),
                 (Function<Document, Object>) Document::asFloat
             ),
             Arguments.of(
                 ShapeType.BIG_DECIMAL,
                 1.0,
-                (Consumer<ShapeSerializer>) s -> s.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, BigDecimal.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigDecimal(schema, BigDecimal.ONE),
                 (Function<Document, Object>) Document::asDouble
             ),
             Arguments.of(
                 ShapeType.BIG_DECIMAL,
                 BigInteger.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, BigDecimal.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigDecimal(schema, BigDecimal.ONE),
                 (Function<Document, Object>) Document::asBigInteger
             ),
             Arguments.of(
                 ShapeType.BIG_DECIMAL,
                 BigDecimal.ONE,
-                (Consumer<ShapeSerializer>) s -> s.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, BigDecimal.ONE),
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBigDecimal(schema, BigDecimal.ONE),
                 (Function<Document, Object>) Document::asBigDecimal
             ),
 
@@ -530,8 +536,8 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.DOCUMENT,
                 List.of(Document.of(1)),
-                (Consumer<ShapeSerializer>) s -> s.writeList(
-                    PreludeSchemas.DOCUMENT,
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeList(
+                    schema,
                     c -> c.writeInteger(PreludeSchemas.INTEGER, 1)
                 ),
                 (Function<Document, Object>) d -> Document.ofValue(Document.of(d.asList())).asList()
@@ -541,8 +547,8 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.DOCUMENT,
                 Map.of(Document.of("a"), Document.of(1)),
-                (Consumer<ShapeSerializer>) s -> s.writeMap(
-                    PreludeSchemas.DOCUMENT,
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
+                    schema,
                     m -> m.entry("a", c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
                 ),
                 (Function<Document, Object>) d -> Document.ofValue(
@@ -554,8 +560,8 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.DOCUMENT,
                 Map.of(Document.of(1), Document.of(1)),
-                (Consumer<ShapeSerializer>) s -> s.writeMap(
-                    PreludeSchemas.DOCUMENT,
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
+                    schema,
                     m -> m.entry(1, c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
                 ),
                 (Function<Document, Object>) d -> Document.ofValue(
@@ -567,8 +573,8 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.DOCUMENT,
                 Map.of(Document.of(1L), Document.of(1)),
-                (Consumer<ShapeSerializer>) s -> s.writeMap(
-                    PreludeSchemas.DOCUMENT,
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
+                    schema,
                     m -> m.entry(1L, c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
                 ),
                 (Function<Document, Object>) d -> Document.ofValue(
@@ -580,8 +586,8 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.DOCUMENT,
                 Document.of(1),
-                (Consumer<ShapeSerializer>) s -> s.writeMap(
-                    PreludeSchemas.DOCUMENT,
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
+                    schema,
                     m -> m.entry("a", c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
                 ),
                 (Function<Document, Object>) d -> Document.ofValue(d.getMember("a"))
@@ -591,16 +597,10 @@ public class TypedDocumentMemberTest {
             Arguments.of(
                 ShapeType.DOCUMENT,
                 Document.of("b"),
-                (Consumer<ShapeSerializer>) s -> {
-                    s.writeStruct(PreludeSchemas.DOCUMENT, ser -> {
-                        ser.member(
-                            PreludeSchemas.DOCUMENT.documentMember("foo"),
-                            c -> c.writeString(PreludeSchemas.STRING, "a")
-                        );
-                        ser.member(
-                            PreludeSchemas.DOCUMENT.documentMember("bar"),
-                            c -> c.writeString(PreludeSchemas.STRING, "b")
-                        );
+                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> {
+                    s.writeStruct(schema, ser -> {
+                        ser.writeString(PreludeSchemas.DOCUMENT.documentMember("foo", PreludeSchemas.STRING), "a");
+                        ser.writeString(PreludeSchemas.DOCUMENT.documentMember("bar", PreludeSchemas.STRING), "b");
                     });
                 },
                 (Function<Document, Object>) d -> Document.ofValue(d.getMember("bar"))

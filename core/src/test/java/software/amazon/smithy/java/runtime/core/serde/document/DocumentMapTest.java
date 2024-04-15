@@ -70,7 +70,7 @@ public class DocumentMapTest {
         // Ensure documents are always serialized as a document.
         document.serialize(new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(Document value) {
+            public void writeDocument(SdkSchema schema, Document value) {
                 assertThat(value, is(document));
             }
         });

@@ -6,9 +6,7 @@
 package software.amazon.smithy.java.runtime.core.serde;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.OutputStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
@@ -51,13 +49,9 @@ public interface Codec {
     default String serializeToString(SerializableShape shape) {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         ShapeSerializer serializer = createSerializer(stream);
-        try {
-            shape.serialize(serializer);
-            serializer.flush();
-            return stream.toString(StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        shape.serialize(serializer);
+        serializer.flush();
+        return stream.toString(StandardCharsets.UTF_8);
     }
 
     /**

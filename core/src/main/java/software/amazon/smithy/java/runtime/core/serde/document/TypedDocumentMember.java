@@ -20,7 +20,6 @@ import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
-import software.amazon.smithy.java.runtime.core.serde.StructSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
@@ -636,12 +635,12 @@ final class TypedDocumentMember implements Document {
             }
 
             @Override
-            public void writeStruct(SdkSchema schema, Consumer<StructSerializer> consumer) {
-                consumer.accept((member, memberWriter) -> {
+            public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+                consumer.accept(ShapeSerializer.ofDelegatingConsumer((member, memberWriter) -> {
                     if (member.memberName().equals(memberName)) {
                         result = new TypedDocumentMember(member, memberWriter);
                     }
-                });
+                }));
             }
         };
         memberWriter.accept(expect);
