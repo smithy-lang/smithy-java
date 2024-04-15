@@ -172,68 +172,59 @@ public class BuilderGenerator implements Runnable {
                 "builderRef",
                 memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isPresent()
             );
-            writer.write(
-                """
-                    public Builder $1L($2T $1L) {
-                        clear$1U();${^builderRef}
-                        create$1UIfNotExists();
-                        ${/builderRef}this.$1L${?builderRef}.get()${/builderRef}.addAll($1L);
-                        return this;
+            writer.putContext("memberName", memberName);
+            writer.putContext("symbol", symbolProvider.toSymbol(shape));
+            writer.putContext("targetSymbol", symbolProvider.toSymbol(shape.getMember()));
+            // Add all
+            writer.write("""
+                public Builder ${memberName:L}(${symbol:T} ${memberName:L}) {
+                    clear${memberName:U}();${^builderRef}
+                    create${memberName:U}IfNotExists();
+                    ${/builderRef}this.${memberName:L}${?builderRef}.get()${/builderRef}.addAll(${memberName:L});
+                    return this;
+                }
+                """);
+            // Clear all
+            writer.write("""
+                public Builder clear${memberName:U}() {
+                    if (${memberName:L}${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
+                        ${memberName:L}${?builderRef}.get()${/builderRef}.clear();
                     }
-                    """,
-                memberName,
-                symbolProvider.toSymbol(shape)
-            );
-
-            writer.write(
-                """
-                    public Builder clear$1U() {
-                        if ($1L${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
-                            $1L${?builderRef}.get()${/builderRef}.clear();
-                        }
-                        return this;
-                    }
-                    """,
-                memberName
-            );
-
+                    return this;
+                }
+                """);
             // Set one
             writer.write(
                 """
-                    public Builder add$1U($2T value) {${^builderRef}
-                        create$1UIfNotExists();
-                        ${/builderRef}$1L${?builderRef}.get()${/builderRef}.add(value);
+                    public Builder add${memberName:U}(${targetSymbol:T} value) {${^builderRef}
+                        create${memberName:U}IfNotExists();
+                        ${/builderRef}${memberName:L}${?builderRef}.get()${/builderRef}.add(value);
                         return this;
                     }
-                    """,
-                memberName,
-                symbolProvider.toSymbol(shape.getMember())
+                    """
             );
-
             // Remove one
             writer.write(
                 """
-                    public Builder remove$1U($2T value) {
-                        if (this.$1L${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
-                            $1L${?builderRef}.get()${/builderRef}.remove(value);
+                    public Builder remove${memberName:U}(${targetSymbol:T} value) {
+                        if (this.${memberName:L}${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
+                            ${memberName:L}${?builderRef}.get()${/builderRef}.remove(value);
                         }
                         return this;
                     }
-                    """,
-                memberName,
-                symbolProvider.toSymbol(shape.getMember())
+                    """
             );
 
-            if (!memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isPresent()) {
+            // Handle collection creation if a builderRef is not used to do so.
+            if (memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isEmpty()) {
                 writer.write(
                     """
-                        private void create$1UIfNotExists() {
-                            if ($1L == null) {
-                                $1L = new $2T<>();
+                        private void create${memberName:U}IfNotExists() {
+                            if (${memberName:L} == null) {
+                                ${memberName:L} = new $T<>();
                             }
                         }
                         """,
-                    memberName,
                     memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
                 );
             }
@@ -244,57 +235,54 @@ public class BuilderGenerator implements Runnable {
 
         @Override
         public Void mapShape(MapShape shape) {
+            writer.pushState();
+            writer.putContext("memberName", memberName);
+            writer.putContext("symbol", symbolProvider.toSymbol(shape));
+            writer.putContext("keySymbol", symbolProvider.toSymbol(shape.getKey()));
+            writer.putContext("valueSymbol", symbolProvider.toSymbol(shape.getValue()));
+
             // Set all
             writer.write(
                 """
-                    public Builder $1L($2T $1L) {
-                        clear$1U();
-                        this.$1L.get().putAll($1L);
+                    public Builder ${memberName:L}(${symbol:T} ${memberName:L}) {
+                        clear${memberName:U}();
+                        this.${memberName:L}.get().putAll(${memberName:L});
                         return this;
                     }
-                    """,
-                memberName,
-                symbolProvider.toSymbol(shape)
+                    """
             );
-
+            // Clear All
             writer.write(
                 """
-                    public Builder clear$1U() {
-                        if ($1L.hasValue()) {
-                            $1L.get().clear();
+                    public Builder clear${memberName:U}() {
+                        if (${memberName:L}.hasValue()) {
+                            ${memberName:L}.get().clear();
                         }
                         return this;
                     }
-                    """,
-                memberName
+                    """
             );
-
             // Set one
             writer.write(
                 """
-                    public Builder put$1U($2T key, $3T value) {
-                       this.$1L.get().put(key, value);
+                    public Builder put${memberName:U}(${keySymbol:T} key, ${valueSymbol:T} value) {
+                       this.${memberName:L}.get().put(key, value);
                        return this;
                     }
-                    """,
-                memberName,
-                symbolProvider.toSymbol(shape.getKey()),
-                symbolProvider.toSymbol(shape.getValue())
+                    """
             );
-
             // Remove one
             writer.write(
                 """
-                    public Builder remove$1U($2T $1L) {
-                        if (this.$1L.hasValue()) {
-                            this.$1L.get().remove($1L);
+                    public Builder remove${memberName:U}(${keySymbol:T} ${memberName:L}) {
+                        if (this.${memberName:L}.hasValue()) {
+                            this.${memberName:L}.get().remove(${memberName:L});
                         }
                         return this;
                     }
-                    """,
-                memberName,
-                symbolProvider.toSymbol(shape.getKey())
+                    """
             );
+            writer.popState();
             return null;
         }
 
