@@ -78,17 +78,20 @@ final class ConstructorGenerator implements Runnable {
                 return writer.format("builder.$1L.copy()", memberName);
             }
             return writer.format("builder.$1L.hasValue() ? builder.$1L.copy() : null", memberName);
-        } else if (memberSymbol.getProperty(SymbolProperties.COLLECTION_FACTORY_METHOD).isPresent()){
+        } else if (memberSymbol.getProperty(SymbolProperties.COLLECTION_FACTORY_METHOD).isPresent()) {
             if (member.isRequired()) {
-                return writer.format("$T.$L(builder.$L)",
-                        Collections.class,
-                        memberSymbol.expectProperty(SymbolProperties.COLLECTION_FACTORY_METHOD, String.class),
-                        memberName);
-            }
-            return writer.format("builder.$1L != null ? $2T.$3L(builder.$1L) : null",
-                    memberName,
+                return writer.format(
+                    "$T.$L(builder.$L)",
                     Collections.class,
-                    memberSymbol.expectProperty(SymbolProperties.COLLECTION_FACTORY_METHOD, String.class)
+                    memberSymbol.expectProperty(SymbolProperties.COLLECTION_FACTORY_METHOD, String.class),
+                    memberName
+                );
+            }
+            return writer.format(
+                "builder.$1L != null ? $2T.$3L(builder.$1L) : null",
+                memberName,
+                Collections.class,
+                memberSymbol.expectProperty(SymbolProperties.COLLECTION_FACTORY_METHOD, String.class)
             );
         } else {
             return writer.format("builder.$L", memberName);

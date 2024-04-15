@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-import java.util.Optional;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.SymbolProperties;
@@ -16,7 +15,6 @@ import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.*;
-import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.utils.BuilderRef;
 import software.amazon.smithy.utils.StringUtils;
 
@@ -89,18 +87,18 @@ public class BuilderGenerator implements Runnable {
             var memberSymbol = symbolProvider.toSymbol(member);
             if (memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isPresent()) {
                 writer.write(
-                        "private final $1T<$2T> $3L = $1T.$4L;",
-                        BuilderRef.class,
-                        symbolProvider.toSymbol(member),
-                        symbolProvider.toMemberName(member),
-                        memberSymbol.expectProperty(SymbolProperties.BUILDER_REF_INITIALIZER, String.class)
+                    "private final $1T<$2T> $3L = $1T.$4L;",
+                    BuilderRef.class,
+                    symbolProvider.toSymbol(member),
+                    symbolProvider.toMemberName(member),
+                    memberSymbol.expectProperty(SymbolProperties.BUILDER_REF_INITIALIZER, String.class)
                 );
             } else if (SymbolUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {
                 // Streaming blobs need a custom initializer
                 writer.write(
-                        "private $1T $2L = $1T.ofEmpty();",
-                        DataStream.class,
-                        symbolProvider.toMemberName(member)
+                    "private $1T $2L = $1T.ofEmpty();",
+                    DataStream.class,
+                    symbolProvider.toMemberName(member)
                 );
             } else {
                 // TODO: handle defaults
@@ -119,7 +117,7 @@ public class BuilderGenerator implements Runnable {
     private void builderSetters() {
         for (var memberShape : shape.members()) {
             memberShape.accept(
-                    new SetterVisitor(symbolProvider.toSymbol(memberShape), symbolProvider.toMemberName(memberShape))
+                new SetterVisitor(symbolProvider.toSymbol(memberShape), symbolProvider.toMemberName(memberShape))
             );
         }
     }
@@ -171,8 +169,10 @@ public class BuilderGenerator implements Runnable {
         @Override
         public Void listShape(ListShape shape) {
             writer.pushState();
-            writer.putContext("builderRef",
-                    memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isPresent());
+            writer.putContext(
+                "builderRef",
+                memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isPresent()
+            );
             writer.write(
                 """
                     public Builder $1L($2T $1L) {
@@ -188,16 +188,16 @@ public class BuilderGenerator implements Runnable {
             );
 
             writer.write(
-                    """
-                        public Builder clear$1L() {
-                            if ($2L${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
-                                $2L${?builderRef}.get()${/builderRef}.clear();
-                            }
-                            return this;
+                """
+                    public Builder clear$1L() {
+                        if ($2L${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
+                            $2L${?builderRef}.get()${/builderRef}.clear();
                         }
-                        """,
-                    StringUtils.capitalize(memberName),
-                    memberName
+                        return this;
+                    }
+                    """,
+                StringUtils.capitalize(memberName),
+                memberName
             );
 
             // Set one
@@ -230,16 +230,17 @@ public class BuilderGenerator implements Runnable {
             );
 
             if (!memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isPresent()) {
-                writer.write("""
+                writer.write(
+                    """
                         private void create$1LIfNotExists() {
                             if ($2L == null) {
                                 $2L = new $3T<>();
                             }
                         }
                         """,
-                        StringUtils.capitalize(memberName),
-                        memberName,
-                        memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
+                    StringUtils.capitalize(memberName),
+                    memberName,
+                    memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
                 );
             }
             writer.popState();
@@ -264,16 +265,16 @@ public class BuilderGenerator implements Runnable {
             );
 
             writer.write(
-                    """
-                        public Builder clear$1L() {
-                            if ($2L.hasValue()) {
-                                $2L.get().clear();
-                            }
-                            return this;
+                """
+                    public Builder clear$1L() {
+                        if ($2L.hasValue()) {
+                            $2L.get().clear();
                         }
-                        """,
-                    StringUtils.capitalize(memberName),
-                    memberName
+                        return this;
+                    }
+                    """,
+                StringUtils.capitalize(memberName),
+                memberName
             );
 
             // Set one

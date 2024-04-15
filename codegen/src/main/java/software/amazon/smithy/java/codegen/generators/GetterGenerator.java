@@ -91,28 +91,28 @@ final class GetterGenerator implements Runnable {
             // If the list has a custom collection factory use that instead.
             if (shapeSymbol.getProperty(SymbolProperties.COLLECTION_FACTORY_METHOD).isPresent()) {
                 writer.write(
-                        """
-                                public $1T $2L() {
-                                    return $2L != null ? $2L : $3T.$4L(new $5T<>());
-                                }
-                                """,
-                        symbolProvider.toSymbol(shape),
-                        symbolProvider.toMemberName(member),
-                        Collections.class,
-                        shapeSymbol.expectProperty(SymbolProperties.COLLECTION_FACTORY_METHOD, String.class),
-                        shapeSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+                    """
+                        public $1T $2L() {
+                            return $2L != null ? $2L : $3T.$4L(new $5T<>());
+                        }
+                        """,
+                    symbolProvider.toSymbol(shape),
+                    symbolProvider.toMemberName(member),
+                    Collections.class,
+                    shapeSymbol.expectProperty(SymbolProperties.COLLECTION_FACTORY_METHOD, String.class),
+                    shapeSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
                 );
             } else {
                 writer.write(
-                                """
-                                        public $1T $2L() {
-                                            return $2L != null ? $2L : $3T.emptyList();
-                                        }
-                                        """,
-                                symbolProvider.toSymbol(shape),
-                                symbolProvider.toMemberName(member),
-                                Collections.class
-                        );
+                    """
+                        public $1T $2L() {
+                            return $2L != null ? $2L : $3T.emptyList();
+                        }
+                        """,
+                    symbolProvider.toSymbol(shape),
+                    symbolProvider.toMemberName(member),
+                    Collections.class
+                );
 
             }
             writer.popState();
