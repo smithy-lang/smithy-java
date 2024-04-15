@@ -10,7 +10,6 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 /**
  * Interface for loading {@link Identity} that is used for authentication.
  */
-@FunctionalInterface
 public interface IdentityResolver<IdentityT extends Identity> {
     /**
      * Resolve the identity from this identity provider.
@@ -23,4 +22,11 @@ public interface IdentityResolver<IdentityT extends Identity> {
      * @throws IdentityNotFoundException when an identity cannot be resolved.
      */
     IdentityT resolveIdentity(AuthProperties requestProperties);
+
+    /**
+     * Retrieve the class of identity this identity resolver produces.
+     *
+     * @return the class of the identity.
+     */
+    Class<IdentityT> identityType();
 }

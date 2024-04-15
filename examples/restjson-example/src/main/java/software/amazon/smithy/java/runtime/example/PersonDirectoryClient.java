@@ -8,7 +8,9 @@ package software.amazon.smithy.java.runtime.example;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.api.Endpoint;
 import software.amazon.smithy.java.runtime.api.EndpointProvider;
@@ -47,6 +49,7 @@ public final class PersonDirectoryClient implements PersonDirectory {
     private final TypeRegistry typeRegistry;
     private final ClientInterceptor interceptor;
     private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
+    private final List<IdentityResolver<?>> supportedIdentityResolvers = new ArrayList<>();
     private final AuthSchemeResolver authSchemeResolver;
     private final IdentityResolvers identityResolvers;
 
@@ -59,15 +62,19 @@ public final class PersonDirectoryClient implements PersonDirectory {
 
         // TODO: Better defaults? Require these?
         this.authSchemeResolver = Objects.requireNonNullElseGet(builder.authSchemeResolver, () -> params -> List.of());
-        this.identityResolvers = Objects.requireNonNullElseGet(
-            builder.identityResolvers,
-            () -> new IdentityResolvers() {
-                @Override
-                public <T extends Identity> IdentityResolver<T> identityResolver(Class<T> identityType) {
-                    return null;
-                }
+
+        Map<Class<?>, IdentityResolver<?>> result = new HashMap<>();
+        for (IdentityResolver<?> identityResolver : builder.identityResolvers) {
+            result.put(identityResolver.identityType(), identityResolver);
+        }
+        // TODO: declare this class somewhere instead of generating this in each client.
+        this.identityResolvers = new IdentityResolvers() {
+            @Override
+            public <T extends Identity> IdentityResolver<T> identityResolver(Class<T> identityType) {
+                // TODO: Any issues with this class cast or a way to avoid it?
+                return (IdentityResolver<T>) result.get(identityType);
             }
-        );
+        };
 
         // Here is where you would register errors bound to the service on the registry.
         // ...
@@ -142,9 +149,9 @@ public final class PersonDirectoryClient implements PersonDirectory {
         private ClientTransport transport;
         private EndpointProvider endpointProvider;
         private final List<ClientInterceptor> interceptors = new ArrayList<>();
-        private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
         private AuthSchemeResolver authSchemeResolver;
-        private IdentityResolvers identityResolvers;
+        private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
+        private final List<IdentityResolver<?>> identityResolvers = new ArrayList<>();
 
         private Builder() {}
 
@@ -245,17 +252,26 @@ public final class PersonDirectoryClient implements PersonDirectory {
             return this;
         }
 
-        // TODO: I think IdentityResolvers itself doesn't need to be configurable. It's basically a map/collection
-        //  like authSchemes, so a method to add individual IdentitiyResolvers should suffice.
-        //  Hmm, would we want to be able to remove an IdentityResolver, depending on if defaults are configured.
         /**
-         * Set the identity resolvers supported by the client.
+         * Add identity resolvers to the client.
          *
-         * @param identityResolvers Client identity resolvers.
+         * @param identityResolvers Identity resolvers to add.
          * @return the builder.
          */
-        public Builder identityResolvers(IdentityResolvers identityResolvers) {
-            this.identityResolvers = identityResolvers;
+        public Builder addIdentityResolver(IdentityResolver<?>... identityResolvers) {
+            this.identityResolvers.addAll(Arrays.asList(identityResolvers));
+            return this;
+        }
+
+        /**
+         * Set the identity resolvers of the client.
+         *
+         * @param identityResolvers Identity resolvers to set.
+         * @return the builder.
+         */
+        public Builder identityResolvers(List<IdentityResolver<?>> identityResolvers) {
+            this.identityResolvers.clear();
+            this.identityResolvers.addAll(identityResolvers);
             return this;
         }
 
