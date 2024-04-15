@@ -16,7 +16,6 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.*;
 import software.amazon.smithy.utils.BuilderRef;
-import software.amazon.smithy.utils.StringUtils;
 
 /**
  * Generates a static nested {@code Builder} class for a Java class.
@@ -176,69 +175,64 @@ public class BuilderGenerator implements Runnable {
             writer.write(
                 """
                     public Builder $1L($2T $1L) {
-                        clear$3L();${^builderRef}
-                        create$3LIfNotExists();
+                        clear$1U();${^builderRef}
+                        create$1UIfNotExists();
                         ${/builderRef}this.$1L${?builderRef}.get()${/builderRef}.addAll($1L);
                         return this;
                     }
                     """,
                 memberName,
-                symbolProvider.toSymbol(shape),
-                StringUtils.capitalize(memberName)
+                symbolProvider.toSymbol(shape)
             );
 
             writer.write(
                 """
-                    public Builder clear$1L() {
-                        if ($2L${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
-                            $2L${?builderRef}.get()${/builderRef}.clear();
+                    public Builder clear$1U() {
+                        if ($1L${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
+                            $1L${?builderRef}.get()${/builderRef}.clear();
                         }
                         return this;
                     }
                     """,
-                StringUtils.capitalize(memberName),
                 memberName
             );
 
             // Set one
             writer.write(
                 """
-                    public Builder add$1L($2T value) {${^builderRef}
-                        create$1LIfNotExists();
-                        ${/builderRef}$3L${?builderRef}.get()${/builderRef}.add(value);
+                    public Builder add$1U($2T value) {${^builderRef}
+                        create$1UIfNotExists();
+                        ${/builderRef}$1L${?builderRef}.get()${/builderRef}.add(value);
                         return this;
                     }
                     """,
-                StringUtils.capitalize(memberName),
-                symbolProvider.toSymbol(shape.getMember()),
-                memberName
+                memberName,
+                symbolProvider.toSymbol(shape.getMember())
             );
 
             // Remove one
             writer.write(
                 """
-                    public Builder remove$1L($2T value) {
-                        if (this.$3L${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
-                            $3L${?builderRef}.get()${/builderRef}.remove(value);
+                    public Builder remove$1U($2T value) {
+                        if (this.$1L${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
+                            $1L${?builderRef}.get()${/builderRef}.remove(value);
                         }
                         return this;
                     }
                     """,
-                StringUtils.capitalize(memberName),
-                symbolProvider.toSymbol(shape.getMember()),
-                memberName
+                memberName,
+                symbolProvider.toSymbol(shape.getMember())
             );
 
             if (!memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isPresent()) {
                 writer.write(
                     """
-                        private void create$1LIfNotExists() {
-                            if ($2L == null) {
-                                $2L = new $3T<>();
+                        private void create$1UIfNotExists() {
+                            if ($1L == null) {
+                                $1L = new $2T<>();
                             }
                         }
                         """,
-                    StringUtils.capitalize(memberName),
                     memberName,
                     memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
                 );
@@ -254,56 +248,52 @@ public class BuilderGenerator implements Runnable {
             writer.write(
                 """
                     public Builder $1L($2T $1L) {
-                        clear$3L();
+                        clear$1U();
                         this.$1L.get().putAll($1L);
                         return this;
                     }
                     """,
                 memberName,
-                symbolProvider.toSymbol(shape),
-                StringUtils.capitalize(memberName)
+                symbolProvider.toSymbol(shape)
             );
 
             writer.write(
                 """
-                    public Builder clear$1L() {
-                        if ($2L.hasValue()) {
-                            $2L.get().clear();
+                    public Builder clear$1U() {
+                        if ($1L.hasValue()) {
+                            $1L.get().clear();
                         }
                         return this;
                     }
                     """,
-                StringUtils.capitalize(memberName),
                 memberName
             );
 
             // Set one
             writer.write(
                 """
-                    public Builder put$L($T key, $T value) {
-                       this.$L.get().put(key, value);
+                    public Builder put$1U($2T key, $3T value) {
+                       this.$1L.get().put(key, value);
                        return this;
                     }
                     """,
-                StringUtils.capitalize(memberName),
+                memberName,
                 symbolProvider.toSymbol(shape.getKey()),
-                symbolProvider.toSymbol(shape.getValue()),
-                memberName
+                symbolProvider.toSymbol(shape.getValue())
             );
 
             // Remove one
             writer.write(
                 """
-                    public Builder remove$1L($2T $3L) {
-                        if (this.$3L.hasValue()) {
-                            this.$3L.get().remove($3L);
+                    public Builder remove$1U($2T $1L) {
+                        if (this.$1L.hasValue()) {
+                            this.$1L.get().remove($1L);
                         }
                         return this;
                     }
                     """,
-                StringUtils.capitalize(memberName),
-                symbolProvider.toSymbol(shape.getKey()),
-                memberName
+                memberName,
+                symbolProvider.toSymbol(shape.getKey())
             );
             return null;
         }

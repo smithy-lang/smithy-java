@@ -17,7 +17,6 @@ import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeVisitor;
 import software.amazon.smithy.model.traits.ErrorTrait;
-import software.amazon.smithy.utils.StringUtils;
 
 /**
  * Generates getters for a shape.
@@ -149,11 +148,10 @@ final class GetterGenerator implements Runnable {
             var memberName = symbolProvider.toMemberName(member);
             writer.write(
                 """
-                    public boolean has$L() {
-                        return $L != null;
+                    public boolean has$1U() {
+                        return $1L != null;
                     }
                     """,
-                StringUtils.capitalize(memberName),
                 memberName
             );
         }
