@@ -7,6 +7,7 @@ package software.amazon.smithy.java.codegen.generators;
 
 import java.util.Collections;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.Model;
@@ -85,18 +86,36 @@ final class GetterGenerator implements Runnable {
 
         @Override
         public Void listShape(ListShape shape) {
-            writer.pushState(new GetterSection(member))
-                .write(
-                    """
-                        public $1T $2L() {
-                            return $2L != null ? $2L : $3T.emptyList();
-                        }
-                        """,
-                    symbolProvider.toSymbol(shape),
-                    symbolProvider.toMemberName(member),
-                    Collections.class
-                )
-                .popState();
+            writer.pushState(new GetterSection(member));
+            var shapeSymbol = symbolProvider.toSymbol(shape);
+            // If the list has a custom collection factory use that instead.
+            if (shapeSymbol.getProperty(SymbolProperties.COLLECTION_FACTORY_METHOD).isPresent()) {
+                writer.write(
+                        """
+                                public $1T $2L() {
+                                    return $2L != null ? $2L : $3T.$4L(new $5T<>());
+                                }
+                                """,
+                        symbolProvider.toSymbol(shape),
+                        symbolProvider.toMemberName(member),
+                        Collections.class,
+                        shapeSymbol.expectProperty(SymbolProperties.COLLECTION_FACTORY_METHOD, String.class),
+                        shapeSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+                );
+            } else {
+                writer.write(
+                                """
+                                        public $1T $2L() {
+                                            return $2L != null ? $2L : $3T.emptyList();
+                                        }
+                                        """,
+                                symbolProvider.toSymbol(shape),
+                                symbolProvider.toMemberName(member),
+                                Collections.class
+                        );
+
+            }
+            writer.popState();
             writeHasCollection();
             return null;
         }

@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.Collections;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -71,11 +72,24 @@ final class ConstructorGenerator implements Runnable {
 
     private String getBuilderValue(MemberShape member, String memberName) {
         // If the member requires a builderRef we need to copy that builder ref value rather than use it directly.
-        if (symbolProvider.toSymbol(member).getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isPresent()) {
+        var memberSymbol = symbolProvider.toSymbol(member);
+        if (memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isPresent()) {
             if (member.isRequired()) {
                 return writer.format("builder.$1L.copy()", memberName);
             }
             return writer.format("builder.$1L.hasValue() ? builder.$1L.copy() : null", memberName);
+        } else if (memberSymbol.getProperty(SymbolProperties.COLLECTION_FACTORY_METHOD).isPresent()){
+            if (member.isRequired()) {
+                return writer.format("$T.$L(builder.$L)",
+                        Collections.class,
+                        memberSymbol.expectProperty(SymbolProperties.COLLECTION_FACTORY_METHOD, String.class),
+                        memberName);
+            }
+            return writer.format("builder.$1L != null ? $2T.$3L(builder.$1L) : null",
+                    memberName,
+                    Collections.class,
+                    memberSymbol.expectProperty(SymbolProperties.COLLECTION_FACTORY_METHOD, String.class)
+            );
         } else {
             return writer.format("builder.$L", memberName);
         }

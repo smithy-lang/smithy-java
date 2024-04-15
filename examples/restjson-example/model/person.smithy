@@ -60,5 +60,8 @@ operation PutPerson {
 
         @notProperty
         list: ListOfString
+
+        @notProperty
+        set: SetOfString
     }
 }

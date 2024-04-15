@@ -16,3 +16,8 @@ map MapListString {
 list ListOfString {
     member: String
 }
+
+@uniqueItems
+list SetOfString {
+    member: String
+}
