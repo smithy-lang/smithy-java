@@ -27,7 +27,13 @@ operation PutPerson {
 
         $birthday
 
+        /// This is a binary blob! Yay!
+        /// It has quite a few documentation traits added to it.
         @notProperty
+        @externalDocumentation(Homepage: "https://www.example.com/", "API Reference": "https://www.example.com/api-ref")
+        @since("1.3.4.5.6")
+        @deprecated(message: "This shape is no longer used.", since: "1.4.5.6")
+        @unstable
         binary: Blob
 
         @notProperty
