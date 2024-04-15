@@ -9,10 +9,7 @@ import java.time.Clock;
 import java.util.Objects;
 
 /**
- * // TODO: use of term identity here is overloaded. Can we call this something else?
- * // TODO: In Java v2 we didn't do identity based. I think there was discussion on identity based or not. Need to check
- * //       back on what the concerns were.
- * An identity-based key used to add properties to {@link AuthProperties}.
+ * An object identity-based key used to add properties to {@link AuthProperties}.
  *
  * @param <T> Value type associated with the property.
  */
@@ -32,8 +29,7 @@ public final class AuthProperty<T> {
     }
 
     /**
-     * // TODO: use of term identity here is overloaded. Can we call this something else?
-     * Create a new identity-based AuthProperty.
+     * Create a new object identity-based AuthProperty.
      *
      * @param name Name of the value used to describe the property.
      * @return the created property.

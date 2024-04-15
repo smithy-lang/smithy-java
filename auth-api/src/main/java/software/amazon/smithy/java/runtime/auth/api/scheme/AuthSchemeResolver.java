@@ -39,8 +39,6 @@ public interface AuthSchemeResolver {
      */
     final class Params {
 
-        // Q: Is the idea that the selected protocol can influence the resolution? How would that work? Model driven?
-        //    We don't have that today, so wondering that's the vision here.
         private final String protocolId;
         private final String operationName;
         private final AuthProperties properties;

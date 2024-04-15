@@ -15,6 +15,5 @@ public interface IdentityResolvers {
      * @param identityClass Identity type to retrieve.
      * @return the identity resolver or null if not found.
      */
-    // TODO: Should this be Optional?
     <T extends Identity> IdentityResolver<T> identityResolver(Class<T> identityClass);
 }
