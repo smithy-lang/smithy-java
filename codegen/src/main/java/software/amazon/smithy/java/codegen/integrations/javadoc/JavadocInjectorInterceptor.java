@@ -32,11 +32,7 @@ final class JavadocInjectorInterceptor implements CodeInterceptor.Prepender<Code
     public boolean isIntercepted(CodeSection section) {
         // Javadocs are generated for Classes, on member Getters, and on enum variants
         // TODO: Add enum variant section
-        return switch (section) {
-            case ClassSection ignored -> true;
-            case GetterSection ignored -> true;
-            default -> false;
-        };
+        return section instanceof ClassSection || section instanceof GetterSection;
     }
 
     @Override

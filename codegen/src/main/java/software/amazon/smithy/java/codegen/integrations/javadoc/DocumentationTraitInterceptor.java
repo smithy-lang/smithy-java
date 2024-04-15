@@ -8,7 +8,6 @@ package software.amazon.smithy.java.codegen.integrations.javadoc;
 import software.amazon.smithy.java.codegen.sections.JavadocSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.traits.DocumentationTrait;
-import software.amazon.smithy.model.traits.SinceTrait;
 import software.amazon.smithy.utils.CodeInterceptor;
 
 /**

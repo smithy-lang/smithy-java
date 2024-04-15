@@ -20,6 +20,7 @@ import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyUnstableApi;
+import software.amazon.smithy.utils.StringUtils;
 
 /**
  * Writer for java code generation
@@ -45,6 +46,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         // Formatters
         putFormatter('T', new JavaTypeFormatter());
         putFormatter('B', new BoxedTypeFormatter());
+        putFormatter('U', new CapitalizingFormatter());
     }
 
     // Java does not support aliases, so just import normally
@@ -74,6 +76,27 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
 
     public void newLine() {
         writeInlineWithNoFormatting(getNewline());
+    }
+
+    /**
+     * Writes the ID string constant for a shape class.
+     *
+     * @param shape Shape to write ID for
+     */
+    public void writeIdString(Shape shape) {
+        write("public static final $1T ID = $1T.from($2S);", ShapeId.class, shape.getId());
+    }
+
+    /**
+     * Writes the toString method for a serializable Class.
+     */
+    public void writeToString() {
+        write("""
+            @Override
+            public $T toString() {
+                return $T.serialize(this);
+            }
+            """, String.class, ToStringSerializer.class);
     }
 
     public String getHeader() {
@@ -199,23 +222,18 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
     }
 
     /**
-     * Writes the ID string constant for a shape class.
-    
-     * @param shape Shape to write ID for
+     * Implements a formatter for {@code $U} that capitalizes the first letter of a string literal.
      */
-    public void writeIdString(Shape shape) {
-        write("public static final $1T ID = $1T.from($2S);", ShapeId.class, shape.getId());
-    }
-
-    /**
-     * Writes the toString method for a serializable Class.
-     */
-    public void writeToString() {
-        write("""
-            @Override
-            public $T toString() {
-                return $T.serialize(this);
+    private static final class CapitalizingFormatter implements BiFunction<Object, String, String> {
+        @Override
+        public String apply(Object type, String indent) {
+            if (type instanceof String s) {
+                return StringUtils.capitalize(s);
             }
-            """, String.class, ToStringSerializer.class);
+            throw new IllegalArgumentException(
+                "Invalid type provided for $U. Expected a String but found: `"
+                    + type + "`."
+            );
+        }
     }
 }

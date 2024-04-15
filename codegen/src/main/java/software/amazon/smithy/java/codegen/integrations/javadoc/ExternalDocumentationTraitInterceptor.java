@@ -19,7 +19,7 @@ final class ExternalDocumentationTraitInterceptor implements CodeInterceptor.App
         var trait = section.shape().expectTrait(ExternalDocumentationTrait.class);
         writer.pushState();
         writer.putContext("links", trait.getUrls());
-        writer.write("${#links}@see <a href=${key:S}>${value:L}</a>${^key.last}\n${/key.last}${/links}");
+        writer.write("${#links}@see <a href=${value:S}>${key:L}</a>${^key.last}\n${/key.last}${/links}");
         writer.popState();
     }
 
