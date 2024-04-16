@@ -21,7 +21,7 @@ import software.amazon.smithy.model.shapes.*;
 /**
  * Generates a static nested {@code Builder} class for a Java class.
  */
-public class BuilderGenerator implements Runnable {
+final class BuilderGenerator implements Runnable {
 
     private final JavaWriter writer;
     private final Shape shape;

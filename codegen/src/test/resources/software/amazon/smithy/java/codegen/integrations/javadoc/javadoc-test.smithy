@@ -3,7 +3,7 @@ $version: "2"
 namespace smithy.java.codegen.integrations.javadoc
 
 service TestService {
-    version: "today",
+    version: "today"
     operations: [
         DocStringWrapping
         SmithyGenerated

@@ -51,7 +51,13 @@ public final class StructureGenerator
                 directive.symbol(),
                 SerializableShape.class,
                 writer.consumer(w -> w.writeIdString(shape)),
-                new SchemaGenerator(writer, directive.shape(), directive.symbolProvider(), directive.model()),
+                new SchemaGenerator(
+                    writer,
+                    directive.shape(),
+                    directive.symbolProvider(),
+                    directive.model(),
+                    directive.context()
+                ),
                 new PropertyGenerator(writer, shape, directive.symbolProvider()),
                 new ConstructorGenerator(writer, shape, directive.symbolProvider()),
                 new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()),

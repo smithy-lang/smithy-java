@@ -70,7 +70,10 @@ public final class SharedSchemasGenerator
             .stream()
             .filter(s -> !EXCLUDED_TYPES.contains(s.getType()))
             .filter(s -> !Prelude.isPreludeShape(s))
-            .forEach(s -> new SchemaGenerator(writer, s, directive.symbolProvider(), directive.model()).run());
+            .forEach(
+                s -> new SchemaGenerator(writer, s, directive.symbolProvider(), directive.model(), directive.context())
+                    .run()
+            );
     }
 
     private static String getFilename(JavaCodegenSettings settings) {

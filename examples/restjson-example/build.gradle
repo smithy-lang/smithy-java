@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     api(project(":client-aws-rest-json1"))
+    api(libs.smithy.aws.traits)
 }
 
 jmh {
