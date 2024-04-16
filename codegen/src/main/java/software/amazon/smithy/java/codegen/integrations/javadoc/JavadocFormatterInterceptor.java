@@ -21,7 +21,7 @@ import software.amazon.smithy.utils.StringUtils;
  * run by other interceptors for formatting.
  */
 final class JavadocFormatterInterceptor implements CodeInterceptor<JavadocSection, JavaWriter> {
-    private static final int MAX_LINE_LENGTH = 120;
+    private static final int MAX_LINE_LENGTH = 100;
     private static final Pattern PATTERN = Pattern.compile("<([a-z]+)*>.*?</\\1>", Pattern.DOTALL);
 
     @Override

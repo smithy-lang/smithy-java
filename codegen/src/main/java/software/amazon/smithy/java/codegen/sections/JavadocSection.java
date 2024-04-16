@@ -8,5 +8,14 @@ package software.amazon.smithy.java.codegen.sections;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.CodeSection;
 
+/**
+ * Adds a section for Javadocs.
+ *
+ * <p>This section does not initially contain any content. Interceptors
+ * are used to populate this section with content and to format it as a doc
+ * comment.
+ *
+ * @param shape Shape that java docs are being added to.
+ */
 public record JavadocSection(Shape shape) implements CodeSection {
 }
