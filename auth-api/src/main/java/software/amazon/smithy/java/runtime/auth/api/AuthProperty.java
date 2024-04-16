@@ -9,7 +9,7 @@ import java.time.Clock;
 import java.util.Objects;
 
 /**
- * An object identity-based key used to add properties to {@link AuthProperties}.
+ * A key used to add properties to {@link AuthProperties}.
  *
  * @param <T> Value type associated with the property.
  */
@@ -29,7 +29,7 @@ public final class AuthProperty<T> {
     }
 
     /**
-     * Create a new object identity-based AuthProperty.
+     * Create a new AuthProperty.
      *
      * @param name Name of the value used to describe the property.
      * @return the created property.

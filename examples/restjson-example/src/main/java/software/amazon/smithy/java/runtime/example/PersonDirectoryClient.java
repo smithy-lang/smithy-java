@@ -8,13 +8,10 @@ package software.amazon.smithy.java.runtime.example;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.api.Endpoint;
 import software.amazon.smithy.java.runtime.api.EndpointProvider;
-import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
@@ -49,7 +46,6 @@ public final class PersonDirectoryClient implements PersonDirectory {
     private final TypeRegistry typeRegistry;
     private final ClientInterceptor interceptor;
     private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
-    private final List<IdentityResolver<?>> supportedIdentityResolvers = new ArrayList<>();
     private final AuthSchemeResolver authSchemeResolver;
     private final IdentityResolvers identityResolvers;
 
@@ -62,19 +58,7 @@ public final class PersonDirectoryClient implements PersonDirectory {
 
         // TODO: Better defaults? Require these?
         this.authSchemeResolver = Objects.requireNonNullElseGet(builder.authSchemeResolver, () -> params -> List.of());
-
-        Map<Class<?>, IdentityResolver<?>> result = new HashMap<>();
-        for (IdentityResolver<?> identityResolver : builder.identityResolvers) {
-            result.put(identityResolver.identityType(), identityResolver);
-        }
-        // TODO: declare this class somewhere instead of generating this in each client.
-        this.identityResolvers = new IdentityResolvers() {
-            @Override
-            public <T extends Identity> IdentityResolver<T> identityResolver(Class<T> identityType) {
-                // TODO: Any issues with this class cast or a way to avoid it?
-                return (IdentityResolver<T>) result.get(identityType);
-            }
-        };
+        this.identityResolvers = IdentityResolvers.of(builder.identityResolvers);
 
         // Here is where you would register errors bound to the service on the registry.
         // ...

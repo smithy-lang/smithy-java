@@ -22,8 +22,6 @@ public interface Signer<RequestT, IdentityT extends Identity> {
      * @param identity  Identity used to sign the request.
      * @param properties Signing properties.
      * @return the signed request.
-     * @throws UnsupportedOperationException if the given identity is incompatible with the signer.
-     * // TODO: Since IdentityT is defined for the Signer, how can the  given to the method be incompatible?
      */
     RequestT sign(RequestT request, IdentityT identity, AuthProperties properties);
 }

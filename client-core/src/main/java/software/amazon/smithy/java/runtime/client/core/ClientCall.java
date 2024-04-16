@@ -178,7 +178,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
     }
 
     /**
-     * Get the priority-ordered list of supported auth schemes.
+     * Get the list of supported auth schemes.
      *
      * @return supported auth schemes.
      */

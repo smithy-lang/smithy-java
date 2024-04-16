@@ -24,7 +24,7 @@ public interface IdentityResolver<IdentityT extends Identity> {
     IdentityT resolveIdentity(AuthProperties requestProperties);
 
     /**
-     * Retrieve the class of identity this identity resolver produces.
+     * Retrieve the class of the identity resolved by this identity resolver.
      *
      * @return the class of the identity.
      */
