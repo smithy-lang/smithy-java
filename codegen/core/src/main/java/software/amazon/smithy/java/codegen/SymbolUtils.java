@@ -13,6 +13,7 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.utils.CaseUtils;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -103,6 +104,7 @@ public final class SymbolUtils {
         return symbol.getProperty(SymbolProperties.IS_JAVA_ARRAY).isPresent();
     }
 
+<<<<<<< HEAD
     /**
      * Determines if a given member represents a nullable type
      *
@@ -124,5 +126,9 @@ public final class SymbolUtils {
     public static boolean targetsCollection(Model model, MemberShape member) {
         var target = model.expectShape(member.getTarget());
         return target.isListShape() || target.isMapShape();
+=======
+    public static boolean isAggregateType(Shape shape) {
+        return shape.getType().getCategory().equals(ShapeType.Category.AGGREGATE);
+>>>>>>> 7f1a0c9 (First pass at deserialization)
     }
 }
