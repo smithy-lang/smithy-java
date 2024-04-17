@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.Collection;
+import java.util.Collections;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.SymbolProperties;
@@ -173,17 +175,31 @@ public class BuilderGenerator implements Runnable {
                 memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isPresent()
             );
             writer.putContext("memberName", memberName);
-            writer.putContext("symbol", symbolProvider.toSymbol(shape));
             writer.putContext("targetSymbol", symbolProvider.toSymbol(shape.getMember()));
+
             // Add all
+            // TODO: Allow null input for optional lists
             writer.write("""
-                public Builder ${memberName:L}(${symbol:T} ${memberName:L}) {
+                public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
                     clear${memberName:U}();${^builderRef}
                     create${memberName:U}IfNotExists();
                     ${/builderRef}this.${memberName:L}${?builderRef}.get()${/builderRef}.addAll(${memberName:L});
                     return this;
                 }
-                """);
+                """, Collection.class);
+
+            // Set with varargs
+            writer.write(
+                """
+                    public Builder ${memberName:L}(${targetSymbol:T}... ${memberName:L}) {${^builderRef}
+                        create${memberName:U}IfNotExists();${/builderRef}
+                        $T.addAll(this.${memberName:L}${?builderRef}.get()${/builderRef}, ${memberName:L});
+                        return this;
+                    }
+                    """,
+                Collections.class
+            );
+
             // Clear all
             writer.write("""
                 public Builder clear${memberName:U}() {
@@ -193,27 +209,6 @@ public class BuilderGenerator implements Runnable {
                     return this;
                 }
                 """);
-            // Set one
-            writer.write(
-                """
-                    public Builder add${memberName:U}(${targetSymbol:T} value) {${^builderRef}
-                        create${memberName:U}IfNotExists();
-                        ${/builderRef}${memberName:L}${?builderRef}.get()${/builderRef}.add(value);
-                        return this;
-                    }
-                    """
-            );
-            // Remove one
-            writer.write(
-                """
-                    public Builder remove${memberName:U}(${targetSymbol:T} value) {
-                        if (this.${memberName:L}${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
-                            ${memberName:L}${?builderRef}.get()${/builderRef}.remove(value);
-                        }
-                        return this;
-                    }
-                    """
-            );
 
             // Handle collection creation if a builderRef is not used to do so.
             if (memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isEmpty()) {
@@ -242,6 +237,7 @@ public class BuilderGenerator implements Runnable {
             writer.putContext("valueSymbol", symbolProvider.toSymbol(shape.getValue()));
 
             // Set all
+            // TODO: Handle nullable maps?
             writer.write(
                 """
                     public Builder ${memberName:L}(${symbol:T} ${memberName:L}) {
@@ -268,17 +264,6 @@ public class BuilderGenerator implements Runnable {
                     public Builder put${memberName:U}(${keySymbol:T} key, ${valueSymbol:T} value) {
                        this.${memberName:L}.get().put(key, value);
                        return this;
-                    }
-                    """
-            );
-            // Remove one
-            writer.write(
-                """
-                    public Builder remove${memberName:U}(${keySymbol:T} ${memberName:L}) {
-                        if (this.${memberName:L}.hasValue()) {
-                            this.${memberName:L}.get().remove(${memberName:L});
-                        }
-                        return this;
                     }
                     """
             );
