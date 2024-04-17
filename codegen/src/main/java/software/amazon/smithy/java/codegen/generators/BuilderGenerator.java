@@ -71,22 +71,10 @@ final class BuilderGenerator implements Runnable {
             SdkShapeBuilder.class,
             (Runnable) this::builderProperties,
             (Runnable) this::builderSetters,
-            (Runnable) this::deserializer
+            new DeserializerGenerator(writer, shape, symbolProvider, model)
         );
     }
 
-    // TODO: Implement deserializer
-    private void deserializer() {
-        writer.write(
-            """
-                @Override
-                public Builder deserialize($T decoder) {
-                    // PLACEHOLDER. Needs implementation
-                    return this;
-                }""",
-            ShapeDeserializer.class
-        );
-    }
 
     // Adds builder properties and initializers
     private void builderProperties() {
