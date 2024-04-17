@@ -179,14 +179,19 @@ public class BuilderGenerator implements Runnable {
 
             // Add all
             // TODO: Allow null input for optional lists
-            writer.write("""
-                public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
-                    clear${memberName:U}();${^builderRef}
-                    create${memberName:U}IfNotExists();
-                    ${/builderRef}this.${memberName:L}${?builderRef}.get()${/builderRef}.addAll(${memberName:L});
-                    return this;
-                }
-                """, Collection.class);
+            writer.write(
+                """
+                    public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
+                        if (this.${memberName:L}${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
+                            this.${memberName:L}${?builderRef}.get()${/builderRef}.clear();
+                        }${^builderRef}
+                        create${memberName:U}IfNotExists();
+                        ${/builderRef}this.${memberName:L}${?builderRef}.get()${/builderRef}.addAll(${memberName:L});
+                        return this;
+                    }
+                    """,
+                Collection.class
+            );
 
 
             // Set one
@@ -211,16 +216,6 @@ public class BuilderGenerator implements Runnable {
                     """,
                 Collections.class
             );
-
-            // Clear all
-            writer.write("""
-                public Builder clear${memberName:U}() {
-                    if (${memberName:L}${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
-                        ${memberName:L}${?builderRef}.get()${/builderRef}.clear();
-                    }
-                    return this;
-                }
-                """);
 
             // Handle collection creation if a builderRef is not used to do so.
             if (memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isEmpty()) {
@@ -253,23 +248,15 @@ public class BuilderGenerator implements Runnable {
             writer.write(
                 """
                     public Builder ${memberName:L}(${symbol:T} ${memberName:L}) {
-                        clear${memberName:U}();
+                        if (this.${memberName:L}.hasValue()) {
+                            this.${memberName:L}.get().clear();
+                        }
                         this.${memberName:L}.get().putAll(${memberName:L});
                         return this;
                     }
                     """
             );
-            // Clear All
-            writer.write(
-                """
-                    public Builder clear${memberName:U}() {
-                        if (${memberName:L}.hasValue()) {
-                            ${memberName:L}.get().clear();
-                        }
-                        return this;
-                    }
-                    """
-            );
+
             // Set one
             writer.write(
                 """
