@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.*;
 import software.amazon.smithy.java.codegen.generators.ExceptionGenerator;
+import software.amazon.smithy.java.codegen.generators.OperationGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -53,7 +54,7 @@ public class DirectedJavaCodegen implements
 
     @Override
     public void generateOperation(GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        // TODO
+        new OperationGenerator().accept(directive);
     }
 
     @Override

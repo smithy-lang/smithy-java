@@ -19,6 +19,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  */
 @SmithyInternalApi
 public final class SchemaUtils {
+    private static final String SCHEMA_STATIC_NAME = "SCHEMA";
 
     /**
      * Determines the name to use for the Schema constant for a member.
@@ -27,17 +28,21 @@ public final class SchemaUtils {
      * @return name to use for static schema property
      */
     public static String toMemberSchemaName(String memberName) {
-        return "SCHEMA_" + CaseUtils.toSnakeCase(memberName).toUpperCase(Locale.ENGLISH);
+        return SCHEMA_STATIC_NAME + "_" + CaseUtils.toSnakeCase(memberName).toUpperCase(Locale.ENGLISH);
     }
 
     /**
      * Determines the name to use for shape Schemas.
      *
-     * @param toShapeId shape to generate name for
+     * @param shape shape to generate name for
      * @return name to use for static schema property
      */
-    public static String toSchemaName(ToShapeId toShapeId) {
-        return CaseUtils.toSnakeCase(toShapeId.toShapeId().getName()).toUpperCase(Locale.ENGLISH);
+    public static String toSchemaName(Shape shape) {
+        // Shapes that generate their own classes have a static name
+        if (shape.isOperationShape() || shape.isStructureShape()) {
+            return SCHEMA_STATIC_NAME;
+        }
+        return CaseUtils.toSnakeCase(shape.toShapeId().getName()).toUpperCase(Locale.ENGLISH);
     }
 
     /**

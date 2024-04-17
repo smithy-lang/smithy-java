@@ -209,8 +209,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
     @Override
     public Symbol operationShape(OperationShape operationShape) {
-        // TODO: Implement
-        return null;
+        return getJavaClassSymbol(operationShape);
     }
 
     @Override
