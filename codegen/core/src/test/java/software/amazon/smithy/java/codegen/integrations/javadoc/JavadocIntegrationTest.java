@@ -39,7 +39,7 @@ public class JavadocIntegrationTest {
             .settings(
                 ObjectNode.builder()
                     .withMember("service", "smithy.java.codegen.integrations.javadoc#TestService")
-                    .withMember("namespace", "test.smithy.traitcodegen")
+                    .withMember("namespace", "test.smithy.codegen")
                     .build()
             )
             .model(model)
@@ -221,7 +221,7 @@ public class JavadocIntegrationTest {
 
     private String getFileStringForClass(String className) {
         var fileStringOptional = manifest.getFileString(
-            Paths.get(String.format("/test/smithy/traitcodegen/model/%s.java", className))
+            Paths.get(String.format("/test/smithy/codegen/model/%s.java", className))
         );
         assertTrue(fileStringOptional.isPresent());
         return fileStringOptional.get();

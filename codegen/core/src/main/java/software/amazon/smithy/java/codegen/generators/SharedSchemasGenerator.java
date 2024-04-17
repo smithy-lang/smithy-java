@@ -7,6 +7,7 @@ package software.amazon.smithy.java.codegen.generators;
 
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -27,6 +28,7 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.Prelude;
 import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.MapShape;
+import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -87,10 +89,73 @@ public final class SharedSchemasGenerator
         CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive,
         Set<Shape> shapes
     ) {
+        Set<Shape> deferred = deferredShapes(directive.model(), shapes);
+        writer.pushState();
+        writer.putContext("schemaClass", SdkSchema.class);
         for (var shape : shapes) {
-            new SchemaGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.context())
-                .run();
+            if (deferred.contains(shape)) {
+                writer.write("static final ${schemaClass:T} $L;", CodegenUtils.toSchemaName(shape));
+            } else {
+                writer.write(
+                    "static final ${schemaClass:T} $L = ${C}",
+                    CodegenUtils.toSchemaName(shape),
+                    new SchemaGenerator(
+                        writer,
+                        shape,
+                        directive.symbolProvider(),
+                        directive.model(),
+                        directive.context()
+                    )
+                );
+            }
         }
+        writer.openBlock("static {", "}", () -> {
+            writeDeferred(writer, directive, deferred);
+        });
+        writer.popState();
+    }
+
+    private void writeDeferred(
+        JavaWriter writer,
+        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive,
+        Set<Shape> shapes
+    ) {
+        Set<Shape> deferred = deferredShapes(directive.model(), shapes);
+        for (var shape : shapes) {
+            if (deferred.contains(shape)) {
+                continue;
+            }
+            writer.write(
+                "$L = ${C}",
+                CodegenUtils.toSchemaName(shape),
+                new SchemaGenerator(
+                    writer,
+                    shape,
+                    directive.symbolProvider(),
+                    directive.model(),
+                    directive.context()
+                )
+            );
+        }
+
+        if (!deferred.isEmpty()) {
+            writeDeferred(writer, directive, deferred);
+        }
+    }
+
+    private Set<Shape> deferredShapes(Model model, Set<Shape> shapes) {
+        Set<Shape> deferred = new HashSet<>();
+        for (var shape : shapes) {
+            boolean isDeferred = shape.members()
+                .stream()
+                .map(MemberShape::getTarget)
+                .map(model::expectShape)
+                .anyMatch(shapes::contains);
+            if (isDeferred) {
+                deferred.add(shape);
+            }
+        }
+        return deferred;
     }
 
     private void generateSerdeMethods(

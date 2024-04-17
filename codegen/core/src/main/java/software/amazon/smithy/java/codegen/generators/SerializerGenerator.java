@@ -86,7 +86,7 @@ final class SerializerGenerator extends ShapeVisitor.Default<Void> implements Ru
                         if (shape.$L != null) {
                             ${C|};
                         }""",
-                    memberName,
+                    stateName,
                     memberVisitor
                 );
             } else {

@@ -59,7 +59,6 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
         this.schemaName = schemaName;
     }
 
-
     @Override
     public void run() {
         writer.pushState();

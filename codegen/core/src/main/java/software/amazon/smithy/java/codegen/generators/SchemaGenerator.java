@@ -62,12 +62,11 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
     protected Void getDefault(Shape shape) {
         writer.write(
             """
-                static final ${schemaClass:T} $1L = ${schemaClass:T}.builder()
-                    .type(${shapeTypeClass:T}.$2L)
-                    .id($3S)${4C}
+                ${schemaClass:T}.builder()
+                    .type(${shapeTypeClass:T}.$1L)
+                    .id($2S)${3C}
                     .build();
                 """,
-            CodegenUtils.toSchemaName(shape),
             shape.getType().name(),
             shape.toShapeId(),
             new TraitInitializerGenerator(writer, shape, context.runtimeTraits())
@@ -79,13 +78,12 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
     public Void listShape(ListShape shape) {
         writer.write(
             """
-                static final ${schemaClass:T} $1L = ${schemaClass:T}.builder()
+                ${schemaClass:T}.builder()
                     .type(${shapeTypeClass:T}.LIST)
-                    .id($2S)${3C}
-                    .members(${4C})
+                    .id($1S)${2C}
+                    .members(${3C})
                     .build();
                 """,
-            CodegenUtils.toSchemaName(shape),
             shape.toShapeId(),
             new TraitInitializerGenerator(writer, shape, context.runtimeTraits()),
             (Runnable) () -> shape.getMember().accept(this)
@@ -98,16 +96,15 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
     public Void mapShape(MapShape shape) {
         writer.write(
             """
-                static final ${schemaClass:T} $1L = ${schemaClass:T}.builder()
+                ${schemaClass:T}.builder()
                     .type(${shapeTypeClass:T}.MAP)
-                    .id($2S)${3C}
+                    .id($1S)${2C}
                     .members(
-                            ${4C|},
-                            ${5C|}
+                            ${3C|},
+                            ${4C|}
                     )
                     .build();
                 """,
-            CodegenUtils.toSchemaName(shape),
             shape.toShapeId(),
             new TraitInitializerGenerator(writer, shape, context.runtimeTraits()),
             (Runnable) () -> shape.getKey().accept(this),

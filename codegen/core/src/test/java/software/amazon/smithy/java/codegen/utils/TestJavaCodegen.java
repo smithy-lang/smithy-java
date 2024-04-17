@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.utils;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.CreateContextDirective;
 import software.amazon.smithy.codegen.core.directed.CreateSymbolProviderDirective;
+import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
 import software.amazon.smithy.codegen.core.directed.DirectedCodegen;
 import software.amazon.smithy.codegen.core.directed.GenerateEnumDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateErrorDirective;
@@ -20,6 +21,7 @@ import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.generators.ExceptionGenerator;
+import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
@@ -48,6 +50,13 @@ public class TestJavaCodegen implements
             directive.fileManifest(),
             directive.integrations()
         );
+    }
+
+    @Override
+    public void customizeBeforeShapeGeneration(
+        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive
+    ) {
+        new SharedSchemasGenerator().accept(directive);
     }
 
     @Override

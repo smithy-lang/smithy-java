@@ -7,6 +7,8 @@ package software.amazon.smithy.java.codegen;
 
 import static java.lang.String.format;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -183,12 +185,12 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
     @Override
     public Symbol bigIntegerShape(BigIntegerShape bigIntegerShape) {
-        return CodegenUtils.fromClass(BigIntegerShape.class);
+        return CodegenUtils.fromClass(BigInteger.class);
     }
 
     @Override
     public Symbol bigDecimalShape(BigDecimalShape bigDecimalShape) {
-        return CodegenUtils.fromClass(BigDecimalShape.class);
+        return CodegenUtils.fromClass(BigDecimal.class);
     }
 
     @Override

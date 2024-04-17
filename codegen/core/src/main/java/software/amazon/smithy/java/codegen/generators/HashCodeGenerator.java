@@ -62,7 +62,7 @@ final class HashCodeGenerator implements Runnable {
             writer.write(
                 """
                     int result = $T.hash(${#obj}${value:L}${^key.last}, ${/key.last}${/obj});
-                    result = 31 * result + $T.hashCode(${#arr}${value:L}${^key.last}, ${/key.last}${/arr});
+                    result = 31 * result${#arr} + $T.hashCode(${value:L})${/arr};
                     return result;
                     """,
                 Objects.class,

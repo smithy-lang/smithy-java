@@ -38,7 +38,7 @@ public class OperationGenerator
                 """
                     public final class $T implements $T<${inputType:T}, ${outputType:T}> {
 
-                        ${C|}
+                        static final ${sdkSchema:T} SCHEMA = ${C}
 
                         ${C|}
 

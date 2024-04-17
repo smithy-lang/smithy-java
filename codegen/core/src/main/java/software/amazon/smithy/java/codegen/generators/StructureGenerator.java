@@ -54,8 +54,8 @@ public final class StructureGenerator
                             serializer.writeStruct(SCHEMA, this, InnerSerializer.INSTANCE);
                         }
 
-                        private static final class InnerSerializer implements ${biConsumer:T}<${shape:T}, ${serializer:T}> {
-                            private static final InnerSerializer INSTANCE = new InnerSerializer();
+                        static final class InnerSerializer implements ${biConsumer:T}<${shape:T}, ${serializer:T}> {
+                            static final InnerSerializer INSTANCE = new InnerSerializer();
 
                             @Override
                             public void accept(${shape:T} shape, ${serializer:T} serializer) {
