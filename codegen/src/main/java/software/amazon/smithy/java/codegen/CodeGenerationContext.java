@@ -30,7 +30,9 @@ import software.amazon.smithy.model.traits.RangeTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.model.traits.RequiresLengthTrait;
 import software.amazon.smithy.model.traits.SensitiveTrait;
+import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
+import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.model.traits.XmlAttributeTrait;
 import software.amazon.smithy.model.traits.XmlFlattenedTrait;
 import software.amazon.smithy.model.traits.XmlNameTrait;
@@ -52,6 +54,9 @@ public class CodeGenerationContext
         RequiredTrait.ID,
         SensitiveTrait.ID,
         IdempotencyTokenTrait.ID,
+        SparseTrait.ID,
+        UniqueItemsTrait.ID,
+        RequiresLengthTrait.ID,
         // Base Prelude Protocol traits
         JsonNameTrait.ID,
         TimestampFormatTrait.ID,
@@ -59,8 +64,7 @@ public class CodeGenerationContext
         XmlNameTrait.ID,
         XmlFlattenedTrait.ID,
         XmlAttributeTrait.ID,
-        XmlNamespaceTrait.ID,
-        RequiresLengthTrait.ID
+        XmlNamespaceTrait.ID
     );
 
     private final Model model;

@@ -74,7 +74,7 @@ public class OperationGenerator
                     """,
                 directive.symbol(),
                 SdkOperation.class,
-                new SchemaGenerator(writer, shape, directive.symbolProvider(), directive.model()),
+                new SchemaGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.context()),
                 writer.consumer(w -> writeTypeRegistry(w, shape, directive))
             );
             writer.popState();
