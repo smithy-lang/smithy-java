@@ -32,3 +32,7 @@ structure authScheme2 {}
 service TestService {
     version: "today"
 }
+
+service NoProtocolService {
+    version: "today"
+}

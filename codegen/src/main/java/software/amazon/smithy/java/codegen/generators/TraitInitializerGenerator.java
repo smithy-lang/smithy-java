@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import software.amazon.smithy.codegen.core.CodegenException;
-import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.SourceLocation;
 import software.amazon.smithy.model.node.ArrayNode;
@@ -29,23 +28,14 @@ import software.amazon.smithy.model.traits.StringTrait;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.model.traits.TraitService;
 
-final class TraitInitializerGenerator implements Runnable {
+record TraitInitializerGenerator(JavaWriter writer, Shape shape, Set<ShapeId> runtimeTraits) implements Runnable {
+
     private static final Map<ShapeId, Class<? extends TraitService>> serviceMap = new HashMap<>();
     static {
         // Add all trait services to a map, so they can be queried for a provider class
         ServiceLoader.load(TraitService.class, TraitInitializerGenerator.class.getClassLoader()).forEach((service) -> {
             serviceMap.put(service.getShapeId(), service.getClass());
         });
-    }
-
-    private final JavaWriter writer;
-    private final Shape shape;
-    private final Set<ShapeId> runtimeTraits;
-
-    public TraitInitializerGenerator(JavaWriter writer, CodeGenerationContext context, Shape shape) {
-        this.writer = writer;
-        this.shape = shape;
-        this.runtimeTraits = context.runtimeTraits();
     }
 
     @Override
@@ -70,7 +60,7 @@ final class TraitInitializerGenerator implements Runnable {
                         slt.getValues(),
                         SourceLocation.class
                     );
-                    default -> traitFactoryInitializer(writer, shape.getAllTraits().get(traitId));
+                    case Trait t -> traitFactoryInitializer(writer, t);
                 }
                 if (iter.hasNext()) {
                     writer.writeInline(",").newLine();
@@ -92,7 +82,8 @@ final class TraitInitializerGenerator implements Runnable {
         if (traitProviderClass.isMemberClass()) {
             writer.putContext("enclosing", traitProviderClass.getEnclosingClass());
         }
-        writer.writeInline("""
+        writer.writeInline(
+            """
                 new ${?enclosing}${enclosing:T}.$1L${/enclosing}${^enclosing}$2T${/enclosing}().createTrait(
                     ${shapeId:T}.from($3S),
                     ${4C|}
@@ -130,10 +121,11 @@ final class TraitInitializerGenerator implements Runnable {
             writer.write("${node:T}.objectNodeBuilder()");
             writer.indent();
             var memberWriter = new MemberNodeWriter(writer);
-            for (var memberEntry: objectNode.getStringMap().entrySet()) {
-                writer.write(".withMember($S, $C)",
-                        memberEntry.getKey(),
-                        (Runnable) () -> memberEntry.getValue().accept(memberWriter)
+            for (var memberEntry : objectNode.getStringMap().entrySet()) {
+                writer.write(
+                    ".withMember($S, $C)",
+                    memberEntry.getKey(),
+                    (Runnable) () -> memberEntry.getValue().accept(memberWriter)
                 );
             }
             writer.writeWithNoFormatting(".build()");
@@ -185,9 +177,10 @@ final class TraitInitializerGenerator implements Runnable {
             writer.write("${node:T}.objectNodeBuilder()");
             writer.indent();
             for (var memberEntry : objectNode.getStringMap().entrySet()) {
-                writer.write(".withMember($S, $C)",
-                        memberEntry.getKey(),
-                        (Runnable) () -> memberEntry.getValue().accept(this)
+                writer.write(
+                    ".withMember($S, $C)",
+                    memberEntry.getKey(),
+                    (Runnable) () -> memberEntry.getValue().accept(this)
                 );
             }
             writer.writeWithNoFormatting(".build()");

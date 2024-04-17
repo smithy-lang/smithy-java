@@ -21,16 +21,25 @@ import software.amazon.smithy.model.traits.HostLabelTrait;
 import software.amazon.smithy.model.traits.HttpPayloadTrait;
 import software.amazon.smithy.model.traits.HttpQueryTrait;
 import software.amazon.smithy.model.traits.HttpTrait;
+import software.amazon.smithy.model.traits.IdempotencyTokenTrait;
+import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.LengthTrait;
+import software.amazon.smithy.model.traits.MediaTypeTrait;
 import software.amazon.smithy.model.traits.PatternTrait;
 import software.amazon.smithy.model.traits.RangeTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
+import software.amazon.smithy.model.traits.RequiresLengthTrait;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
+import software.amazon.smithy.model.traits.XmlAttributeTrait;
+import software.amazon.smithy.model.traits.XmlFlattenedTrait;
+import software.amazon.smithy.model.traits.XmlNameTrait;
+import software.amazon.smithy.model.traits.XmlNamespaceTrait;
 
 public class CodegenContextTest {
     private static Model model;
     private static final ShapeId SERVICE_ID = ShapeId.from("smithy.java.codegen#TestService");
+    private static final ShapeId NO_PROTOCOL_SERVICE_ID = ShapeId.from("smithy.java.codegen#NoProtocolService");
 
     @BeforeAll
     public static void before() {
@@ -41,7 +50,7 @@ public class CodegenContextTest {
     }
 
     @Test
-    void getsCorrectRuntimeTraits() {
+    void getsCorrectRuntimeTraitsForProtocolsAndAuth() {
         var context = new CodeGenerationContext(
             model,
             new JavaCodegenSettings(SERVICE_ID, "ns.foo"),
@@ -49,7 +58,6 @@ public class CodegenContextTest {
             new MockManifest(),
             List.of()
         );
-        System.out.println(context.runtimeTraits());
 
         assertThat(
             context.runtimeTraits(),
@@ -60,8 +68,17 @@ public class CodegenContextTest {
                 RangeTrait.ID,
                 RequiredTrait.ID,
                 SensitiveTrait.ID,
-                // Protocol Traits
+                IdempotencyTokenTrait.ID,
+                // Base Prelude Protocol traits
+                JsonNameTrait.ID,
                 TimestampFormatTrait.ID,
+                MediaTypeTrait.ID,
+                XmlNameTrait.ID,
+                XmlFlattenedTrait.ID,
+                XmlAttributeTrait.ID,
+                XmlNamespaceTrait.ID,
+                RequiresLengthTrait.ID,
+                // Protocol Traits
                 CorsTrait.ID,
                 EndpointTrait.ID,
                 HostLabelTrait.ID,
@@ -69,6 +86,39 @@ public class CodegenContextTest {
                 // Auth traits
                 HttpQueryTrait.ID,
                 HttpPayloadTrait.ID
+            )
+        );
+    }
+
+    @Test
+    void getsCorrectTraitsWithNoProtocolOrAuth() {
+        var context = new CodeGenerationContext(
+            model,
+            new JavaCodegenSettings(NO_PROTOCOL_SERVICE_ID, "ns.foo"),
+            new JavaSymbolProvider(model, model.expectShape(NO_PROTOCOL_SERVICE_ID).asServiceShape().get(), "ns.foo"),
+            new MockManifest(),
+            List.of()
+        );
+
+        assertThat(
+            context.runtimeTraits(),
+            containsInAnyOrder(
+                // Prelude Validation Traits
+                LengthTrait.ID,
+                PatternTrait.ID,
+                RangeTrait.ID,
+                RequiredTrait.ID,
+                SensitiveTrait.ID,
+                IdempotencyTokenTrait.ID,
+                // Base Prelude Protocol traits
+                JsonNameTrait.ID,
+                TimestampFormatTrait.ID,
+                MediaTypeTrait.ID,
+                XmlNameTrait.ID,
+                XmlFlattenedTrait.ID,
+                XmlAttributeTrait.ID,
+                XmlNamespaceTrait.ID,
+                RequiresLengthTrait.ID
             )
         );
     }

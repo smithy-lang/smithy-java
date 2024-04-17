@@ -20,14 +20,21 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.AuthDefinitionTrait;
-import software.amazon.smithy.model.traits.ExternalDocumentationTrait;
+import software.amazon.smithy.model.traits.IdempotencyTokenTrait;
+import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.LengthTrait;
+import software.amazon.smithy.model.traits.MediaTypeTrait;
 import software.amazon.smithy.model.traits.PatternTrait;
 import software.amazon.smithy.model.traits.ProtocolDefinitionTrait;
 import software.amazon.smithy.model.traits.RangeTrait;
-import software.amazon.smithy.model.traits.ReferencesTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
+import software.amazon.smithy.model.traits.RequiresLengthTrait;
 import software.amazon.smithy.model.traits.SensitiveTrait;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
+import software.amazon.smithy.model.traits.XmlAttributeTrait;
+import software.amazon.smithy.model.traits.XmlFlattenedTrait;
+import software.amazon.smithy.model.traits.XmlNameTrait;
+import software.amazon.smithy.model.traits.XmlNamespaceTrait;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
@@ -37,16 +44,23 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 public class CodeGenerationContext
     implements CodegenContext<JavaCodegenSettings, JavaWriter, JavaCodegenIntegration> {
 
-    // Validation + Base/Shared protocol traits in the Prelude
     private static final List<ShapeId> PRELUDE_RUNTIME_TRAITS = List.of(
+        // Validation Traits
         LengthTrait.ID,
         PatternTrait.ID,
         RangeTrait.ID,
         RequiredTrait.ID,
         SensitiveTrait.ID,
-        // TODO: Remove after testing
-        ExternalDocumentationTrait.ID,
-        ReferencesTrait.ID
+        IdempotencyTokenTrait.ID,
+        // Base Prelude Protocol traits
+        JsonNameTrait.ID,
+        TimestampFormatTrait.ID,
+        MediaTypeTrait.ID,
+        XmlNameTrait.ID,
+        XmlFlattenedTrait.ID,
+        XmlAttributeTrait.ID,
+        XmlNamespaceTrait.ID,
+        RequiresLengthTrait.ID
     );
 
     private final Model model;
@@ -70,7 +84,7 @@ public class CodeGenerationContext
         this.fileManifest = fileManifest;
         this.integrations = integrations;
         this.writerDelegator = new WriterDelegator<>(fileManifest, symbolProvider, new JavaWriter.Factory(settings));
-        this.runtimeTraits = computeRuntimeTraits();
+        this.runtimeTraits = collectRuntimeTraits();
     }
 
     @Override
@@ -107,7 +121,22 @@ public class CodeGenerationContext
         return runtimeTraits;
     }
 
-    private Set<ShapeId> computeRuntimeTraits() {
+    /**
+     * Determines the "runtime traits" for a service, i.e. traits that should be included in Shape schemas.
+     *
+     * <p>Runtime traits are added from the following sources:
+     * <dl>
+     *     <dt>Protocol-generic prelude traits</dt>
+     *     <dd>Static list of prelude traits that should be included regardless of protocol.</dd>
+     *     <dt>Protocol traits</dt>
+     *     <dd>Traits supported explicitly by protocols the service uses should be included in Schemas.</dd>
+     *     <dt>AuthScheme traits</dt>
+     *     <dd>Traits supported explicitly by auth schemes used by the service should be included in Schemas.</dd>
+     * </dl>
+     *
+     * @return Set of trait ShapeId's to include in generated Schemas.
+     */
+    private Set<ShapeId> collectRuntimeTraits() {
         ServiceShape shape = model.expectShape(settings.service())
             .asServiceShape()
             .orElseThrow(

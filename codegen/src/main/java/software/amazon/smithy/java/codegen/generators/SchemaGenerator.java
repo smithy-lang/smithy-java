@@ -68,7 +68,7 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
             SchemaUtils.toSchemaName(shape),
             shape.getType().name(),
             shape.toShapeId(),
-            new TraitInitializerGenerator(writer, context, shape)
+            new TraitInitializerGenerator(writer, shape, context.runtimeTraits())
         );
         return null;
     }
@@ -85,7 +85,7 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
                 """,
             SchemaUtils.toSchemaName(shape),
             shape.toShapeId(),
-            new TraitInitializerGenerator(writer, context, shape),
+            new TraitInitializerGenerator(writer, shape, context.runtimeTraits()),
             (Runnable) () -> shape.getMember().accept(this)
         );
 
@@ -107,7 +107,7 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
                 """,
             SchemaUtils.toSchemaName(shape),
             shape.toShapeId(),
-            new TraitInitializerGenerator(writer, context, shape),
+            new TraitInitializerGenerator(writer, shape, context.runtimeTraits()),
             (Runnable) () -> shape.getKey().accept(this),
             (Runnable) () -> shape.getValue().accept(this)
         );
@@ -141,7 +141,7 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
                     ${/memberSchemas}.build();
                 """,
             shape.getType().toString().toUpperCase(),
-            new TraitInitializerGenerator(writer, context, shape)
+            new TraitInitializerGenerator(writer, shape, context.runtimeTraits())
         );
         writer.popState();
 
@@ -155,7 +155,7 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
             "${schemaClass:T}.memberBuilder(0, $1S, $2C)${3C}",
             symbolProvider.toMemberName(shape),
             writer.consumer(w -> SchemaUtils.writeSchemaType(w, target)),
-            new TraitInitializerGenerator(writer, context, shape)
+            new TraitInitializerGenerator(writer, shape, context.runtimeTraits())
         );
         return null;
     }
@@ -173,7 +173,7 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
             idx,
             memberName,
             writer.consumer(w -> SchemaUtils.writeSchemaType(w, target)),
-            new TraitInitializerGenerator(writer, context, member)
+            new TraitInitializerGenerator(writer, shape, context.runtimeTraits())
         );
     }
 }

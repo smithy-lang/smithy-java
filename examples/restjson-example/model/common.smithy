@@ -14,23 +14,12 @@ map MapListString {
     value: ListOfString
 }
 
-@externalDocumentation(example: "https://www.example.com")
 list ListOfString {
-    @length(min: 1, max: 2)
+    @length(min: 1)
     member: String
 }
 
 @uniqueItems
 list SetOfString {
-    member: StringMember
+    member: String
 }
-
-@references([
-    {
-        resource: "smithy.example#a"
-    }
-    {
-        resource: "smithy.example#b"
-    }
-])
-string StringMember
