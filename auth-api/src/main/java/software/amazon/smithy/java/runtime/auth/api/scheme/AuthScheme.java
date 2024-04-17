@@ -95,4 +95,10 @@ public interface AuthScheme<RequestT, IdentityT extends Identity> {
     ) {
         return new AuthSchemeRecord<>(schemeId, requestClass, identityClass, signer);
     }
+
+    // TODO: or AuthScheme<Object, Identity>
+    //       or make NoAuthAuthScheme public and return NoAuthAuthScheme type
+    static AuthScheme<?, ? extends Identity> noAuthAuthScheme() {
+        return NoAuthAuthScheme.INSTANCE;
+    }
 }
