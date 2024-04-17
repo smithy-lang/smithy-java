@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.function.Function;
 import software.amazon.smithy.java.runtime.api.Endpoint;
 import software.amazon.smithy.java.runtime.api.EndpointProviderRequest;
-import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
@@ -97,11 +96,11 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
         request = interceptor.modifyBeforeSigning(context, input, Context.value(requestKey, request)).value();
         interceptor.readBeforeSigning(context, input, Context.value(requestKey, request));
 
-        var resolvedIdentity = resolveIdentity(call, request);
+        var resolvedAuthScheme = resolveAuthScheme(call, request);
 
         // TODO: Make it so we always return an identity.
-        if (resolvedIdentity != null) {
-            var identity = resolvedIdentity.identity();
+        if (resolvedAuthScheme != null) {
+            var identity = resolvedAuthScheme.identity();
             context.put(CallContext.IDENTITY, identity);
         }
 
@@ -110,8 +109,8 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
         request = protocol.setServiceEndpoint(request, endpoint);
 
         // TODO: Make No-op signer.
-        if (resolvedIdentity != null) {
-            request = resolvedIdentity.sign(request);
+        if (resolvedAuthScheme != null) {
+            request = resolvedAuthScheme.sign(request);
         }
 
         interceptor.readAfterSigning(context, input, Context.value(requestKey, request));
@@ -123,7 +122,7 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     }
 
     @SuppressWarnings("unchecked")
-    private <I extends SerializableShape, O extends SerializableShape> ResolvedScheme<?, RequestT> resolveIdentity(
+    private <I extends SerializableShape, O extends SerializableShape> ResolvedScheme<?, RequestT> resolveAuthScheme(
         ClientCall<I, O> call,
         RequestT request
     ) {
@@ -136,21 +135,19 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
 
         // Determine if the auth scheme option is actually supported.
         for (var authSchemeOption : authSchemeOptions) {
-            for (var supportedAuthScheme : call.supportedAuthSchemes()) {
-                if (supportedAuthScheme.schemeId().equals(authSchemeOption.schemeId())) {
-                    if (supportedAuthScheme.requestClass().isAssignableFrom(request.getClass())) {
-                        AuthScheme<RequestT, ?> castAuthScheme = (AuthScheme<RequestT, ?>) supportedAuthScheme;
-                        var resolved = createResolvedSchema(call.identityResolvers(), castAuthScheme, authSchemeOption)
-                            .orElse(null);
-                        if (resolved != null) {
-                            return resolved;
-                        }
-                    }
+            AuthScheme<?, ?> authScheme = call.supportedAuthSchemes().get(authSchemeOption.schemeId());
+            if (authScheme != null && authScheme.requestClass().isAssignableFrom(request.getClass())) {
+                AuthScheme<RequestT, ?> castAuthScheme = (AuthScheme<RequestT, ?>) authScheme;
+                var resolved = createResolvedSchema(call.identityResolvers(), castAuthScheme, authSchemeOption)
+                    .orElse(null);
+                if (resolved != null) {
+                    return resolved;
                 }
             }
         }
 
         // TODO: Throw here
+        // TODO: Build more useful error message (to log also) indicating why some schemes were not used.
         // throw new SdkException("No auth scheme could be resolved for " + call.operation().schema().id());
         return null;
     }
@@ -162,16 +159,17 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     ) {
         return authScheme.identityResolver(identityResolvers).map(identityResolver -> {
             IdentityT identity = identityResolver.resolveIdentity(option.identityProperties());
-            return new ResolvedScheme<>(option, authScheme, identity, authScheme.signer());
+            return new ResolvedScheme<>(option, authScheme, identity);
         });
     }
 
     private record ResolvedScheme<IdentityT extends Identity, RequestT>(
         AuthSchemeOption option,
-        AuthScheme<RequestT, IdentityT> authScheme, IdentityT identity, Signer<RequestT, IdentityT> signer
+        AuthScheme<RequestT, IdentityT> authScheme,
+        IdentityT identity
     ) {
         public RequestT sign(RequestT request) {
-            return signer.sign(request, identity, option.signerProperties());
+            return authScheme.signer().sign(request, identity, option.signerProperties());
         }
     }
 

@@ -7,11 +7,14 @@ package software.amazon.smithy.java.runtime.client.core;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import software.amazon.smithy.java.runtime.api.EndpointProvider;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
@@ -40,7 +43,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
     private final ClientInterceptor interceptor;
     private final DataStream requestInputStream;
     private final AuthSchemeResolver authSchemeResolver;
-    private final List<AuthScheme<?, ?>> supportedAuthSchemes;
+    private final Map<String, AuthScheme<?, ?>> supportedAuthSchemes;
     private final IdentityResolvers identityResolvers;
     private final Object requestEventStream;
     private final ExecutorService executor;
@@ -54,7 +57,8 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
         interceptor = Objects.requireNonNull(builder.interceptor, "interceptor is null");
         authSchemeResolver = Objects.requireNonNull(builder.authSchemeResolver, "authSchemeResolver is null");
         identityResolvers = Objects.requireNonNull(builder.identityResolvers, "identityResolvers is null");
-        supportedAuthSchemes = builder.supportedAuthSchemes;
+        supportedAuthSchemes = builder.supportedAuthSchemes.stream()
+            .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity()));
         requestInputStream = builder.requestInputStream;
         requestEventStream = builder.requestEventStream;
         executor = builder.executor == null ? Executors.newVirtualThreadPerTaskExecutor() : builder.executor;
@@ -182,7 +186,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
      *
      * @return supported auth schemes.
      */
-    public List<AuthScheme<?, ?>> supportedAuthSchemes() {
+    public Map<String, AuthScheme<?, ?>> supportedAuthSchemes() {
         return supportedAuthSchemes;
     }
 
