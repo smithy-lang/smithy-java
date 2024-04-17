@@ -17,7 +17,7 @@ public final class SymbolProperties {
 
     public static final String IS_JAVA_ARRAY = "is-java-array";
 
-    public static final String COLLECTION_FACTORY_METHOD = "collection-factory";
+    public static final String COLLECTION_COPY_METHOD = "collection-factory";
 
     public static final String COLLECTION_IMPLEMENTATION_CLASS = "collection-impl-class";
 

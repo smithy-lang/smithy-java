@@ -88,7 +88,7 @@ final class GetterGenerator implements Runnable {
             writer.pushState(new GetterSection(member));
             var shapeSymbol = symbolProvider.toSymbol(shape);
             // If the list has a custom collection factory use that instead.
-            if (shapeSymbol.getProperty(SymbolProperties.COLLECTION_FACTORY_METHOD).isPresent()) {
+            if (shapeSymbol.getProperty(SymbolProperties.COLLECTION_COPY_METHOD).isPresent()) {
                 writer.write(
                     """
                         public $1T $2L() {
@@ -98,7 +98,7 @@ final class GetterGenerator implements Runnable {
                     symbolProvider.toSymbol(shape),
                     symbolProvider.toMemberName(member),
                     Collections.class,
-                    shapeSymbol.expectProperty(SymbolProperties.COLLECTION_FACTORY_METHOD, String.class),
+                    shapeSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD, String.class),
                     shapeSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
                 );
             } else {

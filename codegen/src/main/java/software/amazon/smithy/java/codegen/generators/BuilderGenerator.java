@@ -17,7 +17,6 @@ import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.*;
-import software.amazon.smithy.utils.BuilderRef;
 
 /**
  * Generates a static nested {@code Builder} class for a Java class.
@@ -85,16 +84,7 @@ public class BuilderGenerator implements Runnable {
     // Adds builder properties and initializers
     private void builderProperties() {
         for (var member : shape.members()) {
-            var memberSymbol = symbolProvider.toSymbol(member);
-            if (memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isPresent()) {
-                writer.write(
-                    "private final $1T<$2T> $3L = $1T.$4L;",
-                    BuilderRef.class,
-                    symbolProvider.toSymbol(member),
-                    symbolProvider.toMemberName(member),
-                    memberSymbol.expectProperty(SymbolProperties.BUILDER_REF_INITIALIZER, String.class)
-                );
-            } else if (SymbolUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {
+            if (SymbolUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {
                 // Streaming blobs need a custom initializer
                 writer.write(
                     "private $1T $2L = $1T.ofEmpty();",
@@ -171,35 +161,46 @@ public class BuilderGenerator implements Runnable {
         public Void listShape(ListShape shape) {
             writer.pushState();
             writer.putContext(
-                "builderRef",
-                memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isPresent()
+                "collectionImpl",
+                memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
             );
             writer.putContext("memberName", memberName);
             writer.putContext("targetSymbol", symbolProvider.toSymbol(shape.getMember()));
 
-            // Add all
-            // TODO: Allow null input for optional lists
+            // Collection Replacement
             writer.write(
                 """
                     public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
-                        if (this.${memberName:L}${?builderRef}.hasValue()${/builderRef}${^builderRef} != null${/builderRef}) {
-                            this.${memberName:L}${?builderRef}.get()${/builderRef}.clear();
-                        }${^builderRef}
-                        create${memberName:U}IfNotExists();
-                        ${/builderRef}this.${memberName:L}${?builderRef}.get()${/builderRef}.addAll(${memberName:L});
+                        this.${memberName:L} = ${memberName:L} != null ? new ${collectionImpl:T}<>(${memberName:L}) : null;
                         return this;
                     }
                     """,
                 Collection.class
             );
 
+            // Bulk Add
+            writer.write(
+                """
+                    public Builder addAll${memberName:U}($T<${targetSymbol:T}> ${memberName:L}) {
+                        if (this.${memberName:L} == null) {
+                            this.${memberName:L} = new ${collectionImpl:T}<>(${memberName:L});
+                        } else {
+                            this.${memberName:L}.addAll(${memberName:L});
+                        }
+                        return this;
+                    }
+                    """,
+                Collection.class
+            );
 
             // Set one
             writer.write(
                 """
-                    public Builder ${memberName:L}(${targetSymbol:T} ${memberName:L}) {${^builderRef}
-                        create${memberName:U}IfNotExists();${/builderRef}
-                        this.${memberName:L}${?builderRef}.get()${/builderRef}.add(${memberName:L});
+                    public Builder ${memberName:L}(${targetSymbol:T} ${memberName:L}) {
+                        if (this.${memberName:L} == null) {
+                            this.${memberName:L} = new ${collectionImpl:T}<>();
+                        }
+                        this.${memberName:L}.add(${memberName:L});
                         return this;
                     }
                     """
@@ -208,28 +209,17 @@ public class BuilderGenerator implements Runnable {
             // Set with varargs
             writer.write(
                 """
-                    public Builder ${memberName:L}(${targetSymbol:T}... ${memberName:L}) {${^builderRef}
-                        create${memberName:U}IfNotExists();${/builderRef}
-                        $T.addAll(this.${memberName:L}${?builderRef}.get()${/builderRef}, ${memberName:L});
+                    public Builder ${memberName:L}(${targetSymbol:T}... ${memberName:L}) {
+                        if (this.${memberName:L} == null) {
+                            this.${memberName:L} = new ${collectionImpl:T}<>();
+                        }
+                        $T.addAll(this.${memberName:L}, ${memberName:L});
                         return this;
                     }
                     """,
                 Collections.class
             );
 
-            // Handle collection creation if a builderRef is not used to do so.
-            if (memberSymbol.getProperty(SymbolProperties.BUILDER_REF_INITIALIZER).isEmpty()) {
-                writer.write(
-                    """
-                        private void create${memberName:U}IfNotExists() {
-                            if (${memberName:L} == null) {
-                                ${memberName:L} = new $T<>();
-                            }
-                        }
-                        """,
-                    memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
-                );
-            }
             writer.popState();
 
             return null;
@@ -240,18 +230,32 @@ public class BuilderGenerator implements Runnable {
             writer.pushState();
             writer.putContext("memberName", memberName);
             writer.putContext("symbol", symbolProvider.toSymbol(shape));
+            writer.putContext(
+                "collectionImpl",
+                memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+            );
             writer.putContext("keySymbol", symbolProvider.toSymbol(shape.getKey()));
             writer.putContext("valueSymbol", symbolProvider.toSymbol(shape.getValue()));
 
-            // Set all
-            // TODO: Handle nullable maps?
+            // Replace Map
             writer.write(
                 """
                     public Builder ${memberName:L}(${symbol:T} ${memberName:L}) {
-                        if (this.${memberName:L}.hasValue()) {
-                            this.${memberName:L}.get().clear();
+                        this.${memberName:L} = ${memberName:L} != null ? new ${collectionImpl:T}<>(${memberName:L}) : null;
+                        return this;
+                    }
+                    """
+            );
+
+            // Add all items
+            writer.write(
+                """
+                    public Builder putAll${memberName:U}(${symbol:T} ${memberName:L}) {
+                        if (this.${memberName:L} == null) {
+                            this.${memberName:L} = new ${collectionImpl:T}<>(${memberName:L});
+                        } else {
+                            this.${memberName:L}.putAll(${memberName:L});
                         }
-                        this.${memberName:L}.get().putAll(${memberName:L});
                         return this;
                     }
                     """
@@ -261,7 +265,10 @@ public class BuilderGenerator implements Runnable {
             writer.write(
                 """
                     public Builder put${memberName:U}(${keySymbol:T} key, ${valueSymbol:T} value) {
-                       this.${memberName:L}.get().put(key, value);
+                       if (this.${memberName:L} == null) {
+                           this.${memberName:L} = new ${collectionImpl:T}<>();
+                       }
+                       this.${memberName:L}.put(key, value);
                        return this;
                     }
                     """

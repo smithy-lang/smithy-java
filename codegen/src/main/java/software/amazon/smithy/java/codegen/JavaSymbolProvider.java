@@ -8,6 +8,8 @@ package software.amazon.smithy.java.codegen;
 import static java.lang.String.format;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -112,14 +114,15 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
         if (listShape.hasTrait(UniqueItemsTrait.class)) {
             return SymbolUtils.fromClass(SequencedSet.class)
                 .toBuilder()
-                .putProperty(SymbolProperties.COLLECTION_FACTORY_METHOD, "unmodifiableSequencedSet")
+                .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableSequencedSet")
                 .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashSet.class)
                 .addReference(listShape.getMember().accept(this))
                 .build();
         }
         return SymbolUtils.fromClass(List.class)
             .toBuilder()
-            .putProperty(SymbolProperties.BUILDER_REF_INITIALIZER, "forList()")
+            .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableList")
+            .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, ArrayList.class)
             .addReference(listShape.getMember().accept(this))
             .build();
     }
@@ -128,7 +131,8 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
     public Symbol mapShape(MapShape mapShape) {
         return SymbolUtils.fromClass(Map.class)
             .toBuilder()
-            .putProperty(SymbolProperties.BUILDER_REF_INITIALIZER, "forOrderedMap()")
+            .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableMap")
+            .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashMap.class)
             .addReference(mapShape.getKey().accept(this))
             .addReference(mapShape.getValue().accept(this))
             .build();
