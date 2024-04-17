@@ -188,6 +188,18 @@ public class BuilderGenerator implements Runnable {
                 }
                 """, Collection.class);
 
+
+            // Set one
+            writer.write(
+                """
+                    public Builder ${memberName:L}(${targetSymbol:T} ${memberName:L}) {${^builderRef}
+                        create${memberName:U}IfNotExists();${/builderRef}
+                        this.${memberName:L}${?builderRef}.get()${/builderRef}.add(${memberName:L});
+                        return this;
+                    }
+                    """
+            );
+
             // Set with varargs
             writer.write(
                 """
