@@ -57,6 +57,10 @@ public final class SchemaUtils {
     public static void writeSchemaType(JavaWriter writer, SymbolProvider provider, Shape shape) {
         if (Prelude.isPreludeShape(shape)) {
             writer.write("$T.$L", PreludeSchemas.class, shape.getType().name());
+<<<<<<< HEAD
+=======
+
+>>>>>>> fc9d095 (Update schema generator to handle structure schemas correctly)
         } else if (shape.isStructureShape() || shape.isUnionShape()) {
             // Shapes that generate a class have their schemas as static properties on that class
             writer.write("$T.$L", provider.toSymbol(shape), toSchemaName(shape));
