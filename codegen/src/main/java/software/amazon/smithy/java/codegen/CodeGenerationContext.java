@@ -20,6 +20,7 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.AuthDefinitionTrait;
+import software.amazon.smithy.model.traits.DefaultTrait;
 import software.amazon.smithy.model.traits.EndpointTrait;
 import software.amazon.smithy.model.traits.ErrorTrait;
 import software.amazon.smithy.model.traits.EventHeaderTrait;
@@ -65,6 +66,7 @@ public class CodeGenerationContext
         RequiresLengthTrait.ID,
         RetryableTrait.ID,
         ErrorTrait.ID,
+        DefaultTrait.ID,
         // Base Prelude Protocol traits
         JsonNameTrait.ID,
         TimestampFormatTrait.ID,
