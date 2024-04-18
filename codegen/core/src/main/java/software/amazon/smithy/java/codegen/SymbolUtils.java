@@ -104,7 +104,6 @@ public final class SymbolUtils {
         return symbol.getProperty(SymbolProperties.IS_JAVA_ARRAY).isPresent();
     }
 
-<<<<<<< HEAD
     /**
      * Determines if a given member represents a nullable type
      *
@@ -126,9 +125,9 @@ public final class SymbolUtils {
     public static boolean targetsCollection(Model model, MemberShape member) {
         var target = model.expectShape(member.getTarget());
         return target.isListShape() || target.isMapShape();
-=======
+    }
+
     public static boolean isAggregateType(Shape shape) {
         return shape.getType().getCategory().equals(ShapeType.Category.AGGREGATE);
->>>>>>> 7f1a0c9 (First pass at deserialization)
     }
 }
