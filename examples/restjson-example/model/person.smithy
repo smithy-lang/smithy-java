@@ -69,5 +69,9 @@ operation PutPerson {
 
         @notProperty
         set: SetOfString
+
+        @notProperty
+        @required
+        requiredList: ListOfString
     }
 }

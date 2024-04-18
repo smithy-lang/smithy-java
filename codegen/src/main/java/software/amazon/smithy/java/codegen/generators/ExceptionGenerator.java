@@ -54,7 +54,7 @@ public final class ExceptionGenerator
                     directive.context()
                 ),
                 new PropertyGenerator(writer, shape, directive.symbolProvider()),
-                new ConstructorGenerator(writer, shape, directive.symbolProvider()),
+                new ConstructorGenerator(writer, shape, directive.symbolProvider(), directive.model()),
                 new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()),
                 writer.consumer(JavaWriter::writeToString),
                 new SerializerGenerator(writer),

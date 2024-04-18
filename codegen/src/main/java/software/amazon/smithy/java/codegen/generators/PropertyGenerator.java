@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.traits.ErrorTrait;
@@ -33,11 +34,10 @@ final class PropertyGenerator implements Runnable {
             if (shape.hasTrait(ErrorTrait.class) && memberName.equals("message")) {
                 continue;
             }
-            // TODO: handle default case
             writer.pushState();
-            writer.putContext("isRequired", member.isRequired());
+            writer.putContext("isNullable", SymbolUtils.isNullableMember(member));
             writer.write(
-                "private final ${?isRequired}$1T${/isRequired}${^isRequired}$1B${/isRequired} $2L;",
+                "private final ${?isNullable}$1T${/isNullable}${^isNullable}$1B${/isNullable} $2L;",
                 symbolProvider.toSymbol(member),
                 memberName
             );

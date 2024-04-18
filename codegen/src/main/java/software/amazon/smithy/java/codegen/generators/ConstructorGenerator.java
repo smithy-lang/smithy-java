@@ -8,7 +8,9 @@ package software.amazon.smithy.java.codegen.generators;
 import java.util.Collections;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.SymbolProperties;
+import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.traits.ErrorTrait;
@@ -25,11 +27,13 @@ final class ConstructorGenerator implements Runnable {
     private final JavaWriter writer;
     private final Shape shape;
     private final SymbolProvider symbolProvider;
+    private final Model model;
 
-    ConstructorGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) {
+    ConstructorGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) {
         this.writer = writer;
         this.shape = shape;
         this.symbolProvider = symbolProvider;
+        this.model = model;
     }
 
     @Override
@@ -58,15 +62,15 @@ final class ConstructorGenerator implements Runnable {
     }
 
     private void writeMemberInitializer(MemberShape member, String memberName) {
-        if (member.isRequired()) {
+        if (SymbolUtils.isNullableMember(member) || SymbolUtils.targetsCollection(model, member)) {
+            writer.write("this.$L = $L;", memberName, getBuilderValue(member, memberName));
+        } else {
             writer.write(
                 "this.$1L = $2T.requiredState($1S, $3L);",
                 memberName,
                 SmithyBuilder.class,
                 getBuilderValue(member, memberName)
             );
-        } else {
-            writer.write("this.$L = $L;", memberName, getBuilderValue(member, memberName));
         }
     }
 
@@ -76,19 +80,19 @@ final class ConstructorGenerator implements Runnable {
         if (memberSymbol.getProperty(SymbolProperties.COLLECTION_COPY_METHOD).isEmpty()) {
             return writer.format("builder.$L", memberName);
         }
-        if (member.isRequired()) {
+        if (SymbolUtils.isNullableMember(member)) {
             return writer.format(
+                    "builder.$1L != null ? $2T.$3L(builder.$1L) : null",
+                    memberName,
+                    Collections.class,
+                    memberSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD, String.class)
+            );
+        }
+        return writer.format(
                 "$T.$L(builder.$L)",
                 Collections.class,
                 memberSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD, String.class),
                 memberName
-            );
-        }
-        return writer.format(
-            "builder.$1L != null ? $2T.$3L(builder.$1L) : null",
-            memberName,
-            Collections.class,
-            memberSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD, String.class)
         );
     }
 }

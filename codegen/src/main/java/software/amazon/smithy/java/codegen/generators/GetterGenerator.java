@@ -6,8 +6,10 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.Collections;
+import java.util.Map;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.SymbolProperties;
+import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.Model;
@@ -65,13 +67,12 @@ final class GetterGenerator implements Runnable {
 
         @Override
         protected Void getDefault(Shape shape) {
-            // TODO: Account for defaults in nullability
             // If the member is not required then prefer the boxed type
             writer.pushState(new GetterSection(member));
-            writer.putContext("isRequired", member.isRequired());
+            writer.putContext("isNullable", SymbolUtils.isNullableMember(member));
             writer.write(
                 """
-                    public ${?isRequired}$1T${/isRequired}${^isRequired}$1B${/isRequired} $2L() {
+                    public ${?isNullable}$1T${/isNullable}${^isNullable}$1B${/isNullable} $2L() {
                         return $2L;
                     }
                     """,
@@ -88,31 +89,29 @@ final class GetterGenerator implements Runnable {
             writer.pushState(new GetterSection(member));
             var shapeSymbol = symbolProvider.toSymbol(shape);
             // If the list has a custom collection factory use that instead.
-            if (shapeSymbol.getProperty(SymbolProperties.COLLECTION_COPY_METHOD).isPresent()) {
+            if (SymbolUtils.isNullableMember(member)) {
                 writer.write(
-                    """
-                        public $1T $2L() {
-                            return $2L != null ? $2L : $3T.$4L(new $5T<>());
-                        }
-                        """,
-                    symbolProvider.toSymbol(shape),
-                    symbolProvider.toMemberName(member),
-                    Collections.class,
-                    shapeSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD, String.class),
-                    shapeSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+                        """
+                                public $1T $2L() {
+                                    return $2L != null ? $2L : $3T.$4L(new $5T<>());
+                                }
+                                """,
+                        shapeSymbol,
+                        symbolProvider.toMemberName(member),
+                        Collections.class,
+                        shapeSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD, String.class),
+                        shapeSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
                 );
             } else {
                 writer.write(
-                    """
-                        public $1T $2L() {
-                            return $2L != null ? $2L : $3T.emptyList();
-                        }
-                        """,
-                    symbolProvider.toSymbol(shape),
-                    symbolProvider.toMemberName(member),
-                    Collections.class
+                        """
+                                public $1T $2L() {
+                                    return $2L;
+                                }
+                                """,
+                        shapeSymbol,
+                        symbolProvider.toMemberName(member)
                 );
-
             }
             writer.popState();
             writeHasCollection();

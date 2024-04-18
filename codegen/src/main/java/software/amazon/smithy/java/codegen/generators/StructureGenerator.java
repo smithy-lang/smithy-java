@@ -59,7 +59,7 @@ public final class StructureGenerator
                     directive.context()
                 ),
                 new PropertyGenerator(writer, shape, directive.symbolProvider()),
-                new ConstructorGenerator(writer, shape, directive.symbolProvider()),
+                new ConstructorGenerator(writer, shape, directive.symbolProvider(), directive.model()),
                 new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()),
                 writer.consumer(JavaWriter::writeToString),
                 new EqualsGenerator(writer, directive.shape(), directive.symbolProvider()),
