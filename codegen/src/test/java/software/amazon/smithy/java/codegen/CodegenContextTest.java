@@ -17,6 +17,9 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.CorsTrait;
 import software.amazon.smithy.model.traits.EndpointTrait;
+import software.amazon.smithy.model.traits.ErrorTrait;
+import software.amazon.smithy.model.traits.EventHeaderTrait;
+import software.amazon.smithy.model.traits.EventPayloadTrait;
 import software.amazon.smithy.model.traits.HostLabelTrait;
 import software.amazon.smithy.model.traits.HttpPayloadTrait;
 import software.amazon.smithy.model.traits.HttpQueryTrait;
@@ -29,6 +32,7 @@ import software.amazon.smithy.model.traits.PatternTrait;
 import software.amazon.smithy.model.traits.RangeTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.model.traits.RequiresLengthTrait;
+import software.amazon.smithy.model.traits.RetryableTrait;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
@@ -74,6 +78,8 @@ public class CodegenContextTest {
                 SparseTrait.ID,
                 UniqueItemsTrait.ID,
                 RequiresLengthTrait.ID,
+                RetryableTrait.ID,
+                ErrorTrait.ID,
                 // Base Prelude Protocol traits
                 JsonNameTrait.ID,
                 TimestampFormatTrait.ID,
@@ -82,10 +88,12 @@ public class CodegenContextTest {
                 XmlFlattenedTrait.ID,
                 XmlAttributeTrait.ID,
                 XmlNamespaceTrait.ID,
+                EventHeaderTrait.ID,
+                EventPayloadTrait.ID,
+                HostLabelTrait.ID,
+                EndpointTrait.ID,
                 // Protocol Traits
                 CorsTrait.ID,
-                EndpointTrait.ID,
-                HostLabelTrait.ID,
                 HttpTrait.ID,
                 // Auth traits
                 HttpQueryTrait.ID,
@@ -117,6 +125,8 @@ public class CodegenContextTest {
                 SparseTrait.ID,
                 UniqueItemsTrait.ID,
                 RequiresLengthTrait.ID,
+                RetryableTrait.ID,
+                ErrorTrait.ID,
                 // Base Prelude Protocol traits
                 JsonNameTrait.ID,
                 TimestampFormatTrait.ID,
@@ -124,7 +134,11 @@ public class CodegenContextTest {
                 XmlNameTrait.ID,
                 XmlFlattenedTrait.ID,
                 XmlAttributeTrait.ID,
-                XmlNamespaceTrait.ID
+                XmlNamespaceTrait.ID,
+                EventHeaderTrait.ID,
+                EventPayloadTrait.ID,
+                HostLabelTrait.ID,
+                EndpointTrait.ID
             )
         );
     }

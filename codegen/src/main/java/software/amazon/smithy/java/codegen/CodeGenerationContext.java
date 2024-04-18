@@ -20,6 +20,11 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.AuthDefinitionTrait;
+import software.amazon.smithy.model.traits.EndpointTrait;
+import software.amazon.smithy.model.traits.ErrorTrait;
+import software.amazon.smithy.model.traits.EventHeaderTrait;
+import software.amazon.smithy.model.traits.EventPayloadTrait;
+import software.amazon.smithy.model.traits.HostLabelTrait;
 import software.amazon.smithy.model.traits.IdempotencyTokenTrait;
 import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.LengthTrait;
@@ -29,6 +34,7 @@ import software.amazon.smithy.model.traits.ProtocolDefinitionTrait;
 import software.amazon.smithy.model.traits.RangeTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.model.traits.RequiresLengthTrait;
+import software.amazon.smithy.model.traits.RetryableTrait;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
@@ -57,6 +63,8 @@ public class CodeGenerationContext
         SparseTrait.ID,
         UniqueItemsTrait.ID,
         RequiresLengthTrait.ID,
+        RetryableTrait.ID,
+        ErrorTrait.ID,
         // Base Prelude Protocol traits
         JsonNameTrait.ID,
         TimestampFormatTrait.ID,
@@ -64,7 +72,11 @@ public class CodeGenerationContext
         XmlNameTrait.ID,
         XmlFlattenedTrait.ID,
         XmlAttributeTrait.ID,
-        XmlNamespaceTrait.ID
+        XmlNamespaceTrait.ID,
+        EventHeaderTrait.ID,
+        EventPayloadTrait.ID,
+        HostLabelTrait.ID,
+        EndpointTrait.ID
     );
 
     private final Model model;
