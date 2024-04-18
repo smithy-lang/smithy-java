@@ -25,6 +25,7 @@ operation PutPerson {
         @jsonName("Age")
         $age
 
+        @default("1985-04-12T23:20:50.52Z")
         $birthday
 
         /// This is a binary blob! Yay!
@@ -46,6 +47,18 @@ operation PutPerson {
         @notProperty
         @httpQueryParams
         queryParams: MapListString
+
+        @notProperty
+        @default(true)
+        defaultBoolean: Boolean
+
+        @notProperty
+        @default([])
+        defaultList: ListOfString
+
+        @notProperty
+        @default({})
+        defaultMap: MapStringString
     }
 
     output := for Person {
@@ -56,7 +69,7 @@ operation PutPerson {
         $favoriteColor
 
         @jsonName("Age")
-        $age
+        $age = 1
 
         $birthday
 

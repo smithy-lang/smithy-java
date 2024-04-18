@@ -14,6 +14,11 @@ map MapListString {
     value: ListOfString
 }
 
+map MapStringString {
+    key: String
+    value: String
+}
+
 list ListOfString {
     @length(min: 1)
     member: String

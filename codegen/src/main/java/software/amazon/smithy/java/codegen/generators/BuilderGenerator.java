@@ -5,6 +5,10 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Collections;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -16,7 +20,10 @@ import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.*;
+import software.amazon.smithy.model.traits.DefaultTrait;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 /**
  * Generates a static nested {@code Builder} class for a Java class.
@@ -83,6 +90,7 @@ final class BuilderGenerator implements Runnable {
 
     // Adds builder properties and initializers
     private void builderProperties() {
+        var defaultVisitor = new DefaultInitializerGenerator(writer, model, symbolProvider);
         for (var member : shape.members()) {
             if (SymbolUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {
                 // Streaming blobs need a custom initializer
@@ -91,17 +99,19 @@ final class BuilderGenerator implements Runnable {
                     DataStream.class,
                     symbolProvider.toMemberName(member)
                 );
-            } else {
-                // TODO: handle defaults
-                writer.pushState();
-                writer.putContext("isRequired", member.isRequired());
-                writer.write(
-                    "private ${?isRequired}$1T${/isRequired}${^isRequired}$1B${/isRequired} $2L;",
-                    symbolProvider.toSymbol(member),
-                    symbolProvider.toMemberName(member)
-                );
-                writer.popState();
+                continue;
             }
+            writer.pushState();
+            writer.putContext("required", member.isRequired());
+            writer.putContext("default", member.hasTrait(DefaultTrait.class));
+            defaultVisitor.member = member;
+            writer.write(
+                "private ${?required}$1T${/required}${^required}$1B${/required} $2L${?default} = ${3C|}${/default};",
+                symbolProvider.toSymbol(member),
+                symbolProvider.toMemberName(member),
+                defaultVisitor
+            );
+            writer.popState();
         }
     }
 
@@ -280,6 +290,176 @@ final class BuilderGenerator implements Runnable {
         @Override
         public Void memberShape(MemberShape shape) {
             return model.expectShape(shape.getTarget()).accept(this);
+        }
+    }
+
+    /**
+     * Adds default values to builder properties.
+     */
+    private static final class DefaultInitializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> implements
+        Runnable {
+        private final JavaWriter writer;
+        private final Model model;
+        private final SymbolProvider symbolProvider;
+        private MemberShape member;
+        private Node defaultValue;
+
+        public DefaultInitializerGenerator(
+            JavaWriter writer,
+            Model model,
+            SymbolProvider symbolProvider
+        ) {
+            this.writer = writer;
+            this.model = model;
+            this.symbolProvider = symbolProvider;
+        }
+
+        @Override
+        public void run() {
+            if (member.hasTrait(DefaultTrait.class)) {
+                this.defaultValue = member.expectTrait(DefaultTrait.class).toNode();
+                member.accept(this);
+            }
+        }
+
+        @Override
+        public Void blobShape(BlobShape blobShape) {
+            throw new UnsupportedOperationException("Blob default value cannot be set.");
+        }
+
+        @Override
+        public Void booleanShape(BooleanShape booleanShape) {
+            writer.write("$L", defaultValue.expectBooleanNode().getValue());
+            return null;
+        }
+
+        @Override
+        public Void listShape(ListShape listShape) {
+            // Note that Lists can _ONLY_ have empty maps as the default,
+            // so we do not need to check the default value. See:
+            // https://github.com/smithy-lang/smithy/blob/main/designs/defaults-and-model-evolution.md
+            writer.write(
+                "new $T<>()",
+                symbolProvider.toSymbol(listShape).expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
+            );
+            return null;
+        }
+
+        @Override
+        public Void mapShape(MapShape mapShape) {
+            // Note that Maps can _ONLY_ have empty maps as the default,
+            // so we do not need to check the default value. See:
+            // https://github.com/smithy-lang/smithy/blob/main/designs/defaults-and-model-evolution.md
+            writer.write(
+                "new $T<>()",
+                symbolProvider.toSymbol(mapShape).expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
+            );
+            return null;
+        }
+
+        @Override
+        public Void byteShape(ByteShape byteShape) {
+            // Bytes duplicate the integer toString method
+            writer.write("$L", defaultValue.expectNumberNode().getValue().intValue());
+            return null;
+        }
+
+        @Override
+        public Void shortShape(ShortShape shortShape) {
+            // Shorts duplicate the int toString method
+            writer.write("$L", defaultValue.expectNumberNode().getValue().intValue());
+            return null;
+        }
+
+        @Override
+        public Void integerShape(IntegerShape integerShape) {
+            writer.write("$L", defaultValue.expectNumberNode().getValue().intValue());
+            return null;
+        }
+
+        @Override
+        public Void longShape(LongShape longShape) {
+            writer.write("$LL", defaultValue.expectNumberNode().getValue().longValue());
+            return null;
+        }
+
+        @Override
+        public Void floatShape(FloatShape floatShape) {
+            writer.write("$Lf", defaultValue.expectNumberNode().getValue().floatValue());
+            return null;
+        }
+
+        @Override
+        public Void documentShape(DocumentShape documentShape) {
+            throw new UnsupportedOperationException("Document shape defaults cannot be set.");
+        }
+
+        @Override
+        public Void doubleShape(DoubleShape doubleShape) {
+            writer.write("$L", defaultValue.expectNumberNode().getValue().doubleValue());
+            return null;
+        }
+
+        @Override
+        public Void bigIntegerShape(BigIntegerShape bigIntegerShape) {
+            writer.write("$T.valueOf($L)", BigInteger.class, defaultValue.expectNumberNode().getValue().intValue());
+            return null;
+        }
+
+        @Override
+        public Void bigDecimalShape(BigDecimalShape bigDecimalShape) {
+            writer.write("$T.valueOf($L)", BigDecimal.class, defaultValue.expectNumberNode().getValue().doubleValue());
+            return null;
+        }
+
+        @Override
+        public Void stringShape(StringShape stringShape) {
+            writer.write("$S", defaultValue.expectStringNode().getValue());
+            return null;
+        }
+
+        @Override
+        public Void structureShape(StructureShape structureShape) {
+            throw new UnsupportedOperationException("Structure shape defaults cannot be set.");
+        }
+
+        @Override
+        public Void unionShape(UnionShape unionShape) {
+            throw new UnsupportedOperationException("Union shape defaults cannot be set.");
+
+        }
+
+        @Override
+        public Void memberShape(MemberShape memberShape) {
+            return model.expectShape(memberShape.getTarget()).accept(this);
+        }
+
+        @Override
+        public Void timestampShape(TimestampShape timestampShape) {
+            if (member.hasTrait(TimestampFormatTrait.class)) {
+                switch (member.expectTrait(TimestampFormatTrait.class).getFormat()) {
+                    case EPOCH_SECONDS:
+                        writer.writeInline(
+                            "$T.ofEpochSecond($LL)",
+                            Instant.class,
+                            defaultValue.expectNumberNode().getValue().longValue()
+                        );
+                        return null;
+                    case HTTP_DATE:
+                        writer.writeInline(
+                            "$T.from($T.RFC_1123_DATE_TIME.parse($S))",
+                            Instant.class,
+                            DateTimeFormatter.class,
+                            defaultValue.expectStringNode().getValue()
+                        );
+                        return null;
+                    default:
+                        // Fall through on default
+                        break;
+                }
+            }
+            writer.write("$T.parse($S)", Instant.class, defaultValue.expectStringNode().getValue());
+            return null;
         }
     }
 }

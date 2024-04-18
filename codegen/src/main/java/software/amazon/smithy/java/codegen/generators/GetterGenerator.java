@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.Collections;
-import java.util.Map;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.SymbolUtils;
@@ -91,26 +90,26 @@ final class GetterGenerator implements Runnable {
             // If the list has a custom collection factory use that instead.
             if (SymbolUtils.isNullableMember(member)) {
                 writer.write(
-                        """
-                                public $1T $2L() {
-                                    return $2L != null ? $2L : $3T.$4L(new $5T<>());
-                                }
-                                """,
-                        shapeSymbol,
-                        symbolProvider.toMemberName(member),
-                        Collections.class,
-                        shapeSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD, String.class),
-                        shapeSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+                    """
+                        public $1T $2L() {
+                            return $2L != null ? $2L : $3T.$4L(new $5T<>());
+                        }
+                        """,
+                    shapeSymbol,
+                    symbolProvider.toMemberName(member),
+                    Collections.class,
+                    shapeSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD, String.class),
+                    shapeSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
                 );
             } else {
                 writer.write(
-                        """
-                                public $1T $2L() {
-                                    return $2L;
-                                }
-                                """,
-                        shapeSymbol,
-                        symbolProvider.toMemberName(member)
+                    """
+                        public $1T $2L() {
+                            return $2L;
+                        }
+                        """,
+                    shapeSymbol,
+                    symbolProvider.toMemberName(member)
                 );
             }
             writer.popState();
