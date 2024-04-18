@@ -1,3 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.codegen.core.CodegenException;
@@ -30,28 +35,29 @@ import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
 
-record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) implements Runnable{
+record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) implements
+    Runnable {
 
     @Override
     public void run() {
         writer.pushState();
         writer.putContext("hasMembers", !shape.members().isEmpty());
         writer.write(
-                """
-                    @Override
-                    public Builder deserialize($T decoder) {
-                        decoder.readStruct(SCHEMA, (member, de) -> {
-                            ${?hasMembers}int index = member.memberIndex() == -1
-                                ? SCHEMA.member(member.memberName()).memberIndex()
-                                : member.memberIndex();
-                            switch (index) {
-                                ${C|}
-                            }${/hasMembers}
-                        });
-                        return this;
-                    }""",
-                ShapeDeserializer.class,
-                (Runnable) this::generateMemberSwitchCases
+            """
+                @Override
+                public Builder deserialize($T decoder) {
+                    decoder.readStruct(SCHEMA, (member, de) -> {
+                        ${?hasMembers}int index = member.memberIndex() == -1
+                            ? SCHEMA.member(member.memberName()).memberIndex()
+                            : member.memberIndex();
+                        switch (index) {
+                            ${C|}
+                        }${/hasMembers}
+                    });
+                    return this;
+                }""",
+            ShapeDeserializer.class,
+            (Runnable) this::generateMemberSwitchCases
         );
         writer.popState();
     }
@@ -64,9 +70,10 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
                 // Streaming blobs are not deserialized by the builder class.
                 continue;
             }
-            writer.write("case $L -> ${C|}",
-                    idx,
-                    new SwitchVisitor(member)
+            writer.write(
+                "case $L -> ${C|}",
+                idx,
+                new SwitchVisitor(member)
             );
         }
     }
@@ -88,40 +95,50 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
 
         @Override
         protected Void getDefault(Shape shape) {
-            writer.write("${memberName:L}($C);",
-                    new DeserReaderVisitor(shape, "de", "member"));
+            writer.write(
+                "${memberName:L}($C);",
+                new DeserReaderVisitor(shape, "de", "member")
+            );
             return null;
         }
 
         @Override
         public Void listShape(ListShape shape) {
             writer.pushState();
-            writer.putContext("collectionImpl", symbolProvider.toSymbol(shape).expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class));
+            writer.putContext(
+                "collectionImpl",
+                symbolProvider.toSymbol(shape)
+                    .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+            );
             if (shape.hasTrait(UniqueItemsTrait.class)) {
                 writer.putContext("sdkSerdeException", SdkSerdeException.class);
-                writer.write("""
-                    {
-                        $T result = new ${collectionImpl:T}<>();
-                        var elementSchema = member.member("member");
-                        de.readList(member, elem -> {
-                            if (result.add($C)) {
-                                throw new ${sdkSerdeException:T}("Duplicate item in unique list " + elem);
-                            }
-                        });
-                        ${memberName:L}(result);
-                    }""",
+                writer.write(
+                    """
+                        {
+                            $T result = new ${collectionImpl:T}<>();
+                            var elementSchema = member.member("member");
+                            de.readList(member, elem -> {
+                                if (result.add($C)) {
+                                    throw new ${sdkSerdeException:T}("Duplicate item in unique list " + elem);
+                                }
+                            });
+                            ${memberName:L}(result);
+                        }""",
                     symbolProvider.toSymbol(shape),
-                    new DeserReaderVisitor(shape.getMember(), "de", "elementSchema"));
+                    new DeserReaderVisitor(shape.getMember(), "de", "elementSchema")
+                );
             } else {
-                writer.write("""
-                    {
-                        $T result = new ${collectionImpl:T}<>();
-                        var elementSchema = member.member("member");
-                        de.readList(member, elem -> result.add($C));
-                        ${memberName:L}(result);
-                    }""",
+                writer.write(
+                    """
+                        {
+                            $T result = new ${collectionImpl:T}<>();
+                            var elementSchema = member.member("member");
+                            de.readList(member, elem -> result.add($C));
+                            ${memberName:L}(result);
+                        }""",
                     symbolProvider.toSymbol(shape),
-                    new DeserReaderVisitor(shape.getMember(), "de", "elementSchema"));
+                    new DeserReaderVisitor(shape.getMember(), "de", "elementSchema")
+                );
             }
             writer.popState();
             return null;
@@ -132,38 +149,47 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
             writer.pushState();
             var keyTarget = model.expectShape(shape.getKey().getTarget());
             var valueTarget = model.expectShape(shape.getValue().getTarget());
-            writer.putContext("collectionImpl", symbolProvider.toSymbol(shape).expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class));
+            writer.putContext(
+                "collectionImpl",
+                symbolProvider.toSymbol(shape)
+                    .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+            );
 
             // Special case lists and maps.
             if (valueTarget.isListShape()) {
-                writer.putContext("nestedCollectionImpl",
-                        symbolProvider.toSymbol(valueTarget).expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS));
-                writer.write("""
-                    {
-                        $T result = new ${collectionImpl:T}<>();
-                        var valueSchema = member.member("value");
-                        de.$L(member, (key, v) -> {
-                            ${C|}
-                        });
-                        ${memberName:L}(result);
-                    }""",
-                        symbolProvider.toSymbol(shape),
-                        getMapReadMethod(keyTarget),
-                        new DeserReaderVisitor(shape.getValue(), "v", "valueSchema")
+                writer.putContext(
+                    "nestedCollectionImpl",
+                    symbolProvider.toSymbol(valueTarget)
+                        .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
+                );
+                writer.write(
+                    """
+                        {
+                            $T result = new ${collectionImpl:T}<>();
+                            var valueSchema = member.member("value");
+                            de.$L(member, (key, v) -> {
+                                ${C|}
+                            });
+                            ${memberName:L}(result);
+                        }""",
+                    symbolProvider.toSymbol(shape),
+                    getMapReadMethod(keyTarget),
+                    new DeserReaderVisitor(shape.getValue(), "v", "valueSchema")
                 );
             } else if (valueTarget.isMapShape()) {
                 // TODO: Implement?
             } else {
-                writer.write("""
-                                {
-                                    $T result = new ${collectionImpl:T}<>();
-                                    var valueSchema = member.member("value");
-                                    de.$L(member, (key, v) -> result.put(key, $C));
-                                    ${memberName:L}(result);
-                                }""",
-                        symbolProvider.toSymbol(shape),
-                        getMapReadMethod(keyTarget),
-                        new DeserReaderVisitor(valueTarget, "de", "valueSchema")
+                writer.write(
+                    """
+                        {
+                            $T result = new ${collectionImpl:T}<>();
+                            var valueSchema = member.member("value");
+                            de.$L(member, (key, v) -> result.put(key, $C));
+                            ${memberName:L}(result);
+                        }""",
+                    symbolProvider.toSymbol(shape),
+                    getMapReadMethod(keyTarget),
+                    new DeserReaderVisitor(valueTarget, "de", "valueSchema")
                 );
             }
             writer.popState();
@@ -182,8 +208,8 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
             case LONG -> "readLongMap";
             case STRING -> "readStringMap";
             default -> throw new CodegenException(
-                    "Invalid map key type: " + shape.getType() + " for shape "
-                            + shape
+                "Invalid map key type: " + shape.getType() + " for shape "
+                    + shape
             );
         };
     }
@@ -217,28 +243,30 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
             writer.pushState();
             if (memberShape.isMemberShape()
                 && model.expectShape(memberShape.asMemberShape().get().getContainer()).isMapShape()) {
-                writer.write("""
-                                var nestedSchema = valueSchema.member("member");
-                                var resultNested = result.computeIfAbsent(key, k -> new ${nestedCollectionImpl:T}<>());
-                                v.readList(valueSchema, nl -> {
-                                    resultNested.add($C);
-                                });
-                                """,
-                                new DeserReaderVisitor(listShape.getMember(), "nl", "nestedSchema")
-                        );
-            } else if (memberShape.isMemberShape()
-                    && model.expectShape(memberShape.asMemberShape().get().getContainer()).isListShape()) {
-                writer.write("""
-                                var nestedSchema = valueSchema.member("member");
-                                var resultNested = ${nestedCollectionImpl:T}<>();
-                                v.readList(valueSchema, nl -> {
-                                    resultNested.add($C);
-                                });
-                                result.add(resultNested);
-                                """,
-                                new DeserReaderVisitor(listShape.getMember(), "nl", "nestedSchema")
+                writer.write(
+                    """
+                        var nestedSchema = valueSchema.member("member");
+                        var resultNested = result.computeIfAbsent(key, k -> new ${nestedCollectionImpl:T}<>());
+                        v.readList(valueSchema, nl -> {
+                            resultNested.add($C);
+                        });
+                        """,
+                    new DeserReaderVisitor(listShape.getMember(), "nl", "nestedSchema")
                 );
-            }
+            } else if (memberShape.isMemberShape()
+                && model.expectShape(memberShape.asMemberShape().get().getContainer()).isListShape()) {
+                    writer.write(
+                        """
+                            var nestedSchema = valueSchema.member("member");
+                            var resultNested = ${nestedCollectionImpl:T}<>();
+                            v.readList(valueSchema, nl -> {
+                                resultNested.add($C);
+                            });
+                            result.add(resultNested);
+                            """,
+                        new DeserReaderVisitor(listShape.getMember(), "nl", "nestedSchema")
+                    );
+                }
             writer.popState();
             return null;
         }
