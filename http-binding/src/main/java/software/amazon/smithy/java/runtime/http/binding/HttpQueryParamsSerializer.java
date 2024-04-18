@@ -24,21 +24,11 @@ final class HttpQueryParamsSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    protected RuntimeException throwForInvalidState(SdkSchema schema) {
-        throw new UnsupportedOperationException(schema + " is not value for httpQueryParam");
-    }
-
-    @Override
     public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
         consumer.accept(new MapSerializer() {
             @Override
-            public void entry(String key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                 valueSerializer.accept(new SpecificShapeSerializer() {
-                    @Override
-                    protected RuntimeException throwForInvalidState(SdkSchema schema) {
-                        throw new UnsupportedOperationException("Expected map of string or list of string: " + schema);
-                    }
-
                     @Override
                     public void writeString(SdkSchema schema, String value) {
                         queryWriter.accept(key, value);
@@ -47,11 +37,6 @@ final class HttpQueryParamsSerializer extends SpecificShapeSerializer {
                     @Override
                     public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
                         consumer.accept(new SpecificShapeSerializer() {
-                            @Override
-                            protected RuntimeException throwForInvalidState(SdkSchema schema) {
-                                throw new UnsupportedOperationException("Expected map of list of string: " + schema);
-                            }
-
                             @Override
                             public void writeString(SdkSchema schema, String value) {
                                 queryWriter.accept(key, value);
@@ -62,12 +47,12 @@ final class HttpQueryParamsSerializer extends SpecificShapeSerializer {
             }
 
             @Override
-            public void entry(int key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
                 throw new UnsupportedOperationException("Query params requires a map of string keys: " + schema);
             }
 
             @Override
-            public void entry(long key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
                 throw new UnsupportedOperationException("Query params requires a map of string keys: " + schema);
             }
         });

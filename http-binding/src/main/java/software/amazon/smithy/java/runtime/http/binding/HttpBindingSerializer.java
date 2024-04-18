@@ -77,11 +77,6 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     }
 
     @Override
-    protected RuntimeException throwForInvalidState(SdkSchema schema) {
-        return new UnsupportedOperationException("HTTP bindings must start with a structure. Found " + schema);
-    }
-
-    @Override
     public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         boolean foundBody = false;
         for (var member : schema.members()) {

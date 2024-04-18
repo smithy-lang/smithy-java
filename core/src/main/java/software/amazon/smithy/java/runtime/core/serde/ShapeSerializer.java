@@ -17,6 +17,9 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
  * Serializes a shape by receiving the Smithy data model and writing output to a receiver owned by the serializer.
+ *
+ * <p>Note: null values should only ever be written using {@link #writeNull(SdkSchema)}. Every other method expects
+ * a non-null value or a value type.
  */
 public interface ShapeSerializer extends Flushable {
 
@@ -184,6 +187,13 @@ public interface ShapeSerializer extends Flushable {
     default void writeDocument(Document value) {
         writeDocument(PreludeSchemas.DOCUMENT, value);
     }
+
+    /**
+     * Writes a null value.
+     *
+     * @param schema Schema of the null value.
+     */
+    void writeNull(SdkSchema schema);
 
     /**
      * Write to the serializer if the given value is not null.

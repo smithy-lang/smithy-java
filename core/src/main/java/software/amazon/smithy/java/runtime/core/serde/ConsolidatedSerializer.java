@@ -104,4 +104,9 @@ final class ConsolidatedSerializer implements ShapeSerializer {
     public void writeDocument(SdkSchema schema, Document value) {
         write(schema, ser -> ser.writeDocument(schema, value));
     }
+
+    @Override
+    public void writeNull(SdkSchema schema) {
+        write(schema, ser -> ser.writeNull(schema));
+    }
 }

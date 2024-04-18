@@ -548,6 +548,20 @@ final class Documents {
     }
 
     record MapDocument(Map<Document, Document> members) implements Document {
+
+        private static final SdkSchema STR_KEY = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember(
+            "key",
+            PreludeSchemas.STRING
+        );
+        private static final SdkSchema INT_KEY = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember(
+            "key",
+            PreludeSchemas.INTEGER
+        );
+        private static final SdkSchema LONG_KEY = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember(
+            "key",
+            PreludeSchemas.LONG
+        );
+
         @Override
         public ShapeType type() {
             return ShapeType.MAP;
@@ -576,9 +590,9 @@ final class Documents {
                     Document key = entry.getKey();
                     Consumer<ShapeSerializer> valueSer = ser -> entry.getValue().serializeContents(ser);
                     switch (key.type()) {
-                        case STRING, ENUM -> s.entry(entry.getKey().asString(), valueSer);
-                        case INTEGER, INT_ENUM -> s.entry(entry.getKey().asInteger(), valueSer);
-                        case LONG -> s.entry(entry.getKey().asLong(), valueSer);
+                        case STRING, ENUM -> s.writeEntry(STR_KEY, entry.getKey().asString(), valueSer);
+                        case INTEGER, INT_ENUM -> s.writeEntry(INT_KEY, entry.getKey().asInteger(), valueSer);
+                        case LONG -> s.writeEntry(LONG_KEY, entry.getKey().asLong(), valueSer);
                         default -> throw new SdkSerdeException("Unexpected document map key: " + key);
                     }
                 }
@@ -708,8 +722,13 @@ final class Documents {
             structWriter.writeDocument(syntheticMember(memberName, schema), value);
         }
 
+        @Override
+        public void writeNull(SdkSchema schema) {
+            structWriter.writeNull(syntheticMember(memberName, schema));
+        }
+
         private static SdkSchema syntheticMember(String name, SdkSchema target) {
-            return SdkSchema.memberBuilder(name, target).id(PreludeSchemas.DOCUMENT.id()).build();
+            return SdkSchema.memberBuilder(-1, name, target).id(PreludeSchemas.DOCUMENT.id()).build();
         }
     }
 }

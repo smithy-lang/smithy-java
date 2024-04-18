@@ -24,11 +24,6 @@ final class HttpLabelSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    protected RuntimeException throwForInvalidState(SdkSchema schema) {
-        throw new UnsupportedOperationException(schema + " is not supported in HTTP labels");
-    }
-
-    @Override
     public void writeBoolean(SdkSchema schema, boolean value) {
         labelReceiver.accept(schema.memberName(), Boolean.toString(value));
     }

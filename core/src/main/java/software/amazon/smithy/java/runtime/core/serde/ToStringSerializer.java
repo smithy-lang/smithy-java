@@ -111,7 +111,7 @@ public final class ToStringSerializer implements ShapeSerializer {
 
         consumer.accept(new MapSerializer() {
             @Override
-            public void entry(String key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                 writeString(schema.member("key"), key);
                 append(": ");
                 valueSerializer.accept(ToStringSerializer.this);
@@ -119,7 +119,7 @@ public final class ToStringSerializer implements ShapeSerializer {
             }
 
             @Override
-            public void entry(int key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
                 writeInteger(schema.member("key"), key);
                 append(": ");
                 valueSerializer.accept(ToStringSerializer.this);
@@ -127,7 +127,7 @@ public final class ToStringSerializer implements ShapeSerializer {
             }
 
             @Override
-            public void entry(long key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
                 writeLong(schema.member("key"), key);
                 append(": ");
                 valueSerializer.accept(ToStringSerializer.this);
@@ -205,5 +205,10 @@ public final class ToStringSerializer implements ShapeSerializer {
         append(System.lineSeparator());
         value.serializeContents(this);
         dedent();
+    }
+
+    @Override
+    public void writeNull(SdkSchema schema) {
+        append(schema, "null");
     }
 }

@@ -73,7 +73,7 @@ public class MapDocumentTest {
                 assertThat(schema, equalTo(PreludeSchemas.DOCUMENT));
                 consumer.accept(new MapSerializer() {
                     @Override
-                    public void entry(String key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                         keys.add(key);
                         valueSerializer.accept(new SpecificShapeSerializer() {
                             @Override
@@ -89,12 +89,12 @@ public class MapDocumentTest {
                     }
 
                     @Override
-                    public void entry(int key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
                         throw new UnsupportedOperationException("Expected a string key");
                     }
 
                     @Override
-                    public void entry(long key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
                         throw new UnsupportedOperationException("Expected a string key");
                     }
                 });

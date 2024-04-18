@@ -23,8 +23,12 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
      * @param schema Unexpected encountered schema.
      * @return Returns an exception to throw.
      */
-    protected RuntimeException throwForInvalidState(SdkSchema schema) {
-        throw new SdkSerdeException("Unexpected schema type: " + schema);
+    protected RuntimeException throwForInvalidState(String message, SdkSchema schema) {
+        throw new SdkSerdeException(message);
+    }
+
+    private RuntimeException throwForInvalidState(SdkSchema schema) {
+        return throwForInvalidState("Unexpected schema type: " + schema, schema);
     }
 
     @Override
@@ -105,6 +109,11 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
     @Override
     public void writeDocument(SdkSchema schema, Document value) {
         throw throwForInvalidState(schema);
+    }
+
+    @Override
+    public void writeNull(SdkSchema schema) {
+        throw throwForInvalidState("Unexpected null value written for " + schema, schema);
     }
 
     // Delegates to writing with a schema. Only override writing a document with a schema.

@@ -106,8 +106,10 @@ public final class Person implements SerializableShape {
             ShapeSerializer.writeIfNotNull(st, SCHEMA_BINARY, binary);
             if (!tags.isEmpty()) {
                 st.writeMap(SCHEMA_QUERY_PARAMS, m -> {
-                    tags.forEach((k, v) -> m.entry(k, mv -> {
-                        mv.writeList(SharedSchemas.MAP_LIST_STRING.member("value"), mvl -> {
+                    var keyMember = SharedSchemas.MAP_LIST_STRING.member("key");
+                    var valueMember = SharedSchemas.MAP_LIST_STRING.member("value");
+                    tags.forEach((k, v) -> m.writeEntry(keyMember, k, mv -> {
+                        mv.writeList(valueMember, mvl -> {
                             v.forEach(value -> mvl.writeString(SharedSchemas.LIST_OF_STRING.member("member"), value));
                         });
                     }));
@@ -160,10 +162,7 @@ public final class Person implements SerializableShape {
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, (member, de) -> {
-                int index = member.memberIndex() == -1
-                    ? SCHEMA.member(member.memberName()).memberIndex()
-                    : member.memberIndex();
-                switch (index) {
+                switch (SCHEMA.lookupMemberIndex(member)) {
                     case 0 -> name(de.readString(member));
                     case 1 -> age(de.readInteger(member));
                     case 2 -> birthday(de.readTimestamp(member));

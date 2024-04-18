@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -561,7 +560,7 @@ final class TypedDocumentMember implements Document {
 
             @Override
             public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-                values.add(new TypedDocumentMember(schema.documentMember("member"), consumer));
+                values.add(new TypedDocumentMember(schema.getOrCreateDocumentMember("member"), consumer));
             }
         };
         memberWriter.accept(expect);
@@ -575,31 +574,28 @@ final class TypedDocumentMember implements Document {
 
             @Override
             public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
-                var valueMember = schema.documentMember("value");
+                var valueMember = schema.getOrCreateDocumentMember("value");
                 consumer.accept(new MapSerializer() {
                     @Override
-                    public void entry(String key, Consumer<ShapeSerializer> valueSerializer) {
-                        var keyMember = schema.documentMember("key", PreludeSchemas.STRING);
+                    public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                         values.put(
-                            new TypedDocumentMember(keyMember, ser -> ser.writeString(keyMember, key)),
+                            new TypedDocumentMember(keySchema, ser -> ser.writeString(keySchema, key)),
                             new TypedDocumentMember(valueMember, valueSerializer)
                         );
                     }
 
                     @Override
-                    public void entry(int key, Consumer<ShapeSerializer> valueSerializer) {
-                        var keyMember = schema.documentMember("key", PreludeSchemas.INTEGER);
+                    public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
                         values.put(
-                            new TypedDocumentMember(keyMember, ser -> ser.writeInteger(keyMember, key)),
+                            new TypedDocumentMember(keySchema, ser -> ser.writeInteger(keySchema, key)),
                             new TypedDocumentMember(valueMember, valueSerializer)
                         );
                     }
 
                     @Override
-                    public void entry(long key, Consumer<ShapeSerializer> valueSerializer) {
-                        var keyMember = schema.documentMember("key", PreludeSchemas.LONG);
+                    public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
                         values.put(
-                            new TypedDocumentMember(keyMember, ser -> ser.writeLong(keyMember, key)),
+                            new TypedDocumentMember(keySchema, ser -> ser.writeLong(keySchema, key)),
                             new TypedDocumentMember(valueMember, valueSerializer)
                         );
                     }
@@ -619,18 +615,18 @@ final class TypedDocumentMember implements Document {
             public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
                 consumer.accept(new MapSerializer() {
                     @Override
-                    public void entry(String key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                         if (key.equals(memberName)) {
-                            var memberSchema = schema.documentMember("member");
+                            var memberSchema = schema.getOrCreateDocumentMember(memberName);
                             result = new TypedDocumentMember(memberSchema, valueSerializer);
                         }
                     }
 
                     @Override
-                    public void entry(int key, Consumer<ShapeSerializer> valueSerializer) {}
+                    public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {}
 
                     @Override
-                    public void entry(long key, Consumer<ShapeSerializer> valueSerializer) {}
+                    public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {}
                 });
             }
 

@@ -29,21 +29,11 @@ final class HttpPrefixHeadersSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    protected RuntimeException throwForInvalidState(SdkSchema schema) {
-        throw new UnsupportedOperationException("Expected a map for prefix headers, found " + schema);
-    }
-
-    @Override
     public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
         consumer.accept(new MapSerializer() {
             @Override
-            public void entry(String key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                 valueSerializer.accept(new SpecificShapeSerializer() {
-                    @Override
-                    protected RuntimeException throwForInvalidState(SdkSchema schema) {
-                        throw new UnsupportedOperationException("Expected a string header, found " + schema);
-                    }
-
                     @Override
                     public void writeString(SdkSchema schema, String value) {
                         headerConsumer.accept(prefix + key, value);
@@ -52,12 +42,12 @@ final class HttpPrefixHeadersSerializer extends SpecificShapeSerializer {
             }
 
             @Override
-            public void entry(int key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
                 throw new UnsupportedOperationException("Prefix headers expects maps with string keys: " + schema);
             }
 
             @Override
-            public void entry(long key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
                 throw new UnsupportedOperationException("Prefix headers expects maps with string keys: " + schema);
             }
         });

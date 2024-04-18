@@ -32,7 +32,7 @@ public class DocumentMapTest {
             public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
                 consumer.accept(new MapSerializer() {
                     @Override
-                    public void entry(String key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                         valueSerializer.accept(new SpecificShapeSerializer() {
                             @Override
                             public void writeString(SdkSchema schema, String value) {
@@ -42,7 +42,7 @@ public class DocumentMapTest {
                     }
 
                     @Override
-                    public void entry(int key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
                         valueSerializer.accept(new SpecificShapeSerializer() {
                             @Override
                             public void writeString(SdkSchema schema, String value) {
@@ -52,7 +52,7 @@ public class DocumentMapTest {
                     }
 
                     @Override
-                    public void entry(long key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
                         valueSerializer.accept(new SpecificShapeSerializer() {
                             @Override
                             public void writeString(SdkSchema schema, String value) {

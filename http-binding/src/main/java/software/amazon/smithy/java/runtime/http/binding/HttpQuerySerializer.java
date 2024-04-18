@@ -29,11 +29,6 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    protected RuntimeException throwForInvalidState(SdkSchema schema) {
-        throw new UnsupportedOperationException(schema + " is not supported in HTTP query");
-    }
-
-    @Override
     public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         consumer.accept(new ListSerializer(this, position -> {}));
     }

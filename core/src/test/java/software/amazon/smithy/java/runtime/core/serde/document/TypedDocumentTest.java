@@ -43,11 +43,11 @@ public class TypedDocumentTest {
     public void wrapsStructContentWithTypeAndSchema() {
         SerializableShape serializableShape = encoder -> {
             encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
-                var aMember = SdkSchema.memberBuilder("a", PreludeSchemas.STRING)
+                var aMember = SdkSchema.memberBuilder(-1, "a", PreludeSchemas.STRING)
                     .id(PreludeSchemas.DOCUMENT.id())
                     .build();
                 s.writeString(aMember, "1");
-                var bMember = SdkSchema.memberBuilder("b", PreludeSchemas.STRING)
+                var bMember = SdkSchema.memberBuilder(-1, "b", PreludeSchemas.STRING)
                     .id(PreludeSchemas.DOCUMENT.id())
                     .build();
                 s.writeString(bMember, "2");

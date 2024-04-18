@@ -142,4 +142,10 @@ public final class ListSerializer implements ShapeSerializer {
         beforeWrite();
         delegate.writeDocument(schema, value);
     }
+
+    @Override
+    public void writeNull(SdkSchema schema) {
+        beforeWrite();
+        delegate.writeNull(schema);
+    }
 }

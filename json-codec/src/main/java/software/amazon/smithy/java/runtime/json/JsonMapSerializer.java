@@ -20,13 +20,13 @@ final class JsonMapSerializer implements MapSerializer {
     private final JsonStream stream;
     private boolean wroteValue = false;
 
-    JsonMapSerializer(SdkSchema keySchema, ShapeSerializer parent, JsonStream stream) {
+    JsonMapSerializer(ShapeSerializer parent, JsonStream stream) {
         this.parent = parent;
         this.stream = stream;
     }
 
     @Override
-    public void entry(String key, Consumer<ShapeSerializer> valueSerializer) {
+    public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
         try {
             beforeWrite();
             stream.writeObjectField(key);
@@ -50,12 +50,12 @@ final class JsonMapSerializer implements MapSerializer {
     }
 
     @Override
-    public void entry(int key, Consumer<ShapeSerializer> valueSerializer) {
-        entry(Integer.toString(key), valueSerializer);
+    public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
+        writeEntry(keySchema, Integer.toString(key), valueSerializer);
     }
 
     @Override
-    public void entry(long key, Consumer<ShapeSerializer> valueSerializer) {
-        entry(Long.toString(key), valueSerializer);
+    public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
+        writeEntry(keySchema, Long.toString(key), valueSerializer);
     }
 }

@@ -188,7 +188,7 @@ public class SdkSchema {
      * @param <T> Trait to get.
      * @throws NoSuchElementException if the value does not exist.
      */
-    public final <T extends Trait> T expectTrait(Class<T> trait) {
+    public <T extends Trait> T expectTrait(Class<T> trait) {
         var t = getTrait(trait);
         if (t == null) {
             throw new NoSuchElementException("Expected trait not found: " + trait.getName());
@@ -197,31 +197,38 @@ public class SdkSchema {
     }
 
     /**
-     * Get the names of the members contained in the shape.
-     *
-     * @return Returns the contained member names.
-     */
-    public final Set<String> memberNames() {
-        return isMember() ? memberTarget.memberNames() : members.keySet();
-    }
-
-    /**
      * Gets the members of the schema.
      *
      * @return Returns the members.
      */
-    public final Collection<SdkSchema> members() {
-        return Collections.unmodifiableCollection(members.values());
+    public Collection<SdkSchema> members() {
+        return members.values();
     }
 
     /**
-     * Get a member by name.
+     * Get a member by name or return a default value.
      *
      * @param memberName Member by name to get.
      * @return Returns the found member or null if not found.
      */
-    public final SdkSchema member(String memberName) {
-        return member(memberName, null);
+    public SdkSchema member(String memberName) {
+        return members.get(memberName);
+    }
+
+    /**
+     * Lookup the memberIndex of a member contained in this shape.
+     *
+     * @param member Member to lookup.
+     * @return the memberIndex or -1 if a member index is unknown.
+     */
+    public int lookupMemberIndex(SdkSchema member) {
+        if (member.memberIndex > -1) {
+            return member.memberIndex;
+        } else {
+            // if the member itself has no index, check if the member can be found by name in this schema.
+            var lookup = member(member.memberName);
+            return lookup == null ? -1 : lookup.memberIndex;
+        }
     }
 
     /**
@@ -231,8 +238,8 @@ public class SdkSchema {
      * @param memberName Member to get or synthesize.
      * @return the member.
      */
-    public final SdkSchema documentMember(String memberName) {
-        return documentMember(memberName, PreludeSchemas.DOCUMENT);
+    public SdkSchema getOrCreateDocumentMember(String memberName) {
+        return getOrCreateDocumentMember(memberName, PreludeSchemas.DOCUMENT);
     }
 
     /**
@@ -242,10 +249,10 @@ public class SdkSchema {
      * @param memberName Member to get or synthesize.
      * @return the member.
      */
-    public final SdkSchema documentMember(String memberName, SdkSchema targetSchema) {
+    public SdkSchema getOrCreateDocumentMember(String memberName, SdkSchema targetSchema) {
         var result = member(memberName);
         if (result == null) {
-            result = SdkSchema.memberBuilder(memberName, targetSchema).id(PreludeSchemas.DOCUMENT.id()).build();
+            result = SdkSchema.memberBuilder(-1, memberName, targetSchema).id(PreludeSchemas.DOCUMENT.id()).build();
         }
         return result;
     }

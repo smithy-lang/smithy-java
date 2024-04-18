@@ -193,8 +193,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
         try {
             stream.writeObjectStart();
-            var keySchema = schema.member("key");
-            consumer.accept(new JsonMapSerializer(keySchema, this, stream));
+            consumer.accept(new JsonMapSerializer(this, stream));
             stream.writeObjectEnd();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -205,5 +204,14 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeDocument(SdkSchema schema, Document value) {
         // Document values in JSON are serialized inline by receiving the data model contents of the document.
         value.serializeContents(this);
+    }
+
+    @Override
+    public void writeNull(SdkSchema schema) {
+        try {
+            stream.writeNull();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }

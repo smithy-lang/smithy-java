@@ -32,6 +32,16 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class JsonDocument implements Document {
 
+    private static final SdkSchema STRING_MAP_KEY = SdkSchema.memberBuilder(0, "key", PreludeSchemas.STRING)
+        .id(PreludeSchemas.DOCUMENT.id())
+        .build();
+    private static final SdkSchema INT_MAP_KEY = SdkSchema.memberBuilder(0, "key", PreludeSchemas.INTEGER)
+        .id(PreludeSchemas.DOCUMENT.id())
+        .build();
+    private static final SdkSchema LONG_MAP_KEY = SdkSchema.memberBuilder(0, "key", PreludeSchemas.LONG)
+        .id(PreludeSchemas.DOCUMENT.id())
+        .build();
+
     private final Any any;
     private final TimestampFormatter defaultTimestampFormat;
     private final boolean useJsonName;
@@ -218,11 +228,23 @@ final class JsonDocument implements Document {
             case MAP -> encoder.writeMap(schema, mapSerializer -> {
                 for (var entry : asMap().entrySet()) {
                     switch (entry.getKey().type()) {
-                        case INTEGER, INT_ENUM ->
-                            mapSerializer.entry(entry.getKey().asInteger(), c -> entry.getValue().serialize(c));
-                        case LONG -> mapSerializer.entry(entry.getKey().asLong(), c -> entry.getValue().serialize(c));
-                        case STRING, ENUM ->
-                            mapSerializer.entry(entry.getKey().asString(), c -> entry.getValue().serialize(c));
+                        case STRING ->
+                            mapSerializer.writeEntry(
+                                STRING_MAP_KEY,
+                                entry.getKey().asString(),
+                                c -> entry.getValue().serialize(c)
+                            );
+                        case INTEGER ->
+                            mapSerializer.writeEntry(
+                                INT_MAP_KEY,
+                                entry.getKey().asInteger(),
+                                c -> entry.getValue().serialize(c)
+                            );
+                        case LONG -> mapSerializer.writeEntry(
+                            LONG_MAP_KEY,
+                            entry.getKey().asLong(),
+                            c -> entry.getValue().serialize(c)
+                        );
                         default -> throw new UnsupportedOperationException(
                             "Unsupported document type map key: " + entry.getKey().type()
                         );
@@ -239,7 +261,7 @@ final class JsonDocument implements Document {
                     for (var entry : any.asMap().entrySet()) {
                         var k = entry.getKey();
                         // Create a synthetic member schema for the key.
-                        var member = SdkSchema.memberBuilder(k, PreludeSchemas.DOCUMENT)
+                        var member = SdkSchema.memberBuilder(-1, k, PreludeSchemas.DOCUMENT)
                             .id(PreludeSchemas.DOCUMENT.id())
                             .build();
                         var v = new JsonDocument(

@@ -18,11 +18,6 @@ final class ResponseStatusSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    protected RuntimeException throwForInvalidState(SdkSchema schema) {
-        throw new UnsupportedOperationException(schema + " is not a value response status code member");
-    }
-
-    @Override
     public void writeInteger(SdkSchema schema, int value) {
         consumer.accept(value);
     }

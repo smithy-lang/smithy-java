@@ -132,4 +132,10 @@ public final class RequiredWriteSerializer implements ShapeSerializer {
         delegate.writeDocument(schema, value);
         wroteSomething = true;
     }
+
+    @Override
+    public void writeNull(SdkSchema schema) {
+        delegate.writeNull(schema);
+        wroteSomething = true;
+    }
 }

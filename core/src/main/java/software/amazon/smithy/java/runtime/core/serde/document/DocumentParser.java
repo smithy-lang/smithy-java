@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
@@ -24,7 +23,7 @@ final class DocumentParser implements ShapeSerializer {
     private Document result;
 
     Document getResult() {
-        return Objects.requireNonNull(result, "result was not set by the shape serializer");
+        return result;
     }
 
     @Override
@@ -63,21 +62,21 @@ final class DocumentParser implements ShapeSerializer {
         Map<Document, Document> entries = new LinkedHashMap<>();
         consumer.accept(new MapSerializer() {
             @Override
-            public void entry(String key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                 DocumentParser p = new DocumentParser();
                 valueSerializer.accept(p);
                 entries.put(Document.of(key), p.result);
             }
 
             @Override
-            public void entry(int key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
                 DocumentParser p = new DocumentParser();
                 valueSerializer.accept(p);
                 entries.put(Document.of(key), p.result);
             }
 
             @Override
-            public void entry(long key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
                 DocumentParser p = new DocumentParser();
                 valueSerializer.accept(p);
                 entries.put(Document.of(key), p.result);
@@ -149,5 +148,10 @@ final class DocumentParser implements ShapeSerializer {
     @Override
     public void writeDocument(SdkSchema schema, Document value) {
         value.serializeContents(this);
+    }
+
+    @Override
+    public void writeNull(SdkSchema schema) {
+        result = null;
     }
 }

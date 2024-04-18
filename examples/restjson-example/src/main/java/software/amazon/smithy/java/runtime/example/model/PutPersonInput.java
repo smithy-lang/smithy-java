@@ -125,7 +125,8 @@ public final class PutPersonInput implements SerializableShape {
             ShapeSerializer.writeIfNotNull(st, SCHEMA_BINARY, binary);
             if (!queryParams.isEmpty()) {
                 st.writeMap(SCHEMA_QUERY_PARAMS, m -> {
-                    queryParams.forEach((k, v) -> m.entry(k, mv -> {
+                    var key = SharedSchemas.MAP_LIST_STRING.member("key");
+                    queryParams.forEach((k, v) -> m.writeEntry(key, k, mv -> {
                         mv.writeList(SharedSchemas.MAP_LIST_STRING.member("value"), mvl -> {
                             v.forEach(value -> mvl.writeString(SharedSchemas.LIST_OF_STRING.member("member"), value));
                         });
@@ -185,10 +186,7 @@ public final class PutPersonInput implements SerializableShape {
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, (member, de) -> {
-                int index = member.memberIndex() == -1
-                    ? SCHEMA.member(member.memberName()).memberIndex()
-                    : member.memberIndex();
-                switch (index) {
+                switch (SCHEMA.lookupMemberIndex(member)) {
                     case 0 -> name(de.readString(member));
                     case 1 -> favoriteColor(de.readString(member));
                     case 2 -> age(de.readInteger(member));

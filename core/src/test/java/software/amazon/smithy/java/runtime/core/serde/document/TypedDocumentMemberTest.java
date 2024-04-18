@@ -34,7 +34,7 @@ public class TypedDocumentMemberTest {
         SerializableShape serializableShape = encoder -> {
             encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
                 var target = PreludeSchemas.getSchemaForType(ShapeType.STRING);
-                var member = PreludeSchemas.DOCUMENT.documentMember("foo", target);
+                var member = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember("foo", target);
                 s.writeString(member, "Hi");
             });
         };
@@ -57,7 +57,7 @@ public class TypedDocumentMemberTest {
         var document1 = Document.ofStruct(encoder -> {
             encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
                 var target = PreludeSchemas.getSchemaForType(ShapeType.STRING);
-                var member = PreludeSchemas.DOCUMENT.documentMember("foo", target);
+                var member = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember("foo", target);
                 s.writeString(member, "Hi");
             });
         });
@@ -65,7 +65,7 @@ public class TypedDocumentMemberTest {
         var document2 = Document.ofStruct(encoder -> {
             encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
                 var target = PreludeSchemas.getSchemaForType(ShapeType.INTEGER);
-                var member = PreludeSchemas.DOCUMENT.documentMember("foo", target);
+                var member = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember("foo", target);
                 s.writeInteger(member, 1);
             });
         });
@@ -85,7 +85,7 @@ public class TypedDocumentMemberTest {
         SerializableShape serializableShape = encoder -> {
             encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
                 var target = PreludeSchemas.getSchemaForType(type);
-                var aMember = SdkSchema.memberBuilder("a", target).id(PreludeSchemas.DOCUMENT.id()).build();
+                var aMember = SdkSchema.memberBuilder(-1, "a", target).id(PreludeSchemas.DOCUMENT.id()).build();
                 writer.accept(aMember, s);
             });
         };
@@ -549,7 +549,11 @@ public class TypedDocumentMemberTest {
                 Map.of(Document.of("a"), Document.of(1)),
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
                     schema,
-                    m -> m.entry("a", c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
+                    m -> m.writeEntry(
+                        schema.getOrCreateDocumentMember("key", PreludeSchemas.STRING),
+                        "a",
+                        c -> c.writeInteger(PreludeSchemas.INTEGER, 1)
+                    )
                 ),
                 (Function<Document, Object>) d -> Document.ofValue(
                     Document.ofMap(d.asMap())
@@ -562,7 +566,11 @@ public class TypedDocumentMemberTest {
                 Map.of(Document.of(1), Document.of(1)),
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
                     schema,
-                    m -> m.entry(1, c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
+                    m -> m.writeEntry(
+                        schema.getOrCreateDocumentMember("key", PreludeSchemas.INTEGER),
+                        1,
+                        c -> c.writeInteger(PreludeSchemas.INTEGER, 1)
+                    )
                 ),
                 (Function<Document, Object>) d -> Document.ofValue(
                     Document.ofMap(d.asMap())
@@ -575,7 +583,11 @@ public class TypedDocumentMemberTest {
                 Map.of(Document.of(1L), Document.of(1)),
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
                     schema,
-                    m -> m.entry(1L, c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
+                    m -> m.writeEntry(
+                        schema.getOrCreateDocumentMember("key", PreludeSchemas.LONG),
+                        1L,
+                        c -> c.writeInteger(PreludeSchemas.INTEGER, 1)
+                    )
                 ),
                 (Function<Document, Object>) d -> Document.ofValue(
                     Document.ofMap(d.asMap())
@@ -588,7 +600,11 @@ public class TypedDocumentMemberTest {
                 Document.of(1),
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
                     schema,
-                    m -> m.entry("a", c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
+                    m -> m.writeEntry(
+                        schema.getOrCreateDocumentMember("key", PreludeSchemas.STRING),
+                        "a",
+                        c -> c.writeInteger(PreludeSchemas.INTEGER, 1)
+                    )
                 ),
                 (Function<Document, Object>) d -> Document.ofValue(d.getMember("a"))
             ),
@@ -599,8 +615,14 @@ public class TypedDocumentMemberTest {
                 Document.of("b"),
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> {
                     s.writeStruct(schema, ser -> {
-                        ser.writeString(PreludeSchemas.DOCUMENT.documentMember("foo", PreludeSchemas.STRING), "a");
-                        ser.writeString(PreludeSchemas.DOCUMENT.documentMember("bar", PreludeSchemas.STRING), "b");
+                        ser.writeString(
+                            PreludeSchemas.DOCUMENT.getOrCreateDocumentMember("foo", PreludeSchemas.STRING),
+                            "a"
+                        );
+                        ser.writeString(
+                            PreludeSchemas.DOCUMENT.getOrCreateDocumentMember("bar", PreludeSchemas.STRING),
+                            "b"
+                        );
                     });
                 },
                 (Function<Document, Object>) d -> Document.ofValue(d.getMember("bar"))

@@ -72,10 +72,7 @@ public final class GetPersonImageInput implements SerializableShape {
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, (member, de) -> {
-                int index = member.memberIndex() == -1
-                    ? SCHEMA.member(member.memberName()).memberIndex()
-                    : member.memberIndex();
-                switch (index) {
+                switch (SCHEMA.lookupMemberIndex(member)) {
                     case 0 -> name(de.readString(member));
                 }
             });

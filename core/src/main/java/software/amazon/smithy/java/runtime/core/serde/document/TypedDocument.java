@@ -26,8 +26,8 @@ final class TypedDocument implements Document {
             private final Map<String, Pair<SdkSchema, Consumer<ShapeSerializer>>> members = new LinkedHashMap<>();
 
             @Override
-            protected RuntimeException throwForInvalidState(SdkSchema schema) {
-                return new SdkSerdeException("Typed documents can only wrap structures. Found: " + schema);
+            protected RuntimeException throwForInvalidState(String message, SdkSchema schema) {
+                return new SdkSerdeException("Typed documents can only wrap structures. " + message);
             }
 
             @Override

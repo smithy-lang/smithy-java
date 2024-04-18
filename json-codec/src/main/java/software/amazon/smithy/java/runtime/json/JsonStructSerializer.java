@@ -148,4 +148,10 @@ class JsonStructSerializer implements ShapeSerializer {
         startMember(member);
         parent.writeDocument(member, value);
     }
+
+    @Override
+    public void writeNull(SdkSchema member) {
+        startMember(member);
+        parent.writeNull(member);
+    }
 }
