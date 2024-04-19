@@ -50,11 +50,7 @@ public enum Attitude implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer encoder) {
-        if (value == null) {
-            encoder.writeNull(SCHEMA);
-        } else {
-            encoder.writeString(SCHEMA, value);
-        }
+        ShapeSerializer.writeIfNotNull(encoder, SCHEMA, value);
     }
 
     public static Attitude from(String value) {

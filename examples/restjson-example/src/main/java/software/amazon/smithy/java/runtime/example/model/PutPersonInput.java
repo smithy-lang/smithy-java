@@ -144,7 +144,7 @@ public final class PutPersonInput implements SerializableShape {
                     }));
                 });
             }
-            st.writeString(SCHEMA_ATTITUDE, attitude.value());
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_ATTITUDE, attitude.value());
         });
     }
 
