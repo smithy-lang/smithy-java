@@ -220,7 +220,7 @@ public final class PutPersonInput implements SerializableShape {
                         });
                         queryParams(result);
                     }
-                    case 6 -> attitude(Attitude.from(de.readString(member)));
+                    case 6 -> attitude(Attitude.builder().deserialize(de).build());
                 }
             });
             return this;
