@@ -6,12 +6,12 @@
 package software.amazon.smithy.java.runtime.example.model;
 
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.EnumUtils;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
@@ -26,13 +26,7 @@ public enum Attitude implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Attitude");
 
-    // TODO: Move this initialization into a util function
-    private static final Map<String, Attitude> VALUE_MAP = new HashMap<>();
-    static {
-        VALUE_MAP.put(OPTIMIST.value, OPTIMIST);
-        VALUE_MAP.put(PESSIMIST.value, PESSIMIST);
-        VALUE_MAP.put(REALIST.value, REALIST);
-    }
+    private static final Map<String, Attitude> VALUE_MAP = EnumUtils.valueMapOf(Attitude.class, Attitude::value);
 
     static final SdkSchema SCHEMA = SdkSchema.builder()
         .id(ID)
@@ -44,6 +38,10 @@ public enum Attitude implements SerializableShape {
 
     Attitude(String value) {
         this.value = value;
+    }
+
+    public String value() {
+        return value;
     }
 
     public String toString() {
