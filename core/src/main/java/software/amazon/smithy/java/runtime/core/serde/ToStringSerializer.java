@@ -92,11 +92,6 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeEnum(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-        consumer.accept(ToStringSerializer.this);
-    }
-
-    @Override
     public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         indent();
         consumer.accept(new ListSerializer(this, this::writeComma));

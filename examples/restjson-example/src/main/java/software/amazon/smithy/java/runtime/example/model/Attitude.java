@@ -9,10 +9,8 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.EnumUtils;
-import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -65,29 +63,5 @@ public enum Attitude implements SerializableShape {
         Set<Attitude> knownValues = EnumSet.allOf(Attitude.class);
         knownValues.remove(UNKNOWN);
         return knownValues;
-    }
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    public static final class Builder implements SdkShapeBuilder<Attitude> {
-        private String value;
-
-        public Builder value(String value) {
-            this.value = value;
-            return this;
-        }
-
-        @Override
-        public SdkShapeBuilder<Attitude> deserialize(ShapeDeserializer decoder) {
-            value(decoder.readString(SCHEMA));
-            return this;
-        }
-
-        @Override
-        public Attitude build() {
-            return Attitude.from(value);
-        }
     }
 }

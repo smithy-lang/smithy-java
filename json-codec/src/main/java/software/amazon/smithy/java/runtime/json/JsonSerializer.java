@@ -169,11 +169,6 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeEnum(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-        consumer.accept(this);
-    }
-
-    @Override
     public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         try {
             stream.writeArrayStart();

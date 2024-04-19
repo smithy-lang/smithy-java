@@ -48,14 +48,6 @@ public interface ShapeSerializer extends Flushable {
     void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer);
 
     /**
-     * Writes an enum or int enum.
-     *
-     * @param schema   Schema to serialize.
-     * @param consumer Receives the enum serializer and writes members.
-     */
-    void writeEnum(SdkSchema schema, Consumer<ShapeSerializer> consumer);
-
-    /**
      * Begin a list and write zero or more values into it using the provided serializer.
      *
      * @param schema   List schema.

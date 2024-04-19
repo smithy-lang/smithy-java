@@ -144,8 +144,7 @@ public final class PutPersonInput implements SerializableShape {
                     }));
                 });
             }
-            st.writeEnum(SCHEMA_ATTITUDE, attitude::serialize);
-            //attitude.serialize(st);
+            st.writeString(SCHEMA_ATTITUDE, attitude.value());
         });
     }
 
@@ -221,7 +220,7 @@ public final class PutPersonInput implements SerializableShape {
                         });
                         queryParams(result);
                     }
-                    case 6 -> attitude(Attitude.builder().deserialize(de).build());
+                    case 6 -> attitude(Attitude.from(de.readString(member)));
                 }
             });
             return this;

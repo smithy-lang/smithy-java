@@ -44,12 +44,6 @@ public final class RequiredWriteSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeEnum(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-        delegate.writeEnum(schema, consumer);
-        wroteSomething = true;
-    }
-
-    @Override
     public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         delegate.writeList(schema, consumer);
         wroteSomething = true;

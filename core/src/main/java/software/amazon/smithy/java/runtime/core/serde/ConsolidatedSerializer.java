@@ -31,11 +31,6 @@ final class ConsolidatedSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeEnum(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-        write(schema, ser -> ser.writeEnum(schema, consumer));
-    }
-
-    @Override
     public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         write(schema, ser -> ser.writeList(schema, consumer));
     }
