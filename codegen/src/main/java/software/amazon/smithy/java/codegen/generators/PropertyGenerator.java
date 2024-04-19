@@ -37,7 +37,7 @@ final class PropertyGenerator implements Runnable {
             writer.pushState();
             writer.putContext("isNullable", SymbolUtils.isNullableMember(member));
             writer.write(
-                "private final ${?isNullable}$1T${/isNullable}${^isNullable}$1B${/isNullable} $2L;",
+                "private final ${?isNullable}$1B${/isNullable}${^isNullable}$1T${/isNullable} $2L;",
                 symbolProvider.toSymbol(member),
                 memberName
             );
