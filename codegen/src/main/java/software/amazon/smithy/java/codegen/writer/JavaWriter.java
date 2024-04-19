@@ -64,10 +64,9 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
                 package $L;
 
                 $L
-
                 $L
                 """,
-            getHeader(),
+            settings.header(),
             packageNamespace,
             getImportContainer(),
             super.toString()
@@ -97,15 +96,6 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
                 return $T.serialize(this);
             }
             """, String.class, ToStringSerializer.class);
-    }
-
-    public String getHeader() {
-        StringBuilder builder = new StringBuilder().append("/**").append(getNewline());
-        for (String line : settings.headerLines()) {
-            builder.append(" * ").append(line).append(getNewline());
-        }
-        builder.append(" */");
-        return builder.toString();
     }
 
     private void putNameContext() {

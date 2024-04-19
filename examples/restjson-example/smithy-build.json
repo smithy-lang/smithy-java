@@ -3,7 +3,8 @@
   "plugins": {
     "java-codegen": {
       "service": "smithy.example#PersonDirectory",
-      "namespace": "software.amazon.smithy.java.runtime.example.codegen"
+      "namespace": "software.amazon.smithy.java.runtime.example.codegen",
+      "headerFile": "license.txt"
     }
   }
 }
