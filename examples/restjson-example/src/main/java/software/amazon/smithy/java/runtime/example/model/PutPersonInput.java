@@ -58,9 +58,9 @@ public final class PutPersonInput implements SerializableShape {
         .traits(new HttpQueryParamsTrait())
         .build();
     private static final SdkSchema SCHEMA_ATTITUDE = SdkSchema
-            .memberBuilder(6, "attitude", Attitude.SCHEMA)
-            .id(ID)
-            .build();
+        .memberBuilder(6, "attitude", Attitude.SCHEMA)
+        .id(ID)
+        .build();
     static final SdkSchema SCHEMA = SdkSchema.builder()
         .id(ID)
         .type(ShapeType.STRUCTURE)

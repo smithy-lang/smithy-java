@@ -1,3 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.runtime.example.model;
 
 import java.util.EnumSet;
@@ -30,10 +35,10 @@ public enum Attitude implements SerializableShape {
     }
 
     static final SdkSchema SCHEMA = SdkSchema.builder()
-            .id(ID)
-            .type(ShapeType.ENUM)
-            .stringEnumValues(OPTIMIST.value, PESSIMIST.value)
-            .build();
+        .id(ID)
+        .type(ShapeType.ENUM)
+        .stringEnumValues(OPTIMIST.value, PESSIMIST.value)
+        .build();
 
     private final String value;
 

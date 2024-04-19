@@ -5,6 +5,9 @@
 
 package software.amazon.smithy.java.runtime.example;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+
 import java.io.InputStream;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
@@ -140,6 +143,21 @@ public class GenericTest {
 
         // Use a helper to deserialize directly into a builder and create the shape.
         PutPersonInput copy = codec.deserializeShape(jsonString, PutPersonInput.builder());
+
+        // Dump out the copy of the shape.
+        System.out.println(codec.serializeToString(copy));
+    }
+
+    @Test
+    public void unknownEnumDeser() {
+        JsonCodec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
+
+        String jsonString = "{\"name\":\"Michael\",\"Age\":999,\"birthday\":1.713557676235E9,\"favoriteColor\":\"Green\",\"attitude\":\"somethingElse\"}";
+
+        // Use a helper to deserialize directly into a builder and create the shape.
+        PutPersonInput copy = codec.deserializeShape(jsonString, PutPersonInput.builder());
+
+        assertThat(copy.attitude, equalTo(Attitude.UNKNOWN));
 
         // Dump out the copy of the shape.
         System.out.println(codec.serializeToString(copy));
