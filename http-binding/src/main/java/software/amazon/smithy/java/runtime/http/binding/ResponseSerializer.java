@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.Objects;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
@@ -19,7 +19,7 @@ import software.amazon.smithy.model.traits.HttpTrait;
  */
 public final class ResponseSerializer {
     private Codec payloadCodec;
-    private SdkSchema operation;
+    private Schema operation;
     private SerializableShape shapeValue;
     private final BindingMatcher bindingMatcher = BindingMatcher.responseMatcher();
     private DataStream payload;
@@ -32,7 +32,7 @@ public final class ResponseSerializer {
      * @param operation Operation schema.
      * @return Returns the serializer.
      */
-    public ResponseSerializer operation(SdkSchema operation) {
+    public ResponseSerializer operation(Schema operation) {
         if (operation.type() != ShapeType.OPERATION) {
             throw new IllegalArgumentException("operation must be an operation, but found " + operation);
         }

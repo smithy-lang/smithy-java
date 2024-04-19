@@ -26,7 +26,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.java.runtime.core.testmodels.Person;
@@ -115,7 +115,7 @@ public class DocumentTest {
     @ParameterizedTest
     @MethodSource("invalidConversionSupplier")
     public void throwsOnInvalidConversion(Document value, Consumer<Document> call) {
-        Assertions.assertThrows(SdkSerdeException.class, () -> call.accept(value));
+        Assertions.assertThrows(SerdeException.class, () -> call.accept(value));
     }
 
     public static List<Arguments> invalidConversionSupplier() {

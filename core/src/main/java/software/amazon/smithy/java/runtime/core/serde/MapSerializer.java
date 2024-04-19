@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.core.serde;
 
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 
 /**
  * Serializes a map shape.
@@ -19,7 +19,7 @@ public interface MapSerializer {
      * @param key             Key to write.
      * @param valueSerializer Serializer used to serialize the map value. A value must be serialized.
      */
-    void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer);
+    void writeEntry(Schema keySchema, String key, Consumer<ShapeSerializer> valueSerializer);
 
     /**
      * Writes an integer key for the map, and the valueSerializer is called and required to serialize the value.
@@ -28,7 +28,7 @@ public interface MapSerializer {
      * @param key             Key to write.
      * @param valueSerializer Serializer used to serialize the map value. A value must be serialized.
      */
-    void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer);
+    void writeEntry(Schema keySchema, int key, Consumer<ShapeSerializer> valueSerializer);
 
     /**
      * Writes a long key for the map, and the valueSerializer is called and required to serialize the value.
@@ -37,5 +37,5 @@ public interface MapSerializer {
      * @param key             Key to write.
      * @param valueSerializer Serializer used to serialize the map value. A value must be serialized.
      */
-    void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer);
+    void writeEntry(Schema keySchema, long key, Consumer<ShapeSerializer> valueSerializer);
 }

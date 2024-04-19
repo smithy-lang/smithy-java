@@ -11,11 +11,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -40,7 +40,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private final Map<String, String> requestPathLabels;
     private final BindingMatcher bindingMatcher;
     private final DataStream body;
-    private final SdkShapeBuilder<?> shapeBuilder;
+    private final ShapeBuilder<?> shapeBuilder;
 
     private HttpBindingDeserializer(Builder builder) {
         this.shapeBuilder = Objects.requireNonNull(builder.shapeBuilder, "shapeBuilder not set");
@@ -59,16 +59,16 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     @Override
-    protected RuntimeException throwForInvalidState(SdkSchema schema) {
+    protected RuntimeException throwForInvalidState(Schema schema) {
         throw new IllegalStateException("Expected to parse a structure for HTTP bindings, but found " + schema);
     }
 
     @Override
-    public void readStruct(SdkSchema schema, BiConsumer<SdkSchema, ShapeDeserializer> eachEntry) {
+    public void readStruct(Schema schema, BiConsumer<Schema, ShapeDeserializer> eachEntry) {
         List<String> bodyMembers = new ArrayList<>();
 
         // First parse members in the framing.
-        for (SdkSchema member : schema.members()) {
+        for (Schema member : schema.members()) {
             switch (bindingMatcher.match(member)) {
                 case LABEL -> throw new UnsupportedOperationException("httpLabel binding not supported yet");
                 case QUERY -> throw new UnsupportedOperationException("httpQuery binding not supported yet");
@@ -105,7 +105,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         // Now parse members in the payload of body.
         if (!bodyMembers.isEmpty()) {
             // Extract from the payload codec and exclude members from other locations.
-            SdkSchema payloadOnly = schema.withFilteredMembers(member -> !bodyMembers.contains(member.id().getName()));
+            Schema payloadOnly = schema.withFilteredMembers(member -> !bodyMembers.contains(member.id().getName()));
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
             var bytes = readPayloadBytes();
             LOGGER.log(
@@ -128,7 +128,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         // Validate the media-type matches the codec.
         String contentType = headers.firstValue("content-type").orElse("");
         if (!contentType.equals(payloadCodec.getMediaType())) {
-            throw new SdkSerdeException(
+            throw new SerdeException(
                 "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec.toString()
             );
         }
@@ -136,7 +136,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         // Ensure the content-length is in the allowable range.
         var contentLength = headers.firstValue("content-length").map(Long::valueOf).orElse(0L);
         if (contentLength > MAX_IN_MEMORY_PAYLOAD) {
-            throw new SdkSerdeException("Content-Length too large " + contentLength);
+            throw new SerdeException("Content-Length too large " + contentLength);
         }
 
         return body.readToBytes(MAX_IN_MEMORY_PAYLOAD);
@@ -151,7 +151,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         private DataStream body;
         private String requestPath;
         private int responseStatus;
-        private SdkShapeBuilder<?> shapeBuilder;
+        private ShapeBuilder<?> shapeBuilder;
 
         private Builder() {
         }
@@ -270,7 +270,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @param shapeBuilder Shape builder to create a shape.
          * @return the builder.
          */
-        Builder shapeBuilder(SdkShapeBuilder<?> shapeBuilder) {
+        Builder shapeBuilder(ShapeBuilder<?> shapeBuilder) {
             this.shapeBuilder = shapeBuilder;
             return this;
         }

@@ -12,11 +12,11 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.model.shapes.ShapeType;
 
-public class SdkSchemaTest {
+public class SchemaTest {
     @Test
     public void intEnumRequiresIntEnumSchema() {
         Assertions.assertThrows(SdkException.class, () -> {
-            SdkSchema.builder()
+            Schema.builder()
                 .type(ShapeType.STRING)
                 .id("smithy.example#Foo")
                 .intEnumValues(1, 2, 3)
@@ -27,7 +27,7 @@ public class SdkSchemaTest {
     @Test
     public void enumRequiresStringSchema() {
         Assertions.assertThrows(SdkException.class, () -> {
-            SdkSchema.builder()
+            Schema.builder()
                 .type(ShapeType.INTEGER)
                 .id("smithy.example#Foo")
                 .stringEnumValues("a", "b")
@@ -37,7 +37,7 @@ public class SdkSchemaTest {
 
     @Test
     public void enumWorksWithEnumSchema() {
-        var schema = SdkSchema.builder()
+        var schema = Schema.builder()
             .id("smithy.example#Foo")
             .type(ShapeType.ENUM)
             .stringEnumValues("a", "b")
@@ -48,7 +48,7 @@ public class SdkSchemaTest {
 
     @Test
     public void intEnumWorksWithIntEnumSchema() {
-        var schema = SdkSchema.builder()
+        var schema = Schema.builder()
             .id("smithy.example#Foo")
             .type(ShapeType.INT_ENUM)
             .intEnumValues(1, 2, 3)

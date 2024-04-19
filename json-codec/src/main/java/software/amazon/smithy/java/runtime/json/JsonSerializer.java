@@ -14,7 +14,7 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -51,7 +51,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeBoolean(SdkSchema schema, boolean value) {
+    public void writeBoolean(Schema schema, boolean value) {
         try {
             stream.writeVal(value);
         } catch (IOException e) {
@@ -60,7 +60,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeByte(SdkSchema schema, byte value) {
+    public void writeByte(Schema schema, byte value) {
         try {
             stream.writeVal(value);
         } catch (IOException e) {
@@ -69,7 +69,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeShort(SdkSchema schema, short value) {
+    public void writeShort(Schema schema, short value) {
         try {
             stream.writeVal(value);
         } catch (IOException e) {
@@ -78,7 +78,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeBlob(SdkSchema schema, byte[] value) {
+    public void writeBlob(Schema schema, byte[] value) {
         try {
             stream.writeVal(Base64.getEncoder().encodeToString(value));
         } catch (IOException e) {
@@ -87,7 +87,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeInteger(SdkSchema schema, int value) {
+    public void writeInteger(Schema schema, int value) {
         try {
             stream.writeVal(value);
         } catch (IOException e) {
@@ -96,7 +96,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeLong(SdkSchema schema, long value) {
+    public void writeLong(Schema schema, long value) {
         try {
             stream.writeVal(value);
         } catch (IOException e) {
@@ -105,7 +105,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeFloat(SdkSchema schema, float value) {
+    public void writeFloat(Schema schema, float value) {
         try {
             stream.writeVal(value);
         } catch (IOException e) {
@@ -114,7 +114,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeDouble(SdkSchema schema, double value) {
+    public void writeDouble(Schema schema, double value) {
         try {
             stream.writeVal(value);
         } catch (IOException e) {
@@ -123,7 +123,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeBigInteger(SdkSchema schema, BigInteger value) {
+    public void writeBigInteger(Schema schema, BigInteger value) {
         try {
             stream.writeVal(value);
         } catch (IOException e) {
@@ -132,7 +132,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+    public void writeBigDecimal(Schema schema, BigDecimal value) {
         try {
             stream.writeVal(value);
         } catch (IOException e) {
@@ -141,7 +141,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeString(SdkSchema schema, String value) {
+    public void writeString(Schema schema, String value) {
         try {
             stream.writeVal(value);
         } catch (IOException e) {
@@ -150,7 +150,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeTimestamp(SdkSchema schema, Instant value) {
+    public void writeTimestamp(Schema schema, Instant value) {
         var formatter = useTimestampFormat && schema.hasTrait(TimestampFormatTrait.class)
             ? TimestampFormatter.of(schema.getTrait(TimestampFormatTrait.class))
             : defaultTimestampFormat;
@@ -158,7 +158,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeStruct(Schema schema, Consumer<ShapeSerializer> consumer) {
         try {
             stream.writeObjectStart();
             consumer.accept(new JsonStructSerializer(this, stream, useJsonName));
@@ -169,7 +169,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeList(Schema schema, Consumer<ShapeSerializer> consumer) {
         try {
             stream.writeArrayStart();
             consumer.accept(new ListSerializer(this, this::writeComma));
@@ -190,7 +190,7 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public void writeMap(Schema schema, Consumer<MapSerializer> consumer) {
         try {
             stream.writeObjectStart();
             consumer.accept(new JsonMapSerializer(this, stream));
@@ -201,13 +201,13 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeDocument(SdkSchema schema, Document value) {
+    public void writeDocument(Schema schema, Document value) {
         // Document values in JSON are serialized inline by receiving the data model contents of the document.
         value.serializeContents(this);
     }
 
     @Override
-    public void writeNull(SdkSchema schema) {
+    public void writeNull(Schema schema) {
         try {
             stream.writeNull();
         } catch (IOException e) {

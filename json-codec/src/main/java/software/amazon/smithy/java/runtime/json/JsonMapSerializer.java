@@ -9,7 +9,7 @@ import com.jsoniter.output.JsonStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.RequiredWriteSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -26,7 +26,7 @@ final class JsonMapSerializer implements MapSerializer {
     }
 
     @Override
-    public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
+    public void writeEntry(Schema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
         try {
             beforeWrite();
             stream.writeObjectField(key);
@@ -50,12 +50,12 @@ final class JsonMapSerializer implements MapSerializer {
     }
 
     @Override
-    public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
+    public void writeEntry(Schema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
         writeEntry(keySchema, Integer.toString(key), valueSerializer);
     }
 
     @Override
-    public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
+    public void writeEntry(Schema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
         writeEntry(keySchema, Long.toString(key), valueSerializer);
     }
 }

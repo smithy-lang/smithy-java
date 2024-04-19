@@ -10,7 +10,7 @@ import static org.hamcrest.Matchers.is;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerdeException;
 import software.amazon.smithy.java.runtime.core.testmodels.Bird;
 import software.amazon.smithy.java.runtime.core.testmodels.Person;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -43,7 +43,7 @@ public class TypeRegistryTest {
             .build();
 
         Assertions.assertThrows(
-            SdkSerdeException.class,
+            SerdeException.class,
             () -> registry.create(ShapeId.from("smithy.example#Person"), Bird.class)
         );
     }

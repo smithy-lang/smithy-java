@@ -5,9 +5,9 @@
 
 package software.amazon.smithy.java.runtime.example.model;
 
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
@@ -18,7 +18,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public final class PutPersonImageOutput implements SerializableShape {
 
     static final ShapeId ID = ShapeId.from("smithy.example#PutPersonImageOutput");
-    static final SdkSchema SCHEMA = SdkSchema.builder().id(ID).type(ShapeType.STRUCTURE).build();
+    static final Schema SCHEMA = Schema.builder().id(ID).type(ShapeType.STRUCTURE).build();
 
     private PutPersonImageOutput(Builder builder) {}
 
@@ -36,7 +36,7 @@ public final class PutPersonImageOutput implements SerializableShape {
         serializer.writeStruct(SCHEMA, st -> {});
     }
 
-    public static final class Builder implements SdkShapeBuilder<PutPersonImageOutput> {
+    public static final class Builder implements ShapeBuilder<PutPersonImageOutput> {
 
         private Builder() {
         }

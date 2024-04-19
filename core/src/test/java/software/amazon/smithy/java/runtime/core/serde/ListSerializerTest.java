@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 
 public class ListSerializerTest {
     @Test
@@ -23,7 +23,7 @@ public class ListSerializerTest {
 
         var delegate = new SpecificShapeSerializer() {
             @Override
-            public void writeString(SdkSchema schema, String value) {
+            public void writeString(Schema schema, String value) {
                 strings.add(value);
             }
         };

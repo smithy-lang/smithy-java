@@ -11,9 +11,9 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SdkOperation;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.model.shapes.OperationShape;
 
@@ -30,8 +30,8 @@ public class OperationGenerator
             writer.pushState(new ClassSection(shape));
             writer.putContext("inputType", input);
             writer.putContext("outputType", output);
-            writer.putContext("sdkSchema", SdkSchema.class);
-            writer.putContext("sdkShapeBuilder", SdkShapeBuilder.class);
+            writer.putContext("sdkSchema", Schema.class);
+            writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
             writer.putContext("typeRegistry", TypeRegistry.class);
             writer.write(
                 """

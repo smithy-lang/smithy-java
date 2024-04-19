@@ -15,9 +15,9 @@ import static org.hamcrest.Matchers.nullValue;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerdeException;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -25,7 +25,7 @@ public class TypedDocumentTest {
     @Test
     public void requiresSchemaToEmitStruct() {
         var e = Assertions.assertThrows(
-            SdkSerdeException.class,
+            SerdeException.class,
             () -> Document.ofStruct(encoder -> encoder.writeString(PreludeSchemas.STRING, "A"))
         );
 
@@ -34,7 +34,7 @@ public class TypedDocumentTest {
 
     @Test
     public void requiresSchemaToEmitSomething() {
-        var e = Assertions.assertThrows(SdkSerdeException.class, () -> Document.ofStruct(encoder -> {}));
+        var e = Assertions.assertThrows(SerdeException.class, () -> Document.ofStruct(encoder -> {}));
 
         assertThat(e.getMessage(), containsString("When attempting to create a typed document"));
     }
@@ -43,11 +43,11 @@ public class TypedDocumentTest {
     public void wrapsStructContentWithTypeAndSchema() {
         SerializableShape serializableShape = encoder -> {
             encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
-                var aMember = SdkSchema.memberBuilder(-1, "a", PreludeSchemas.STRING)
+                var aMember = Schema.memberBuilder(-1, "a", PreludeSchemas.STRING)
                     .id(PreludeSchemas.DOCUMENT.id())
                     .build();
                 s.writeString(aMember, "1");
-                var bMember = SdkSchema.memberBuilder(-1, "b", PreludeSchemas.STRING)
+                var bMember = Schema.memberBuilder(-1, "b", PreludeSchemas.STRING)
                     .id(PreludeSchemas.DOCUMENT.id())
                     .build();
                 s.writeString(bMember, "2");
@@ -82,7 +82,7 @@ public class TypedDocumentTest {
         // Writes as document unless getting contents.
         result.serialize(new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(SdkSchema schema, Document value) {
+            public void writeDocument(Schema schema, Document value) {
                 assertThat(value, is(result));
             }
         });

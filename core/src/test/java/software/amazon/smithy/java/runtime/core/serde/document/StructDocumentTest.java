@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -64,7 +64,7 @@ public class StructDocumentTest {
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(SdkSchema schema, Document value) {
+            public void writeDocument(Schema schema, Document value) {
                 assertThat(value, is(document));
             }
         });
@@ -81,14 +81,14 @@ public class StructDocumentTest {
 
         document.serializeContents(new SpecificShapeSerializer() {
             @Override
-            public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+            public void writeStruct(Schema schema, Consumer<ShapeSerializer> consumer) {
                 assertThat(schema, equalTo(PreludeSchemas.DOCUMENT));
                 actions.add("beginStruct");
                 consumer.accept(ShapeSerializer.ofDelegatingConsumer((member, memberWriter) -> {
                     actions.add("member:" + member.memberName());
                     memberWriter.accept(new SpecificShapeSerializer() {
                         @Override
-                        public void writeString(SdkSchema schema1, String value) {
+                        public void writeString(Schema schema1, String value) {
                             // Make sure the schema gave the appropriate member name and target.
                             assertThat(schema1.memberName(), equalTo("a"));
                             assertThat(schema1.memberTarget(), equalTo(PreludeSchemas.STRING));
@@ -96,7 +96,7 @@ public class StructDocumentTest {
                         }
 
                         @Override
-                        public void writeInteger(SdkSchema schema1, int value) {
+                        public void writeInteger(Schema schema1, int value) {
                             // Make sure the schema gave the appropriate member name and target.
                             assertThat(schema1.memberName(), equalTo("b"));
                             assertThat(schema1.memberTarget(), equalTo(PreludeSchemas.INTEGER));

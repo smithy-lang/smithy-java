@@ -11,8 +11,8 @@ import java.util.Optional;
 import software.amazon.smithy.java.runtime.client.core.ClientCall;
 import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkException;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
@@ -112,7 +112,7 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
     private ModeledSdkException createModeledException(
         Codec codec,
         SmithyHttpResponse response,
-        SdkShapeBuilder<ModeledSdkException> error
+        ShapeBuilder<ModeledSdkException> error
     ) {
         HttpBinding.responseDeserializer()
             .payloadCodec(codec)

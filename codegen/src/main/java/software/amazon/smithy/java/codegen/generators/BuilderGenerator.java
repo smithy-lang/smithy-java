@@ -12,7 +12,7 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
@@ -61,7 +61,7 @@ final class BuilderGenerator implements Runnable {
                     ${5C|}
                 }""",
             symbolProvider.toSymbol(shape),
-            SdkShapeBuilder.class,
+            ShapeBuilder.class,
             (Runnable) this::builderProperties,
             (Runnable) this::builderSetters,
             (Runnable) this::deserializer

@@ -12,9 +12,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
@@ -25,24 +25,24 @@ import software.amazon.smithy.model.traits.JsonNameTrait;
 public final class Person implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Person");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
+    private static final Schema SCHEMA_NAME = Schema.memberBuilder(0, "name", PreludeSchemas.STRING)
         .id(ID)
         .build();
-    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder(1, "age", PreludeSchemas.INTEGER)
+    private static final Schema SCHEMA_AGE = Schema.memberBuilder(1, "age", PreludeSchemas.INTEGER)
         .id(ID)
         .traits(new JsonNameTrait("Age"))
         .build();
-    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder(2, "birthday", SharedSchemas.BIRTHDAY)
+    private static final Schema SCHEMA_BIRTHDAY = Schema.memberBuilder(2, "birthday", SharedSchemas.BIRTHDAY)
         .id(ID)
         .build();
-    private static final SdkSchema SCHEMA_BINARY = SdkSchema.memberBuilder(3, "binary", PreludeSchemas.BLOB)
+    private static final Schema SCHEMA_BINARY = Schema.memberBuilder(3, "binary", PreludeSchemas.BLOB)
         .id(ID)
         .build();
-    private static final SdkSchema SCHEMA_QUERY_PARAMS = SdkSchema
+    private static final Schema SCHEMA_QUERY_PARAMS = Schema
         .memberBuilder(4, "tags", SharedSchemas.MAP_LIST_STRING)
         .id(ID)
         .build();
-    static final SdkSchema SCHEMA = SdkSchema.builder()
+    static final Schema SCHEMA = Schema.builder()
         .id(ID)
         .type(ShapeType.STRUCTURE)
         .members(
@@ -118,7 +118,7 @@ public final class Person implements SerializableShape {
         });
     }
 
-    public static final class Builder implements SdkShapeBuilder<Person> {
+    public static final class Builder implements ShapeBuilder<Person> {
 
         private String name;
         private int age = 0;

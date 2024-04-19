@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 /**
@@ -95,7 +95,7 @@ public interface TimestampFormatter {
      * @param value      Timestamp value to serialize.
      * @param serializer Where to serialize the data.
      */
-    void serializeToUnderlyingFormat(SdkSchema schema, Instant value, ShapeSerializer serializer);
+    void serializeToUnderlyingFormat(Schema schema, Instant value, ShapeSerializer serializer);
 
     /**
      * Defines the underlying encoding type of a timestamp value.
@@ -152,7 +152,7 @@ public interface TimestampFormatter {
             }
 
             @Override
-            public void serializeToUnderlyingFormat(SdkSchema schema, Instant instant, ShapeSerializer serializer) {
+            public void serializeToUnderlyingFormat(Schema schema, Instant instant, ShapeSerializer serializer) {
                 double value = ((double) instant.toEpochMilli()) / 1000;
                 serializer.writeDouble(schema, value);
             }
@@ -203,7 +203,7 @@ public interface TimestampFormatter {
         }
 
         @Override
-        public void serializeToUnderlyingFormat(SdkSchema schema, Instant value, ShapeSerializer serializer) {
+        public void serializeToUnderlyingFormat(Schema schema, Instant value, ShapeSerializer serializer) {
             serializer.writeString(schema, formatToString(value));
         }
 

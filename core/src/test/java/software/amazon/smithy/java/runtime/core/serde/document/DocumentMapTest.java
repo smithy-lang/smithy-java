@@ -16,7 +16,7 @@ import java.util.function.Consumer;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
@@ -29,33 +29,33 @@ public class DocumentMapTest {
         Map<Document, Document> received = new HashMap<>();
         document.serializeContents(new SpecificShapeSerializer() {
             @Override
-            public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+            public void writeMap(Schema schema, Consumer<MapSerializer> consumer) {
                 consumer.accept(new MapSerializer() {
                     @Override
-                    public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(Schema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                         valueSerializer.accept(new SpecificShapeSerializer() {
                             @Override
-                            public void writeString(SdkSchema schema, String value) {
+                            public void writeString(Schema schema, String value) {
                                 received.put(Document.of(key), Document.of(value));
                             }
                         });
                     }
 
                     @Override
-                    public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(Schema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
                         valueSerializer.accept(new SpecificShapeSerializer() {
                             @Override
-                            public void writeString(SdkSchema schema, String value) {
+                            public void writeString(Schema schema, String value) {
                                 received.put(Document.of(key), Document.of(value));
                             }
                         });
                     }
 
                     @Override
-                    public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(Schema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
                         valueSerializer.accept(new SpecificShapeSerializer() {
                             @Override
-                            public void writeString(SdkSchema schema, String value) {
+                            public void writeString(Schema schema, String value) {
                                 received.put(Document.of(key), Document.of(value));
                             }
                         });
@@ -70,7 +70,7 @@ public class DocumentMapTest {
         // Ensure documents are always serialized as a document.
         document.serialize(new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(SdkSchema schema, Document value) {
+            public void writeDocument(Schema schema, Document value) {
                 assertThat(value, is(document));
             }
         });

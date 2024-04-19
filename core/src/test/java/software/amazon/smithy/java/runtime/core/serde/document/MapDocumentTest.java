@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
@@ -50,7 +50,7 @@ public class MapDocumentTest {
 
         map.serialize(new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(SdkSchema schema, Document value) {
+            public void writeDocument(Schema schema, Document value) {
                 assertThat(value, is(map));
             }
         });
@@ -69,15 +69,15 @@ public class MapDocumentTest {
         var keys = new ArrayList<>();
         map.serializeContents(new SpecificShapeSerializer() {
             @Override
-            public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+            public void writeMap(Schema schema, Consumer<MapSerializer> consumer) {
                 assertThat(schema, equalTo(PreludeSchemas.DOCUMENT));
                 consumer.accept(new MapSerializer() {
                     @Override
-                    public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(Schema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                         keys.add(key);
                         valueSerializer.accept(new SpecificShapeSerializer() {
                             @Override
-                            public void writeInteger(SdkSchema schema, int value) {
+                            public void writeInteger(Schema schema, int value) {
                                 assertThat(schema, equalTo(PreludeSchemas.INTEGER));
                                 if (key.equals("a")) {
                                     assertThat(value, is(1));
@@ -89,12 +89,12 @@ public class MapDocumentTest {
                     }
 
                     @Override
-                    public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(Schema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
                         throw new UnsupportedOperationException("Expected a string key");
                     }
 
                     @Override
-                    public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(Schema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
                         throw new UnsupportedOperationException("Expected a string key");
                     }
                 });

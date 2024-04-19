@@ -14,7 +14,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.model.traits.JsonNameTrait;
@@ -43,7 +43,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public byte[] readBlob(SdkSchema schema) {
+    public byte[] readBlob(Schema schema) {
         try {
             String content = iter.readString();
             return decoder.decode(content);
@@ -53,7 +53,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public byte readByte(SdkSchema schema) {
+    public byte readByte(Schema schema) {
         try {
             return (byte) iter.readShort();
         } catch (IOException e) {
@@ -62,7 +62,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public short readShort(SdkSchema schema) {
+    public short readShort(Schema schema) {
         try {
             return iter.readShort();
         } catch (IOException e) {
@@ -71,7 +71,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public int readInteger(SdkSchema schema) {
+    public int readInteger(Schema schema) {
         try {
             return iter.readInt();
         } catch (IOException e) {
@@ -80,7 +80,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public long readLong(SdkSchema schema) {
+    public long readLong(Schema schema) {
         try {
             return iter.readLong();
         } catch (IOException e) {
@@ -89,7 +89,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public float readFloat(SdkSchema schema) {
+    public float readFloat(Schema schema) {
         try {
             return iter.readFloat();
         } catch (IOException e) {
@@ -98,7 +98,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public double readDouble(SdkSchema schema) {
+    public double readDouble(Schema schema) {
         try {
             return iter.readDouble();
         } catch (IOException e) {
@@ -107,7 +107,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public BigInteger readBigInteger(SdkSchema schema) {
+    public BigInteger readBigInteger(Schema schema) {
         try {
             return iter.readBigInteger();
         } catch (IOException e) {
@@ -116,7 +116,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public BigDecimal readBigDecimal(SdkSchema schema) {
+    public BigDecimal readBigDecimal(Schema schema) {
         try {
             return iter.readBigDecimal();
         } catch (IOException e) {
@@ -125,7 +125,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public String readString(SdkSchema schema) {
+    public String readString(Schema schema) {
         try {
             return iter.readString();
         } catch (IOException e) {
@@ -134,7 +134,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public boolean readBoolean(SdkSchema schema) {
+    public boolean readBoolean(Schema schema) {
         try {
             return iter.readBoolean();
         } catch (IOException e) {
@@ -152,12 +152,12 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public Instant readTimestamp(SdkSchema schema) {
+    public Instant readTimestamp(Schema schema) {
         return readDocument().asTimestamp();
     }
 
     @Override
-    public void readStruct(SdkSchema schema, BiConsumer<SdkSchema, ShapeDeserializer> eachEntry) {
+    public void readStruct(Schema schema, BiConsumer<Schema, ShapeDeserializer> eachEntry) {
         try {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
                 var member = resolveMember(schema, field);
@@ -172,8 +172,8 @@ final class JsonDeserializer implements ShapeDeserializer {
         }
     }
 
-    private SdkSchema resolveMember(SdkSchema schema, String field) {
-        for (SdkSchema m : schema.members()) {
+    private Schema resolveMember(Schema schema, String field) {
+        for (Schema m : schema.members()) {
             if (useJsonName && m.hasTrait(JsonNameTrait.class)) {
                 if (m.getTrait(JsonNameTrait.class).getValue().equals(field)) {
                     return m;
@@ -186,7 +186,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public void readList(SdkSchema schema, Consumer<ShapeDeserializer> eachElement) {
+    public void readList(Schema schema, Consumer<ShapeDeserializer> eachElement) {
         try {
             while (iter.readArray()) {
                 eachElement.accept(this);
@@ -197,7 +197,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public void readStringMap(SdkSchema schema, BiConsumer<String, ShapeDeserializer> eachEntry) {
+    public void readStringMap(Schema schema, BiConsumer<String, ShapeDeserializer> eachEntry) {
         try {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
                 eachEntry.accept(field, this);
@@ -208,7 +208,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public void readIntMap(SdkSchema schema, BiConsumer<Integer, ShapeDeserializer> eachEntry) {
+    public void readIntMap(Schema schema, BiConsumer<Integer, ShapeDeserializer> eachEntry) {
         try {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
                 eachEntry.accept(Integer.parseInt(field), this);
@@ -219,7 +219,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public void readLongMap(SdkSchema schema, BiConsumer<Long, ShapeDeserializer> eachEntry) {
+    public void readLongMap(Schema schema, BiConsumer<Long, ShapeDeserializer> eachEntry) {
         try {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
                 eachEntry.accept(Long.parseLong(field), this);

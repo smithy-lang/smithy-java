@@ -20,8 +20,8 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterc
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkOperation;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 
 /**
@@ -36,7 +36,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
     private final EndpointProvider endpointProvider;
     private final SdkOperation<I, O> operation;
     private final Context context;
-    private final BiFunction<Context, String, Optional<SdkShapeBuilder<ModeledSdkException>>> errorCreator;
+    private final BiFunction<Context, String, Optional<ShapeBuilder<ModeledSdkException>>> errorCreator;
     private final ClientInterceptor interceptor;
     private final DataStream requestInputStream;
     private final AuthSchemeResolver authSchemeResolver;
@@ -149,7 +149,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
      * @param shapeId Nullable ID of the error shape to create, if known.
      * @return Returns the created output builder.
      */
-    public SdkShapeBuilder<O> createOutputBuilder(Context context, String shapeId) {
+    public ShapeBuilder<O> createOutputBuilder(Context context, String shapeId) {
         // TODO: Allow customizing this if needed.
         return operation().outputBuilder();
     }
@@ -164,7 +164,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
      *                only information we have is just a name.
      * @return Returns the error deserializer if present.
      */
-    public Optional<SdkShapeBuilder<ModeledSdkException>> createExceptionBuilder(Context context, String shapeId) {
+    public Optional<ShapeBuilder<ModeledSdkException>> createExceptionBuilder(Context context, String shapeId) {
         return errorCreator.apply(context, shapeId);
     }
 
@@ -216,7 +216,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
         private EndpointProvider endpointProvider;
         private SdkOperation<I, O> operation;
         private Context context;
-        private BiFunction<Context, String, Optional<SdkShapeBuilder<ModeledSdkException>>> errorCreator;
+        private BiFunction<Context, String, Optional<ShapeBuilder<ModeledSdkException>>> errorCreator;
         private ClientInterceptor interceptor = ClientInterceptor.NOOP;
         private DataStream requestInputStream;
         private AuthSchemeResolver authSchemeResolver;
@@ -271,7 +271,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
          * @return Returns the builder.
          */
         public Builder<I, O> errorCreator(
-            BiFunction<Context, String, Optional<SdkShapeBuilder<ModeledSdkException>>> errorCreator
+            BiFunction<Context, String, Optional<ShapeBuilder<ModeledSdkException>>> errorCreator
         ) {
             this.errorCreator = errorCreator;
             return this;

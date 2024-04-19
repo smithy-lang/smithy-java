@@ -10,7 +10,7 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
@@ -38,103 +38,103 @@ public final class RequiredWriteSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeStruct(Schema schema, Consumer<ShapeSerializer> consumer) {
         delegate.writeStruct(schema, consumer);
         wroteSomething = true;
     }
 
     @Override
-    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeList(Schema schema, Consumer<ShapeSerializer> consumer) {
         delegate.writeList(schema, consumer);
         wroteSomething = true;
     }
 
     @Override
-    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public void writeMap(Schema schema, Consumer<MapSerializer> consumer) {
         delegate.writeMap(schema, consumer);
         wroteSomething = true;
     }
 
     @Override
-    public void writeBoolean(SdkSchema schema, boolean value) {
+    public void writeBoolean(Schema schema, boolean value) {
         delegate.writeBoolean(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeByte(SdkSchema schema, byte value) {
+    public void writeByte(Schema schema, byte value) {
         delegate.writeByte(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeShort(SdkSchema schema, short value) {
+    public void writeShort(Schema schema, short value) {
         delegate.writeShort(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeInteger(SdkSchema schema, int value) {
+    public void writeInteger(Schema schema, int value) {
         delegate.writeInteger(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeLong(SdkSchema schema, long value) {
+    public void writeLong(Schema schema, long value) {
         delegate.writeLong(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeFloat(SdkSchema schema, float value) {
+    public void writeFloat(Schema schema, float value) {
         delegate.writeFloat(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeDouble(SdkSchema schema, double value) {
+    public void writeDouble(Schema schema, double value) {
         delegate.writeDouble(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeBigInteger(SdkSchema schema, BigInteger value) {
+    public void writeBigInteger(Schema schema, BigInteger value) {
         delegate.writeBigInteger(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+    public void writeBigDecimal(Schema schema, BigDecimal value) {
         delegate.writeBigDecimal(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeString(SdkSchema schema, String value) {
+    public void writeString(Schema schema, String value) {
         delegate.writeString(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeBlob(SdkSchema schema, byte[] value) {
+    public void writeBlob(Schema schema, byte[] value) {
         delegate.writeBlob(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeTimestamp(SdkSchema schema, Instant value) {
+    public void writeTimestamp(Schema schema, Instant value) {
         delegate.writeTimestamp(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeDocument(SdkSchema schema, Document value) {
+    public void writeDocument(Schema schema, Document value) {
         delegate.writeDocument(schema, value);
         wroteSomething = true;
     }
 
     @Override
-    public void writeNull(SdkSchema schema) {
+    public void writeNull(Schema schema) {
         delegate.writeNull(schema);
         wroteSomething = true;
     }

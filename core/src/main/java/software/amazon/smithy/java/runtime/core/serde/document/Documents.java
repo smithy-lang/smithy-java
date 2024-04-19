@@ -14,9 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -549,15 +549,15 @@ final class Documents {
 
     record MapDocument(Map<Document, Document> members) implements Document {
 
-        private static final SdkSchema STR_KEY = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember(
+        private static final Schema STR_KEY = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember(
             "key",
             PreludeSchemas.STRING
         );
-        private static final SdkSchema INT_KEY = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember(
+        private static final Schema INT_KEY = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember(
             "key",
             PreludeSchemas.INTEGER
         );
-        private static final SdkSchema LONG_KEY = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember(
+        private static final Schema LONG_KEY = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember(
             "key",
             PreludeSchemas.LONG
         );
@@ -593,7 +593,7 @@ final class Documents {
                         case STRING, ENUM -> s.writeEntry(STR_KEY, entry.getKey().asString(), valueSer);
                         case INTEGER, INT_ENUM -> s.writeEntry(INT_KEY, entry.getKey().asInteger(), valueSer);
                         case LONG -> s.writeEntry(LONG_KEY, entry.getKey().asLong(), valueSer);
-                        default -> throw new SdkSerdeException("Unexpected document map key: " + key);
+                        default -> throw new SerdeException("Unexpected document map key: " + key);
                     }
                 }
             });
@@ -643,92 +643,92 @@ final class Documents {
         }
 
         @Override
-        public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+        public void writeStruct(Schema schema, Consumer<ShapeSerializer> consumer) {
             structWriter.writeStruct(syntheticMember(memberName, schema), consumer);
         }
 
         @Override
-        public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+        public void writeList(Schema schema, Consumer<ShapeSerializer> consumer) {
             structWriter.writeList(syntheticMember(memberName, schema), consumer);
         }
 
         @Override
-        public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+        public void writeMap(Schema schema, Consumer<MapSerializer> consumer) {
             structWriter.writeMap(syntheticMember(memberName, schema), consumer);
         }
 
         @Override
-        public void writeBoolean(SdkSchema schema, boolean value) {
+        public void writeBoolean(Schema schema, boolean value) {
             structWriter.writeBoolean(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeByte(SdkSchema schema, byte value) {
+        public void writeByte(Schema schema, byte value) {
             structWriter.writeByte(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeShort(SdkSchema schema, short value) {
+        public void writeShort(Schema schema, short value) {
             structWriter.writeShort(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeInteger(SdkSchema schema, int value) {
+        public void writeInteger(Schema schema, int value) {
             structWriter.writeInteger(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeLong(SdkSchema schema, long value) {
+        public void writeLong(Schema schema, long value) {
             structWriter.writeLong(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeFloat(SdkSchema schema, float value) {
+        public void writeFloat(Schema schema, float value) {
             structWriter.writeFloat(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeDouble(SdkSchema schema, double value) {
+        public void writeDouble(Schema schema, double value) {
             structWriter.writeDouble(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeBigInteger(SdkSchema schema, BigInteger value) {
+        public void writeBigInteger(Schema schema, BigInteger value) {
             structWriter.writeBigInteger(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+        public void writeBigDecimal(Schema schema, BigDecimal value) {
             structWriter.writeBigDecimal(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeString(SdkSchema schema, String value) {
+        public void writeString(Schema schema, String value) {
             structWriter.writeString(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeBlob(SdkSchema schema, byte[] value) {
+        public void writeBlob(Schema schema, byte[] value) {
             structWriter.writeBlob(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeTimestamp(SdkSchema schema, Instant value) {
+        public void writeTimestamp(Schema schema, Instant value) {
             structWriter.writeTimestamp(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeDocument(SdkSchema schema, Document value) {
+        public void writeDocument(Schema schema, Document value) {
             structWriter.writeDocument(syntheticMember(memberName, schema), value);
         }
 
         @Override
-        public void writeNull(SdkSchema schema) {
+        public void writeNull(Schema schema) {
             structWriter.writeNull(syntheticMember(memberName, schema));
         }
 
-        private static SdkSchema syntheticMember(String name, SdkSchema target) {
-            return SdkSchema.memberBuilder(-1, name, target).id(PreludeSchemas.DOCUMENT.id()).build();
+        private static Schema syntheticMember(String name, Schema target) {
+            return Schema.memberBuilder(-1, name, target).id(PreludeSchemas.DOCUMENT.id()).build();
         }
     }
 }

@@ -9,7 +9,7 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.SchemaUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.MapShape;
@@ -50,7 +50,7 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
     @Override
     public void run() {
         writer.pushState();
-        writer.putContext("schemaClass", SdkSchema.class);
+        writer.putContext("schemaClass", Schema.class);
         writer.putContext("shapeTypeClass", ShapeType.class);
         shape.accept(this);
         writer.popState();

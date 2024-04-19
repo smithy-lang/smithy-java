@@ -5,9 +5,9 @@
 
 package software.amazon.smithy.java.runtime.example.model;
 
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SdkOperation;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -16,7 +16,7 @@ import software.amazon.smithy.model.traits.HttpTrait;
 
 public final class PutPerson implements SdkOperation<PutPersonInput, PutPersonOutput> {
 
-    private static final SdkSchema SCHEMA = SdkSchema.builder()
+    private static final Schema SCHEMA = Schema.builder()
         .id(ShapeId.from("smithy.example#PutPerson"))
         .type(ShapeType.OPERATION)
         .traits(HttpTrait.builder().method("PUT").uri(UriPattern.parse("/persons/{name}")).code(200).build())
@@ -30,27 +30,27 @@ public final class PutPerson implements SdkOperation<PutPersonInput, PutPersonOu
         .build();
 
     @Override
-    public SdkShapeBuilder<PutPersonInput> inputBuilder() {
+    public ShapeBuilder<PutPersonInput> inputBuilder() {
         return PutPersonInput.builder();
     }
 
     @Override
-    public SdkShapeBuilder<PutPersonOutput> outputBuilder() {
+    public ShapeBuilder<PutPersonOutput> outputBuilder() {
         return PutPersonOutput.builder();
     }
 
     @Override
-    public SdkSchema schema() {
+    public Schema schema() {
         return SCHEMA;
     }
 
     @Override
-    public SdkSchema inputSchema() {
+    public Schema inputSchema() {
         return PutPersonInput.SCHEMA;
     }
 
     @Override
-    public SdkSchema outputSchema() {
+    public Schema outputSchema() {
         return PutPersonOutput.SCHEMA;
     }
 

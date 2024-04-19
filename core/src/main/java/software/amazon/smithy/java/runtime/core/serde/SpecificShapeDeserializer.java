@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
@@ -22,61 +22,61 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
      * @param schema Unexpected encountered schema.
      * @return Returns an exception to throw.
      */
-    protected abstract RuntimeException throwForInvalidState(SdkSchema schema);
+    protected abstract RuntimeException throwForInvalidState(Schema schema);
 
     @Override
-    public byte[] readBlob(SdkSchema schema) {
+    public byte[] readBlob(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
 
-    public byte readByte(SdkSchema schema) {
+    public byte readByte(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public short readShort(SdkSchema schema) {
+    public short readShort(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public int readInteger(SdkSchema schema) {
+    public int readInteger(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public long readLong(SdkSchema schema) {
+    public long readLong(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public float readFloat(SdkSchema schema) {
+    public float readFloat(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public double readDouble(SdkSchema schema) {
+    public double readDouble(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public BigInteger readBigInteger(SdkSchema schema) {
+    public BigInteger readBigInteger(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public BigDecimal readBigDecimal(SdkSchema schema) {
+    public BigDecimal readBigDecimal(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public String readString(SdkSchema schema) {
+    public String readString(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public boolean readBoolean(SdkSchema schema) {
+    public boolean readBoolean(Schema schema) {
         return false;
     }
 
@@ -86,32 +86,32 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public Instant readTimestamp(SdkSchema schema) {
+    public Instant readTimestamp(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public void readStruct(SdkSchema schema, BiConsumer<SdkSchema, ShapeDeserializer> eachEntry) {
+    public void readStruct(Schema schema, BiConsumer<Schema, ShapeDeserializer> eachEntry) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public void readList(SdkSchema schema, Consumer<ShapeDeserializer> eachElement) {
+    public void readList(Schema schema, Consumer<ShapeDeserializer> eachElement) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public void readStringMap(SdkSchema schema, BiConsumer<String, ShapeDeserializer> eachEntry) {
+    public void readStringMap(Schema schema, BiConsumer<String, ShapeDeserializer> eachEntry) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public void readIntMap(SdkSchema schema, BiConsumer<Integer, ShapeDeserializer> eachEntry) {
+    public void readIntMap(Schema schema, BiConsumer<Integer, ShapeDeserializer> eachEntry) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public void readLongMap(SdkSchema schema, BiConsumer<Long, ShapeDeserializer> eachEntry) {
+    public void readLongMap(Schema schema, BiConsumer<Long, ShapeDeserializer> eachEntry) {
         throw throwForInvalidState(schema);
     }
 }

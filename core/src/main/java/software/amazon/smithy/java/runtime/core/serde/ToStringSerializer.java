@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Objects;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.traits.SensitiveTrait;
@@ -30,7 +30,7 @@ public final class ToStringSerializer implements ShapeSerializer {
         return serializer.toString();
     }
 
-    private ToStringSerializer append(SdkSchema schema, String value) {
+    private ToStringSerializer append(Schema schema, String value) {
         if (value == null) {
             append("null");
         }
@@ -55,7 +55,7 @@ public final class ToStringSerializer implements ShapeSerializer {
         return this;
     }
 
-    private ToStringSerializer appendStringWithPotentialNewlines(SdkSchema schema, String value) {
+    private ToStringSerializer appendStringWithPotentialNewlines(Schema schema, String value) {
         if (value == null) {
             append("null");
             return this;
@@ -81,7 +81,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeStruct(Schema schema, Consumer<ShapeSerializer> consumer) {
         append(schema.id().toString()).append(':').indent().append(System.lineSeparator());
         consumer.accept(ShapeSerializer.ofDelegatingConsumer((member, memberWriter) -> {
             append(member.memberName()).append(": ");
@@ -92,7 +92,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeList(Schema schema, Consumer<ShapeSerializer> consumer) {
         indent();
         consumer.accept(new ListSerializer(this, this::writeComma));
         dedent();
@@ -105,13 +105,13 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public void writeMap(Schema schema, Consumer<MapSerializer> consumer) {
         indent();
         append(System.lineSeparator());
 
         consumer.accept(new MapSerializer() {
             @Override
-            public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(Schema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                 writeString(schema.member("key"), key);
                 append(": ");
                 valueSerializer.accept(ToStringSerializer.this);
@@ -119,7 +119,7 @@ public final class ToStringSerializer implements ShapeSerializer {
             }
 
             @Override
-            public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(Schema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
                 writeInteger(schema.member("key"), key);
                 append(": ");
                 valueSerializer.accept(ToStringSerializer.this);
@@ -127,7 +127,7 @@ public final class ToStringSerializer implements ShapeSerializer {
             }
 
             @Override
-            public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(Schema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
                 writeLong(schema.member("key"), key);
                 append(": ");
                 valueSerializer.accept(ToStringSerializer.this);
@@ -139,67 +139,67 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeBoolean(SdkSchema schema, boolean value) {
+    public void writeBoolean(Schema schema, boolean value) {
         append(schema, Boolean.toString(value));
     }
 
     @Override
-    public void writeShort(SdkSchema schema, short value) {
+    public void writeShort(Schema schema, short value) {
         append(schema, Short.toString(value));
     }
 
     @Override
-    public void writeByte(SdkSchema schema, byte value) {
+    public void writeByte(Schema schema, byte value) {
         append(schema, Byte.toString(value));
     }
 
     @Override
-    public void writeInteger(SdkSchema schema, int value) {
+    public void writeInteger(Schema schema, int value) {
         append(schema, Integer.toString(value));
     }
 
     @Override
-    public void writeLong(SdkSchema schema, long value) {
+    public void writeLong(Schema schema, long value) {
         append(schema, Long.toString(value));
     }
 
     @Override
-    public void writeFloat(SdkSchema schema, float value) {
+    public void writeFloat(Schema schema, float value) {
         append(schema, Float.toString(value));
     }
 
     @Override
-    public void writeDouble(SdkSchema schema, double value) {
+    public void writeDouble(Schema schema, double value) {
         append(schema, Double.toString(value));
     }
 
     @Override
-    public void writeBigInteger(SdkSchema schema, BigInteger value) {
+    public void writeBigInteger(Schema schema, BigInteger value) {
         append(schema, value.toString());
     }
 
     @Override
-    public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+    public void writeBigDecimal(Schema schema, BigDecimal value) {
         append(schema, value.toString());
     }
 
     @Override
-    public void writeString(SdkSchema schema, String value) {
+    public void writeString(Schema schema, String value) {
         appendStringWithPotentialNewlines(schema, value);
     }
 
     @Override
-    public void writeBlob(SdkSchema schema, byte[] value) {
+    public void writeBlob(Schema schema, byte[] value) {
         append(schema, Base64.getEncoder().encodeToString(value));
     }
 
     @Override
-    public void writeTimestamp(SdkSchema schema, Instant value) {
+    public void writeTimestamp(Schema schema, Instant value) {
         append(schema, TimestampFormatter.Prelude.DATE_TIME.formatToString(value));
     }
 
     @Override
-    public void writeDocument(SdkSchema schema, Document value) {
+    public void writeDocument(Schema schema, Document value) {
         append("Document (" + value.type()).append("):");
         indent();
         append(System.lineSeparator());
@@ -208,7 +208,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeNull(SdkSchema schema) {
+    public void writeNull(Schema schema) {
         append(schema, "null");
     }
 }

@@ -12,7 +12,7 @@ import static org.hamcrest.Matchers.is;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -34,7 +34,7 @@ public class BigDecimalDocumentTest {
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(SdkSchema schema, Document value) {
+            public void writeDocument(Schema schema, Document value) {
                 assertThat(value, is(document));
             }
         });
@@ -46,7 +46,7 @@ public class BigDecimalDocumentTest {
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
-            public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+            public void writeBigDecimal(Schema schema, BigDecimal value) {
                 assertThat(schema, equalTo(PreludeSchemas.BIG_DECIMAL));
                 assertThat(value, equalTo(new BigDecimal(10)));
             }

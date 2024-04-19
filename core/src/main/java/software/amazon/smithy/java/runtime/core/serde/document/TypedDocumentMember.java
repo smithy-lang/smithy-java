@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
@@ -29,12 +29,12 @@ import software.amazon.smithy.model.shapes.ShapeType;
  */
 final class TypedDocumentMember implements Document {
 
-    private final SdkSchema schema;
+    private final Schema schema;
     private final Consumer<ShapeSerializer> memberWriter;
     private volatile int computedHashCode;
     private volatile Document equalityValue;
 
-    TypedDocumentMember(SdkSchema schema, Consumer<ShapeSerializer> memberWriter) {
+    TypedDocumentMember(Schema schema, Consumer<ShapeSerializer> memberWriter) {
         this.schema = Objects.requireNonNull(schema, "Typed document member schema is null");
         this.memberWriter = Objects.requireNonNull(memberWriter, "Typed document member writer is null");
     }
@@ -100,7 +100,7 @@ final class TypedDocumentMember implements Document {
             private boolean value;
 
             @Override
-            public void writeBoolean(SdkSchema schema, boolean value) {
+            public void writeBoolean(Schema schema, boolean value) {
                 this.value = value;
             }
         };
@@ -114,42 +114,42 @@ final class TypedDocumentMember implements Document {
             private byte value;
 
             @Override
-            public void writeByte(SdkSchema schema, byte value) {
+            public void writeByte(Schema schema, byte value) {
                 this.value = value;
             }
 
             @Override
-            public void writeShort(SdkSchema schema, short value) {
+            public void writeShort(Schema schema, short value) {
                 this.value = (byte) value;
             }
 
             @Override
-            public void writeInteger(SdkSchema schema, int value) {
+            public void writeInteger(Schema schema, int value) {
                 this.value = (byte) value;
             }
 
             @Override
-            public void writeLong(SdkSchema schema, long value) {
+            public void writeLong(Schema schema, long value) {
                 this.value = (byte) value;
             }
 
             @Override
-            public void writeFloat(SdkSchema schema, float value) {
+            public void writeFloat(Schema schema, float value) {
                 this.value = (byte) value;
             }
 
             @Override
-            public void writeDouble(SdkSchema schema, double value) {
+            public void writeDouble(Schema schema, double value) {
                 this.value = (byte) value;
             }
 
             @Override
-            public void writeBigInteger(SdkSchema schema, BigInteger value) {
+            public void writeBigInteger(Schema schema, BigInteger value) {
                 this.value = value.byteValueExact();
             }
 
             @Override
-            public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+            public void writeBigDecimal(Schema schema, BigDecimal value) {
                 this.value = value.byteValueExact();
             }
         };
@@ -163,42 +163,42 @@ final class TypedDocumentMember implements Document {
             private short value;
 
             @Override
-            public void writeByte(SdkSchema schema, byte value) {
+            public void writeByte(Schema schema, byte value) {
                 this.value = value;
             }
 
             @Override
-            public void writeShort(SdkSchema schema, short value) {
+            public void writeShort(Schema schema, short value) {
                 this.value = value;
             }
 
             @Override
-            public void writeInteger(SdkSchema schema, int value) {
+            public void writeInteger(Schema schema, int value) {
                 this.value = (short) value;
             }
 
             @Override
-            public void writeLong(SdkSchema schema, long value) {
+            public void writeLong(Schema schema, long value) {
                 this.value = (short) value;
             }
 
             @Override
-            public void writeFloat(SdkSchema schema, float value) {
+            public void writeFloat(Schema schema, float value) {
                 this.value = (short) value;
             }
 
             @Override
-            public void writeDouble(SdkSchema schema, double value) {
+            public void writeDouble(Schema schema, double value) {
                 this.value = (short) value;
             }
 
             @Override
-            public void writeBigInteger(SdkSchema schema, BigInteger value) {
+            public void writeBigInteger(Schema schema, BigInteger value) {
                 this.value = value.shortValueExact();
             }
 
             @Override
-            public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+            public void writeBigDecimal(Schema schema, BigDecimal value) {
                 this.value = value.shortValueExact();
             }
         };
@@ -212,42 +212,42 @@ final class TypedDocumentMember implements Document {
             private int value;
 
             @Override
-            public void writeByte(SdkSchema schema, byte value) {
+            public void writeByte(Schema schema, byte value) {
                 this.value = value;
             }
 
             @Override
-            public void writeShort(SdkSchema schema, short value) {
+            public void writeShort(Schema schema, short value) {
                 this.value = value;
             }
 
             @Override
-            public void writeInteger(SdkSchema schema, int value) {
+            public void writeInteger(Schema schema, int value) {
                 this.value = value;
             }
 
             @Override
-            public void writeLong(SdkSchema schema, long value) {
+            public void writeLong(Schema schema, long value) {
                 this.value = (int) value;
             }
 
             @Override
-            public void writeFloat(SdkSchema schema, float value) {
+            public void writeFloat(Schema schema, float value) {
                 this.value = (int) value;
             }
 
             @Override
-            public void writeDouble(SdkSchema schema, double value) {
+            public void writeDouble(Schema schema, double value) {
                 this.value = (int) value;
             }
 
             @Override
-            public void writeBigInteger(SdkSchema schema, BigInteger value) {
+            public void writeBigInteger(Schema schema, BigInteger value) {
                 this.value = value.intValueExact();
             }
 
             @Override
-            public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+            public void writeBigDecimal(Schema schema, BigDecimal value) {
                 this.value = value.intValueExact();
             }
         };
@@ -261,42 +261,42 @@ final class TypedDocumentMember implements Document {
             private long value;
 
             @Override
-            public void writeByte(SdkSchema schema, byte value) {
+            public void writeByte(Schema schema, byte value) {
                 this.value = value;
             }
 
             @Override
-            public void writeShort(SdkSchema schema, short value) {
+            public void writeShort(Schema schema, short value) {
                 this.value = value;
             }
 
             @Override
-            public void writeInteger(SdkSchema schema, int value) {
+            public void writeInteger(Schema schema, int value) {
                 this.value = value;
             }
 
             @Override
-            public void writeLong(SdkSchema schema, long value) {
+            public void writeLong(Schema schema, long value) {
                 this.value = value;
             }
 
             @Override
-            public void writeFloat(SdkSchema schema, float value) {
+            public void writeFloat(Schema schema, float value) {
                 this.value = (long) value;
             }
 
             @Override
-            public void writeDouble(SdkSchema schema, double value) {
+            public void writeDouble(Schema schema, double value) {
                 this.value = (long) value;
             }
 
             @Override
-            public void writeBigInteger(SdkSchema schema, BigInteger value) {
+            public void writeBigInteger(Schema schema, BigInteger value) {
                 this.value = value.longValueExact();
             }
 
             @Override
-            public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+            public void writeBigDecimal(Schema schema, BigDecimal value) {
                 this.value = value.longValueExact();
             }
         };
@@ -310,42 +310,42 @@ final class TypedDocumentMember implements Document {
             private float value;
 
             @Override
-            public void writeByte(SdkSchema schema, byte value) {
+            public void writeByte(Schema schema, byte value) {
                 this.value = value;
             }
 
             @Override
-            public void writeShort(SdkSchema schema, short value) {
+            public void writeShort(Schema schema, short value) {
                 this.value = value;
             }
 
             @Override
-            public void writeInteger(SdkSchema schema, int value) {
+            public void writeInteger(Schema schema, int value) {
                 this.value = value;
             }
 
             @Override
-            public void writeLong(SdkSchema schema, long value) {
+            public void writeLong(Schema schema, long value) {
                 this.value = value;
             }
 
             @Override
-            public void writeFloat(SdkSchema schema, float value) {
+            public void writeFloat(Schema schema, float value) {
                 this.value = value;
             }
 
             @Override
-            public void writeDouble(SdkSchema schema, double value) {
+            public void writeDouble(Schema schema, double value) {
                 this.value = (float) value;
             }
 
             @Override
-            public void writeBigInteger(SdkSchema schema, BigInteger value) {
+            public void writeBigInteger(Schema schema, BigInteger value) {
                 this.value = value.floatValue();
             }
 
             @Override
-            public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+            public void writeBigDecimal(Schema schema, BigDecimal value) {
                 this.value = value.floatValue();
             }
         };
@@ -359,42 +359,42 @@ final class TypedDocumentMember implements Document {
             private double value;
 
             @Override
-            public void writeByte(SdkSchema schema, byte value) {
+            public void writeByte(Schema schema, byte value) {
                 this.value = value;
             }
 
             @Override
-            public void writeShort(SdkSchema schema, short value) {
+            public void writeShort(Schema schema, short value) {
                 this.value = value;
             }
 
             @Override
-            public void writeInteger(SdkSchema schema, int value) {
+            public void writeInteger(Schema schema, int value) {
                 this.value = value;
             }
 
             @Override
-            public void writeLong(SdkSchema schema, long value) {
+            public void writeLong(Schema schema, long value) {
                 this.value = value;
             }
 
             @Override
-            public void writeFloat(SdkSchema schema, float value) {
+            public void writeFloat(Schema schema, float value) {
                 this.value = value;
             }
 
             @Override
-            public void writeDouble(SdkSchema schema, double value) {
+            public void writeDouble(Schema schema, double value) {
                 this.value = value;
             }
 
             @Override
-            public void writeBigInteger(SdkSchema schema, BigInteger value) {
+            public void writeBigInteger(Schema schema, BigInteger value) {
                 this.value = value.doubleValue();
             }
 
             @Override
-            public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+            public void writeBigDecimal(Schema schema, BigDecimal value) {
                 this.value = value.doubleValue();
             }
         };
@@ -408,42 +408,42 @@ final class TypedDocumentMember implements Document {
             private BigInteger value;
 
             @Override
-            public void writeByte(SdkSchema schema, byte value) {
+            public void writeByte(Schema schema, byte value) {
                 this.value = BigInteger.valueOf(value);
             }
 
             @Override
-            public void writeShort(SdkSchema schema, short value) {
+            public void writeShort(Schema schema, short value) {
                 this.value = BigInteger.valueOf(value);
             }
 
             @Override
-            public void writeInteger(SdkSchema schema, int value) {
+            public void writeInteger(Schema schema, int value) {
                 this.value = BigInteger.valueOf(value);
             }
 
             @Override
-            public void writeLong(SdkSchema schema, long value) {
+            public void writeLong(Schema schema, long value) {
                 this.value = BigInteger.valueOf(value);
             }
 
             @Override
-            public void writeFloat(SdkSchema schema, float value) {
+            public void writeFloat(Schema schema, float value) {
                 this.value = BigInteger.valueOf((long) value);
             }
 
             @Override
-            public void writeDouble(SdkSchema schema, double value) {
+            public void writeDouble(Schema schema, double value) {
                 this.value = BigInteger.valueOf((long) value);
             }
 
             @Override
-            public void writeBigInteger(SdkSchema schema, BigInteger value) {
+            public void writeBigInteger(Schema schema, BigInteger value) {
                 this.value = value;
             }
 
             @Override
-            public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+            public void writeBigDecimal(Schema schema, BigDecimal value) {
                 this.value = value.toBigInteger();
             }
         };
@@ -457,42 +457,42 @@ final class TypedDocumentMember implements Document {
             private BigDecimal value;
 
             @Override
-            public void writeByte(SdkSchema schema, byte value) {
+            public void writeByte(Schema schema, byte value) {
                 this.value = new BigDecimal(value);
             }
 
             @Override
-            public void writeShort(SdkSchema schema, short value) {
+            public void writeShort(Schema schema, short value) {
                 this.value = new BigDecimal(value);
             }
 
             @Override
-            public void writeInteger(SdkSchema schema, int value) {
+            public void writeInteger(Schema schema, int value) {
                 this.value = BigDecimal.valueOf(value);
             }
 
             @Override
-            public void writeLong(SdkSchema schema, long value) {
+            public void writeLong(Schema schema, long value) {
                 this.value = BigDecimal.valueOf(value);
             }
 
             @Override
-            public void writeFloat(SdkSchema schema, float value) {
+            public void writeFloat(Schema schema, float value) {
                 this.value = new BigDecimal(value);
             }
 
             @Override
-            public void writeDouble(SdkSchema schema, double value) {
+            public void writeDouble(Schema schema, double value) {
                 this.value = new BigDecimal(value);
             }
 
             @Override
-            public void writeBigInteger(SdkSchema schema, BigInteger value) {
+            public void writeBigInteger(Schema schema, BigInteger value) {
                 this.value = new BigDecimal(value);
             }
 
             @Override
-            public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+            public void writeBigDecimal(Schema schema, BigDecimal value) {
                 this.value = value;
             }
         };
@@ -506,12 +506,12 @@ final class TypedDocumentMember implements Document {
             private String value;
 
             @Override
-            public void writeString(SdkSchema schema, String value) {
+            public void writeString(Schema schema, String value) {
                 this.value = value;
             }
 
             @Override
-            public void writeBlob(SdkSchema schema, byte[] value) {
+            public void writeBlob(Schema schema, byte[] value) {
                 this.value = new String(value, StandardCharsets.UTF_8);
             }
         };
@@ -525,12 +525,12 @@ final class TypedDocumentMember implements Document {
             private byte[] value;
 
             @Override
-            public void writeString(SdkSchema schema, String value) {
+            public void writeString(Schema schema, String value) {
                 this.value = value.getBytes(StandardCharsets.UTF_8);
             }
 
             @Override
-            public void writeBlob(SdkSchema schema, byte[] value) {
+            public void writeBlob(Schema schema, byte[] value) {
                 this.value = value;
             }
         };
@@ -544,7 +544,7 @@ final class TypedDocumentMember implements Document {
             private Instant value;
 
             @Override
-            public void writeTimestamp(SdkSchema schema, Instant value) {
+            public void writeTimestamp(Schema schema, Instant value) {
                 this.value = value;
             }
         };
@@ -559,7 +559,7 @@ final class TypedDocumentMember implements Document {
             private final List<Document> values = new ArrayList<>();
 
             @Override
-            public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+            public void writeList(Schema schema, Consumer<ShapeSerializer> consumer) {
                 values.add(new TypedDocumentMember(schema.getOrCreateDocumentMember("member"), consumer));
             }
         };
@@ -573,11 +573,11 @@ final class TypedDocumentMember implements Document {
             private final Map<Document, Document> values = new LinkedHashMap<>();
 
             @Override
-            public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+            public void writeMap(Schema schema, Consumer<MapSerializer> consumer) {
                 var valueMember = schema.getOrCreateDocumentMember("value");
                 consumer.accept(new MapSerializer() {
                     @Override
-                    public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(Schema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                         values.put(
                             new TypedDocumentMember(keySchema, ser -> ser.writeString(keySchema, key)),
                             new TypedDocumentMember(valueMember, valueSerializer)
@@ -585,7 +585,7 @@ final class TypedDocumentMember implements Document {
                     }
 
                     @Override
-                    public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(Schema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
                         values.put(
                             new TypedDocumentMember(keySchema, ser -> ser.writeInteger(keySchema, key)),
                             new TypedDocumentMember(valueMember, valueSerializer)
@@ -593,7 +593,7 @@ final class TypedDocumentMember implements Document {
                     }
 
                     @Override
-                    public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(Schema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
                         values.put(
                             new TypedDocumentMember(keySchema, ser -> ser.writeLong(keySchema, key)),
                             new TypedDocumentMember(valueMember, valueSerializer)
@@ -612,10 +612,10 @@ final class TypedDocumentMember implements Document {
             private Document result;
 
             @Override
-            public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+            public void writeMap(Schema schema, Consumer<MapSerializer> consumer) {
                 consumer.accept(new MapSerializer() {
                     @Override
-                    public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
+                    public void writeEntry(Schema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                         if (key.equals(memberName)) {
                             var memberSchema = schema.getOrCreateDocumentMember(memberName);
                             result = new TypedDocumentMember(memberSchema, valueSerializer);
@@ -623,15 +623,15 @@ final class TypedDocumentMember implements Document {
                     }
 
                     @Override
-                    public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {}
+                    public void writeEntry(Schema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {}
 
                     @Override
-                    public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {}
+                    public void writeEntry(Schema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {}
                 });
             }
 
             @Override
-            public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+            public void writeStruct(Schema schema, Consumer<ShapeSerializer> consumer) {
                 consumer.accept(ShapeSerializer.ofDelegatingConsumer((member, memberWriter) -> {
                     if (member.memberName().equals(memberName)) {
                         result = new TypedDocumentMember(member, memberWriter);

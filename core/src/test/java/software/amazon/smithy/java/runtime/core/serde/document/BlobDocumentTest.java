@@ -12,7 +12,7 @@ import static org.hamcrest.Matchers.is;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -34,7 +34,7 @@ public class BlobDocumentTest {
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(SdkSchema schema, Document value) {
+            public void writeDocument(Schema schema, Document value) {
                 assertThat(value, is(document));
             }
         });
@@ -46,7 +46,7 @@ public class BlobDocumentTest {
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
-            public void writeBlob(SdkSchema schema, byte[] value) {
+            public void writeBlob(Schema schema, byte[] value) {
                 assertThat(schema, equalTo(PreludeSchemas.BLOB));
                 assertThat(value, equalTo("hi".getBytes(StandardCharsets.UTF_8)));
             }

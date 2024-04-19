@@ -17,10 +17,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.runtime.core.serde.SerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
@@ -32,13 +32,13 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class JsonDocument implements Document {
 
-    private static final SdkSchema STRING_MAP_KEY = SdkSchema.memberBuilder(0, "key", PreludeSchemas.STRING)
+    private static final Schema STRING_MAP_KEY = Schema.memberBuilder(0, "key", PreludeSchemas.STRING)
         .id(PreludeSchemas.DOCUMENT.id())
         .build();
-    private static final SdkSchema INT_MAP_KEY = SdkSchema.memberBuilder(0, "key", PreludeSchemas.INTEGER)
+    private static final Schema INT_MAP_KEY = Schema.memberBuilder(0, "key", PreludeSchemas.INTEGER)
         .id(PreludeSchemas.DOCUMENT.id())
         .build();
-    private static final SdkSchema LONG_MAP_KEY = SdkSchema.memberBuilder(0, "key", PreludeSchemas.LONG)
+    private static final Schema LONG_MAP_KEY = Schema.memberBuilder(0, "key", PreludeSchemas.LONG)
         .id(PreludeSchemas.DOCUMENT.id())
         .build();
 
@@ -47,7 +47,7 @@ final class JsonDocument implements Document {
     private final boolean useJsonName;
     private final boolean useTimestampFormat;
     private final ShapeType type;
-    private final SdkSchema schema;
+    private final Schema schema;
 
     JsonDocument(
         com.jsoniter.any.Any any,
@@ -63,7 +63,7 @@ final class JsonDocument implements Document {
         boolean useJsonName,
         TimestampFormatter defaultTimestampFormat,
         boolean useTimestampFormat,
-        SdkSchema schema
+        Schema schema
     ) {
         this.any = any;
         this.useJsonName = useJsonName;
@@ -261,7 +261,7 @@ final class JsonDocument implements Document {
                     for (var entry : any.asMap().entrySet()) {
                         var k = entry.getKey();
                         // Create a synthetic member schema for the key.
-                        var member = SdkSchema.memberBuilder(-1, k, PreludeSchemas.DOCUMENT)
+                        var member = Schema.memberBuilder(-1, k, PreludeSchemas.DOCUMENT)
                             .id(PreludeSchemas.DOCUMENT.id())
                             .build();
                         var v = new JsonDocument(
@@ -275,12 +275,12 @@ final class JsonDocument implements Document {
                     }
                 });
             }
-            default -> throw new SdkSerdeException("Cannot serialize unexpected JSON value: " + any);
+            default -> throw new SerdeException("Cannot serialize unexpected JSON value: " + any);
         }
     }
 
     @Override
-    public <T extends SerializableShape> void deserializeInto(SdkShapeBuilder<T> builder) {
+    public <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
         builder.deserialize(new JsonDocumentDeserializer(this));
     }
 
@@ -298,7 +298,7 @@ final class JsonDocument implements Document {
         }
 
         @Override
-        public void readStruct(SdkSchema schema, BiConsumer<SdkSchema, ShapeDeserializer> eachEntry) {
+        public void readStruct(Schema schema, BiConsumer<Schema, ShapeDeserializer> eachEntry) {
             for (var member : schema.members()) {
                 var jsonName = member.hasTrait(JsonNameTrait.class)
                     ? member.getTrait(JsonNameTrait.class).getValue()
@@ -311,7 +311,7 @@ final class JsonDocument implements Document {
         }
 
         @Override
-        public Instant readTimestamp(SdkSchema schema) {
+        public Instant readTimestamp(Schema schema) {
             TimestampFormatter format = defaultTimestampFormat;
 
             if (useTimestampFormat && schema.hasTrait(TimestampFormatTrait.class)) {

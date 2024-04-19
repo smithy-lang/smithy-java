@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.example.model;
 
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
@@ -16,30 +16,30 @@ import software.amazon.smithy.model.traits.StreamingTrait;
  */
 final class SharedSchemas {
 
-    static final SdkSchema BIRTHDAY = SdkSchema.builder()
+    static final Schema BIRTHDAY = Schema.builder()
         .type(ShapeType.TIMESTAMP)
         .id("smithy.example#Birthday")
         .traits(new SensitiveTrait())
         .build();
 
-    static final SdkSchema STREAM = SdkSchema.builder()
+    static final Schema STREAM = Schema.builder()
         .type(ShapeType.BLOB)
         .id("smithy.example#Stream")
         .traits(new StreamingTrait())
         .build();
 
-    static final SdkSchema LIST_OF_STRING = SdkSchema.builder()
+    static final Schema LIST_OF_STRING = Schema.builder()
         .type(ShapeType.LIST)
         .id("smithy.example#ListOfString")
-        .members(SdkSchema.memberBuilder(0, "member", PreludeSchemas.STRING))
+        .members(Schema.memberBuilder(0, "member", PreludeSchemas.STRING))
         .build();
 
-    static final SdkSchema MAP_LIST_STRING = SdkSchema.builder()
+    static final Schema MAP_LIST_STRING = Schema.builder()
         .type(ShapeType.MAP)
         .id("smithy.example#StringsMap")
         .members(
-            SdkSchema.memberBuilder(0, "key", PreludeSchemas.STRING),
-            SdkSchema.memberBuilder(1, "value", SharedSchemas.LIST_OF_STRING)
+            Schema.memberBuilder(0, "key", PreludeSchemas.STRING),
+            Schema.memberBuilder(1, "value", SharedSchemas.LIST_OF_STRING)
         )
         .build();
 

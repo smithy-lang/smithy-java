@@ -12,7 +12,7 @@ import java.util.Base64;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
@@ -29,73 +29,73 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeList(Schema schema, Consumer<ShapeSerializer> consumer) {
         consumer.accept(new ListSerializer(this, position -> {}));
     }
 
-    void writeHeader(SdkSchema schema, Supplier<String> supplier) {
+    void writeHeader(Schema schema, Supplier<String> supplier) {
         var headerTrait = schema.getTrait(HttpHeaderTrait.class);
         var field = headerTrait != null ? headerTrait.getValue() : schema.memberName();
         headerWriter.accept(field, supplier.get());
     }
 
     @Override
-    public void writeBoolean(SdkSchema schema, boolean value) {
+    public void writeBoolean(Schema schema, boolean value) {
         writeHeader(schema, () -> value ? "true" : "false");
     }
 
     @Override
-    public void writeShort(SdkSchema schema, short value) {
+    public void writeShort(Schema schema, short value) {
         writeHeader(schema, () -> Short.toString(value));
     }
 
     @Override
-    public void writeByte(SdkSchema schema, byte value) {
+    public void writeByte(Schema schema, byte value) {
         writeHeader(schema, () -> Byte.toString(value));
     }
 
     @Override
-    public void writeInteger(SdkSchema schema, int value) {
+    public void writeInteger(Schema schema, int value) {
         writeHeader(schema, () -> Integer.toString(value));
     }
 
     @Override
-    public void writeLong(SdkSchema schema, long value) {
+    public void writeLong(Schema schema, long value) {
         writeHeader(schema, () -> Long.toString(value));
     }
 
     @Override
-    public void writeFloat(SdkSchema schema, float value) {
+    public void writeFloat(Schema schema, float value) {
         writeHeader(schema, () -> Float.toString(value));
     }
 
     @Override
-    public void writeDouble(SdkSchema schema, double value) {
+    public void writeDouble(Schema schema, double value) {
         writeHeader(schema, () -> Double.toString(value));
     }
 
     @Override
-    public void writeBigInteger(SdkSchema schema, BigInteger value) {
+    public void writeBigInteger(Schema schema, BigInteger value) {
         writeHeader(schema, value::toString);
     }
 
     @Override
-    public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+    public void writeBigDecimal(Schema schema, BigDecimal value) {
         writeHeader(schema, value::toString);
     }
 
     @Override
-    public void writeString(SdkSchema schema, String value) {
+    public void writeString(Schema schema, String value) {
         writeHeader(schema, () -> value);
     }
 
     @Override
-    public void writeBlob(SdkSchema schema, byte[] value) {
+    public void writeBlob(Schema schema, byte[] value) {
         writeHeader(schema, () -> Base64.getEncoder().encodeToString(value));
     }
 
     @Override
-    public void writeTimestamp(SdkSchema schema, Instant value) {
+    public void writeTimestamp(Schema schema, Instant value) {
         writeHeader(
             schema,
             () -> {

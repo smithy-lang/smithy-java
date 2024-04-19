@@ -10,7 +10,7 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
@@ -18,39 +18,39 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
  */
 public interface ShapeDeserializer {
 
-    boolean readBoolean(SdkSchema schema);
+    boolean readBoolean(Schema schema);
 
-    byte[] readBlob(SdkSchema schema);
+    byte[] readBlob(Schema schema);
 
-    byte readByte(SdkSchema schema);
+    byte readByte(Schema schema);
 
-    short readShort(SdkSchema schema);
+    short readShort(Schema schema);
 
-    int readInteger(SdkSchema schema);
+    int readInteger(Schema schema);
 
-    long readLong(SdkSchema schema);
+    long readLong(Schema schema);
 
-    float readFloat(SdkSchema schema);
+    float readFloat(Schema schema);
 
-    double readDouble(SdkSchema schema);
+    double readDouble(Schema schema);
 
-    BigInteger readBigInteger(SdkSchema schema);
+    BigInteger readBigInteger(Schema schema);
 
-    BigDecimal readBigDecimal(SdkSchema schema);
+    BigDecimal readBigDecimal(Schema schema);
 
-    String readString(SdkSchema schema);
+    String readString(Schema schema);
 
     Document readDocument();
 
-    Instant readTimestamp(SdkSchema schema);
+    Instant readTimestamp(Schema schema);
 
-    void readStruct(SdkSchema schema, BiConsumer<SdkSchema, ShapeDeserializer> eachEntry);
+    void readStruct(Schema schema, BiConsumer<Schema, ShapeDeserializer> eachEntry);
 
-    void readList(SdkSchema schema, Consumer<ShapeDeserializer> eachElement);
+    void readList(Schema schema, Consumer<ShapeDeserializer> eachElement);
 
-    void readStringMap(SdkSchema schema, BiConsumer<String, ShapeDeserializer> eachEntry);
+    void readStringMap(Schema schema, BiConsumer<String, ShapeDeserializer> eachEntry);
 
-    void readIntMap(SdkSchema schema, BiConsumer<Integer, ShapeDeserializer> eachEntry);
+    void readIntMap(Schema schema, BiConsumer<Integer, ShapeDeserializer> eachEntry);
 
-    void readLongMap(SdkSchema schema, BiConsumer<Long, ShapeDeserializer> eachEntry);
+    void readLongMap(Schema schema, BiConsumer<Long, ShapeDeserializer> eachEntry);
 }

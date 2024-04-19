@@ -7,7 +7,7 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
@@ -29,25 +29,25 @@ final class HttpPrefixHeadersSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public void writeMap(Schema schema, Consumer<MapSerializer> consumer) {
         consumer.accept(new MapSerializer() {
             @Override
-            public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(Schema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
                 valueSerializer.accept(new SpecificShapeSerializer() {
                     @Override
-                    public void writeString(SdkSchema schema, String value) {
+                    public void writeString(Schema schema, String value) {
                         headerConsumer.accept(prefix + key, value);
                     }
                 });
             }
 
             @Override
-            public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(Schema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
                 throw new UnsupportedOperationException("Prefix headers expects maps with string keys: " + schema);
             }
 
             @Override
-            public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
+            public void writeEntry(Schema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
                 throw new UnsupportedOperationException("Prefix headers expects maps with string keys: " + schema);
             }
         });

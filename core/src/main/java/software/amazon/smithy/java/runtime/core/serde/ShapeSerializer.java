@@ -12,13 +12,13 @@ import java.time.Instant;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
  * Serializes a shape by receiving the Smithy data model and writing output to a receiver owned by the serializer.
  *
- * <p>Note: null values should only ever be written using {@link #writeNull(SdkSchema)}. Every other method expects
+ * <p>Note: null values should only ever be written using {@link #writeNull(Schema)}. Every other method expects
  * a non-null value or a value type.
  */
 public interface ShapeSerializer extends Flushable {
@@ -29,7 +29,7 @@ public interface ShapeSerializer extends Flushable {
      * @param delegatingConsumer Consumer that receives each schema and a consumer that will write if invoked.
      * @return the created ShapeSerializer.
      */
-    static ShapeSerializer ofDelegatingConsumer(BiConsumer<SdkSchema, Consumer<ShapeSerializer>> delegatingConsumer) {
+    static ShapeSerializer ofDelegatingConsumer(BiConsumer<Schema, Consumer<ShapeSerializer>> delegatingConsumer) {
         return new ConsolidatedSerializer(delegatingConsumer);
     }
 
@@ -45,7 +45,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema   Schema to serialize.
      * @param consumer Receives the struct serializer and writes members.
      */
-    void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer);
+    void writeStruct(Schema schema, Consumer<ShapeSerializer> consumer);
 
     /**
      * Begin a list and write zero or more values into it using the provided serializer.
@@ -53,7 +53,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema   List schema.
      * @param consumer Received in the context of the list and writes zero or more values.
      */
-    void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer);
+    void writeList(Schema schema, Consumer<ShapeSerializer> consumer);
 
     /**
      * Begin a map and write zero or more entries into it using the provided serializer.
@@ -61,7 +61,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema   List schema.
      * @param consumer Received in the context of the map and writes zero or more entries.
      */
-    void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer);
+    void writeMap(Schema schema, Consumer<MapSerializer> consumer);
 
     /**
      * Serialize a boolean.
@@ -69,7 +69,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeBoolean(SdkSchema schema, boolean value);
+    void writeBoolean(Schema schema, boolean value);
 
     /**
      * Serialize a byte.
@@ -77,7 +77,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeByte(SdkSchema schema, byte value);
+    void writeByte(Schema schema, byte value);
 
     /**
      * Serialize a short.
@@ -85,7 +85,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeShort(SdkSchema schema, short value);
+    void writeShort(Schema schema, short value);
 
     /**
      * Serialize an integer.
@@ -93,7 +93,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeInteger(SdkSchema schema, int value);
+    void writeInteger(Schema schema, int value);
 
     /**
      * Serialize a long.
@@ -101,7 +101,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeLong(SdkSchema schema, long value);
+    void writeLong(Schema schema, long value);
 
     /**
      * Serialize a float.
@@ -109,7 +109,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeFloat(SdkSchema schema, float value);
+    void writeFloat(Schema schema, float value);
 
     /**
      * Serialize a double.
@@ -117,7 +117,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeDouble(SdkSchema schema, double value);
+    void writeDouble(Schema schema, double value);
 
     /**
      * Serialize a big integer.
@@ -125,7 +125,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeBigInteger(SdkSchema schema, BigInteger value);
+    void writeBigInteger(Schema schema, BigInteger value);
 
     /**
      * Serialize a big decimal.
@@ -133,7 +133,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeBigDecimal(SdkSchema schema, BigDecimal value);
+    void writeBigDecimal(Schema schema, BigDecimal value);
 
     /**
      * Serialize a string.
@@ -141,7 +141,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema Schema of the shape.
      * @param value  String value.
      */
-    void writeString(SdkSchema schema, String value);
+    void writeString(Schema schema, String value);
 
     /**
      * Serialize a blob.
@@ -149,7 +149,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema Schema of the shape.
      * @param value  Blob value.
      */
-    void writeBlob(SdkSchema schema, byte[] value);
+    void writeBlob(Schema schema, byte[] value);
 
     /**
      * Serialize a timestamp.
@@ -157,7 +157,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema Schema of the shape.
      * @param value  Timestamp value.
      */
-    void writeTimestamp(SdkSchema schema, Instant value);
+    void writeTimestamp(Schema schema, Instant value);
 
     /**
      * Serialize a document shape.
@@ -168,7 +168,7 @@ public interface ShapeSerializer extends Flushable {
      *               wraps a modeled shape.
      * @param value  Value to serialize.
      */
-    void writeDocument(SdkSchema schema, Document value);
+    void writeDocument(Schema schema, Document value);
 
     /**
      * Serialize a document shape using the schema {@link PreludeSchemas#DOCUMENT}.
@@ -193,7 +193,7 @@ public interface ShapeSerializer extends Flushable {
      *
      * @param schema Schema of the null value.
      */
-    void writeNull(SdkSchema schema);
+    void writeNull(Schema schema);
 
     /**
      * Write to the serializer if the given value is not null.
@@ -202,7 +202,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Boolean value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, Boolean value) {
         if (value != null) {
             serializer.writeBoolean(schema, value);
         }
@@ -215,7 +215,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Byte value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, Byte value) {
         if (value != null) {
             serializer.writeByte(schema, value);
         }
@@ -228,7 +228,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Short value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, Short value) {
         if (value != null) {
             serializer.writeShort(schema, value);
         }
@@ -241,7 +241,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Integer value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, Integer value) {
         if (value != null) {
             serializer.writeInteger(schema, value);
         }
@@ -254,7 +254,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Long value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, Long value) {
         if (value != null) {
             serializer.writeLong(schema, value);
         }
@@ -267,7 +267,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Float value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, Float value) {
         if (value != null) {
             serializer.writeFloat(schema, value);
         }
@@ -280,7 +280,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Double value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, Double value) {
         if (value != null) {
             serializer.writeDouble(schema, value);
         }
@@ -293,7 +293,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, BigInteger value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, BigInteger value) {
         if (value != null) {
             serializer.writeBigInteger(schema, value);
         }
@@ -306,7 +306,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, BigDecimal value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, BigDecimal value) {
         if (value != null) {
             serializer.writeBigDecimal(schema, value);
         }
@@ -319,7 +319,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, byte[] value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, byte[] value) {
         if (value != null) {
             serializer.writeBlob(schema, value);
         }
@@ -332,7 +332,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, String value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, String value) {
         if (value != null) {
             serializer.writeString(schema, value);
         }
@@ -345,7 +345,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Instant value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, Instant value) {
         if (value != null) {
             serializer.writeTimestamp(schema, value);
         }
@@ -358,7 +358,7 @@ public interface ShapeSerializer extends Flushable {
      * @param schema     Schema to write if not null.
      * @param value      Value to write if not null.
      */
-    static void writeIfNotNull(ShapeSerializer serializer, SdkSchema schema, Document value) {
+    static void writeIfNotNull(ShapeSerializer serializer, Schema schema, Document value) {
         if (value != null) {
             serializer.writeDocument(schema, value);
         }

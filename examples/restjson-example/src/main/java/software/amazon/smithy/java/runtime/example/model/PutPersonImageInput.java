@@ -8,9 +8,9 @@ package software.amazon.smithy.java.runtime.example.model;
 import java.util.ArrayList;
 import java.util.List;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -27,23 +27,23 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class PutPersonImageInput implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#PutPersonInput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
+    private static final Schema SCHEMA_NAME = Schema.memberBuilder(0, "name", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpLabelTrait(), new RequiredTrait())
         .build();
-    private static final SdkSchema SCHEMA_TAGS = SdkSchema.memberBuilder(1, "tags", PreludeSchemas.STRING)
+    private static final Schema SCHEMA_TAGS = Schema.memberBuilder(1, "tags", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpHeaderTrait("Tags"))
         .build();
-    private static final SdkSchema SCHEMA_MORE_TAGS = SdkSchema.memberBuilder(2, "moreTags", PreludeSchemas.STRING)
+    private static final Schema SCHEMA_MORE_TAGS = Schema.memberBuilder(2, "moreTags", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpQueryTrait("MoreTags"))
         .build();
-    private static final SdkSchema SCHEMA_IMAGE = SdkSchema.memberBuilder(3, "image", SharedSchemas.STREAM)
+    private static final Schema SCHEMA_IMAGE = Schema.memberBuilder(3, "image", SharedSchemas.STREAM)
         .id(ID)
         .traits(new HttpPayloadTrait())
         .build();
-    static final SdkSchema SCHEMA = SdkSchema.builder()
+    static final Schema SCHEMA = Schema.builder()
         .id(ID)
         .type(ShapeType.STRUCTURE)
         .members(SCHEMA_NAME, SCHEMA_TAGS, SCHEMA_MORE_TAGS, SCHEMA_IMAGE)
@@ -99,7 +99,7 @@ public final class PutPersonImageInput implements SerializableShape {
         });
     }
 
-    public static final class Builder implements SdkShapeBuilder<PutPersonImageInput> {
+    public static final class Builder implements ShapeBuilder<PutPersonImageInput> {
 
         private String name;
         private List<String> tags = new ArrayList<>();

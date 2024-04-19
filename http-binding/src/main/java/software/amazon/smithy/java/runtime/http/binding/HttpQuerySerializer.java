@@ -12,7 +12,7 @@ import java.util.Base64;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
@@ -29,11 +29,11 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public void writeList(Schema schema, Consumer<ShapeSerializer> consumer) {
         consumer.accept(new ListSerializer(this, position -> {}));
     }
 
-    void writeQuery(SdkSchema schema, Supplier<String> supplier) {
+    void writeQuery(Schema schema, Supplier<String> supplier) {
         var queryTrait = schema.getTrait(HttpQueryTrait.class);
         if (queryTrait != null) {
             queryWriter.accept(queryTrait.getValue(), supplier.get());
@@ -41,62 +41,62 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public void writeBoolean(SdkSchema schema, boolean value) {
+    public void writeBoolean(Schema schema, boolean value) {
         writeQuery(schema, () -> value ? "true" : "false");
     }
 
     @Override
-    public void writeShort(SdkSchema schema, short value) {
+    public void writeShort(Schema schema, short value) {
         writeQuery(schema, () -> Short.toString(value));
     }
 
     @Override
-    public void writeByte(SdkSchema schema, byte value) {
+    public void writeByte(Schema schema, byte value) {
         writeQuery(schema, () -> Byte.toString(value));
     }
 
     @Override
-    public void writeInteger(SdkSchema schema, int value) {
+    public void writeInteger(Schema schema, int value) {
         writeQuery(schema, () -> Integer.toString(value));
     }
 
     @Override
-    public void writeLong(SdkSchema schema, long value) {
+    public void writeLong(Schema schema, long value) {
         writeQuery(schema, () -> Long.toString(value));
     }
 
     @Override
-    public void writeFloat(SdkSchema schema, float value) {
+    public void writeFloat(Schema schema, float value) {
         writeQuery(schema, () -> Float.toString(value));
     }
 
     @Override
-    public void writeDouble(SdkSchema schema, double value) {
+    public void writeDouble(Schema schema, double value) {
         writeQuery(schema, () -> Double.toString(value));
     }
 
     @Override
-    public void writeBigInteger(SdkSchema schema, BigInteger value) {
+    public void writeBigInteger(Schema schema, BigInteger value) {
         writeQuery(schema, value::toString);
     }
 
     @Override
-    public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+    public void writeBigDecimal(Schema schema, BigDecimal value) {
         writeQuery(schema, value::toString);
     }
 
     @Override
-    public void writeString(SdkSchema schema, String value) {
+    public void writeString(Schema schema, String value) {
         writeQuery(schema, () -> value);
     }
 
     @Override
-    public void writeBlob(SdkSchema schema, byte[] value) {
+    public void writeBlob(Schema schema, byte[] value) {
         writeQuery(schema, () -> Base64.getEncoder().encodeToString(value));
     }
 
     @Override
-    public void writeTimestamp(SdkSchema schema, Instant value) {
+    public void writeTimestamp(Schema schema, Instant value) {
         var trait = schema.getTrait(TimestampFormatTrait.class);
         TimestampFormatter formatter = trait != null
             ? TimestampFormatter.of(trait)
