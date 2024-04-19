@@ -5,9 +5,6 @@
 
 package software.amazon.smithy.java.codegen.writer;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.BiFunction;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -29,7 +26,6 @@ import software.amazon.smithy.utils.StringUtils;
  */
 @SmithyUnstableApi
 public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportContainer> {
-    private final Map<String, Set<Symbol>> symbolTable = new HashMap<>();
     private final String packageNamespace;
     private final JavaCodegenSettings settings;
 
@@ -109,7 +105,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
     }
 
     private void putNameContext() {
-        for (Set<Symbol> duplicates : symbolTable.values()) {
+        for (final Set<Symbol> duplicates : symbolTable.values()) {
             // If the duplicates list has more than one entry
             // then duplicates are present, and we need to de-duplicate the names
             if (duplicates.size() > 1) {
@@ -182,15 +178,13 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         }
 
         private String getPlaceholder(Symbol symbol) {
-            // Add symbol to import container
-            addImport(symbol);
-
-            // Add symbol to symbol map, so we can handle potential type name conflicts
-            Set<Symbol> nameSet = symbolTable.computeIfAbsent(symbol.getName(), n -> new HashSet<>());
-            nameSet.add(symbol);
+            // Add symbol to import container and symbol table
+            var normalizedSymbol = normalizeSymbol(symbol);
+            addImport(normalizedSymbol);
+            addToSymbolTable(normalizedSymbol);
 
             // Return a placeholder value that will be filled when toString is called
-            // [] is replaced with "Array" to ensure array types dont break formatter.
+            // [] is replaced with "Array" to ensure array types don't break formatter.
             return format("$${$L:L}", symbol.getFullName().replace("[]", "Array"));
         }
     }
