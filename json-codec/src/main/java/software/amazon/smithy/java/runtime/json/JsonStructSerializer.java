@@ -60,6 +60,12 @@ class JsonStructSerializer implements ShapeSerializer {
     }
 
     @Override
+    public void writeEnum(SdkSchema member, Consumer<ShapeSerializer> consumer) {
+        startMember(member);
+        consumer.accept(parent);
+    }
+
+    @Override
     public void writeList(SdkSchema member, Consumer<ShapeSerializer> consumer) {
         startMember(member);
         consumer.accept(parent);

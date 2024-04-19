@@ -37,6 +37,11 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
     }
 
     @Override
+    public void writeEnum(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+        throw throwForInvalidState(schema);
+    }
+
+    @Override
     public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         throw throwForInvalidState(schema);
     }

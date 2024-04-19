@@ -54,6 +54,12 @@ public final class ListSerializer implements ShapeSerializer {
     }
 
     @Override
+    public void writeEnum(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+        beforeWrite();
+        delegate.writeEnum(schema, consumer);
+    }
+
+    @Override
     public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         beforeWrite();
         delegate.writeList(schema, consumer);

@@ -648,6 +648,11 @@ final class Documents {
         }
 
         @Override
+        public void writeEnum(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+
+        }
+
+        @Override
         public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
             structWriter.writeList(syntheticMember(memberName, schema), consumer);
         }

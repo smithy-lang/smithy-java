@@ -23,6 +23,7 @@ import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.runtime.example.model.Attitude;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PersonDirectory;
@@ -129,6 +130,7 @@ public class GenericTest {
             .age(999)
             .favoriteColor("Green")
             .birthday(Instant.now())
+            .attitude(Attitude.OPTIMIST)
             .build();
 
         JsonCodec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();

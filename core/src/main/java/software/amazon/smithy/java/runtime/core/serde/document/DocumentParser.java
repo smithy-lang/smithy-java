@@ -41,6 +41,11 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
+    public void writeEnum(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+        consumer.accept(new DocumentParser());
+    }
+
+    @Override
     public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
         List<Document> elements = new ArrayList<>();
         var elementParser = new DocumentParser();

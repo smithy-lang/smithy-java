@@ -57,6 +57,10 @@ public final class PutPersonInput implements SerializableShape {
         .id(ID)
         .traits(new HttpQueryParamsTrait())
         .build();
+    private static final SdkSchema SCHEMA_ATTITUDE = SdkSchema
+            .memberBuilder(6, "attitude", Attitude.SCHEMA)
+            .id(ID)
+            .build();
     static final SdkSchema SCHEMA = SdkSchema.builder()
         .id(ID)
         .type(ShapeType.STRUCTURE)
@@ -66,7 +70,8 @@ public final class PutPersonInput implements SerializableShape {
             SCHEMA_AGE,
             SCHEMA_BIRTHDAY,
             SCHEMA_BINARY,
-            SCHEMA_QUERY_PARAMS
+            SCHEMA_QUERY_PARAMS,
+            SCHEMA_ATTITUDE
         )
         .build();
 
@@ -76,6 +81,7 @@ public final class PutPersonInput implements SerializableShape {
     private final String favoriteColor;
     private final byte[] binary;
     private final Map<String, List<String>> queryParams;
+    public final Attitude attitude;
 
     private PutPersonInput(Builder builder) {
         this.name = builder.name;
@@ -84,6 +90,7 @@ public final class PutPersonInput implements SerializableShape {
         this.favoriteColor = builder.favoriteColor;
         this.binary = builder.binary;
         this.queryParams = builder.queryParams;
+        this.attitude = builder.attitude;
     }
 
     public static Builder builder() {
@@ -110,6 +117,10 @@ public final class PutPersonInput implements SerializableShape {
         return queryParams;
     }
 
+    public Attitude attitude() {
+        return attitude;
+    }
+
     @Override
     public String toString() {
         return ToStringSerializer.serialize(this);
@@ -133,6 +144,8 @@ public final class PutPersonInput implements SerializableShape {
                     }));
                 });
             }
+            st.writeEnum(SCHEMA_ATTITUDE, attitude::serialize);
+            //attitude.serialize(st);
         });
     }
 
@@ -144,6 +157,7 @@ public final class PutPersonInput implements SerializableShape {
         private String favoriteColor;
         private byte[] binary;
         private Map<String, List<String>> queryParams = Collections.emptyMap();
+        private Attitude attitude;
 
         private Builder() {
         }
@@ -183,6 +197,11 @@ public final class PutPersonInput implements SerializableShape {
             return this;
         }
 
+        public Builder attitude(Attitude attitude) {
+            this.attitude = attitude;
+            return this;
+        }
+
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, (member, de) -> {
@@ -202,6 +221,7 @@ public final class PutPersonInput implements SerializableShape {
                         });
                         queryParams(result);
                     }
+                    case 6 -> attitude(Attitude.builder().deserialize(de).build());
                 }
             });
             return this;
