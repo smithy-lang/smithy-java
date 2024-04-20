@@ -98,20 +98,14 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
 
         var resolvedAuthScheme = resolveAuthScheme(call, request);
 
-        // TODO: Make it so we always return an identity.
-        if (resolvedAuthScheme != null) {
-            var identity = resolvedAuthScheme.identity();
-            context.put(CallContext.IDENTITY, identity);
-        }
+        var identity = resolvedAuthScheme.identity();
+        context.put(CallContext.IDENTITY, identity);
 
         // TODO: what to do with supportedAuthSchemes of an endpoint?
         Endpoint endpoint = resolveEndpoint(call);
         request = protocol.setServiceEndpoint(request, endpoint);
 
-        // TODO: Make No-op signer.
-        if (resolvedAuthScheme != null) {
-            request = resolvedAuthScheme.sign(request);
-        }
+        request = resolvedAuthScheme.sign(request);
 
         interceptor.readAfterSigning(context, input, Context.value(requestKey, request));
 
@@ -146,10 +140,8 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
             }
         }
 
-        // TODO: Throw here
         // TODO: Build more useful error message (to log also) indicating why some schemes were not used.
-        // throw new SdkException("No auth scheme could be resolved for " + call.operation().schema().id());
-        return null;
+        throw new SdkException("No auth scheme could be resolved for " + call.operation().schema().id());
     }
 
     private <IdentityT extends Identity> Optional<ResolvedScheme<IdentityT, RequestT>> createResolvedSchema(

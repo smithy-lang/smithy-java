@@ -15,6 +15,7 @@ import software.amazon.smithy.java.runtime.api.EndpointProvider;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
+import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.ApiCallTimeoutTransport;
 import software.amazon.smithy.java.runtime.client.core.ClientCall;
@@ -54,10 +55,20 @@ public final class PersonDirectoryClient implements PersonDirectory {
         this.transport = new ApiCallTimeoutTransport(Objects.requireNonNull(builder.transport, "transport is null"));
         // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
         this.interceptor = ClientInterceptor.chain(builder.interceptors);
+
+        // By default, support NoAuthAuthScheme
+        AuthScheme<?, ?> noAuthAuthScheme = AuthScheme.noAuthAuthScheme();
+        this.supportedAuthSchemes.add(noAuthAuthScheme);
         this.supportedAuthSchemes.addAll(builder.supportedAuthSchemes);
 
         // TODO: Better defaults? Require these?
-        this.authSchemeResolver = Objects.requireNonNullElseGet(builder.authSchemeResolver, () -> params -> List.of());
+        AuthSchemeResolver defaultAuthSchemeResolver = params -> List.of(
+            new AuthSchemeOption(noAuthAuthScheme.schemeId(), null, null)
+        );
+        this.authSchemeResolver = Objects.requireNonNullElseGet(
+            builder.authSchemeResolver,
+            () -> defaultAuthSchemeResolver
+        );
         this.identityResolvers = IdentityResolvers.of(builder.identityResolvers);
 
         // Here is where you would register errors bound to the service on the registry.
@@ -219,6 +230,7 @@ public final class PersonDirectoryClient implements PersonDirectory {
          * @param authSchemes Auth schemes to add.
          * @return the builder.
          */
+        // TODO: Name the method put to convey that if another AuthScheme with same schemeId is added, it replaces?
         public Builder addSupportedAuthSchemes(AuthScheme<?, ?>... authSchemes) {
             supportedAuthSchemes.addAll(Arrays.asList(authSchemes));
             return this;
@@ -230,6 +242,9 @@ public final class PersonDirectoryClient implements PersonDirectory {
          * @param supportedAuthSchemes Auth schemes to set.
          * @return the builder.
          */
+        // TODO: Do we want this list to remove default NoAuthAuthScheme? Or any other auth schemes added via model?
+        //       AuthSchemeResolver can always exclude a scheme if it shouldn't be used, but should it be removable from
+        //       supportedAuthSchemes? Maybe we remove this method.
         public Builder supportedAuthSchemes(List<AuthScheme<?, ?>> supportedAuthSchemes) {
             this.supportedAuthSchemes.clear();
             this.supportedAuthSchemes.addAll(supportedAuthSchemes);
