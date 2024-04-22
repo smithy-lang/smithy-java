@@ -51,7 +51,7 @@ final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
 
     @Override
     public Signer<Object, Identity> signer() {
-        return Signer.noOpSigner();
+        return Signer.nullSigner();
     }
 
     private static class AnonymousIdentityResolver implements IdentityResolver<Identity> {

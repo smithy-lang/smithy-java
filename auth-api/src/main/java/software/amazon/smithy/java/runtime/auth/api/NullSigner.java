@@ -11,14 +11,14 @@ import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
  * A signer that does nothing.
  */
 @SuppressWarnings("rawtypes")
-final class NoopSigner implements Signer {
+final class NullSigner implements Signer {
 
     /**
      * An instance of NoopSigner.
      */
-    public static final NoopSigner INSTANCE = new NoopSigner();
+    public static final NullSigner INSTANCE = new NullSigner();
 
-    private NoopSigner() {}
+    private NullSigner() {}
 
     /**
      * Sign the given request, by doing nothing.

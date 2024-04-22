@@ -27,7 +27,7 @@ public interface Signer<RequestT, IdentityT extends Identity> {
     RequestT sign(RequestT request, IdentityT identity, AuthProperties properties);
 
     @SuppressWarnings("unchecked")
-    static <RequestT, IdentityT extends Identity> Signer<RequestT, IdentityT> noOpSigner() {
-        return (Signer<RequestT, IdentityT>) NoopSigner.INSTANCE;
+    static <RequestT, IdentityT extends Identity> Signer<RequestT, IdentityT> nullSigner() {
+        return (Signer<RequestT, IdentityT>) NullSigner.INSTANCE;
     }
 }
