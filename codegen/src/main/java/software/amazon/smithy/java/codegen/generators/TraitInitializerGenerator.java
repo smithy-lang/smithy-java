@@ -9,7 +9,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
-import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.SourceLocation;
 import software.amazon.smithy.model.node.ArrayNode;
@@ -149,7 +148,8 @@ record TraitInitializerGenerator(JavaWriter writer, Shape shape, Set<ShapeId> ru
 
         @Override
         public Void nullNode(NullNode nullNode) {
-            throw new CodegenException("Could not write null node");
+            writer.write("${node:T}.nullNode()");
+            return null;
         }
     }
 
@@ -163,7 +163,8 @@ record TraitInitializerGenerator(JavaWriter writer, Shape shape, Set<ShapeId> ru
 
         @Override
         public Void nullNode(NullNode nullNode) {
-            throw new CodegenException("Could not write value for null node.");
+            writer.writeInlineWithNoFormatting("null");
+            return null;
         }
 
         @Override
