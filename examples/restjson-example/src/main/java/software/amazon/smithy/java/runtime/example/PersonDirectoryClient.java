@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.api.Endpoint;
 import software.amazon.smithy.java.runtime.api.EndpointProvider;
+import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
@@ -57,7 +58,7 @@ public final class PersonDirectoryClient implements PersonDirectory {
         this.interceptor = ClientInterceptor.chain(builder.interceptors);
 
         // By default, support NoAuthAuthScheme
-        AuthScheme<?, ?> noAuthAuthScheme = AuthScheme.noAuthAuthScheme();
+        AuthScheme<Object, Identity> noAuthAuthScheme = AuthScheme.noAuthAuthScheme();
         this.supportedAuthSchemes.add(noAuthAuthScheme);
         this.supportedAuthSchemes.addAll(builder.supportedAuthSchemes);
 
@@ -65,10 +66,7 @@ public final class PersonDirectoryClient implements PersonDirectory {
         AuthSchemeResolver defaultAuthSchemeResolver = params -> List.of(
             new AuthSchemeOption(noAuthAuthScheme.schemeId(), null, null)
         );
-        this.authSchemeResolver = Objects.requireNonNullElseGet(
-            builder.authSchemeResolver,
-            () -> defaultAuthSchemeResolver
-        );
+        this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, defaultAuthSchemeResolver);
         this.identityResolvers = IdentityResolvers.of(builder.identityResolvers);
 
         // Here is where you would register errors bound to the service on the registry.
@@ -227,27 +225,13 @@ public final class PersonDirectoryClient implements PersonDirectory {
         /**
          * Add supported auth schemes to the client that works in tandem with the {@link AuthSchemeResolver}.
          *
+         * <p> If the scheme ID is already supported, it will be replaced by the provided auth scheme.
+         *
          * @param authSchemes Auth schemes to add.
          * @return the builder.
          */
-        // TODO: Name the method put to convey that if another AuthScheme with same schemeId is added, it replaces?
-        public Builder addSupportedAuthSchemes(AuthScheme<?, ?>... authSchemes) {
+        public Builder putSupportedAuthSchemes(AuthScheme<?, ?>... authSchemes) {
             supportedAuthSchemes.addAll(Arrays.asList(authSchemes));
-            return this;
-        }
-
-        /**
-         * Set the supported auth schemes of the client, used in tandem with the {@link AuthSchemeResolver}.
-         *
-         * @param supportedAuthSchemes Auth schemes to set.
-         * @return the builder.
-         */
-        // TODO: Do we want this list to remove default NoAuthAuthScheme? Or any other auth schemes added via model?
-        //       AuthSchemeResolver can always exclude a scheme if it shouldn't be used, but should it be removable from
-        //       supportedAuthSchemes? Maybe we remove this method.
-        public Builder supportedAuthSchemes(List<AuthScheme<?, ?>> supportedAuthSchemes) {
-            this.supportedAuthSchemes.clear();
-            this.supportedAuthSchemes.addAll(supportedAuthSchemes);
             return this;
         }
 

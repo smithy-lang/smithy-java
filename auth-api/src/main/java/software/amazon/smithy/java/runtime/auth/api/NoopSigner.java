@@ -10,12 +10,13 @@ import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 /**
  * A signer that does nothing.
  */
-public class NoopSigner implements Signer<Object, Identity> {
+@SuppressWarnings("rawtypes")
+final class NoopSigner implements Signer {
 
     /**
      * An instance of NoopSigner.
      */
-    public static final NoopSigner INSTANCE = new NoopSigner() {};
+    public static final NoopSigner INSTANCE = new NoopSigner();
 
     private NoopSigner() {}
 
@@ -23,7 +24,7 @@ public class NoopSigner implements Signer<Object, Identity> {
      * Sign the given request, by doing nothing.
      *
      * @param request    Request to sign.
-     * @param identity   AnonymousIdentity used to sign the request. This is unused.
+     * @param identity   Identity used to sign the request. This is unused.
      * @param properties Signing properties. This is unused.
      * @return the request as-is.
      */

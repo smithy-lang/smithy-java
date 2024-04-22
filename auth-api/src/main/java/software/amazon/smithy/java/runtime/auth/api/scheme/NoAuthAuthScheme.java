@@ -7,7 +7,7 @@ package software.amazon.smithy.java.runtime.auth.api.scheme;
 
 import java.util.Optional;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
-import software.amazon.smithy.java.runtime.auth.api.NoopSigner;
+import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
@@ -15,9 +15,9 @@ import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 /**
  * An auth scheme for {@code smithy.api#noAuth} that represents no authentication.
  */
-class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
+final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
 
-    public static NoAuthAuthScheme INSTANCE = new NoAuthAuthScheme() {};
+    public static NoAuthAuthScheme INSTANCE = new NoAuthAuthScheme();
     private static final IdentityResolver<Identity> ANONYMOUS_IDENTITY_RESOLVER = new AnonymousIdentityResolver();
 
     private NoAuthAuthScheme() {}
@@ -50,8 +50,8 @@ class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
     }
 
     @Override
-    public NoopSigner signer() {
-        return NoopSigner.INSTANCE;
+    public Signer<Object, Identity> signer() {
+        return Signer.noOpSigner();
     }
 
     private static class AnonymousIdentityResolver implements IdentityResolver<Identity> {

@@ -15,6 +15,7 @@ import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
  */
 @FunctionalInterface
 public interface Signer<RequestT, IdentityT extends Identity> {
+
     /**
      * Sign the given request.
      *
@@ -24,4 +25,9 @@ public interface Signer<RequestT, IdentityT extends Identity> {
      * @return the signed request.
      */
     RequestT sign(RequestT request, IdentityT identity, AuthProperties properties);
+
+    @SuppressWarnings("unchecked")
+    static <RequestT, IdentityT extends Identity> Signer<RequestT, IdentityT> noOpSigner() {
+        return (Signer<RequestT, IdentityT>) NoopSigner.INSTANCE;
+    }
 }
