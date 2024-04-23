@@ -101,13 +101,13 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
 
         @Override
         public Void listShape(ListShape shape) {
-            writer.pushState();
-            writer.putContext(
-                "collectionImpl",
-                symbolProvider.toSymbol(shape)
-                    .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
-            );
             if (shape.hasTrait(UniqueItemsTrait.class)) {
+                writer.pushState();
+                writer.putContext(
+                        "collectionImpl",
+                        symbolProvider.toSymbol(shape)
+                                .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+                );
                 writer.putContext("sdkSerdeException", SdkSerdeException.class);
                 writer.write(
                     """
@@ -124,20 +124,17 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
                     symbolProvider.toSymbol(shape),
                     new DeserReaderVisitor(shape.getMember(), "de", "elementSchema")
                 );
+                writer.popState();
             } else {
                 writer.write(
                     """
                         {
-                            $T result = new ${collectionImpl:T}<>();
                             var elementSchema = member.member("member");
-                            de.readList(member, elem -> result.add($C));
-                            ${memberName:L}(result);
+                            de.readList(member, elem ->  ${memberName:L}($C));
                         }""",
-                    symbolProvider.toSymbol(shape),
-                    new DeserReaderVisitor(shape.getMember(), "de", "elementSchema")
+                    new DeserReaderVisitor(shape.getMember(), "elem", "elementSchema")
                 );
             }
-            writer.popState();
             return null;
         }
 
@@ -164,13 +161,12 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
                         {
                             $T result = new ${collectionImpl:T}<>();
                             var valueSchema = member.member("value");
-                            de.$L(member, (key, v) -> {
+                            de.readStringMap(member, (key, v) -> {
                                 ${C|}
                             });
                             ${memberName:L}(result);
                         }""",
                     symbolProvider.toSymbol(shape),
-                    getMapReadMethod(keyTarget),
                     new DeserReaderVisitor(shape.getValue(), "v", "valueSchema")
                 );
             } else if (valueTarget.isMapShape()) {
@@ -179,14 +175,10 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
                 writer.write(
                     """
                         {
-                            $T result = new ${collectionImpl:T}<>();
                             var valueSchema = member.member("value");
-                            de.$L(member, (key, v) -> result.put(key, $C));
-                            ${memberName:L}(result);
+                            de.readStringMap(member, (key, v) -> put${memberName:U}(key, $C));
                         }""",
-                    symbolProvider.toSymbol(shape),
-                    getMapReadMethod(keyTarget),
-                    new DeserReaderVisitor(valueTarget, "de", "valueSchema")
+                    new DeserReaderVisitor(valueTarget, "v", "valueSchema")
                 );
             }
             writer.popState();
@@ -197,18 +189,6 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
         public Void memberShape(MemberShape shape) {
             return model.expectShape(shape.getTarget()).accept(this);
         }
-    }
-
-    private static String getMapReadMethod(Shape shape) {
-        return switch (shape.getType()) {
-            case INTEGER -> "readIntMap";
-            case LONG -> "readLongMap";
-            case STRING -> "readStringMap";
-            default -> throw new CodegenException(
-                "Invalid map key type: " + shape.getType() + " for shape "
-                    + shape
-            );
-        };
     }
 
     private final class DeserReaderVisitor extends ShapeVisitor.DataShapeVisitor<Void> implements Runnable {
