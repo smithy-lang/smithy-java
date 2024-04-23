@@ -126,8 +126,4 @@ public final class SymbolUtils {
         var target = model.expectShape(member.getTarget());
         return target.isListShape() || target.isMapShape();
     }
-
-    public static boolean isAggregateType(Shape shape) {
-        return shape.getType().getCategory().equals(ShapeType.Category.AGGREGATE);
-    }
 }
