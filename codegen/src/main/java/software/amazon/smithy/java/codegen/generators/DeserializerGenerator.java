@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.SymbolUtils;
@@ -104,9 +103,9 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
             if (shape.hasTrait(UniqueItemsTrait.class)) {
                 writer.pushState();
                 writer.putContext(
-                        "collectionImpl",
-                        symbolProvider.toSymbol(shape)
-                                .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+                    "collectionImpl",
+                    symbolProvider.toSymbol(shape)
+                        .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
                 );
                 writer.putContext("sdkSerdeException", SdkSerdeException.class);
                 writer.write(
