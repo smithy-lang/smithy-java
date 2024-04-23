@@ -101,25 +101,25 @@ final class GetterGenerator implements Runnable {
             // If the collection is nullable use an empty collection if null
             if (SymbolUtils.isNullableMember(member)) {
                 writer.write(
-                        """
-                            public $1T $2L() {
-                                return $2L != null ? $2L : $3T.$4L;
-                            }
-                            """,
-                        shapeSymbol,
-                        symbolProvider.toMemberName(member),
-                        Collections.class,
-                        shapeSymbol.expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, String.class)
+                    """
+                        public $1T $2L() {
+                            return $2L != null ? $2L : $3T.$4L;
+                        }
+                        """,
+                    shapeSymbol,
+                    symbolProvider.toMemberName(member),
+                    Collections.class,
+                    shapeSymbol.expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, String.class)
                 );
             } else {
                 writer.write(
-                        """
-                            public $1T $2L() {
-                                return $2L;
-                            }
-                            """,
-                        shapeSymbol,
-                        symbolProvider.toMemberName(member)
+                    """
+                        public $1T $2L() {
+                            return $2L;
+                        }
+                        """,
+                    shapeSymbol,
+                    symbolProvider.toMemberName(member)
                 );
             }
             writer.popState();
