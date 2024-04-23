@@ -47,7 +47,7 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
                 @Override
                 public Builder deserialize($T decoder) {
                     decoder.readStruct(SCHEMA, (member, de) -> {
-                        ${?hasMembers}switch (SCHEMA.lookupMemberIndex(member)) {
+                        ${?hasMembers}switch (member.memberIndex()) {
                             ${C|}
                         }${/hasMembers}
                     });
