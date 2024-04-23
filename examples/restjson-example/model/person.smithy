@@ -86,5 +86,8 @@ operation PutPerson {
         @notProperty
         @required
         requiredList: ListOfString
+
+        @notProperty
+        pojo: DemoPojo
     }
 }
