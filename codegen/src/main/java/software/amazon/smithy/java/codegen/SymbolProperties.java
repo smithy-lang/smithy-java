@@ -12,14 +12,13 @@ public final class SymbolProperties {
     // TODO: Docs
     public static final String PRIMITIVE = "primitive";
 
-    // TODO: Docs
-    public static final String BUILDER_REF_INITIALIZER = "builder-ref-init";
-
     public static final String IS_JAVA_ARRAY = "is-java-array";
 
     public static final String COLLECTION_COPY_METHOD = "collection-factory";
 
     public static final String COLLECTION_IMPLEMENTATION_CLASS = "collection-impl-class";
+
+    public static final String COLLECTION_EMPTY_METHOD = "collection-empty";
 
     private SymbolProperties() {}
 }
