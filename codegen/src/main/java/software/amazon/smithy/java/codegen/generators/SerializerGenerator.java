@@ -157,7 +157,6 @@ final class SerializerGenerator implements Runnable {
                 listShape,
                 s -> writer.write(
                     """
-                        var ${schemaName:L}_MEMBER = ${schemaName:L}.member("member");
                         ${serializer:L}.writeList(${schemaName:L}, ${serializer:L}l -> {
                             for(var ${memberName:L}Elem : ${memberName:L}) {
                                 ${C|};
@@ -181,8 +180,6 @@ final class SerializerGenerator implements Runnable {
                 m -> writer.write(
                     """
                         ${serializer:L}.writeMap(${schemaName:L}, ${serializer:L}m -> {
-                            var ${schemaName:L}_KEY = ${schemaName:L}.member("key");
-                            var ${schemaName:L}_VALUE = ${schemaName:L}.member("value");
                             for (var ${memberName:L}Entry : ${memberName:L}.entrySet()) {
                                 stm.writeEntry(${schemaName:L}_KEY, ${memberName:L}Entry.getKey(), ${serializer:L}mv -> {
                                     var ${memberName:L}Val = ${memberName:L}Entry.getValue();
