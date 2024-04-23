@@ -173,5 +173,40 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
             writer.consumer(w -> SchemaUtils.writeSchemaType(w, symbolProvider, target)),
             new TraitInitializerGenerator(writer, member, context.runtimeTraits())
         );
+
+        generateCollectionMemberSchemas(target, SchemaUtils.toMemberSchemaName(memberName));
+    }
+
+    /**
+     * Generates a static constant for member schemas of list and map shapes for use in serde.
+     * Other shapes are ignored.
+     *
+     * <p>These member schemas are resolved using the {@link SdkSchema#member(String)} method and allow serde
+     * code to use the member schemas without creating a new variable in a consumer lambda each time serde is performed.
+     *
+     * @param shape shape to generate member schemas for
+     * @param baseSchemaName name of the list or map schema to get the member schema for
+     */
+    private void generateCollectionMemberSchemas(Shape shape, String baseSchemaName) {
+        if (shape.isListShape()) {
+            writer.write(
+                "private static final ${schemaClass:T} $1L_MEMBER = $1L.member(\"member\");",
+                baseSchemaName
+            );
+            generateCollectionMemberSchemas(
+                model.expectShape(shape.asListShape().get().getMember().getTarget()),
+                baseSchemaName + "_MEMBER"
+            );
+        } else if (shape.isMapShape()) {
+            writer.write("private static final ${schemaClass:T} $1L_KEY = $1L.member(\"key\");", baseSchemaName);
+            writer.write(
+                "private static final ${schemaClass:T} $1L_VALUE = $1L.member(\"value\");",
+                baseSchemaName
+            );
+            generateCollectionMemberSchemas(
+                model.expectShape(shape.asMapShape().get().getValue().getTarget()),
+                baseSchemaName + "_VALUE"
+            );
+        }
     }
 }
