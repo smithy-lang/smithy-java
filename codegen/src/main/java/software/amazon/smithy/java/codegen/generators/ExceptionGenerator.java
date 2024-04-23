@@ -57,7 +57,7 @@ public final class ExceptionGenerator
                 new ConstructorGenerator(writer, shape, directive.symbolProvider(), directive.model()),
                 new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()),
                 writer.consumer(JavaWriter::writeToString),
-                new SerializerGenerator(writer),
+                new SerializerGenerator(writer, shape, directive.symbolProvider(), directive.model()),
                 new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model())
             );
             writer.popState();

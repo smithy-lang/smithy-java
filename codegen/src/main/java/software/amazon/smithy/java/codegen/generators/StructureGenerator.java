@@ -64,7 +64,7 @@ public final class StructureGenerator
                 writer.consumer(JavaWriter::writeToString),
                 new EqualsGenerator(writer, directive.shape(), directive.symbolProvider()),
                 new HashCodeGenerator(writer, directive.shape(), directive.symbolProvider()),
-                new SerializerGenerator(writer),
+                new SerializerGenerator(writer, shape, directive.symbolProvider(), directive.model()),
                 new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model())
             );
             writer.popState();
