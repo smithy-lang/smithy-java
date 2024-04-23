@@ -5,8 +5,10 @@
 
 package software.amazon.smithy.java.runtime.core.schema;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -15,8 +17,14 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.DefaultTrait;
+import software.amazon.smithy.model.traits.LengthTrait;
+import software.amazon.smithy.model.traits.PatternTrait;
+import software.amazon.smithy.model.traits.RangeTrait;
+import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.utils.SmithyBuilder;
 
@@ -45,6 +53,30 @@ public final class SdkSchema {
     private final Set<String> stringEnumValues;
     private final Set<Integer> intEnumValues;
 
+    // The following variables are used to speed up validation and prevent looking up constraints over and over.
+    private final transient boolean hasRequiredMembers;
+    final transient long minLengthConstraint;
+    final transient long maxLengthConstraint;
+    final transient BigDecimal minRangeConstraint;
+    final transient BigDecimal maxRangeConstraint;
+    final transient Pattern patternConstraint;
+    final transient long minLongConstraint;
+    final transient long maxLongConstraint;
+    final transient double minDoubleConstraint;
+    final transient double maxDoubleConstraint;
+
+    /**
+     * The bitmask to use for this member to compute a required member bitfield. This value will match the memberIndex
+     * if the member is required and has no default value. It will be zero if it's not required or has a default value.
+     */
+    transient int requiredByValidationBitmask;
+
+    /**
+     * The result of creating a bitfield of the memberIndex of every required member with no default value.
+     * This allows for an inexpensive comparison for required structure member validation.
+     */
+    final transient int requiredStructureMemberBitfield;
+
     private SdkSchema(Builder builder) {
         this.id = Objects.requireNonNull(builder.id, "id is null");
         this.type = Objects.requireNonNull(builder.type, "type is null");
@@ -67,6 +99,82 @@ public final class SdkSchema {
 
         this.stringEnumValues = builder.stringEnumValues;
         this.intEnumValues = builder.intEnumValues;
+
+        // Precompute an allowed range, setting Long.MIN and Long.MAX when missing.
+        var lengthTrait = getTrait(LengthTrait.class);
+        if (lengthTrait == null) {
+            minLengthConstraint = Long.MIN_VALUE;
+            maxLengthConstraint = Long.MAX_VALUE;
+        } else {
+            minLengthConstraint = lengthTrait.getMin().orElse(Long.MIN_VALUE);
+            maxLengthConstraint = lengthTrait.getMax().orElse(Long.MAX_VALUE);
+        }
+
+        // Range traits use BigDecimal, so use null when missing rather than any kind of default.
+        var rangeTrait = getTrait(RangeTrait.class);
+        if (rangeTrait != null) {
+            this.minRangeConstraint = rangeTrait.getMin().orElse(null);
+            this.maxRangeConstraint = rangeTrait.getMax().orElse(null);
+        } else {
+            this.minRangeConstraint = null;
+            this.maxRangeConstraint = null;
+        }
+
+        // Pre-compute allowable ranges so this doesn't have to be looked up during validation.
+        // BigInteger and BigDecimal just use the rangeConstraint BigDecimal directly.
+        switch (type) {
+            case BYTE -> {
+                minLongConstraint = minRangeConstraint == null ? Byte.MIN_VALUE : minRangeConstraint.byteValue();
+                maxLongConstraint = maxRangeConstraint == null ? Byte.MAX_VALUE : maxRangeConstraint.byteValue();
+                minDoubleConstraint = Double.MIN_VALUE;
+                maxDoubleConstraint = Double.MAX_VALUE;
+            }
+            case SHORT -> {
+                minLongConstraint = minRangeConstraint == null ? Short.MIN_VALUE : minRangeConstraint.shortValue();
+                maxLongConstraint = maxRangeConstraint == null ? Short.MAX_VALUE : maxRangeConstraint.shortValue();
+                minDoubleConstraint = Double.MIN_VALUE;
+                maxDoubleConstraint = Double.MAX_VALUE;
+            }
+            case INTEGER -> {
+                minLongConstraint = minRangeConstraint == null ? Integer.MIN_VALUE : minRangeConstraint.intValue();
+                maxLongConstraint = maxRangeConstraint == null ? Integer.MAX_VALUE : maxRangeConstraint.intValue();
+                minDoubleConstraint = Double.MIN_VALUE;
+                maxDoubleConstraint = Double.MAX_VALUE;
+            }
+            case LONG -> {
+                minLongConstraint = minRangeConstraint == null ? Long.MIN_VALUE : minRangeConstraint.longValue();
+                maxLongConstraint = maxRangeConstraint == null ? Long.MAX_VALUE : maxRangeConstraint.longValue();
+                minDoubleConstraint = Double.MIN_VALUE;
+                maxDoubleConstraint = Double.MAX_VALUE;
+            }
+            case FLOAT -> {
+                minLongConstraint = Long.MIN_VALUE;
+                maxLongConstraint = Long.MAX_VALUE;
+                minDoubleConstraint = minRangeConstraint == null ? Float.MIN_VALUE : minRangeConstraint.floatValue();
+                maxDoubleConstraint = maxRangeConstraint == null ? Float.MAX_VALUE : maxRangeConstraint.floatValue();
+            }
+            case DOUBLE -> {
+                minLongConstraint = Long.MIN_VALUE;
+                maxLongConstraint = Long.MAX_VALUE;
+                minDoubleConstraint = minRangeConstraint == null ? Double.MIN_VALUE : minRangeConstraint.doubleValue();
+                maxDoubleConstraint = maxRangeConstraint == null ? Double.MAX_VALUE : maxRangeConstraint.doubleValue();
+            }
+            default -> {
+                minLongConstraint = Long.MIN_VALUE;
+                maxLongConstraint = Long.MAX_VALUE;
+                minDoubleConstraint = Double.MIN_VALUE;
+                maxDoubleConstraint = Double.MAX_VALUE;
+            }
+        }
+
+        var patternTrait = getTrait(PatternTrait.class);
+        this.patternConstraint = patternTrait != null ? patternTrait.getPattern() : null;
+
+        // Pre-compute where the shape contains any members marked as required.
+        this.hasRequiredMembers = hasRequired(this.type, this.memberTarget, this.memberList);
+
+        // Precompute the bitfields needed to be set when all required members are present.
+        this.requiredStructureMemberBitfield = hasRequiredMembers ? computeRequiredBitField(members()) : 0;
     }
 
     private static Map<Class<? extends Trait>, Trait> createTraitMap(Trait[] traits) {
@@ -83,6 +191,29 @@ public final class SdkSchema {
         }
     }
 
+    private static boolean hasRequired(ShapeType type, SdkSchema memberTarget, List<SdkSchema> members) {
+        if (memberTarget != null) {
+            return memberTarget.hasRequiredMembers;
+        } else if (type != ShapeType.STRUCTURE) {
+            return false;
+        } else {
+            for (var member : members) {
+                if (member.isRequiredByValidation()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    private static int computeRequiredBitField(Collection<SdkSchema> members) {
+        int setFields = 0;
+        for (SdkSchema member : members) {
+            setFields |= member.requiredByValidationBitmask;
+        }
+        return setFields;
+    }
+
     private void setMemberIndex(int memberIndex) {
         if (this.memberIndex != -1) {
             throw new IllegalStateException(
@@ -93,6 +224,13 @@ public final class SdkSchema {
         }
 
         this.memberIndex = memberIndex;
+
+        // Compute the bitmask of the memberIndex if the shape is required and has no default.
+        if (hasTrait(RequiredTrait.class) && !hasTrait(DefaultTrait.class)) {
+            requiredByValidationBitmask = 1 << memberIndex;
+        } else {
+            requiredByValidationBitmask = 0;
+        }
     }
 
     /**
@@ -255,6 +393,15 @@ public final class SdkSchema {
      */
     public SdkSchema member(String memberName) {
         return members.get(memberName);
+    }
+
+    /**
+     * Returns true if this is a required member with no default value.
+     *
+     * @return true if required.
+     */
+    boolean isRequiredByValidation() {
+        return requiredByValidationBitmask != 0;
     }
 
     /**

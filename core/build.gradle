@@ -1,5 +1,6 @@
 plugins {
     id 'smithy-java.module-conventions'
+    alias(libs.plugins.jmh)
 }
 
 description = "This module provides the core functionality for Smithy java"
@@ -11,4 +12,10 @@ ext {
 
 dependencies {
     api(libs.smithy.model)
+}
+
+jmh {
+    warmupIterations = 3
+    iterations = 3
+    fork = 1
 }
