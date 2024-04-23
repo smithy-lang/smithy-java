@@ -158,9 +158,11 @@ final class SerializerGenerator implements Runnable {
                 s -> writer.write(
                     """
                         var ${schemaName:L}_MEMBER = ${schemaName:L}.member("member");
-                        ${serializer:L}.writeList(${schemaName:L}, ${serializer:L}l -> ${memberName:L}.forEach(${memberName:L}Elem -> {
-                            ${C|};
-                        }))""",
+                        ${serializer:L}.writeList(${schemaName:L}, ${serializer:L}l -> {
+                            for(var ${memberName:L}Elem : ${memberName:L}) {
+                                ${C|};
+                            }
+                        })""",
                     new MemberSerializerShapeVisitor(
                         listShape.getMember(),
                         memberName + "Elem",
@@ -181,9 +183,12 @@ final class SerializerGenerator implements Runnable {
                         ${serializer:L}.writeMap(${schemaName:L}, ${serializer:L}m -> {
                             var ${schemaName:L}_KEY = ${schemaName:L}.member("key");
                             var ${schemaName:L}_VALUE = ${schemaName:L}.member("value");
-                            ${memberName:L}.forEach((k, ${memberName:L}Val) -> ${serializer:L}m.writeEntry(${schemaName:L}_KEY, k, ${serializer:L}mv -> {
-                                ${C|};
-                            }));
+                            for (var ${memberName:L}Entry : ${memberName:L}.entrySet()) {
+                                stm.writeEntry(${schemaName:L}_KEY, ${memberName:L}Entry.getKey(), ${serializer:L}mv -> {
+                                    var ${memberName:L}Val = ${memberName:L}Entry.getValue();
+                                    ${C|};
+                                });
+                            }
                         })""",
                     new MemberSerializerShapeVisitor(
                         mapShape.getValue(),
