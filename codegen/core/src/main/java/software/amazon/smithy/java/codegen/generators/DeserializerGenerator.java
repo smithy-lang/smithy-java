@@ -140,7 +140,6 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
         @Override
         public Void mapShape(MapShape shape) {
             writer.pushState();
-            var keyTarget = model.expectShape(shape.getKey().getTarget());
             var valueTarget = model.expectShape(shape.getValue().getTarget());
             writer.putContext(
                 "collectionImpl",
