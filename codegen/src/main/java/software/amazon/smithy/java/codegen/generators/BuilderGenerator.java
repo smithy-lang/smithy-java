@@ -102,11 +102,11 @@ final class BuilderGenerator implements Runnable {
                 continue;
             }
             writer.pushState();
-            writer.putContext("required", member.isRequired());
-            writer.putContext("default", member.hasTrait(DefaultTrait.class));
+            writer.putContext("isNullable", SymbolUtils.isNullableMember(member));
+            writer.putContext("default", member.hasNonNullDefault());
             defaultVisitor.member = member;
             writer.write(
-                "private ${?required}$1T${/required}${^required}$1B${/required} $2L${?default} = ${3C|}${/default};",
+                "private ${^isNullable}$1T${/isNullable}${?isNullable}$1B${/isNullable} $2L${?default} = ${3C|}${/default};",
                 symbolProvider.toSymbol(member),
                 symbolProvider.toMemberName(member),
                 defaultVisitor
@@ -316,7 +316,7 @@ final class BuilderGenerator implements Runnable {
 
         @Override
         public void run() {
-            if (member.hasTrait(DefaultTrait.class)) {
+            if (member.hasNonNullDefault()) {
                 this.defaultValue = member.expectTrait(DefaultTrait.class).toNode();
                 member.accept(this);
             }
