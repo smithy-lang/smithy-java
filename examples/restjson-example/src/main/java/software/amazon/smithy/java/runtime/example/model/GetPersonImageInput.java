@@ -20,7 +20,7 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class GetPersonImageInput implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#GetPersonImageInput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpHeaderTrait("X-Name"), new RequiredTrait())
         .build();
@@ -72,7 +72,7 @@ public final class GetPersonImageInput implements SerializableShape {
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, (member, de) -> {
-                switch (SCHEMA.lookupMemberIndex(member)) {
+                switch (member.memberIndex()) {
                     case 0 -> name(de.readString(member));
                 }
             });

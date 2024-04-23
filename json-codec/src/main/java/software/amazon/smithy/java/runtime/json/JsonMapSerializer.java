@@ -48,14 +48,4 @@ final class JsonMapSerializer implements MapSerializer {
             wroteValue = true;
         }
     }
-
-    @Override
-    public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
-        writeEntry(keySchema, Integer.toString(key), valueSerializer);
-    }
-
-    @Override
-    public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
-        writeEntry(keySchema, Long.toString(key), valueSerializer);
-    }
 }

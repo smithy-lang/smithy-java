@@ -27,19 +27,19 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class PutPersonImageInput implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#PutPersonInput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpLabelTrait(), new RequiredTrait())
         .build();
-    private static final SdkSchema SCHEMA_TAGS = SdkSchema.memberBuilder(1, "tags", PreludeSchemas.STRING)
+    private static final SdkSchema SCHEMA_TAGS = SdkSchema.memberBuilder("tags", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpHeaderTrait("Tags"))
         .build();
-    private static final SdkSchema SCHEMA_MORE_TAGS = SdkSchema.memberBuilder(2, "moreTags", PreludeSchemas.STRING)
+    private static final SdkSchema SCHEMA_MORE_TAGS = SdkSchema.memberBuilder("moreTags", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpQueryTrait("MoreTags"))
         .build();
-    private static final SdkSchema SCHEMA_IMAGE = SdkSchema.memberBuilder(3, "image", SharedSchemas.STREAM)
+    private static final SdkSchema SCHEMA_IMAGE = SdkSchema.memberBuilder("image", SharedSchemas.STREAM)
         .id(ID)
         .traits(new HttpPayloadTrait())
         .build();
@@ -142,7 +142,7 @@ public final class PutPersonImageInput implements SerializableShape {
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, (member, de) -> {
-                switch (SCHEMA.lookupMemberIndex(member)) {
+                switch (member.memberIndex()) {
                     case 0 -> name(de.readString(member));
                     case 1 -> de.readList(SCHEMA_TAGS, ser -> tags.add(ser.readString(SCHEMA_TAGS)));
                     case 2 -> de.readList(SCHEMA_MORE_TAGS, ser -> moreTags.add(ser.readString(SCHEMA_MORE_TAGS)));

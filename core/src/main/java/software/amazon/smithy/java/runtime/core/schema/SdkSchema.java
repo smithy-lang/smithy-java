@@ -7,17 +7,14 @@ package software.amazon.smithy.java.runtime.core.schema;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Predicate;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.Trait;
@@ -25,29 +22,77 @@ import software.amazon.smithy.utils.SmithyBuilder;
 
 /**
  * Describes a generated shape with important metadata from a Smithy model.
+ *
+ * <p>Various constraint traits are precomputed based on the presence of traits exposed by this class to aid in the
+ * performance of validation to avoid computing constraints and hashmap lookups by trait class.
  */
-public class SdkSchema {
+public final class SdkSchema {
 
     private final ShapeId id;
     private final ShapeType type;
     private final Map<Class<? extends Trait>, Trait> traits;
     private final Map<String, SdkSchema> members;
-    private final Set<String> stringEnumValues;
-    private final Set<Integer> intEnumValues;
+    private final List<SdkSchema> memberList;
+
     private final String memberName;
     private final SdkSchema memberTarget;
-    private final int memberIndex;
+
+    /**
+     * The position of the member in a containing shape's {@link #members()} return value.
+     */
+    private int memberIndex = -1;
+
+    private final Set<String> stringEnumValues;
+    private final Set<Integer> intEnumValues;
 
     private SdkSchema(Builder builder) {
         this.id = Objects.requireNonNull(builder.id, "id is null");
         this.type = Objects.requireNonNull(builder.type, "type is null");
-        this.traits = builder.traits == null ? Collections.emptyMap() : builder.traits;
-        this.members = builder.members == null ? Collections.emptyMap() : builder.members;
-        this.memberIndex = builder.memberIndex;
+
         this.memberName = builder.memberName;
         this.memberTarget = builder.memberTarget;
+
+        // Create a more efficient trait map based on the number of traits.
+        this.traits = createTraitMap(builder.traits);
+
+        // Create a more efficient member map based on the number of members.
+        this.members = MemberContainers.of(
+            this.type,
+            builder.members,
+            this.memberTarget != null ? this.memberTarget.members : null
+        );
+
+        // Create the immutable copy of the members as a list, the companion to memberIndex.
+        this.memberList = builder.members == null ? Collections.emptyList() : List.copyOf(members.values());
+
         this.stringEnumValues = builder.stringEnumValues;
         this.intEnumValues = builder.intEnumValues;
+    }
+
+    private static Map<Class<? extends Trait>, Trait> createTraitMap(Trait[] traits) {
+        if (traits == null) {
+            return Map.of();
+        } else if (traits.length == 1) {
+            return Map.of(traits[0].getClass(), traits[0]);
+        } else {
+            var result = new HashMap<Class<? extends Trait>, Trait>(traits.length);
+            for (Trait trait : traits) {
+                result.put(trait.getClass(), trait);
+            }
+            return Collections.unmodifiableMap(result);
+        }
+    }
+
+    private void setMemberIndex(int memberIndex) {
+        if (this.memberIndex != -1) {
+            throw new IllegalStateException(
+                "Member schema already has an assigned member index of "
+                    + this.memberIndex + ". Members cannot be reused across shapes. "
+                    + "Member: " + this
+            );
+        }
+
+        this.memberIndex = memberIndex;
     }
 
     /**
@@ -65,24 +110,12 @@ public class SdkSchema {
      * @param memberName   Name of the member.
      * @param memberTarget Schema the member targets.
      * @return Returns the member builder.
+     * @throws IllegalArgumentException if {@code memberIndex} is less than 1.
      */
     public static Builder memberBuilder(String memberName, SdkSchema memberTarget) {
-        return memberBuilder(-1, memberName, memberTarget);
-    }
-
-    /**
-     * Create a builder for a member.
-     *
-     * @param index        Index of the code generated member.
-     * @param memberName   Name of the member.
-     * @param memberTarget Schema the member targets.
-     * @return Returns the member builder.
-     */
-    public static Builder memberBuilder(int index, String memberName, SdkSchema memberTarget) {
         Builder builder = builder();
         builder.memberTarget = Objects.requireNonNull(memberTarget, "memberTarget is null");
         builder.memberName = Objects.requireNonNull(memberName, "memberName is null");
-        builder.memberIndex = index;
         builder.type = memberTarget.type;
         return builder;
     }
@@ -97,7 +130,7 @@ public class SdkSchema {
      *
      * @return Return the shape ID.
      */
-    public final ShapeId id() {
+    public ShapeId id() {
         return id;
     }
 
@@ -108,7 +141,7 @@ public class SdkSchema {
      *
      * @return Returns the schema shape type.
      */
-    public final ShapeType type() {
+    public ShapeType type() {
         return type;
     }
 
@@ -137,12 +170,21 @@ public class SdkSchema {
         );
     }
 
+    /**
+     * The position of the member in the containing shape's list of members <em>at this point in time</em>.
+     *
+     * <p>This index is not stable over time; it can change between versions of a published JAR for a shape.
+     * Do not serialize the member index itself, rely on it for persistence, or assume it will be the same across
+     * versions of a JAR. This value is primarily used for
+     *
+     * @return the member index of this schema starting from 1. 0 is used when a shape is not a member.
+     */
     public int memberIndex() {
         return memberIndex;
     }
 
     /**
-     * Get the target of the member.
+     * Get the target of the member, or null if the schema is not a member.
      *
      * @return Member target.
      */
@@ -201,8 +243,8 @@ public class SdkSchema {
      *
      * @return Returns the members.
      */
-    public Collection<SdkSchema> members() {
-        return members.values();
+    public List<SdkSchema> members() {
+        return memberList;
     }
 
     /**
@@ -213,110 +255,6 @@ public class SdkSchema {
      */
     public SdkSchema member(String memberName) {
         return members.get(memberName);
-    }
-
-    /**
-     * Lookup the memberIndex of a member contained in this shape.
-     *
-     * @param member Member to lookup.
-     * @return the memberIndex or -1 if a member index is unknown.
-     */
-    public int lookupMemberIndex(SdkSchema member) {
-        if (member.memberIndex > -1) {
-            return member.memberIndex;
-        } else {
-            // if the member itself has no index, check if the member can be found by name in this schema.
-            var lookup = member(member.memberName);
-            return lookup == null ? -1 : lookup.memberIndex;
-        }
-    }
-
-    /**
-     * Get a member from this shape by name, or generate a synthetic member that uses the given name, targets
-     * {@link PreludeSchemas#DOCUMENT}, and is a member of DOCUMENT.
-     *
-     * @param memberName Member to get or synthesize.
-     * @return the member.
-     */
-    public SdkSchema getOrCreateDocumentMember(String memberName) {
-        return getOrCreateDocumentMember(memberName, PreludeSchemas.DOCUMENT);
-    }
-
-    /**
-     * Get a member from this shape by name, or generate a synthetic member that uses the given name, targets
-     * {@link PreludeSchemas#DOCUMENT}, and is a member of DOCUMENT.
-     *
-     * @param memberName Member to get or synthesize.
-     * @return the member.
-     */
-    public SdkSchema getOrCreateDocumentMember(String memberName, SdkSchema targetSchema) {
-        var result = member(memberName);
-        if (result == null) {
-            result = SdkSchema.memberBuilder(-1, memberName, targetSchema).id(PreludeSchemas.DOCUMENT.id()).build();
-        }
-        return result;
-    }
-
-    /**
-     * Get a member by name or return a default value.
-     *
-     * @param memberName Member by name to get.
-     * @param defaultValue Default to return when not found.
-     * @return Returns the found member or null if not found.
-     */
-    public final SdkSchema member(String memberName, SdkSchema defaultValue) {
-        var m = members.get(memberName);
-        if (m != null) {
-            return m;
-        } else if (isMember()) {
-            return memberTarget.member(memberName, defaultValue);
-        } else {
-            return defaultValue;
-        }
-    }
-
-    /**
-     * Find the first member that matches the given predicate.
-     *
-     * @param predicate Predicate to filter members.
-     * @return Returns the found member or null if none matched.
-     */
-    public final SdkSchema findMember(Predicate<SdkSchema> predicate) {
-        for (SdkSchema memberSchema : members.values()) {
-            if (predicate.test(memberSchema)) {
-                return memberSchema;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Convert the shape to a builder that's populated with the state of the shape.
-     *
-     * @return Returns the created builder.
-     */
-    public Builder toBuilder() {
-        Builder b = builder().id(id).traits(traits).type(type);
-        b.memberIndex = memberIndex;
-        b.memberName = memberName;
-        b.memberTarget = memberTarget;
-        return b;
-    }
-
-    /**
-     * Creates a new SdkSchema that only contains members that match the given predicate.
-     *
-     * @param memberPredicate Predicate that returns true to keep a member.
-     * @return Returns the created shape.
-     */
-    public SdkSchema withFilteredMembers(Predicate<SdkSchema> memberPredicate) {
-        List<SdkSchema> filtered = new ArrayList<>(members.size());
-        for (SdkSchema member : members.values()) {
-            if (!memberPredicate.test(member)) {
-                filtered.add(member);
-            }
-        }
-        return toBuilder().members(filtered).build();
     }
 
     /**
@@ -375,11 +313,11 @@ public class SdkSchema {
 
         private ShapeId id;
         private ShapeType type;
-        private Map<Class<? extends Trait>, Trait> traits = null;
-        private Map<String, SdkSchema> members = null;
+        private Trait[] traits;
+        private List<SdkSchema> members;
         private String memberName;
         private SdkSchema memberTarget;
-        private int memberIndex = -1;
+
         private Set<String> stringEnumValues = Collections.emptySet();
         private Set<Integer> intEnumValues = Collections.emptySet();
 
@@ -437,34 +375,8 @@ public class SdkSchema {
          * @param traits Traits to set.
          * @return Returns the builder.
          */
-        public Builder traits(Map<Class<? extends Trait>, Trait> traits) {
-            traits(traits.values());
-            return this;
-        }
-
-        /**
-         * Set traits on the shape.
-         *
-         * @param traits Traits to set.
-         * @return Returns the builder.
-         */
         public Builder traits(Trait... traits) {
-            return traits(Arrays.asList(traits));
-        }
-
-        /**
-         * Set traits on the shape.
-         *
-         * @param traits Traits to set.
-         * @return Returns the builder.
-         */
-        public Builder traits(Iterable<Trait> traits) {
-            if (this.traits == null) {
-                this.traits = new HashMap<>();
-            }
-            for (Trait trait : traits) {
-                this.traits.put(trait.getClass(), trait);
-            }
+            this.traits = traits;
             return this;
         }
 
@@ -499,18 +411,20 @@ public class SdkSchema {
          *
          * @param members Members to set.
          * @return Returns the builder.
-         * @throws IllegalStateException if the schema is for a member.
+         * @throws IllegalStateException if the schema is for a member, or if the member is owned by another shape.
          */
         public Builder members(List<SdkSchema> members) {
             if (memberTarget != null) {
                 throw new IllegalStateException("Cannot add members to a member");
             }
-            if (this.members == null) {
-                this.members = new LinkedHashMap<>();
+
+            // Assign the member index for each, checking to ensure members aren't illegally shared across shapes.
+            int index = 0;
+            for (var member : members) {
+                member.setMemberIndex(index++);
             }
-            for (SdkSchema member : members) {
-                this.members.put(member.memberName(), member);
-            }
+
+            this.members = members;
             return this;
         }
 

@@ -33,27 +33,27 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class PutPersonInput implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#PutPersonInput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpLabelTrait(), new RequiredTrait(), LengthTrait.builder().max(7L).build())
         .build();
     private static final SdkSchema SCHEMA_FAVORITE_COLOR = SdkSchema
-        .memberBuilder(1, "favoriteColor", PreludeSchemas.STRING)
+        .memberBuilder("favoriteColor", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpQueryTrait("favoriteColor"))
         .build();
-    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder(2, "age", PreludeSchemas.INTEGER)
+    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder("age", PreludeSchemas.INTEGER)
         .id(ID)
         .traits(new JsonNameTrait("Age"), RangeTrait.builder().max(BigDecimal.valueOf(150)).build())
         .build();
-    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder(3, "birthday", SharedSchemas.BIRTHDAY)
+    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder("birthday", SharedSchemas.BIRTHDAY)
         .id(ID)
         .build();
-    private static final SdkSchema SCHEMA_BINARY = SdkSchema.memberBuilder(4, "binary", PreludeSchemas.BLOB)
+    private static final SdkSchema SCHEMA_BINARY = SdkSchema.memberBuilder("binary", PreludeSchemas.BLOB)
         .id(ID)
         .build();
     private static final SdkSchema SCHEMA_QUERY_PARAMS = SdkSchema
-        .memberBuilder(5, "queryParams", SharedSchemas.MAP_LIST_STRING)
+        .memberBuilder("queryParams", SharedSchemas.MAP_LIST_STRING)
         .id(ID)
         .traits(new HttpQueryParamsTrait())
         .build();
@@ -186,7 +186,7 @@ public final class PutPersonInput implements SerializableShape {
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, (member, de) -> {
-                switch (SCHEMA.lookupMemberIndex(member)) {
+                switch (member.memberIndex()) {
                     case 0 -> name(de.readString(member));
                     case 1 -> favoriteColor(de.readString(member));
                     case 2 -> age(de.readInteger(member));

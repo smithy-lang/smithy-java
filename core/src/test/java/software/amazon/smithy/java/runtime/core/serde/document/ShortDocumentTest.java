@@ -20,16 +20,16 @@ public class ShortDocumentTest {
 
     @Test
     public void createsDocument() {
-        var document = Document.of((short) 10);
+        var document = Document.createShort((short) 10);
 
         assertThat(document.type(), equalTo(ShapeType.SHORT));
         assertThat(document.asShort(), equalTo((short) 10));
-        assertThat(document, equalTo(Document.of((short) 10)));
+        assertThat(document, equalTo(Document.createShort((short) 10)));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.of((short) 10);
+        var document = Document.createShort((short) 10);
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -41,7 +41,7 @@ public class ShortDocumentTest {
 
     @Test
     public void serializesContent() {
-        var document = Document.of((short) 10);
+        var document = Document.createShort((short) 10);
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
@@ -56,7 +56,7 @@ public class ShortDocumentTest {
 
     @Test
     public void canWiden() {
-        var document = Document.of((short) 1);
+        var document = Document.createShort((short) 1);
 
         assertThat(document.asShort(), equalTo((short) 1));
         assertThat(document.asInteger(), equalTo(1));

@@ -120,25 +120,9 @@ public class DocumentDeserializer implements ShapeDeserializer {
 
     @Override
     public void readStringMap(SdkSchema schema, BiConsumer<String, ShapeDeserializer> eachEntry) {
-        var map = value.asMap();
+        var map = value.asStringMap();
         for (var entry : map.entrySet()) {
-            eachEntry.accept(entry.getKey().asString(), deserializer(entry.getValue()));
-        }
-    }
-
-    @Override
-    public void readIntMap(SdkSchema schema, BiConsumer<Integer, ShapeDeserializer> eachEntry) {
-        var map = value.asMap();
-        for (var entry : map.entrySet()) {
-            eachEntry.accept(entry.getKey().asInteger(), deserializer(entry.getValue()));
-        }
-    }
-
-    @Override
-    public void readLongMap(SdkSchema schema, BiConsumer<Long, ShapeDeserializer> eachEntry) {
-        var map = value.asMap();
-        for (var entry : map.entrySet()) {
-            eachEntry.accept(entry.getKey().asLong(), deserializer(entry.getValue()));
+            eachEntry.accept(entry.getKey(), deserializer(entry.getValue()));
         }
     }
 }

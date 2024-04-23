@@ -21,16 +21,16 @@ public class BigIntegerDocumentTest {
 
     @Test
     public void createsDocument() {
-        var document = Document.of(BigInteger.valueOf(10));
+        var document = Document.createBigInteger(BigInteger.valueOf(10));
 
         assertThat(document.type(), equalTo(ShapeType.BIG_INTEGER));
         assertThat(document.asBigInteger(), equalTo(BigInteger.valueOf(10)));
-        assertThat(document, equalTo(Document.of(BigInteger.valueOf(10))));
+        assertThat(document, equalTo(Document.createBigInteger(BigInteger.valueOf(10))));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.of(BigInteger.valueOf(10));
+        var document = Document.createBigInteger(BigInteger.valueOf(10));
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -42,7 +42,7 @@ public class BigIntegerDocumentTest {
 
     @Test
     public void serializesContent() {
-        var document = Document.of(BigInteger.valueOf(10));
+        var document = Document.createBigInteger(BigInteger.valueOf(10));
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override

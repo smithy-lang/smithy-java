@@ -117,22 +117,6 @@ public final class ToStringSerializer implements ShapeSerializer {
                 valueSerializer.accept(ToStringSerializer.this);
                 append(System.lineSeparator());
             }
-
-            @Override
-            public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
-                writeInteger(schema.member("key"), key);
-                append(": ");
-                valueSerializer.accept(ToStringSerializer.this);
-                append(System.lineSeparator());
-            }
-
-            @Override
-            public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
-                writeLong(schema.member("key"), key);
-                append(": ");
-                valueSerializer.accept(ToStringSerializer.this);
-                append(System.lineSeparator());
-            }
         });
 
         dedent();

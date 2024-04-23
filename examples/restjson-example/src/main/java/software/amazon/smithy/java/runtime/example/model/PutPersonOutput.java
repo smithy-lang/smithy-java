@@ -25,24 +25,24 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
 public final class PutPersonOutput implements SerializableShape {
 
     static final ShapeId ID = ShapeId.from("smithy.example#PutPersonOutput");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
         .id(ID)
         .traits(new RequiredTrait())
         .build();
     private static final SdkSchema SCHEMA_FAVORITE_COLOR = SdkSchema
-        .memberBuilder(1, "favoriteColor", PreludeSchemas.STRING)
+        .memberBuilder("favoriteColor", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpHeaderTrait("X-Favorite-Color"))
         .build();
-    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder(2, "age", PreludeSchemas.INTEGER)
+    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder("age", PreludeSchemas.INTEGER)
         .id(ID)
         .traits(new JsonNameTrait("Age"))
         .build();
-    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder(3, "birthday", SharedSchemas.BIRTHDAY)
+    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder("birthday", SharedSchemas.BIRTHDAY)
         .id(ID)
         .traits(new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
         .build();
-    private static final SdkSchema SCHEMA_STATUS = SdkSchema.memberBuilder(4, "status", PreludeSchemas.INTEGER)
+    private static final SdkSchema SCHEMA_STATUS = SdkSchema.memberBuilder("status", PreludeSchemas.INTEGER)
         .id(ID)
         .traits(new HttpResponseCodeTrait())
         .build();
@@ -142,7 +142,7 @@ public final class PutPersonOutput implements SerializableShape {
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, (member, de) -> {
-                switch (SCHEMA.lookupMemberIndex(member)) {
+                switch (member.memberIndex()) {
                     case 0 -> name(de.readString(member));
                     case 1 -> favoriteColor(de.readString(member));
                     case 2 -> age(de.readInteger(member));

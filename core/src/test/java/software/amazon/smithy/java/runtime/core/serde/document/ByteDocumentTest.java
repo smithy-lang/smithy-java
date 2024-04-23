@@ -20,16 +20,16 @@ public class ByteDocumentTest {
 
     @Test
     public void createsDocument() {
-        var document = Document.of((byte) 1);
+        var document = Document.createByte((byte) 1);
 
         assertThat(document.type(), equalTo(ShapeType.BYTE));
         assertThat(document.asByte(), equalTo((byte) 1));
-        assertThat(document, equalTo(Document.of((byte) 1)));
+        assertThat(document, equalTo(Document.createByte((byte) 1)));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.of((byte) 1);
+        var document = Document.createByte((byte) 1);
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -41,7 +41,7 @@ public class ByteDocumentTest {
 
     @Test
     public void serializesContent() {
-        var document = Document.of((byte) 1);
+        var document = Document.createByte((byte) 1);
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
@@ -56,7 +56,7 @@ public class ByteDocumentTest {
 
     @Test
     public void canWiden() {
-        var document = Document.of((byte) 1);
+        var document = Document.createByte((byte) 1);
 
         assertThat(document.asByte(), equalTo((byte) 1));
         assertThat(document.asShort(), equalTo((short) 1));

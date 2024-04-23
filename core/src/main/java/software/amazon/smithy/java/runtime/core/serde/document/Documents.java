@@ -9,22 +9,34 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class Documents {
 
+    static final SdkSchema LIST_SCHEMA = SdkSchema.builder()
+        .id(PreludeSchemas.DOCUMENT.id())
+        .type(ShapeType.LIST)
+        .members(SdkSchema.memberBuilder("member", PreludeSchemas.DOCUMENT))
+        .build();
+
+    static final SdkSchema STR_MAP_SCHEMA = SdkSchema.builder()
+        .id(PreludeSchemas.DOCUMENT.id())
+        .type(ShapeType.MAP)
+        .members(
+            SdkSchema.memberBuilder("key", PreludeSchemas.STRING).id(PreludeSchemas.DOCUMENT.id()).build(),
+            SdkSchema.memberBuilder("value", PreludeSchemas.DOCUMENT).id(PreludeSchemas.DOCUMENT.id()).build()
+        )
+        .build();
+
     private Documents() {}
 
-    record BooleanDocument(boolean value) implements Document {
+    record BooleanDocument(SdkSchema schema, boolean value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.BOOLEAN;
@@ -37,11 +49,11 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeBoolean(PreludeSchemas.BOOLEAN, value);
+            serializer.writeBoolean(schema, value);
         }
     }
 
-    record ByteDocument(byte value) implements Document {
+    record ByteDocument(SdkSchema schema, byte value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.BYTE;
@@ -89,11 +101,11 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeByte(PreludeSchemas.BYTE, value);
+            serializer.writeByte(schema, value);
         }
     }
 
-    record ShortDocument(short value) implements Document {
+    record ShortDocument(SdkSchema schema, short value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.SHORT;
@@ -141,11 +153,11 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeShort(PreludeSchemas.SHORT, value);
+            serializer.writeShort(schema, value);
         }
     }
 
-    record IntegerDocument(int value) implements Document {
+    record IntegerDocument(SdkSchema schema, int value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.INTEGER;
@@ -193,11 +205,11 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeInteger(PreludeSchemas.INTEGER, value);
+            serializer.writeInteger(schema, value);
         }
     }
 
-    record LongDocument(long value) implements Document {
+    record LongDocument(SdkSchema schema, long value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.LONG;
@@ -245,11 +257,11 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeLong(PreludeSchemas.LONG, value);
+            serializer.writeLong(schema, value);
         }
     }
 
-    record FloatDocument(float value) implements Document {
+    record FloatDocument(SdkSchema schema, float value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.FLOAT;
@@ -297,11 +309,11 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeFloat(PreludeSchemas.FLOAT, value);
+            serializer.writeFloat(schema, value);
         }
     }
 
-    record DoubleDocument(double value) implements Document {
+    record DoubleDocument(SdkSchema schema, double value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.DOUBLE;
@@ -349,11 +361,11 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeDouble(PreludeSchemas.DOUBLE, value);
+            serializer.writeDouble(schema, value);
         }
     }
 
-    record BigIntegerDocument(BigInteger value) implements Document {
+    record BigIntegerDocument(SdkSchema schema, BigInteger value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.BIG_INTEGER;
@@ -401,11 +413,11 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeBigInteger(PreludeSchemas.BIG_INTEGER, value);
+            serializer.writeBigInteger(schema, value);
         }
     }
 
-    record BigDecimalDocument(BigDecimal value) implements Document {
+    record BigDecimalDocument(SdkSchema schema, BigDecimal value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.BIG_DECIMAL;
@@ -453,11 +465,11 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, value);
+            serializer.writeBigDecimal(schema, value);
         }
     }
 
-    record StringDocument(String value) implements Document {
+    record StringDocument(SdkSchema schema, String value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.STRING;
@@ -470,11 +482,11 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeString(PreludeSchemas.STRING, value);
+            serializer.writeString(schema, value);
         }
     }
 
-    record BlobDocument(byte[] value) implements Document {
+    record BlobDocument(SdkSchema schema, byte[] value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.BLOB;
@@ -487,7 +499,7 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeBlob(PreludeSchemas.BLOB, value);
+            serializer.writeBlob(schema, value);
         }
 
         // Records don't generate this same equals behavior for byte arrays, so customize it.
@@ -509,7 +521,7 @@ final class Documents {
         }
     }
 
-    record TimestampDocument(Instant value) implements Document {
+    record TimestampDocument(SdkSchema schema, Instant value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.TIMESTAMP;
@@ -522,11 +534,11 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeTimestamp(PreludeSchemas.TIMESTAMP, value);
+            serializer.writeTimestamp(schema, value);
         }
     }
 
-    record ListDocument(List<Document> values) implements Document {
+    record ListDocument(SdkSchema schema, List<Document> values) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.LIST;
@@ -539,7 +551,7 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeList(PreludeSchemas.DOCUMENT, ser -> {
+            serializer.writeList(schema, ser -> {
                 for (var element : values) {
                     element.serializeContents(ser);
                 }
@@ -547,60 +559,34 @@ final class Documents {
         }
     }
 
-    record MapDocument(Map<Document, Document> members) implements Document {
-
-        private static final SdkSchema STR_KEY = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember(
-            "key",
-            PreludeSchemas.STRING
-        );
-        private static final SdkSchema INT_KEY = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember(
-            "key",
-            PreludeSchemas.INTEGER
-        );
-        private static final SdkSchema LONG_KEY = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember(
-            "key",
-            PreludeSchemas.LONG
-        );
-
+    record StringMapDocument(SdkSchema schema, Map<String, Document> members) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.MAP;
         }
 
         @Override
-        public Map<Document, Document> asMap() {
+        public Map<String, Document> asStringMap() {
             return members;
         }
 
         @Override
         public Document getMember(String memberName) {
-            // Attempt to access a string member from the map.
-            for (var entry : members.entrySet()) {
-                if (entry.getKey().type() == ShapeType.STRING && entry.getKey().asString().equals(memberName)) {
-                    return entry.getValue();
-                }
-            }
-            return null;
+            return members.get(memberName);
         }
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeMap(PreludeSchemas.DOCUMENT, s -> {
+            serializer.writeMap(schema, s -> {
+                var key = schema.member("key");
                 for (var entry : members.entrySet()) {
-                    Document key = entry.getKey();
-                    Consumer<ShapeSerializer> valueSer = ser -> entry.getValue().serializeContents(ser);
-                    switch (key.type()) {
-                        case STRING, ENUM -> s.writeEntry(STR_KEY, entry.getKey().asString(), valueSer);
-                        case INTEGER, INT_ENUM -> s.writeEntry(INT_KEY, entry.getKey().asInteger(), valueSer);
-                        case LONG -> s.writeEntry(LONG_KEY, entry.getKey().asLong(), valueSer);
-                        default -> throw new SdkSerdeException("Unexpected document map key: " + key);
-                    }
+                    s.writeEntry(key, entry.getKey(), ser -> entry.getValue().serializeContents(ser));
                 }
             });
         }
     }
 
-    record StructureDocument(Map<String, Document> members) implements Document {
+    record StructureDocument(SdkSchema schema, Map<String, Document> members) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.STRUCTURE;
@@ -612,123 +598,154 @@ final class Documents {
         }
 
         @Override
-        public Map<Document, Document> asMap() {
-            Map<Document, Document> map = new LinkedHashMap<>();
-            for (var entry : members.entrySet()) {
-                map.put(Document.of(entry.getKey()), entry.getValue());
-            }
-            return map;
+        public Map<String, Document> asStringMap() {
+            return members;
         }
 
         @Override
         public void serializeContents(ShapeSerializer encoder) {
-            encoder.writeStruct(PreludeSchemas.DOCUMENT, structSerializer -> {
-                var rewriter = new StructMemberRewriter(structSerializer);
+            encoder.writeStruct(schema, structSerializer -> {
                 for (var entry : members.entrySet()) {
-                    rewriter.memberName = entry.getKey();
-                    entry.getValue().serializeContents(rewriter);
+                    entry.getValue().serializeContents(structSerializer);
                 }
             });
         }
     }
 
-    // Rewrites document members to use the right member name.
-    private static final class StructMemberRewriter implements ShapeSerializer {
+    // If the document is only used to serialize a shape to a document, then the typed document nodes don't need
+    // to be created.
+    static final class LazilyCreatedTypedDocument implements Document {
 
-        private final ShapeSerializer structWriter;
-        private String memberName;
+        private final SerializableShape shape;
+        private volatile transient Document createdDocument;
 
-        StructMemberRewriter(ShapeSerializer structWriter) {
-            this.structWriter = structWriter;
+        LazilyCreatedTypedDocument(SerializableShape shape) {
+            this.shape = shape;
+        }
+
+        private Document getDocument() {
+            var result = createdDocument;
+            if (result == null) {
+                var parser = new DocumentParser();
+                shape.serialize(parser);
+                this.createdDocument = result = parser.getResult();
+            }
+            return result;
         }
 
         @Override
-        public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-            structWriter.writeStruct(syntheticMember(memberName, schema), consumer);
+        public void serializeContents(ShapeSerializer serializer) {
+            shape.serialize(serializer);
         }
 
         @Override
-        public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-            structWriter.writeList(syntheticMember(memberName, schema), consumer);
+        public ShapeType type() {
+            return getDocument().type();
         }
 
         @Override
-        public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
-            structWriter.writeMap(syntheticMember(memberName, schema), consumer);
+        public boolean asBoolean() {
+            return getDocument().asBoolean();
         }
 
         @Override
-        public void writeBoolean(SdkSchema schema, boolean value) {
-            structWriter.writeBoolean(syntheticMember(memberName, schema), value);
+        public byte asByte() {
+            return getDocument().asByte();
         }
 
         @Override
-        public void writeByte(SdkSchema schema, byte value) {
-            structWriter.writeByte(syntheticMember(memberName, schema), value);
+        public short asShort() {
+            return getDocument().asShort();
         }
 
         @Override
-        public void writeShort(SdkSchema schema, short value) {
-            structWriter.writeShort(syntheticMember(memberName, schema), value);
+        public int asInteger() {
+            return getDocument().asInteger();
         }
 
         @Override
-        public void writeInteger(SdkSchema schema, int value) {
-            structWriter.writeInteger(syntheticMember(memberName, schema), value);
+        public long asLong() {
+            return getDocument().asLong();
         }
 
         @Override
-        public void writeLong(SdkSchema schema, long value) {
-            structWriter.writeLong(syntheticMember(memberName, schema), value);
+        public float asFloat() {
+            return getDocument().asFloat();
         }
 
         @Override
-        public void writeFloat(SdkSchema schema, float value) {
-            structWriter.writeFloat(syntheticMember(memberName, schema), value);
+        public double asDouble() {
+            return getDocument().asDouble();
         }
 
         @Override
-        public void writeDouble(SdkSchema schema, double value) {
-            structWriter.writeDouble(syntheticMember(memberName, schema), value);
+        public BigInteger asBigInteger() {
+            return getDocument().asBigInteger();
         }
 
         @Override
-        public void writeBigInteger(SdkSchema schema, BigInteger value) {
-            structWriter.writeBigInteger(syntheticMember(memberName, schema), value);
+        public BigDecimal asBigDecimal() {
+            return getDocument().asBigDecimal();
         }
 
         @Override
-        public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
-            structWriter.writeBigDecimal(syntheticMember(memberName, schema), value);
+        public Number asNumber() {
+            return getDocument().asNumber();
         }
 
         @Override
-        public void writeString(SdkSchema schema, String value) {
-            structWriter.writeString(syntheticMember(memberName, schema), value);
+        public String asString() {
+            return getDocument().asString();
         }
 
         @Override
-        public void writeBlob(SdkSchema schema, byte[] value) {
-            structWriter.writeBlob(syntheticMember(memberName, schema), value);
+        public byte[] asBlob() {
+            return getDocument().asBlob();
         }
 
         @Override
-        public void writeTimestamp(SdkSchema schema, Instant value) {
-            structWriter.writeTimestamp(syntheticMember(memberName, schema), value);
+        public Instant asTimestamp() {
+            return getDocument().asTimestamp();
         }
 
         @Override
-        public void writeDocument(SdkSchema schema, Document value) {
-            structWriter.writeDocument(syntheticMember(memberName, schema), value);
+        public List<Document> asList() {
+            return getDocument().asList();
         }
 
         @Override
-        public void writeNull(SdkSchema schema) {
-            structWriter.writeNull(syntheticMember(memberName, schema));
+        public Map<String, Document> asStringMap() {
+            return getDocument().asStringMap();
         }
 
-        private static SdkSchema syntheticMember(String name, SdkSchema target) {
-            return SdkSchema.memberBuilder(-1, name, target).id(PreludeSchemas.DOCUMENT.id()).build();
+        @Override
+        public Document getMember(String memberName) {
+            return getDocument().getMember(memberName);
+        }
+
+        @Override
+        public String toString() {
+            return getDocument().toString();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this) {
+                return true;
+            } else if (obj == null) {
+                return false;
+            } else if (obj instanceof LazilyCreatedTypedDocument) {
+                return getDocument().equals(((LazilyCreatedTypedDocument) obj).getDocument());
+            } else if (obj instanceof Document) {
+                return getDocument().equals(obj);
+            } else {
+                return false;
+            }
+        }
+
+        @Override
+        public int hashCode() {
+            return getDocument().hashCode();
         }
     }
 }

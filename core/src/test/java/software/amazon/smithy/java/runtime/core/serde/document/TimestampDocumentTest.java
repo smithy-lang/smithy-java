@@ -29,16 +29,16 @@ public class TimestampDocumentTest {
     @Test
     public void createsDocument() {
         var time = getTestTime();
-        var document = Document.of(time);
+        var document = Document.createTimestamp(time);
 
         assertThat(document.type(), equalTo(ShapeType.TIMESTAMP));
         assertThat(document.asTimestamp(), equalTo(time));
-        assertThat(document, equalTo(Document.of(time)));
+        assertThat(document, equalTo(Document.createTimestamp(time)));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.of(getTestTime());
+        var document = Document.createTimestamp(getTestTime());
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -51,7 +51,7 @@ public class TimestampDocumentTest {
     @Test
     public void serializesContent() {
         var time = getTestTime();
-        var document = Document.of(time);
+        var document = Document.createTimestamp(time);
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override

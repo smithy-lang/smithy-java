@@ -20,16 +20,16 @@ public class DoubleDocumentTest {
 
     @Test
     public void createsDocument() {
-        var document = Document.of(1.0);
+        var document = Document.createDouble(1.0);
 
         assertThat(document.type(), equalTo(ShapeType.DOUBLE));
         assertThat(document.asDouble(), equalTo(1.0));
-        assertThat(document, equalTo(Document.of(1.0)));
+        assertThat(document, equalTo(Document.createDouble(1.0)));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.of(1.0);
+        var document = Document.createDouble(1.0);
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -41,7 +41,7 @@ public class DoubleDocumentTest {
 
     @Test
     public void serializesContent() {
-        var document = Document.of(1.0);
+        var document = Document.createDouble(1.0);
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override

@@ -37,7 +37,7 @@ public class SerdeBenchmarks {
             .birthday(Instant.now())
             .build();
         codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
-        inputAsDocument = Document.ofValue(input);
+        inputAsDocument = Document.createTyped(input);
     }
 
     @Benchmark
@@ -59,7 +59,7 @@ public class SerdeBenchmarks {
 
     @Benchmark
     public void shapeToAny(Blackhole bh) {
-        bh.consume(Document.ofValue(input));
+        bh.consume(Document.createTyped(input));
     }
 
     @Benchmark

@@ -19,16 +19,16 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public class BooleanDocumentTest {
     @Test
     public void createsDocument() {
-        var document = Document.of(true);
+        var document = Document.createBoolean(true);
 
         assertThat(document.type(), equalTo(ShapeType.BOOLEAN));
         assertThat(document.asBoolean(), equalTo(true));
-        assertThat(document, equalTo(Document.of(true)));
+        assertThat(document, equalTo(Document.createBoolean(true)));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.of(true);
+        var document = Document.createBoolean(true);
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -40,7 +40,7 @@ public class BooleanDocumentTest {
 
     @Test
     public void serializesContent() {
-        var document = Document.of(true);
+        var document = Document.createBoolean(true);
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override

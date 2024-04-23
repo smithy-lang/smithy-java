@@ -116,9 +116,8 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
 
     @Override
     public Void structureShape(StructureShape shape) {
-        int idx = 0;
-        for (var iter = shape.members().iterator(); iter.hasNext(); idx++) {
-            writeNestedMemberSchema(idx, iter.next());
+        for (var member : shape.members()) {
+            writeNestedMemberSchema(member);
         }
         writer.pushState();
         // Add the member schema names to the context, so we can iterate through them
@@ -152,7 +151,7 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
     public Void memberShape(MemberShape shape) {
         var target = model.expectShape(shape.getTarget());
         writer.write(
-            "${schemaClass:T}.memberBuilder(0, $1S, $2C)${3C}",
+            "${schemaClass:T}.memberBuilder($1S, $2C)${3C}",
             symbolProvider.toMemberName(shape),
             writer.consumer(w -> SchemaUtils.writeSchemaType(w, target)),
             new TraitInitializerGenerator(writer, shape, context.runtimeTraits())
@@ -160,17 +159,16 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
         return null;
     }
 
-    private void writeNestedMemberSchema(int idx, MemberShape member) {
+    private void writeNestedMemberSchema(MemberShape member) {
         var memberName = symbolProvider.toMemberName(member);
         var target = model.expectShape(member.getTarget());
         writer.write(
             """
-                private static final ${schemaClass:T} $1L = ${schemaClass:T}.memberBuilder($2L, $3S, $4C)
-                    .id(ID)${5C}
+                private static final ${schemaClass:T} $1L = ${schemaClass:T}.memberBuilder($2S, $3C)
+                    .id(ID)${4C}
                     .build();
                 """,
             SchemaUtils.toMemberSchemaName(memberName),
-            idx,
             memberName,
             writer.consumer(w -> SchemaUtils.writeSchemaType(w, target)),
             new TraitInitializerGenerator(writer, shape, context.runtimeTraits())

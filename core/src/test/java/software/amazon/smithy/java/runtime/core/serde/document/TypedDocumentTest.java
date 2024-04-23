@@ -6,61 +6,44 @@
 package software.amazon.smithy.java.runtime.core.serde.document;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 public class TypedDocumentTest {
     @Test
-    public void requiresSchemaToEmitStruct() {
-        var e = Assertions.assertThrows(
-            SdkSerdeException.class,
-            () -> Document.ofStruct(encoder -> encoder.writeString(PreludeSchemas.STRING, "A"))
-        );
-
-        assertThat(e.getMessage(), containsString("Typed documents can only wrap structures"));
-    }
-
-    @Test
-    public void requiresSchemaToEmitSomething() {
-        var e = Assertions.assertThrows(SdkSerdeException.class, () -> Document.ofStruct(encoder -> {}));
-
-        assertThat(e.getMessage(), containsString("When attempting to create a typed document"));
-    }
-
-    @Test
     public void wrapsStructContentWithTypeAndSchema() {
+        var structSchema = SdkSchema.builder()
+            .id("smithy.example#Struct")
+            .type(ShapeType.STRUCTURE)
+            .members(
+                SdkSchema.memberBuilder("a", PreludeSchemas.STRING),
+                SdkSchema.memberBuilder("b", PreludeSchemas.STRING)
+            )
+            .build();
+
         SerializableShape serializableShape = encoder -> {
-            encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
-                var aMember = SdkSchema.memberBuilder(-1, "a", PreludeSchemas.STRING)
-                    .id(PreludeSchemas.DOCUMENT.id())
-                    .build();
-                s.writeString(aMember, "1");
-                var bMember = SdkSchema.memberBuilder(-1, "b", PreludeSchemas.STRING)
-                    .id(PreludeSchemas.DOCUMENT.id())
-                    .build();
-                s.writeString(bMember, "2");
+            encoder.writeStruct(structSchema, s -> {
+                s.writeString(structSchema.member("a"), "1");
+                s.writeString(structSchema.member("b"), "2");
             });
         };
 
-        var result = Document.ofStruct(serializableShape);
+        var result = Document.createTyped(serializableShape);
 
-        assertThat(result.type(), equalTo(ShapeType.DOCUMENT));
+        assertThat(result.type(), equalTo(ShapeType.STRUCTURE));
         assertThat(
             result.toString(),
             equalTo(
-                "TypedDocument{schema=SdkSchema{id='smithy.api#Document', type=document}, members={a=SdkSchema{id='smithy.api#Document$a', type=string}}, {b=SdkSchema{id='smithy.api#Document$b', type=string}}}"
+                "StructureDocument[schema=SdkSchema{id='smithy.example#Struct', type=structure}, members={a=StringDocument[schema=SdkSchema{id='smithy.example#Struct$a', type=string}, value=1], b=StringDocument[schema=SdkSchema{id='smithy.example#Struct$b', type=string}, value=2]}]"
             )
         );
 
@@ -76,8 +59,8 @@ public class TypedDocumentTest {
         assertThat(result, equalTo(result));
         assertThat(result, not(equalTo(null)));
         assertThat(result, not(equalTo("X")));
-        assertThat(result, equalTo(Document.ofStruct(serializableShape)));
-        assertThat(result.hashCode(), equalTo(Document.ofStruct(serializableShape).hashCode()));
+        assertThat(result, equalTo(Document.createTyped(serializableShape)));
+        assertThat(result.hashCode(), equalTo(Document.createTyped(serializableShape).hashCode()));
 
         // Writes as document unless getting contents.
         result.serialize(new SpecificShapeSerializer() {
@@ -87,11 +70,16 @@ public class TypedDocumentTest {
             }
         });
 
-        var copy1 = Document.ofValue(result);
-        var copy2 = Document.ofValue(result);
-        assertThat(copy1, equalTo(copy2));
+        // This is basically recreating the same document with the same captured schema.
+        assertThat(result, equalTo(Document.createTyped(result)));
 
-        assertThat(copy1.getMember("a"), equalTo(Document.of("1")));
-        assertThat(copy1.getMember("b"), equalTo(Document.of("2")));
+        // Not equal because the left member has a schema with the same value, but the right has no schema.
+        assertThat(result.getMember("a"), not(equalTo(Document.createString("1"))));
+        assertThat(result.getMember("b"), not(equalTo(Document.createString("2"))));
+
+        // Converts to a string map.
+        var copy1 = result.asStringMap();
+        assertThat(copy1.get("a").asString(), equalTo("1"));
+        assertThat(copy1.get("b").asString(), equalTo("2"));
     }
 }

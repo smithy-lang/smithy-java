@@ -25,28 +25,23 @@ public class MapDocumentTest {
 
     @Test
     public void createsDocument() {
-        Map<Document, Document> entries = Map.of(
-            Document.of("a"),
-            Document.of(true),
-            Document.of("b"),
-            Document.of(false)
+        Map<String, Document> entries = Map.of(
+            "a",
+            Document.createBoolean(true),
+            "b",
+            Document.createBoolean(false)
         );
-        var map = Document.ofMap(entries);
+        var map = Document.createStringMap(entries);
 
         assertThat(map.type(), is(ShapeType.MAP));
-        assertThat(map.asMap(), equalTo(entries));
-        assertThat(Document.ofMap(map.asMap()), equalTo(map));
+        assertThat(map.asStringMap(), equalTo(entries));
+        assertThat(Document.createStringMap(map.asStringMap()), equalTo(map));
     }
 
     @Test
     public void serializesShape() {
-        Map<Document, Document> entries = Map.of(
-            Document.of("a"),
-            Document.of(1),
-            Document.of("b"),
-            Document.of(2)
-        );
-        var map = Document.ofMap(entries);
+        Map<String, Document> entries = Map.of("a", Document.createInteger(1), "b", Document.createInteger(2));
+        var map = Document.createStringMap(entries);
 
         map.serialize(new SpecificShapeSerializer() {
             @Override
@@ -58,19 +53,14 @@ public class MapDocumentTest {
 
     @Test
     public void serializesContent() {
-        Map<Document, Document> entries = Map.of(
-            Document.of("a"),
-            Document.of(1),
-            Document.of("b"),
-            Document.of(2)
-        );
-        var map = Document.ofMap(entries);
+        Map<String, Document> entries = Map.of("a", Document.createInteger(1), "b", Document.createInteger(2));
+        var map = Document.createStringMap(entries);
 
         var keys = new ArrayList<>();
         map.serializeContents(new SpecificShapeSerializer() {
             @Override
             public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
-                assertThat(schema, equalTo(PreludeSchemas.DOCUMENT));
+                assertThat(schema.type(), equalTo(ShapeType.MAP));
                 consumer.accept(new MapSerializer() {
                     @Override
                     public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
@@ -86,16 +76,6 @@ public class MapDocumentTest {
                                 }
                             }
                         });
-                    }
-
-                    @Override
-                    public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
-                        throw new UnsupportedOperationException("Expected a string key");
-                    }
-
-                    @Override
-                    public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
-                        throw new UnsupportedOperationException("Expected a string key");
                     }
                 });
             }

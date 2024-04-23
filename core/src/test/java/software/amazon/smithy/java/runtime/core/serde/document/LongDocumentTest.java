@@ -20,16 +20,16 @@ public class LongDocumentTest {
 
     @Test
     public void createsDocument() {
-        var document = Document.of(10L);
+        var document = Document.createLong(10L);
 
         assertThat(document.type(), equalTo(ShapeType.LONG));
         assertThat(document.asLong(), equalTo(10L));
-        assertThat(document, equalTo(Document.of(10L)));
+        assertThat(document, equalTo(Document.createLong(10L)));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.of(1L);
+        var document = Document.createLong(1L);
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -41,7 +41,7 @@ public class LongDocumentTest {
 
     @Test
     public void serializesContent() {
-        var document = Document.of(10L);
+        var document = Document.createLong(10L);
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override

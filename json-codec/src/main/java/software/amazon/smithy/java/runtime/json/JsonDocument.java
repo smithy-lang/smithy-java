@@ -32,13 +32,7 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class JsonDocument implements Document {
 
-    private static final SdkSchema STRING_MAP_KEY = SdkSchema.memberBuilder(0, "key", PreludeSchemas.STRING)
-        .id(PreludeSchemas.DOCUMENT.id())
-        .build();
-    private static final SdkSchema INT_MAP_KEY = SdkSchema.memberBuilder(0, "key", PreludeSchemas.INTEGER)
-        .id(PreludeSchemas.DOCUMENT.id())
-        .build();
-    private static final SdkSchema LONG_MAP_KEY = SdkSchema.memberBuilder(0, "key", PreludeSchemas.LONG)
+    private static final SdkSchema STRING_MAP_KEY = SdkSchema.memberBuilder("key", PreludeSchemas.STRING)
         .id(PreludeSchemas.DOCUMENT.id())
         .build();
 
@@ -54,16 +48,6 @@ final class JsonDocument implements Document {
         boolean useJsonName,
         TimestampFormatter defaultTimestampFormat,
         boolean useTimestampFormat
-    ) {
-        this(any, useJsonName, defaultTimestampFormat, useTimestampFormat, null);
-    }
-
-    private JsonDocument(
-        com.jsoniter.any.Any any,
-        boolean useJsonName,
-        TimestampFormatter defaultTimestampFormat,
-        boolean useTimestampFormat,
-        SdkSchema schema
     ) {
         this.any = any;
         this.useJsonName = useJsonName;
@@ -86,8 +70,7 @@ final class JsonDocument implements Document {
             case BOOLEAN -> ShapeType.BOOLEAN;
             default -> ShapeType.DOCUMENT;
         };
-
-        this.schema = schema == null ? PreludeSchemas.getSchemaForType(type) : schema;
+        this.schema = PreludeSchemas.getSchemaForType(type);
     }
 
     @Override
@@ -182,15 +165,14 @@ final class JsonDocument implements Document {
     }
 
     @Override
-    public Map<Document, Document> asMap() {
+    public Map<String, Document> asStringMap() {
         if (any.valueType() != ValueType.OBJECT) {
-            return Document.super.asMap();
+            return Document.super.asStringMap();
         } else {
-            Map<Document, Document> result = new LinkedHashMap<>();
+            Map<String, Document> result = new LinkedHashMap<>();
             for (var entry : any.asMap().entrySet()) {
-                var key = Any.wrap(entry.getKey());
                 result.put(
-                    new JsonDocument(key, useJsonName, defaultTimestampFormat, useTimestampFormat),
+                    entry.getKey(),
                     new JsonDocument(entry.getValue(), useJsonName, defaultTimestampFormat, useTimestampFormat)
                 );
             }
@@ -226,29 +208,8 @@ final class JsonDocument implements Document {
             case TIMESTAMP -> encoder.writeTimestamp(schema, asTimestamp());
             case DOCUMENT -> encoder.writeDocument(this);
             case MAP -> encoder.writeMap(schema, mapSerializer -> {
-                for (var entry : asMap().entrySet()) {
-                    switch (entry.getKey().type()) {
-                        case STRING ->
-                            mapSerializer.writeEntry(
-                                STRING_MAP_KEY,
-                                entry.getKey().asString(),
-                                c -> entry.getValue().serialize(c)
-                            );
-                        case INTEGER ->
-                            mapSerializer.writeEntry(
-                                INT_MAP_KEY,
-                                entry.getKey().asInteger(),
-                                c -> entry.getValue().serialize(c)
-                            );
-                        case LONG -> mapSerializer.writeEntry(
-                            LONG_MAP_KEY,
-                            entry.getKey().asLong(),
-                            c -> entry.getValue().serialize(c)
-                        );
-                        default -> throw new UnsupportedOperationException(
-                            "Unsupported document type map key: " + entry.getKey().type()
-                        );
-                    }
+                for (var entry : asStringMap().entrySet()) {
+                    mapSerializer.writeEntry(STRING_MAP_KEY, entry.getKey(), c -> entry.getValue().serialize(c));
                 }
             });
             case LIST -> encoder.writeList(schema, c -> {
@@ -256,25 +217,6 @@ final class JsonDocument implements Document {
                     entry.serialize(c);
                 }
             });
-            case STRUCTURE, UNION -> {
-                encoder.writeStruct(schema, structSerializer -> {
-                    for (var entry : any.asMap().entrySet()) {
-                        var k = entry.getKey();
-                        // Create a synthetic member schema for the key.
-                        var member = SdkSchema.memberBuilder(-1, k, PreludeSchemas.DOCUMENT)
-                            .id(PreludeSchemas.DOCUMENT.id())
-                            .build();
-                        var v = new JsonDocument(
-                            entry.getValue(),
-                            useJsonName,
-                            defaultTimestampFormat,
-                            useTimestampFormat,
-                            member // use the synthetic member when serializing the value.
-                        );
-                        v.serialize(structSerializer);
-                    }
-                });
-            }
             default -> throw new SdkSerdeException("Cannot serialize unexpected JSON value: " + any);
         }
     }

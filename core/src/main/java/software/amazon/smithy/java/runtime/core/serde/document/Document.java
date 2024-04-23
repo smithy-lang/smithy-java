@@ -56,7 +56,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
  *
  * <h3>Typed documents</h3>
  *
- * <p>Document types can be combined with a typed schema using {@link #ofStruct(SerializableShape)}. This kind of
+ * <p>Document types can be combined with a typed schema using {@link #createTyped(SerializableShape)}. This kind of
  * document type allows (but does not require) codecs to serialize or deserialize the document exactly as if the shape
  * itself was serialized or deserialized directly.
  */
@@ -301,16 +301,17 @@ public interface Document extends SerializableShape {
     }
 
     /**
-     * Get the map contents of the Document if it is a map, a structure, or union.
+     * Get the Document as a map of strings to Documents if the Document is a map, a structure, or union.
      *
-     * <p>If the Document is a map, the map entries are returned. If the document is a structure or union, the
-     * members of the structure or union are returned as a Map.
+     * <p>If the Document is a map, and the keys are strings the map entries are returned. If the document is a
+     * structure or union, the members of the structure or union are returned as a map where the keys are the
+     * member names of each present member.
      *
      * @return the map contents.
-     * @throws SdkSerdeException if the Document is not a map, structure, or union.
+     * @throws SdkSerdeException if the Document is not a map, structure, or union or the keys are numbers.
      */
-    default Map<Document, Document> asMap() {
-        throw new SdkSerdeException("Expected a map document, but found " + type());
+    default Map<String, Document> asStringMap() {
+        throw new SdkSerdeException("Expected a map of strings to documents, but found " + type());
     }
 
     /**
@@ -353,8 +354,8 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document of(byte value) {
-        return new Documents.ByteDocument(value);
+    static Document createByte(byte value) {
+        return new Documents.ByteDocument(PreludeSchemas.BYTE, value);
     }
 
     /**
@@ -363,8 +364,8 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document of(short value) {
-        return new Documents.ShortDocument(value);
+    static Document createShort(short value) {
+        return new Documents.ShortDocument(PreludeSchemas.SHORT, value);
     }
 
     /**
@@ -373,8 +374,8 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document of(int value) {
-        return new Documents.IntegerDocument(value);
+    static Document createInteger(int value) {
+        return new Documents.IntegerDocument(PreludeSchemas.INTEGER, value);
     }
 
     /**
@@ -383,8 +384,8 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document of(long value) {
-        return new Documents.LongDocument(value);
+    static Document createLong(long value) {
+        return new Documents.LongDocument(PreludeSchemas.LONG, value);
     }
 
     /**
@@ -393,8 +394,8 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document of(float value) {
-        return new Documents.FloatDocument(value);
+    static Document createFloat(float value) {
+        return new Documents.FloatDocument(PreludeSchemas.FLOAT, value);
     }
 
     /**
@@ -403,8 +404,8 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document of(double value) {
-        return new Documents.DoubleDocument(value);
+    static Document createDouble(double value) {
+        return new Documents.DoubleDocument(PreludeSchemas.DOUBLE, value);
     }
 
     /**
@@ -413,8 +414,8 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document of(BigInteger value) {
-        return new Documents.BigIntegerDocument(value);
+    static Document createBigInteger(BigInteger value) {
+        return new Documents.BigIntegerDocument(PreludeSchemas.BIG_INTEGER, value);
     }
 
     /**
@@ -423,8 +424,8 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document of(BigDecimal value) {
-        return new Documents.BigDecimalDocument(value);
+    static Document createBigDecimal(BigDecimal value) {
+        return new Documents.BigDecimalDocument(PreludeSchemas.BIG_DECIMAL, value);
     }
 
     /**
@@ -433,8 +434,8 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document of(boolean value) {
-        return new Documents.BooleanDocument(value);
+    static Document createBoolean(boolean value) {
+        return new Documents.BooleanDocument(PreludeSchemas.BOOLEAN, value);
     }
 
     /**
@@ -443,8 +444,8 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document of(String value) {
-        return new Documents.StringDocument(value);
+    static Document createString(String value) {
+        return new Documents.StringDocument(PreludeSchemas.STRING, value);
     }
 
     /**
@@ -453,8 +454,8 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document of(byte[] value) {
-        return new Documents.BlobDocument(value);
+    static Document createBlob(byte[] value) {
+        return new Documents.BlobDocument(PreludeSchemas.BLOB, value);
     }
 
     /**
@@ -463,8 +464,8 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document of(Instant value) {
-        return new Documents.TimestampDocument(value);
+    static Document createTimestamp(Instant value) {
+        return new Documents.TimestampDocument(PreludeSchemas.TIMESTAMP, value);
     }
 
     /**
@@ -473,56 +474,31 @@ public interface Document extends SerializableShape {
      * @param values Values to wrap.
      * @return the Document type.
      */
-    static Document of(List<Document> values) {
-        return new Documents.ListDocument(values);
+    static Document createList(List<Document> values) {
+        return new Documents.ListDocument(Documents.LIST_SCHEMA, values);
     }
 
     /**
-     * Create a Map Document.
+     * Create a Document for a map of strings to Documents.
      *
      * @param members Members to wrap.
      * @return the Document type.
      */
-    static Document ofMap(Map<Document, Document> members) {
-        return new Documents.MapDocument(members);
+    static Document createStringMap(Map<String, Document> members) {
+        return new Documents.StringMapDocument(Documents.STR_MAP_SCHEMA, members);
     }
 
     /**
-     * Create an untyped structure or union Document type.
+     * Create a Document from a {@link SerializableShape}.
      *
-     * @param members Map of member name to document values.
-     * @return the Document type.
-     */
-    static Document ofStruct(Map<String, Document> members) {
-        return new Documents.StructureDocument(members);
-    }
-
-    /**
-     * Create a typed Document from a structure or union shape.
-     *
-     * <p>The created Document can be serialized and deserialized by codec exactly as if the underlying shape is
-     * serialized or deserialized.
-     *
-     * @param shape Shape to turn into a Document. The given value must emit a structure or union shape.
-     * @return the Document type.
-     * @throws SdkSerdeException if the shape is not a structure or union.
-     */
-    static Document ofStruct(SerializableShape shape) {
-        return TypedDocument.of(shape);
-    }
-
-    /**
-     * Create a Document from a shape.
-     *
-     * <p>This method can be used to normalize document types across codecs and typed documents, for example when
-     * you need independent document type equality comparisons.
+     * <p>The created document is <em>typed</em> and captures the state of the shape exactly; meaning if the document
+     * is serialized or deserialized by a codec, it'd done so exactly as if the underlying shape was serialized or
+     * deserialized.
      *
      * @param shape Shape to turn into a Document.
      * @return the Document type.
      */
-    static Document ofValue(SerializableShape shape) {
-        var parser = new DocumentParser();
-        shape.serialize(parser);
-        return parser.getResult();
+    static Document createTyped(SerializableShape shape) {
+        return new Documents.LazilyCreatedTypedDocument(shape);
     }
 }

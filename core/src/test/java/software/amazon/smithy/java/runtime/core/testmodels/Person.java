@@ -25,21 +25,21 @@ import software.amazon.smithy.model.traits.JsonNameTrait;
 public final class Person implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Person");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder(0, "name", PreludeSchemas.STRING)
+    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
         .id(ID)
         .build();
-    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder(1, "age", PreludeSchemas.INTEGER)
+    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder("age", PreludeSchemas.INTEGER)
         .id(ID)
         .traits(new JsonNameTrait("Age"))
         .build();
-    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder(2, "birthday", SharedSchemas.BIRTHDAY)
+    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder("birthday", SharedSchemas.BIRTHDAY)
         .id(ID)
         .build();
-    private static final SdkSchema SCHEMA_BINARY = SdkSchema.memberBuilder(3, "binary", PreludeSchemas.BLOB)
+    private static final SdkSchema SCHEMA_BINARY = SdkSchema.memberBuilder("binary", PreludeSchemas.BLOB)
         .id(ID)
         .build();
     private static final SdkSchema SCHEMA_QUERY_PARAMS = SdkSchema
-        .memberBuilder(4, "tags", SharedSchemas.MAP_LIST_STRING)
+        .memberBuilder("tags", SharedSchemas.MAP_LIST_STRING)
         .id(ID)
         .build();
     static final SdkSchema SCHEMA = SdkSchema.builder()
@@ -162,7 +162,7 @@ public final class Person implements SerializableShape {
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, (member, de) -> {
-                switch (SCHEMA.lookupMemberIndex(member)) {
+                switch (member.memberIndex()) {
                     case 0 -> name(de.readString(member));
                     case 1 -> age(de.readInteger(member));
                     case 2 -> birthday(de.readTimestamp(member));

@@ -120,14 +120,4 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
     public void readStringMap(SdkSchema schema, BiConsumer<String, ShapeDeserializer> eachEntry) {
         throw new UnsupportedOperationException("List map support not yet implemented");
     }
-
-    @Override
-    public void readIntMap(SdkSchema schema, BiConsumer<Integer, ShapeDeserializer> eachEntry) {
-        throw new UnsupportedOperationException("List map support not yet implemented");
-    }
-
-    @Override
-    public void readLongMap(SdkSchema schema, BiConsumer<Long, ShapeDeserializer> eachEntry) {
-        throw new UnsupportedOperationException("List map support not yet implemented");
-    }
 }

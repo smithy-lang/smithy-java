@@ -19,16 +19,16 @@ public class DocumentDeserializerTest {
     public void deserializesMapIntoBuilder() {
         Person.Builder builder = Person.builder();
 
-        var document = Document.ofMap(
+        var document = Document.createStringMap(
             Map.of(
-                Document.of("name"),
-                Document.of("Savage Bob"),
-                Document.of("age"),
-                Document.of(100),
-                Document.of("birthday"),
-                Document.of(Instant.EPOCH),
-                Document.of("binary"),
-                Document.of("hi".getBytes(StandardCharsets.UTF_8))
+                "name",
+                Document.createString("Savage Bob"),
+                "age",
+                Document.createInteger(100),
+                "birthday",
+                Document.createTimestamp(Instant.EPOCH),
+                "binary",
+                Document.createBlob("hi".getBytes(StandardCharsets.UTF_8))
             )
         );
 
@@ -42,26 +42,19 @@ public class DocumentDeserializerTest {
 
     @Test
     public void deserializesStructIntoBuilder() {
-        Person.Builder builder = Person.builder();
+        Person person = Person.builder()
+            .name("Savage Bob")
+            .age(100)
+            .birthday(Instant.EPOCH)
+            .binary("hi".getBytes(StandardCharsets.UTF_8))
+            .build();
 
-        var document = Document.ofStruct(
-            Map.of(
-                "name",
-                Document.of("Savage Bob"),
-                "age",
-                Document.of(100),
-                "birthday",
-                Document.of(Instant.EPOCH),
-                "binary",
-                Document.of("hi".getBytes(StandardCharsets.UTF_8))
-            )
-        );
+        var bobDocument = Document.createTyped(person);
+        var personCopy = bobDocument.asShape(Person.builder());
 
-        var person = document.asShape(builder);
-
-        assertThat(person.name(), is("Savage Bob"));
-        assertThat(person.age(), is(100));
-        assertThat(person.birthday(), is(Instant.EPOCH));
-        assertThat(person.binary(), is("hi".getBytes(StandardCharsets.UTF_8)));
+        assertThat(personCopy.name(), is("Savage Bob"));
+        assertThat(personCopy.age(), is(100));
+        assertThat(personCopy.birthday(), is(Instant.EPOCH));
+        assertThat(personCopy.binary(), is("hi".getBytes(StandardCharsets.UTF_8)));
     }
 }

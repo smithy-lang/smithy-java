@@ -45,16 +45,6 @@ final class HttpQueryParamsSerializer extends SpecificShapeSerializer {
                     }
                 });
             }
-
-            @Override
-            public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
-                throw new UnsupportedOperationException("Query params requires a map of string keys: " + schema);
-            }
-
-            @Override
-            public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
-                throw new UnsupportedOperationException("Query params requires a map of string keys: " + schema);
-            }
         });
     }
 }

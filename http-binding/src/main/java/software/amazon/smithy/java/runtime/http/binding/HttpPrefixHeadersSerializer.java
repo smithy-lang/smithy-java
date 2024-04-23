@@ -40,16 +40,6 @@ final class HttpPrefixHeadersSerializer extends SpecificShapeSerializer {
                     }
                 });
             }
-
-            @Override
-            public void writeEntry(SdkSchema keySchema, int key, Consumer<ShapeSerializer> valueSerializer) {
-                throw new UnsupportedOperationException("Prefix headers expects maps with string keys: " + schema);
-            }
-
-            @Override
-            public void writeEntry(SdkSchema keySchema, long key, Consumer<ShapeSerializer> valueSerializer) {
-                throw new UnsupportedOperationException("Prefix headers expects maps with string keys: " + schema);
-            }
         });
     }
 }

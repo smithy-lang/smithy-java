@@ -104,8 +104,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
 
         // Now parse members in the payload of body.
         if (!bodyMembers.isEmpty()) {
-            // Extract from the payload codec and exclude members from other locations.
-            SdkSchema payloadOnly = schema.withFilteredMembers(member -> !bodyMembers.contains(member.id().getName()));
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
             var bytes = readPayloadBytes();
             LOGGER.log(
@@ -114,7 +112,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 schema,
                 payloadCodec.getMediaType()
             );
-            payloadCodec.createDeserializer(bytes).readStruct(payloadOnly, eachEntry);
+            payloadCodec.createDeserializer(bytes).readStruct(schema, (m, de) -> {
+                if (!bodyMembers.contains(m.id().getName())) {
+                    eachEntry.accept(m, de);
+                }
+            });
             LOGGER.log(
                 System.Logger.Level.TRACE,
                 "Deserialized the structured body of %s via %s",

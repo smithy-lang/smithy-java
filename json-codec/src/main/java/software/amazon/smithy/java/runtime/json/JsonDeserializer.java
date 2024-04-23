@@ -206,26 +206,4 @@ final class JsonDeserializer implements ShapeDeserializer {
             throw new UncheckedIOException(e);
         }
     }
-
-    @Override
-    public void readIntMap(SdkSchema schema, BiConsumer<Integer, ShapeDeserializer> eachEntry) {
-        try {
-            for (var field = iter.readObject(); field != null; field = iter.readObject()) {
-                eachEntry.accept(Integer.parseInt(field), this);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    @Override
-    public void readLongMap(SdkSchema schema, BiConsumer<Long, ShapeDeserializer> eachEntry) {
-        try {
-            for (var field = iter.readObject(); field != null; field = iter.readObject()) {
-                eachEntry.accept(Long.parseLong(field), this);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
 }

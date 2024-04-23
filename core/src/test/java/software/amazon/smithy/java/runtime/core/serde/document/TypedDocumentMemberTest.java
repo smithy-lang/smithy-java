@@ -31,19 +31,21 @@ public class TypedDocumentMemberTest {
     // There's special handling for equality to account for the schema and normalized value.
     @Test
     public void equalityAndHashTest() {
+        var structSchema = SdkSchema.builder()
+            .id("smithy.example#Struct1")
+            .type(ShapeType.STRUCTURE)
+            .members(SdkSchema.memberBuilder("foo", PreludeSchemas.STRING))
+            .build();
+
         SerializableShape serializableShape = encoder -> {
-            encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
-                var target = PreludeSchemas.getSchemaForType(ShapeType.STRING);
-                var member = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember("foo", target);
-                s.writeString(member, "Hi");
-            });
+            encoder.writeStruct(structSchema, s -> s.writeString(structSchema.member("foo"), "Hi"));
         };
 
-        var document = Document.ofStruct(serializableShape);
-        var documentCopy = Document.ofStruct(serializableShape);
+        var document = Document.createTyped(serializableShape);
+        var documentCopy = Document.createTyped(serializableShape);
 
-        assertThat(document.getMember("foo"), equalTo(document.getMember("foo")));
-        assertThat(document.getMember("foo"), equalTo(document.getMember("foo")));
+        assertThat(document.getMember("foo"), equalTo(document.getMember("foo"))); // map value not cached
+        assertThat(document.getMember("foo"), equalTo(document.getMember("foo"))); // cached at this point
         assertThat(document.getMember("foo"), equalTo(documentCopy.getMember("foo")));
 
         var fooMember = document.getMember("foo");
@@ -53,43 +55,59 @@ public class TypedDocumentMemberTest {
     }
 
     @Test
-    public void inEqualityAndHashTest() {
-        var document1 = Document.ofStruct(encoder -> {
-            encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
-                var target = PreludeSchemas.getSchemaForType(ShapeType.STRING);
-                var member = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember("foo", target);
-                s.writeString(member, "Hi");
-            });
+    public void inequalityAndHashTest() {
+        var structSchema1 = SdkSchema.builder()
+            .id("smithy.example#Struct1")
+            .type(ShapeType.STRUCTURE)
+            .members(SdkSchema.memberBuilder("foo", PreludeSchemas.STRING))
+            .build();
+        var structSchema2 = SdkSchema.builder()
+            .id("smithy.example#Struct2")
+            .type(ShapeType.STRUCTURE)
+            .members(SdkSchema.memberBuilder("foo", PreludeSchemas.INTEGER))
+            .build();
+
+        var document1 = Document.createTyped(encoder -> {
+            encoder.writeStruct(structSchema1, s -> s.writeString(structSchema1.member("foo"), "Hi"));
         });
 
-        var document2 = Document.ofStruct(encoder -> {
-            encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
-                var target = PreludeSchemas.getSchemaForType(ShapeType.INTEGER);
-                var member = PreludeSchemas.DOCUMENT.getOrCreateDocumentMember("foo", target);
-                s.writeInteger(member, 1);
-            });
+        var document2 = Document.createTyped(encoder -> {
+            encoder.writeStruct(structSchema2, s -> s.writeInteger(structSchema2.member("foo"), 1));
         });
 
         assertThat(document1.getMember("foo"), not(equalTo(null)));
         assertThat(document1.getMember("foo"), not(equalTo(document2.getMember("foo"))));
     }
 
+    // Exercises the "as" methods of a document.
     @ParameterizedTest
     @MethodSource("convertsMemberProvider")
     public void convertsMember(
-        ShapeType type,
+        Object targetTypeOrSchema,
         Object value,
         BiConsumer<SdkSchema, ShapeSerializer> writer,
         Function<Document, Object> extractor
     ) {
-        SerializableShape serializableShape = encoder -> {
-            encoder.writeStruct(PreludeSchemas.DOCUMENT, s -> {
-                var target = PreludeSchemas.getSchemaForType(type);
-                var aMember = SdkSchema.memberBuilder(-1, "a", target).id(PreludeSchemas.DOCUMENT.id()).build();
-                writer.accept(aMember, s);
-            });
-        };
-        var document = Document.ofStruct(serializableShape);
+        SdkSchema targetSchema;
+        if (targetTypeOrSchema instanceof ShapeType t) {
+            targetSchema = PreludeSchemas.getSchemaForType(t);
+        } else if (targetTypeOrSchema instanceof SdkSchema s) {
+            targetSchema = s;
+        } else {
+            throw new IllegalArgumentException(
+                "Expected targetTypeOrSchema to be ShapeType or SdkSchema: "
+                    + targetTypeOrSchema
+            );
+        }
+
+        SdkSchema structSchema = SdkSchema.builder()
+            .type(ShapeType.STRUCTURE)
+            .id("smithy.example#Foo")
+            .members(SdkSchema.memberBuilder("a", targetSchema))
+            .build();
+        var document = Document.createTyped(encoder -> {
+            encoder.writeStruct(structSchema, s -> writer.accept(structSchema.member("a"), s));
+        });
 
         assertThat(extractor.apply(document.getMember("a")), equalTo(value));
     }
@@ -532,100 +550,57 @@ public class TypedDocumentMemberTest {
                 (Function<Document, Object>) Document::asBigDecimal
             ),
 
-            // Get the document as a list. Typed equality needs normalization through Document.ofValue().
+            // Get the document as a list.
             Arguments.of(
                 ShapeType.DOCUMENT,
-                List.of(Document.of(1)),
+                List.of(Document.createInteger(1)),
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeList(
                     schema,
                     c -> c.writeInteger(PreludeSchemas.INTEGER, 1)
                 ),
-                (Function<Document, Object>) d -> Document.ofValue(Document.of(d.asList())).asList()
+                (Function<Document, Object>) d -> Document.createTyped(Document.createList(d.asList())).asList()
             ),
 
-            // Get the document as a string map. Typed equality needs normalization through Document.ofValue().
+            // Get the document as a string map.
             Arguments.of(
-                ShapeType.DOCUMENT,
-                Map.of(Document.of("a"), Document.of(1)),
+                Documents.STR_MAP_SCHEMA,
+                Map.of("a", Document.createInteger(1)),
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
                     schema,
-                    m -> m.writeEntry(
-                        schema.getOrCreateDocumentMember("key", PreludeSchemas.STRING),
-                        "a",
-                        c -> c.writeInteger(PreludeSchemas.INTEGER, 1)
-                    )
+                    m -> m.writeEntry(schema.member("key"), "a", c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
                 ),
-                (Function<Document, Object>) d -> Document.ofValue(
-                    Document.ofMap(d.asMap())
-                ).asMap()
+                (Function<Document, Object>) Document::asStringMap
             ),
 
-            // Get the document as an integer map. Typed equality needs normalization through Document.ofValue().
+            // Get a member from a map by name.
             Arguments.of(
-                ShapeType.DOCUMENT,
-                Map.of(Document.of(1), Document.of(1)),
+                Documents.STR_MAP_SCHEMA,
+                Document.createInteger(1),
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
                     schema,
-                    m -> m.writeEntry(
-                        schema.getOrCreateDocumentMember("key", PreludeSchemas.INTEGER),
-                        1,
-                        c -> c.writeInteger(PreludeSchemas.INTEGER, 1)
-                    )
+                    m -> m.writeEntry(schema.member("key"), "a", c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
                 ),
-                (Function<Document, Object>) d -> Document.ofValue(
-                    Document.ofMap(d.asMap())
-                ).asMap()
+                (Function<Document, Object>) d -> d.getMember("a")
             ),
 
-            // Get the document as a long map. Typed equality needs normalization through Document.ofValue().
+            // Get a member from a struct by name.
             Arguments.of(
-                ShapeType.DOCUMENT,
-                Map.of(Document.of(1L), Document.of(1)),
-                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
-                    schema,
-                    m -> m.writeEntry(
-                        schema.getOrCreateDocumentMember("key", PreludeSchemas.LONG),
-                        1L,
-                        c -> c.writeInteger(PreludeSchemas.INTEGER, 1)
+                SdkSchema.builder()
+                    .type(ShapeType.STRUCTURE)
+                    .id("smithy.example#Foo")
+                    .members(
+                        SdkSchema.memberBuilder("foo", PreludeSchemas.STRING),
+                        SdkSchema.memberBuilder("bar", PreludeSchemas.STRING)
                     )
-                ),
-                (Function<Document, Object>) d -> Document.ofValue(
-                    Document.ofMap(d.asMap())
-                ).asMap()
-            ),
-
-            // Get a member from a map by name. Typed equality needs normalization through Document.ofValue().
-            Arguments.of(
-                ShapeType.DOCUMENT,
-                Document.of(1),
-                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
-                    schema,
-                    m -> m.writeEntry(
-                        schema.getOrCreateDocumentMember("key", PreludeSchemas.STRING),
-                        "a",
-                        c -> c.writeInteger(PreludeSchemas.INTEGER, 1)
-                    )
-                ),
-                (Function<Document, Object>) d -> Document.ofValue(d.getMember("a"))
-            ),
-
-            // Get a member from a struct by name. Typed equality needs normalization through Document.ofValue().
-            Arguments.of(
-                ShapeType.DOCUMENT,
-                Document.of("b"),
+                    .build(),
+                "b",
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> {
                     s.writeStruct(schema, ser -> {
-                        ser.writeString(
-                            PreludeSchemas.DOCUMENT.getOrCreateDocumentMember("foo", PreludeSchemas.STRING),
-                            "a"
-                        );
-                        ser.writeString(
-                            PreludeSchemas.DOCUMENT.getOrCreateDocumentMember("bar", PreludeSchemas.STRING),
-                            "b"
-                        );
+                        ser.writeString(schema.member("foo"), "a");
+                        ser.writeString(schema.member("bar"), "b");
                     });
                 },
-                (Function<Document, Object>) d -> Document.ofValue(d.getMember("bar"))
+                (Function<Document, Object>) d -> d.getMember("bar").asString()
             )
         );
     }

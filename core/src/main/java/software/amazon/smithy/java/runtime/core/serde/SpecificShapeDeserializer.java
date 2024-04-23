@@ -104,14 +104,4 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
     public void readStringMap(SdkSchema schema, BiConsumer<String, ShapeDeserializer> eachEntry) {
         throw throwForInvalidState(schema);
     }
-
-    @Override
-    public void readIntMap(SdkSchema schema, BiConsumer<Integer, ShapeDeserializer> eachEntry) {
-        throw throwForInvalidState(schema);
-    }
-
-    @Override
-    public void readLongMap(SdkSchema schema, BiConsumer<Long, ShapeDeserializer> eachEntry) {
-        throw throwForInvalidState(schema);
-    }
 }

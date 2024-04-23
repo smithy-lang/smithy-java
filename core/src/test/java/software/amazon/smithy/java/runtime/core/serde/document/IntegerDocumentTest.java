@@ -20,16 +20,16 @@ public class IntegerDocumentTest {
 
     @Test
     public void createsDocument() {
-        var document = Document.of(10);
+        var document = Document.createInteger(10);
 
         assertThat(document.type(), equalTo(ShapeType.INTEGER));
         assertThat(document.asInteger(), equalTo(10));
-        assertThat(document, equalTo(Document.of(10)));
+        assertThat(document, equalTo(Document.createInteger(10)));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.of(1);
+        var document = Document.createInteger(1);
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -41,7 +41,7 @@ public class IntegerDocumentTest {
 
     @Test
     public void serializesContent() {
-        var document = Document.of(10);
+        var document = Document.createInteger(10);
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
@@ -56,7 +56,7 @@ public class IntegerDocumentTest {
 
     @Test
     public void canWidenType() {
-        var document = Document.of(10);
+        var document = Document.createInteger(10);
 
         assertThat(document.asLong(), equalTo(10L));
         assertThat(document.asFloat(), equalTo(10f));

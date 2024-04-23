@@ -49,8 +49,4 @@ public interface ShapeDeserializer {
     void readList(SdkSchema schema, Consumer<ShapeDeserializer> eachElement);
 
     void readStringMap(SdkSchema schema, BiConsumer<String, ShapeDeserializer> eachEntry);
-
-    void readIntMap(SdkSchema schema, BiConsumer<Integer, ShapeDeserializer> eachEntry);
-
-    void readLongMap(SdkSchema schema, BiConsumer<Long, ShapeDeserializer> eachEntry);
 }

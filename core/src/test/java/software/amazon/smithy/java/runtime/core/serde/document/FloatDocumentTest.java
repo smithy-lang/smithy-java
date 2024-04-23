@@ -20,16 +20,16 @@ public class FloatDocumentTest {
 
     @Test
     public void createsDocument() {
-        var document = Document.of(1.0f);
+        var document = Document.createFloat(1.0f);
 
         assertThat(document.type(), equalTo(ShapeType.FLOAT));
         assertThat(document.asFloat(), equalTo(1.0f));
-        assertThat(document, equalTo(Document.of(1.0f)));
+        assertThat(document, equalTo(Document.createFloat(1.0f)));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.of(1.0f);
+        var document = Document.createFloat(1.0f);
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -41,7 +41,7 @@ public class FloatDocumentTest {
 
     @Test
     public void serializesContent() {
-        var document = Document.of(1.0f);
+        var document = Document.createFloat(1.0f);
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
@@ -56,7 +56,7 @@ public class FloatDocumentTest {
 
     @Test
     public void canWiden() {
-        var document = Document.of(1.0f);
+        var document = Document.createFloat(1.0f);
 
         assertThat(document.asDouble(), equalTo(1.0));
     }

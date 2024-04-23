@@ -24,17 +24,17 @@ public class ListDocumentTest {
 
     @Test
     public void createsDocument() {
-        List<Document> values = List.of(Document.of(1), Document.of(2));
-        var document = Document.of(values);
+        List<Document> values = List.of(Document.createInteger(1), Document.createInteger(2));
+        var document = Document.createList(values);
 
         assertThat(document.type(), equalTo(ShapeType.LIST));
         assertThat(document.asList(), equalTo(values));
-        assertThat(document, equalTo(Document.of(values)));
+        assertThat(document, equalTo(Document.createList(values)));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.of(List.of(Document.of("a"), Document.of("b")));
+        var document = Document.createList(List.of(Document.createString("a"), Document.createString("b")));
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -46,15 +46,15 @@ public class ListDocumentTest {
 
     @Test
     public void serializesContents() {
-        List<Document> values = List.of(Document.of("a"), Document.of("b"));
-        var document = Document.of(values);
+        List<Document> values = List.of(Document.createString("a"), Document.createString("b"));
+        var document = Document.createList(values);
 
         List<String> writtenStrings = new ArrayList<>();
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
             public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-                assertThat(schema, equalTo(PreludeSchemas.DOCUMENT));
+                assertThat(schema.type(), equalTo(ShapeType.LIST));
                 consumer.accept(new SpecificShapeSerializer() {
                     @Override
                     public void writeString(SdkSchema schema, String value) {

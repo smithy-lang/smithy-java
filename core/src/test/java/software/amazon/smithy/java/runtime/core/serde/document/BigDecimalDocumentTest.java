@@ -21,16 +21,16 @@ public class BigDecimalDocumentTest {
 
     @Test
     public void createsDocument() {
-        var document = Document.of(new BigDecimal(10));
+        var document = Document.createBigDecimal(new BigDecimal(10));
 
         assertThat(document.type(), equalTo(ShapeType.BIG_DECIMAL));
         assertThat(document.asBigDecimal(), equalTo(new BigDecimal(10)));
-        assertThat(document, equalTo(Document.of(new BigDecimal(10))));
+        assertThat(document, equalTo(Document.createBigDecimal(new BigDecimal(10))));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.of(new BigDecimal(10));
+        var document = Document.createBigDecimal(new BigDecimal(10));
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -42,7 +42,7 @@ public class BigDecimalDocumentTest {
 
     @Test
     public void serializesContent() {
-        var document = Document.of(new BigDecimal(10));
+        var document = Document.createBigDecimal(new BigDecimal(10));
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
