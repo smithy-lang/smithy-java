@@ -9,6 +9,7 @@ package software.amazon.smithy.java.codegen.generators;
 import java.util.Arrays;
 import java.util.Objects;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
@@ -54,8 +55,7 @@ final class EqualsGenerator implements Runnable {
                     return false;
                 }
                 $1T that = ($1T) other;
-                return ${2C|};
-                """,
+                return ${2C|};""",
             symbolProvider.toSymbol(shape),
             (Runnable) this::writePropertyEqualityChecks
         );
@@ -65,10 +65,20 @@ final class EqualsGenerator implements Runnable {
         var iter = shape.members().iterator();
         while (iter.hasNext()) {
             var member = iter.next();
-            Class<?> comparator = SymbolUtils.isJavaArray(symbolProvider.toSymbol(member))
-                ? Arrays.class
-                : Objects.class;
-            writer.writeInline("$1T.equals($2L, that.$2L)", comparator, symbolProvider.toMemberName(member));
+            var memberSymbol = symbolProvider.toSymbol(member);
+
+            // Use `==` instead of `equals` for unboxed primitives
+            if (memberSymbol.expectProperty(SymbolProperties.PRIMITIVE, Boolean.class)
+                    && !SymbolUtils.isNullableMember(member)
+            ) {
+                writer.writeInline("$1L == that.$1L", symbolProvider.toMemberName(member));
+            } else {
+                Class<?> comparator = SymbolUtils.isJavaArray(memberSymbol)
+                        ? Arrays.class
+                        : Objects.class;
+                writer.writeInline("$1T.equals($2L, that.$2L)", comparator, symbolProvider.toMemberName(member));
+            }
+
             if (iter.hasNext()) {
                 writer.writeInlineWithNoFormatting(writer.getNewline() + "&& ");
             }
