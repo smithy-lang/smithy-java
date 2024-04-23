@@ -273,15 +273,13 @@ final class SerializerGenerator implements Runnable {
 
         @Override
         public Void structureShape(StructureShape structureShape) {
-            // TODO: Is this correct?
-            writer.write("${serializer:L}.writeStructure(${schemaName:L}, ${memberName:L})");
+            writer.write("${memberName:L}.serialize(${serializer:L})");
             return null;
         }
 
         @Override
         public Void unionShape(UnionShape unionShape) {
-            // TODO: Is this correct?
-            writer.write("${serializer:L}.writeStructure(${schemaName:L}, ${memberName:L})");
+            writer.write("${memberName:L}.serialize(${serializer:L})");
             return null;
         }
 
