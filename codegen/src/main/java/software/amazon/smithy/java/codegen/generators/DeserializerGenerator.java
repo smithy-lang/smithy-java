@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.SchemaUtils;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -69,16 +70,18 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
             writer.write(
                 "case $L -> ${C|}",
                 idx,
-                new SwitchVisitor(member)
+                new SwitchVisitor(member, SchemaUtils.toMemberSchemaName(symbolProvider.toMemberName(member)))
             );
         }
     }
 
     private final class SwitchVisitor extends ShapeVisitor.Default<Void> implements Runnable {
         private final MemberShape memberShape;
+        private final String schemaName;
 
-        private SwitchVisitor(MemberShape memberShape) {
+        private SwitchVisitor(MemberShape memberShape, String schemaName) {
             this.memberShape = memberShape;
+            this.schemaName = schemaName;
         }
 
         @Override
@@ -93,7 +96,7 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
         protected Void getDefault(Shape shape) {
             writer.write(
                 "${memberName:L}($C);",
-                new DeserReaderVisitor(shape, "de", "member")
+                new ReaderVisitor(memberShape, "de", "member", null)
             );
             return null;
         }
@@ -112,7 +115,6 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
                     """
                         {
                             $T result = new ${collectionImpl:T}<>();
-                            var elementSchema = member.member("member");
                             de.readList(member, elem -> {
                                 if (result.add($C)) {
                                     throw new ${sdkSerdeException:T}("Duplicate item in unique list " + elem);
@@ -121,17 +123,16 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
                             ${memberName:L}(result);
                         }""",
                     symbolProvider.toSymbol(shape),
-                    new DeserReaderVisitor(shape.getMember(), "de", "elementSchema")
+                    new ReaderVisitor(shape.getMember(), "elem", schemaName + "_MEMBER", "result")
                 );
                 writer.popState();
             } else {
                 writer.write(
                     """
                         {
-                            var elementSchema = member.member("member");
                             de.readList(member, elem ->  ${memberName:L}($C));
                         }""",
-                    new DeserReaderVisitor(shape.getMember(), "elem", "elementSchema")
+                    new ReaderVisitor(shape.getMember(), "elem", schemaName + "_MEMBER", "result")
                 );
             }
             return null;
@@ -148,35 +149,26 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
             );
 
             // Special case lists and maps.
-            if (valueTarget.isListShape()) {
-                writer.putContext(
-                    "nestedCollectionImpl",
-                    symbolProvider.toSymbol(valueTarget)
-                        .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
-                );
+            if (valueTarget.isListShape() || valueTarget.isMapShape()) {
                 writer.write(
                     """
                         {
                             $T result = new ${collectionImpl:T}<>();
-                            var valueSchema = member.member("value");
-                            de.readStringMap(member, (key, v) -> {
+                            de.readStringMap(member, (key, val) -> {
                                 ${C|}
                             });
                             ${memberName:L}(result);
                         }""",
                     symbolProvider.toSymbol(shape),
-                    new DeserReaderVisitor(shape.getValue(), "v", "valueSchema")
+                    new ReaderVisitor(shape.getValue(), "val", schemaName + "_VALUE", "result")
                 );
-            } else if (valueTarget.isMapShape()) {
-                // TODO: Implement?
             } else {
                 writer.write(
                     """
                         {
-                            var valueSchema = member.member("value");
-                            de.readStringMap(member, (key, v) -> put${memberName:U}(key, $C));
+                            de.readStringMap(member, (key, val) -> put${memberName:U}(key, $C));
                         }""",
-                    new DeserReaderVisitor(valueTarget, "v", "valueSchema")
+                    new ReaderVisitor(shape.getValue(), "val", schemaName + "_VALUE", "result")
                 );
             }
             writer.popState();
@@ -189,26 +181,38 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
         }
     }
 
-    private final class DeserReaderVisitor extends ShapeVisitor.DataShapeVisitor<Void> implements Runnable {
-        private final Shape memberShape;
-        private final String deserVar;
+    private final class ReaderVisitor extends ShapeVisitor.DataShapeVisitor<Void> implements Runnable {
+        private final MemberShape memberShape;
+        private final String deserializer;
         private final String schemaName;
+        private final String result;
 
-        private DeserReaderVisitor(Shape memberShape, String deserVar, String schemaName) {
-            this.deserVar = deserVar;
+        private ReaderVisitor(MemberShape memberShape, String deserializer, String schemaName, String result) {
+            this.deserializer = deserializer;
             this.memberShape = memberShape;
             this.schemaName = schemaName;
+            this.result = result;
+        }
+
+        @Override
+        public void run() {
+            writer.pushState();
+            writer.putContext("deserializer", deserializer);
+            writer.putContext("schemaName", schemaName);
+            writer.putContext("result", result);
+            memberShape.accept(this);
+            writer.popState();
         }
 
         @Override
         public Void blobShape(BlobShape blobShape) {
-            writer.write("$L.readBlob($L)", deserVar, schemaName);
+            writer.write("${deserializer:L}.readBlob(${schemaName:L})");
             return null;
         }
 
         @Override
         public Void booleanShape(BooleanShape booleanShape) {
-            writer.write("$L.readBoolean($L)", deserVar, schemaName);
+            writer.write("${deserializer:L}.readBoolean(${schemaName:L})");
             return null;
         }
 
@@ -216,32 +220,42 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
         @Override
         public Void listShape(ListShape listShape) {
             writer.pushState();
-            if (memberShape.isMemberShape()
-                && model.expectShape(memberShape.asMemberShape().get().getContainer()).isMapShape()) {
+            writer.putContext(
+                "collectionImpl",
+                symbolProvider.toSymbol(listShape)
+                    .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+            );
+            var container = model.expectShape(memberShape.getContainer());
+            if (container.isMapShape()) {
                 writer.write(
                     """
-                        var nestedSchema = valueSchema.member("member");
-                        var resultNested = result.computeIfAbsent(key, k -> new ${nestedCollectionImpl:T}<>());
-                        v.readList(valueSchema, nl -> {
-                            resultNested.add($C);
-                        });
-                        """,
-                    new DeserReaderVisitor(listShape.getMember(), "nl", "nestedSchema")
+                        var ${result:L}Nested = ${result:L}.computeIfAbsent(key, k -> new ${collectionImpl:T}<>());
+                        ${deserializer:L}.readList(${schemaName:L}, ${deserializer:L}l -> {
+                            ${result:L}Nested.add($C);
+                        });""",
+                    new ReaderVisitor(
+                        listShape.getMember(),
+                        deserializer + "l",
+                        schemaName + "_MEMBER",
+                        result + "Nested"
+                    )
                 );
-            } else if (memberShape.isMemberShape()
-                && model.expectShape(memberShape.asMemberShape().get().getContainer()).isListShape()) {
-                    writer.write(
-                        """
-                            var nestedSchema = valueSchema.member("member");
-                            var resultNested = ${nestedCollectionImpl:T}<>();
-                            v.readList(valueSchema, nl -> {
-                                resultNested.add($C);
-                            });
-                            result.add(resultNested);
-                            """,
-                        new DeserReaderVisitor(listShape.getMember(), "nl", "nestedSchema")
-                    );
-                }
+            } else if (container.isListShape()) {
+                writer.write(
+                    """
+                        var ${result:L}Nested = ${collectionImpl:T}<>();
+                        ${deserializer:L}.readList(${schemaName:L}, ${deserializer:L}l -> {
+                            ${result:L}Nested.add($C);
+                        });
+                        ${result:L}.add(${result:L}Nested);""",
+                    new ReaderVisitor(
+                        listShape.getMember(),
+                        deserializer + "l",
+                        schemaName + "_MEMBER",
+                        result + "Nested"
+                    )
+                );
+            }
             writer.popState();
             return null;
         }
@@ -254,90 +268,85 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
 
         @Override
         public Void byteShape(ByteShape byteShape) {
-            writer.write("$L.readByte($L)", deserVar, schemaName);
+            writer.write("${deserializer:L}.readByte(${schemaName:L})");
             return null;
         }
 
         @Override
         public Void shortShape(ShortShape shortShape) {
-            writer.write("$L.readShort($L)", deserVar, schemaName);
+            writer.write("${deserializer:L}.readShort(${schemaName:L})");
             return null;
         }
 
         @Override
         public Void integerShape(IntegerShape integerShape) {
-            writer.write("$L.readInteger($L)", deserVar, schemaName);
+            writer.write("${deserializer:L}.readInteger(${schemaName:L})");
             return null;
         }
 
         @Override
         public Void longShape(LongShape longShape) {
-            writer.write("$L.readLong($L)", deserVar, schemaName);
+            writer.write("${deserializer:L}.readLong(${schemaName:L})");
             return null;
         }
 
         @Override
         public Void floatShape(FloatShape floatShape) {
-            writer.write("$L.readFloat($L)", deserVar, schemaName);
+            writer.write("${deserializer:L}.readFloat(${schemaName:L})");
             return null;
         }
 
         @Override
         public Void documentShape(DocumentShape documentShape) {
-            writer.write("$L.readDocument()", deserVar);
+            writer.write("${deserializer:L}.readDocument()");
             return null;
         }
 
         @Override
         public Void doubleShape(DoubleShape doubleShape) {
-            writer.write("$L.readDouble($L)", deserVar, schemaName);
+            writer.write("${deserializer:L}.readDouble(${schemaName:L})");
             return null;
         }
 
         @Override
         public Void bigIntegerShape(BigIntegerShape bigIntegerShape) {
-            writer.write("$L.readBigInteger($L)", deserVar, schemaName);
+            writer.write("${deserializer:L}.readBigInteger(${schemaName:L})");
             return null;
         }
 
         @Override
         public Void bigDecimalShape(BigDecimalShape bigDecimalShape) {
-            writer.write("$L.readBigDecimal($L)", deserVar, schemaName);
+            writer.write("${deserializer:L}.readBigDecimal(${schemaName:L})");
             return null;
         }
 
         @Override
         public Void stringShape(StringShape stringShape) {
-            writer.write("$L.readString($L)", deserVar, schemaName);
+            writer.write("${deserializer:L}.readString(${schemaName:L})");
             return null;
         }
 
         @Override
         public Void structureShape(StructureShape structureShape) {
-            writer.write("$T.builder().deserialize($L).build()", symbolProvider.toSymbol(memberShape), deserVar);
+            writer.write("$T.builder().deserialize(${deserializer:L}).build()", symbolProvider.toSymbol(memberShape));
             return null;
         }
 
         @Override
         public Void unionShape(UnionShape unionShape) {
-            // TODO: Implement
+            writer.write("$T.builder().deserialize(${deserializer:L}).build()", symbolProvider.toSymbol(memberShape));
+            return null;
+        }
+
+        @Override
+        public Void timestampShape(TimestampShape timestampShape) {
+            writer.write("${deserializer:L}.readTimestamp(${schemaName:L})");
             return null;
         }
 
         @Override
         public Void memberShape(MemberShape memberShape) {
             return model.expectShape(memberShape.getTarget()).accept(this);
-        }
-
-        @Override
-        public Void timestampShape(TimestampShape timestampShape) {
-            writer.write("$L.readTimestamp($L)", deserVar, schemaName);
-            return null;
-        }
-
-        @Override
-        public void run() {
-            memberShape.accept(this);
         }
     }
 }
