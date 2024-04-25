@@ -59,6 +59,12 @@ operation PutPerson {
         @notProperty
         @default({})
         defaultMap: MapStringString
+
+        @notProperty
+        nestedMap: MapOfStringMap
+
+        @notProperty
+        nestedList: ListOfStringList
     }
 
     output := for Person {

@@ -33,3 +33,12 @@ structure Nested {
     fieldA: String
     fieldB: Integer
 }
+
+map MapOfStringMap {
+    key: String
+    value: MapStringString
+}
+
+list ListOfStringList {
+    member: ListOfString
+}
