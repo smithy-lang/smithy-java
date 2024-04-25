@@ -96,45 +96,61 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
         protected Void getDefault(Shape shape) {
             writer.write(
                 "${memberName:L}($C);",
-                new ReaderVisitor(memberShape, "de", "member", null)
+                new ReaderVisitor(memberShape, "de", "member", null, null)
             );
             return null;
         }
 
         @Override
         public Void listShape(ListShape shape) {
-            if (shape.hasTrait(UniqueItemsTrait.class)) {
-                writer.pushState();
-                writer.putContext(
+            var target = model.expectShape(shape.getMember().getTarget());
+            writer.pushState();
+            writer.putContext(
                     "collectionImpl",
                     symbolProvider.toSymbol(shape)
-                        .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
-                );
+                            .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+            );
+            if (shape.hasTrait(UniqueItemsTrait.class)) {
                 writer.putContext("sdkSerdeException", SdkSerdeException.class);
                 writer.write(
-                    """
-                        {
-                            $T result = new ${collectionImpl:T}<>();
-                            de.readList(member, elem -> {
-                                if (result.add($C)) {
-                                    throw new ${sdkSerdeException:T}("Duplicate item in unique list " + elem);
-                                }
-                            });
-                            ${memberName:L}(result);
-                        }""",
-                    symbolProvider.toSymbol(shape),
-                    new ReaderVisitor(shape.getMember(), "elem", schemaName + "_MEMBER", "result")
+                        """
+                                {
+                                    $T result = new ${collectionImpl:T}<>();
+                                    de.readList(member, elem -> {
+                                        if (result.add($C)) {
+                                            throw new ${sdkSerdeException:T}("Duplicate item in unique list " + elem);
+                                        }
+                                    });
+                                    ${memberName:L}(result);
+                                }""",
+                        symbolProvider.toSymbol(shape),
+                        new ReaderVisitor(shape.getMember(), "elem", schemaName + "_MEMBER", "result", "key")
                 );
-                writer.popState();
+            } else if (target.isListShape() || target.isMapShape()) {
+
+                // Special case lists and maps.
+                writer.write(
+                        """
+                            {
+                                $T result = new ${collectionImpl:T}<>();
+                                de.readList(member, elem -> {
+                                    ${C|}
+                                });
+                                ${memberName:L}(result);
+                            }""",
+                        symbolProvider.toSymbol(shape),
+                        new ReaderVisitor(shape.getMember(), "elem", schemaName + "_MEMBER", "result", "key")
+                );
             } else {
                 writer.write(
                     """
                         {
                             de.readList(member, elem ->  ${memberName:L}($C));
                         }""",
-                    new ReaderVisitor(shape.getMember(), "elem", schemaName + "_MEMBER", "result")
+                    new ReaderVisitor(shape.getMember(), "elem", schemaName + "_MEMBER", "result", "key")
                 );
             }
+            writer.popState();
             return null;
         }
 
@@ -160,7 +176,7 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
                             ${memberName:L}(result);
                         }""",
                     symbolProvider.toSymbol(shape),
-                    new ReaderVisitor(shape.getValue(), "val", schemaName + "_VALUE", "result")
+                    new ReaderVisitor(shape.getValue(), "val", schemaName + "_VALUE", "result", "key")
                 );
             } else {
                 writer.write(
@@ -168,7 +184,7 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
                         {
                             de.readStringMap(member, (key, val) -> put${memberName:U}(key, $C));
                         }""",
-                    new ReaderVisitor(shape.getValue(), "val", schemaName + "_VALUE", "result")
+                    new ReaderVisitor(shape.getValue(), "val", schemaName + "_VALUE", "result", "key")
                 );
             }
             writer.popState();
@@ -186,12 +202,14 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
         private final String deserializer;
         private final String schemaName;
         private final String result;
+        private final String key;
 
-        private ReaderVisitor(MemberShape memberShape, String deserializer, String schemaName, String result) {
+        private ReaderVisitor(MemberShape memberShape, String deserializer, String schemaName, String result, String key) {
             this.deserializer = deserializer;
             this.memberShape = memberShape;
             this.schemaName = schemaName;
             this.result = result;
+            this.key = key;
         }
 
         @Override
@@ -200,6 +218,7 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
             writer.putContext("deserializer", deserializer);
             writer.putContext("schemaName", schemaName);
             writer.putContext("result", result);
+            writer.putContext("key", key);
             memberShape.accept(this);
             writer.popState();
         }
@@ -216,7 +235,7 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
             return null;
         }
 
-        // TODO: Handle multiply nested lists
+        // TODO: Handle recursive lists
         @Override
         public Void listShape(ListShape listShape) {
             writer.pushState();
@@ -225,44 +244,53 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
                 symbolProvider.toSymbol(listShape)
                     .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
             );
-            var container = model.expectShape(memberShape.getContainer());
-            if (container.isMapShape()) {
-                writer.write(
+            writer.putContext("insideMap", model.expectShape(memberShape.getContainer()).isMapShape());
+            writer.write(
                     """
-                        var ${result:L}Nested = ${result:L}.computeIfAbsent(key, k -> new ${collectionImpl:T}<>());
-                        ${deserializer:L}.readList(${schemaName:L}, ${deserializer:L}l -> {
-                            ${result:L}Nested.add($C);
-                        });""",
-                    new ReaderVisitor(
-                        listShape.getMember(),
-                        deserializer + "l",
-                        schemaName + "_MEMBER",
-                        result + "Nested"
-                    )
-                );
-            } else if (container.isListShape()) {
-                writer.write(
-                    """
-                        var ${result:L}Nested = ${collectionImpl:T}<>();
+                        $T ${result:L}Nested = new ${collectionImpl:T}<>();
                         ${deserializer:L}.readList(${schemaName:L}, ${deserializer:L}l -> {
                             ${result:L}Nested.add($C);
                         });
-                        ${result:L}.add(${result:L}Nested);""",
+                        ${result:L}${?insideMap}.put(${key:L}, ${/insideMap}${^insideMap}.add(${/insideMap}${result:L}Nested);""",
+                    symbolProvider.toSymbol(listShape),
                     new ReaderVisitor(
-                        listShape.getMember(),
-                        deserializer + "l",
-                        schemaName + "_MEMBER",
-                        result + "Nested"
+                            listShape.getMember(),
+                            deserializer + "l",
+                            schemaName + "_MEMBER",
+                            result + "Nested",
+                            key + "Nested"
                     )
-                );
-            }
+            );
             writer.popState();
             return null;
         }
 
         @Override
         public Void mapShape(MapShape mapShape) {
-            // TODO: handle nested maps
+            writer.pushState();
+            writer.putContext(
+                    "collectionImpl",
+                    symbolProvider.toSymbol(mapShape)
+                            .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+            );
+            writer.putContext("insideMap", model.expectShape(memberShape.getContainer()).isMapShape());
+            writer.write(
+                    """
+                        $T ${result:L}Nested = new ${collectionImpl:T}<>();
+                        ${deserializer:L}.readStringMap(${schemaName:L}, (${key:L}Nested, ${deserializer:L}Val) -> {                           
+                            ${result:L}Nested.put(${key:L}Nested, $C);
+                        });
+                        ${result:L}${?insideMap}.put(${key:L}, ${/insideMap}${^insideMap}.add(${/insideMap}${result:L}Nested);""",
+                    symbolProvider.toSymbol(mapShape),
+                    new ReaderVisitor(
+                            mapShape.getValue(),
+                            deserializer + "Val",
+                            schemaName + "_VALUE",
+                            result + "Nested",
+                            key + "Nested"
+                    )
+            );
+            writer.popState();
             return null;
         }
 
