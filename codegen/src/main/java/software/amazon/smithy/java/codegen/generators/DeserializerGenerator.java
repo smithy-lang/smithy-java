@@ -106,40 +106,40 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
             var target = model.expectShape(shape.getMember().getTarget());
             writer.pushState();
             writer.putContext(
-                    "collectionImpl",
-                    symbolProvider.toSymbol(shape)
-                            .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+                "collectionImpl",
+                symbolProvider.toSymbol(shape)
+                    .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
             );
             if (shape.hasTrait(UniqueItemsTrait.class)) {
                 writer.putContext("sdkSerdeException", SdkSerdeException.class);
                 writer.write(
-                        """
-                                {
-                                    $T result = new ${collectionImpl:T}<>();
-                                    de.readList(member, elem -> {
-                                        if (result.add($C)) {
-                                            throw new ${sdkSerdeException:T}("Duplicate item in unique list " + elem);
-                                        }
-                                    });
-                                    ${memberName:L}(result);
-                                }""",
-                        symbolProvider.toSymbol(shape),
-                        new ReaderVisitor(shape.getMember(), "elem", schemaName + "_MEMBER", "result", "key")
+                    """
+                        {
+                            $T result = new ${collectionImpl:T}<>();
+                            de.readList(member, elem -> {
+                                if (result.add($C)) {
+                                    throw new ${sdkSerdeException:T}("Duplicate item in unique list " + elem);
+                                }
+                            });
+                            ${memberName:L}(result);
+                        }""",
+                    symbolProvider.toSymbol(shape),
+                    new ReaderVisitor(shape.getMember(), "elem", schemaName + "_MEMBER", "result", "key")
                 );
             } else if (target.isListShape() || target.isMapShape()) {
 
                 // Special case lists and maps.
                 writer.write(
-                        """
-                            {
-                                $T result = new ${collectionImpl:T}<>();
-                                de.readList(member, elem -> {
-                                    ${C|}
-                                });
-                                ${memberName:L}(result);
-                            }""",
-                        symbolProvider.toSymbol(shape),
-                        new ReaderVisitor(shape.getMember(), "elem", schemaName + "_MEMBER", "result", "key")
+                    """
+                        {
+                            $T result = new ${collectionImpl:T}<>();
+                            de.readList(member, elem -> {
+                                ${C|}
+                            });
+                            ${memberName:L}(result);
+                        }""",
+                    symbolProvider.toSymbol(shape),
+                    new ReaderVisitor(shape.getMember(), "elem", schemaName + "_MEMBER", "result", "key")
                 );
             } else {
                 writer.write(
@@ -204,7 +204,13 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
         private final String result;
         private final String key;
 
-        private ReaderVisitor(MemberShape memberShape, String deserializer, String schemaName, String result, String key) {
+        private ReaderVisitor(
+            MemberShape memberShape,
+            String deserializer,
+            String schemaName,
+            String result,
+            String key
+        ) {
             this.deserializer = deserializer;
             this.memberShape = memberShape;
             this.schemaName = schemaName;
@@ -246,20 +252,20 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
             );
             writer.putContext("insideMap", model.expectShape(memberShape.getContainer()).isMapShape());
             writer.write(
-                    """
-                        $T ${result:L}Nested = new ${collectionImpl:T}<>();
-                        ${deserializer:L}.readList(${schemaName:L}, ${deserializer:L}l -> {
-                            ${result:L}Nested.add($C);
-                        });
-                        ${result:L}${?insideMap}.put(${key:L}, ${/insideMap}${^insideMap}.add(${/insideMap}${result:L}Nested);""",
-                    symbolProvider.toSymbol(listShape),
-                    new ReaderVisitor(
-                            listShape.getMember(),
-                            deserializer + "l",
-                            schemaName + "_MEMBER",
-                            result + "Nested",
-                            key + "Nested"
-                    )
+                """
+                    $T ${result:L}Nested = new ${collectionImpl:T}<>();
+                    ${deserializer:L}.readList(${schemaName:L}, ${deserializer:L}l -> {
+                        ${result:L}Nested.add($C);
+                    });
+                    ${result:L}${?insideMap}.put(${key:L}, ${/insideMap}${^insideMap}.add(${/insideMap}${result:L}Nested);""",
+                symbolProvider.toSymbol(listShape),
+                new ReaderVisitor(
+                    listShape.getMember(),
+                    deserializer + "l",
+                    schemaName + "_MEMBER",
+                    result + "Nested",
+                    key + "Nested"
+                )
             );
             writer.popState();
             return null;
@@ -269,26 +275,26 @@ record DeserializerGenerator(JavaWriter writer, Shape shape, SymbolProvider symb
         public Void mapShape(MapShape mapShape) {
             writer.pushState();
             writer.putContext(
-                    "collectionImpl",
-                    symbolProvider.toSymbol(mapShape)
-                            .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+                "collectionImpl",
+                symbolProvider.toSymbol(mapShape)
+                    .expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
             );
             writer.putContext("insideMap", model.expectShape(memberShape.getContainer()).isMapShape());
             writer.write(
-                    """
-                        $T ${result:L}Nested = new ${collectionImpl:T}<>();
-                        ${deserializer:L}.readStringMap(${schemaName:L}, (${key:L}Nested, ${deserializer:L}Val) -> {                           
-                            ${result:L}Nested.put(${key:L}Nested, $C);
-                        });
-                        ${result:L}${?insideMap}.put(${key:L}, ${/insideMap}${^insideMap}.add(${/insideMap}${result:L}Nested);""",
-                    symbolProvider.toSymbol(mapShape),
-                    new ReaderVisitor(
-                            mapShape.getValue(),
-                            deserializer + "Val",
-                            schemaName + "_VALUE",
-                            result + "Nested",
-                            key + "Nested"
-                    )
+                """
+                    $T ${result:L}Nested = new ${collectionImpl:T}<>();
+                    ${deserializer:L}.readStringMap(${schemaName:L}, (${key:L}Nested, ${deserializer:L}Val) -> {
+                        ${result:L}Nested.put(${key:L}Nested, $C);
+                    });
+                    ${result:L}${?insideMap}.put(${key:L}, ${/insideMap}${^insideMap}.add(${/insideMap}${result:L}Nested);""",
+                symbolProvider.toSymbol(mapShape),
+                new ReaderVisitor(
+                    mapShape.getValue(),
+                    deserializer + "Val",
+                    schemaName + "_VALUE",
+                    result + "Nested",
+                    key + "Nested"
+                )
             );
             writer.popState();
             return null;
