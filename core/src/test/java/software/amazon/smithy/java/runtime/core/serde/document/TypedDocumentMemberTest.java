@@ -38,7 +38,7 @@ public class TypedDocumentMemberTest {
             .build();
 
         SerializableShape serializableShape = encoder -> {
-            encoder.writeStruct(structSchema, s -> s.writeString(structSchema.member("foo"), "Hi"));
+            encoder.writeStruct(structSchema, structSchema, (schema, s) -> s.writeString(schema.member("foo"), "Hi"));
         };
 
         var document = Document.createTyped(serializableShape);
@@ -68,11 +68,11 @@ public class TypedDocumentMemberTest {
             .build();
 
         var document1 = Document.createTyped(encoder -> {
-            encoder.writeStruct(structSchema1, s -> s.writeString(structSchema1.member("foo"), "Hi"));
+            encoder.writeStruct(structSchema1, structSchema1, (schema, s) -> s.writeString(schema.member("foo"), "Hi"));
         });
 
         var document2 = Document.createTyped(encoder -> {
-            encoder.writeStruct(structSchema2, s -> s.writeInteger(structSchema2.member("foo"), 1));
+            encoder.writeStruct(structSchema2, structSchema2, (schema, s) -> s.writeInteger(schema.member("foo"), 1));
         });
 
         assertThat(document1.getMember("foo"), not(equalTo(null)));
@@ -106,7 +106,9 @@ public class TypedDocumentMemberTest {
             .members(SdkSchema.memberBuilder("a", targetSchema))
             .build();
         var document = Document.createTyped(encoder -> {
-            encoder.writeStruct(structSchema, s -> writer.accept(structSchema.member("a"), s));
+            encoder.writeStruct(structSchema, null, (ignoredValue, serializer) -> {
+                writer.accept(structSchema.member("a"), serializer);
+            });
         });
 
         assertThat(extractor.apply(document.getMember("a")), equalTo(value));
@@ -556,7 +558,8 @@ public class TypedDocumentMemberTest {
                 List.of(Document.createInteger(1)),
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeList(
                     schema,
-                    c -> c.writeInteger(PreludeSchemas.INTEGER, 1)
+                    null,
+                    (v, c) -> c.writeInteger(PreludeSchemas.INTEGER, 1)
                 ),
                 (Function<Document, Object>) d -> Document.createTyped(Document.createList(d.asList())).asList()
             ),
@@ -567,7 +570,13 @@ public class TypedDocumentMemberTest {
                 Map.of("a", Document.createInteger(1)),
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
                     schema,
-                    m -> m.writeEntry(schema.member("key"), "a", c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
+                    null,
+                    (mapValue, mapSerializer) -> mapSerializer.writeEntry(
+                        schema.member("key"),
+                        "a",
+                        null,
+                        (v, c) -> c.writeInteger(PreludeSchemas.INTEGER, 1)
+                    )
                 ),
                 (Function<Document, Object>) Document::asStringMap
             ),
@@ -578,7 +587,13 @@ public class TypedDocumentMemberTest {
                 Document.createInteger(1),
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeMap(
                     schema,
-                    m -> m.writeEntry(schema.member("key"), "a", c -> c.writeInteger(PreludeSchemas.INTEGER, 1))
+                    null,
+                    (mapState, m) -> m.writeEntry(
+                        schema.member("key"),
+                        "a",
+                        null,
+                        (v, c) -> c.writeInteger(PreludeSchemas.INTEGER, 1)
+                    )
                 ),
                 (Function<Document, Object>) d -> d.getMember("a")
             ),
@@ -595,9 +610,9 @@ public class TypedDocumentMemberTest {
                     .build(),
                 "b",
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> {
-                    s.writeStruct(schema, ser -> {
-                        ser.writeString(schema.member("foo"), "a");
-                        ser.writeString(schema.member("bar"), "b");
+                    s.writeStruct(schema, schema, (passedSchema, ser) -> {
+                        ser.writeString(passedSchema.member("foo"), "a");
+                        ser.writeString(passedSchema.member("bar"), "b");
                     });
                 },
                 (Function<Document, Object>) d -> d.getMember("bar").asString()

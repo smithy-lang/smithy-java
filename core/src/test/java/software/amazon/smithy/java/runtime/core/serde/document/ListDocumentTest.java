@@ -12,7 +12,7 @@ import static org.hamcrest.Matchers.is;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
@@ -53,9 +53,9 @@ public class ListDocumentTest {
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
-            public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+            public <T> void writeList(SdkSchema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
                 assertThat(schema.type(), equalTo(ShapeType.LIST));
-                consumer.accept(new SpecificShapeSerializer() {
+                consumer.accept(listState, new SpecificShapeSerializer() {
                     @Override
                     public void writeString(SdkSchema schema, String value) {
                         assertThat(schema, equalTo(PreludeSchemas.STRING));

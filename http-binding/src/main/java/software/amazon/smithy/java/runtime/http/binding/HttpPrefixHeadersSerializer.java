@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -20,26 +19,32 @@ import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
  */
 final class HttpPrefixHeadersSerializer extends SpecificShapeSerializer {
 
-    private final String prefix;
-    private final BiConsumer<String, String> headerConsumer;
+    private final PrefixHeadersMapSerializer prefixHeadersMapSerializer;
 
     HttpPrefixHeadersSerializer(String prefix, BiConsumer<String, String> headerConsumer) {
-        this.prefix = prefix;
-        this.headerConsumer = headerConsumer;
+        prefixHeadersMapSerializer = new PrefixHeadersMapSerializer(prefix, headerConsumer);
     }
 
     @Override
-    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
-        consumer.accept(new MapSerializer() {
-            @Override
-            public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
-                valueSerializer.accept(new SpecificShapeSerializer() {
-                    @Override
-                    public void writeString(SdkSchema schema, String value) {
-                        headerConsumer.accept(prefix + key, value);
-                    }
-                });
-            }
-        });
+    public <T> void writeMap(SdkSchema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {
+        consumer.accept(mapState, prefixHeadersMapSerializer);
+    }
+
+    private record PrefixHeadersMapSerializer(String prefix, BiConsumer<String, String> headerConsumer) implements
+        MapSerializer {
+        @Override
+        public <K> void writeEntry(
+            SdkSchema keySchema,
+            String key,
+            K keyState,
+            BiConsumer<K, ShapeSerializer> valueSerializer
+        ) {
+            valueSerializer.accept(keyState, new SpecificShapeSerializer() {
+                @Override
+                public void writeString(SdkSchema schema, String value) {
+                    headerConsumer.accept(prefix + key, value);
+                }
+            });
+        }
     }
 }

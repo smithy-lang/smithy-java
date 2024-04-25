@@ -88,13 +88,17 @@ public final class PutPersonImageInput implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            st.writeString(SCHEMA_NAME, name);
-            st.writeList(SCHEMA_TAGS, ser -> {
-                tags.forEach(tag -> ser.writeString(SCHEMA_TAGS, tag));
+        serializer.writeStruct(SCHEMA, this, (pojo, st) -> {
+            st.writeString(SCHEMA_NAME, pojo.name);
+            st.writeList(SCHEMA_TAGS, pojo.tags, (tags, ser) -> {
+                for (var tag : tags) {
+                    ser.writeString(SCHEMA_TAGS, tag);
+                }
             });
-            st.writeList(SCHEMA_MORE_TAGS, ser -> {
-                moreTags.forEach(tag -> ser.writeString(SCHEMA_MORE_TAGS, tag));
+            st.writeList(SCHEMA_MORE_TAGS, pojo.moreTags, (moreTags, ser) -> {
+                for (var tag : moreTags) {
+                    ser.writeString(SCHEMA_MORE_TAGS, tag);
+                }
             });
         });
     }

@@ -8,7 +8,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
@@ -32,17 +32,17 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeList(SdkSchema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public <T> void writeMap(SdkSchema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {
         throw throwForInvalidState(schema);
     }
 

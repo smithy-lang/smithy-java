@@ -117,20 +117,25 @@ public final class PutPersonInput implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            st.writeString(SCHEMA_NAME, name);
-            st.writeInteger(SCHEMA_AGE, age);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BIRTHDAY, birthday);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_FAVORITE_COLOR, favoriteColor);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BINARY, binary);
-            if (!queryParams.isEmpty()) {
-                st.writeMap(SCHEMA_QUERY_PARAMS, m -> {
+        serializer.writeStruct(SCHEMA, this, (pojo, st) -> {
+            st.writeString(SCHEMA_NAME, pojo.name);
+            st.writeInteger(SCHEMA_AGE, pojo.age);
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_BIRTHDAY, pojo.birthday);
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_FAVORITE_COLOR, pojo.favoriteColor);
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_BINARY, pojo.binary);
+            if (!pojo.queryParams.isEmpty()) {
+                st.writeMap(SCHEMA_QUERY_PARAMS, pojo.queryParams, (queryParams, m) -> {
                     var key = SharedSchemas.MAP_LIST_STRING.member("key");
-                    queryParams.forEach((k, v) -> m.writeEntry(key, k, mv -> {
-                        mv.writeList(SharedSchemas.MAP_LIST_STRING.member("value"), mvl -> {
-                            v.forEach(value -> mvl.writeString(SharedSchemas.LIST_OF_STRING.member("member"), value));
+                    for (var entry : queryParams.entrySet()) {
+                        m.writeEntry(key, entry.getKey(), entry.getValue(), (value, mv) -> {
+                            mv.writeList(SharedSchemas.MAP_LIST_STRING.member("value"), value, (listValue, mvl) -> {
+                                var listValueMemberSchema = SharedSchemas.LIST_OF_STRING.member("member");
+                                for (var listValueElement : listValue) {
+                                    mvl.writeString(listValueMemberSchema, listValueElement);
+                                }
+                            });
                         });
-                    }));
+                    }
                 });
             }
         });

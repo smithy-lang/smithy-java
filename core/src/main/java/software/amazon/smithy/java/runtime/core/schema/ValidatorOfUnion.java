@@ -8,7 +8,7 @@ package software.amazon.smithy.java.runtime.core.schema;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -25,9 +25,13 @@ final class ValidatorOfUnion implements ShapeSerializer {
         this.validator = validator;
     }
 
-    static void validate(Validator.ShapeValidator validator, Consumer<ShapeSerializer> consumer) {
+    static <T> void validate(
+        Validator.ShapeValidator validator,
+        T unionState,
+        BiConsumer<T, ShapeSerializer> consumer
+    ) {
         var unionValidator = new ValidatorOfUnion(validator);
-        consumer.accept(unionValidator);
+        consumer.accept(unionState, unionValidator);
         if (unionValidator.setMember == null) {
             validator.addError(
                 new ValidationError.UnionValidationFailure(validator.createPath(), "No member is set in the union")
@@ -173,28 +177,28 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeList(SdkSchema member, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeList(SdkSchema member, T state, BiConsumer<T, ShapeSerializer> consumer) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
-            validator.writeList(member, consumer);
+            validator.writeList(member, state, consumer);
         }
         validator.popPath();
     }
 
     @Override
-    public void writeMap(SdkSchema member, Consumer<MapSerializer> consumer) {
+    public <T> void writeMap(SdkSchema member, T state, BiConsumer<T, MapSerializer> consumer) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
-            validator.writeMap(member, consumer);
+            validator.writeMap(member, state, consumer);
         }
         validator.popPath();
     }
 
     @Override
-    public void writeStruct(SdkSchema member, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeStruct(SdkSchema member, T structState, BiConsumer<T, ShapeSerializer> consumer) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
-            validator.writeStruct(member, consumer);
+            validator.writeStruct(member, structState, consumer);
         }
         validator.popPath();
     }

@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.core.testmodels;
 
 import java.math.BigDecimal;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
@@ -44,6 +45,7 @@ public final class ValidatedPojo implements SerializableShape {
     private final String string;
     private final int integer;
     private final Integer boxedInteger;
+    private final InnerSerializer innerSerializer = new InnerSerializer();
 
     private ValidatedPojo(Builder builder) {
         this.string = builder.string;
@@ -74,11 +76,16 @@ public final class ValidatedPojo implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_STRING, string);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BOXED_INTEGER, boxedInteger);
-            st.writeInteger(SCHEMA_INTEGER, integer);
-        });
+        serializer.writeStruct(SCHEMA, this, innerSerializer);
+    }
+
+    private static final class InnerSerializer implements BiConsumer<ValidatedPojo, ShapeSerializer> {
+        @Override
+        public void accept(ValidatedPojo pojo, ShapeSerializer st) {
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_STRING, pojo.string);
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_BOXED_INTEGER, pojo.boxedInteger);
+            st.writeInteger(SCHEMA_INTEGER, pojo.integer);
+        }
     }
 
     public static final class Builder implements SdkShapeBuilder<ValidatedPojo> {
