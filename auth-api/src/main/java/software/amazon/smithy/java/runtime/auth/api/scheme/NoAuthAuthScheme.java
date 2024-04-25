@@ -18,7 +18,7 @@ import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
 
     public static NoAuthAuthScheme INSTANCE = new NoAuthAuthScheme();
-    private static final IdentityResolver<Identity> ANONYMOUS_IDENTITY_RESOLVER = new AnonymousIdentityResolver();
+    private static final IdentityResolver<Identity> NULL_IDENTITY_RESOLVER = new NullIdentityResolver();
 
     private NoAuthAuthScheme() {}
 
@@ -42,11 +42,11 @@ final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
      * {@link Identity}, independent of what resolvers are provided.
      *
      * @param resolvers Resolver repository.
-     * @return An identity provider that unconditionally returns an anonymous identity.
+     * @return An identity provider that unconditionally returns an empty identity.
      */
     @Override
     public Optional<IdentityResolver<Identity>> identityResolver(IdentityResolvers resolvers) {
-        return Optional.of(ANONYMOUS_IDENTITY_RESOLVER);
+        return Optional.of(NULL_IDENTITY_RESOLVER);
     }
 
     @Override
@@ -54,12 +54,12 @@ final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
         return Signer.nullSigner();
     }
 
-    private static class AnonymousIdentityResolver implements IdentityResolver<Identity> {
-        public static final Identity ANONYMOUS_IDENTITY = new Identity() {};
+    private static class NullIdentityResolver implements IdentityResolver<Identity> {
+        public static final Identity NULL_IDENTITY = new Identity() {};
 
         @Override
         public Identity resolveIdentity(AuthProperties requestProperties) {
-            return ANONYMOUS_IDENTITY;
+            return NULL_IDENTITY;
         }
 
         @Override

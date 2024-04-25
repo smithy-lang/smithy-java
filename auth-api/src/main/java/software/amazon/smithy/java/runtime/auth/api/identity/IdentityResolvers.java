@@ -44,6 +44,7 @@ public interface IdentityResolvers {
         }
 
         return new IdentityResolvers() {
+            @SuppressWarnings("unchecked")
             @Override
             public <T extends Identity> IdentityResolver<T> identityResolver(Class<T> identityClass) {
                 return (IdentityResolver<T>) result.get(identityClass);
