@@ -207,13 +207,18 @@ final class JsonDocument implements Document {
             case BLOB -> encoder.writeBlob(schema, asBlob());
             case TIMESTAMP -> encoder.writeTimestamp(schema, asTimestamp());
             case DOCUMENT -> encoder.writeDocument(this);
-            case MAP -> encoder.writeMap(schema, mapSerializer -> {
-                for (var entry : asStringMap().entrySet()) {
-                    mapSerializer.writeEntry(STRING_MAP_KEY, entry.getKey(), c -> entry.getValue().serialize(c));
+            case MAP -> encoder.writeMap(schema, asStringMap(), (stringMap, mapSerializer) -> {
+                for (var entry : stringMap.entrySet()) {
+                    mapSerializer.writeEntry(
+                        STRING_MAP_KEY,
+                        entry.getKey(),
+                        entry.getValue(),
+                        Document::serializeContents
+                    );
                 }
             });
-            case LIST -> encoder.writeList(schema, c -> {
-                for (Document entry : asList()) {
+            case LIST -> encoder.writeList(schema, asList(), (list, c) -> {
+                for (Document entry : list) {
                     entry.serialize(c);
                 }
             });

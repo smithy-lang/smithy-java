@@ -71,13 +71,13 @@ public class ToStringSerializerTest {
             .build();
 
         var str = ToStringSerializer.serialize(e -> {
-            e.writeStruct(schema, ser -> {
-                ser.writeMap(schema.member("foo"), map -> {
-                    map.writeEntry(mapSchema.member("key"), "a", ms -> {
-                        ms.writeString(mapSchema.member("value"), "hi");
+            e.writeStruct(schema, null, (ignored, ser) -> {
+                ser.writeMap(schema.member("foo"), mapSchema, (innerMapSchema, map) -> {
+                    map.writeEntry(innerMapSchema.member("key"), "a", innerMapSchema, (mapSchema2, ms) -> {
+                        ms.writeString(mapSchema2.member("value"), "hi");
                     });
-                    map.writeEntry(mapSchema.member("key"), "b", ms -> {
-                        ms.writeNull(mapSchema.member("value"));
+                    map.writeEntry(innerMapSchema.member("key"), "b", innerMapSchema, (mapSchema2, ms) -> {
+                        ms.writeNull(mapSchema2.member("value"));
                     });
                 });
             });
@@ -100,8 +100,8 @@ public class ToStringSerializerTest {
             .build();
 
         var str = ToStringSerializer.serialize(e -> {
-            e.writeStruct(schema, ser -> {
-                ser.writeBlob(schema.member("foo"), "abc".getBytes(StandardCharsets.UTF_8));
+            e.writeStruct(schema, schema.member("foo"), (member, ser) -> {
+                ser.writeBlob(member, "abc".getBytes(StandardCharsets.UTF_8));
             });
         });
 

@@ -11,7 +11,7 @@ import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -54,21 +54,21 @@ class JsonStructSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
+    public <T> void writeStruct(SdkSchema member, T structState, BiConsumer<T, ShapeSerializer> memberWriter) {
         startMember(member);
-        memberWriter.accept(this);
+        memberWriter.accept(structState, this);
     }
 
     @Override
-    public void writeList(SdkSchema member, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeList(SdkSchema member, T listState, BiConsumer<T, ShapeSerializer> consumer) {
         startMember(member);
-        consumer.accept(parent);
+        consumer.accept(listState, parent);
     }
 
     @Override
-    public void writeMap(SdkSchema member, Consumer<MapSerializer> consumer) {
+    public <T> void writeMap(SdkSchema member, T mapState, BiConsumer<T, MapSerializer> consumer) {
         startMember(member);
-        parent.writeMap(member, consumer);
+        parent.writeMap(member, mapState, consumer);
     }
 
     @Override

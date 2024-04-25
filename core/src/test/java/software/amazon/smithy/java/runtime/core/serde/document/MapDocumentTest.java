@@ -12,7 +12,7 @@ import static org.hamcrest.Matchers.is;
 
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
@@ -59,13 +59,18 @@ public class MapDocumentTest {
         var keys = new ArrayList<>();
         map.serializeContents(new SpecificShapeSerializer() {
             @Override
-            public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+            public <T> void writeMap(SdkSchema schema, T state, BiConsumer<T, MapSerializer> consumer) {
                 assertThat(schema.type(), equalTo(ShapeType.MAP));
-                consumer.accept(new MapSerializer() {
+                consumer.accept(state, new MapSerializer() {
                     @Override
-                    public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
+                    public <K> void writeEntry(
+                        SdkSchema keySchema,
+                        String key,
+                        K mapState,
+                        BiConsumer<K, ShapeSerializer> valueSerializer
+                    ) {
                         keys.add(key);
-                        valueSerializer.accept(new SpecificShapeSerializer() {
+                        valueSerializer.accept(mapState, new SpecificShapeSerializer() {
                             @Override
                             public void writeInteger(SdkSchema schema, int value) {
                                 assertThat(schema, equalTo(PreludeSchemas.INTEGER));

@@ -73,10 +73,10 @@ public final class UnvalidatedPojo implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_STRING, string);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BOXED_INTEGER, boxedInteger);
-            st.writeInteger(SCHEMA_INTEGER, integer);
+        serializer.writeStruct(SCHEMA, this, (pojo, st) -> {
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_STRING, pojo.string);
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_BOXED_INTEGER, pojo.boxedInteger);
+            st.writeInteger(SCHEMA_INTEGER, pojo.integer);
         });
     }
 

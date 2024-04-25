@@ -48,8 +48,8 @@ public final class Bird implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            st.writeString(SCHEMA_NAME, name);
+        serializer.writeStruct(SCHEMA, this, (pojo, structSerializer) -> {
+            structSerializer.writeString(SCHEMA_NAME, pojo.name);
         });
     }
 

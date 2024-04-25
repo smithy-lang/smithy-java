@@ -10,7 +10,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -24,13 +23,12 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 public interface ShapeSerializer extends Flushable {
 
     /**
-     * Create a ShapeSerializer that sends all write calls to a singular consumer that can delegate and replay writes.
+     * Create a serializer that serializes nothing.
      *
-     * @param delegatingConsumer Consumer that receives each schema and a consumer that will write if invoked.
-     * @return the created ShapeSerializer.
+     * @return the null serializer.
      */
-    static ShapeSerializer ofDelegatingConsumer(BiConsumer<SdkSchema, Consumer<ShapeSerializer>> delegatingConsumer) {
-        return new ConsolidatedSerializer(delegatingConsumer);
+    static ShapeSerializer nullSerializer() {
+        return NullSerializer.INSTANCE;
     }
 
     @Override
@@ -42,26 +40,29 @@ public interface ShapeSerializer extends Flushable {
      * <p>Each shape written to the given consumer <em>must</em> use a schema that has a member name.
      * The member name is used to write field names.
      *
-     * @param schema   Schema to serialize.
-     * @param consumer Receives the struct serializer and writes members.
+     * @param schema      Schema to serialize.
+     * @param structState State to pass into the consumer.
+     * @param consumer    Receives the struct serializer and writes members.
      */
-    void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer);
+    <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer);
 
     /**
      * Begin a list and write zero or more values into it using the provided serializer.
      *
-     * @param schema   List schema.
-     * @param consumer Received in the context of the list and writes zero or more values.
+     * @param schema    List schema.
+     * @param listState State to pass into the consumer.
+     * @param consumer  Received in the context of the list and writes zero or more values.
      */
-    void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer);
+    <T> void writeList(SdkSchema schema, T listState, BiConsumer<T, ShapeSerializer> consumer);
 
     /**
      * Begin a map and write zero or more entries into it using the provided serializer.
      *
      * @param schema   List schema.
+     * @param mapState State to pass into the consumer.
      * @param consumer Received in the context of the map and writes zero or more entries.
      */
-    void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer);
+    <T> void writeMap(SdkSchema schema, T mapState, BiConsumer<T, MapSerializer> consumer);
 
     /**
      * Serialize a boolean.

@@ -10,7 +10,6 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
@@ -29,8 +28,8 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-        consumer.accept(new ListSerializer(this, position -> {}));
+    public <T> void writeList(SdkSchema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
+        consumer.accept(listState, new ListSerializer(this, position -> {}));
     }
 
     void writeHeader(SdkSchema schema, Supplier<String> supplier) {

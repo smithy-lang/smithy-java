@@ -63,8 +63,8 @@ public final class GetPersonImageOutput implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_NAME, name);
+        serializer.writeStruct(SCHEMA, this, (pojo, st) -> {
+            ShapeSerializer.writeIfNotNull(st, SCHEMA_NAME, pojo.name);
         });
     }
 

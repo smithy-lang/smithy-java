@@ -16,6 +16,7 @@ import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
@@ -63,6 +64,9 @@ public final class Person implements SerializableShape {
             SCHEMA_QUERY_PARAMS
         )
         .build();
+    private static final SdkSchema SCHEMA_QUERY_PARAMS_KEY = SharedSchemas.MAP_LIST_STRING.member("key");
+    private static final SdkSchema SCHEMA_QUERY_PARAMS_VALUE = SharedSchemas.MAP_LIST_STRING.member("value");
+    private static final SdkSchema LIST_OF_STRING_MEMBER = SharedSchemas.LIST_OF_STRING.member("member");
 
     private final String name;
     private final int age;
@@ -111,28 +115,38 @@ public final class Person implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            st.writeString(SCHEMA_NAME, name);
-            st.writeInteger(SCHEMA_AGE, age);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_FAVORITE_COLOR, favoriteColor);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BINARY, binary);
-            if (!queryParams.isEmpty()) {
-                st.writeMap(SCHEMA_QUERY_PARAMS, m -> {
-                    var keyMember = SharedSchemas.MAP_LIST_STRING.member("key");
-                    var valueMember = SharedSchemas.MAP_LIST_STRING.member("value");
-                    for (var queryParamsEntry : queryParams.entrySet()) {
-                        m.writeEntry(keyMember, queryParamsEntry.getKey(), mv -> {
-                            mv.writeList(valueMember, mvl -> {
-                                var LIST_OF_STRING_member = SharedSchemas.LIST_OF_STRING.member("member");
-                                for (var queryParamsEntryValue : queryParamsEntry.getValue()) {
-                                    mvl.writeString(LIST_OF_STRING_member, queryParamsEntryValue);
-                                }
-                            });
-                        });
-                    }
-                });
-            }
-        });
+        serializer.writeStruct(SCHEMA, this, Person::writeShape);
+    }
+
+    private static void writeShape(Person shape, ShapeSerializer serializer) {
+        serializer.writeString(SCHEMA_NAME, shape.name);
+        serializer.writeInteger(SCHEMA_AGE, shape.age);
+        ShapeSerializer.writeIfNotNull(serializer, SCHEMA_FAVORITE_COLOR, shape.favoriteColor);
+        ShapeSerializer.writeIfNotNull(serializer, SCHEMA_BINARY, shape.binary);
+        if (!shape.queryParams.isEmpty()) {
+            serializer.writeMap(SCHEMA_QUERY_PARAMS, shape, Person::writeQueryParamsMember);
+        }
+    }
+
+    private static void writeQueryParamsMember(Person shape, MapSerializer serializer) {
+        for (var queryParamsEntry : shape.queryParams.entrySet()) {
+            serializer.writeEntry(
+                SCHEMA_QUERY_PARAMS_KEY,
+                queryParamsEntry.getKey(),
+                queryParamsEntry.getValue(),
+                Person::writeQueryParamsMemberEntry
+            );
+        }
+    }
+
+    private static void writeQueryParamsMemberEntry(List<String> values, ShapeSerializer serializer) {
+        serializer.writeList(SCHEMA_QUERY_PARAMS_VALUE, values, Person::writeQueryParamsMemberEntryElement);
+    }
+
+    private static void writeQueryParamsMemberEntryElement(List<String> listValue, ShapeSerializer serializer) {
+        for (var queryParamsEntryValue : listValue) {
+            serializer.writeString(LIST_OF_STRING_MEMBER, queryParamsEntryValue);
+        }
     }
 
     public static final class Builder implements SdkShapeBuilder<Person> {

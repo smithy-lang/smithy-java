@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
@@ -158,10 +158,10 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
         try {
             stream.writeObjectStart();
-            consumer.accept(new JsonStructSerializer(this, stream, useJsonName));
+            consumer.accept(structState, new JsonStructSerializer(this, stream, useJsonName));
             stream.writeObjectEnd();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -169,10 +169,10 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeList(SdkSchema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
         try {
             stream.writeArrayStart();
-            consumer.accept(new ListSerializer(this, this::writeComma));
+            consumer.accept(listState, new ListSerializer(this, this::writeComma));
             stream.writeArrayEnd();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -190,10 +190,10 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public <T> void writeMap(SdkSchema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {
         try {
             stream.writeObjectStart();
-            consumer.accept(new JsonMapSerializer(this, stream));
+            consumer.accept(mapState, new JsonMapSerializer(this, stream));
             stream.writeObjectEnd();
         } catch (IOException e) {
             throw new UncheckedIOException(e);

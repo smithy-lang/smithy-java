@@ -43,8 +43,8 @@ public final class ValidationError extends ModeledSdkException {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            st.writeString(SCHEMA_MESSAGE, getMessage());
+        serializer.writeStruct(SCHEMA, this, (pojo, st) -> {
+            st.writeString(SCHEMA_MESSAGE, pojo.getMessage());
         });
     }
 

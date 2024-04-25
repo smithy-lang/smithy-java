@@ -12,6 +12,7 @@ import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
@@ -40,6 +41,7 @@ public final class PojoWithValidatedCollection implements SerializableShape {
         .id(ID)
         .traits(new RequiredTrait())
         .build();
+    private static final SdkSchema SCHEMA_MAP_KEY = SCHEMA_MAP.member("key");
     private static final SdkSchema SCHEMA_LIST = SdkSchema
         .memberBuilder("list", LIST_OF_VALIDATED_POJO)
         .id(ID)
@@ -78,19 +80,24 @@ public final class PojoWithValidatedCollection implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            st.writeList(SCHEMA_LIST, ser -> {
-                for (var entry : list) {
-                    entry.serialize(ser);
-                }
-            });
-            st.writeMap(SCHEMA_MAP, ser -> {
-                var keyMember = SCHEMA_MAP.member("key");
-                for (var entry : map.entrySet()) {
-                    ser.writeEntry(keyMember, entry.getKey(), entry.getValue()::serialize);
-                }
-            });
-        });
+        serializer.writeStruct(SCHEMA, this, PojoWithValidatedCollection::writeShape);
+    }
+
+    private static void writeShape(PojoWithValidatedCollection shape, ShapeSerializer st) {
+        st.writeList(SCHEMA_LIST, shape, PojoWithValidatedCollection::writeListMember);
+        st.writeMap(SCHEMA_MAP, shape, PojoWithValidatedCollection::writeMapMember);
+    }
+
+    private static void writeListMember(PojoWithValidatedCollection shape, ShapeSerializer ser) {
+        for (var entry : shape.list) {
+            entry.serialize(ser);
+        }
+    }
+
+    private static void writeMapMember(PojoWithValidatedCollection shape, MapSerializer ser) {
+        for (var entry : shape.map.entrySet()) {
+            ser.writeEntry(SCHEMA_MAP_KEY, entry.getKey(), entry.getValue(), ValidatedPojo::serialize);
+        }
     }
 
     public static final class Builder implements SdkShapeBuilder<PojoWithValidatedCollection> {

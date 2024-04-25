@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
@@ -207,7 +207,7 @@ public final class Validator {
         }
 
         @Override
-        public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+        public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
             // Track the current schema and count.
             var previousSchema = currentSchema;
             var previousCount = elementCount;
@@ -215,8 +215,8 @@ public final class Validator {
             elementCount = 0; // note that we don't track the count of structure members.
 
             switch (schema.type()) {
-                case STRUCTURE -> ValidatorOfStruct.validate(this, schema, consumer);
-                case UNION -> ValidatorOfUnion.validate(this, consumer);
+                case STRUCTURE -> ValidatorOfStruct.validate(this, schema, structState, consumer);
+                case UNION -> ValidatorOfUnion.validate(this, structState, consumer);
                 default -> checkType(schema, ShapeType.STRUCTURE); // Schema / shape mis-match.
             }
 
@@ -225,7 +225,7 @@ public final class Validator {
         }
 
         @Override
-        public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+        public <T> void writeList(SdkSchema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
             checkType(schema, ShapeType.LIST);
 
             // Track the current schema and count.
@@ -237,7 +237,7 @@ public final class Validator {
             // Push a preliminary value of 0 even if there are no elements. Subsequent elements will swap this
             // path segment with the next index (e.g., 1, then 2, etc).
             pushPath(0);
-            consumer.accept(listValidator);
+            consumer.accept(state, listValidator);
             popPath();
 
             // Grab the count and reset the schema and count.
@@ -268,7 +268,7 @@ public final class Validator {
         }
 
         @Override
-        public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+        public <T> void writeMap(SdkSchema schema, T state, BiConsumer<T, MapSerializer> consumer) {
             checkType(schema, ShapeType.MAP);
 
             // Track the current schema and count.
@@ -281,7 +281,7 @@ public final class Validator {
             // has values. If empty, no errors are created and segment is ignored. If not empty, then this null
             // segment is swapped with the appropriate map key prior to nested validation.
             pushPath(null);
-            consumer.accept(this);
+            consumer.accept(state, this);
             popPath();
 
             // Grab the count and reset the schema and count.
@@ -453,11 +453,16 @@ public final class Validator {
         // MapSerializer implementation.
 
         @Override
-        public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
+        public <T> void writeEntry(
+            SdkSchema keySchema,
+            String key,
+            T state,
+            BiConsumer<T, ShapeSerializer> valueSerializer
+        ) {
             elementCount++;
             swapPath(key);
             writeString(keySchema, key);
-            valueSerializer.accept(this);
+            valueSerializer.accept(state, this);
         }
 
         private void validateStringEnumValues(String value, Set<String> allowedValues) {
