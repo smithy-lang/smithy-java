@@ -65,7 +65,7 @@ public final class StructureGenerator
                 new EqualsGenerator(writer, directive.shape(), directive.symbolProvider()),
                 new HashCodeGenerator(writer, directive.shape(), directive.symbolProvider()),
                 new SerializerGenerator(writer),
-                new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model())
+                new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.service())
             );
             writer.popState();
         });

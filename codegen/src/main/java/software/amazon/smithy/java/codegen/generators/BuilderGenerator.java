@@ -18,6 +18,7 @@ import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
+import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.*;
@@ -33,12 +34,20 @@ final class BuilderGenerator implements Runnable {
     private final Shape shape;
     private final SymbolProvider symbolProvider;
     private final Model model;
+    private final ServiceShape service;
 
-    public BuilderGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) {
+    public BuilderGenerator(
+        JavaWriter writer,
+        Shape shape,
+        SymbolProvider symbolProvider,
+        Model model,
+        ServiceShape service
+    ) {
         this.writer = writer;
         this.shape = shape;
         this.symbolProvider = symbolProvider;
         this.model = model;
+        this.service = service;
     }
 
     @Override
@@ -70,10 +79,50 @@ final class BuilderGenerator implements Runnable {
             SdkShapeBuilder.class,
             (Runnable) this::builderProperties,
             (Runnable) this::builderSetters,
-            new DeserializerGenerator(writer, shape, symbolProvider, model)
+            (Runnable) this::deserializerMethod
         );
     }
 
+    public void deserializerMethod() {
+        writer.pushState();
+        writer.putContext("hasMembers", !shape.members().isEmpty());
+        writer.write(
+            """
+                @Override
+                public Builder deserialize($T decoder) {
+                    decoder.readStruct(SCHEMA, (member, de) -> {
+                        ${?hasMembers}switch (member.memberIndex()) {
+                            ${C|}
+                        }${/hasMembers}
+                    });
+                    return this;
+                }""",
+            ShapeDeserializer.class,
+            (Runnable) this::generateMemberSwitchCases
+        );
+        writer.popState();
+    }
+
+    private void generateMemberSwitchCases() {
+        int idx = 0;
+        for (var iter = shape.members().iterator(); iter.hasNext(); idx++) {
+            var member = iter.next();
+            var target = model.expectShape(member.getTarget());
+            if (SymbolUtils.isStreamingBlob(target)) {
+                // Streaming blobs are not deserialized by the builder class.
+                continue;
+            }
+
+            writer.pushState();
+            writer.putContext("memberName", symbolProvider.toMemberName(member));
+            writer.write(
+                "case $L -> ${memberName:L}($C);",
+                idx,
+                new DeserializerGenerator(writer, member, symbolProvider, model, service, "de", "member")
+            );
+            writer.popState();
+        }
+    }
 
     // Adds builder properties and initializers
     private void builderProperties() {

@@ -151,9 +151,9 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
     public Void memberShape(MemberShape shape) {
         var target = model.expectShape(shape.getTarget());
         writer.write(
-            "${schemaClass:T}.memberBuilder($1S, $2C)${3C}",
+            "${schemaClass:T}.memberBuilder($1S, $2L)${3C}",
             symbolProvider.toMemberName(shape),
-            writer.consumer(w -> SchemaUtils.writeSchemaType(w, symbolProvider, target)),
+            SchemaUtils.getSchemaType(writer, symbolProvider, target),
             new TraitInitializerGenerator(writer, shape, context.runtimeTraits())
         );
         return null;
@@ -164,13 +164,13 @@ final class SchemaGenerator extends ShapeVisitor.Default<Void> implements Runnab
         var target = model.expectShape(member.getTarget());
         writer.write(
             """
-                private static final ${schemaClass:T} $1L = ${schemaClass:T}.memberBuilder($2S, $3C)
+                private static final ${schemaClass:T} $1L = ${schemaClass:T}.memberBuilder($2S, $3L)
                     .id(ID)${4C}
                     .build();
                 """,
             SchemaUtils.toMemberSchemaName(memberName),
             memberName,
-            writer.consumer(w -> SchemaUtils.writeSchemaType(w, symbolProvider, target)),
+            SchemaUtils.getSchemaType(writer, symbolProvider, target),
             new TraitInitializerGenerator(writer, member, context.runtimeTraits())
         );
 

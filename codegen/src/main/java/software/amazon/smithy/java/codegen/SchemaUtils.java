@@ -54,15 +54,14 @@ public final class SchemaUtils {
      * @param writer Writer to use for writing the Schema type.
      * @param shape shape to write Schema type for.
      */
-    public static void writeSchemaType(JavaWriter writer, SymbolProvider provider, Shape shape) {
+    public static String getSchemaType(JavaWriter writer, SymbolProvider provider, Shape shape) {
         if (Prelude.isPreludeShape(shape)) {
-            writer.write("$T.$L", PreludeSchemas.class, shape.getType().name());
+            return writer.format("$T.$L", PreludeSchemas.class, shape.getType().name());
         } else if (shape.isStructureShape() || shape.isUnionShape()) {
             // Shapes that generate a class have their schemas as static properties on that class
-            writer.write("$T.$L", provider.toSymbol(shape), toSchemaName(shape));
-        } else {
-            writer.write("SharedSchemas.$L", toSchemaName(shape));
+            return writer.format("$T.$L", provider.toSymbol(shape), toSchemaName(shape));
         }
+        return writer.format("SharedSchemas.$L", toSchemaName(shape));
     }
 
     private SchemaUtils() {}
