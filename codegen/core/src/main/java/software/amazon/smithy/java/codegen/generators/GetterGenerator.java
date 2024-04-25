@@ -7,8 +7,8 @@ package software.amazon.smithy.java.codegen.generators;
 
 import java.util.Collections;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.SymbolProperties;
-import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.Model;
@@ -68,7 +68,7 @@ final class GetterGenerator implements Runnable {
         protected Void getDefault(Shape shape) {
             // If the member is not required then prefer the boxed type
             writer.pushState(new GetterSection(member));
-            writer.putContext("isNullable", SymbolUtils.isNullableMember(member));
+            writer.putContext("isNullable", CodegenUtils.isNullableMember(member));
             writer.write(
                 """
                     public ${?isNullable}$1T${/isNullable}${^isNullable}$1B${/isNullable} $2L() {
@@ -99,7 +99,7 @@ final class GetterGenerator implements Runnable {
             writer.pushState(new GetterSection(member));
             var shapeSymbol = symbolProvider.toSymbol(shape);
             // If the collection is nullable use an empty collection if null
-            if (SymbolUtils.isNullableMember(member)) {
+            if (CodegenUtils.isNullableMember(member)) {
                 writer.write(
                     """
                         public $1T $2L() {

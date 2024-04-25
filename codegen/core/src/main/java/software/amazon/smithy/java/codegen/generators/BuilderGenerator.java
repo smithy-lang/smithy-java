@@ -13,11 +13,12 @@ import java.util.Collection;
 import java.util.Collections;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.SymbolProperties;
-import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
+import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.*;
@@ -33,16 +34,29 @@ final class BuilderGenerator implements Runnable {
     private final Shape shape;
     private final SymbolProvider symbolProvider;
     private final Model model;
+    private final ServiceShape service;
 
-    public BuilderGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) {
+    public BuilderGenerator(
+        JavaWriter writer,
+        Shape shape,
+        SymbolProvider symbolProvider,
+        Model model,
+        ServiceShape service
+    ) {
         this.writer = writer;
         this.shape = shape;
         this.symbolProvider = symbolProvider;
         this.model = model;
+        this.service = service;
     }
 
     @Override
     public void run() {
+        writer.pushState();
+        writer.putContext("hasMembers", !shape.members().isEmpty());
+        writer.putContext("shape", symbolProvider.toSymbol(shape));
+        writer.putContext("sdkShapeBuilder", SdkShapeBuilder.class);
+        writer.putContext("shapeDeserializer", ShapeDeserializer.class);
         writer.write(
             """
                 public static Builder builder() {
@@ -50,36 +64,64 @@ final class BuilderGenerator implements Runnable {
                 }
 
                 /**
-                 * Builder for {@link $1T}.
+                 * Builder for {@link ${shape:T}}.
                  */
-                public static final class Builder implements $2T<$1T> {
-                    ${3C|}
+                public static final class Builder implements ${sdkShapeBuilder:T}<${shape:T}> {
+                    ${C|}
 
                     private Builder() {}
 
-                    ${4C|}
+                    ${C|}
 
                     @Override
-                    public $1T build() {
-                        return new $1T(this);
+                    public ${shape:T} build() {
+                        return new ${shape:T}(this);
                     }
 
-                    ${5C|}
+                    @Override
+                    public Builder deserialize(${shapeDeserializer:T} decoder) {
+                        decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
+                            ${?hasMembers}switch (member.memberIndex()) {
+                                ${C|}
+                            }${/hasMembers}
+                        });
+                        return this;
+                    }
                 }""",
-            symbolProvider.toSymbol(shape),
-            SdkShapeBuilder.class,
+
             (Runnable) this::builderProperties,
             (Runnable) this::builderSetters,
-            new DeserializerGenerator(writer, shape, symbolProvider, model)
+            (Runnable) this::generateMemberSwitchCases
         );
+        writer.popState();
     }
 
+    private void generateMemberSwitchCases() {
+        int idx = 0;
+        for (var iter = shape.members().iterator(); iter.hasNext(); idx++) {
+            var member = iter.next();
+            var target = model.expectShape(member.getTarget());
+            if (CodegenUtils.isStreamingBlob(target)) {
+                // Streaming blobs are not deserialized by the builder class.
+                continue;
+            }
+
+            writer.pushState();
+            writer.putContext("memberName", symbolProvider.toMemberName(member));
+            writer.write(
+                "case $L -> builder.${memberName:L}($C);",
+                idx,
+                new DeserializerGenerator(writer, member, symbolProvider, model, service, "de", "member")
+            );
+            writer.popState();
+        }
+    }
 
     // Adds builder properties and initializers
     private void builderProperties() {
         var defaultVisitor = new DefaultInitializerGenerator(writer, model, symbolProvider);
         for (var member : shape.members()) {
-            if (SymbolUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {
+            if (CodegenUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {
                 // Streaming blobs need a custom initializer
                 writer.write(
                     "private $1T $2L = $1T.ofEmpty();",
@@ -89,7 +131,7 @@ final class BuilderGenerator implements Runnable {
                 continue;
             }
             writer.pushState();
-            writer.putContext("isNullable", SymbolUtils.isNullableMember(member));
+            writer.putContext("isNullable", CodegenUtils.isNullableMember(member));
             writer.putContext("default", member.hasNonNullDefault());
             defaultVisitor.member = member;
             writer.write(
@@ -143,7 +185,7 @@ final class BuilderGenerator implements Runnable {
 
             // If streaming blob then a setter must be added to allow
             // operation to set on builder.
-            if (SymbolUtils.isStreamingBlob(shape)) {
+            if (CodegenUtils.isStreamingBlob(shape)) {
                 writer.write("""
                     @Override
                     public void setDataStream($T stream) {
@@ -291,7 +333,7 @@ final class BuilderGenerator implements Runnable {
         private MemberShape member;
         private Node defaultValue;
 
-        public DefaultInitializerGenerator(
+        DefaultInitializerGenerator(
             JavaWriter writer,
             Model model,
             SymbolProvider symbolProvider

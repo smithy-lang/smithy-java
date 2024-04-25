@@ -7,8 +7,8 @@ package software.amazon.smithy.java.codegen.generators;
 
 import java.util.Collections;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.SymbolProperties;
-import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.MemberShape;
@@ -62,7 +62,7 @@ final class ConstructorGenerator implements Runnable {
     }
 
     private void writeMemberInitializer(MemberShape member, String memberName) {
-        if (SymbolUtils.isNullableMember(member) || SymbolUtils.targetsCollection(model, member)) {
+        if (CodegenUtils.isNullableMember(member) || CodegenUtils.targetsCollection(model, member)) {
             writer.write("this.$L = $L;", memberName, getBuilderValue(member, memberName));
         } else {
             writer.write(
@@ -80,7 +80,7 @@ final class ConstructorGenerator implements Runnable {
         if (memberSymbol.getProperty(SymbolProperties.COLLECTION_COPY_METHOD).isEmpty()) {
             return writer.format("builder.$L", memberName);
         }
-        if (SymbolUtils.isNullableMember(member)) {
+        if (CodegenUtils.isNullableMember(member)) {
             return writer.format(
                 "builder.$1L != null ? $2T.$3L(builder.$1L) : null",
                 memberName,

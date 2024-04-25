@@ -9,7 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.codegen.core.SymbolProvider;
-import software.amazon.smithy.java.codegen.SymbolUtils;
+import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 
@@ -41,7 +41,7 @@ final class HashCodeGenerator implements Runnable {
     private void generate() {
         List<String> arrayMemberNames = shape.members()
             .stream()
-            .filter(member -> SymbolUtils.isJavaArray(symbolProvider.toSymbol(member)))
+            .filter(member -> CodegenUtils.isJavaArray(symbolProvider.toSymbol(member)))
             .map(symbolProvider::toMemberName)
             .toList();
         List<String> objectMemberNames = shape.members()

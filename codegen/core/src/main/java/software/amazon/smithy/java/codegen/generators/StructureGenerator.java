@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.directed.GenerateStructureDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -12,6 +13,7 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -24,9 +26,18 @@ public final class StructureGenerator
 
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
+            writer.putContext("shape", directive.symbol());
+            writer.putContext("serializable", SerializableShape.class);
+            writer.putContext("biConsumer", BiConsumer.class);
+            writer.putContext("serializer", ShapeSerializer.class);
             writer.write(
                 """
-                    public final class $T implements $T {
+                    public final class ${shape:T} implements ${serializable:T} {
+                        ${C|}
+
+                        ${C|}
+
+                        private static final InnerSerializer INNER_SERIALIZER = new InnerSerializer();
                         ${C|}
 
                         ${C|}
@@ -39,17 +50,21 @@ public final class StructureGenerator
 
                         ${C|}
 
-                        ${C|}
+                        @Override
+                        public void serialize(${serializer:T} serializer) {
+                            serializer.writeStruct(SCHEMA, this, INNER_SERIALIZER);
+                        }
 
-                        ${C|}
-
-                        ${C|}
+                        private static final class InnerSerializer implements ${biConsumer:T}<${shape:T}, ${serializer:T}> {
+                            @Override
+                            public void accept(${shape:T} shape, ${serializer:T} serializer) {
+                                ${C|}
+                            }
+                        }
 
                         ${C|}
                     }
                     """,
-                directive.symbol(),
-                SerializableShape.class,
                 writer.consumer(w -> w.writeIdString(shape)),
                 new SchemaGenerator(
                     writer,
@@ -64,8 +79,14 @@ public final class StructureGenerator
                 writer.consumer(JavaWriter::writeToString),
                 new EqualsGenerator(writer, directive.shape(), directive.symbolProvider()),
                 new HashCodeGenerator(writer, directive.shape(), directive.symbolProvider()),
-                new SerializerGenerator(writer),
-                new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model())
+                new SerializerGenerator(
+                    writer,
+                    directive.symbolProvider(),
+                    directive.model(),
+                    directive.shape(),
+                    directive.service()
+                ),
+                new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.service())
             );
             writer.popState();
         });

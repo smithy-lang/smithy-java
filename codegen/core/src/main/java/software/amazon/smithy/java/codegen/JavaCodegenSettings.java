@@ -14,6 +14,9 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.IoUtils;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
+/**
+ * Settings for {@link JavaCodegenPlugin}.
+ */
 @SmithyUnstableApi
 public final class JavaCodegenSettings {
     private static final System.Logger LOGGER = System.getLogger(JavaCodegenSettings.class.getName());
@@ -60,7 +63,7 @@ public final class JavaCodegenSettings {
         return header;
     }
 
-    private String getHeader(String headerFile, String sourceLocation) {
+    private static String getHeader(String headerFile, String sourceLocation) {
         if (headerFile == null) {
             return null;
         }

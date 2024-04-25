@@ -10,9 +10,9 @@ import java.util.function.BiFunction;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolReference;
 import software.amazon.smithy.codegen.core.SymbolWriter;
+import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
-import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -143,12 +143,11 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
     private final class JavaTypeFormatter implements BiFunction<Object, String, String> {
         @Override
         public String apply(Object type, String indent) {
-
             Symbol typeSymbol;
             if (type instanceof Symbol s) {
                 typeSymbol = s;
             } else if (type instanceof Class<?> c) {
-                typeSymbol = SymbolUtils.fromClass(c);
+                typeSymbol = CodegenUtils.fromClass(c);
             } else if (type instanceof SymbolReference r) {
                 typeSymbol = r.getSymbol();
             } else {
@@ -196,7 +195,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
             if (type instanceof Symbol s) {
                 typeSymbol = s;
             } else if (type instanceof Class<?> c) {
-                typeSymbol = SymbolUtils.fromClass(c);
+                typeSymbol = CodegenUtils.fromClass(c);
             } else if (type instanceof SymbolReference r) {
                 typeSymbol = r.getSymbol();
             } else {

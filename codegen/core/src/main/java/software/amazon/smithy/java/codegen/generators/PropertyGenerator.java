@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.codegen.core.SymbolProvider;
-import software.amazon.smithy.java.codegen.SymbolUtils;
+import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.traits.ErrorTrait;
@@ -35,7 +35,7 @@ final class PropertyGenerator implements Runnable {
                 continue;
             }
             writer.pushState();
-            writer.putContext("isNullable", SymbolUtils.isNullableMember(member));
+            writer.putContext("isNullable", CodegenUtils.isNullableMember(member));
             writer.write(
                 "private final ${?isNullable}$1B${/isNullable}${^isNullable}$1T${/isNullable} $2L;",
                 symbolProvider.toSymbol(member),

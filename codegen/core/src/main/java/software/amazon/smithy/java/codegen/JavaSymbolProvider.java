@@ -79,24 +79,24 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
     public String toMemberName(MemberShape shape) {
         Shape containerShape = model.expectShape(shape.getContainer());
         if (containerShape.isEnumShape() || containerShape.isIntEnumShape()) {
-            return CaseUtils.toSnakeCase(SymbolUtils.MEMBER_ESCAPER.escape(shape.getMemberName()))
+            return CaseUtils.toSnakeCase(CodegenUtils.MEMBER_ESCAPER.escape(shape.getMemberName()))
                 .toUpperCase(Locale.ENGLISH);
         }
 
         // If a member name contains an underscore, convert to camel case
         if (shape.getMemberName().contains("_")) {
-            return SymbolUtils.MEMBER_ESCAPER.escape(CaseUtils.toCamelCase(shape.getMemberName()));
+            return CodegenUtils.MEMBER_ESCAPER.escape(CaseUtils.toCamelCase(shape.getMemberName()));
         }
 
-        return SymbolUtils.MEMBER_ESCAPER.escape(shape.getMemberName());
+        return CodegenUtils.MEMBER_ESCAPER.escape(shape.getMemberName());
     }
 
     @Override
     public Symbol blobShape(BlobShape blobShape) {
         if (blobShape.hasTrait(StreamingTrait.class)) {
-            return SymbolUtils.fromClass(DataStream.class);
+            return CodegenUtils.fromClass(DataStream.class);
         }
-        return SymbolUtils.fromClass(byte[].class)
+        return CodegenUtils.fromClass(byte[].class)
             .toBuilder()
             .putProperty(SymbolProperties.IS_JAVA_ARRAY, true)
             .putProperty(SymbolProperties.IS_PRIMITIVE, true)
@@ -105,14 +105,14 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
     @Override
     public Symbol booleanShape(BooleanShape booleanShape) {
-        return SymbolUtils.fromBoxedClass(boolean.class, Boolean.class);
+        return CodegenUtils.fromBoxedClass(boolean.class, Boolean.class);
     }
 
     @Override
     public Symbol listShape(ListShape listShape) {
         // Lists with unique Items are treated as Sequenced Sets
         if (listShape.hasTrait(UniqueItemsTrait.class)) {
-            return SymbolUtils.fromClass(Set.class)
+            return CodegenUtils.fromClass(Set.class)
                 .toBuilder()
                 .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableSet")
                 .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashSet.class)
@@ -120,7 +120,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
                 .addReference(listShape.getMember().accept(this))
                 .build();
         }
-        return SymbolUtils.fromClass(List.class)
+        return CodegenUtils.fromClass(List.class)
             .toBuilder()
             .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableList")
             .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, ArrayList.class)
@@ -131,7 +131,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
     @Override
     public Symbol mapShape(MapShape mapShape) {
-        return SymbolUtils.fromClass(Map.class)
+        return CodegenUtils.fromClass(Map.class)
             .toBuilder()
             .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableMap")
             .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashMap.class)
@@ -143,17 +143,17 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
     @Override
     public Symbol byteShape(ByteShape byteShape) {
-        return SymbolUtils.fromBoxedClass(byte.class, Byte.class);
+        return CodegenUtils.fromBoxedClass(byte.class, Byte.class);
     }
 
     @Override
     public Symbol shortShape(ShortShape shortShape) {
-        return SymbolUtils.fromBoxedClass(short.class, Short.class);
+        return CodegenUtils.fromBoxedClass(short.class, Short.class);
     }
 
     @Override
     public Symbol integerShape(IntegerShape integerShape) {
-        return SymbolUtils.fromBoxedClass(int.class, Integer.class);
+        return CodegenUtils.fromBoxedClass(int.class, Integer.class);
     }
 
     @Override
@@ -163,42 +163,42 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
     @Override
     public Symbol longShape(LongShape longShape) {
-        return SymbolUtils.fromBoxedClass(long.class, Long.class);
+        return CodegenUtils.fromBoxedClass(long.class, Long.class);
     }
 
     @Override
     public Symbol floatShape(FloatShape floatShape) {
-        return SymbolUtils.fromBoxedClass(float.class, Float.class);
+        return CodegenUtils.fromBoxedClass(float.class, Float.class);
     }
 
     @Override
     public Symbol documentShape(DocumentShape documentShape) {
-        return SymbolUtils.fromClass(Document.class);
+        return CodegenUtils.fromClass(Document.class);
     }
 
     @Override
     public Symbol doubleShape(DoubleShape doubleShape) {
-        return SymbolUtils.fromBoxedClass(double.class, Double.class);
+        return CodegenUtils.fromBoxedClass(double.class, Double.class);
     }
 
     @Override
     public Symbol bigIntegerShape(BigIntegerShape bigIntegerShape) {
-        return SymbolUtils.fromClass(BigIntegerShape.class);
+        return CodegenUtils.fromClass(BigIntegerShape.class);
     }
 
     @Override
     public Symbol bigDecimalShape(BigDecimalShape bigDecimalShape) {
-        return SymbolUtils.fromClass(BigDecimalShape.class);
+        return CodegenUtils.fromClass(BigDecimalShape.class);
     }
 
     @Override
     public Symbol timestampShape(TimestampShape timestampShape) {
-        return SymbolUtils.fromClass(Instant.class);
+        return CodegenUtils.fromClass(Instant.class);
     }
 
     @Override
     public Symbol stringShape(StringShape stringShape) {
-        return SymbolUtils.fromClass(String.class);
+        return CodegenUtils.fromClass(String.class);
     }
 
     @Override
@@ -248,7 +248,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
 
 
     private Symbol getJavaClassSymbol(Shape shape) {
-        String name = SymbolUtils.getDefaultName(shape, service);
+        String name = CodegenUtils.getDefaultName(shape, service);
         return Symbol.builder()
             .name(name)
             .putProperty(SymbolProperties.IS_PRIMITIVE, false)

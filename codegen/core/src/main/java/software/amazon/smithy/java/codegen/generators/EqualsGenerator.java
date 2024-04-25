@@ -9,8 +9,8 @@ package software.amazon.smithy.java.codegen.generators;
 import java.util.Arrays;
 import java.util.Objects;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.SymbolProperties;
-import software.amazon.smithy.java.codegen.SymbolUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 
@@ -68,10 +68,10 @@ final class EqualsGenerator implements Runnable {
             var memberSymbol = symbolProvider.toSymbol(member);
 
             // Use `==` instead of `equals` for unboxed primitives
-            if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE) && !SymbolUtils.isNullableMember(member)) {
+            if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE) && !CodegenUtils.isNullableMember(member)) {
                 writer.writeInline("$1L == that.$1L", symbolProvider.toMemberName(member));
             } else {
-                Class<?> comparator = SymbolUtils.isJavaArray(memberSymbol)
+                Class<?> comparator = CodegenUtils.isJavaArray(memberSymbol)
                     ? Arrays.class
                     : Objects.class;
                 writer.writeInline("$1T.equals($2L, that.$2L)", comparator, symbolProvider.toMemberName(member));
