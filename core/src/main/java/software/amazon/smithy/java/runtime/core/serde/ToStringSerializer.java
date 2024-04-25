@@ -8,8 +8,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
@@ -22,7 +21,6 @@ import software.amazon.smithy.model.traits.SensitiveTrait;
 public final class ToStringSerializer implements ShapeSerializer {
 
     private final StringBuilder builder = new StringBuilder();
-    private String indentString = "";
 
     public static String serialize(SerializableShape shape) {
         ToStringSerializer serializer = new ToStringSerializer();
@@ -30,169 +28,150 @@ public final class ToStringSerializer implements ShapeSerializer {
         return serializer.toString();
     }
 
-    private ToStringSerializer append(SdkSchema schema, String value) {
-        if (value == null) {
-            append("null");
-        }
-        if (schema != null && schema.hasTrait(SensitiveTrait.class)) {
-            builder.append("(redacted)");
-        } else {
-            append(value);
-        }
-        return this;
-    }
-
-    private ToStringSerializer append(char value) {
-        builder.append(value);
-        if (value == '\n') {
-            builder.append(indentString);
-        }
-        return this;
-    }
-
-    private ToStringSerializer append(String value) {
-        builder.append(Objects.requireNonNullElse(value, "null"));
-        return this;
-    }
-
-    private ToStringSerializer appendStringWithPotentialNewlines(SdkSchema schema, String value) {
-        if (value == null) {
-            append("null");
-            return this;
-        } else {
-            value = value.replace(System.lineSeparator(), System.lineSeparator() + indentString);
-            return append(schema, value);
-        }
-    }
-
-    private ToStringSerializer indent() {
-        indentString += "    ";
-        return this;
-    }
-
-    private ToStringSerializer dedent() {
-        indentString = indentString.substring(4);
-        return this;
-    }
-
     @Override
     public String toString() {
         return builder.toString().trim();
     }
 
+    private void append(SdkSchema schema, Object value) {
+        if (schema.hasTrait(SensitiveTrait.class)) {
+            builder.append("*REDACTED*");
+        } else {
+            builder.append(value);
+        }
+    }
+
     @Override
     public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-        append(schema.id().toString()).append(':').indent().append(System.lineSeparator());
-        consumer.accept(ShapeSerializer.ofDelegatingConsumer((member, memberWriter) -> {
-            append(member.memberName()).append(": ");
-            memberWriter.accept(this);
-            append(System.lineSeparator());
-        }));
-        dedent().append(System.lineSeparator());
+        builder.append(schema.id().getName()).append('[');
+        consumer.accept(ShapeSerializer.ofDelegatingConsumer(new StructureMemberWriter()));
+        builder.append(']');
+    }
+
+    private final class StructureMemberWriter implements BiConsumer<SdkSchema, Consumer<ShapeSerializer>> {
+        private boolean isFirst = true;
+
+        @Override
+        public void accept(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
+            if (!isFirst) {
+                builder.append(", ");
+            } else {
+                isFirst = false;
+            }
+            builder.append(member.memberName()).append('=');
+            memberWriter.accept(ToStringSerializer.this);
+        }
     }
 
     @Override
     public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
-        indent();
+        builder.append('[');
         consumer.accept(new ListSerializer(this, this::writeComma));
-        dedent();
+        builder.append(']');
     }
 
     private void writeComma(int position) {
         if (position > 0) {
-            append(',').append(System.lineSeparator());
+            builder.append(", ");
         }
     }
 
     @Override
     public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
-        indent();
-        append(System.lineSeparator());
-
+        builder.append('{');
         consumer.accept(new MapSerializer() {
+            private boolean isFirst = true;
+
             @Override
             public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
-                writeString(schema.member("key"), key);
-                append(": ");
+                if (!isFirst) {
+                    builder.append(", ");
+                } else {
+                    isFirst = false;
+                }
+                append(keySchema, key);
+                builder.append('=');
                 valueSerializer.accept(ToStringSerializer.this);
-                append(System.lineSeparator());
             }
         });
-
-        dedent();
+        builder.append('}');
     }
 
     @Override
     public void writeBoolean(SdkSchema schema, boolean value) {
-        append(schema, Boolean.toString(value));
+        append(schema, value);
     }
 
     @Override
     public void writeShort(SdkSchema schema, short value) {
-        append(schema, Short.toString(value));
+        append(schema, value);
     }
 
     @Override
     public void writeByte(SdkSchema schema, byte value) {
-        append(schema, Byte.toString(value));
+        append(schema, value);
     }
 
     @Override
     public void writeInteger(SdkSchema schema, int value) {
-        append(schema, Integer.toString(value));
+        append(schema, value);
     }
 
     @Override
     public void writeLong(SdkSchema schema, long value) {
-        append(schema, Long.toString(value));
+        append(schema, value);
     }
 
     @Override
     public void writeFloat(SdkSchema schema, float value) {
-        append(schema, Float.toString(value));
+        builder.append(value);
     }
 
     @Override
     public void writeDouble(SdkSchema schema, double value) {
-        append(schema, Double.toString(value));
+        append(schema, value);
     }
 
     @Override
     public void writeBigInteger(SdkSchema schema, BigInteger value) {
-        append(schema, value.toString());
+        append(schema, value);
     }
 
     @Override
     public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
-        append(schema, value.toString());
+        append(schema, value);
     }
 
     @Override
     public void writeString(SdkSchema schema, String value) {
-        appendStringWithPotentialNewlines(schema, value);
+        append(schema, value);
     }
 
     @Override
     public void writeBlob(SdkSchema schema, byte[] value) {
-        append(schema, Base64.getEncoder().encodeToString(value));
+        if (schema.hasTrait(SensitiveTrait.class)) {
+            append(schema, value);
+        } else {
+            for (var b : value) {
+                builder.append(Integer.toHexString(b));
+            }
+        }
     }
 
     @Override
     public void writeTimestamp(SdkSchema schema, Instant value) {
-        append(schema, TimestampFormatter.Prelude.DATE_TIME.formatToString(value));
+        append(schema, value);
     }
 
     @Override
     public void writeDocument(SdkSchema schema, Document value) {
-        append("Document (" + value.type()).append("):");
-        indent();
-        append(System.lineSeparator());
+        builder.append(value.type()).append('.').append("Document[");
         value.serializeContents(this);
-        dedent();
+        builder.append(']');
     }
 
     @Override
     public void writeNull(SdkSchema schema) {
-        append(schema, "null");
+        builder.append("null");
     }
 }
