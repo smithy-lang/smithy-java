@@ -15,13 +15,11 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
-import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -245,14 +243,14 @@ final class JsonDocument implements Document {
         }
 
         @Override
-        public void readStruct(SdkSchema schema, BiConsumer<SdkSchema, ShapeDeserializer> eachEntry) {
+        public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
             for (var member : schema.members()) {
                 var jsonName = member.hasTrait(JsonNameTrait.class)
                     ? member.getTrait(JsonNameTrait.class).getValue()
                     : member.memberName();
                 var value = getMember(jsonName);
                 if (value != null) {
-                    eachEntry.accept(member, new DocumentDeserializer(value));
+                    structMemberConsumer.accept(state, member, new DocumentDeserializer(value));
                 }
             }
         }

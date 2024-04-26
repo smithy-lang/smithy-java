@@ -49,8 +49,7 @@ public final class PutPersonImageOutput implements SerializableShape {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct(SCHEMA, (member, de) -> {
-            });
+            decoder.readStruct(SCHEMA, this, (builder, member, de) -> {});
             return this;
         }
     }

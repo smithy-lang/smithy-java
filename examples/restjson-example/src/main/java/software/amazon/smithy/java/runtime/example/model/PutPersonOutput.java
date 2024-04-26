@@ -141,13 +141,13 @@ public final class PutPersonOutput implements SerializableShape {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct(SCHEMA, (member, de) -> {
+            decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
                 switch (member.memberIndex()) {
-                    case 0 -> name(de.readString(member));
-                    case 1 -> favoriteColor(de.readString(member));
-                    case 2 -> age(de.readInteger(member));
-                    case 3 -> birthday(de.readTimestamp(member));
-                    case 4 -> status(de.readInteger(member));
+                    case 0 -> builder.name(de.readString(member));
+                    case 1 -> builder.favoriteColor(de.readString(member));
+                    case 2 -> builder.age(de.readInteger(member));
+                    case 3 -> builder.birthday(de.readTimestamp(member));
+                    case 4 -> builder.status(de.readInteger(member));
                 }
             });
             return this;

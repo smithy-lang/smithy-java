@@ -6,11 +6,9 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.net.http.HttpHeaders;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
@@ -64,16 +62,20 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     @Override
-    public void readStruct(SdkSchema schema, BiConsumer<SdkSchema, ShapeDeserializer> eachEntry) {
-        List<String> bodyMembers = new ArrayList<>();
+    public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
+        BodyMembersList<T> bodyMembers = new BodyMembersList<>(state, structMemberConsumer);
 
         // First parse members in the framing.
         for (SdkSchema member : schema.members()) {
             switch (bindingMatcher.match(member)) {
                 case LABEL -> throw new UnsupportedOperationException("httpLabel binding not supported yet");
                 case QUERY -> throw new UnsupportedOperationException("httpQuery binding not supported yet");
-                case HEADER -> headers.firstValue(bindingMatcher.header())
-                    .ifPresent(headerValue -> eachEntry.accept(member, new HttpHeaderDeserializer(headerValue)));
+                case HEADER -> {
+                    var headerValue = headers.firstValue(bindingMatcher.header()).orElse(null);
+                    if (headerValue != null) {
+                        structMemberConsumer.accept(state, member, new HttpHeaderDeserializer(headerValue));
+                    }
+                }
                 case BODY -> bodyMembers.add(member.id().getName());
                 case PAYLOAD -> {
                     if (member.memberTarget().type() == ShapeType.STRUCTURE) {
@@ -90,7 +92,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                             schema,
                             payloadCodec.getMediaType()
                         );
-                        eachEntry.accept(member, payloadCodec.createDeserializer(bytes));
+                        structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bytes));
                     } else if (member.memberTarget().type() == ShapeType.BLOB) {
                         // Set the payload on shape builder directly. This will fail for misconfigured shapes.
                         shapeBuilder.setDataStream(body);
@@ -112,9 +114,9 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 schema,
                 payloadCodec.getMediaType()
             );
-            payloadCodec.createDeserializer(bytes).readStruct(schema, (m, de) -> {
-                if (!bodyMembers.contains(m.id().getName())) {
-                    eachEntry.accept(m, de);
+            payloadCodec.createDeserializer(bytes).readStruct(schema, bodyMembers, (body, m, de) -> {
+                if (!body.contains(m.id().getName())) {
+                    body.structMemberConsumer.accept(body.state, m, de);
                 }
             });
             LOGGER.log(
@@ -123,6 +125,20 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 schema,
                 payloadCodec.getMediaType()
             );
+        }
+    }
+
+    /**
+     * Data class that contains the set of members that need to be serialized in the body, and the delegated
+     * deserializer and state to invoke when found.
+     */
+    private static final class BodyMembersList<T> extends HashSet<String> {
+        private final StructMemberConsumer<T> structMemberConsumer;
+        private final T state;
+
+        BodyMembersList(T state, StructMemberConsumer<T> structMemberConsumer) {
+            this.state = state;
+            this.structMemberConsumer = structMemberConsumer;
         }
     }
 
