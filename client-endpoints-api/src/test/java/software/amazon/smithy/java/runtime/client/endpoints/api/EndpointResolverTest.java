@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.endpointprovider;
+package software.amazon.smithy.java.runtime.client.endpoints.api;
 
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.runtime.api.Endpoint;
-import software.amazon.smithy.java.runtime.api.EndpointResolver;
-import software.amazon.smithy.java.runtime.api.EndpointResolverRequest;
+import software.amazon.smithy.java.runtime.client.endpoints.api.Endpoint;
+import software.amazon.smithy.java.runtime.client.endpoints.api.EndpointResolver;
+import software.amazon.smithy.java.runtime.client.endpoints.api.EndpointResolverRequest;
 
 public class EndpointResolverTest {
     @Test

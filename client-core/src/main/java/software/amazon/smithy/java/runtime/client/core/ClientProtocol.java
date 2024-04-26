@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.client.core;
 
 import java.net.URI;
-import software.amazon.smithy.java.runtime.api.Endpoint;
+import software.amazon.smithy.java.runtime.client.endpoints.api.Endpoint;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.SdkException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;

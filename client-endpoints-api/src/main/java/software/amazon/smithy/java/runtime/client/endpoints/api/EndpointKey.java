@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.api;
+package software.amazon.smithy.java.runtime.client.endpoints.api;
 
 import java.util.Objects;
 

@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.runtime.client.http;
 
 import java.net.http.HttpHeaders;
-import software.amazon.smithy.java.runtime.api.EndpointKey;
-import software.amazon.smithy.java.runtime.api.EndpointResolver;
+import software.amazon.smithy.java.runtime.client.endpoints.api.EndpointKey;
+import software.amazon.smithy.java.runtime.client.endpoints.api.EndpointResolver;
 
 public final class HttpEndpointKeys {
 
