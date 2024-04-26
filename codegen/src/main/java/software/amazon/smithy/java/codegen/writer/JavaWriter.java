@@ -198,7 +198,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
             };
 
             if (typeSymbol.getProperty(SymbolProperties.BOXED_TYPE).isPresent()) {
-                typeSymbol = typeSymbol.expectProperty(SymbolProperties.BOXED_TYPE, Symbol.class);
+                typeSymbol = typeSymbol.expectProperty(SymbolProperties.BOXED_TYPE);
             }
 
             return javaTypeFormatter.apply(typeSymbol, indent);

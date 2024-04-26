@@ -85,13 +85,13 @@ final class ConstructorGenerator implements Runnable {
                 "builder.$1L != null ? $2T.$3L(builder.$1L) : null",
                 memberName,
                 Collections.class,
-                memberSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD, String.class)
+                memberSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD)
             );
         }
         return writer.format(
             "$T.$L(builder.$L)",
             Collections.class,
-            memberSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD, String.class),
+            memberSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD),
             memberName
         );
     }

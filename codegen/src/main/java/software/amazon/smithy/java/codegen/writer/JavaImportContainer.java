@@ -28,7 +28,7 @@ final class JavaImportContainer implements ImportContainer {
     public void importSymbol(Symbol symbol, String s) {
         // Do not import primitive types, java.lang standard library imports,
         // or any symbols already in the same namespace.
-        if (symbol.expectProperty(SymbolProperties.PRIMITIVE, Boolean.class)
+        if (symbol.expectProperty(SymbolProperties.IS_PRIMITIVE)
             || symbol.getNamespace().startsWith("java.lang")
             || symbol.getNamespace().equals(namespace)
         ) {

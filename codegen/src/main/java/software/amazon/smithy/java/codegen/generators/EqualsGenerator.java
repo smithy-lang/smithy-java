@@ -68,9 +68,7 @@ final class EqualsGenerator implements Runnable {
             var memberSymbol = symbolProvider.toSymbol(member);
 
             // Use `==` instead of `equals` for unboxed primitives
-            if (memberSymbol.expectProperty(SymbolProperties.PRIMITIVE, Boolean.class)
-                && !SymbolUtils.isNullableMember(member)
-            ) {
+            if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE) && !SymbolUtils.isNullableMember(member)) {
                 writer.writeInline("$1L == that.$1L", symbolProvider.toMemberName(member));
             } else {
                 Class<?> comparator = SymbolUtils.isJavaArray(memberSymbol)

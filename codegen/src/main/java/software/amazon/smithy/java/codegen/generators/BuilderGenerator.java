@@ -172,7 +172,7 @@ final class BuilderGenerator implements Runnable {
             writer.pushState();
             writer.putContext(
                 "collectionImpl",
-                memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+                memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
             );
             writer.putContext("memberName", memberName);
             writer.putContext("targetSymbol", symbolProvider.toSymbol(shape.getMember()));
@@ -242,7 +242,7 @@ final class BuilderGenerator implements Runnable {
             writer.putContext("symbol", symbolProvider.toSymbol(shape));
             writer.putContext(
                 "collectionImpl",
-                memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, Class.class)
+                memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
             );
             writer.putContext("keySymbol", symbolProvider.toSymbol(shape.getKey()));
             writer.putContext("valueSymbol", symbolProvider.toSymbol(shape.getValue()));

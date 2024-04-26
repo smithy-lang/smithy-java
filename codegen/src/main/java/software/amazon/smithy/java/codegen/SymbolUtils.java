@@ -43,7 +43,7 @@ public final class SymbolUtils {
         return Symbol.builder()
             .name(clazz.getSimpleName())
             .namespace(clazz.getCanonicalName().replace("." + clazz.getSimpleName(), ""), ".")
-            .putProperty(SymbolProperties.PRIMITIVE, clazz.isPrimitive())
+            .putProperty(SymbolProperties.IS_PRIMITIVE, clazz.isPrimitive())
             .build();
     }
 
@@ -56,7 +56,7 @@ public final class SymbolUtils {
      */
     public static Symbol fromBoxedClass(Class<?> unboxed, Class<?> boxed) {
         return fromClass(unboxed).toBuilder()
-            .putProperty(SymbolProperties.PRIMITIVE, true)
+            .putProperty(SymbolProperties.IS_PRIMITIVE, true)
             .putProperty(SymbolProperties.BOXED_TYPE, fromClass(boxed))
             .build();
     }

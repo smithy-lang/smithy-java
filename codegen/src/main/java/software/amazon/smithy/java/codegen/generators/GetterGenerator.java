@@ -109,7 +109,7 @@ final class GetterGenerator implements Runnable {
                     shapeSymbol,
                     symbolProvider.toMemberName(member),
                     Collections.class,
-                    shapeSymbol.expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, String.class)
+                    shapeSymbol.expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)
                 );
             } else {
                 writer.write(

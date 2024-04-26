@@ -99,7 +99,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
         return SymbolUtils.fromClass(byte[].class)
             .toBuilder()
             .putProperty(SymbolProperties.IS_JAVA_ARRAY, true)
-            .putProperty(SymbolProperties.PRIMITIVE, true)
+            .putProperty(SymbolProperties.IS_PRIMITIVE, true)
             .build();
     }
 
@@ -251,7 +251,7 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
         String name = SymbolUtils.getDefaultName(shape, service);
         return Symbol.builder()
             .name(name)
-            .putProperty(SymbolProperties.PRIMITIVE, false)
+            .putProperty(SymbolProperties.IS_PRIMITIVE, false)
             .namespace(format("%s.model", packageNamespace), ".")
             .declarationFile(format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name))
             .build();
