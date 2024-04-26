@@ -10,8 +10,6 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
@@ -107,17 +105,17 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public void readStruct(SdkSchema schema, BiConsumer<SdkSchema, ShapeDeserializer> eachEntry) {
+    public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         throw new UnsupportedOperationException("Structures are not supported in HTTP header bindings");
     }
 
     @Override
-    public void readList(SdkSchema schema, Consumer<ShapeDeserializer> eachElement) {
+    public <T> void readList(SdkSchema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
         throw new UnsupportedOperationException("List header support not yet implemented");
     }
 
     @Override
-    public void readStringMap(SdkSchema schema, BiConsumer<String, ShapeDeserializer> eachEntry) {
+    public <T> void readStringMap(SdkSchema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
         throw new UnsupportedOperationException("List map support not yet implemented");
     }
 }

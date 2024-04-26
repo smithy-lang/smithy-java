@@ -108,11 +108,11 @@ public final class UnvalidatedPojo implements SerializableShape {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct(SCHEMA, (member, de) -> {
+            decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
                 switch (member.memberIndex()) {
-                    case 0 -> string(de.readString(member));
-                    case 1 -> boxedInteger(de.readInteger(member));
-                    case 2 -> integer(de.readInteger(member));
+                    case 0 -> builder.string(de.readString(member));
+                    case 1 -> builder.boxedInteger(de.readInteger(member));
+                    case 2 -> builder.integer(de.readInteger(member));
                     default -> {
                         // TODO: Log periodically
                     }

@@ -8,8 +8,6 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 
@@ -102,27 +100,27 @@ public class DocumentDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public void readStruct(SdkSchema schema, BiConsumer<SdkSchema, ShapeDeserializer> eachEntry) {
+    public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         for (var memberSchema : schema.members()) {
             var memberValue = value.getMember(memberSchema.memberName());
             if (memberValue != null) {
-                eachEntry.accept(memberSchema, deserializer(memberValue));
+                structMemberConsumer.accept(state, memberSchema, deserializer(memberValue));
             }
         }
     }
 
     @Override
-    public void readList(SdkSchema schema, Consumer<ShapeDeserializer> eachElement) {
+    public <T> void readList(SdkSchema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
         for (var element : value.asList()) {
-            eachElement.accept(deserializer(element));
+            listMemberConsumer.accept(state, deserializer(element));
         }
     }
 
     @Override
-    public void readStringMap(SdkSchema schema, BiConsumer<String, ShapeDeserializer> eachEntry) {
+    public <T> void readStringMap(SdkSchema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
         var map = value.asStringMap();
         for (var entry : map.entrySet()) {
-            eachEntry.accept(entry.getKey(), deserializer(entry.getValue()));
+            mapMemberConsumer.accept(state, entry.getKey(), deserializer(entry.getValue()));
         }
     }
 }
