@@ -11,20 +11,20 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Encapsulates endpoint provider request parameters.
+ * Encapsulates endpoint resolver request parameters.
  */
-public final class EndpointProviderRequest {
+public final class EndpointResolverRequest {
 
     private final String operationName;
     private final Map<EndpointKey<?>, Object> immutableMap;
 
-    private EndpointProviderRequest(Map<EndpointKey<?>, Object> map, String operationName) {
+    private EndpointResolverRequest(Map<EndpointKey<?>, Object> map, String operationName) {
         this.immutableMap = new HashMap<>(map);
         this.operationName = Objects.requireNonNull(operationName, "operationName is null");
     }
 
     /**
-     * Create a new EndpointProviderRequest.
+     * Create a new {@link EndpointResolverRequest}.
      *
      * @return the created request.
      */
@@ -69,7 +69,7 @@ public final class EndpointProviderRequest {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        EndpointProviderRequest request = (EndpointProviderRequest) o;
+        EndpointResolverRequest request = (EndpointResolverRequest) o;
         return Objects.equals(operationName, request.operationName)
             && Objects.equals(immutableMap, request.immutableMap);
     }
@@ -92,7 +92,7 @@ public final class EndpointProviderRequest {
     }
 
     /**
-     * Builder used to create and EndpointProviderRequest.
+     * Builder used to create and {@link EndpointResolverRequest}.
      */
     public static final class Builder {
 
@@ -103,8 +103,8 @@ public final class EndpointProviderRequest {
          * Build the request.
          * @return the built request.
          */
-        public EndpointProviderRequest build() {
-            return new EndpointProviderRequest(map, operationName);
+        public EndpointResolverRequest build() {
+            return new EndpointResolverRequest(map, operationName);
         }
 
         /**

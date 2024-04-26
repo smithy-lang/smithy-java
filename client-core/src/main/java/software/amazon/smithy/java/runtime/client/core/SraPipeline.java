@@ -10,7 +10,7 @@ import java.net.URISyntaxException;
 import java.util.Optional;
 import java.util.function.Function;
 import software.amazon.smithy.java.runtime.api.Endpoint;
-import software.amazon.smithy.java.runtime.api.EndpointProviderRequest;
+import software.amazon.smithy.java.runtime.api.EndpointResolverRequest;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
@@ -260,7 +260,7 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     // TODO: Add more parameters here somehow from the caller.
     private <I extends SerializableShape, O extends SerializableShape> Endpoint resolveEndpoint(ClientCall<I, O> call) {
         var operation = call.operation().schema();
-        var request = EndpointProviderRequest.builder().operationName(operation.id().getName()).build();
+        var request = EndpointResolverRequest.builder().operationName(operation.id().getName()).build();
         return call.endpointProvider().resolveEndpoint(request);
     }
 }
