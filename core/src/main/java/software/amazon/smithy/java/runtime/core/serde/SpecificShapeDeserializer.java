@@ -8,8 +8,6 @@ package software.amazon.smithy.java.runtime.core.serde;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -91,17 +89,17 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public void readStruct(SdkSchema schema, BiConsumer<SdkSchema, ShapeDeserializer> eachEntry) {
+    public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> consumer) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public void readList(SdkSchema schema, Consumer<ShapeDeserializer> eachElement) {
+    public <T> void readList(SdkSchema schema, T state, ListMemberConsumer<T> consumer) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public void readStringMap(SdkSchema schema, BiConsumer<String, ShapeDeserializer> eachEntry) {
+    public <T> void readStringMap(SdkSchema schema, T state, MapMemberConsumer<String, T> consumer) {
         throw throwForInvalidState(schema);
     }
 }

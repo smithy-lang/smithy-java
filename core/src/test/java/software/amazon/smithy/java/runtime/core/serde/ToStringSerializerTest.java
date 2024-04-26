@@ -40,12 +40,12 @@ public class ToStringSerializerTest {
             .age(102)
             .birthday(Instant.EPOCH)
             .binary("hello".getBytes(StandardCharsets.UTF_8))
-            .tags(tags)
+            .queryParams(Map.of("a", List.of("1", "2")))
             .build();
 
         assertThat(
             person.toString(),
-            equalTo("Person[name=Mike, age=102, birthday=*REDACTED*, binary=68656c6c6f, tags={a=[b, c], b=[d], c=[]}]")
+            equalTo("Person[name=Mike, age=102, binary=68656c6c6f, birthday=*REDACTED*, queryParams={a=[1, 2]}]")
         );
     }
 

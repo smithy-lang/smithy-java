@@ -190,22 +190,22 @@ public final class PutPersonInput implements SerializableShape {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct(SCHEMA, (member, de) -> {
+            decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
                 switch (member.memberIndex()) {
-                    case 0 -> name(de.readString(member));
-                    case 1 -> favoriteColor(de.readString(member));
-                    case 2 -> age(de.readInteger(member));
-                    case 3 -> birthday(de.readTimestamp(member));
-                    case 4 -> binary(de.readBlob(member));
+                    case 0 -> builder.name(de.readString(member));
+                    case 1 -> builder.favoriteColor(de.readString(member));
+                    case 2 -> builder.age(de.readInteger(member));
+                    case 3 -> builder.birthday(de.readTimestamp(member));
+                    case 4 -> builder.binary(de.readBlob(member));
                     case 5 -> {
                         Map<String, List<String>> result = new LinkedHashMap<>();
-                        de.readStringMap(SCHEMA_QUERY_PARAMS, (key, v) -> {
-                            v.readList(SharedSchemas.MAP_LIST_STRING.member("member"), list -> {
-                                result.computeIfAbsent(key, k -> new ArrayList<>())
-                                    .add(list.readString(SharedSchemas.LIST_OF_STRING.member("member")));
+                        de.readStringMap(SCHEMA_QUERY_PARAMS, result, (mapData, key, v) -> {
+                            List<String> listValue = mapData.computeIfAbsent(key, k -> new ArrayList<>());
+                            v.readList(SharedSchemas.MAP_LIST_STRING.member("member"), listValue, (list, ser) -> {
+                                list.add(ser.readString(SharedSchemas.LIST_OF_STRING.member("member")));
                             });
                         });
-                        queryParams(result);
+                        builder.queryParams(result);
                     }
                 }
             });
