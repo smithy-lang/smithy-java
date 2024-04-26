@@ -145,12 +145,12 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         public String apply(Object type, String indent) {
 
             Symbol typeSymbol;
-            if (type instanceof Symbol) {
-                typeSymbol = (Symbol) type;
-            } else if (type instanceof Class<?>) {
-                typeSymbol = SymbolUtils.fromClass((Class<?>) type);
-            } else if (type instanceof SymbolReference) {
-                typeSymbol = ((SymbolReference) type).getSymbol();
+            if (type instanceof Symbol s) {
+                typeSymbol = s;
+            } else if (type instanceof Class<?> c) {
+                typeSymbol = SymbolUtils.fromClass(c);
+            } else if (type instanceof SymbolReference r) {
+                typeSymbol = r.getSymbol();
             } else {
                 throw new IllegalArgumentException(
                     "Invalid type provided for $T. Expected a Symbol or Class"
@@ -193,12 +193,12 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         @Override
         public String apply(Object type, String indent) {
             Symbol typeSymbol;
-            if (type instanceof Symbol) {
-                typeSymbol = (Symbol) type;
-            } else if (type instanceof Class<?>) {
-                typeSymbol = SymbolUtils.fromClass((Class<?>) type);
-            } else if (type instanceof SymbolReference) {
-                typeSymbol = ((SymbolReference) type).getSymbol();
+            if (type instanceof Symbol s) {
+                typeSymbol = s;
+            } else if (type instanceof Class<?> c) {
+                typeSymbol = SymbolUtils.fromClass(c);
+            } else if (type instanceof SymbolReference r) {
+                typeSymbol = r.getSymbol();
             } else {
                 throw new IllegalArgumentException(
                     "Invalid type provided for $B. Expected a Symbol or Class"

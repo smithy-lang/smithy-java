@@ -38,10 +38,10 @@ final class JavadocInjectorInterceptor implements CodeInterceptor.Prepender<Code
     @Override
     public void prepend(JavaWriter writer, CodeSection section) {
         Shape shape;
-        if (section instanceof ClassSection) {
-            shape = ((ClassSection) section).shape();
-        } else if (section instanceof GetterSection) {
-            shape = ((GetterSection) section).memberShape();
+        if (section instanceof ClassSection cs) {
+            shape = cs.shape();
+        } else if (section instanceof GetterSection gs) {
+            shape = gs.memberShape();
         } else {
             throw new IllegalArgumentException("Javadocs cannot be injected for section: " + section);
         }

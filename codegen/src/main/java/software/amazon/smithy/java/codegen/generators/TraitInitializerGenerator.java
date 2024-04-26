@@ -51,15 +51,15 @@ record TraitInitializerGenerator(JavaWriter writer, Shape shape, Set<ShapeId> ru
             while (iter.hasNext()) {
                 var traitId = iter.next();
                 Trait trait = shape.getAllTraits().get(traitId);
-                if (trait instanceof AnnotationTrait) {
-                    writer.writeInline("new $T()", trait.getClass());
-                } else if (trait instanceof StringTrait) {
-                    writer.writeInline("new $T($S)", trait.getClass(), ((StringTrait) trait).getValue());
-                } else if (trait instanceof StringListTrait) {
+                if (trait instanceof AnnotationTrait at) {
+                    writer.writeInline("new $T()", at.getClass());
+                } else if (trait instanceof StringTrait st) {
+                    writer.writeInline("new $T($S)", st.getClass(), st.getValue());
+                } else if (trait instanceof StringListTrait slt) {
                     writer.writeInline(
                         "new $T($S, $T.NONE)",
                         trait.getClass(),
-                        ((StringListTrait) trait).getValues(),
+                        slt.getValues(),
                         SourceLocation.class
                     );
                 } else {
