@@ -143,15 +143,20 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
     private final class JavaTypeFormatter implements BiFunction<Object, String, String> {
         @Override
         public String apply(Object type, String indent) {
-            Symbol typeSymbol = switch (type) {
-                case Symbol s -> s;
-                case Class<?> c -> SymbolUtils.fromClass(c);
-                case SymbolReference r -> r.getSymbol();
-                default -> throw new IllegalArgumentException(
+
+            Symbol typeSymbol;
+            if (type instanceof Symbol) {
+                typeSymbol = (Symbol) type;
+            } else if (type instanceof Class<?>) {
+                typeSymbol = SymbolUtils.fromClass((Class<?>) type);
+            } else if (type instanceof SymbolReference) {
+                typeSymbol = ((SymbolReference) type).getSymbol();
+            } else {
+                throw new IllegalArgumentException(
                     "Invalid type provided for $T. Expected a Symbol or Class"
                         + " but found: `" + type + "`."
                 );
-            };
+            }
 
             if (typeSymbol.getReferences().isEmpty()) {
                 return getPlaceholder(typeSymbol);
@@ -187,15 +192,19 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
 
         @Override
         public String apply(Object type, String indent) {
-            Symbol typeSymbol = switch (type) {
-                case Symbol s -> s;
-                case Class<?> c -> SymbolUtils.fromClass(c);
-                case SymbolReference r -> r.getSymbol();
-                default -> throw new IllegalArgumentException(
+            Symbol typeSymbol;
+            if (type instanceof Symbol) {
+                typeSymbol = (Symbol) type;
+            } else if (type instanceof Class<?>) {
+                typeSymbol = SymbolUtils.fromClass((Class<?>) type);
+            } else if (type instanceof SymbolReference) {
+                typeSymbol = ((SymbolReference) type).getSymbol();
+            } else {
+                throw new IllegalArgumentException(
                     "Invalid type provided for $B. Expected a Symbol or Class"
                         + " but found: `" + type + "`."
                 );
-            };
+            }
 
             if (typeSymbol.getProperty(SymbolProperties.BOXED_TYPE).isPresent()) {
                 typeSymbol = typeSymbol.expectProperty(SymbolProperties.BOXED_TYPE, Symbol.class);

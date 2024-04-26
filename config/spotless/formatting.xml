@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<profiles version="21">
-    <profile kind="CodeFormatterProfile" name="Smithy Formatting" version="21">
+<profiles version="17">
+    <profile kind="CodeFormatterProfile" name="Smithy Formatting" version="17">
         <setting id="org.eclipse.jdt.core.formatter.insert_new_line_after_type_annotation" value="do not insert"/>
         <setting id="org.eclipse.jdt.core.formatter.insert_new_line_in_empty_type_declaration" value="do not insert"/>
         <setting id="org.eclipse.jdt.core.formatter.insert_new_line_in_empty_method_body" value="do not insert"/>

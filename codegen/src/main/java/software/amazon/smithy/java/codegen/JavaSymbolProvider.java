@@ -14,7 +14,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.SequencedSet;
+import java.util.Set;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
@@ -112,11 +112,11 @@ public final class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolPro
     public Symbol listShape(ListShape listShape) {
         // Lists with unique Items are treated as Sequenced Sets
         if (listShape.hasTrait(UniqueItemsTrait.class)) {
-            return SymbolUtils.fromClass(SequencedSet.class)
+            return SymbolUtils.fromClass(Set.class)
                 .toBuilder()
-                .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableSequencedSet")
+                .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableSet")
                 .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashSet.class)
-                .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptySortedSet()")
+                .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptySet()")
                 .addReference(listShape.getMember().accept(this))
                 .build();
         }

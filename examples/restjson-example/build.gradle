@@ -3,10 +3,6 @@ plugins {
     alias(libs.plugins.jmh)
 }
 
-tasks.compileJava {
-    options.release = 21
-}
-
 dependencies {
     api(project(":client-aws-rest-json1"))
     api(libs.smithy.aws.traits)

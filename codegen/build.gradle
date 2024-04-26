@@ -4,10 +4,6 @@ plugins {
 
 description = "This module provides the codegen functionality for Smithy java"
 
-tasks.compileJava {
-    options.release = 21
-}
-
 ext {
     displayName = "Smithy :: Java :: Codegen"
     moduleName = "software.amazon.smithy.smithy-java.codegen"
