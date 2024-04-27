@@ -12,10 +12,10 @@ public interface EndpointResolver {
     /**
      * Resolves an endpoint using the provided parameters.
      *
-     * @param request Request parameters used during endpoint resolution.
+     * @param params The parameters used during endpoint resolution.
      * @return Returns the resolved endpoint.
      */
-    Endpoint resolveEndpoint(EndpointResolverRequest request);
+    Endpoint resolveEndpoint(EndpointResolverParams params);
 
     /**
      * Create an endpoint resolver that always returns the same endpoint.

@@ -68,7 +68,7 @@ public interface AuthSchemeResolver {
         }
 
         /**
-         * Properties to query when resolving the endpoint.
+         * Properties to query when resolving the auth shemes.
          *
          * @return properties.
          */

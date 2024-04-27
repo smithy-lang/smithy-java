@@ -11,22 +11,22 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Encapsulates endpoint resolver request parameters.
+ * Encapsulates endpoint resolver parameters.
  */
-public final class EndpointResolverRequest {
+public final class EndpointResolverParams {
 
     private final String operationName;
     private final Map<EndpointKey<?>, Object> immutableMap;
 
-    private EndpointResolverRequest(Map<EndpointKey<?>, Object> map, String operationName) {
+    private EndpointResolverParams(Map<EndpointKey<?>, Object> map, String operationName) {
         this.immutableMap = new HashMap<>(map);
         this.operationName = Objects.requireNonNull(operationName, "operationName is null");
     }
 
     /**
-     * Create a new {@link EndpointResolverRequest}.
+     * Create a new builder to build {@link EndpointResolverParams}.
      *
-     * @return the created request.
+     * @return the builder.
      */
     public static Builder builder() {
         return new Builder();
@@ -44,9 +44,9 @@ public final class EndpointResolverRequest {
     }
 
     /**
-     * Get all the keys registered with the request.
+     * Get all the keys available when resolving the endpoint.
      *
-     * @return the keys of the request.
+     * @return the keys.
      */
     public Iterator<EndpointKey<?>> attributeKeys() {
         return immutableMap.keySet().iterator();
@@ -69,9 +69,9 @@ public final class EndpointResolverRequest {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        EndpointResolverRequest request = (EndpointResolverRequest) o;
-        return Objects.equals(operationName, request.operationName)
-            && Objects.equals(immutableMap, request.immutableMap);
+        EndpointResolverParams params = (EndpointResolverParams) o;
+        return Objects.equals(operationName, params.operationName)
+            && Objects.equals(immutableMap, params.immutableMap);
     }
 
     @Override
@@ -80,7 +80,7 @@ public final class EndpointResolverRequest {
     }
 
     /**
-     * Create a builder from this request.
+     * Create a builder from this {@link EndpointResolverParams}.
      *
      * @return the builder.
      */
@@ -92,7 +92,7 @@ public final class EndpointResolverRequest {
     }
 
     /**
-     * Builder used to create and {@link EndpointResolverRequest}.
+     * Builder used to create and {@link EndpointResolverParams}.
      */
     public static final class Builder {
 
@@ -100,15 +100,15 @@ public final class EndpointResolverRequest {
         private final Map<EndpointKey<?>, Object> map = new HashMap<>();
 
         /**
-         * Build the request.
-         * @return the built request.
+         * Build the params.
+         * @return the built params.
          */
-        public EndpointResolverRequest build() {
-            return new EndpointResolverRequest(map, operationName);
+        public EndpointResolverParams build() {
+            return new EndpointResolverParams(map, operationName);
         }
 
         /**
-         * Put an attribute on the request.
+         * Put an attribute on the params.
          *
          * @param key   Key to set.
          * @param value Value to set.
