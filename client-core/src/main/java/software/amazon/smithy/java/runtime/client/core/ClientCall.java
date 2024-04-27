@@ -53,7 +53,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
         operation = Objects.requireNonNull(builder.operation, "operation is null");
         context = Objects.requireNonNull(builder.context, "context is null");
         errorCreator = Objects.requireNonNull(builder.errorCreator, "errorCreator is null");
-        endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointProvider is null");
+        endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
         interceptor = Objects.requireNonNull(builder.interceptor, "interceptor is null");
         authSchemeResolver = Objects.requireNonNull(builder.authSchemeResolver, "authSchemeResolver is null");
         identityResolvers = Objects.requireNonNull(builder.identityResolvers, "identityResolvers is null");
@@ -102,11 +102,11 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
     }
 
     /**
-     * The endpoint provider to use with the call.
+     * The endpoint resolver to use with the call.
      *
-     * @return Returns the endpoint provider.
+     * @return Returns the endpoint resolver.
      */
-    public EndpointResolver endpointProvider() {
+    public EndpointResolver endpointResolver() {
         return endpointResolver;
     }
 
@@ -283,12 +283,12 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
         }
 
         /**
-         * Set the endpoint provider used to resolve endpoints for the call.
+         * Set the endpoint resolver used to resolve endpoints for the call.
          *
-         * @param endpointResolver Endpoint provider to set.
+         * @param endpointResolver Endpoint resolver to set.
          * @return Returns the builder.
          */
-        public Builder<I, O> endpointProvider(EndpointResolver endpointResolver) {
+        public Builder<I, O> endpointResolver(EndpointResolver endpointResolver) {
             this.endpointResolver = endpointResolver;
             return this;
         }

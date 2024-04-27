@@ -52,7 +52,7 @@ public final class PersonDirectoryClient implements PersonDirectory {
     private final IdentityResolvers identityResolvers;
 
     private PersonDirectoryClient(Builder builder) {
-        this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointProvider is null");
+        this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
         this.transport = new ApiCallTimeoutTransport(Objects.requireNonNull(builder.transport, "transport is null"));
         // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
         this.interceptor = ClientInterceptor.chain(builder.interceptors);
@@ -121,7 +121,7 @@ public final class PersonDirectoryClient implements PersonDirectory {
             ClientCall.<I, O>builder()
                 .input(input)
                 .operation(operation)
-                .endpointProvider(endpointResolver)
+                .endpointResolver(endpointResolver)
                 .context(context)
                 .requestInputStream(inputStream)
                 .requestEventStream(eventStream)
@@ -160,12 +160,12 @@ public final class PersonDirectoryClient implements PersonDirectory {
         }
 
         /**
-         * Set the provider used to resolve endpoints.
+         * Set the resolver used to resolve endpoints.
          *
-         * @param endpointResolver Endpoint provider to use to resolve endpoints.
-         * @return Returns the endpoint provider.
+         * @param endpointResolver Endpoint resolver to use to resolve endpoints.
+         * @return Returns the endpoint resolver.
          */
-        public Builder endpointProvider(EndpointResolver endpointResolver) {
+        public Builder endpointResolver(EndpointResolver endpointResolver) {
             this.endpointResolver = endpointResolver;
             return this;
         }
@@ -177,7 +177,7 @@ public final class PersonDirectoryClient implements PersonDirectory {
          * @return the builder.
          */
         public Builder endpoint(Endpoint endpoint) {
-            return endpointProvider(EndpointResolver.staticEndpoint(endpoint));
+            return endpointResolver(EndpointResolver.staticEndpoint(endpoint));
         }
 
         /**

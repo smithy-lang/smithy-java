@@ -59,9 +59,9 @@ public final class CallContext {
     public static final Context.Key<Duration> API_CALL_ATTEMPT_TIMEOUT = Context.key("API call attempt timeout");
 
     /**
-     * The endpoint provider used to resolve the destination endpoint for a request.
+     * The endpoint resolver used to resolve the destination endpoint for a request.
      */
-    public static final Context.Key<EndpointResolver> ENDPOINT_PROVIDER = Context.key("EndpointProvider");
+    public static final Context.Key<EndpointResolver> ENDPOINT_RESOLVER = Context.key("EndpointResolver");
 
     /**
      * The SRA client interceptor.

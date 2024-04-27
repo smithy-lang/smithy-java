@@ -261,6 +261,6 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     private <I extends SerializableShape, O extends SerializableShape> Endpoint resolveEndpoint(ClientCall<I, O> call) {
         var operation = call.operation().schema();
         var request = EndpointResolverParams.builder().operationName(operation.id().getName()).build();
-        return call.endpointProvider().resolveEndpoint(request);
+        return call.endpointResolver().resolveEndpoint(request);
     }
 }
