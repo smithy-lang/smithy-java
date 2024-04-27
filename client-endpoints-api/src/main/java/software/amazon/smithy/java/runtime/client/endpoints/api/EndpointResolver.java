@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.client.endpoints.api;
 /**
  * Resolves an endpoint for an operation.
  */
+@FunctionalInterface
 public interface EndpointResolver {
     /**
      * Resolves an endpoint using the provided parameters.
