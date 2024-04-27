@@ -16,9 +16,9 @@ import java.util.Objects;
 public final class EndpointResolverParams {
 
     private final String operationName;
-    private final Map<EndpointKey<?>, Object> immutableMap;
+    private final Map<EndpointProperty<?>, Object> immutableMap;
 
-    private EndpointResolverParams(Map<EndpointKey<?>, Object> map, String operationName) {
+    private EndpointResolverParams(Map<EndpointProperty<?>, Object> map, String operationName) {
         this.immutableMap = new HashMap<>(map);
         this.operationName = Objects.requireNonNull(operationName, "operationName is null");
     }
@@ -33,22 +33,22 @@ public final class EndpointResolverParams {
     }
 
     /**
-     * Get an auth scheme-specific property using a strongly typed key, or {@code null}.
+     * Get the value of an EndpointProperty.
      *
-     * @param key Key of the property to get.
-     * @return Returns the value or null of not found.
+     * @param property Endpoint property to get.
+     * @return the value or null if not found.
      */
     @SuppressWarnings("unchecked")
-    public <T> T attribute(EndpointKey<T> key) {
-        return (T) immutableMap.get(key);
+    public <T> T property(EndpointProperty<T> property) {
+        return (T) immutableMap.get(property);
     }
 
     /**
-     * Get all the keys available when resolving the endpoint.
+     * Get all the properties available when resolving the endpoint.
      *
-     * @return the keys.
+     * @return the properties.
      */
-    public Iterator<EndpointKey<?>> attributeKeys() {
+    public Iterator<EndpointProperty<?>> properties() {
         return immutableMap.keySet().iterator();
     }
 
@@ -97,7 +97,7 @@ public final class EndpointResolverParams {
     public static final class Builder {
 
         private String operationName;
-        private final Map<EndpointKey<?>, Object> map = new HashMap<>();
+        private final Map<EndpointProperty<?>, Object> map = new HashMap<>();
 
         /**
          * Build the params.
@@ -108,15 +108,15 @@ public final class EndpointResolverParams {
         }
 
         /**
-         * Put an attribute on the params.
+         * Put a typed property on the params.
          *
-         * @param key   Key to set.
-         * @param value Value to set.
+         * @param property Property to set.
+         * @param value    Value to associate with the property.
          * @return the builder.
-         * @param <T> value type stored in the key.
+         * @param <T> Value type.
          */
-        public <T> Builder putAttribute(EndpointKey<T> key, T value) {
-            map.put(key, value);
+        public <T> Builder putProperty(EndpointProperty<T> property, T value) {
+            map.put(property, value);
             return this;
         }
 

@@ -19,19 +19,19 @@ public interface EndpointAuthScheme {
     String authSchemeId();
 
     /**
-     * Get an auth scheme-specific property using a strongly typed key, or {@code null}.
+     * Get the value of an EndpointProperty for the EndpointAuthScheme.
      *
-     * @param key Key of the property to get.
-     * @return Returns the value or null of not found.
+     * @param property Endpoint property to get.
+     * @return the value or null if not found.
      */
-    <T> T attribute(EndpointKey<T> key);
+    <T> T property(EndpointProperty<T> property);
 
     /**
-     * Get the attribute keys of the auth scheme.
+     * Get the properties of the EndpointAuthScheme.
      *
-     * @return the attribute keys.
+     * @return the properties.
      */
-    Iterator<EndpointKey<?>> attributeKeys();
+    Iterator<EndpointProperty<?>> properties();
 
     /**
      * Convert the EndpointAuthScheme to a builder.
@@ -41,7 +41,7 @@ public interface EndpointAuthScheme {
     default Builder toBuilder() {
         EndpointAuthSchemeImpl.Builder builder = new EndpointAuthSchemeImpl.Builder();
         builder.authSchemeId(authSchemeId());
-        attributeKeys().forEachRemaining(k -> builder.attributes.put(k, attribute(k)));
+        properties().forEachRemaining(k -> builder.properties.put(k, property(k)));
         return builder;
     }
 
@@ -67,14 +67,14 @@ public interface EndpointAuthScheme {
         Builder authSchemeId(String authSchemeId);
 
         /**
-         * Add an attribute to the EndpointAuthScheme.
+         * Put a typed property on the EndpointAuthScheme.
          *
-         * @param key   Ket to set.
-         * @param value Value to set.
+         * @param property Property to set.
+         * @param value    Value to associate with the property.
          * @return the builder.
-         * @param <T> the value type.
+         * @param <T> Value type.
          */
-        <T> Builder putAttribute(EndpointKey<T> key, T value);
+        <T> Builder putProperty(EndpointProperty<T> property, T value);
 
         /**
          * Create the {@link EndpointAuthScheme}.

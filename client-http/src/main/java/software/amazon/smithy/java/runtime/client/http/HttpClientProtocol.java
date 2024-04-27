@@ -70,8 +70,8 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
         }
 
         // Merge in any HTTP headers found on the endpoint.
-        if (endpoint.endpointAttribute(HttpEndpointKeys.HTTP_HEADERS) != null) {
-            request = request.withAddedHeaders(endpoint.endpointAttribute(HttpEndpointKeys.HTTP_HEADERS));
+        if (endpoint.property(HttpEndpointProperties.HTTP_HEADERS) != null) {
+            request = request.withAddedHeaders(endpoint.property(HttpEndpointProperties.HTTP_HEADERS));
         }
 
         return request.withUri(builder.build());

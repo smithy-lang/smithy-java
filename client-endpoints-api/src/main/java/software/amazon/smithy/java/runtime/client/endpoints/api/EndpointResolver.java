@@ -14,7 +14,7 @@ public interface EndpointResolver {
      * Resolves an endpoint using the provided parameters.
      *
      * @param params The parameters used during endpoint resolution.
-     * @return Returns the resolved endpoint.
+     * @return the resolved endpoint.
      */
     Endpoint resolveEndpoint(EndpointResolverParams params);
 
@@ -22,7 +22,7 @@ public interface EndpointResolver {
      * Create an endpoint resolver that always returns the same endpoint.
      *
      * @param endpoint Endpoint to always resolve.
-     * @return Returns the endpoint resolver.
+     * @return the endpoint resolver.
      */
     static EndpointResolver staticEndpoint(Endpoint endpoint) {
         return params -> endpoint;

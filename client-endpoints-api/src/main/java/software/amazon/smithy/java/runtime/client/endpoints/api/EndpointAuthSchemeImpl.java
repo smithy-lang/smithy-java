@@ -12,11 +12,11 @@ import java.util.Objects;
 
 final class EndpointAuthSchemeImpl implements EndpointAuthScheme {
     private final String authSchemeId;
-    private final Map<EndpointKey<?>, Object> attributes;
+    private final Map<EndpointProperty<?>, Object> properties;
 
     EndpointAuthSchemeImpl(Builder builder) {
         this.authSchemeId = Objects.requireNonNull(builder.authSchemeId, "authSchemeId is null");
-        this.attributes = Map.copyOf(builder.attributes);
+        this.properties = Map.copyOf(builder.properties);
     }
 
     @Override
@@ -26,13 +26,13 @@ final class EndpointAuthSchemeImpl implements EndpointAuthScheme {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <T> T attribute(EndpointKey<T> key) {
-        return (T) attributes.get(key);
+    public <T> T property(EndpointProperty<T> property) {
+        return (T) properties.get(property);
     }
 
     @Override
-    public Iterator<EndpointKey<?>> attributeKeys() {
-        return attributes.keySet().iterator();
+    public Iterator<EndpointProperty<?>> properties() {
+        return properties.keySet().iterator();
     }
 
     @Override
@@ -44,17 +44,17 @@ final class EndpointAuthSchemeImpl implements EndpointAuthScheme {
             return false;
         }
         EndpointAuthSchemeImpl that = (EndpointAuthSchemeImpl) o;
-        return Objects.equals(authSchemeId, that.authSchemeId) && Objects.equals(attributes, that.attributes);
+        return Objects.equals(authSchemeId, that.authSchemeId) && Objects.equals(properties, that.properties);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(authSchemeId, attributes);
+        return Objects.hash(authSchemeId, properties);
     }
 
     static final class Builder implements EndpointAuthScheme.Builder {
         String authSchemeId;
-        final Map<EndpointKey<?>, Object> attributes = new HashMap<>();
+        final Map<EndpointProperty<?>, Object> properties = new HashMap<>();
 
         @Override
         public EndpointAuthScheme.Builder authSchemeId(String authSchemeId) {
@@ -63,8 +63,8 @@ final class EndpointAuthSchemeImpl implements EndpointAuthScheme {
         }
 
         @Override
-        public <T> EndpointAuthScheme.Builder putAttribute(EndpointKey<T> key, T value) {
-            attributes.put(key, value);
+        public <T> EndpointAuthScheme.Builder putProperty(EndpointProperty<T> property, T value) {
+            properties.put(property, value);
             return this;
         }
 

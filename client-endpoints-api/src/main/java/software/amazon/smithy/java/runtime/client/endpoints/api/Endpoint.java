@@ -22,21 +22,21 @@ public interface Endpoint {
     URI uri();
 
     /**
-     * Get an endpoint-specific property using a strongly typed key, or {@code null}.
+     * Get the value of an EndpointProperty for the endpoint.
      *
      * <p>For example, in some AWS use cases, this might contain HTTP headers to add to each request.
      *
-     * @param key Endpoint key to get.
-     * @return Returns the value or null of not found.
+     * @param property Endpoint property to get.
+     * @return the value or null if not found.
      */
-    <T> T endpointAttribute(EndpointKey<T> key);
+    <T> T property(EndpointProperty<T> property);
 
     /**
-     * Get the attribute keys of the endpoint.
+     * Get the properties of the endpoint.
      *
-     * @return the attribute keys.
+     * @return the properties.
      */
-    Iterator<EndpointKey<?>> endpointAttributeKeys();
+    Iterator<EndpointProperty<?>> properties();
 
     /**
      * Get the list of auth scheme overrides for the endpoint.
@@ -53,7 +53,7 @@ public interface Endpoint {
     default Builder toBuilder() {
         var builder = new EndpointImpl.Builder();
         builder.uri(uri());
-        endpointAttributeKeys().forEachRemaining(k -> builder.attributes.put(k, endpointAttribute(k)));
+        properties().forEachRemaining(k -> builder.properties.put(k, property(k)));
         for (EndpointAuthScheme authScheme : authSchemes()) {
             builder.addAuthScheme(authScheme);
         }
@@ -105,14 +105,14 @@ public interface Endpoint {
         Builder addAuthScheme(EndpointAuthScheme authScheme);
 
         /**
-         * Put a typed attribute on the endpoint.
+         * Put a typed property on the endpoint.
          *
-         * @param key   Key to set.
-         * @param value Value to associate with the key.
+         * @param property Property to set.
+         * @param value    Value to associate with the property.
          * @return the builder.
          * @param <T> Value type.
          */
-        <T> Builder putAttribute(EndpointKey<T> key, T value);
+        <T> Builder putProperty(EndpointProperty<T> property, T value);
 
         /**
          * Create the endpoint.
