@@ -12,7 +12,7 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
  */
 public interface IdentityResolver<IdentityT extends Identity> {
     /**
-     * Resolve the identity from this identity provider.
+     * Resolve the identity from this identity resolver.
      *
      * <p>If not identity can be resolved, this method MUST throw {@link IdentityNotFoundException} and never
      * return null.

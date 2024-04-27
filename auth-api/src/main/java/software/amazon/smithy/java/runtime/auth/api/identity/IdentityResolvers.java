@@ -11,11 +11,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * An interface to allow retrieving an IdentityProvider based on the identity class.
+ * An interface to allow retrieving an {@link IdentityResolver} based on the identity class.
  */
 public interface IdentityResolvers {
     /**
-     * Retrieve an identity provider for the provided identity type.
+     * Retrieve an identity resolver for the provided identity type.
      *
      * @param identityClass Identity type to retrieve.
      * @return the identity resolver or null if not found.

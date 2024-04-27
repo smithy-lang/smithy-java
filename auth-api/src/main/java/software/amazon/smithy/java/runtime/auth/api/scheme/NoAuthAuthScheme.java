@@ -38,11 +38,11 @@ final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
     }
 
     /**
-     * Retrieve an identity provider associated with this authentication scheme, that unconditionally returns an empty
+     * Retrieve an identity resolver associated with this authentication scheme, that unconditionally returns an empty
      * {@link Identity}, independent of what resolvers are provided.
      *
      * @param resolvers Resolver repository.
-     * @return An identity provider that unconditionally returns an empty identity.
+     * @return An identity resolver that unconditionally returns an empty identity.
      */
     @Override
     public Optional<IdentityResolver<Identity>> identityResolver(IdentityResolvers resolvers) {
