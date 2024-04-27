@@ -16,10 +16,10 @@ import java.util.Set;
 public final class AuthProperties {
 
     private static final AuthProperties EMPTY = AuthProperties.builder().build();
-    private final Map<AuthProperty<?>, Object> attributes;
+    private final Map<AuthProperty<?>, Object> properties;
 
-    private AuthProperties(Map<AuthProperty<?>, Object> attributes) {
-        this.attributes = attributes;
+    private AuthProperties(Map<AuthProperty<?>, Object> properties) {
+        this.properties = properties;
     }
 
     /**
@@ -41,24 +41,24 @@ public final class AuthProperties {
     }
 
     /**
-     * Get a property.
+     * Get the value of a property.
      *
-     * @param key   property key to get by exact reference identity.
-     * @param <T>   Returns the value, or null if not present.
-     * @return Returns the nullable property value.
+     * @param property Property to get.
+     * @return the value or null if not found.
      */
     @SuppressWarnings("unchecked")
-    public <T> T get(AuthProperty<T> key) {
-        return (T) attributes.get(key);
+    public <T> T get(AuthProperty<T> property) {
+        return (T) properties.get(property);
     }
 
     /**
-     * Get the set of property keys that are set on the AuthProperties object.
+     * Get the properties that are set on the AuthProperties object.
      *
-     * @return the set property keys.
+     * @return the properties.
      */
-    public Set<AuthProperty<?>> keys() {
-        return attributes.keySet();
+    // TODO: Is AuthProperties.properties odd?
+    public Set<AuthProperty<?>> properties() {
+        return properties.keySet();
     }
 
     /**
@@ -68,7 +68,7 @@ public final class AuthProperties {
      */
     public Builder toBuilder() {
         var builder = builder();
-        builder.attributes.putAll(attributes);
+        builder.properties.putAll(properties);
         return builder;
     }
 
@@ -81,19 +81,19 @@ public final class AuthProperties {
             return false;
         }
         AuthProperties that = (AuthProperties) o;
-        return Objects.equals(attributes, that.attributes);
+        return Objects.equals(properties, that.properties);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(attributes);
+        return Objects.hash(properties);
     }
 
     /**
      * Creates an {@link AuthProperties}.
      */
     public static final class Builder {
-        private Map<AuthProperty<?>, Object> attributes = new HashMap<>();
+        private Map<AuthProperty<?>, Object> properties = new HashMap<>();
 
         private Builder() {
         }
@@ -104,21 +104,21 @@ public final class AuthProperties {
          * @return the built AuthProperties object.
          */
         public AuthProperties build() {
-            var copy = attributes;
-            this.attributes = new HashMap<>();
+            var copy = properties;
+            this.properties = new HashMap<>();
             return new AuthProperties(copy);
         }
 
         /**
          * Put a strongly typed property on the builder.
          *
-         * @param key   AuthProperty of the property, accessed by identity.
-         * @param value Value associated with the property.
+         * @param property Property to set.
+         * @param value    Value to associate with the property.
          * @return the builder.
-         * @param <T> value type.
+         * @param <T> Value type.
          */
-        public <T> Builder put(AuthProperty<T> key, T value) {
-            attributes.put(key, value);
+        public <T> Builder put(AuthProperty<T> property, T value) {
+            properties.put(property, value);
             return this;
         }
     }
