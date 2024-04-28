@@ -15,7 +15,7 @@ dependencies {
 }
 
 jmh {
-    warmupIterations = 3
     iterations = 3
     fork = 1
+//    profilers = ['async:output=flamegraph', 'gc']
 }

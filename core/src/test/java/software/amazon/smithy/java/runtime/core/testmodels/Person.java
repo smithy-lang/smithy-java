@@ -121,9 +121,15 @@ public final class Person implements SerializableShape {
     private static void writeShape(Person shape, ShapeSerializer serializer) {
         serializer.writeString(SCHEMA_NAME, shape.name);
         serializer.writeInteger(SCHEMA_AGE, shape.age);
-        ShapeSerializer.writeIfNotNull(serializer, SCHEMA_FAVORITE_COLOR, shape.favoriteColor);
-        ShapeSerializer.writeIfNotNull(serializer, SCHEMA_BINARY, shape.binary);
-        ShapeSerializer.writeIfNotNull(serializer, SCHEMA_BIRTHDAY, shape.birthday);
+        if (shape.favoriteColor != null) {
+            serializer.writeString(SCHEMA_FAVORITE_COLOR, shape.favoriteColor);
+        }
+        if (shape.binary != null) {
+            serializer.writeBlob(SCHEMA_BINARY, shape.binary);
+        }
+        if (shape.birthday != null) {
+            serializer.writeTimestamp(SCHEMA_BIRTHDAY, shape.birthday);
+        }
         if (!shape.queryParams.isEmpty()) {
             serializer.writeMap(SCHEMA_QUERY_PARAMS, shape, Person::writeQueryParamsMember);
         }

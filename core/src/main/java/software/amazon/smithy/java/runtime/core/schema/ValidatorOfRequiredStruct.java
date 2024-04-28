@@ -16,17 +16,15 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
- * Evaluates structures and find missing required members.
+ * Validates structures that have required members and fewer than 64 total members.
  */
-final class ValidatorOfStruct implements ShapeSerializer {
+final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     private final Validator.ShapeValidator validator;
-    private final SdkSchema schema;
-    private int setFields = 0;
+    private int setBitfields = 0;
 
-    private ValidatorOfStruct(Validator.ShapeValidator validator, SdkSchema schema) {
+    ValidatorOfRequiredStruct(Validator.ShapeValidator validator) {
         this.validator = validator;
-        this.schema = schema;
     }
 
     static <T> void validate(
@@ -35,149 +33,162 @@ final class ValidatorOfStruct implements ShapeSerializer {
         T structState,
         BiConsumer<T, ShapeSerializer> consumer
     ) {
-        var statefulStructSerializer = new ValidatorOfStruct(validator, schema);
-        consumer.accept(structState, statefulStructSerializer);
-        if (schema.requiredStructureMemberBitfield != statefulStructSerializer.setFields) {
-            for (var member : statefulStructSerializer.getMissingMembers()) {
-                validator.addError(new ValidationError.RequiredValidationFailure(validator.createPath(), member));
+        var structValidator = new ValidatorOfRequiredStruct(validator);
+        consumer.accept(structState, structValidator);
+        checkResult(schema, structValidator.setBitfields, validator);
+    }
+
+    private static void checkResult(SdkSchema schema, int setBitfields, Validator.ShapeValidator validator) {
+        if (schema.requiredStructureMemberBitfield != setBitfields) {
+            for (var member : missingMembers(schema, setBitfields)) {
+                validator.addError(
+                    new ValidationError.RequiredValidationFailure(validator.createPath(), member, schema)
+                );
             }
         }
     }
 
-    private Set<String> getMissingMembers() {
+    private static Set<String> missingMembers(SdkSchema schema, int setBitfields) {
         Set<String> result = new TreeSet<>();
         for (var member : schema.members()) {
-            if (member.isRequiredByValidation() && !isPresent(member)) {
+            if (member.isRequiredByValidation() && (setBitfields & member.requiredByValidationBitmask) == 0) {
                 result.add(member.memberName());
             }
         }
         return result;
     }
 
-    private boolean isPresent(SdkSchema member) {
-        return (setFields & member.requiredByValidationBitmask) != 0;
-    }
-
-    private void before(SdkSchema member) {
-        setFields |= member.requiredByValidationBitmask;
-        validator.pushPath(member.memberName());
-    }
-
     @Override
     public void writeBoolean(SdkSchema member, boolean value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeBoolean(member, value);
         validator.popPath();
     }
 
     @Override
     public void writeByte(SdkSchema member, byte value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeByte(member, value);
         validator.popPath();
     }
 
     @Override
     public void writeShort(SdkSchema member, short value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeShort(member, value);
         validator.popPath();
     }
 
     @Override
     public void writeInteger(SdkSchema member, int value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeInteger(member, value);
         validator.popPath();
     }
 
     @Override
     public void writeLong(SdkSchema member, long value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeLong(member, value);
         validator.popPath();
     }
 
     @Override
     public void writeFloat(SdkSchema member, float value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeFloat(member, value);
         validator.popPath();
     }
 
     @Override
     public void writeDouble(SdkSchema member, double value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeDouble(member, value);
         validator.popPath();
     }
 
     @Override
     public void writeBigInteger(SdkSchema member, BigInteger value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeBigInteger(member, value);
         validator.popPath();
     }
 
     @Override
     public void writeBigDecimal(SdkSchema member, BigDecimal value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeBigDecimal(member, value);
         validator.popPath();
     }
 
     @Override
     public void writeBlob(SdkSchema member, byte[] value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeBlob(member, value);
         validator.popPath();
     }
 
     @Override
     public void writeString(SdkSchema member, String value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeString(member, value);
         validator.popPath();
     }
 
     @Override
     public void writeTimestamp(SdkSchema member, Instant value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeTimestamp(member, value);
         validator.popPath();
     }
 
     @Override
     public void writeDocument(SdkSchema member, Document value) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeDocument(value);
         validator.popPath();
     }
 
     @Override
     public <T> void writeList(SdkSchema member, T state, BiConsumer<T, ShapeSerializer> consumer) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeList(member, state, consumer);
         validator.popPath();
     }
 
     @Override
     public <T> void writeMap(SdkSchema member, T state, BiConsumer<T, MapSerializer> consumer) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeMap(member, state, consumer);
         validator.popPath();
     }
 
     @Override
     public <T> void writeStruct(SdkSchema member, T structState, BiConsumer<T, ShapeSerializer> consumer) {
-        before(member);
+        setBitfields |= member.requiredByValidationBitmask;
+        validator.pushPath(member.memberName());
         validator.writeStruct(member, structState, consumer);
         validator.popPath();
     }
 
     @Override
     public void writeNull(SdkSchema member) {
-        // A null member does not count as present so don't call before() here.
+        // A null member does not count as present so don't set the bitfield.
         validator.pushPath(member.memberName());
         validator.writeNull(member);
         validator.popPath();

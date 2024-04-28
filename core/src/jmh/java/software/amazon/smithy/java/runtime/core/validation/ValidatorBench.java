@@ -80,4 +80,17 @@ public class ValidatorBench {
     public List<ValidationError> pojoWithValidatedCollections() {
         return validator.validate(pojoWithValidatedCollection);
     }
+
+    // Allows for running the profiler in Intellij.
+    public static void main(String[] args) {
+        ValidatorBench bench = new ValidatorBench();
+        bench.prepare();
+        for (int i = 0; i < 1000000; i++) {
+            runit(bench.validator, bench.pojoWithValidatedCollection, i);
+        }
+    }
+
+    private static int runit(Validator validator, PojoWithValidatedCollection pojoWithValidatedCollection, int i) {
+        return validator.validate(pojoWithValidatedCollection).size() + i;
+    }
 }

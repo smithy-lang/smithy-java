@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.core.schema.model;
 
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
@@ -70,12 +71,19 @@ public final class UnvalidatedPojo implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, this, UnvalidatedPojo::writeShape);
+        serializer.writeStruct(SCHEMA, this, WriteShape.INSTANCE);
     }
 
-    private static void writeShape(UnvalidatedPojo shape, ShapeSerializer serializer) {
-        ShapeSerializer.writeIfNotNull(serializer, SCHEMA_BOXED_INTEGER, shape.boxedInteger);
-        serializer.writeInteger(SCHEMA_INTEGER, shape.integer);
+    private static final class WriteShape implements BiConsumer<UnvalidatedPojo, ShapeSerializer> {
+        private static final WriteShape INSTANCE = new WriteShape();
+
+        @Override
+        public void accept(UnvalidatedPojo shape, ShapeSerializer serializer) {
+            if (shape.boxedInteger != null) {
+                serializer.writeInteger(SCHEMA_BOXED_INTEGER, shape.boxedInteger);
+            }
+            serializer.writeInteger(SCHEMA_INTEGER, shape.integer);
+        }
     }
 
     public static final class Builder implements SdkShapeBuilder<UnvalidatedPojo> {

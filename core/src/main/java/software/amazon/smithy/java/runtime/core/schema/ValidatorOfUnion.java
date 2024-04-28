@@ -19,23 +19,33 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 final class ValidatorOfUnion implements ShapeSerializer {
 
     private final Validator.ShapeValidator validator;
+    private final SdkSchema schema;
     private String setMember;
 
-    private ValidatorOfUnion(Validator.ShapeValidator validator) {
+    private ValidatorOfUnion(Validator.ShapeValidator validator, SdkSchema schema) {
         this.validator = validator;
+        this.schema = schema;
     }
 
     static <T> void validate(
         Validator.ShapeValidator validator,
+        SdkSchema schema,
         T unionState,
         BiConsumer<T, ShapeSerializer> consumer
     ) {
-        var unionValidator = new ValidatorOfUnion(validator);
+        var unionValidator = new ValidatorOfUnion(validator, schema);
         consumer.accept(unionState, unionValidator);
-        if (unionValidator.setMember == null) {
-            validator.addError(
-                new ValidationError.UnionValidationFailure(validator.createPath(), "No member is set in the union")
+        unionValidator.checkResult();
+    }
+
+    private void checkResult() {
+        if (setMember == null) {
+            var err = new ValidationError.UnionValidationFailure(
+                validator.createPath(),
+                "No member is set in the union",
+                schema
             );
+            validator.addError(err);
         }
     }
 
@@ -46,12 +56,8 @@ final class ValidatorOfUnion implements ShapeSerializer {
 
     private boolean validateSetValue(SdkSchema schema) {
         if (setMember != null) {
-            validator.addError(
-                new ValidationError.UnionValidationFailure(
-                    validator.createPath(),
-                    "Union member conflicts with '" + setMember + "'"
-                )
-            );
+            String message = "Union member conflicts with '" + setMember + "'";
+            validator.addError(new ValidationError.UnionValidationFailure(validator.createPath(), message, schema));
             return false;
         } else {
             setMember = schema.memberName();

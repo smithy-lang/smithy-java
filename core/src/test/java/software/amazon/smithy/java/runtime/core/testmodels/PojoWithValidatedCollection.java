@@ -93,24 +93,24 @@ public final class PojoWithValidatedCollection implements SerializableShape {
     private static final class InnerSerializer implements BiConsumer<PojoWithValidatedCollection, ShapeSerializer> {
         @Override
         public void accept(PojoWithValidatedCollection pojo, ShapeSerializer st) {
-            st.writeList(SCHEMA_LIST, pojo, pojo.innerListSerializer);
-            st.writeMap(SCHEMA_MAP, pojo, pojo.innerMapSerializer);
+            st.writeList(SCHEMA_LIST, pojo.list, pojo.innerListSerializer);
+            st.writeMap(SCHEMA_MAP, pojo.map, pojo.innerMapSerializer);
         }
     }
 
-    private static final class InnerListSerializer implements BiConsumer<PojoWithValidatedCollection, ShapeSerializer> {
+    private static final class InnerListSerializer implements BiConsumer<List<ValidatedPojo>, ShapeSerializer> {
         @Override
-        public void accept(PojoWithValidatedCollection value, ShapeSerializer ser) {
-            for (var entry : value.list) {
+        public void accept(List<ValidatedPojo> value, ShapeSerializer ser) {
+            for (var entry : value) {
                 entry.serialize(ser);
             }
         }
     }
 
-    private static final class InnerMapSerializer implements BiConsumer<PojoWithValidatedCollection, MapSerializer> {
+    private static final class InnerMapSerializer implements BiConsumer<Map<String, ValidatedPojo>, MapSerializer> {
         @Override
-        public void accept(PojoWithValidatedCollection that, MapSerializer ser) {
-            for (var entry : that.map.entrySet()) {
+        public void accept(Map<String, ValidatedPojo> map, MapSerializer ser) {
+            for (var entry : map.entrySet()) {
                 ser.writeEntry(MAP_OF_VALIDATED_POJO_KEY, entry.getKey(), entry.getValue(), ValidatedPojo::serialize);
             }
         }

@@ -120,9 +120,15 @@ public final class PutPersonInput implements SerializableShape {
         serializer.writeStruct(SCHEMA, this, (pojo, st) -> {
             st.writeString(SCHEMA_NAME, pojo.name);
             st.writeInteger(SCHEMA_AGE, pojo.age);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BIRTHDAY, pojo.birthday);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_FAVORITE_COLOR, pojo.favoriteColor);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BINARY, pojo.binary);
+            if (pojo.favoriteColor != null) {
+                serializer.writeString(SCHEMA_FAVORITE_COLOR, pojo.favoriteColor);
+            }
+            if (pojo.binary != null) {
+                serializer.writeBlob(SCHEMA_BINARY, pojo.binary);
+            }
+            if (pojo.birthday != null) {
+                serializer.writeTimestamp(SCHEMA_BIRTHDAY, pojo.birthday);
+            }
             if (!pojo.queryParams.isEmpty()) {
                 st.writeMap(SCHEMA_QUERY_PARAMS, pojo.queryParams, (queryParams, m) -> {
                     var key = SharedSchemas.MAP_LIST_STRING.member("key");

@@ -9,10 +9,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.regex.Pattern;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
@@ -34,6 +33,13 @@ import software.amazon.smithy.model.traits.SparseTrait;
  * <p>Note that Validator is not thread safe.
  */
 public final class Validator {
+
+    enum StructValidation {
+        UNION,
+        REQUIRED,
+        JUMBO,
+        NOT_STRUCT
+    }
 
     private final ShapeValidator shapeValidator;
 
@@ -59,20 +65,17 @@ public final class Validator {
     public List<ValidationError> validate(SerializableShape shape) {
         try {
             shape.serialize(shapeValidator);
+            return shapeValidator.errors.isEmpty() ? Collections.emptyList() : returnCopyOfErrors();
         } catch (ValidationShortCircuitException ignored) {
-            // If an error occurred, reset the state of the validator.
-            shapeValidator.elementCount = 0;
-            shapeValidator.currentSchema = null;
-            shapeValidator.depth = 0;
+            shapeValidator.resetValidatorState();
+            return returnCopyOfErrors();
         }
+    }
 
-        if (shapeValidator.errors.isEmpty()) {
-            return List.of();
-        } else {
-            var result = new ArrayList<>(shapeValidator.errors);
-            shapeValidator.errors.clear();
-            return result;
-        }
+    private List<ValidationError> returnCopyOfErrors() {
+        List<ValidationError> result = new ArrayList<>(shapeValidator.errors);
+        shapeValidator.errors.clear();
+        return result;
     }
 
     /**
@@ -118,7 +121,7 @@ public final class Validator {
     }
 
     /**
-     * Adds an error and short circuits further validation.
+     * An error that short circuits further validation.
      */
     static final class ValidationShortCircuitException extends SdkSerdeException {
         ValidationShortCircuitException() {
@@ -128,11 +131,12 @@ public final class Validator {
 
     static final class ShapeValidator implements ShapeSerializer, MapSerializer {
 
+        private static final int STARTING_PATH_SIZE = 6;
         private final int maxAllowedErrors;
         private final int maxDepth;
         private final ListSerializer listValidator;
         private final List<ValidationError> errors = new ArrayList<>();
-        private Object[] path = new Object[8];
+        private Object[] path;
         private int depth = 0;
 
         /**
@@ -149,34 +153,51 @@ public final class Validator {
          */
         private SdkSchema currentSchema = null;
 
-        ShapeValidator(int maxAllowedErrors, int maxDepth) {
+        private ShapeValidator(int maxAllowedErrors, int maxDepth) {
             this.maxAllowedErrors = maxAllowedErrors;
             this.maxDepth = maxDepth;
 
+            // The length of the path will never exceed the current depth + the maxDepth, removing a conditional in
+            // pushPath and ensuring we don't over-allocate. Default to 6 initially, but go lower if maxDepth is lower.
+            this.path = new Object[Math.min(STARTING_PATH_SIZE, maxDepth)];
+
             // Every list is validated with this serializer. Because it's reused, the element count of the list can't
             // be used. Instead, the number of elements is tracked in the elementCount member of Validator.
-            listValidator = new ListSerializer(this, ignoredPosition -> swapPath(elementCount++));
+            listValidator = new ListSerializer(this, this::betweenListElements);
+        }
+
+        private void betweenListElements(int ignoredPosition) {
+            swapPath(elementCount);
+            elementCount++;
+        }
+
+        private void resetValidatorState() {
+            elementCount = 0;
+            currentSchema = null;
+            depth = 0;
         }
 
         void pushPath(Object pathSegment) {
-            if (depth == maxDepth) {
-                addError(new ValidationError.DepthValidationFailure(createPath(), maxDepth));
-                throw new Validator.ValidationShortCircuitException();
-            }
-
+            // Rather than check if the depth exceeds maxDepth _and_ if depth == path.length, we instead always
+            // ensure that the path length never exceeds maxDepth.
             if (depth == path.length) {
-                // Resize the path if needed by doubling its size.
-                Object[] resized = new Object[Math.min((depth + 1) * 2, maxDepth)];
-                System.arraycopy(path, 0, resized, 0, path.length);
-                path = resized;
+                // Resize the path if needed by multiplying the size by 1.5.
+                int remainingDepth = maxDepth - depth;
+                if (remainingDepth == 0) {
+                    addError(new ValidationError.DepthValidationFailure(createPath(), maxDepth));
+                    throw new Validator.ValidationShortCircuitException();
+                } else {
+                    int newSize = Math.min(remainingDepth, depth + (depth >> 1));
+                    Object[] resized = new Object[newSize];
+                    System.arraycopy(path, 0, resized, 0, path.length);
+                    path = resized;
+                }
             }
 
             path[depth++] = pathSegment;
         }
 
-        private void swapPath(Object pathSegment) {
-            // Swap the current path segment, used in maps and lists that ensure a preliminary segment is
-            // unconditionally pushed before validation and unconditionally popped after validation.
+        void swapPath(Object pathSegment) {
             path[depth - 1] = pathSegment;
         }
 
@@ -185,18 +206,15 @@ public final class Validator {
         }
 
         String createPath() {
-            String errorPath;
             if (depth == 0) {
-                errorPath = "/";
+                return "/";
             } else {
                 StringBuilder builder = new StringBuilder();
                 for (int i = 0; i < depth; i++) {
                     builder.append('/').append(path[i].toString());
                 }
-                errorPath = builder.toString();
+                return builder.toString();
             }
-
-            return errorPath;
         }
 
         void addError(ValidationError error) {
@@ -213,13 +231,12 @@ public final class Validator {
             var previousCount = elementCount;
             currentSchema = schema;
             elementCount = 0; // note that we don't track the count of structure members.
-
-            switch (schema.type()) {
-                case STRUCTURE -> ValidatorOfStruct.validate(this, schema, structState, consumer);
-                case UNION -> ValidatorOfUnion.validate(this, structState, consumer);
-                default -> checkType(schema, ShapeType.STRUCTURE); // Schema / shape mis-match.
+            switch (schema.structValidation) {
+                case REQUIRED -> ValidatorOfRequiredStruct.validate(this, schema, structState, consumer);
+                case UNION -> ValidatorOfUnion.validate(this, schema, structState, consumer);
+                case JUMBO -> ValidatorOfJumboStruct.validate(this, schema, structState, consumer);
+                case NOT_STRUCT -> this.checkType(schema, ShapeType.STRUCTURE);
             }
-
             currentSchema = previousSchema;
             elementCount = previousCount;
         }
@@ -234,9 +251,8 @@ public final class Validator {
             currentSchema = schema;
             elementCount = 0;
 
-            // Push a preliminary value of 0 even if there are no elements. Subsequent elements will swap this
-            // path segment with the next index (e.g., 1, then 2, etc).
-            pushPath(0);
+            // Push a preliminary value of null. Each list element will swap this path position with its index.
+            pushPath(null);
             consumer.accept(state, listValidator);
             popPath();
 
@@ -245,25 +261,15 @@ public final class Validator {
             currentSchema = previousSchema;
             elementCount = previousCount;
 
+            checkListLength(schema, count);
+        }
+
+        private void checkListLength(SdkSchema schema, int count) {
             // Ensure the list has an acceptable length.
             if (count < schema.minLengthConstraint) {
-                addError(
-                    new ValidationError.LengthValidationFailure(
-                        createPath(),
-                        count,
-                        schema.minLengthConstraint,
-                        schema.maxLengthConstraint
-                    )
-                );
+                addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));
             } else if (count > schema.maxLengthConstraint) {
-                addError(
-                    new ValidationError.LengthValidationFailure(
-                        createPath(),
-                        count,
-                        schema.minLengthConstraint,
-                        schema.maxLengthConstraint
-                    )
-                );
+                addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));
             }
         }
 
@@ -277,11 +283,12 @@ public final class Validator {
             currentSchema = schema;
             elementCount = 0;
 
-            // Push a preliminary map key of null. This key isn't actually used if the map is empty or if the map
-            // has values. If empty, no errors are created and segment is ignored. If not empty, then this null
-            // segment is swapped with the appropriate map key prior to nested validation.
+            // Push a preliminary map key and key/value holder of null. These values are replaced as map keys and
+            // values are validated.
+            pushPath(null);
             pushPath(null);
             consumer.accept(state, this);
+            popPath();
             popPath();
 
             // Grab the count and reset the schema and count.
@@ -289,26 +296,33 @@ public final class Validator {
             currentSchema = previousSchema;
             elementCount = previousCount;
 
+            checkMapLength(schema, count);
+        }
+
+        private void checkMapLength(SdkSchema schema, int count) {
             // Ensure the map is properly sized.
             if (count < schema.minLengthConstraint) {
-                addError(
-                    new ValidationError.LengthValidationFailure(
-                        createPath(),
-                        count,
-                        schema.minLengthConstraint,
-                        schema.maxLengthConstraint
-                    )
-                );
+                addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));
             } else if (count > schema.maxLengthConstraint) {
-                addError(
-                    new ValidationError.LengthValidationFailure(
-                        createPath(),
-                        count,
-                        schema.minLengthConstraint,
-                        schema.maxLengthConstraint
-                    )
-                );
+                addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));
             }
+        }
+
+        // MapSerializer implementation to write a map key.
+
+        @Override
+        public <T> void writeEntry(
+            SdkSchema keySchema,
+            String key,
+            T state,
+            BiConsumer<T, ShapeSerializer> valueSerializer
+        ) {
+            elementCount++;
+            path[depth - 2] = key; // set /map/<key>
+            path[depth - 1] = "key"; // set /map/<key>/key
+            writeString(keySchema, key);
+            path[depth - 1] = "value"; // set /map/<key>/value
+            valueSerializer.accept(state, this);
         }
 
         @Override
@@ -334,9 +348,8 @@ public final class Validator {
             switch (schema.type()) {
                 case INTEGER -> validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
                 case INT_ENUM -> {
-                    var values = schema.intEnumValues();
-                    if (!values.isEmpty() && !values.contains(value)) {
-                        addError(new ValidationError.IntEnumValidationFailure(createPath(), value, values));
+                    if (!schema.intEnumValues().isEmpty() && !schema.intEnumValues().contains(value)) {
+                        addError(new ValidationError.IntEnumValidationFailure(createPath(), value, schema));
                     }
                 }
                 default -> checkType(schema, ShapeType.INTEGER); // it's invalid.
@@ -386,44 +399,17 @@ public final class Validator {
         @Override
         public void writeString(SdkSchema schema, String value) {
             switch (schema.type()) {
-                case STRING -> {
-                    validateStringEnumValues(value, schema.stringEnumValues());
-                    validateLength(
-                        value.codePointCount(0, value.length()),
-                        schema.minLengthConstraint,
-                        schema.maxLengthConstraint
-                    );
-                    if (schema.patternConstraint != null) {
-                        validatePattern(value, schema.patternConstraint);
-                    }
-                }
-                case ENUM -> validateStringEnumValues(value, schema.stringEnumValues());
+                case STRING, ENUM -> schema.stringValidation.apply(schema, value, this);
                 default -> checkType(schema, ShapeType.STRING); // it's invalid, and calling this adds an error.
-            }
-        }
-
-        private void validatePattern(String value, Pattern pattern) {
-            try {
-                // Note: using Matcher#find() here and not Matcher#match() because Smithy expects patterns to be rooted
-                // with ^ and $ to get the same behavior as #match().
-                if (!pattern.matcher(value).find()) {
-                    addError(new ValidationError.PatternValidationFailure(createPath(), value, pattern));
-                }
-            } catch (StackOverflowError e) {
-                throw new StackOverflowError(
-                    String.format(
-                        "Pattern '%s' is too expensive to evaluate against given input. Please "
-                            + "refactor your pattern to be more performant",
-                        pattern.pattern()
-                    )
-                );
             }
         }
 
         @Override
         public void writeBlob(SdkSchema schema, byte[] value) {
             checkType(schema, ShapeType.BLOB);
-            validateLength(value.length, schema.minLengthConstraint, schema.maxLengthConstraint);
+            if (value.length < schema.minLengthConstraint || value.length > schema.maxLengthConstraint) {
+                addError(new ValidationError.LengthValidationFailure(createPath(), value.length, schema));
+            }
         }
 
         @Override
@@ -444,36 +430,9 @@ public final class Validator {
             if (currentSchema != null) {
                 if (currentSchema.type() == ShapeType.MAP || currentSchema.type() == ShapeType.LIST) {
                     if (!currentSchema.hasTrait(SparseTrait.class)) {
-                        addError(new ValidationError.SparseValidationFailure(createPath(), currentSchema.type()));
+                        addError(new ValidationError.SparseValidationFailure(createPath(), currentSchema));
                     }
                 }
-            }
-        }
-
-        // MapSerializer implementation.
-
-        @Override
-        public <T> void writeEntry(
-            SdkSchema keySchema,
-            String key,
-            T state,
-            BiConsumer<T, ShapeSerializer> valueSerializer
-        ) {
-            elementCount++;
-            swapPath(key);
-            writeString(keySchema, key);
-            valueSerializer.accept(state, this);
-        }
-
-        private void validateStringEnumValues(String value, Set<String> allowedValues) {
-            if (!allowedValues.isEmpty() && !allowedValues.contains(value)) {
-                addError(new ValidationError.EnumValidationFailure(createPath(), value, allowedValues));
-            }
-        }
-
-        private void validateLength(long length, long min, long max) {
-            if (length < min || length > max) {
-                addError(new ValidationError.LengthValidationFailure(createPath(), length, min, max));
             }
         }
 
@@ -490,19 +449,12 @@ public final class Validator {
         }
 
         private void emitRangeError(SdkSchema schema, Number value) {
-            addError(
-                new ValidationError.RangeValidationFailure(
-                    createPath(),
-                    value,
-                    schema.minRangeConstraint,
-                    schema.maxRangeConstraint
-                )
-            );
+            addError(new ValidationError.RangeValidationFailure(createPath(), value, schema));
         }
 
         private void checkType(SdkSchema schema, ShapeType type) {
             if (schema.type() != type) {
-                addError(new ValidationError.TypeValidationFailure(createPath(), schema.type(), type));
+                addError(new ValidationError.TypeValidationFailure(createPath(), type, schema));
                 // Stop any further validation if an incorrect type is given. This should only be encountered when data
                 // is emitted from something manually and not from an actual modeled shape.
                 throw new ValidationShortCircuitException();

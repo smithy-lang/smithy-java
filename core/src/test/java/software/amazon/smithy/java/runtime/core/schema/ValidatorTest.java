@@ -84,7 +84,7 @@ public class ValidatorTest {
         SdkSchema schema = SdkSchema.builder()
             .type(ShapeType.BYTE)
             .id("smithy.example#E")
-            .traits(RangeTrait.builder().min(BigDecimal.TWO).build())
+            .traits(RangeTrait.builder().min(BigDecimal.valueOf(2)).build())
             .build();
 
         var errors = validator.validate(encoder -> {
@@ -118,8 +118,8 @@ public class ValidatorTest {
         });
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst().path(), equalTo("/0/0/0"));
-        assertThat(errors.getFirst().message(), equalTo("Value is too deeply nested"));
+        assertThat(errors.get(0).path(), equalTo("/0/0/0"));
+        assertThat(errors.get(0).message(), equalTo("Value is too deeply nested"));
 
         // Now ensure that the path is back to normal.
         SdkSchema schema = SdkSchema.builder()
@@ -130,7 +130,7 @@ public class ValidatorTest {
 
         errors = validator.validate(encoder -> encoder.writeByte(schema, (byte) 4));
         assertThat(errors, hasSize(1));
-        assertThat(errors.getLast().path(), equalTo("/"));
+        assertThat(errors.get(0).path(), equalTo("/"));
     }
 
     private List<SdkSchema> createListSchemas(int depth) {
@@ -149,7 +149,7 @@ public class ValidatorTest {
                     SdkSchema.builder()
                         .type(ShapeType.LIST)
                         .id("s#L3")
-                        .members(SdkSchema.memberBuilder("member", schemas.getLast()))
+                        .members(SdkSchema.memberBuilder("member", schemas.get(schemas.size() - 1)))
                         .build()
                 );
             }
@@ -204,9 +204,9 @@ public class ValidatorTest {
         });
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst().path(), equalTo("/"));
+        assertThat(errors.get(0).path(), equalTo("/"));
         assertThat(
-            errors.getFirst().message(),
+            errors.get(0).message(),
             equalTo("Value must satisfy regular expression pattern: ^[a-z]+$")
         );
     }
@@ -243,10 +243,10 @@ public class ValidatorTest {
         });
 
         assertThat(errors, hasSize(2));
-        assertThat(errors.getFirst().path(), equalTo("/"));
-        assertThat(errors.getFirst().message(), equalTo("Value missing required member: b"));
-        assertThat(errors.getLast().path(), equalTo("/"));
-        assertThat(errors.getLast().message(), equalTo("Value missing required member: c"));
+        assertThat(errors.get(0).path(), equalTo("/"));
+        assertThat(errors.get(0).message(), equalTo("Value missing required member: b"));
+        assertThat(errors.get(1).path(), equalTo("/"));
+        assertThat(errors.get(1).message(), equalTo("Value missing required member: c"));
     }
 
     @Test
@@ -264,8 +264,8 @@ public class ValidatorTest {
         });
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst().path(), equalTo("/"));
-        assertThat(errors.getFirst().message(), equalTo("Value missing required member: a"));
+        assertThat(errors.get(0).path(), equalTo("/"));
+        assertThat(errors.get(0).message(), equalTo("Value missing required member: a"));
     }
 
     // Enum and intEnum validation
@@ -281,8 +281,8 @@ public class ValidatorTest {
 
         var errors = validator.validate(encoder -> encoder.writeString(schema, "d"));
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst().path(), equalTo("/"));
-        assertThat(errors.getFirst().message(), equalTo("Value must satisfy enum value set: [a, b, c]"));
+        assertThat(errors.get(0).path(), equalTo("/"));
+        assertThat(errors.get(0).message(), equalTo("Value is not an allowed enum string"));
 
         // This is fine.
         assertThat(validator.validate(encoder -> encoder.writeString(schema, "a")), hasSize(0));
@@ -304,7 +304,7 @@ public class ValidatorTest {
         // The wrong types.
         errors = validator.validate(encoder -> encoder.writeLong(schema, 2));
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst().message(), startsWith("Value must be intEnum, but found "));
+        assertThat(errors.get(0).message(), startsWith("Value must be intEnum, but found "));
 
         // Out of range.
         errors = validator.validate(encoder -> encoder.writeInteger(schema, -1));
@@ -313,7 +313,7 @@ public class ValidatorTest {
         // Out of range.
         errors = validator.validate(encoder -> encoder.writeInteger(schema, 4));
         assertThat(errors, hasSize(1));
-        assertThat(errors.getLast().message(), equalTo("Value must satisfy intEnum value set: [1, 2, 3]"));
+        assertThat(errors.get(0).message(), equalTo("Value is not an allowed integer enum number"));
     }
 
     // Nested collection validation
@@ -382,17 +382,17 @@ public class ValidatorTest {
         });
 
         assertThat(errors, hasSize(3));
-        assertThat(errors.get(0).path(), equalTo("/a"));
+        assertThat(errors.get(0).path(), equalTo("/a/key"));
         assertThat(
             errors.get(0).message(),
             equalTo("Value with length 1 must have length greater than or equal to 3")
         );
-        assertThat(errors.get(1).path(), equalTo("/b"));
+        assertThat(errors.get(1).path(), equalTo("/b/key"));
         assertThat(
             errors.get(1).message(),
             equalTo("Value with length 1 must have length greater than or equal to 3")
         );
-        assertThat(errors.get(2).path(), equalTo("/good-key-bad-value"));
+        assertThat(errors.get(2).path(), equalTo("/good-key-bad-value/value"));
         assertThat(
             errors.get(2).message(),
             equalTo("Value with length 1 must have length greater than or equal to 2")
@@ -492,8 +492,8 @@ public class ValidatorTest {
         var errors = validator.validate(s -> s.writeStruct(unionSchema, null, (ignored, serializer) -> {}));
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst().path(), equalTo("/"));
-        assertThat(errors.getFirst().message(), equalTo("No member is set in the union"));
+        assertThat(errors.get(0).path(), equalTo("/"));
+        assertThat(errors.get(0).message(), equalTo("No member is set in the union"));
     }
 
     @Test
@@ -509,8 +509,8 @@ public class ValidatorTest {
         });
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst().path(), equalTo("/b"));
-        assertThat(errors.getFirst().message(), equalTo("Union member conflicts with 'a'"));
+        assertThat(errors.get(0).path(), equalTo("/b"));
+        assertThat(errors.get(0).message(), equalTo("Union member conflicts with 'a'"));
     }
 
     @Test
@@ -539,9 +539,9 @@ public class ValidatorTest {
         });
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst().path(), equalTo("/a"));
+        assertThat(errors.get(0).path(), equalTo("/a"));
         assertThat(
-            errors.getFirst().message(),
+            errors.get(0).message(),
             equalTo("Value with length 17 must have length less than or equal to 3")
         );
     }
@@ -632,10 +632,10 @@ public class ValidatorTest {
         });
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst().path(), equalTo("/1"));
+        assertThat(errors.get(0).path(), equalTo("/1"));
         assertThat(
-            errors.getFirst().message(),
-            equalTo("Value is a list that does not allow null values")
+            errors.get(0).message(),
+            equalTo("Value is in a list that does not allow null values")
         );
     }
 
@@ -670,10 +670,10 @@ public class ValidatorTest {
         });
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst().path(), equalTo("/oops"));
+        assertThat(errors.get(0).path(), equalTo("/oops/value"));
         assertThat(
-            errors.getFirst().message(),
-            equalTo("Value is a map that does not allow null values")
+            errors.get(0).message(),
+            equalTo("Value is in a map that does not allow null values")
         );
     }
 
@@ -684,9 +684,9 @@ public class ValidatorTest {
         var errors = validator.validate(encoder::accept);
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst().path(), equalTo("/"));
-        assertThat(errors.getFirst().message(), startsWith("Value must be "));
-        assertThat(errors.getFirst().message(), endsWith(", but found " + type));
+        assertThat(errors.get(0).path(), equalTo("/"));
+        assertThat(errors.get(0).message(), startsWith("Value must be "));
+        assertThat(errors.get(0).message(), endsWith(", but found " + type));
     }
 
     public static List<Arguments> detectsIncorrectTypeSupplier() {
@@ -802,17 +802,17 @@ public class ValidatorTest {
         if (error == null) {
             assertThat(errors, empty());
         } else if (error.equals(ValidationError.RangeValidationFailure.class)) {
-            assertThat(errors.getFirst().getClass(), is(error));
+            assertThat(errors.get(0).getClass(), is(error));
             assertThat(errors, hasSize(1));
-            assertThat(errors.getFirst().path(), equalTo("/"));
-            assertThat(errors.getFirst().message(), equalTo("Value must be between 1 and 10, inclusive"));
+            assertThat(errors.get(0).path(), equalTo("/"));
+            assertThat(errors.get(0).message(), equalTo("Value must be between 1 and 10, inclusive"));
         } else if (error.equals(ValidationError.LengthValidationFailure.class)) {
-            assertThat(errors.getFirst().getClass(), is(error));
+            assertThat(errors.get(0).getClass(), is(error));
             assertThat(errors, hasSize(1));
-            assertThat(errors.getFirst().path(), equalTo("/"));
-            assertThat(errors.getFirst().message(), startsWith("Value with length "));
+            assertThat(errors.get(0).path(), equalTo("/"));
+            assertThat(errors.get(0).message(), startsWith("Value with length "));
             assertThat(
-                errors.getFirst().message(),
+                errors.get(0).message(),
                 endsWith("must have length between 1 and 10, inclusive")
             );
         } else {
@@ -1102,8 +1102,8 @@ public class ValidatorTest {
         var errors = validator.validate(e -> e.writeFloat(schema, 1.0f));
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst(), instanceOf(ValidationError.RangeValidationFailure.class));
-        assertThat(errors.getFirst().message(), equalTo("Value must be greater than or equal to 1.2"));
+        assertThat(errors.get(0), instanceOf(ValidationError.RangeValidationFailure.class));
+        assertThat(errors.get(0).message(), equalTo("Value must be greater than or equal to 1.2"));
     }
 
     @Test
@@ -1117,8 +1117,8 @@ public class ValidatorTest {
         var errors = validator.validate(e -> e.writeFloat(schema, 1.3f));
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst(), instanceOf(ValidationError.RangeValidationFailure.class));
-        assertThat(errors.getFirst().message(), equalTo("Value must be less than or equal to 1.2"));
+        assertThat(errors.get(0), instanceOf(ValidationError.RangeValidationFailure.class));
+        assertThat(errors.get(0).message(), equalTo("Value must be less than or equal to 1.2"));
     }
 
     @Test
@@ -1132,13 +1132,13 @@ public class ValidatorTest {
         var errors = validator.validate(e -> e.writeFloat(schema, 1.3f));
 
         assertThat(errors, hasSize(1));
-        var first = errors.getFirst();
-        assertThat(errors.getFirst(), instanceOf(ValidationError.RangeValidationFailure.class));
+        var first = errors.get(0);
+        assertThat(errors.get(0), instanceOf(ValidationError.RangeValidationFailure.class));
 
         var error = (ValidationError.RangeValidationFailure) first;
         assertThat(error.value().doubleValue(), closeTo(1.3f, 0.01f));
-        assertThat(error.min(), is(new BigDecimal("1.1")));
-        assertThat(error.max(), is(new BigDecimal("1.2")));
+        assertThat(error.schema().getTrait(RangeTrait.class).getMin().get(), is(new BigDecimal("1.1")));
+        assertThat(error.schema().getTrait(RangeTrait.class).getMax().get(), is(new BigDecimal("1.2")));
         assertThat(error.path(), is("/"));
         assertThat(error.message(), is("Value must be between 1.1 and 1.2, inclusive"));
     }
@@ -1155,9 +1155,9 @@ public class ValidatorTest {
         var errors = validator.validate(e -> e.writeList(schema, null, (v, ser) -> {}));
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst(), instanceOf(ValidationError.LengthValidationFailure.class));
+        assertThat(errors.get(0), instanceOf(ValidationError.LengthValidationFailure.class));
         assertThat(
-            errors.getFirst().message(),
+            errors.get(0).message(),
             equalTo("Value with length 0 must have length greater than or equal to 2")
         );
     }
@@ -1177,9 +1177,9 @@ public class ValidatorTest {
         }));
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.getFirst(), instanceOf(ValidationError.LengthValidationFailure.class));
+        assertThat(errors.get(0), instanceOf(ValidationError.LengthValidationFailure.class));
         assertThat(
-            errors.getFirst().message(),
+            errors.get(0).message(),
             equalTo("Value with length 2 must have length less than or equal to 1")
         );
     }
@@ -1200,14 +1200,38 @@ public class ValidatorTest {
         }));
 
         assertThat(errors, hasSize(1));
-        var first = errors.getFirst();
-        assertThat(errors.getFirst(), instanceOf(ValidationError.LengthValidationFailure.class));
+        var first = errors.get(0);
+        assertThat(errors.get(0), instanceOf(ValidationError.LengthValidationFailure.class));
 
         var error = (ValidationError.LengthValidationFailure) first;
         assertThat(error.length(), is(3L));
-        assertThat(error.min(), is(1L));
-        assertThat(error.max(), is(2L));
+        assertThat(error.schema().getTrait(LengthTrait.class).getMin().get(), is(1L));
+        assertThat(error.schema().getTrait(LengthTrait.class).getMax().get(), is(2L));
         assertThat(error.path(), is("/"));
         assertThat(error.message(), is("Value with length 3 must have length between 1 and 2, inclusive"));
+    }
+
+    @Test
+    public void validatesRequiredMembersOfJumboStructs() {
+        var string = PreludeSchemas.STRING;
+
+        SdkSchema.Builder[] members = new SdkSchema.Builder[100];
+        for (var i = 0; i < 100; i++) {
+            members[i] = SdkSchema.memberBuilder("member" + i, string).traits(new RequiredTrait());
+        }
+
+        SdkSchema struct = SdkSchema.builder()
+            .type(ShapeType.STRUCTURE)
+            .id("smithy.example#Foo")
+            .members(members)
+            .build();
+
+        Validator validator = Validator.builder().build();
+
+        var errors = validator.validate(encoder -> {
+            encoder.writeStruct(struct, struct, (member, serializer) -> {});
+        });
+
+        assertThat(errors, hasSize(100));
     }
 }

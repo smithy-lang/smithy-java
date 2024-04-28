@@ -82,8 +82,12 @@ public final class ValidatedPojo implements SerializableShape {
     private static final class InnerSerializer implements BiConsumer<ValidatedPojo, ShapeSerializer> {
         @Override
         public void accept(ValidatedPojo pojo, ShapeSerializer st) {
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_STRING, pojo.string);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BOXED_INTEGER, pojo.boxedInteger);
+            if (pojo.string != null) {
+                st.writeString(SCHEMA_STRING, pojo.string);
+            }
+            if (pojo.boxedInteger != null) {
+                st.writeInteger(SCHEMA_BOXED_INTEGER, pojo.boxedInteger);
+            }
             st.writeInteger(SCHEMA_INTEGER, pojo.integer);
         }
     }

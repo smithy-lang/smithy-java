@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.core.schema.model;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
@@ -80,23 +81,38 @@ public final class PojoWithValidatedCollection implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, this, PojoWithValidatedCollection::writeShape);
+        serializer.writeStruct(SCHEMA, this, WriteShape.INSTANCE);
     }
 
-    private static void writeShape(PojoWithValidatedCollection shape, ShapeSerializer st) {
-        st.writeList(SCHEMA_LIST, shape, PojoWithValidatedCollection::writeListMember);
-        st.writeMap(SCHEMA_MAP, shape, PojoWithValidatedCollection::writeMapMember);
-    }
+    private static final class WriteShape implements BiConsumer<PojoWithValidatedCollection, ShapeSerializer> {
+        private static final WriteShape INSTANCE = new WriteShape();
 
-    private static void writeListMember(PojoWithValidatedCollection shape, ShapeSerializer ser) {
-        for (var entry : shape.list) {
-            entry.serialize(ser);
+        @Override
+        public void accept(PojoWithValidatedCollection shape, ShapeSerializer st) {
+            st.writeList(SCHEMA_LIST, shape.list, WriteList.INSTANCE);
+            st.writeMap(SCHEMA_MAP, shape.map, WriteMap.INSTANCE);
         }
     }
 
-    private static void writeMapMember(PojoWithValidatedCollection shape, MapSerializer ser) {
-        for (var entry : shape.map.entrySet()) {
-            ser.writeEntry(SCHEMA_MAP_KEY, entry.getKey(), entry.getValue(), ValidatedPojo::serialize);
+    private static final class WriteMap implements BiConsumer<Map<String, ValidatedPojo>, MapSerializer> {
+        private static final WriteMap INSTANCE = new WriteMap();
+
+        @Override
+        public void accept(Map<String, ValidatedPojo> value, MapSerializer ser) {
+            for (var entry : value.entrySet()) {
+                ser.writeEntry(SCHEMA_MAP_KEY, entry.getKey(), entry.getValue(), ValidatedPojo::serialize);
+            }
+        }
+    }
+
+    private static final class WriteList implements BiConsumer<List<ValidatedPojo>, ShapeSerializer> {
+        private static final WriteList INSTANCE = new WriteList();
+
+        @Override
+        public void accept(List<ValidatedPojo> value, ShapeSerializer ser) {
+            for (var entry : value) {
+                entry.serialize(ser);
+            }
         }
     }
 
