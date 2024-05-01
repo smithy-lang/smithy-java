@@ -6,7 +6,7 @@ description = "This module provides json functionality"
 
 ext {
     displayName = "Smithy :: Java :: JSON"
-    moduleName = "software.amazon.smithy.smithy-java.json"
+    moduleName = "software.amazon.smithy.java.json"
 }
 
 dependencies {

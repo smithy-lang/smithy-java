@@ -6,5 +6,5 @@ description = "This module provides SigV4 signing functionality"
 
 ext {
     displayName = "Smithy :: Java :: SigV4"
-    moduleName = "software.amazon.smithy.smithy-java.sigv4"
+    moduleName = "software.amazon.smithy.java.sigv4"
 }

@@ -1,0 +1,10 @@
+plugins {
+    id 'smithy-java.codegen-plugin-conventions'
+}
+
+description = "This module provides the codegen plugin for Smithy java server codegen"
+
+ext {
+    displayName = "Smithy :: Java :: Codegen :: Server"
+    moduleName = "software.amazon.smithy.java.codegen.server"
+}

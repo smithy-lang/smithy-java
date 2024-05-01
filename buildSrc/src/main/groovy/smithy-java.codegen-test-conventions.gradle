@@ -5,16 +5,17 @@ plugins {
 }
 
 dependencies {
-    smithyBuild(project(":codegen"))
+    smithyBuild(project(":codegen:client"))
+    smithyBuild(project(":codegen:server"))
 }
 
 // Add generated Java sources to the main sourceset
 afterEvaluate {
-    var outputPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-codegen")
+    var clientOutputPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-client-codegen")
     sourceSets {
         main {
             java {
-                srcDir(outputPath)
+                srcDir(clientOutputPath)
             }
         }
     }

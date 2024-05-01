@@ -2,7 +2,11 @@ rootProject.name = "smithy-java"
 
 include ":core"
 
-include ":codegen"
+// Codegen
+include ":codegen:core"
+include ":codegen:client"
+include ":codegen:server"
+include ":codegen:types"
 
 include "tracing-api"
 

@@ -6,5 +6,5 @@ description = "This module provides endpoint provider API"
 
 ext {
     displayName = "Smithy :: Java :: Endpoint Provider API"
-    moduleName = "software.amazon.smithy.smithy-java.endpoint-provider-api"
+    moduleName = "software.amazon.smithy.java.endpoint-provider-api"
 }

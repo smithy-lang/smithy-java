@@ -6,7 +6,7 @@ description = "This module provides http-binding functionality"
 
 ext {
     displayName = "Smithy :: Java :: Http Binding"
-    moduleName = "software.amazon.smithy.smithy-java.http-binding"
+    moduleName = "software.amazon.smithy.java.http-binding"
 }
 
 dependencies {

@@ -6,7 +6,7 @@ description = "This module provides client HTTP functionality"
 
 ext {
     displayName = "Smithy :: Java :: Client Http"
-    moduleName = "software.amazon.smithy.smithy-java.client-http"
+    moduleName = "software.amazon.smithy.java.client-http"
 }
 
 dependencies {

@@ -6,7 +6,7 @@ description = "This module provides the core client functionality"
 
 ext {
     displayName = "Smithy :: Java :: Client Core"
-    moduleName = "software.amazon.smithy.smithy-java.client-core"
+    moduleName = "software.amazon.smithy.java.client-core"
 }
 
 dependencies {
