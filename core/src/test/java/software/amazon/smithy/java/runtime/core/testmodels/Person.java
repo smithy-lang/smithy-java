@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
@@ -115,23 +116,28 @@ public final class Person implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, this, Person::writeShape);
+        serializer.writeStruct(SCHEMA, this, WriteShape.INSTANCE);
     }
 
-    private static void writeShape(Person shape, ShapeSerializer serializer) {
-        serializer.writeString(SCHEMA_NAME, shape.name);
-        serializer.writeInteger(SCHEMA_AGE, shape.age);
-        if (shape.favoriteColor != null) {
-            serializer.writeString(SCHEMA_FAVORITE_COLOR, shape.favoriteColor);
-        }
-        if (shape.binary != null) {
-            serializer.writeBlob(SCHEMA_BINARY, shape.binary);
-        }
-        if (shape.birthday != null) {
-            serializer.writeTimestamp(SCHEMA_BIRTHDAY, shape.birthday);
-        }
-        if (!shape.queryParams.isEmpty()) {
-            serializer.writeMap(SCHEMA_QUERY_PARAMS, shape, Person::writeQueryParamsMember);
+    private static final class WriteShape implements BiConsumer<Person, ShapeSerializer> {
+        private static final WriteShape INSTANCE = new WriteShape();
+
+        @Override
+        public void accept(Person shape, ShapeSerializer serializer) {
+            serializer.writeString(SCHEMA_NAME, shape.name);
+            serializer.writeInteger(SCHEMA_AGE, shape.age);
+            if (shape.favoriteColor != null) {
+                serializer.writeString(SCHEMA_FAVORITE_COLOR, shape.favoriteColor);
+            }
+            if (shape.binary != null) {
+                serializer.writeBlob(SCHEMA_BINARY, shape.binary);
+            }
+            if (shape.birthday != null) {
+                serializer.writeTimestamp(SCHEMA_BIRTHDAY, shape.birthday);
+            }
+            if (!shape.queryParams.isEmpty()) {
+                serializer.writeMap(SCHEMA_QUERY_PARAMS, shape, Person::writeQueryParamsMember);
+            }
         }
     }
 

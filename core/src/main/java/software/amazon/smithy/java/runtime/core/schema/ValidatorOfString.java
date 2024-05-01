@@ -8,14 +8,13 @@ package software.amazon.smithy.java.runtime.core.schema;
 import java.util.List;
 import java.util.regex.Pattern;
 
-@SuppressWarnings("ClassEscapesDefinedScope")
-sealed interface ValidatorOfString permits ValidatorOfString.NoStringValidation,
+abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValidation,
     ValidatorOfString.EnumStringValidator,
     ValidatorOfString.LengthStringValidator,
     ValidatorOfString.PatternStringValidator,
     ValidatorOfString.CompositeStringValidator {
 
-    void apply(SdkSchema schema, String value, Validator.ShapeValidator validator);
+    abstract void apply(SdkSchema schema, String value, Validator.ShapeValidator validator);
 
     static ValidatorOfString of(List<ValidatorOfString> validators) {
         if (validators == null || validators.isEmpty()) {
@@ -27,14 +26,14 @@ sealed interface ValidatorOfString permits ValidatorOfString.NoStringValidation,
         }
     }
 
-    final class NoStringValidation implements ValidatorOfString {
+    static final class NoStringValidation extends ValidatorOfString {
         static final NoStringValidation INSTANCE = new NoStringValidation();
 
         @Override
         public void apply(SdkSchema schema, String value, Validator.ShapeValidator validator) {}
     }
 
-    final class CompositeStringValidator implements ValidatorOfString {
+    static final class CompositeStringValidator extends ValidatorOfString {
         private final List<ValidatorOfString> validators;
 
         CompositeStringValidator(List<ValidatorOfString> validators) {
@@ -49,7 +48,7 @@ sealed interface ValidatorOfString permits ValidatorOfString.NoStringValidation,
         }
     }
 
-    final class LengthStringValidator implements ValidatorOfString {
+    static final class LengthStringValidator extends ValidatorOfString {
 
         private final long min;
         private final long max;
@@ -68,7 +67,7 @@ sealed interface ValidatorOfString permits ValidatorOfString.NoStringValidation,
         }
     }
 
-    final class PatternStringValidator implements ValidatorOfString {
+    static final class PatternStringValidator extends ValidatorOfString {
 
         private final Pattern pattern;
 
@@ -98,12 +97,12 @@ sealed interface ValidatorOfString permits ValidatorOfString.NoStringValidation,
         }
     }
 
-    final class EnumStringValidator implements ValidatorOfString {
+    static final class EnumStringValidator extends ValidatorOfString {
         static final EnumStringValidator INSTANCE = new EnumStringValidator();
 
         @Override
         public void apply(SdkSchema schema, String value, Validator.ShapeValidator validator) {
-            if (!schema.stringEnumValues.contains(value)) {
+            if (!schema.stringEnumValues().contains(value)) {
                 validator.addError(new ValidationError.EnumValidationFailure(validator.createPath(), value, schema));
             }
         }

@@ -21,7 +21,7 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     private final Validator.ShapeValidator validator;
-    private int setBitfields = 0;
+    private long setBitfields = 0L;
 
     ValidatorOfRequiredStruct(Validator.ShapeValidator validator) {
         this.validator = validator;
@@ -38,7 +38,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
         checkResult(schema, structValidator.setBitfields, validator);
     }
 
-    private static void checkResult(SdkSchema schema, int setBitfields, Validator.ShapeValidator validator) {
+    private static void checkResult(SdkSchema schema, long setBitfields, Validator.ShapeValidator validator) {
         if (schema.requiredStructureMemberBitfield != setBitfields) {
             for (var member : missingMembers(schema, setBitfields)) {
                 validator.addError(
@@ -48,10 +48,10 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
         }
     }
 
-    private static Set<String> missingMembers(SdkSchema schema, int setBitfields) {
+    private static Set<String> missingMembers(SdkSchema schema, long setBitfields) {
         Set<String> result = new TreeSet<>();
         for (var member : schema.members()) {
-            if (member.isRequiredByValidation() && (setBitfields & member.requiredByValidationBitmask) == 0) {
+            if (member.isRequiredByValidation() && (setBitfields & member.requiredByValidationBitmask) == 0L) {
                 result.add(member.memberName());
             }
         }

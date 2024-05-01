@@ -17,12 +17,12 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 /**
  * Validates structures that have required members and more than 64 total members.
  */
-final class ValidatorOfJumboStruct implements ShapeSerializer {
+final class ValidatorOfBigRequiredStruct implements ShapeSerializer {
 
     private final Validator.ShapeValidator validator;
     private final BitSet bitSet;
 
-    private ValidatorOfJumboStruct(Validator.ShapeValidator validator, SdkSchema schema) {
+    private ValidatorOfBigRequiredStruct(Validator.ShapeValidator validator, SdkSchema schema) {
         this.validator = validator;
         this.bitSet = new BitSet(schema.members().size());
     }
@@ -33,20 +33,30 @@ final class ValidatorOfJumboStruct implements ShapeSerializer {
         T structState,
         BiConsumer<T, ShapeSerializer> consumer
     ) {
-        var statefulStructSerializer = new ValidatorOfJumboStruct(validator, schema);
+        var statefulStructSerializer = new ValidatorOfBigRequiredStruct(validator, schema);
         consumer.accept(structState, statefulStructSerializer);
 
-        for (var member : schema.members()) {
-            if (!statefulStructSerializer.bitSet.get(member.memberIndex())) {
-                validator.addError(
-                    new ValidationError.RequiredValidationFailure(validator.createPath(), member.memberName(), schema)
-                );
+        // We can do a quick check first that length is the count of required members.
+        if (statefulStructSerializer.bitSet.length() != schema.requiredMemberCount) {
+            for (var member : schema.members()) {
+                if (member.isRequiredByValidation() && !statefulStructSerializer.bitSet.get(member.memberIndex())) {
+                    validator.addError(
+                        new ValidationError.RequiredValidationFailure(
+                            validator.createPath(),
+                            member.memberName(),
+                            schema
+                        )
+                    );
+                }
             }
         }
     }
 
     private void before(SdkSchema member) {
-        bitSet.set(member.memberIndex());
+        if (member.isRequiredByValidation()) {
+            bitSet.set(member.memberIndex());
+        }
+
         validator.pushPath(member.memberName());
     }
 

@@ -28,6 +28,12 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
+    public void close() {
+        builder.setLength(0);
+        builder.trimToSize();
+    }
+
+    @Override
     public String toString() {
         return builder.toString().trim();
     }

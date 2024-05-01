@@ -37,7 +37,7 @@ public final class Validator {
     enum StructValidation {
         UNION,
         REQUIRED,
-        JUMBO,
+        BIG_REQUIRED,
         NOT_STRUCT
     }
 
@@ -233,9 +233,9 @@ public final class Validator {
             elementCount = 0; // note that we don't track the count of structure members.
             switch (schema.structValidation) {
                 case REQUIRED -> ValidatorOfRequiredStruct.validate(this, schema, structState, consumer);
+                case BIG_REQUIRED -> ValidatorOfBigRequiredStruct.validate(this, schema, structState, consumer);
                 case UNION -> ValidatorOfUnion.validate(this, schema, structState, consumer);
-                case JUMBO -> ValidatorOfJumboStruct.validate(this, schema, structState, consumer);
-                case NOT_STRUCT -> this.checkType(schema, ShapeType.STRUCTURE);
+                case NOT_STRUCT -> checkType(schema, ShapeType.STRUCTURE); // this is guaranteed to fail type checking.
             }
             currentSchema = previousSchema;
             elementCount = previousCount;

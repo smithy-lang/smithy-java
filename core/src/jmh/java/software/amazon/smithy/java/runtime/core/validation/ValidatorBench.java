@@ -19,7 +19,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import software.amazon.smithy.java.runtime.core.schema.ValidationError;
 import software.amazon.smithy.java.runtime.core.schema.Validator;
-import software.amazon.smithy.java.runtime.core.schema.model.Person;
+import software.amazon.smithy.java.runtime.core.testmodels.Person;
 import software.amazon.smithy.java.runtime.core.testmodels.PojoWithValidatedCollection;
 import software.amazon.smithy.java.runtime.core.testmodels.UnvalidatedPojo;
 import software.amazon.smithy.java.runtime.core.testmodels.ValidatedPojo;

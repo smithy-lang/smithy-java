@@ -59,9 +59,6 @@ public final class PojoWithValidatedCollection implements SerializableShape {
 
     private final Map<String, ValidatedPojo> map;
     private final List<ValidatedPojo> list;
-    private final InnerSerializer innerSerializer = new InnerSerializer();
-    private final InnerListSerializer innerListSerializer = new InnerListSerializer();
-    private final InnerMapSerializer innerMapSerializer = new InnerMapSerializer();
 
     private PojoWithValidatedCollection(Builder builder) {
         this.map = builder.map;
@@ -87,18 +84,22 @@ public final class PojoWithValidatedCollection implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, this, innerSerializer);
+        serializer.writeStruct(SCHEMA, this, InnerSerializer.INSTANCE);
     }
 
     private static final class InnerSerializer implements BiConsumer<PojoWithValidatedCollection, ShapeSerializer> {
+        private static final InnerSerializer INSTANCE = new InnerSerializer();
+
         @Override
         public void accept(PojoWithValidatedCollection pojo, ShapeSerializer st) {
-            st.writeList(SCHEMA_LIST, pojo.list, pojo.innerListSerializer);
-            st.writeMap(SCHEMA_MAP, pojo.map, pojo.innerMapSerializer);
+            st.writeList(SCHEMA_LIST, pojo.list, InnerListSerializer.INSTANCE);
+            st.writeMap(SCHEMA_MAP, pojo.map, InnerMapSerializer.INSTANCE);
         }
     }
 
     private static final class InnerListSerializer implements BiConsumer<List<ValidatedPojo>, ShapeSerializer> {
+        private static final InnerListSerializer INSTANCE = new InnerListSerializer();
+
         @Override
         public void accept(List<ValidatedPojo> value, ShapeSerializer ser) {
             for (var entry : value) {
@@ -108,6 +109,8 @@ public final class PojoWithValidatedCollection implements SerializableShape {
     }
 
     private static final class InnerMapSerializer implements BiConsumer<Map<String, ValidatedPojo>, MapSerializer> {
+        private static final InnerMapSerializer INSTANCE = new InnerMapSerializer();
+
         @Override
         public void accept(Map<String, ValidatedPojo> map, MapSerializer ser) {
             for (var entry : map.entrySet()) {

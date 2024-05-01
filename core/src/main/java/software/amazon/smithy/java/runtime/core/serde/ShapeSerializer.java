@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.core.serde;
 
+import java.io.Closeable;
 import java.io.Flushable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -20,7 +21,7 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
  * <p>Note: null values should only ever be written using {@link #writeNull(SdkSchema)}. Every other method expects
  * a non-null value or a value type.
  */
-public interface ShapeSerializer extends Flushable {
+public interface ShapeSerializer extends Flushable, Closeable {
 
     /**
      * Create a serializer that serializes nothing.
@@ -33,6 +34,9 @@ public interface ShapeSerializer extends Flushable {
 
     @Override
     default void flush() {}
+
+    @Override
+    default void close() {}
 
     /**
      * Writes a structure or union.

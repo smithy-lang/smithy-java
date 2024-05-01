@@ -7,7 +7,6 @@ package software.amazon.smithy.java.runtime.core.schema;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,6 +31,8 @@ import software.amazon.smithy.utils.SmithyBuilder;
  *
  * <p>Various constraint traits are precomputed based on the presence of traits exposed by this class to aid in the
  * performance of validation to avoid computing constraints and hashmap lookups by trait class.
+ *
+ * <p>Note: when creating a structure schema, all required members must come before optional members.
  */
 public final class SdkSchema {
 
@@ -40,6 +41,7 @@ public final class SdkSchema {
     private final Map<Class<? extends Trait>, Trait> traits;
     private final Map<String, SdkSchema> members;
     private final List<SdkSchema> memberList;
+    private volatile int hashCode;
 
     private final String memberName;
     private final SdkSchema memberTarget;
@@ -49,11 +51,11 @@ public final class SdkSchema {
      */
     private int memberIndex = -1;
 
-    final Set<String> stringEnumValues;
-    final Set<Integer> intEnumValues;
+    private final Set<String> stringEnumValues;
+    private final Set<Integer> intEnumValues;
 
     // The following variables are used to speed up validation and prevent looking up constraints over and over.
-    private final boolean hasRequiredMembers;
+    final int requiredMemberCount;
     final long minLengthConstraint;
     final long maxLengthConstraint;
     final BigDecimal minRangeConstraint;
@@ -63,26 +65,27 @@ public final class SdkSchema {
     final double minDoubleConstraint;
     final double maxDoubleConstraint;
     final Validator.StructValidation structValidation;
-
     final ValidatorOfString stringValidation;
+    boolean isRequiredByValidation;
 
     /**
      * The bitmask to use for this member to compute a required member bitfield. This value will match the memberIndex
-     * if the member is required and has no default value. It will be zero if it's not required or has a default value.
+     * if the member is required and has no default value. It will be zero if isRequiredByValidation == false.
      */
-    int requiredByValidationBitmask;
+    long requiredByValidationBitmask;
 
     /**
      * The result of creating a bitfield of the memberIndex of every required member with no default value.
      * This allows for an inexpensive comparison for required structure member validation.
      */
-    final int requiredStructureMemberBitfield;
+    final long requiredStructureMemberBitfield;
 
     private SdkSchema(Builder builder) {
         this.id = Objects.requireNonNull(builder.id, "id is null");
         this.type = Objects.requireNonNull(builder.type, "type is null");
         this.traits = createTraitMap(builder.traits);
 
+        // Member setting.s
         this.memberName = builder.memberName;
         this.memberTarget = builder.memberTarget;
         this.members = MemberContainers.of(
@@ -91,6 +94,10 @@ public final class SdkSchema {
             this.memberTarget != null ? this.memberTarget.members : null
         );
         this.memberList = builder.members == null ? Collections.emptyList() : List.copyOf(members.values());
+        // Validation requires the member is present if it's required and has no default value.
+        this.isRequiredByValidation = memberName != null
+            && !hasTrait(DefaultTrait.class)
+            && hasTrait(RequiredTrait.class);
 
         this.stringEnumValues = builder.stringEnumValues;
         this.intEnumValues = builder.intEnumValues;
@@ -166,18 +173,20 @@ public final class SdkSchema {
         }
 
         // Pre-compute where the shape contains any members marked as required.
-        this.hasRequiredMembers = hasRequired(this.type, this.memberTarget, this.memberList);
-
-        // Precompute the bitfields needed to be set when all required members are present.
-        this.requiredStructureMemberBitfield = hasRequiredMembers ? computeRequiredBitField(members()) : 0;
+        // We only need to use the slow version of required member validation if there are > 64 required members.
+        this.requiredMemberCount = computeRequiredMemberCount(this.type, this.memberTarget, this.memberList);
 
         structValidation = switch (type) {
             case UNION -> Validator.StructValidation.UNION;
-            case STRUCTURE -> members.size() > 32
-                ? Validator.StructValidation.JUMBO
+            case STRUCTURE -> requiredMemberCount > 64
+                ? Validator.StructValidation.BIG_REQUIRED
                 : Validator.StructValidation.REQUIRED;
             default -> Validator.StructValidation.NOT_STRUCT;
         };
+
+        this.requiredStructureMemberBitfield = structValidation == Validator.StructValidation.REQUIRED
+            ? computeRequiredBitField(members())
+            : 0;
     }
 
     private static Map<Class<? extends Trait>, Trait> createTraitMap(Trait[] traits) {
@@ -222,23 +231,24 @@ public final class SdkSchema {
         return ValidatorOfString.of(stringValidators);
     }
 
-    private static boolean hasRequired(ShapeType type, SdkSchema memberTarget, List<SdkSchema> members) {
+    private static int computeRequiredMemberCount(ShapeType type, SdkSchema memberTarget, List<SdkSchema> members) {
         if (memberTarget != null) {
-            return memberTarget.hasRequiredMembers;
+            return memberTarget.requiredMemberCount;
         } else if (type != ShapeType.STRUCTURE) {
-            return false;
+            return 0;
         } else {
+            int result = 0;
             for (var member : members) {
-                if (member.isRequiredByValidation()) {
-                    return true;
+                if (member.isRequiredByValidation) {
+                    result++;
                 }
             }
-            return false;
+            return result;
         }
     }
 
-    private static int computeRequiredBitField(Collection<SdkSchema> members) {
-        int setFields = 0;
+    private static long computeRequiredBitField(Collection<SdkSchema> members) {
+        long setFields = 0L;
         for (SdkSchema member : members) {
             setFields |= member.requiredByValidationBitmask;
         }
@@ -249,19 +259,13 @@ public final class SdkSchema {
         if (this.memberIndex != -1) {
             throw new IllegalStateException(
                 "Member schema already has an assigned member index of "
-                    + this.memberIndex + ". Members cannot be reused across shapes. "
-                    + "Member: " + this
+                    + this.memberIndex + ". Members cannot be reused across shapes. Member: " + this
             );
         }
 
+        hashCode = 0; // reset the hashcode
         this.memberIndex = memberIndex;
-
-        // Compute the bitmask of the memberIndex if the shape is required and has no default.
-        if (hasTrait(RequiredTrait.class) && !hasTrait(DefaultTrait.class)) {
-            requiredByValidationBitmask = 1 << memberIndex;
-        } else {
-            requiredByValidationBitmask = 0;
-        }
+        requiredByValidationBitmask = isRequiredByValidation ? 1L << memberIndex : 0L;
     }
 
     /**
@@ -422,7 +426,7 @@ public final class SdkSchema {
      * @return true if required.
      */
     boolean isRequiredByValidation() {
-        return requiredByValidationBitmask != 0;
+        return isRequiredByValidation;
     }
 
     /**
@@ -464,17 +468,22 @@ public final class SdkSchema {
 
     @Override
     public int hashCode() {
-        return Objects.hash(
-            id,
-            type,
-            traits,
-            members,
-            stringEnumValues,
-            intEnumValues,
-            memberName,
-            memberTarget,
-            memberIndex
-        );
+        var code = hashCode;
+        if (code == 0) {
+            code = Objects.hash(
+                id,
+                type,
+                traits,
+                members,
+                stringEnumValues,
+                intEnumValues,
+                memberName,
+                memberTarget,
+                memberIndex
+            );
+            hashCode = code;
+        }
+        return code;
     }
 
     public static final class Builder implements SmithyBuilder<SdkSchema> {
@@ -556,7 +565,9 @@ public final class SdkSchema {
          * @throws IllegalStateException if the schema is for a member.
          */
         public Builder members(SdkSchema... members) {
-            return members(Arrays.asList(members));
+            List<SdkSchema> result = new ArrayList<>(members.length);
+            Collections.addAll(result, members);
+            return membersWithOwnedList(result);
         }
 
         /**
@@ -571,7 +582,7 @@ public final class SdkSchema {
             for (Builder member : members) {
                 built.add(member.id(id).build());
             }
-            return members(built);
+            return membersWithOwnedList(built);
         }
 
         /**
@@ -582,9 +593,25 @@ public final class SdkSchema {
          * @throws IllegalStateException if the schema is for a member, or if the member is owned by another shape.
          */
         public Builder members(List<SdkSchema> members) {
+            return membersWithOwnedList(new ArrayList<>(members));
+        }
+
+        // Given a list that the builder owns and is free to mutate and keep, sort the members and store them.
+        private Builder membersWithOwnedList(List<SdkSchema> members) {
             if (memberTarget != null) {
                 throw new IllegalStateException("Cannot add members to a member");
             }
+
+            // Sort members to ensure that required members with no default come before other members.
+            members.sort((a, b) -> {
+                if (a.isRequiredByValidation && !b.isRequiredByValidation) {
+                    return -1;
+                } else if (a.isRequiredByValidation) {
+                    return 0;
+                } else {
+                    return 1;
+                }
+            });
 
             // Assign the member index for each, checking to ensure members aren't illegally shared across shapes.
             int index = 0;

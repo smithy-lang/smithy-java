@@ -20,6 +20,7 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -1211,27 +1212,62 @@ public class ValidatorTest {
         assertThat(error.message(), is("Value with length 3 must have length between 1 and 2, inclusive"));
     }
 
-    @Test
-    public void validatesRequiredMembersOfJumboStructs() {
-        var string = PreludeSchemas.STRING;
-
-        SdkSchema.Builder[] members = new SdkSchema.Builder[100];
-        for (var i = 0; i < 100; i++) {
-            members[i] = SdkSchema.memberBuilder("member" + i, string).traits(new RequiredTrait());
-        }
-
-        SdkSchema struct = SdkSchema.builder()
-            .type(ShapeType.STRUCTURE)
-            .id("smithy.example#Foo")
-            .members(members)
-            .build();
-
+    @ParameterizedTest
+    @MethodSource("validatesRequiredMembersOfBigStructsProvider")
+    public void validatesRequiredMembersOfBigStructs(
+        int totalMembers,
+        int requiredCount,
+        int defaultedCount,
+        int failures
+    ) {
+        var struct = createBigRequiredSchema(totalMembers, requiredCount, defaultedCount);
         Validator validator = Validator.builder().build();
 
         var errors = validator.validate(encoder -> {
             encoder.writeStruct(struct, struct, (member, serializer) -> {});
         });
 
-        assertThat(errors, hasSize(100));
+        assertThat(errors, hasSize(failures));
+
+        for (var e : errors) {
+            assertThat(e, instanceOf(ValidationError.RequiredValidationFailure.class));
+        }
+    }
+
+    static List<Arguments> validatesRequiredMembersOfBigStructsProvider() {
+        return Arrays.asList(
+            // int totalMembers, int requiredCount, int defaultedCount, int failures
+            Arguments.of(100, 100, 0, 100),
+            Arguments.of(100, 80, 0, 80),
+            Arguments.of(100, 80, 20, 60),
+            Arguments.of(100, 100, 100, 0),
+            Arguments.of(1000, 10, 0, 10),
+            Arguments.of(0, 0, 0, 0),
+            Arguments.of(63, 63, 0, 63),
+            Arguments.of(64, 64, 0, 64),
+            Arguments.of(65, 65, 0, 65)
+        );
+    }
+
+    private static SdkSchema createBigRequiredSchema(int totalMembers, int requiredCount, int defaultedCount) {
+        var string = PreludeSchemas.STRING;
+
+        SdkSchema.Builder[] members = new SdkSchema.Builder[totalMembers];
+        for (var i = 0; i < totalMembers; i++) {
+            SdkSchema.Builder member = SdkSchema.memberBuilder("member" + i, string);
+            if (i < requiredCount) {
+                member.traits(new RequiredTrait());
+            }
+            if (i < defaultedCount) {
+                member.traits(new DefaultTrait(Node.from("")));
+            }
+            members[i] = member;
+        }
+
+        return SdkSchema.builder()
+            .type(ShapeType.STRUCTURE)
+            .id("smithy.example#Foo")
+            .members(members)
+            .build();
     }
 }

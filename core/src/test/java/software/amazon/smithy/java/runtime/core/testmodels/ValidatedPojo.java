@@ -45,7 +45,6 @@ public final class ValidatedPojo implements SerializableShape {
     private final String string;
     private final int integer;
     private final Integer boxedInteger;
-    private final InnerSerializer innerSerializer = new InnerSerializer();
 
     private ValidatedPojo(Builder builder) {
         this.string = builder.string;
@@ -76,10 +75,12 @@ public final class ValidatedPojo implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, this, innerSerializer);
+        serializer.writeStruct(SCHEMA, this, InnerSerializer.INSTANCE);
     }
 
     private static final class InnerSerializer implements BiConsumer<ValidatedPojo, ShapeSerializer> {
+        private static final InnerSerializer INSTANCE = new InnerSerializer();
+
         @Override
         public void accept(ValidatedPojo pojo, ShapeSerializer st) {
             if (pojo.string != null) {
@@ -127,6 +128,9 @@ public final class ValidatedPojo implements SerializableShape {
                     case 0 -> builder.string(de.readString(member));
                     case 1 -> builder.boxedInteger(de.readInteger(member));
                     case 2 -> builder.integer(de.readInteger(member));
+                    default -> {
+                        // TODO: Log periodically
+                    }
                 }
             });
             return this;
