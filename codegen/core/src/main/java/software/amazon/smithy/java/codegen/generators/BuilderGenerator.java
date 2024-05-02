@@ -98,7 +98,7 @@ final class BuilderGenerator implements Runnable {
 
     private void generateMemberSwitchCases() {
         int idx = 0;
-        for (var iter = shape.members().iterator(); iter.hasNext(); idx++) {
+        for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {
             var member = iter.next();
             var target = model.expectShape(member.getTarget());
             if (CodegenUtils.isStreamingBlob(target)) {

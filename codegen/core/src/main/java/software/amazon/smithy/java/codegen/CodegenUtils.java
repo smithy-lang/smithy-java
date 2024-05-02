@@ -6,8 +6,10 @@
 package software.amazon.smithy.java.codegen;
 
 import java.net.URL;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import software.amazon.smithy.codegen.core.ReservedWords;
 import software.amazon.smithy.codegen.core.ReservedWordsBuilder;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -179,5 +181,33 @@ public final class CodegenUtils {
             return writer.format("$T.$L", provider.toSymbol(shape), toSchemaName(shape));
         }
         return writer.format("SharedSchemas.$L", toSchemaName(shape));
+    }
+
+    /**
+     * Sorts shape members to ensure that required members with no default value come before other members.
+     *
+     * @param shape Shape to sort members of
+     * @return list of sorted members
+     */
+    public static List<MemberShape> getSortedMembers(Shape shape) {
+        return shape.members()
+            .stream()
+            .sorted(
+                (a, b) -> {
+                    //
+                    if (isRequiredWithDefault(a) && !isRequiredWithDefault(b)) {
+                        return -1;
+                    } else if (isRequiredWithDefault(a)) {
+                        return 0;
+                    } else {
+                        return 1;
+                    }
+                }
+            )
+            .collect(Collectors.toList());
+    }
+
+    private static boolean isRequiredWithDefault(MemberShape memberShape) {
+        return memberShape.isRequired() && memberShape.hasNonNullDefault();
     }
 }

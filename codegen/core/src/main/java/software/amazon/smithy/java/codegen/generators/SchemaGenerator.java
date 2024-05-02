@@ -125,7 +125,7 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
         // Add the member schema names to the context, so we can iterate through them
         writer.putContext(
             "memberSchemas",
-            shape.members()
+            CodegenUtils.getSortedMembers(shape)
                 .stream()
                 .map(symbolProvider::toMemberName)
                 .map(CodegenUtils::toMemberSchemaName)
