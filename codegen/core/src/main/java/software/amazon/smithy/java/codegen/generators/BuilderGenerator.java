@@ -16,6 +16,7 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
@@ -57,6 +58,7 @@ final class BuilderGenerator implements Runnable {
         writer.putContext("shape", symbolProvider.toSymbol(shape));
         writer.putContext("sdkShapeBuilder", SdkShapeBuilder.class);
         writer.putContext("shapeDeserializer", ShapeDeserializer.class);
+        writer.putContext("sdkSchema", SdkSchema.class);
         writer.write(
             """
                 public static Builder builder() {
@@ -69,6 +71,8 @@ final class BuilderGenerator implements Runnable {
                 public static final class Builder implements ${sdkShapeBuilder:T}<${shape:T}> {
                     ${C|}
 
+                    private static final InnerDeserializer INNER_DESERIALIZER = new InnerDeserializer();
+                    
                     private Builder() {}
 
                     ${C|}
@@ -80,12 +84,17 @@ final class BuilderGenerator implements Runnable {
 
                     @Override
                     public Builder deserialize(${shapeDeserializer:T} decoder) {
-                        decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
+                        decoder.readStruct(SCHEMA, this, ${?hasMembers}INNER_DESERIALIZER${/hasMembers}${^hasMembers}(b, m, d) -> {}${/hasMembers});
+                        return this;
+                    }
+                    
+                    private static final class InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer<Builder> {
+                        @Override
+                        public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {
                             ${?hasMembers}switch (member.memberIndex()) {
                                 ${C|}
                             }${/hasMembers}
-                        });
-                        return this;
+                        }
                     }
                 }""",
 
