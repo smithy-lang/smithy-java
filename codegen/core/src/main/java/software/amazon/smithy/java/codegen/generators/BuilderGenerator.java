@@ -72,7 +72,7 @@ final class BuilderGenerator implements Runnable {
                     ${C|}
 
                     private static final InnerDeserializer INNER_DESERIALIZER = new InnerDeserializer();
-                    
+
                     private Builder() {}
 
                     ${C|}
@@ -87,7 +87,7 @@ final class BuilderGenerator implements Runnable {
                         decoder.readStruct(SCHEMA, this, ${?hasMembers}INNER_DESERIALIZER${/hasMembers}${^hasMembers}(b, m, d) -> {}${/hasMembers});
                         return this;
                     }
-                    
+
                     private static final class InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer<Builder> {
                         @Override
                         public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {
