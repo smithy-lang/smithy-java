@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
@@ -30,7 +29,7 @@ import software.amazon.smithy.model.traits.SparseTrait;
  * List<ValidationError> errors = validator.validate(someShape);
  * }</pre>
  *
- * <p>Note that Validator is not thread safe.
+ * <p>Validator is thread safe.
  */
 public final class Validator {
 
@@ -41,10 +40,12 @@ public final class Validator {
         NOT_STRUCT
     }
 
-    private final ShapeValidator shapeValidator;
+    private final int maxDepth;
+    private final int maxAllowedErrors;
 
     private Validator(Builder builder) {
-        shapeValidator = new ShapeValidator(builder.maxAllowedErrors, builder.maxDepth);
+        this.maxAllowedErrors = builder.maxAllowedErrors;
+        this.maxDepth = builder.maxDepth;
     }
 
     /**
@@ -63,19 +64,13 @@ public final class Validator {
      * @return the validation errors produced by the shape.
      */
     public List<ValidationError> validate(SerializableShape shape) {
+        var shapeValidator = new ShapeValidator(maxAllowedErrors, maxDepth);
         try {
             shape.serialize(shapeValidator);
-            return shapeValidator.errors.isEmpty() ? Collections.emptyList() : returnCopyOfErrors();
+            return shapeValidator.errors;
         } catch (ValidationShortCircuitException ignored) {
-            shapeValidator.resetValidatorState();
-            return returnCopyOfErrors();
+            return shapeValidator.errors;
         }
-    }
-
-    private List<ValidationError> returnCopyOfErrors() {
-        List<ValidationError> result = new ArrayList<>(shapeValidator.errors);
-        shapeValidator.errors.clear();
-        return result;
     }
 
     /**
@@ -131,7 +126,7 @@ public final class Validator {
 
     static final class ShapeValidator implements ShapeSerializer, MapSerializer {
 
-        private static final int STARTING_PATH_SIZE = 6;
+        private static final int STARTING_PATH_SIZE = 4;
         private final int maxAllowedErrors;
         private final int maxDepth;
         private final ListSerializer listValidator;
