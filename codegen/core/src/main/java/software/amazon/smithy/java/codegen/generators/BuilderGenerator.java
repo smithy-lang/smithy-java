@@ -84,11 +84,12 @@ final class BuilderGenerator implements Runnable {
 
                     @Override
                     public Builder deserialize(${shapeDeserializer:T} decoder) {
-                        decoder.readStruct(SCHEMA, this, ${?hasMembers}INNER_DESERIALIZER${/hasMembers}${^hasMembers}(b, m, d) -> {}${/hasMembers});
+                        decoder.readStruct(SCHEMA, this, InnerDeserializer.INSTANCE);
                         return this;
                     }
 
                     private static final class InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer<Builder> {
+                        private static final InnerDeserializer INSTANCE = new InnerDeserializer();
                         @Override
                         public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {
                             ${?hasMembers}switch (member.memberIndex()) {
