@@ -6,47 +6,50 @@
 package software.amazon.smithy.java.runtime.json;
 
 import com.jsoniter.JsonIterator;
+import com.jsoniter.ValueType;
+import com.jsoniter.spi.JsonException;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
-import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
-import software.amazon.smithy.model.traits.JsonNameTrait;
 
 final class JsonDeserializer implements ShapeDeserializer {
 
-    private final JsonIterator iter;
-    private final boolean useJsonName;
-    private final Base64.Decoder decoder = Base64.getDecoder();
-    private final TimestampFormatter defaultTimestampFormat;
-    private final boolean useTimestampFormat;
+    private JsonIterator iter;
+    private final TimestampResolver timestampResolver;
+    private final JsonFieldMapper fieldMapper;
+    private final Consumer<JsonIterator> returnHandle;
 
     JsonDeserializer(
-        byte[] source,
-        boolean useJsonName,
-        TimestampFormatter defaultTimestampFormat,
-        boolean useTimestampFormat
+        JsonIterator iter,
+        TimestampResolver timestampResolver,
+        JsonFieldMapper fieldMapper,
+        Consumer<JsonIterator> returnHandle
     ) {
-        this.useJsonName = useJsonName;
-        this.useTimestampFormat = useTimestampFormat;
-        this.defaultTimestampFormat = defaultTimestampFormat;
-        if (source.length == 0) {
-            throw new IllegalArgumentException("Cannot parse empty JSON string");
-        }
-        this.iter = JsonIterator.parse(source);
+        this.iter = iter;
+        this.timestampResolver = timestampResolver;
+        this.fieldMapper = fieldMapper;
+        this.returnHandle = returnHandle;
+    }
+
+    @Override
+    public void close() {
+        returnHandle.accept(iter);
+        iter = null;
     }
 
     @Override
     public byte[] readBlob(SdkSchema schema) {
         try {
             String content = iter.readString();
-            return decoder.decode(content);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            return Base64.getDecoder().decode(content);
+        } catch (JsonException | IOException | IllegalArgumentException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
@@ -54,8 +57,8 @@ final class JsonDeserializer implements ShapeDeserializer {
     public byte readByte(SdkSchema schema) {
         try {
             return (byte) iter.readShort();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
@@ -63,8 +66,8 @@ final class JsonDeserializer implements ShapeDeserializer {
     public short readShort(SdkSchema schema) {
         try {
             return iter.readShort();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
@@ -72,8 +75,8 @@ final class JsonDeserializer implements ShapeDeserializer {
     public int readInteger(SdkSchema schema) {
         try {
             return iter.readInt();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
@@ -81,8 +84,8 @@ final class JsonDeserializer implements ShapeDeserializer {
     public long readLong(SdkSchema schema) {
         try {
             return iter.readLong();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
@@ -90,8 +93,8 @@ final class JsonDeserializer implements ShapeDeserializer {
     public float readFloat(SdkSchema schema) {
         try {
             return iter.readFloat();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
@@ -99,8 +102,8 @@ final class JsonDeserializer implements ShapeDeserializer {
     public double readDouble(SdkSchema schema) {
         try {
             return iter.readDouble();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
@@ -108,8 +111,8 @@ final class JsonDeserializer implements ShapeDeserializer {
     public BigInteger readBigInteger(SdkSchema schema) {
         try {
             return iter.readBigInteger();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
@@ -117,8 +120,8 @@ final class JsonDeserializer implements ShapeDeserializer {
     public BigDecimal readBigDecimal(SdkSchema schema) {
         try {
             return iter.readBigDecimal();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
@@ -126,8 +129,8 @@ final class JsonDeserializer implements ShapeDeserializer {
     public String readString(SdkSchema schema) {
         try {
             return iter.readString();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
@@ -135,52 +138,50 @@ final class JsonDeserializer implements ShapeDeserializer {
     public boolean readBoolean(SdkSchema schema) {
         try {
             return iter.readBoolean();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
     @Override
     public JsonDocument readDocument() {
         try {
-            return new JsonDocument(iter.readAny(), useJsonName, defaultTimestampFormat, useTimestampFormat);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            var any = iter.readAny().mustBeValid();
+            // Return a regular null here if the result was null.
+            if (any.valueType() == ValueType.NULL) {
+                return null;
+            } else {
+                return new JsonDocument(any, fieldMapper, timestampResolver);
+            }
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
     @Override
     public Instant readTimestamp(SdkSchema schema) {
-        return readDocument().asTimestamp();
+        try {
+            var format = timestampResolver.resolve(schema);
+            return TimestampResolver.readTimestamp(iter.readAny(), format);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
+        }
     }
 
     @Override
     public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         try {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
-                var member = resolveMember(schema, field);
+                var member = fieldMapper.fieldToMember(schema, field);
                 if (member == null) {
                     iter.skip();
                 } else {
                     structMemberConsumer.accept(state, member, this);
                 }
             }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
-    }
-
-    private SdkSchema resolveMember(SdkSchema schema, String field) {
-        for (SdkSchema m : schema.members()) {
-            if (useJsonName && m.hasTrait(JsonNameTrait.class)) {
-                if (m.getTrait(JsonNameTrait.class).getValue().equals(field)) {
-                    return m;
-                }
-            } else if (m.memberName().equals(field)) {
-                return m;
-            }
-        }
-        return null;
     }
 
     @Override
@@ -189,8 +190,8 @@ final class JsonDeserializer implements ShapeDeserializer {
             while (iter.readArray()) {
                 listMemberConsumer.accept(state, this);
             }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 
@@ -200,8 +201,8 @@ final class JsonDeserializer implements ShapeDeserializer {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
                 mapMemberConsumer.accept(state, field, this);
             }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 }

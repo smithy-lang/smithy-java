@@ -12,10 +12,12 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
@@ -117,34 +119,62 @@ public final class PutPersonInput implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, this, (pojo, st) -> {
+        serializer.writeStruct(SCHEMA, this, ShapeWriter.INSTANCE);
+    }
+
+    private static final class ShapeWriter implements BiConsumer<PutPersonInput, ShapeSerializer> {
+        private static final ShapeWriter INSTANCE = new ShapeWriter();
+
+        @Override
+        public void accept(PutPersonInput pojo, ShapeSerializer st) {
             st.writeString(SCHEMA_NAME, pojo.name);
             st.writeInteger(SCHEMA_AGE, pojo.age);
             if (pojo.favoriteColor != null) {
-                serializer.writeString(SCHEMA_FAVORITE_COLOR, pojo.favoriteColor);
+                st.writeString(SCHEMA_FAVORITE_COLOR, pojo.favoriteColor);
             }
             if (pojo.binary != null) {
-                serializer.writeBlob(SCHEMA_BINARY, pojo.binary);
+                st.writeBlob(SCHEMA_BINARY, pojo.binary);
             }
             if (pojo.birthday != null) {
-                serializer.writeTimestamp(SCHEMA_BIRTHDAY, pojo.birthday);
+                st.writeTimestamp(SCHEMA_BIRTHDAY, pojo.birthday);
             }
             if (!pojo.queryParams.isEmpty()) {
-                st.writeMap(SCHEMA_QUERY_PARAMS, pojo.queryParams, (queryParams, m) -> {
-                    var key = SharedSchemas.MAP_LIST_STRING.member("key");
-                    for (var entry : queryParams.entrySet()) {
-                        m.writeEntry(key, entry.getKey(), entry.getValue(), (value, mv) -> {
-                            mv.writeList(SharedSchemas.MAP_LIST_STRING.member("value"), value, (listValue, mvl) -> {
-                                var listValueMemberSchema = SharedSchemas.LIST_OF_STRING.member("member");
-                                for (var listValueElement : listValue) {
-                                    mvl.writeString(listValueMemberSchema, listValueElement);
-                                }
-                            });
-                        });
-                    }
-                });
+                st.writeMap(SCHEMA_QUERY_PARAMS, pojo, QueryParamsWriter.INSTANCE);
             }
-        });
+        }
+    }
+
+    private static final class QueryParamsWriter implements BiConsumer<PutPersonInput, MapSerializer> {
+        private static final QueryParamsWriter INSTANCE = new QueryParamsWriter();
+
+        @Override
+        public void accept(PutPersonInput shape, MapSerializer m) {
+            var key = SharedSchemas.MAP_LIST_STRING.member("key");
+            for (var entry : shape.queryParams.entrySet()) {
+                m.writeEntry(key, entry.getKey(), entry.getValue(), QueryParamsMemberWriter.INSTANCE);
+            }
+        }
+    }
+
+    private static final class QueryParamsMemberWriter implements BiConsumer<List<String>, ShapeSerializer> {
+        private static final QueryParamsMemberWriter INSTANCE = new QueryParamsMemberWriter();
+
+        @Override
+        public void accept(List<String> value, ShapeSerializer mv) {
+            mv.writeList(SharedSchemas.MAP_LIST_STRING.member("value"), value, QueryParamsMemberWriterList.INSTANCE);
+        }
+    }
+
+    private static final class QueryParamsMemberWriterList implements BiConsumer<List<String>, ShapeSerializer> {
+        private static final QueryParamsMemberWriterList INSTANCE = new QueryParamsMemberWriterList();
+
+        @Override
+        public void accept(List<String> listValue, ShapeSerializer mvl) {
+            var listValueMemberSchema = SharedSchemas.LIST_OF_STRING.member("member");
+            for (var listValueElement : listValue) {
+                mvl.writeString(listValueMemberSchema, listValueElement);
+            }
+        }
     }
 
     public static final class Builder implements SdkShapeBuilder<PutPersonInput> {
@@ -196,7 +226,15 @@ public final class PutPersonInput implements SerializableShape {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
+            decoder.readStruct(SCHEMA, this, ReadShape.INSTANCE);
+            return this;
+        }
+
+        private static final class ReadShape implements ShapeDeserializer.StructMemberConsumer<PutPersonInput.Builder> {
+            private static final ReadShape INSTANCE = new ReadShape();
+
+            @Override
+            public void accept(PutPersonInput.Builder builder, SdkSchema member, ShapeDeserializer de) {
                 switch (member.memberIndex()) {
                     case 0 -> builder.name(de.readString(member));
                     case 1 -> builder.favoriteColor(de.readString(member));
@@ -205,17 +243,32 @@ public final class PutPersonInput implements SerializableShape {
                     case 4 -> builder.binary(de.readBlob(member));
                     case 5 -> {
                         Map<String, List<String>> result = new LinkedHashMap<>();
-                        de.readStringMap(SCHEMA_QUERY_PARAMS, result, (mapData, key, v) -> {
-                            List<String> listValue = mapData.computeIfAbsent(key, k -> new ArrayList<>());
-                            v.readList(SharedSchemas.MAP_LIST_STRING.member("member"), listValue, (list, ser) -> {
-                                list.add(ser.readString(SharedSchemas.LIST_OF_STRING.member("member")));
-                            });
-                        });
+                        de.readStringMap(SCHEMA_QUERY_PARAMS, result, ReadQueryParams.INSTANCE);
                         builder.queryParams(result);
                     }
                 }
-            });
-            return this;
+            }
+        }
+
+        private static final class ReadQueryParams implements
+            ShapeDeserializer.MapMemberConsumer<String, Map<String, List<String>>> {
+            private static final ReadQueryParams INSTANCE = new ReadQueryParams();
+
+            @Override
+            public void accept(Map<String, List<String>> mapData, String key, ShapeDeserializer m) {
+                List<String> listValue = mapData.computeIfAbsent(key, k -> new ArrayList<>());
+                m.readList(SharedSchemas.MAP_LIST_STRING.member("member"), listValue, ReadQueryParamsMembers.INSTANCE);
+            }
+        }
+
+        private static final class ReadQueryParamsMembers implements
+            ShapeDeserializer.ListMemberConsumer<List<String>> {
+            private static final ReadQueryParamsMembers INSTANCE = new ReadQueryParamsMembers();
+
+            @Override
+            public void accept(List<String> list, ShapeDeserializer ser) {
+                list.add(ser.readString(SharedSchemas.LIST_OF_STRING.member("member")));
+            }
         }
     }
 }

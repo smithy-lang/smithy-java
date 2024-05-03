@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -29,8 +30,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.java.runtime.core.testmodels.Person;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 public class DocumentTest {
     @Test
@@ -328,5 +331,177 @@ public class DocumentTest {
             e.getMessage(),
             containsString("Unable to create a document from ShapeSerializer that serialized nothing")
         );
+    }
+
+    @ParameterizedTest
+    @MethodSource("normalizedEqualsTestProvider")
+    public void normalizedEqualsTest(Document value) {
+        var other = new DifferentDocument(value);
+
+        assertThat(other, not(equalTo(value)));
+        assertThat(Document.equals(other, value), is(true));
+    }
+
+    static List<Arguments> normalizedEqualsTestProvider() {
+        return List.of(
+            Arguments.of(Document.createString("hi")),
+            Arguments.of(Document.createBlob("hi".getBytes(StandardCharsets.UTF_8))),
+            Arguments.of(Document.createByte((byte) 1)),
+            Arguments.of(Document.createShort((short) 1)),
+            Arguments.of(Document.createInteger(1)),
+            Arguments.of(Document.createLong(1L)),
+            Arguments.of(Document.createFloat(1f)),
+            Arguments.of(Document.createDouble(1.0)),
+            Arguments.of(Document.createBigInteger(BigInteger.ONE)),
+            Arguments.of(Document.createBigDecimal(BigDecimal.ONE)),
+            Arguments.of(Document.createBoolean(true)),
+            Arguments.of(Document.createStringMap(Map.of("hi", Document.createString("there")))),
+            Arguments.of(Document.createList(List.of(Document.createString("hi")))),
+            Arguments.of(Document.createTimestamp(Instant.EPOCH))
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("inEqualDocumentsTestProvider")
+    public void inEqualDocumentsTest(Document a, Document b) {
+        assertThat(Document.equals(a, b), is(false));
+    }
+
+    public static List<Arguments> inEqualDocumentsTestProvider() {
+        return List.of(
+            Arguments.of(Document.createString("a"), Document.createInteger(1)),
+            Arguments.of(Document.createList(List.of(Document.createInteger(1))), Document.createList(List.of())),
+            Arguments.of(
+                Document.createList(List.of(Document.createInteger(1))),
+                Document.createList(List.of(Document.createInteger(2)))
+            ),
+            Arguments.of(
+                Document.createStringMap(Map.of("a", Document.createString("a"))),
+                Document.createStringMap(Map.of())
+            ),
+            Arguments.of(
+                Document.createStringMap(Map.of("a", Document.createString("a"))),
+                Document.createStringMap(Map.of("a", Document.createString("b")))
+            )
+        );
+    }
+
+    static final class DifferentDocument implements Document {
+
+        private final Document delegate;
+
+        DifferentDocument(Document delegate) {
+            this.delegate = delegate;
+        }
+
+        private Document getDocument() {
+            return delegate;
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+            delegate.serialize(serializer);
+        }
+
+        @Override
+        public ShapeType type() {
+            return getDocument().type();
+        }
+
+        @Override
+        public boolean asBoolean() {
+            return getDocument().asBoolean();
+        }
+
+        @Override
+        public byte asByte() {
+            return getDocument().asByte();
+        }
+
+        @Override
+        public short asShort() {
+            return getDocument().asShort();
+        }
+
+        @Override
+        public int asInteger() {
+            return getDocument().asInteger();
+        }
+
+        @Override
+        public long asLong() {
+            return getDocument().asLong();
+        }
+
+        @Override
+        public float asFloat() {
+            return getDocument().asFloat();
+        }
+
+        @Override
+        public double asDouble() {
+            return getDocument().asDouble();
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+            return getDocument().asBigInteger();
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+            return getDocument().asBigDecimal();
+        }
+
+        @Override
+        public Number asNumber() {
+            return getDocument().asNumber();
+        }
+
+        @Override
+        public String asString() {
+            return getDocument().asString();
+        }
+
+        @Override
+        public byte[] asBlob() {
+            return getDocument().asBlob();
+        }
+
+        @Override
+        public Instant asTimestamp() {
+            return getDocument().asTimestamp();
+        }
+
+        @Override
+        public List<Document> asList() {
+            return getDocument().asList();
+        }
+
+        @Override
+        public Map<String, Document> asStringMap() {
+            return getDocument().asStringMap();
+        }
+
+        @Override
+        public Document getMember(String memberName) {
+            return getDocument().getMember(memberName);
+        }
+
+        @Override
+        public String toString() {
+            return getDocument().toString();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            // Just for test purposes.
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            return getDocument().hashCode();
+        }
     }
 }

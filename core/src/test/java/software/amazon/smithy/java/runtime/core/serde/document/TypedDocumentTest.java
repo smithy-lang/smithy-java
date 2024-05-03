@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
 
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
@@ -19,8 +20,8 @@ import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 public class TypedDocumentTest {
-    @Test
-    public void wrapsStructContentWithTypeAndSchema() {
+
+    private SerializableShape createSerializableShape() {
         var structSchema = SdkSchema.builder()
             .id("smithy.example#Struct")
             .type(ShapeType.STRUCTURE)
@@ -30,13 +31,17 @@ public class TypedDocumentTest {
             )
             .build();
 
-        SerializableShape serializableShape = encoder -> {
+        return encoder -> {
             encoder.writeStruct(structSchema, structSchema, (schema, s) -> {
                 s.writeString(schema.member("a"), "1");
                 s.writeString(schema.member("b"), "2");
             });
         };
+    }
 
+    @Test
+    public void wrapsStructContentWithTypeAndSchema() {
+        var serializableShape = createSerializableShape();
         var result = Document.createTyped(serializableShape);
 
         assertThat(result.type(), equalTo(ShapeType.STRUCTURE));
@@ -81,5 +86,13 @@ public class TypedDocumentTest {
         var copy1 = result.asStringMap();
         assertThat(copy1.get("a").asString(), equalTo("1"));
         assertThat(copy1.get("b").asString(), equalTo("2"));
+    }
+
+    @Test
+    public void normalizesWithoutSchema() {
+        var serializableShape = createSerializableShape();
+        var result = Document.createTyped(serializableShape);
+
+        assertThat(result.normalize(), not(sameInstance(result)));
     }
 }

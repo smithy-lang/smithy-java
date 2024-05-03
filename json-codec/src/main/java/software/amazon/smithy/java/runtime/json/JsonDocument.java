@@ -15,18 +15,16 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.core.serde.document.DocumentDeserializer;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.JsonNameTrait;
-import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class JsonDocument implements Document {
 
@@ -35,24 +33,21 @@ final class JsonDocument implements Document {
         .build();
 
     private final Any any;
-    private final TimestampFormatter defaultTimestampFormat;
-    private final boolean useJsonName;
-    private final boolean useTimestampFormat;
+    private final JsonFieldMapper fieldMapper;
+    private final TimestampResolver timestampResolver;
     private final ShapeType type;
     private final SdkSchema schema;
 
     JsonDocument(
         com.jsoniter.any.Any any,
-        boolean useJsonName,
-        TimestampFormatter defaultTimestampFormat,
-        boolean useTimestampFormat
+        JsonFieldMapper fieldMapper,
+        TimestampResolver timestampResolver
     ) {
         this.any = any;
-        this.useJsonName = useJsonName;
-        this.defaultTimestampFormat = defaultTimestampFormat;
-        this.useTimestampFormat = useTimestampFormat;
+        this.fieldMapper = fieldMapper;
+        this.timestampResolver = timestampResolver;
 
-        // Guess the type from the underlying JSON value.
+        // Determine the type from the underlying JSON value.
         this.type = switch (any.valueType()) {
             case NUMBER -> {
                 String val = any.toString();
@@ -66,7 +61,8 @@ final class JsonDocument implements Document {
             case OBJECT -> ShapeType.MAP;
             case STRING -> ShapeType.STRING;
             case BOOLEAN -> ShapeType.BOOLEAN;
-            default -> ShapeType.DOCUMENT;
+            // The default case should never be reached.
+            default -> throw new SdkSerdeException("Expected JSON document: " + any.mustBeValid());
         };
         this.schema = PreludeSchemas.getSchemaForType(type);
     }
@@ -118,7 +114,7 @@ final class JsonDocument implements Document {
 
     @Override
     public BigDecimal asBigDecimal() {
-        return any.valueType() == ValueType.NUMBER ? BigDecimal.valueOf(any.toLong()) : Document.super.asBigDecimal();
+        return any.valueType() == ValueType.NUMBER ? BigDecimal.valueOf(any.toDouble()) : Document.super.asBigDecimal();
     }
 
     @Override
@@ -128,24 +124,22 @@ final class JsonDocument implements Document {
 
     @Override
     public byte[] asBlob() {
-        // Base64 decode JSON blobs.
-        return any.valueType() == ValueType.STRING
-            ? Base64.getDecoder().decode(any.toString())
-            : Document.super.asBlob();
+        if (any.valueType() != ValueType.STRING) {
+            return Document.super.asBlob(); // this always fails
+        } else {
+            try {
+                // Base64 decode JSON blobs.
+                return Base64.getDecoder().decode(any.toString());
+            } catch (IllegalArgumentException e) {
+                throw new SdkSerdeException("Expected a base64 encoded blob value", e);
+            }
+        }
     }
 
     @Override
     public Instant asTimestamp() {
-        TimestampFormatter format = defaultTimestampFormat;
-        return switch (any.valueType()) {
-            case NUMBER -> format.createFromNumber(any.toDouble());
-            case STRING -> format.parseFromString(any.toString(), true); // fail if the format does not accept strings.
-            default -> {
-                throw new IllegalStateException(
-                    "Expected a string or number value for a timestamp, but found " + any.valueType()
-                );
-            }
-        };
+        // Always use the default JSON timestamp format with untyped documents.
+        return TimestampResolver.readTimestamp(any, timestampResolver.defaultFormat());
     }
 
     @Override
@@ -155,8 +149,8 @@ final class JsonDocument implements Document {
         }
 
         List<Document> result = new ArrayList<>();
-        for (com.jsoniter.any.Any value : any) {
-            result.add(new JsonDocument(value, useJsonName, defaultTimestampFormat, useTimestampFormat));
+        for (var value : any) {
+            result.add(new JsonDocument(value, fieldMapper, timestampResolver));
         }
 
         return result;
@@ -171,7 +165,7 @@ final class JsonDocument implements Document {
             for (var entry : any.asMap().entrySet()) {
                 result.put(
                     entry.getKey(),
-                    new JsonDocument(entry.getValue(), useJsonName, defaultTimestampFormat, useTimestampFormat)
+                    new JsonDocument(entry.getValue(), fieldMapper, timestampResolver)
                 );
             }
             return result;
@@ -181,9 +175,9 @@ final class JsonDocument implements Document {
     @Override
     public Document getMember(String memberName) {
         if (any.valueType() == ValueType.OBJECT) {
-            var result = any.get(memberName);
-            if (result != null) {
-                return new JsonDocument(result, useJsonName, defaultTimestampFormat, useTimestampFormat);
+            var memberDocument = any.get(memberName);
+            if (memberDocument.valueType() != ValueType.NULL && memberDocument.valueType() != ValueType.INVALID) {
+                return new JsonDocument(memberDocument, fieldMapper, timestampResolver);
             }
         }
         return null;
@@ -193,18 +187,9 @@ final class JsonDocument implements Document {
     public void serializeContents(ShapeSerializer encoder) {
         switch (type()) {
             case BOOLEAN -> encoder.writeBoolean(schema, asBoolean());
-            case BYTE -> encoder.writeByte(schema, asByte());
-            case SHORT -> encoder.writeShort(schema, asShort());
-            case INTEGER, INT_ENUM -> encoder.writeInteger(schema, asInteger());
-            case LONG -> encoder.writeLong(schema, asLong());
-            case FLOAT -> encoder.writeFloat(schema, asFloat());
+            case INTEGER -> encoder.writeInteger(schema, asInteger());
             case DOUBLE -> encoder.writeDouble(schema, asDouble());
-            case BIG_INTEGER -> encoder.writeBigInteger(schema, asBigInteger());
-            case BIG_DECIMAL -> encoder.writeBigDecimal(schema, asBigDecimal());
-            case STRING, ENUM -> encoder.writeString(schema, asString());
-            case BLOB -> encoder.writeBlob(schema, asBlob());
-            case TIMESTAMP -> encoder.writeTimestamp(schema, asTimestamp());
-            case DOCUMENT -> encoder.writeDocument(this);
+            case STRING -> encoder.writeString(schema, asString());
             case MAP -> encoder.writeMap(schema, asStringMap(), (stringMap, mapSerializer) -> {
                 for (var entry : stringMap.entrySet()) {
                     mapSerializer.writeEntry(
@@ -217,9 +202,10 @@ final class JsonDocument implements Document {
             });
             case LIST -> encoder.writeList(schema, asList(), (list, c) -> {
                 for (Document entry : list) {
-                    entry.serialize(c);
+                    entry.serializeContents(c);
                 }
             });
+            // When type is set in the ctor, it only allows the above types; the default switch should never happen.
             default -> throw new SdkSerdeException("Cannot serialize unexpected JSON value: " + any);
         }
     }
@@ -229,47 +215,63 @@ final class JsonDocument implements Document {
         builder.deserialize(new JsonDocumentDeserializer(this));
     }
 
+    // JSON documents are considered equal if they have the same Any and if they have the same JSON settings.
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        } else if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        JsonDocument that = (JsonDocument) o;
+        return type == that.type
+            && fieldMapper.getClass() == that.fieldMapper.getClass()
+            && timestampResolver.equals(that.timestampResolver)
+            && any.equals(that.any);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(type, any, timestampResolver);
+    }
+
+    @Override
+    public String toString() {
+        return "JsonDocument{any=" + any + ", timestampResolver=" + timestampResolver
+            + ", memberToField=" + fieldMapper + '}';
+    }
+
     /**
      * Customized version of DocumentDeserializer to account for the settings of the JSON codec.
      */
-    private final class JsonDocumentDeserializer extends DocumentDeserializer {
-        JsonDocumentDeserializer(Document value) {
+    private static final class JsonDocumentDeserializer extends DocumentDeserializer {
+
+        private final JsonDocument jsonDocument;
+
+        JsonDocumentDeserializer(JsonDocument value) {
             super(value);
+            this.jsonDocument = value;
         }
 
         @Override
-        protected DocumentDeserializer deserializer(Document value) {
-            return new JsonDocumentDeserializer(value);
+        protected DocumentDeserializer deserializer(Document nextValue) {
+            return new JsonDocumentDeserializer((JsonDocument) nextValue);
         }
 
         @Override
         public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
             for (var member : schema.members()) {
-                var jsonName = member.hasTrait(JsonNameTrait.class)
-                    ? member.getTrait(JsonNameTrait.class).getValue()
-                    : member.memberName();
-                var value = getMember(jsonName);
-                if (value != null) {
-                    structMemberConsumer.accept(state, member, new DocumentDeserializer(value));
+                var nextValue = jsonDocument.getMember(jsonDocument.fieldMapper.memberToField(member));
+                if (nextValue != null) {
+                    structMemberConsumer.accept(state, member, deserializer(nextValue));
                 }
             }
         }
 
         @Override
         public Instant readTimestamp(SdkSchema schema) {
-            TimestampFormatter format = defaultTimestampFormat;
-
-            if (useTimestampFormat && schema.hasTrait(TimestampFormatTrait.class)) {
-                format = TimestampFormatter.of(schema.getTrait(TimestampFormatTrait.class));
-            }
-
-            return switch (any.valueType()) {
-                case NUMBER -> format.createFromNumber(any.toDouble());
-                case STRING -> format.parseFromString(any.toString(), true);
-                default -> throw new IllegalStateException(
-                    "Expected a string or number value for a timestamp, but found " + any.valueType()
-                );
-            };
+            var format = jsonDocument.timestampResolver.resolve(schema);
+            return TimestampResolver.readTimestamp(jsonDocument.any, format);
         }
     }
 }

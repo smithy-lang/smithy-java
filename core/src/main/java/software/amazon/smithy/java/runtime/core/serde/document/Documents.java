@@ -51,6 +51,11 @@ final class Documents {
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeBoolean(schema, value);
         }
+
+        @Override
+        public Document normalize() {
+            return schema == PreludeSchemas.BOOLEAN ? this : Document.super.normalize();
+        }
     }
 
     record ByteDocument(SdkSchema schema, byte value) implements Document {
@@ -102,6 +107,11 @@ final class Documents {
         @Override
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeByte(schema, value);
+        }
+
+        @Override
+        public Document normalize() {
+            return schema == PreludeSchemas.BYTE ? this : Document.super.normalize();
         }
     }
 
@@ -155,6 +165,11 @@ final class Documents {
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeShort(schema, value);
         }
+
+        @Override
+        public Document normalize() {
+            return schema == PreludeSchemas.SHORT ? this : Document.super.normalize();
+        }
     }
 
     record IntegerDocument(SdkSchema schema, int value) implements Document {
@@ -206,6 +221,11 @@ final class Documents {
         @Override
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeInteger(schema, value);
+        }
+
+        @Override
+        public Document normalize() {
+            return schema == PreludeSchemas.INTEGER ? this : Document.super.normalize();
         }
     }
 
@@ -259,6 +279,11 @@ final class Documents {
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeLong(schema, value);
         }
+
+        @Override
+        public Document normalize() {
+            return schema == PreludeSchemas.LONG ? this : Document.super.normalize();
+        }
     }
 
     record FloatDocument(SdkSchema schema, float value) implements Document {
@@ -310,6 +335,11 @@ final class Documents {
         @Override
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeFloat(schema, value);
+        }
+
+        @Override
+        public Document normalize() {
+            return schema == PreludeSchemas.FLOAT ? this : Document.super.normalize();
         }
     }
 
@@ -363,6 +393,11 @@ final class Documents {
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeDouble(schema, value);
         }
+
+        @Override
+        public Document normalize() {
+            return schema == PreludeSchemas.DOUBLE ? this : Document.super.normalize();
+        }
     }
 
     record BigIntegerDocument(SdkSchema schema, BigInteger value) implements Document {
@@ -414,6 +449,11 @@ final class Documents {
         @Override
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeBigInteger(schema, value);
+        }
+
+        @Override
+        public Document normalize() {
+            return schema == PreludeSchemas.BIG_INTEGER ? this : Document.super.normalize();
         }
     }
 
@@ -467,6 +507,11 @@ final class Documents {
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeBigDecimal(schema, value);
         }
+
+        @Override
+        public Document normalize() {
+            return schema == PreludeSchemas.BIG_DECIMAL ? this : Document.super.normalize();
+        }
     }
 
     record StringDocument(SdkSchema schema, String value) implements Document {
@@ -483,6 +528,11 @@ final class Documents {
         @Override
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeString(schema, value);
+        }
+
+        @Override
+        public Document normalize() {
+            return schema == PreludeSchemas.STRING ? this : Document.super.normalize();
         }
     }
 
@@ -519,6 +569,11 @@ final class Documents {
         public int hashCode() {
             return Arrays.hashCode(value);
         }
+
+        @Override
+        public Document normalize() {
+            return schema == PreludeSchemas.BLOB ? this : Document.super.normalize();
+        }
     }
 
     record TimestampDocument(SdkSchema schema, Instant value) implements Document {
@@ -535,6 +590,11 @@ final class Documents {
         @Override
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeTimestamp(schema, value);
+        }
+
+        @Override
+        public Document normalize() {
+            return schema == PreludeSchemas.TIMESTAMP ? this : Document.super.normalize();
         }
     }
 

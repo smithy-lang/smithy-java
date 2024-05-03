@@ -6,11 +6,12 @@
 package software.amazon.smithy.java.runtime.json;
 
 import com.jsoniter.output.JsonStream;
+import com.jsoniter.spi.JsonException;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 
 final class JsonMapSerializer implements MapSerializer {
@@ -35,8 +36,8 @@ final class JsonMapSerializer implements MapSerializer {
             beforeWrite();
             stream.writeObjectField(key);
             valueSerializer.accept(state, parent);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 

@@ -14,7 +14,11 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 /**
  * Deserializes a shape by emitted the Smithy data model from the shape, aided by schemas.
  */
-public interface ShapeDeserializer {
+public interface ShapeDeserializer extends AutoCloseable {
+
+    @Override
+    default void close() {}
+
     /**
      * Attempt to read a boolean value.
      *

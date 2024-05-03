@@ -9,6 +9,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.xml.validation.Schema;
@@ -115,9 +118,9 @@ public interface Document extends SerializableShape {
      * and target shape. For example, to represent the value of a map entry, the value must be emitted as a member
      * schema (even a synthetic member) with a member name of "value" and the document value target
      * (e.g., {@code smithy.api#Document$value}). In doing so, receivers of the document's data model do not need to
-     * implement special-cased logic to account for synthetic document type members vs actual modeled members
+     * implement special-cased logic to account for synthetic document type members vs. actual modeled members
      *
-     * <p>Implementations must not write the conents of the document as {@link ShapeSerializer#writeDocument(Document)},
+     * <p>Implementations must not write the contents of the document as {@link ShapeSerializer#writeDocument(Document)},
      * because that could result in infinite recursion for serializers that want access to the contents of a document.
      *
      * @param serializer Serializer to write the underlying data of the document to.
@@ -327,6 +330,49 @@ public interface Document extends SerializableShape {
     }
 
     /**
+     * Create a normalized version of the document using normalized document types that aren't tied to any specific
+     * protocol or schema.
+     *
+     * <p>A structure and union document are converted to a map of string to normalized documents. An intEnum is
+     * converted to an integer. An enum is converted to a string.
+     *
+     * @return the normalized document.
+     */
+    default Document normalize() {
+        return switch (type()) {
+            case BOOLEAN -> createBoolean(asBoolean());
+            case BYTE -> createByte(asByte());
+            case SHORT -> createShort(asShort());
+            case INTEGER, INT_ENUM -> createInteger(asInteger());
+            case LONG -> createLong(asLong());
+            case FLOAT -> createFloat(asFloat());
+            case DOUBLE -> createDouble(asDouble());
+            case BIG_INTEGER -> createBigInteger(asBigInteger());
+            case BIG_DECIMAL -> createBigDecimal(asBigDecimal());
+            case STRING, ENUM -> createString(asString());
+            case BLOB -> createBlob(asBlob());
+            case TIMESTAMP -> createTimestamp(asTimestamp());
+            case STRUCTURE, UNION, MAP -> {
+                var map = asStringMap();
+                Map<String, Document> result = new LinkedHashMap<>(map.size());
+                for (var entry : map.entrySet()) {
+                    result.put(entry.getKey(), entry.getValue().normalize());
+                }
+                yield createStringMap(result);
+            }
+            case LIST -> {
+                var list = asList();
+                List<Document> result = new ArrayList<>(list.size());
+                for (var element : list) {
+                    result.add(element.normalize());
+                }
+                yield createList(result);
+            }
+            default -> throw new UnsupportedOperationException("Unable to normalize document: " + this);
+        };
+    }
+
+    /**
      * Attempt to deserialize the Document into a builder.
      *
      * @param builder Builder to populate from the Document.
@@ -500,5 +546,66 @@ public interface Document extends SerializableShape {
      */
     static Document createTyped(SerializableShape shape) {
         return new Documents.LazilyCreatedTypedDocument(shape);
+    }
+
+    /**
+     * Determines if two documents are equal, ignoring schemas and protocol details.
+     *
+     * @param left  Left document to compare.
+     * @param right Right document to compare.
+     * @return true if they are equal.
+     */
+    static boolean equals(Object left, Object right) {
+        if (left instanceof Document l) {
+            if (right instanceof Document r) {
+                if (l == r) {
+                    return true;
+                } else if (l.type() != r.type()) {
+                    return false;
+                }
+                return switch (l.type()) {
+                    case BLOB -> Arrays.equals(l.asBlob(), r.asBlob());
+                    case BOOLEAN -> l.asBoolean() == r.asBoolean();
+                    case STRING, ENUM -> l.asString().equals(r.asString());
+                    case TIMESTAMP -> l.asTimestamp().equals(r.asTimestamp());
+                    case BYTE -> l.asByte() == r.asByte();
+                    case SHORT -> l.asShort() == r.asShort();
+                    case INTEGER, INT_ENUM -> l.asInteger() == r.asInteger();
+                    case LONG -> l.asLong() == r.asLong();
+                    case FLOAT -> l.asFloat() == r.asFloat();
+                    case DOUBLE -> l.asDouble() == r.asDouble();
+                    case BIG_DECIMAL -> l.asBigDecimal().equals(r.asBigDecimal());
+                    case BIG_INTEGER -> l.asBigInteger().equals(r.asBigInteger());
+                    case LIST, SET -> {
+                        var ll = l.asList();
+                        var rl = r.asList();
+                        if (ll.size() != rl.size()) {
+                            yield false;
+                        }
+                        for (int i = 0; i < ll.size(); i++) {
+                            if (!equals(ll.get(i), rl.get(i))) {
+                                yield false;
+                            }
+                        }
+                        yield true;
+                    }
+                    case MAP, STRUCTURE, UNION -> {
+                        var lm = l.asStringMap();
+                        var rm = r.asStringMap();
+                        if (lm.size() != rm.size()) {
+                            yield false;
+                        }
+                        for (var entry : lm.entrySet()) {
+                            if (!equals(entry.getValue(), rm.get(entry.getKey()))) {
+                                yield false;
+                            }
+                        }
+                        yield true;
+                    }
+                    default -> false; // unexpected type (DOCUMENT, MEMBER, OPERATION, SERVICE).
+                };
+            }
+        }
+        return false;
     }
 }

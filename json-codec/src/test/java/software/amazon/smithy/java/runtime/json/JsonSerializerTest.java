@@ -1,0 +1,152 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.json;
+
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+
+import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
+
+public class JsonSerializerTest {
+
+    @Test
+    public void writesNull() {
+        var codec = JsonCodec.builder().build();
+        var output = new ByteArrayOutputStream();
+        var serializer = codec.createSerializer(output);
+        serializer.writeNull(PreludeSchemas.STRING);
+        serializer.flush();
+        var result = output.toString(StandardCharsets.UTF_8);
+        assertThat(result, equalTo("null"));
+    }
+
+    @Test
+    public void writesDocumentsInline() throws Exception {
+        var document = Document.createList(List.of(Document.createString("a")));
+
+        try (JsonCodec codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeDocument(PreludeSchemas.DOCUMENT, document);
+            }
+            var result = output.toString(StandardCharsets.UTF_8);
+            assertThat(result, equalTo("[\"a\"]"));
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("serializesJsonValuesProvider")
+    public void serializesJsonValues(Document value, String expected) throws Exception {
+        try (JsonCodec codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                value.serializeContents(serializer);
+            }
+            var result = output.toString(StandardCharsets.UTF_8);
+            assertThat(result, equalTo(expected));
+        }
+    }
+
+    static List<Arguments> serializesJsonValuesProvider() {
+        var now = Instant.now();
+
+        return List.of(
+            Arguments.of(Document.createString("a"), "\"a\""),
+            Arguments.of(Document.createBlob("a".getBytes(StandardCharsets.UTF_8)), "\"YQ==\""),
+            Arguments.of(Document.createByte((byte) 1), "1"),
+            Arguments.of(Document.createShort((short) 1), "1"),
+            Arguments.of(Document.createInteger(1), "1"),
+            Arguments.of(Document.createLong(1L), "1"),
+            Arguments.of(Document.createFloat(1.1f), "1.1"),
+            Arguments.of(Document.createDouble(1.1), "1.1"),
+            Arguments.of(Document.createBigInteger(BigInteger.ZERO), "0"),
+            Arguments.of(Document.createBigDecimal(BigDecimal.ONE), "1"),
+            Arguments.of(Document.createBoolean(true), "true"),
+            Arguments.of(Document.createTimestamp(now), Double.toString(((double) now.toEpochMilli()) / 1000)),
+            Arguments.of(Document.createList(List.of(Document.createString("a"))), "[\"a\"]"),
+            Arguments.of(
+                Document.createList(List.of(Document.createString("a"), Document.createString("b"))),
+                "[\"a\",\"b\"]"
+            ),
+            Arguments.of(Document.createStringMap(Map.of("a", Document.createString("av"))), "{\"a\":\"av\"}"),
+            Arguments.of(Document.createStringMap(new LinkedHashMap<>() {
+                {
+                    this.put("a", Document.createString("av"));
+                    this.put("b", Document.createString("bv"));
+                    this.put("c", Document.createInteger(1));
+                    this.put("d", Document.createList(List.of(Document.createInteger(1), Document.createInteger(2))));
+                    this.put("e", Document.createStringMap(Map.of("ek", Document.createString("ek1"))));
+                }
+            }), "{\"a\":\"av\",\"b\":\"bv\",\"c\":1,\"d\":[1,2],\"e\":{\"ek\":\"ek1\"}}")
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("configurableTimestampFormatProvider")
+    public void configurableTimestampFormat(boolean useTimestampFormat, String json) throws Exception {
+        SdkSchema schema = SdkSchema.builder()
+            .type(ShapeType.TIMESTAMP)
+            .id("smithy.example#foo")
+            .traits(new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
+            .build();
+        try (
+            var codec = JsonCodec.builder()
+                .useTimestampFormat(useTimestampFormat)
+                .build(); var output = new ByteArrayOutputStream()
+        ) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeTimestamp(schema, Instant.EPOCH);
+            }
+            var result = output.toString(StandardCharsets.UTF_8);
+            assertThat(result, equalTo(json));
+        }
+    }
+
+    public static List<Arguments> configurableTimestampFormatProvider() {
+        return List.of(
+            Arguments.of(true, "\"1970-01-01T00:00:00Z\""),
+            Arguments.of(false, "0")
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("configurableJsonNameProvider")
+    public void configurableJsonName(boolean useJsonName, String json) throws Exception {
+        try (
+            var codec = JsonCodec.builder().useJsonName(useJsonName).build(); var output = new ByteArrayOutputStream()
+        ) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeStruct(JsonTestData.BIRD, null, (state, ser) -> {
+                    ser.writeString(JsonTestData.BIRD.member("name"), "Toucan");
+                    ser.writeString(JsonTestData.BIRD.member("color"), "red");
+                });
+            }
+            var result = output.toString(StandardCharsets.UTF_8);
+            assertThat(result, equalTo(json));
+        }
+    }
+
+    public static List<Arguments> configurableJsonNameProvider() {
+        return List.of(
+            Arguments.of(true, "{\"name\":\"Toucan\",\"Color\":\"red\"}"),
+            Arguments.of(false, "{\"name\":\"Toucan\",\"color\":\"red\"}")
+        );
+    }
+}

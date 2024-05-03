@@ -102,7 +102,7 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
                 TimestampFormatter formatter = trait != null
                     ? TimestampFormatter.of(trait)
                     : TimestampFormatter.Prelude.HTTP_DATE;
-                return formatter.formatToString(value);
+                return formatter.writeString(value);
             }
         );
     }

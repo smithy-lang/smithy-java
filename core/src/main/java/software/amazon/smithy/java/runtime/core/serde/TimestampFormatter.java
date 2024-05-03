@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.runtime.core.serde;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -22,91 +24,73 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
 public interface TimestampFormatter {
 
     /**
-     * Create a formatter from a timestamp format trait.
+     * Create a formatter from a timestamp format trait and the known prelude formats for date-time, epoch-seconds,
+     * and http-date.
      *
      * @param trait Trait to create the format from.
      * @return Returns the created formatter.
+     * @throws SdkSerdeException for an unknown format.
      */
     static TimestampFormatter of(TimestampFormatTrait trait) {
-        return of(trait.getValue());
-    }
-
-    /**
-     * Create a formatter from a string name.
-     *
-     * @param name Name to create from.
-     * @return Returns the created formatter.
-     */
-    static TimestampFormatter of(String name) {
-        return switch (name) {
-            case "date-time" -> Prelude.DATE_TIME;
-            case "epoch-seconds" -> Prelude.EPOCH_SECONDS;
-            case "http-date" -> Prelude.HTTP_DATE;
-            default -> throw new IllegalStateException("Unknown timestamp format: " + name);
+        return switch (trait.getFormat()) {
+            case DATE_TIME -> Prelude.DATE_TIME;
+            case EPOCH_SECONDS -> Prelude.EPOCH_SECONDS;
+            case HTTP_DATE -> Prelude.HTTP_DATE;
+            default -> throw new SdkSerdeException("Unknown timestamp format: " + trait.getFormat());
         };
     }
 
     /**
-     * Get the identifier of the format (e.g., "date-time").
+     * Get the modeled timestamp format type.
      *
-     * @return Return the identifier.
+     * @return Return the format type.
      */
-    String getIdentifier();
+    TimestampFormatTrait.Format format();
 
     /**
      * Format the given Instant to a String.
      *
-     *
-     * <p>Even if the instant normally serializes into a number, this method must return that number as a string.
+     * <p>If the instant normally serializes into a number, this method must return that number as a string.
      *
      * @param value Value to format.
      * @return Returns the formatted string.
      */
-    String formatToString(Instant value);
+    String writeString(Instant value);
 
     /**
-     * Parse the timestamp from a string.
+     * Writes the timestamp value to given serializer using the underlying data format for the timestamp.
      *
-     * <p>This method must be able to parse the output of {@link #formatToString(Instant)}.
+     * <p>This method must not attempt to write a timestamp as that will cause infinite recursion. Instead, it
+     * should serialize the timestamp as a string or number to the given serializer. In other words: don't call
+     * writeTimestamp on the given serializer.
+     *
+     * @param schema     Schema of the timestamp.
+     * @param value      Timestamp value to serialize.
+     * @param serializer Where to serialize the data.
+     */
+    void writeToSerializer(SdkSchema schema, Instant value, ShapeSerializer serializer);
+
+    /**
+     * Parse a timestamp from a string.
+     *
+     * <p>This method must be able to parse the output of {@link #writeString(Instant)}.
      *
      * @param value Value to parse.
      * @param strict Set to true to throw if the string value comes from a serialization format that should
      *               serialize this format as a number.
      * @return Returns the created Instant.
+     * @throws TimestampSyntaxError if the timestamp is not the right type or format.
      */
-    Instant parseFromString(String value, boolean strict);
+    Instant readFromString(String value, boolean strict);
 
     /**
      * Create the timestamp from a number, if possible.
      *
      * @param value Value to convert into a timestamp.
      * @return Returns the created Instant.
-     * @throws IllegalArgumentException if the format does not support numeric values.
+     * @throws TimestampSyntaxError if the timestamp is not the right type or format.
      */
-    Instant createFromNumber(Number value);
-
-    /**
-     * Writes the timestamp value to given serializer using the underlying data format for the timestamp.
-     *
-     * <p>This method must not attempt to write a timestamp as that will cause infinite recursion. Instead, it
-     * should serialize the timestamp as a string or number to the given serializer.
-     *
-     * @param schema     Schema of the timestamp.
-     * @param value      Timestamp value to serialize.
-     * @param serializer Where to serialize the data.
-     */
-    void serializeToUnderlyingFormat(SdkSchema schema, Instant value, ShapeSerializer serializer);
-
-    /**
-     * Defines the underlying encoding type of a timestamp value.
-     */
-    enum FormatValueType {
-        /** The value is a string. */
-        STRING,
-
-        /** The value should be a number. */
-        NUMBER
-    }
+    Instant readFromNumber(Number value);
 
     /**
      * Formats built into the Smithy prelude.
@@ -114,45 +98,49 @@ public interface TimestampFormatter {
     enum Prelude implements TimestampFormatter {
         EPOCH_SECONDS {
             @Override
-            public String getIdentifier() {
-                return "epoch-seconds";
+            public TimestampFormatTrait.Format format() {
+                return TimestampFormatTrait.Format.EPOCH_SECONDS;
             }
 
             @Override
-            public String formatToString(Instant value) {
+            public String writeString(Instant value) {
                 return String.format("%.3f", ((double) value.toEpochMilli()) / 1000);
             }
 
             @Override
-            public Instant parseFromString(String value, boolean strict) {
+            public Instant readFromString(String value, boolean strict) {
                 if (strict) {
-                    throw new IllegalArgumentException(
-                        "Expected a numeric value for a " + getIdentifier() + " timestamp, but found a string"
-                    );
+                    throw new TimestampSyntaxError(format(), ExpectedType.NUMBER, value);
                 }
                 return Instant.ofEpochMilli((long) (Double.parseDouble(value) * 1000));
             }
 
             @Override
-            public Instant createFromNumber(Number value) {
-                if (value instanceof Integer i) {
-                    return Instant.ofEpochMilli(i * 1000);
+            public Instant readFromNumber(Number value) {
+                // The most common types for serialized epoch-seconds, double/integer/long, are checked first.
+                if (value instanceof Double f) {
+                    return Instant.ofEpochMilli((long) (f * 1000f));
+                } else if (value instanceof Integer i) {
+                    return Instant.ofEpochMilli(i * 1000L);
                 } else if (value instanceof Long l) {
-                    return Instant.ofEpochMilli(l * 1000);
+                    return Instant.ofEpochMilli(l * 1000L);
+                } else if (value instanceof Byte b) {
+                    return Instant.ofEpochMilli(b * 1000L);
+                } else if (value instanceof Short s) {
+                    return Instant.ofEpochMilli(s * 1000L);
                 } else if (value instanceof Float f) {
                     return Instant.ofEpochMilli((long) (f * 1000f));
-                } else if (value instanceof Double f) {
-                    return Instant.ofEpochMilli((long) (f * 1000f));
+                } else if (value instanceof BigInteger bi) {
+                    return Instant.ofEpochMilli(bi.longValue() * 1000);
+                } else if (value instanceof BigDecimal bd) {
+                    return Instant.ofEpochMilli(bd.longValue() * 1000);
                 } else {
-                    throw new IllegalArgumentException(
-                        "Expected numeric value for epoch-seconds to be an "
-                            + "integer, long, float, or double, but found " + value.getClass().getName()
-                    );
+                    throw new TimestampSyntaxError(format(), ExpectedType.NUMBER, value);
                 }
             }
 
             @Override
-            public void serializeToUnderlyingFormat(SdkSchema schema, Instant instant, ShapeSerializer serializer) {
+            public void writeToSerializer(SdkSchema schema, Instant instant, ShapeSerializer serializer) {
                 double value = ((double) instant.toEpochMilli()) / 1000;
                 serializer.writeDouble(schema, value);
             }
@@ -160,34 +148,34 @@ public interface TimestampFormatter {
 
         DATE_TIME {
             @Override
-            public String getIdentifier() {
-                return "date-time";
+            public TimestampFormatTrait.Format format() {
+                return TimestampFormatTrait.Format.DATE_TIME;
             }
 
             @Override
-            public String formatToString(Instant value) {
+            public String writeString(Instant value) {
                 return value.toString();
             }
 
             @Override
-            public Instant parseFromString(String value, boolean strict) {
+            public Instant readFromString(String value, boolean strict) {
                 return DateTimeFormatter.ISO_INSTANT.parse(value, Instant::from);
             }
         },
 
         HTTP_DATE {
             @Override
-            public String getIdentifier() {
-                return "http-date";
+            public TimestampFormatTrait.Format format() {
+                return TimestampFormatTrait.Format.HTTP_DATE;
             }
 
             @Override
-            public String formatToString(Instant value) {
+            public String writeString(Instant value) {
                 return HTTP_DATE_FORMAT.format(value);
             }
 
             @Override
-            public Instant parseFromString(String value, boolean strict) {
+            public Instant readFromString(String value, boolean strict) {
                 return HTTP_DATE_FORMAT.parse(value, Instant::from);
             }
         };
@@ -199,19 +187,75 @@ public interface TimestampFormatter {
 
         @Override
         public String toString() {
-            return getIdentifier();
+            return format().toString();
         }
 
         @Override
-        public void serializeToUnderlyingFormat(SdkSchema schema, Instant value, ShapeSerializer serializer) {
-            serializer.writeString(schema, formatToString(value));
+        public void writeToSerializer(SdkSchema schema, Instant value, ShapeSerializer serializer) {
+            serializer.writeString(schema, writeString(value));
         }
 
         @Override
-        public Instant createFromNumber(Number value) {
-            throw new IllegalStateException(
-                "Expected a string value for a " + getIdentifier() + " timestamp, but found a number"
+        public Instant readFromNumber(Number value) {
+            throw new TimestampSyntaxError(format(), ExpectedType.STRING, value);
+        }
+    }
+
+    /**
+     * The type expected when deserializing a timestamp.
+     *
+     * <p>This can be checked when {@link TimestampSyntaxError} is thrown.
+     */
+    enum ExpectedType {
+        STRING,
+        NUMBER
+    }
+
+    /**
+     * Thrown when a timestamp format cannot be parsed.
+     */
+    final class TimestampSyntaxError extends SdkSerdeException {
+
+        private final TimestampFormatTrait.Format format;
+        private final ExpectedType expectedType;
+        private final Object value;
+
+        public TimestampSyntaxError(TimestampFormatTrait.Format format, ExpectedType expectedType, Object value) {
+            super(
+                "Expected a " + expectedType + " value for a " + format.name() + " timestamp, but found " + value
+                    .getClass()
+                    .getSimpleName()
             );
+            this.format = format;
+            this.expectedType = expectedType;
+            this.value = value;
+        }
+
+        /**
+         * Get the timestamp format that failed to parse.
+         *
+         * @return timestamp format.
+         */
+        public TimestampFormatTrait.Format format() {
+            return format;
+        }
+
+        /**
+         * Get the expected type the timestamp parser expected.
+         *
+         * @return the expected type.
+         */
+        public ExpectedType expectedType() {
+            return expectedType;
+        }
+
+        /**
+         * Get the timestamp value that could not be parsed.
+         *
+         * @return timestamp value.
+         */
+        public Object value() {
+            return value;
         }
     }
 }

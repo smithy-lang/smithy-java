@@ -14,7 +14,11 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 /**
  * Generic shape serialization and deserialization.
  */
-public interface Codec {
+public interface Codec extends AutoCloseable {
+
+    @Override
+    default void close() {}
+
     /**
      * Returns the default media type used by this codec.
      *

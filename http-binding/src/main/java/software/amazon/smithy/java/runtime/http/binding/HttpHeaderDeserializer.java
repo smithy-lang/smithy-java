@@ -101,7 +101,7 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
         TimestampFormatter formatter = trait != null
             ? TimestampFormatter.of(trait)
             : TimestampFormatter.Prelude.HTTP_DATE;
-        return formatter.parseFromString(value, false); // headers always are strings.
+        return formatter.readFromString(value, false); // headers always are strings.
     }
 
     @Override

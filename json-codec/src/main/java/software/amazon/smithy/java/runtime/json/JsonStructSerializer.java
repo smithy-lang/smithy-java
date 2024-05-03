@@ -6,50 +6,42 @@
 package software.amazon.smithy.java.runtime.json;
 
 import com.jsoniter.output.JsonStream;
+import com.jsoniter.spi.JsonException;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.model.traits.JsonNameTrait;
 
 class JsonStructSerializer implements ShapeSerializer {
 
-    private final boolean useJsonName;
     private final ShapeSerializer parent;
     private final JsonStream stream;
-    private boolean wroteValues = false;
+    private final JsonFieldMapper fieldMapper;
+    private boolean firstValue = true;
 
-    JsonStructSerializer(ShapeSerializer parent, JsonStream stream, boolean useJsonName) {
+    JsonStructSerializer(ShapeSerializer parent, JsonStream stream, JsonFieldMapper fieldMapper) {
         this.parent = parent;
         this.stream = stream;
-        this.useJsonName = useJsonName;
-    }
-
-    private String getMemberName(SdkSchema member) {
-        if (useJsonName && member.hasTrait(JsonNameTrait.class)) {
-            return member.getTrait(JsonNameTrait.class).getValue();
-        } else {
-            return member.memberName();
-        }
+        this.fieldMapper = fieldMapper;
     }
 
     void startMember(SdkSchema member) {
         try {
             // Write commas when needed.
-            if (wroteValues) {
+            if (!firstValue) {
                 stream.writeMore();
             } else {
-                wroteValues = true;
+                firstValue = false;
             }
-            stream.writeObjectField(getMemberName(member));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            stream.writeObjectField(fieldMapper.memberToField(member));
+        } catch (JsonException | IOException e) {
+            throw new SdkSerdeException(e);
         }
     }
 

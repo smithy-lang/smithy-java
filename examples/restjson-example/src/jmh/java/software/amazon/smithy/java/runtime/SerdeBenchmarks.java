@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.runtime;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -41,8 +43,11 @@ public class SerdeBenchmarks {
     }
 
     @Benchmark
-    public void shapeToJson(Blackhole bh) {
-        bh.consume(codec.serializeToString(input));
+    public void shapeToJson(Blackhole bh) throws IOException {
+        try (var sink = new ByteArrayOutputStream(); var serializer = codec.createSerializer(sink)) {
+            input.serialize(serializer);
+            bh.consume(sink.size());
+        }
     }
 
     @Benchmark

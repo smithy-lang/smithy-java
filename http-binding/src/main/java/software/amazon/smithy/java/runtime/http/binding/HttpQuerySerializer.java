@@ -100,6 +100,6 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
         TimestampFormatter formatter = trait != null
             ? TimestampFormatter.of(trait)
             : TimestampFormatter.Prelude.DATE_TIME;
-        writeQuery(schema, () -> formatter.formatToString(value));
+        writeQuery(schema, () -> formatter.writeString(value));
     }
 }

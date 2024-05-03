@@ -54,4 +54,11 @@ public class BlobDocumentTest {
 
         document.serializeContents(serializer);
     }
+
+    @Test
+    public void normalizeReturnsSelf() {
+        var doc = Document.createBlob("a".getBytes(StandardCharsets.UTF_8));
+
+        assertThat(doc.normalize(), is(doc));
+    }
 }
