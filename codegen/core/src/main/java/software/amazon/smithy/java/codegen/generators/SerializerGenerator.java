@@ -109,7 +109,6 @@ final class SerializerGenerator extends ShapeVisitor.Default<Void> implements Ru
         return null;
     }
 
-
     @Override
     public Void listShape(ListShape shape) {
         writer.write(
@@ -140,24 +139,30 @@ final class SerializerGenerator extends ShapeVisitor.Default<Void> implements Ru
                         $L,
                         valueEntry.getKey(),
                         valueEntry.getValue(),
-                        (val, ser) -> ${C|}
+                        ${C|}
                     );
                 }""",
             CodegenUtils.getSchemaType(writer, symbolProvider, target),
-            new SerializerMemberWriterVisitor(
-                writer,
-                symbolProvider,
-                model,
-                shape.getValue(),
-                "ser",
-                "val",
-                service
-            )
+            writer.consumer(w -> getValueSerializer(w, target, shape))
         );
         return null;
     }
 
-    private static final class SerializerMemberWriterVisitor extends ShapeVisitor.DataShapeVisitor<Void> implements
+    private void getValueSerializer(JavaWriter writer, Shape target, Shape root) {
+        if (target.isListShape()) {
+            writer.write(
+                "SharedSchemas.$USerializer.INSTANCE",
+                CodegenUtils.getDefaultName(target, service)
+            );
+        } else {
+            writer.write(
+                "SharedSchemas.$UValueSerializer.INSTANCE",
+                CodegenUtils.getDefaultName(root, service)
+            );
+        }
+    }
+
+    public static final class SerializerMemberWriterVisitor extends ShapeVisitor.DataShapeVisitor<Void> implements
         Runnable {
         private final JavaWriter writer;
         private final SymbolProvider provider;

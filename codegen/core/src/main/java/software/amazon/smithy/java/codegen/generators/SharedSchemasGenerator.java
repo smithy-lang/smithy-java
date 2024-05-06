@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -100,55 +101,125 @@ public final class SharedSchemasGenerator
         for (var shape : shapes) {
             // Only Map and List shapes need custom deserializers
             if (shape.isMapShape() || shape.isListShape()) {
-                writer.pushState();
 
                 var symbol = directive.symbolProvider().toSymbol(shape);
                 var name = CodegenUtils.getDefaultName(shape, directive.service());
-                writer.putContext(
-                    "collectionImpl",
-                    symbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
-                );
-                writer.putContext("shape", symbol);
-                writer.putContext("name", name);
+
+                writer.pushState();
                 writer.putContext("schema", SdkSchema.class);
+                writer.putContext("name", name);
                 writer.putContext("biConsumer", BiConsumer.class);
-                writer.putContext("shapeDeserializer", ShapeDeserializer.class);
-                writer.putContext("serializer", shape.isMapShape() ? MapSerializer.class : ShapeSerializer.class);
-                writer.write(
-                    """
-                        static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:T}, ${serializer:T}> {
-                            static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
 
-                            @Override
-                            public void accept(${shape:T} values, ${serializer:T} serializer) {
-                                ${C|}
-                            }
-                        }
-
-                        static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
-                            ${shape:T} result = new ${collectionImpl:T}<>();
-                            ${C|}
-                            return result;
-                        }
-                        """,
-                    new SerializerGenerator(
-                        writer,
-                        directive.symbolProvider(),
-                        directive.model(),
-                        shape,
-                        directive.service()
-                    ),
-                    new DeserializationMethodVisitor(
-                        writer,
-                        directive.symbolProvider(),
-                        directive.model(),
-                        directive.service(),
-                        shape
-                    )
-                );
+                writeSerializationClass(writer, symbol, shape, directive);
+                // Map shapes need to generate an intermediate wrapper serializer
+                if (shape.isMapShape()) {
+                    writeMapValueSerializerWrapper(writer, shape.asMapShape().get(), directive);
+                }
+                writeDeserializerMethod(writer, symbol, shape, directive);
                 writer.popState();
             }
         }
+    }
+
+    private static void writeSerializationClass(
+        JavaWriter writer,
+        Symbol symbol,
+        Shape shape,
+        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive
+    ) {
+        writer.pushState();
+        writer.putContext("shape", symbol);
+        writer.putContext("serializer", shape.isMapShape() ? MapSerializer.class : ShapeSerializer.class);
+        writer.write(
+            """
+                static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:T}, ${serializer:T}> {
+                    static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
+
+                    @Override
+                    public void accept(${shape:T} values, ${serializer:T} serializer) {
+                        ${C|}
+                    }
+                }
+                """,
+            new SerializerGenerator(
+                writer,
+                directive.symbolProvider(),
+                directive.model(),
+                shape,
+                directive.service()
+            )
+        );
+        writer.popState();
+    }
+
+    private static void writeMapValueSerializerWrapper(
+        JavaWriter writer,
+        MapShape shape,
+        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive
+    ) {
+        var value = directive.model().expectShape(shape.getValue().getTarget());
+        // Lists already have generated serializers so we can skip this.
+        if (value.isListShape()) {
+            return;
+        }
+        var valueSymbol = directive.symbolProvider().toSymbol(value);
+        writer.pushState();
+        writer.putContext("shape", valueSymbol);
+        writer.putContext("serializer", ShapeSerializer.class);
+        writer.write(
+            """
+                private static final class ${name:U}ValueSerializer implements ${biConsumer:T}<${shape:T}, ${serializer:T}> {
+                    static final ${name:U}ValueSerializer INSTANCE = new ${name:U}ValueSerializer();
+
+                    @Override
+                    public void accept(${shape:T} values, ${serializer:T} serializer) {
+                        ${C|};
+                    }
+                }
+                """,
+            new SerializerGenerator.SerializerMemberWriterVisitor(
+                writer,
+                directive.symbolProvider(),
+                directive.model(),
+                shape.getValue(),
+                "serializer",
+                "values",
+                directive.service()
+            )
+        );
+        writer.popState();
+    }
+
+    private static void writeDeserializerMethod(
+        JavaWriter writer,
+        Symbol symbol,
+        Shape shape,
+        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive
+    ) {
+        writer.pushState();
+        writer.putContext("shape", symbol);
+        writer.putContext("shapeDeserializer", ShapeDeserializer.class);
+        writer.putContext(
+            "collectionImpl",
+            symbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
+        );
+        writer.write(
+            """
+                static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
+                    ${shape:T} result = new ${collectionImpl:T}<>();
+                    ${C|}
+                    return result;
+                }
+                """,
+            new DeserializationMethodVisitor(
+                writer,
+                directive.symbolProvider(),
+                directive.model(),
+                directive.service(),
+                shape
+            )
+        );
+        writer.popState();
     }
 
     /**
