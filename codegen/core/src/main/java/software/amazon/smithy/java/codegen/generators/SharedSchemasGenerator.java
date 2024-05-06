@@ -169,7 +169,7 @@ public final class SharedSchemasGenerator
         writer.write(
             """
                 private static final class ${name:U}ValueSerializer implements ${biConsumer:T}<${shape:T}, ${serializer:T}> {
-                    static final ${name:U}ValueSerializer INSTANCE = new ${name:U}ValueSerializer();
+                    private static final ${name:U}ValueSerializer INSTANCE = new ${name:U}ValueSerializer();
 
                     @Override
                     public void accept(${shape:T} values, ${serializer:T} serializer) {
@@ -177,7 +177,7 @@ public final class SharedSchemasGenerator
                     }
                 }
                 """,
-            new SerializerGenerator.SerializerMemberWriterVisitor(
+            new SerializerMemberGenerator(
                 writer,
                 directive.symbolProvider(),
                 directive.model(),
