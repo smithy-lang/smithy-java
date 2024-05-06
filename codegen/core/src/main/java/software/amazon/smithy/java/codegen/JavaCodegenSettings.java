@@ -15,7 +15,7 @@ import software.amazon.smithy.utils.IoUtils;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
- * Settings for {@link JavaCodegenPlugin}.
+ * Settings for {@code JavaCodegenPlugin}.
  */
 @SmithyUnstableApi
 public final class JavaCodegenSettings {
