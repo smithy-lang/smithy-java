@@ -10,27 +10,12 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.BigDecimalShape;
-import software.amazon.smithy.model.shapes.BigIntegerShape;
-import software.amazon.smithy.model.shapes.BlobShape;
-import software.amazon.smithy.model.shapes.BooleanShape;
-import software.amazon.smithy.model.shapes.ByteShape;
-import software.amazon.smithy.model.shapes.DocumentShape;
-import software.amazon.smithy.model.shapes.DoubleShape;
-import software.amazon.smithy.model.shapes.FloatShape;
-import software.amazon.smithy.model.shapes.IntegerShape;
 import software.amazon.smithy.model.shapes.ListShape;
-import software.amazon.smithy.model.shapes.LongShape;
 import software.amazon.smithy.model.shapes.MapShape;
-import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeVisitor;
-import software.amazon.smithy.model.shapes.ShortShape;
-import software.amazon.smithy.model.shapes.StringShape;
 import software.amazon.smithy.model.shapes.StructureShape;
-import software.amazon.smithy.model.shapes.TimestampShape;
-import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.ErrorTrait;
 
 /**
@@ -80,7 +65,7 @@ final class SerializerGenerator extends ShapeVisitor.Default<Void> implements Ru
             if (CodegenUtils.isStreamingBlob(target)) {
                 continue;
             }
-            
+
             var memberName = symbolProvider.toMemberName(member);
             // if the shape is an error we need to use the `getMessage()` method for message field.
             var stateName = isError && memberName.equals("message") ? "getMessage()" : memberName;

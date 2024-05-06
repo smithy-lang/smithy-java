@@ -1,3 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.codegen.core.SymbolProvider;
@@ -28,7 +33,7 @@ import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.ErrorTrait;
 
 final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void> implements
-        Runnable {
+    Runnable {
     private final JavaWriter writer;
     private final SymbolProvider provider;
     private final Model model;
@@ -38,13 +43,13 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     private final ServiceShape service;
 
     SerializerMemberGenerator(
-            JavaWriter writer,
-            SymbolProvider provider,
-            Model model,
-            MemberShape memberShape,
-            String serializer,
-            String state,
-            ServiceShape service
+        JavaWriter writer,
+        SymbolProvider provider,
+        Model model,
+        MemberShape memberShape,
+        String serializer,
+        String state,
+        ServiceShape service
     ) {
         this.writer = writer;
         this.provider = provider;
@@ -93,8 +98,8 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     @Override
     public Void listShape(ListShape listShape) {
         writer.write(
-                "${serializer:L}.writeList(${schema:L}, ${state:L}, SharedSchemas.$USerializer.INSTANCE)",
-                CodegenUtils.getDefaultName(listShape, service)
+            "${serializer:L}.writeList(${schema:L}, ${state:L}, SharedSchemas.$USerializer.INSTANCE)",
+            CodegenUtils.getDefaultName(listShape, service)
         );
         return null;
     }
@@ -102,8 +107,8 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     @Override
     public Void mapShape(MapShape mapShape) {
         writer.write(
-                "${serializer:L}.writeMap(${schema:L}, ${state:L}, SharedSchemas.$USerializer.INSTANCE)",
-                CodegenUtils.getDefaultName(mapShape, service)
+            "${serializer:L}.writeMap(${schema:L}, ${state:L}, SharedSchemas.$USerializer.INSTANCE)",
+            CodegenUtils.getDefaultName(mapShape, service)
         );
         return null;
     }
