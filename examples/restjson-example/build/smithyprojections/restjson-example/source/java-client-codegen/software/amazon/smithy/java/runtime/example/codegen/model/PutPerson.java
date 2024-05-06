@@ -1,0 +1,73 @@
+/*
+ * Example file license header.
+ * File header line two
+ */
+
+
+package software.amazon.smithy.java.runtime.example.codegen.model;
+
+import software.amazon.smithy.java.runtime.core.schema.SdkOperation;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
+import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.HttpTrait;
+import software.amazon.smithy.utils.SmithyGenerated;
+
+@SmithyGenerated
+public final class PutPerson implements SdkOperation<PutPersonInput, PutPersonOutput> {
+
+    static final SdkSchema SCHEMA = SdkSchema.builder()
+        .type(ShapeType.OPERATION)
+        .id("smithy.example#PutPerson")
+        .traits(
+            new HttpTrait.Provider().createTrait(
+                ShapeId.from("smithy.api#http"),
+                Node.objectNodeBuilder()
+                    .withMember("method", "PUT")
+                    .withMember("uri", "/persons/{name}")
+                    .withMember("code", 200)
+                    .build()
+            )
+        )
+        .build();
+
+    private final TypeRegistry typeRegistry = TypeRegistry.builder()
+        .putType(PutPersonInput.ID, PutPersonInput.class, PutPersonInput::builder)
+        .putType(PutPersonOutput.ID, PutPersonOutput.class, PutPersonOutput::builder)
+        .putType(ValidationError.ID, ValidationError.class, ValidationError::builder)
+        .build();
+
+    @Override
+    public SdkShapeBuilder<PutPersonInput> inputBuilder() {
+        return PutPersonInput.builder();
+    }
+
+    @Override
+    public SdkShapeBuilder<PutPersonOutput> outputBuilder() {
+        return PutPersonOutput.builder();
+    }
+
+    @Override
+    public SdkSchema schema() {
+        return SCHEMA;
+    }
+
+    @Override
+    public SdkSchema inputSchema() {
+        return PutPersonInput.SCHEMA;
+    }
+
+    @Override
+    public SdkSchema outputSchema() {
+        return PutPersonOutput.SCHEMA;
+    }
+
+    @Override
+    public TypeRegistry typeRegistry() {
+        return typeRegistry;
+    }
+}
+
