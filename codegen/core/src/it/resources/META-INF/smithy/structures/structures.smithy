@@ -38,12 +38,12 @@ resource StructureShapes {
         ListWithStructs,
         NestedLists,
         // TODO: Get recursive working
-        // RecursiveLists,
+        //RecursiveLists,
         // Maps
         Maps,
         NestedMaps,
         // TODO: Get recursive working
-        //RecursiveMaps,
+        // RecursiveMaps,
         // Number members
         BigDecimals,
         BigIntegers,
