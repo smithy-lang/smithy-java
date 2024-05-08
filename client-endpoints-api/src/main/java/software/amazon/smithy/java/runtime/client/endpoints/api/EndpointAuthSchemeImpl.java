@@ -6,9 +6,9 @@
 package software.amazon.smithy.java.runtime.client.endpoints.api;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 final class EndpointAuthSchemeImpl implements EndpointAuthScheme {
     private final String authSchemeId;
@@ -31,8 +31,8 @@ final class EndpointAuthSchemeImpl implements EndpointAuthScheme {
     }
 
     @Override
-    public Iterator<EndpointProperty<?>> properties() {
-        return properties.keySet().iterator();
+    public Set<EndpointProperty<?>> properties() {
+        return properties.keySet();
     }
 
     @Override

@@ -7,8 +7,8 @@ package software.amazon.smithy.java.runtime.client.endpoints.api;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 /**
  * A resolved endpoint.
@@ -36,7 +36,7 @@ public interface Endpoint {
      *
      * @return the properties.
      */
-    Iterator<EndpointProperty<?>> properties();
+    Set<EndpointProperty<?>> properties();
 
     /**
      * Get the list of auth scheme overrides for the endpoint.
@@ -53,7 +53,7 @@ public interface Endpoint {
     default Builder toBuilder() {
         var builder = new EndpointImpl.Builder();
         builder.uri(uri());
-        properties().forEachRemaining(k -> builder.properties.put(k, property(k)));
+        properties().forEach(k -> builder.properties.put(k, property(k)));
         for (EndpointAuthScheme authScheme : authSchemes()) {
             builder.addAuthScheme(authScheme);
         }

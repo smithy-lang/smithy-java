@@ -6,9 +6,9 @@
 package software.amazon.smithy.java.runtime.client.endpoints.api;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Encapsulates endpoint resolver parameters.
@@ -48,8 +48,8 @@ public final class EndpointResolverParams {
      *
      * @return the properties.
      */
-    public Iterator<EndpointProperty<?>> properties() {
-        return immutableMap.keySet().iterator();
+    public Set<EndpointProperty<?>> properties() {
+        return immutableMap.keySet();
     }
 
     /**

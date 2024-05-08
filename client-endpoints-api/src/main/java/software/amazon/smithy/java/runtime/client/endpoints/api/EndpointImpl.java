@@ -9,10 +9,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 final class EndpointImpl implements Endpoint {
 
@@ -38,8 +38,8 @@ final class EndpointImpl implements Endpoint {
     }
 
     @Override
-    public Iterator<EndpointProperty<?>> properties() {
-        return properties.keySet().iterator();
+    public Set<EndpointProperty<?>> properties() {
+        return properties.keySet();
     }
 
     @Override

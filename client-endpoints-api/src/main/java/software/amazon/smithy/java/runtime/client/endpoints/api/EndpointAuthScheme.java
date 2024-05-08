@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.runtime.client.endpoints.api;
 
-import java.util.Iterator;
+import java.util.Set;
 
 /**
  * An authentication scheme supported for the endpoint.
@@ -31,7 +31,7 @@ public interface EndpointAuthScheme {
      *
      * @return the properties.
      */
-    Iterator<EndpointProperty<?>> properties();
+    Set<EndpointProperty<?>> properties();
 
     /**
      * Convert the EndpointAuthScheme to a builder.
@@ -41,7 +41,7 @@ public interface EndpointAuthScheme {
     default Builder toBuilder() {
         EndpointAuthSchemeImpl.Builder builder = new EndpointAuthSchemeImpl.Builder();
         builder.authSchemeId(authSchemeId());
-        properties().forEachRemaining(k -> builder.properties.put(k, property(k)));
+        properties().forEach(k -> builder.properties.put(k, property(k)));
         return builder;
     }
 
