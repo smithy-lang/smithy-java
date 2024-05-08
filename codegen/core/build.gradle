@@ -43,3 +43,10 @@ tasks {
         enabled = false
     }
 }
+
+// Ignore generated generated code for formatter check
+spotless {
+    java {
+        targetExclude("**/build/**/*.*")
+    }
+}

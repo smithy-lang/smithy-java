@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import io.smithy.codegen.test.model.BigDecimalsInput;
 import io.smithy.codegen.test.model.BigIntegersInput;
+import io.smithy.codegen.test.model.BlobsInput;
 import io.smithy.codegen.test.model.BooleansInput;
 import io.smithy.codegen.test.model.BytesInput;
 import io.smithy.codegen.test.model.DoublesInput;
@@ -31,15 +32,18 @@ import io.smithy.codegen.test.model.TimestampsInput;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 
@@ -124,6 +128,15 @@ public class SerdeTest {
         assertEquals(exception.getMessage(), output.getMessage());
         assertEquals(exception.getCause(), output.getCause());
         assertNotEquals(exception.hashCode(), output.hashCode());
+    }
+
+    @Test
+    void blobSerialization() {
+        var datastream = DataStream.ofBytes("data streeeeeeeeeeam".getBytes());
+        var builder = BlobsInput.builder().requiredBlob("data".getBytes());
+        builder.setDataStream(datastream);
+        var input = builder.build();
+        var document = Document.createTyped(builder.build());
     }
 
     @SuppressWarnings("unchecked")
