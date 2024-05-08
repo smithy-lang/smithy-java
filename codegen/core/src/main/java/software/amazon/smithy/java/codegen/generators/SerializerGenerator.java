@@ -126,26 +126,12 @@ final class SerializerGenerator extends ShapeVisitor.Default<Void> implements Ru
                         $L,
                         valueEntry.getKey(),
                         valueEntry.getValue(),
-                        ${C|}
+                        SharedSchemas.$UValueSerializer.INSTANCE
                     );
                 }""",
             CodegenUtils.getSchemaType(writer, symbolProvider, target),
-            writer.consumer(w -> getValueSerializer(w, target, shape))
+            CodegenUtils.getDefaultName(shape, service)
         );
         return null;
-    }
-
-    private void getValueSerializer(JavaWriter writer, Shape target, Shape root) {
-        if (target.isListShape()) {
-            writer.write(
-                "SharedSchemas.$USerializer.INSTANCE",
-                CodegenUtils.getDefaultName(target, service)
-            );
-        } else {
-            writer.write(
-                "SharedSchemas.$UValueSerializer.INSTANCE",
-                CodegenUtils.getDefaultName(root, service)
-            );
-        }
     }
 }

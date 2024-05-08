@@ -222,12 +222,7 @@ public final class SharedSchemasGenerator
         MapShape shape,
         CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive
     ) {
-        var value = directive.model().expectShape(shape.getValue().getTarget());
-        // Lists already have generated serializers so we can skip this.
-        if (value.isListShape()) {
-            return;
-        }
-        var valueSymbol = directive.symbolProvider().toSymbol(value);
+        var valueSymbol = directive.symbolProvider().toSymbol(shape.getValue());
         writer.pushState();
         writer.putContext("shape", valueSymbol);
         writer.putContext("serializer", ShapeSerializer.class);

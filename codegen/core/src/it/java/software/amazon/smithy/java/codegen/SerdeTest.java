@@ -46,7 +46,7 @@ import software.amazon.smithy.java.runtime.json.JsonCodec;
 /**
  * Integration tests that serializes and then deserialize a POJO
  */
-public class SerdeTests {
+public class SerdeTest {
     private static final JsonCodec CODEC = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
 
     static Stream<SerializableShape> source() {
@@ -71,11 +71,11 @@ public class SerdeTests {
             // Maps
             MapsInput.builder().requiredMap(Map.of("a", "b")).build(),
             NestedMapsInput.builder()
-                    //.mapOfStringMap(Map.of("a", Map.of("b","c"), "d", Map.of("e", "f")))
-                    //.mapOfMapOfStringMap(Map.of("a", Map.of("b", Map.of("c", "d"))))
-                    .mapOfStringList(Map.of("a", List.of("b", "c")))
-                    //.mapOfMapList(Map.of("a", List.of(Map.of("b", "c"), Map.of("d", "e"))))
-                    .build(),
+                .mapOfStringMap(Map.of("a", Map.of("b", "c"), "d", Map.of("e", "f")))
+                .mapOfMapOfStringMap(Map.of("a", Map.of("b", Map.of("c", "d"))))
+                .mapOfStringList(Map.of("a", List.of("b", "c")))
+                .mapOfMapList(Map.of("a", List.of(Map.of("b", "c"), Map.of("d", "e"))))
+                .build(),
             // Number
             BigDecimalsInput.builder().requiredBigDecimal(BigDecimal.valueOf(1.0)).build(),
             BigIntegersInput.builder().requiredBigInteger(BigInteger.valueOf(1L)).build(),
@@ -100,15 +100,11 @@ public class SerdeTests {
     @MethodSource("source")
     <T extends SerializableShape> void pojoToDocumentRoundTrip(T pojo) {
         var document = Document.createTyped(pojo);
-        try {
-            SdkShapeBuilder<T> builder = getBuilder(pojo);
-            document.deserializeInto(builder);
-            var output = builder.build();
-            assertEquals(pojo.hashCode(), output.hashCode());
-        } catch (Exception e) {
-            System.out.println(document);
-            throw e;
-        }
+        SdkShapeBuilder<T> builder = getBuilder(pojo);
+        document.deserializeInto(builder);
+        var output = builder.build();
+        assertEquals(pojo.hashCode(), output.hashCode());
+        assertEquals(pojo, output);
     }
 
     static Stream<SerializableShape> exceptions() {
