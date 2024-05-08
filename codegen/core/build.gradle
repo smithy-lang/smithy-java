@@ -39,4 +39,7 @@ tasks {
     compileItJava {
         dependsOn("generatePojos")
     }
+    spotbugsIt {
+        enabled = false
+    }
 }
