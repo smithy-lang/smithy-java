@@ -194,10 +194,9 @@ public final class CodegenUtils {
             .stream()
             .sorted(
                 (a, b) -> {
-                    //
-                    if (isRequiredWithDefault(a) && !isRequiredWithDefault(b)) {
+                    if (isRequiredWithNoDefault(a) && !isRequiredWithNoDefault(b)) {
                         return -1;
-                    } else if (isRequiredWithDefault(a)) {
+                    } else if (isRequiredWithNoDefault(a)) {
                         return 0;
                     } else {
                         return 1;
@@ -207,7 +206,7 @@ public final class CodegenUtils {
             .collect(Collectors.toList());
     }
 
-    private static boolean isRequiredWithDefault(MemberShape memberShape) {
-        return memberShape.isRequired() && memberShape.hasNonNullDefault();
+    private static boolean isRequiredWithNoDefault(MemberShape memberShape) {
+        return memberShape.isRequired() && !memberShape.hasNonNullDefault();
     }
 }
