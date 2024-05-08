@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.core.testmodels;
 
 import java.math.BigDecimal;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
@@ -74,11 +75,22 @@ public final class ValidatedPojo implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_STRING, string);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BOXED_INTEGER, boxedInteger);
-            st.writeInteger(SCHEMA_INTEGER, integer);
-        });
+        serializer.writeStruct(SCHEMA, this, InnerSerializer.INSTANCE);
+    }
+
+    private static final class InnerSerializer implements BiConsumer<ValidatedPojo, ShapeSerializer> {
+        private static final InnerSerializer INSTANCE = new InnerSerializer();
+
+        @Override
+        public void accept(ValidatedPojo pojo, ShapeSerializer st) {
+            if (pojo.string != null) {
+                st.writeString(SCHEMA_STRING, pojo.string);
+            }
+            if (pojo.boxedInteger != null) {
+                st.writeInteger(SCHEMA_BOXED_INTEGER, pojo.boxedInteger);
+            }
+            st.writeInteger(SCHEMA_INTEGER, pojo.integer);
+        }
     }
 
     public static final class Builder implements SdkShapeBuilder<ValidatedPojo> {
@@ -111,11 +123,14 @@ public final class ValidatedPojo implements SerializableShape {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct(SCHEMA, (member, de) -> {
+            decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
                 switch (member.memberIndex()) {
-                    case 0 -> string(de.readString(member));
-                    case 1 -> boxedInteger(de.readInteger(member));
-                    case 2 -> integer(de.readInteger(member));
+                    case 0 -> builder.string(de.readString(member));
+                    case 1 -> builder.boxedInteger(de.readInteger(member));
+                    case 2 -> builder.integer(de.readInteger(member));
+                    default -> {
+                        // TODO: Log periodically
+                    }
                 }
             });
             return this;

@@ -551,7 +551,7 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeList(schema, ser -> {
+            serializer.writeList(schema, values, (values, ser) -> {
                 for (var element : values) {
                     element.serializeContents(ser);
                 }
@@ -577,10 +577,10 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeMap(schema, s -> {
+            serializer.writeMap(schema, members, (members, s) -> {
                 var key = schema.member("key");
                 for (var entry : members.entrySet()) {
-                    s.writeEntry(key, entry.getKey(), ser -> entry.getValue().serializeContents(ser));
+                    s.writeEntry(key, entry.getKey(), entry.getValue(), Document::serializeContents);
                 }
             });
         }
@@ -604,7 +604,7 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer encoder) {
-            encoder.writeStruct(schema, structSerializer -> {
+            encoder.writeStruct(schema, members, (members, structSerializer) -> {
                 for (var entry : members.entrySet()) {
                     entry.getValue().serializeContents(structSerializer);
                 }

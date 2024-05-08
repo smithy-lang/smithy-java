@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.function.IntConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -48,21 +48,21 @@ public final class ListSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
         beforeWrite();
-        delegate.writeStruct(schema, consumer);
+        delegate.writeStruct(schema, structState, consumer);
     }
 
     @Override
-    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeList(SdkSchema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
         beforeWrite();
-        delegate.writeList(schema, consumer);
+        delegate.writeList(schema, state, consumer);
     }
 
     @Override
-    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public <T> void writeMap(SdkSchema schema, T state, BiConsumer<T, MapSerializer> consumer) {
         beforeWrite();
-        delegate.writeMap(schema, consumer);
+        delegate.writeMap(schema, state, consumer);
     }
 
     @Override

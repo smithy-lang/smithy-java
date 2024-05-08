@@ -1,0 +1,11 @@
+plugins {
+    id 'smithy-java.module-conventions'
+}
+
+group = "software.amazon.smithy.java.codegen"
+
+dependencies {
+    implementation(libs.smithy.codegen)
+    implementation(project(":core"))
+    implementation(project(":codegen:core"))
+}

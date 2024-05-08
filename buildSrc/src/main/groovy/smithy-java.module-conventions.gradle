@@ -6,7 +6,7 @@ plugins {
 
 def smithyJavaVersion = project.file("${project.rootDir}/VERSION").getText().replace(System.lineSeparator(), "")
 
-group = "software.amazon.smithy.smithy-java"
+group = "software.amazon.smithy.java"
 version = smithyJavaVersion
 
 /*

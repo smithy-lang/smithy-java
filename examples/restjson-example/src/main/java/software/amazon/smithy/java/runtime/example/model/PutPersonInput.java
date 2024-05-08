@@ -117,20 +117,31 @@ public final class PutPersonInput implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            st.writeString(SCHEMA_NAME, name);
-            st.writeInteger(SCHEMA_AGE, age);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BIRTHDAY, birthday);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_FAVORITE_COLOR, favoriteColor);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BINARY, binary);
-            if (!queryParams.isEmpty()) {
-                st.writeMap(SCHEMA_QUERY_PARAMS, m -> {
+        serializer.writeStruct(SCHEMA, this, (pojo, st) -> {
+            st.writeString(SCHEMA_NAME, pojo.name);
+            st.writeInteger(SCHEMA_AGE, pojo.age);
+            if (pojo.favoriteColor != null) {
+                serializer.writeString(SCHEMA_FAVORITE_COLOR, pojo.favoriteColor);
+            }
+            if (pojo.binary != null) {
+                serializer.writeBlob(SCHEMA_BINARY, pojo.binary);
+            }
+            if (pojo.birthday != null) {
+                serializer.writeTimestamp(SCHEMA_BIRTHDAY, pojo.birthday);
+            }
+            if (!pojo.queryParams.isEmpty()) {
+                st.writeMap(SCHEMA_QUERY_PARAMS, pojo.queryParams, (queryParams, m) -> {
                     var key = SharedSchemas.MAP_LIST_STRING.member("key");
-                    queryParams.forEach((k, v) -> m.writeEntry(key, k, mv -> {
-                        mv.writeList(SharedSchemas.MAP_LIST_STRING.member("value"), mvl -> {
-                            v.forEach(value -> mvl.writeString(SharedSchemas.LIST_OF_STRING.member("member"), value));
+                    for (var entry : queryParams.entrySet()) {
+                        m.writeEntry(key, entry.getKey(), entry.getValue(), (value, mv) -> {
+                            mv.writeList(SharedSchemas.MAP_LIST_STRING.member("value"), value, (listValue, mvl) -> {
+                                var listValueMemberSchema = SharedSchemas.LIST_OF_STRING.member("member");
+                                for (var listValueElement : listValue) {
+                                    mvl.writeString(listValueMemberSchema, listValueElement);
+                                }
+                            });
                         });
-                    }));
+                    }
                 });
             }
         });
@@ -185,22 +196,22 @@ public final class PutPersonInput implements SerializableShape {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct(SCHEMA, (member, de) -> {
+            decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
                 switch (member.memberIndex()) {
-                    case 0 -> name(de.readString(member));
-                    case 1 -> favoriteColor(de.readString(member));
-                    case 2 -> age(de.readInteger(member));
-                    case 3 -> birthday(de.readTimestamp(member));
-                    case 4 -> binary(de.readBlob(member));
+                    case 0 -> builder.name(de.readString(member));
+                    case 1 -> builder.favoriteColor(de.readString(member));
+                    case 2 -> builder.age(de.readInteger(member));
+                    case 3 -> builder.birthday(de.readTimestamp(member));
+                    case 4 -> builder.binary(de.readBlob(member));
                     case 5 -> {
                         Map<String, List<String>> result = new LinkedHashMap<>();
-                        de.readStringMap(SCHEMA_QUERY_PARAMS, (key, v) -> {
-                            v.readList(SharedSchemas.MAP_LIST_STRING.member("member"), list -> {
-                                result.computeIfAbsent(key, k -> new ArrayList<>())
-                                    .add(list.readString(SharedSchemas.LIST_OF_STRING.member("member")));
+                        de.readStringMap(SCHEMA_QUERY_PARAMS, result, (mapData, key, v) -> {
+                            List<String> listValue = mapData.computeIfAbsent(key, k -> new ArrayList<>());
+                            v.readList(SharedSchemas.MAP_LIST_STRING.member("member"), listValue, (list, ser) -> {
+                                list.add(ser.readString(SharedSchemas.LIST_OF_STRING.member("member")));
                             });
                         });
-                        queryParams(result);
+                        builder.queryParams(result);
                     }
                 }
             });

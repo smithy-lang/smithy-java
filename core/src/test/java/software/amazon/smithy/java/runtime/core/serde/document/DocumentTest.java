@@ -294,7 +294,9 @@ public class DocumentTest {
         DocumentDeserializer deserializer = new DocumentDeserializer(value);
         List<String> result = new ArrayList<>();
 
-        deserializer.readList(PreludeSchemas.DOCUMENT, c -> result.add(c.readString(PreludeSchemas.STRING)));
+        deserializer.readList(PreludeSchemas.DOCUMENT, result, (listResult, c) -> {
+            listResult.add(c.readString(PreludeSchemas.STRING));
+        });
 
         assertThat(result, contains("a", "b"));
     }
@@ -307,7 +309,8 @@ public class DocumentTest {
 
         deserializer.readStringMap(
             PreludeSchemas.DOCUMENT,
-            (k, v) -> result.put(k, v.readString(PreludeSchemas.STRING))
+            result,
+            (resultMap, k, v) -> resultMap.put(k, v.readString(PreludeSchemas.STRING))
         );
 
         assertThat(result, equalTo(Map.of("a", "v")));

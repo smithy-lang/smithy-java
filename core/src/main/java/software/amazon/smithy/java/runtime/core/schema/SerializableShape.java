@@ -10,6 +10,7 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 /**
  * SDK Shape that can be serialized by a {@link ShapeSerializer}.
  */
+@FunctionalInterface
 public interface SerializableShape {
     /**
      * Serialize the state of the shape into the given serializer.

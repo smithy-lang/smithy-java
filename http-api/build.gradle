@@ -6,5 +6,5 @@ description = "This module provides the Smithy Java HTTP API"
 
 ext {
     displayName = "Smithy :: Java :: HTTP"
-    moduleName = "software.amazon.smithy.smithy-java.http-api"
+    moduleName = "software.amazon.smithy.java.http-api"
 }

@@ -63,8 +63,10 @@ public final class GetPersonImageOutput implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_NAME, name);
+        serializer.writeStruct(SCHEMA, this, (pojo, st) -> {
+            if (pojo.name != null) {
+                st.writeString(SCHEMA_NAME, pojo.name);
+            }
         });
     }
 
@@ -98,9 +100,9 @@ public final class GetPersonImageOutput implements SerializableShape {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct(SCHEMA, (member, de) -> {
+            decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
                 switch (member.memberIndex()) {
-                    case 0 -> name(de.readString(member));
+                    case 0 -> builder.name(de.readString(member));
                 }
             });
             return this;

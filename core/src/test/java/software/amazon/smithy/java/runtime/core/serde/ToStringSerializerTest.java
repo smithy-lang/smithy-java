@@ -40,12 +40,12 @@ public class ToStringSerializerTest {
             .age(102)
             .birthday(Instant.EPOCH)
             .binary("hello".getBytes(StandardCharsets.UTF_8))
-            .tags(tags)
+            .queryParams(Map.of("a", List.of("1", "2")))
             .build();
 
         assertThat(
             person.toString(),
-            equalTo("Person[name=Mike, age=102, birthday=*REDACTED*, binary=68656c6c6f, tags={a=[b, c], b=[d], c=[]}]")
+            equalTo("Person[name=Mike, age=102, binary=68656c6c6f, birthday=*REDACTED*, queryParams={a=[1, 2]}]")
         );
     }
 
@@ -71,13 +71,13 @@ public class ToStringSerializerTest {
             .build();
 
         var str = ToStringSerializer.serialize(e -> {
-            e.writeStruct(schema, ser -> {
-                ser.writeMap(schema.member("foo"), map -> {
-                    map.writeEntry(mapSchema.member("key"), "a", ms -> {
-                        ms.writeString(mapSchema.member("value"), "hi");
+            e.writeStruct(schema, null, (ignored, ser) -> {
+                ser.writeMap(schema.member("foo"), mapSchema, (innerMapSchema, map) -> {
+                    map.writeEntry(innerMapSchema.member("key"), "a", innerMapSchema, (mapSchema2, ms) -> {
+                        ms.writeString(mapSchema2.member("value"), "hi");
                     });
-                    map.writeEntry(mapSchema.member("key"), "b", ms -> {
-                        ms.writeNull(mapSchema.member("value"));
+                    map.writeEntry(innerMapSchema.member("key"), "b", innerMapSchema, (mapSchema2, ms) -> {
+                        ms.writeNull(mapSchema2.member("value"));
                     });
                 });
             });
@@ -100,8 +100,8 @@ public class ToStringSerializerTest {
             .build();
 
         var str = ToStringSerializer.serialize(e -> {
-            e.writeStruct(schema, ser -> {
-                ser.writeBlob(schema.member("foo"), "abc".getBytes(StandardCharsets.UTF_8));
+            e.writeStruct(schema, schema.member("foo"), (member, ser) -> {
+                ser.writeBlob(member, "abc".getBytes(StandardCharsets.UTF_8));
             });
         });
 

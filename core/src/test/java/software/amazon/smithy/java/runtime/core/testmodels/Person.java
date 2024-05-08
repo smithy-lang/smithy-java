@@ -5,32 +5,43 @@
 
 package software.amazon.smithy.java.runtime.core.testmodels;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.JsonNameTrait;
+import software.amazon.smithy.model.traits.HttpLabelTrait;
+import software.amazon.smithy.model.traits.LengthTrait;
+import software.amazon.smithy.model.traits.RangeTrait;
+import software.amazon.smithy.model.traits.RequiredTrait;
 
 public final class Person implements SerializableShape {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Person");
     private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
         .id(ID)
+        .traits(new HttpLabelTrait(), new RequiredTrait(), LengthTrait.builder().max(7L).build())
+        .build();
+    private static final SdkSchema SCHEMA_FAVORITE_COLOR = SdkSchema
+        .memberBuilder("favoriteColor", PreludeSchemas.STRING)
+        .id(ID)
         .build();
     private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder("age", PreludeSchemas.INTEGER)
         .id(ID)
-        .traits(new JsonNameTrait("Age"))
+        .traits(RangeTrait.builder().max(BigDecimal.valueOf(150)).build())
         .build();
     private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder("birthday", SharedSchemas.BIRTHDAY)
         .id(ID)
@@ -39,7 +50,7 @@ public final class Person implements SerializableShape {
         .id(ID)
         .build();
     private static final SdkSchema SCHEMA_QUERY_PARAMS = SdkSchema
-        .memberBuilder("tags", SharedSchemas.MAP_LIST_STRING)
+        .memberBuilder("queryParams", SharedSchemas.MAP_LIST_STRING)
         .id(ID)
         .build();
     static final SdkSchema SCHEMA = SdkSchema.builder()
@@ -47,25 +58,31 @@ public final class Person implements SerializableShape {
         .type(ShapeType.STRUCTURE)
         .members(
             SCHEMA_NAME,
+            SCHEMA_FAVORITE_COLOR,
             SCHEMA_AGE,
             SCHEMA_BIRTHDAY,
             SCHEMA_BINARY,
             SCHEMA_QUERY_PARAMS
         )
         .build();
+    private static final SdkSchema SCHEMA_QUERY_PARAMS_KEY = SharedSchemas.MAP_LIST_STRING.member("key");
+    private static final SdkSchema SCHEMA_QUERY_PARAMS_VALUE = SharedSchemas.MAP_LIST_STRING.member("value");
+    private static final SdkSchema LIST_OF_STRING_MEMBER = SharedSchemas.LIST_OF_STRING.member("member");
 
     private final String name;
     private final int age;
     private final Instant birthday;
+    private final String favoriteColor;
     private final byte[] binary;
-    private final Map<String, List<String>> tags;
+    private final Map<String, List<String>> queryParams;
 
     private Person(Builder builder) {
         this.name = builder.name;
         this.age = builder.age;
         this.birthday = builder.birthday;
+        this.favoriteColor = builder.favoriteColor;
         this.binary = builder.binary;
-        this.tags = builder.tags;
+        this.queryParams = builder.queryParams;
     }
 
     public static Builder builder() {
@@ -88,8 +105,8 @@ public final class Person implements SerializableShape {
         return binary;
     }
 
-    public Map<String, List<String>> tags() {
-        return tags;
+    public Map<String, List<String>> queryParams() {
+        return queryParams;
     }
 
     @Override
@@ -99,23 +116,50 @@ public final class Person implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            st.writeString(SCHEMA_NAME, name);
-            st.writeInteger(SCHEMA_AGE, age);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BIRTHDAY, birthday);
-            ShapeSerializer.writeIfNotNull(st, SCHEMA_BINARY, binary);
-            if (!tags.isEmpty()) {
-                st.writeMap(SCHEMA_QUERY_PARAMS, m -> {
-                    var keyMember = SharedSchemas.MAP_LIST_STRING.member("key");
-                    var valueMember = SharedSchemas.MAP_LIST_STRING.member("value");
-                    tags.forEach((k, v) -> m.writeEntry(keyMember, k, mv -> {
-                        mv.writeList(valueMember, mvl -> {
-                            v.forEach(value -> mvl.writeString(SharedSchemas.LIST_OF_STRING.member("member"), value));
-                        });
-                    }));
-                });
+        serializer.writeStruct(SCHEMA, this, WriteShape.INSTANCE);
+    }
+
+    private static final class WriteShape implements BiConsumer<Person, ShapeSerializer> {
+        private static final WriteShape INSTANCE = new WriteShape();
+
+        @Override
+        public void accept(Person shape, ShapeSerializer serializer) {
+            serializer.writeString(SCHEMA_NAME, shape.name);
+            serializer.writeInteger(SCHEMA_AGE, shape.age);
+            if (shape.favoriteColor != null) {
+                serializer.writeString(SCHEMA_FAVORITE_COLOR, shape.favoriteColor);
             }
-        });
+            if (shape.binary != null) {
+                serializer.writeBlob(SCHEMA_BINARY, shape.binary);
+            }
+            if (shape.birthday != null) {
+                serializer.writeTimestamp(SCHEMA_BIRTHDAY, shape.birthday);
+            }
+            if (!shape.queryParams.isEmpty()) {
+                serializer.writeMap(SCHEMA_QUERY_PARAMS, shape, Person::writeQueryParamsMember);
+            }
+        }
+    }
+
+    private static void writeQueryParamsMember(Person shape, MapSerializer serializer) {
+        for (var queryParamsEntry : shape.queryParams.entrySet()) {
+            serializer.writeEntry(
+                SCHEMA_QUERY_PARAMS_KEY,
+                queryParamsEntry.getKey(),
+                queryParamsEntry.getValue(),
+                Person::writeQueryParamsMemberEntry
+            );
+        }
+    }
+
+    private static void writeQueryParamsMemberEntry(List<String> values, ShapeSerializer serializer) {
+        serializer.writeList(SCHEMA_QUERY_PARAMS_VALUE, values, Person::writeQueryParamsMemberEntryElement);
+    }
+
+    private static void writeQueryParamsMemberEntryElement(List<String> listValue, ShapeSerializer serializer) {
+        for (var queryParamsEntryValue : listValue) {
+            serializer.writeString(LIST_OF_STRING_MEMBER, queryParamsEntryValue);
+        }
     }
 
     public static final class Builder implements SdkShapeBuilder<Person> {
@@ -123,11 +167,11 @@ public final class Person implements SerializableShape {
         private String name;
         private int age = 0;
         private Instant birthday;
+        private String favoriteColor;
         private byte[] binary;
-        private Map<String, List<String>> tags = Collections.emptyMap();
+        private Map<String, List<String>> queryParams = Collections.emptyMap();
 
-        private Builder() {
-        }
+        private Builder() {}
 
         @Override
         public Person build() {
@@ -149,33 +193,42 @@ public final class Person implements SerializableShape {
             return this;
         }
 
+        public Builder favoriteColor(String favoriteColor) {
+            this.favoriteColor = favoriteColor;
+            return this;
+        }
+
         public Builder binary(byte[] binary) {
             this.binary = binary;
             return this;
         }
 
-        public Builder tags(Map<String, List<String>> tags) {
-            this.tags = tags;
+        public Builder queryParams(Map<String, List<String>> queryParams) {
+            this.queryParams = queryParams;
             return this;
         }
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct(SCHEMA, (member, de) -> {
+            decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
                 switch (member.memberIndex()) {
-                    case 0 -> name(de.readString(member));
-                    case 1 -> age(de.readInteger(member));
-                    case 2 -> birthday(de.readTimestamp(member));
-                    case 3 -> binary(de.readBlob(member));
-                    case 4 -> {
+                    case 0 -> builder.name(de.readString(member));
+                    case 1 -> builder.favoriteColor(de.readString(member));
+                    case 2 -> builder.age(de.readInteger(member));
+                    case 3 -> builder.birthday(de.readTimestamp(member));
+                    case 4 -> builder.binary(de.readBlob(member));
+                    case 5 -> {
                         Map<String, List<String>> result = new LinkedHashMap<>();
-                        de.readStringMap(SCHEMA_QUERY_PARAMS, (key, v) -> {
-                            v.readList(SharedSchemas.MAP_LIST_STRING.member("member"), list -> {
-                                result.computeIfAbsent(key, k -> new ArrayList<>())
-                                    .add(list.readString(SharedSchemas.LIST_OF_STRING.member("member")));
+                        de.readStringMap(SCHEMA_QUERY_PARAMS, result, (mapData, key, v) -> {
+                            List<String> listValue = mapData.computeIfAbsent(key, k -> new ArrayList<>());
+                            v.readList(SharedSchemas.MAP_LIST_STRING.member("member"), listValue, (list, ser) -> {
+                                list.add(ser.readString(SharedSchemas.LIST_OF_STRING.member("member")));
                             });
                         });
-                        tags(result);
+                        builder.queryParams(result);
+                    }
+                    default -> {
+                        // TODO: Log periodically
                     }
                 }
             });

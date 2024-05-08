@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -29,6 +28,12 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
+    public void close() {
+        builder.setLength(0);
+        builder.trimToSize();
+    }
+
+    @Override
     public String toString() {
         return builder.toString().trim();
     }
@@ -42,31 +47,36 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
         builder.append(schema.id().getName()).append('[');
-        consumer.accept(ShapeSerializer.ofDelegatingConsumer(new StructureMemberWriter()));
+        consumer.accept(structState, new StructureWriter(this));
         builder.append(']');
     }
 
-    private final class StructureMemberWriter implements BiConsumer<SdkSchema, Consumer<ShapeSerializer>> {
+    private static final class StructureWriter extends InterceptingSerializer {
+        private final ToStringSerializer toStringSerializer;
         private boolean isFirst = true;
 
+        private StructureWriter(ToStringSerializer toStringSerializer) {
+            this.toStringSerializer = toStringSerializer;
+        }
+
         @Override
-        public void accept(SdkSchema member, Consumer<ShapeSerializer> memberWriter) {
+        protected ShapeSerializer before(SdkSchema schema) {
             if (!isFirst) {
-                builder.append(", ");
+                toStringSerializer.builder.append(", ");
             } else {
                 isFirst = false;
             }
-            builder.append(member.memberName()).append('=');
-            memberWriter.accept(ToStringSerializer.this);
+            toStringSerializer.builder.append(schema.memberName()).append('=');
+            return toStringSerializer;
         }
     }
 
     @Override
-    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeList(SdkSchema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
         builder.append('[');
-        consumer.accept(new ListSerializer(this, this::writeComma));
+        consumer.accept(state, new ListSerializer(this, this::writeComma));
         builder.append(']');
     }
 
@@ -77,24 +87,36 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public <T> void writeMap(SdkSchema schema, T state, BiConsumer<T, MapSerializer> consumer) {
         builder.append('{');
-        consumer.accept(new MapSerializer() {
-            private boolean isFirst = true;
-
-            @Override
-            public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
-                if (!isFirst) {
-                    builder.append(", ");
-                } else {
-                    isFirst = false;
-                }
-                append(keySchema, key);
-                builder.append('=');
-                valueSerializer.accept(ToStringSerializer.this);
-            }
-        });
+        consumer.accept(state, new ToStringMapSerializer(this));
         builder.append('}');
+    }
+
+    private static final class ToStringMapSerializer implements MapSerializer {
+        private final ToStringSerializer serializer;
+        private boolean isFirst = true;
+
+        ToStringMapSerializer(ToStringSerializer serializer) {
+            this.serializer = serializer;
+        }
+
+        @Override
+        public <T> void writeEntry(
+            SdkSchema keySchema,
+            String key,
+            T state,
+            BiConsumer<T, ShapeSerializer> valueSerializer
+        ) {
+            if (!isFirst) {
+                serializer.builder.append(", ");
+            } else {
+                isFirst = false;
+            }
+            serializer.append(keySchema, key);
+            serializer.builder.append('=');
+            valueSerializer.accept(state, serializer);
+        }
     }
 
     @Override

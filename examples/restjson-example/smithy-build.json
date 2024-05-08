@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "plugins": {
-    "java-codegen": {
+    "java-client-codegen": {
       "service": "smithy.example#PersonDirectory",
       "namespace": "software.amazon.smithy.java.runtime.example.codegen",
       "headerFile": "license.txt"

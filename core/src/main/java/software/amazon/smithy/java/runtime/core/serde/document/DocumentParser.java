@@ -12,8 +12,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
@@ -41,24 +42,38 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
         if (schema.type() != ShapeType.STRUCTURE && schema.type() != ShapeType.UNION) {
             throw new SdkSerdeException("Expected a structure or union for this document, but found " + schema);
         }
 
         Map<String, Document> members = new LinkedHashMap<>();
-        consumer.accept(ShapeSerializer.ofDelegatingConsumer((memberSchema, writer) -> {
-            var memberName = memberSchema.memberName();
-            var parser = new DocumentParser();
-            writer.accept(parser);
-            members.put(memberName, parser.getResult());
-        }));
+        consumer.accept(structState, new StructureParser(members));
 
         setResult(new Documents.StructureDocument(schema, members));
     }
 
+    private static final class StructureParser extends InterceptingSerializer {
+        private final DocumentParser parser = new DocumentParser();
+        private final Map<String, Document> members;
+
+        private StructureParser(Map<String, Document> members) {
+            this.members = members;
+        }
+
+        @Override
+        protected ShapeSerializer before(SdkSchema schema) {
+            return parser;
+        }
+
+        @Override
+        protected void after(SdkSchema schema) {
+            members.put(schema.memberName(), parser.getResult());
+        }
+    }
+
     @Override
-    public void writeList(SdkSchema schema, Consumer<ShapeSerializer> consumer) {
+    public <T> void writeList(SdkSchema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
         List<Document> elements = new ArrayList<>();
         var elementParser = new DocumentParser();
         ListSerializer serializer = new ListSerializer(elementParser, position -> {
@@ -67,7 +82,7 @@ final class DocumentParser implements ShapeSerializer {
                 elementParser.result = null;
             }
         });
-        consumer.accept(serializer);
+        consumer.accept(state, serializer);
         if (elementParser.result != null) {
             elements.add(elementParser.result);
         }
@@ -75,25 +90,32 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public void writeMap(SdkSchema schema, Consumer<MapSerializer> consumer) {
+    public <T> void writeMap(SdkSchema schema, T state, BiConsumer<T, MapSerializer> consumer) {
         var keyMember = schema.member("key");
         if (keyMember == null) {
             throw new SdkSerdeException("Cannot create a map from a schema that does not define a map key: " + schema);
         } else if (keyMember.type() == ShapeType.STRING || keyMember.type() == ShapeType.ENUM) {
-            var serializer = new MapSerializer() {
-                private final Map<String, Document> entries = new LinkedHashMap<>();
-
-                @Override
-                public void writeEntry(SdkSchema keySchema, String key, Consumer<ShapeSerializer> valueSerializer) {
-                    DocumentParser valueParser = new DocumentParser();
-                    valueSerializer.accept(valueParser);
-                    entries.put(key, valueParser.result);
-                }
-            };
-            consumer.accept(serializer);
+            var serializer = new DocumentMapSerializer();
+            consumer.accept(state, serializer);
             setResult(new Documents.StringMapDocument(schema, serializer.entries));
         } else {
             throw new SdkSerdeException("Unexpected map key schema: " + schema);
+        }
+    }
+
+    private static final class DocumentMapSerializer implements MapSerializer {
+        private final Map<String, Document> entries = new LinkedHashMap<>();
+
+        @Override
+        public <U> void writeEntry(
+            SdkSchema keySchema,
+            String key,
+            U keyState,
+            BiConsumer<U, ShapeSerializer> valueSerializer
+        ) {
+            DocumentParser valueParser = new DocumentParser();
+            valueSerializer.accept(keyState, valueParser);
+            entries.put(key, valueParser.result);
         }
     }
 

@@ -12,8 +12,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
@@ -157,14 +155,14 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public void readStruct(SdkSchema schema, BiConsumer<SdkSchema, ShapeDeserializer> eachEntry) {
+    public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         try {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
                 var member = resolveMember(schema, field);
                 if (member == null) {
                     iter.skip();
                 } else {
-                    eachEntry.accept(member, this);
+                    structMemberConsumer.accept(state, member, this);
                 }
             }
         } catch (IOException e) {
@@ -186,10 +184,10 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public void readList(SdkSchema schema, Consumer<ShapeDeserializer> eachElement) {
+    public <T> void readList(SdkSchema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
         try {
             while (iter.readArray()) {
-                eachElement.accept(this);
+                listMemberConsumer.accept(state, this);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -197,10 +195,10 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public void readStringMap(SdkSchema schema, BiConsumer<String, ShapeDeserializer> eachEntry) {
+    public <T> void readStringMap(SdkSchema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
         try {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
-                eachEntry.accept(field, this);
+                mapMemberConsumer.accept(state, field, this);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);

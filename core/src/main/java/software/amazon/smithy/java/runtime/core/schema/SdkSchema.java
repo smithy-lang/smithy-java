@@ -5,8 +5,9 @@
 
 package software.amazon.smithy.java.runtime.core.schema;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -17,6 +18,11 @@ import java.util.Objects;
 import java.util.Set;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.DefaultTrait;
+import software.amazon.smithy.model.traits.LengthTrait;
+import software.amazon.smithy.model.traits.PatternTrait;
+import software.amazon.smithy.model.traits.RangeTrait;
+import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.utils.SmithyBuilder;
 
@@ -25,6 +31,8 @@ import software.amazon.smithy.utils.SmithyBuilder;
  *
  * <p>Various constraint traits are precomputed based on the presence of traits exposed by this class to aid in the
  * performance of validation to avoid computing constraints and hashmap lookups by trait class.
+ *
+ * <p>Note: when creating a structure schema, all required members must come before optional members.
  */
 public final class SdkSchema {
 
@@ -33,6 +41,7 @@ public final class SdkSchema {
     private final Map<Class<? extends Trait>, Trait> traits;
     private final Map<String, SdkSchema> members;
     private final List<SdkSchema> memberList;
+    private volatile int hashCode;
 
     private final String memberName;
     private final SdkSchema memberTarget;
@@ -45,28 +54,139 @@ public final class SdkSchema {
     private final Set<String> stringEnumValues;
     private final Set<Integer> intEnumValues;
 
+    // The following variables are used to speed up validation and prevent looking up constraints over and over.
+    final int requiredMemberCount;
+    final long minLengthConstraint;
+    final long maxLengthConstraint;
+    final BigDecimal minRangeConstraint;
+    final BigDecimal maxRangeConstraint;
+    final long minLongConstraint;
+    final long maxLongConstraint;
+    final double minDoubleConstraint;
+    final double maxDoubleConstraint;
+    final Validator.StructValidation structValidation;
+    final ValidatorOfString stringValidation;
+    boolean isRequiredByValidation;
+
+    /**
+     * The bitmask to use for this member to compute a required member bitfield. This value will match the memberIndex
+     * if the member is required and has no default value. It will be zero if isRequiredByValidation == false.
+     */
+    long requiredByValidationBitmask;
+
+    /**
+     * The result of creating a bitfield of the memberIndex of every required member with no default value.
+     * This allows for an inexpensive comparison for required structure member validation.
+     */
+    final long requiredStructureMemberBitfield;
+
     private SdkSchema(Builder builder) {
         this.id = Objects.requireNonNull(builder.id, "id is null");
         this.type = Objects.requireNonNull(builder.type, "type is null");
-
-        this.memberName = builder.memberName;
-        this.memberTarget = builder.memberTarget;
-
-        // Create a more efficient trait map based on the number of traits.
         this.traits = createTraitMap(builder.traits);
 
-        // Create a more efficient member map based on the number of members.
+        // Member setting.s
+        this.memberName = builder.memberName;
+        this.memberTarget = builder.memberTarget;
         this.members = MemberContainers.of(
             this.type,
             builder.members,
             this.memberTarget != null ? this.memberTarget.members : null
         );
-
-        // Create the immutable copy of the members as a list, the companion to memberIndex.
         this.memberList = builder.members == null ? Collections.emptyList() : List.copyOf(members.values());
+        // Validation requires the member is present if it's required and has no default value.
+        this.isRequiredByValidation = memberName != null
+            && !hasTrait(DefaultTrait.class)
+            && hasTrait(RequiredTrait.class);
 
         this.stringEnumValues = builder.stringEnumValues;
         this.intEnumValues = builder.intEnumValues;
+
+        // Precompute an allowed range, setting Long.MIN and Long.MAX when missing.
+        var lengthTrait = getTrait(LengthTrait.class);
+        if (lengthTrait == null) {
+            minLengthConstraint = Long.MIN_VALUE;
+            maxLengthConstraint = Long.MAX_VALUE;
+        } else {
+            minLengthConstraint = lengthTrait.getMin().orElse(Long.MIN_VALUE);
+            maxLengthConstraint = lengthTrait.getMax().orElse(Long.MAX_VALUE);
+        }
+
+        // If the shape is a string or enum, pre-compute necessary validation (or no-op if not a string/enum).
+        stringValidation = createStringValidator(this, lengthTrait);
+
+        // Range traits use BigDecimal, so use null when missing rather than any kind of default.
+        var rangeTrait = getTrait(RangeTrait.class);
+        if (rangeTrait != null) {
+            this.minRangeConstraint = rangeTrait.getMin().orElse(null);
+            this.maxRangeConstraint = rangeTrait.getMax().orElse(null);
+        } else {
+            this.minRangeConstraint = null;
+            this.maxRangeConstraint = null;
+        }
+
+        // Pre-compute allowable ranges so this doesn't have to be looked up during validation.
+        // BigInteger and BigDecimal just use the rangeConstraint BigDecimal directly.
+        switch (type) {
+            case BYTE -> {
+                minLongConstraint = minRangeConstraint == null ? Byte.MIN_VALUE : minRangeConstraint.byteValue();
+                maxLongConstraint = maxRangeConstraint == null ? Byte.MAX_VALUE : maxRangeConstraint.byteValue();
+                minDoubleConstraint = Double.MIN_VALUE;
+                maxDoubleConstraint = Double.MAX_VALUE;
+            }
+            case SHORT -> {
+                minLongConstraint = minRangeConstraint == null ? Short.MIN_VALUE : minRangeConstraint.shortValue();
+                maxLongConstraint = maxRangeConstraint == null ? Short.MAX_VALUE : maxRangeConstraint.shortValue();
+                minDoubleConstraint = Double.MIN_VALUE;
+                maxDoubleConstraint = Double.MAX_VALUE;
+            }
+            case INTEGER -> {
+                minLongConstraint = minRangeConstraint == null ? Integer.MIN_VALUE : minRangeConstraint.intValue();
+                maxLongConstraint = maxRangeConstraint == null ? Integer.MAX_VALUE : maxRangeConstraint.intValue();
+                minDoubleConstraint = Double.MIN_VALUE;
+                maxDoubleConstraint = Double.MAX_VALUE;
+            }
+            case LONG -> {
+                minLongConstraint = minRangeConstraint == null ? Long.MIN_VALUE : minRangeConstraint.longValue();
+                maxLongConstraint = maxRangeConstraint == null ? Long.MAX_VALUE : maxRangeConstraint.longValue();
+                minDoubleConstraint = Double.MIN_VALUE;
+                maxDoubleConstraint = Double.MAX_VALUE;
+            }
+            case FLOAT -> {
+                minLongConstraint = Long.MIN_VALUE;
+                maxLongConstraint = Long.MAX_VALUE;
+                minDoubleConstraint = minRangeConstraint == null ? Float.MIN_VALUE : minRangeConstraint.floatValue();
+                maxDoubleConstraint = maxRangeConstraint == null ? Float.MAX_VALUE : maxRangeConstraint.floatValue();
+            }
+            case DOUBLE -> {
+                minLongConstraint = Long.MIN_VALUE;
+                maxLongConstraint = Long.MAX_VALUE;
+                minDoubleConstraint = minRangeConstraint == null ? Double.MIN_VALUE : minRangeConstraint.doubleValue();
+                maxDoubleConstraint = maxRangeConstraint == null ? Double.MAX_VALUE : maxRangeConstraint.doubleValue();
+            }
+            default -> {
+                minLongConstraint = Long.MIN_VALUE;
+                maxLongConstraint = Long.MAX_VALUE;
+                minDoubleConstraint = Double.MIN_VALUE;
+                maxDoubleConstraint = Double.MAX_VALUE;
+            }
+        }
+
+        // Pre-compute where the shape contains any members marked as required.
+        // We only need to use the slow version of required member validation if there are > 64 required members.
+        this.requiredMemberCount = computeRequiredMemberCount(this.type, this.memberTarget, this.memberList);
+
+        structValidation = switch (type) {
+            case UNION -> Validator.StructValidation.UNION;
+            case STRUCTURE -> requiredMemberCount > 64
+                ? Validator.StructValidation.BIG_REQUIRED
+                : Validator.StructValidation.REQUIRED;
+            default -> Validator.StructValidation.NOT_STRUCT;
+        };
+
+        this.requiredStructureMemberBitfield = structValidation == Validator.StructValidation.REQUIRED
+            ? computeRequiredBitField(members())
+            : 0;
     }
 
     private static Map<Class<? extends Trait>, Trait> createTraitMap(Trait[] traits) {
@@ -83,16 +203,69 @@ public final class SdkSchema {
         }
     }
 
+    private static ValidatorOfString createStringValidator(SdkSchema schema, LengthTrait lengthTrait) {
+        List<ValidatorOfString> stringValidators = null;
+
+        if (schema.type == ShapeType.STRING || schema.type == ShapeType.ENUM) {
+            stringValidators = new ArrayList<>();
+
+            if (lengthTrait != null) {
+                stringValidators.add(
+                    new ValidatorOfString.LengthStringValidator(
+                        lengthTrait.getMin().orElse(Long.MIN_VALUE),
+                        lengthTrait.getMax().orElse(Long.MAX_VALUE)
+                    )
+                );
+            }
+
+            if (!schema.stringEnumValues.isEmpty()) {
+                stringValidators.add(ValidatorOfString.EnumStringValidator.INSTANCE);
+            }
+
+            var patternTrait = schema.getTrait(PatternTrait.class);
+            if (patternTrait != null) {
+                stringValidators.add(new ValidatorOfString.PatternStringValidator(patternTrait.getPattern()));
+            }
+        }
+
+        return ValidatorOfString.of(stringValidators);
+    }
+
+    private static int computeRequiredMemberCount(ShapeType type, SdkSchema memberTarget, List<SdkSchema> members) {
+        if (memberTarget != null) {
+            return memberTarget.requiredMemberCount;
+        } else if (type != ShapeType.STRUCTURE) {
+            return 0;
+        } else {
+            int result = 0;
+            for (var member : members) {
+                if (member.isRequiredByValidation) {
+                    result++;
+                }
+            }
+            return result;
+        }
+    }
+
+    private static long computeRequiredBitField(Collection<SdkSchema> members) {
+        long setFields = 0L;
+        for (SdkSchema member : members) {
+            setFields |= member.requiredByValidationBitmask;
+        }
+        return setFields;
+    }
+
     private void setMemberIndex(int memberIndex) {
         if (this.memberIndex != -1) {
             throw new IllegalStateException(
                 "Member schema already has an assigned member index of "
-                    + this.memberIndex + ". Members cannot be reused across shapes. "
-                    + "Member: " + this
+                    + this.memberIndex + ". Members cannot be reused across shapes. Member: " + this
             );
         }
 
+        hashCode = 0; // reset the hashcode
         this.memberIndex = memberIndex;
+        requiredByValidationBitmask = isRequiredByValidation ? 1L << memberIndex : 0L;
     }
 
     /**
@@ -155,19 +328,12 @@ public final class SdkSchema {
     }
 
     /**
-     * Get the name of the member if the schema is for a member.
+     * Get the name of the member if the schema is for a member, or null if not.
      *
-     * @return Returns the member name.
-     * @throws UnsupportedOperationException if the schema is not a member.
+     * @return Returns the member name or null if not a member.
      */
     public String memberName() {
-        if (isMember()) {
-            return memberName;
-        }
-        throw new UnsupportedOperationException(
-            "Attempted to get the member name of a schema that is not a member: "
-                + this
-        );
+        return memberName;
     }
 
     /**
@@ -189,10 +355,7 @@ public final class SdkSchema {
      * @return Member target.
      */
     public SdkSchema memberTarget() {
-        if (isMember()) {
-            return memberTarget;
-        }
-        throw new UnsupportedOperationException("Schema is not for a member: " + this);
+        return memberTarget;
     }
 
     /**
@@ -258,6 +421,15 @@ public final class SdkSchema {
     }
 
     /**
+     * Returns true if this is a required member with no default value.
+     *
+     * @return true if required.
+     */
+    boolean isRequiredByValidation() {
+        return isRequiredByValidation;
+    }
+
+    /**
      * Get the allowed values of the string.
      *
      * @return allowed string values (only relevant if not empty).
@@ -296,17 +468,22 @@ public final class SdkSchema {
 
     @Override
     public int hashCode() {
-        return Objects.hash(
-            id,
-            type,
-            traits,
-            members,
-            stringEnumValues,
-            intEnumValues,
-            memberName,
-            memberTarget,
-            memberIndex
-        );
+        var code = hashCode;
+        if (code == 0) {
+            code = Objects.hash(
+                id,
+                type,
+                traits,
+                members,
+                stringEnumValues,
+                intEnumValues,
+                memberName,
+                memberTarget,
+                memberIndex
+            );
+            hashCode = code;
+        }
+        return code;
     }
 
     public static final class Builder implements SmithyBuilder<SdkSchema> {
@@ -388,7 +565,9 @@ public final class SdkSchema {
          * @throws IllegalStateException if the schema is for a member.
          */
         public Builder members(SdkSchema... members) {
-            return members(Arrays.asList(members));
+            List<SdkSchema> result = new ArrayList<>(members.length);
+            Collections.addAll(result, members);
+            return membersWithOwnedList(result);
         }
 
         /**
@@ -403,7 +582,7 @@ public final class SdkSchema {
             for (Builder member : members) {
                 built.add(member.id(id).build());
             }
-            return members(built);
+            return membersWithOwnedList(built);
         }
 
         /**
@@ -414,9 +593,25 @@ public final class SdkSchema {
          * @throws IllegalStateException if the schema is for a member, or if the member is owned by another shape.
          */
         public Builder members(List<SdkSchema> members) {
+            return membersWithOwnedList(new ArrayList<>(members));
+        }
+
+        // Given a list that the builder owns and is free to mutate and keep, sort the members and store them.
+        private Builder membersWithOwnedList(List<SdkSchema> members) {
             if (memberTarget != null) {
                 throw new IllegalStateException("Cannot add members to a member");
             }
+
+            // Sort members to ensure that required members with no default come before other members.
+            members.sort((a, b) -> {
+                if (a.isRequiredByValidation && !b.isRequiredByValidation) {
+                    return -1;
+                } else if (a.isRequiredByValidation) {
+                    return 0;
+                } else {
+                    return 1;
+                }
+            });
 
             // Assign the member index for each, checking to ensure members aren't illegally shared across shapes.
             int index = 0;

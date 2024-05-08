@@ -88,13 +88,17 @@ public final class PutPersonImageInput implements SerializableShape {
 
     @Override
     public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, st -> {
-            st.writeString(SCHEMA_NAME, name);
-            st.writeList(SCHEMA_TAGS, ser -> {
-                tags.forEach(tag -> ser.writeString(SCHEMA_TAGS, tag));
+        serializer.writeStruct(SCHEMA, this, (pojo, st) -> {
+            st.writeString(SCHEMA_NAME, pojo.name);
+            st.writeList(SCHEMA_TAGS, pojo.tags, (tags, ser) -> {
+                for (var tag : tags) {
+                    ser.writeString(SCHEMA_TAGS, tag);
+                }
             });
-            st.writeList(SCHEMA_MORE_TAGS, ser -> {
-                moreTags.forEach(tag -> ser.writeString(SCHEMA_MORE_TAGS, tag));
+            st.writeList(SCHEMA_MORE_TAGS, pojo.moreTags, (moreTags, ser) -> {
+                for (var tag : moreTags) {
+                    ser.writeString(SCHEMA_MORE_TAGS, tag);
+                }
             });
         });
     }
@@ -141,11 +145,15 @@ public final class PutPersonImageInput implements SerializableShape {
 
         @Override
         public Builder deserialize(ShapeDeserializer decoder) {
-            decoder.readStruct(SCHEMA, (member, de) -> {
+            decoder.readStruct(SCHEMA, this, (builder, member, de) -> {
                 switch (member.memberIndex()) {
-                    case 0 -> name(de.readString(member));
-                    case 1 -> de.readList(SCHEMA_TAGS, ser -> tags.add(ser.readString(SCHEMA_TAGS)));
-                    case 2 -> de.readList(SCHEMA_MORE_TAGS, ser -> moreTags.add(ser.readString(SCHEMA_MORE_TAGS)));
+                    case 0 -> builder.name(de.readString(member));
+                    case 1 -> de.readList(SCHEMA_TAGS, builder, (builder2, ser) -> {
+                        builder2.tags.add(ser.readString(SCHEMA_TAGS));
+                    });
+                    case 2 -> de.readList(SCHEMA_MORE_TAGS, builder, (builder2, ser) -> {
+                        builder2.moreTags.add(ser.readString(SCHEMA_MORE_TAGS));
+                    });
                 }
             });
             return this;

@@ -31,9 +31,9 @@ public class TypedDocumentTest {
             .build();
 
         SerializableShape serializableShape = encoder -> {
-            encoder.writeStruct(structSchema, s -> {
-                s.writeString(structSchema.member("a"), "1");
-                s.writeString(structSchema.member("b"), "2");
+            encoder.writeStruct(structSchema, structSchema, (schema, s) -> {
+                s.writeString(schema.member("a"), "1");
+                s.writeString(schema.member("b"), "2");
             });
         };
 

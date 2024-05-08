@@ -6,7 +6,7 @@ description = "This module provides the core server functionality"
 
 ext {
     displayName = "Smithy :: Java :: Server Core"
-    moduleName = "software.amazon.smithy.smithy-java.server-core"
+    moduleName = "software.amazon.smithy.java.server-core"
 }
 
 dependencies {

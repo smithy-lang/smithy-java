@@ -6,7 +6,7 @@ description = "This module provides the implementation of AWS REST JSON 1.0"
 
 ext {
     displayName = "Smithy :: Java :: Client AWS REST JSON 1.0"
-    moduleName = "software.amazon.smithy.smithy-java.client-aws-rest-json1"
+    moduleName = "software.amazon.smithy.java.client-aws-rest-json1"
 }
 
 dependencies {
