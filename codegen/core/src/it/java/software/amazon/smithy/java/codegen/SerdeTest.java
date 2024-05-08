@@ -32,7 +32,6 @@ import io.smithy.codegen.test.model.TimestampsInput;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -137,6 +136,12 @@ public class SerdeTest {
         builder.setDataStream(datastream);
         var input = builder.build();
         var document = Document.createTyped(builder.build());
+        var outputBuilder = BlobsInput.builder();
+        document.deserializeInto(outputBuilder);
+        outputBuilder.setDataStream(input.streamingBlob());
+        var output = builder.build();
+        assertEquals(input.hashCode(), output.hashCode());
+        assertEquals(input, output);
     }
 
     @SuppressWarnings("unchecked")
