@@ -86,7 +86,7 @@ public interface Context {
      *
      * @param name Name of the key.
      * @return the created key.
-     * @param <T> value type associated with the key.
+     * @param <T> Value type associated with the key.
      */
     static <T> Key<T> key(String name) {
         return new Key<>(name);
@@ -109,25 +109,26 @@ public interface Context {
      *
      * @param key   Property key.
      * @param value Value to set.
-     * @param <T>   Returns the previously set value, or null if not present.
+     * @param <T>   Value type.
      */
     <T> void put(Key<T> key, T value);
 
     /**
      * Get a property.
      *
-     * @param key   property key to get by exact reference identity.
-     * @param <T>   Returns the value, or null if not present.
-     * @return Returns the nullable property value.
+     * @param key Property key to get by exact reference identity.
+     * @return    the value, or null if not present.
+     * @param <T> Value type.
      */
     <T> T get(Key<T> key);
 
     /**
      * Get a property and throw if it isn't present.
      *
-     * @param key property key to get by exact reference identity.
-     * @param <T> Returns the value.
+     * @param key Property key to get by exact reference identity.
+     * @return the value
      * @throws NullPointerException if the property isn't found.
+     * @param <T> Value type.
      */
     default <T> T expect(Key<T> key) {
         T value = get(key);
@@ -142,10 +143,10 @@ public interface Context {
      *
      * <p>The mapping function should not modify the context during computation.
      *
-     * @param key property key to get by exact reference identity.
+     * @param key Property key to get by exact reference identity.
      * @param mappingFunction A function that computes a value for this key if the value is not assigned.
      * @return the value assigned to the key.
-     * @param <T> the value assigned to the key.
+     * @param <T> Value type.
      */
     <T> T computeIfAbsent(Key<T> key, Function<Key<T>, ? extends T> mappingFunction);
 
@@ -159,7 +160,7 @@ public interface Context {
     /**
      * Creates a thread-safe, mutable context map.
      *
-     * @return Returns the created context.
+     * @return the created context.
      */
     static Context create() {
         return new Context() {
