@@ -16,7 +16,7 @@ include ":http-binding"
 include ":json-codec"
 
 include ":client-core"
-include ":client-endpoints-api"
+include ":client-endpoint-api"
 include ":client-http"
 include ":client-auth"
 
