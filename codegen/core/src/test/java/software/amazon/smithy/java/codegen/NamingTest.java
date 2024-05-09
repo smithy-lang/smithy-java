@@ -92,9 +92,9 @@ public class NamingTest {
     void escapesMemberNames() {
         var fileStr = getFileStringForClass("ReservedWordMembersInput");
         var expected = """
-                private final Byte byteMember;
-                private final String staticMember;
-                private final Double doubleMember;
+                private transient final Byte byteMember;
+                private transient final String staticMember;
+                private transient final Double doubleMember;
             """;
         assertTrue(fileStr.contains(expected));
     }
