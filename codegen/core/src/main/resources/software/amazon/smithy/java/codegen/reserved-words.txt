@@ -39,6 +39,8 @@ interface
 long
 native
 new
+object
+objects
 package
 private
 protected
