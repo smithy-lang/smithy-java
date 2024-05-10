@@ -11,17 +11,38 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Tracks the existence of required fields
+ * Tracks the presence of required fields
  */
-public sealed interface PresenceTracker {
+public abstract sealed class PresenceTracker {
 
-    void setMember(SdkSchema memberSchema);
+    /**
+     * Sets a member as present.
+     *
+     * @param memberSchema schema of member to set
+     */
+    abstract void setMember(SdkSchema memberSchema);
 
-    boolean checkMember(SdkSchema memberSchema);
+    /**
+     * Checks if a member is present.
+     *
+     * @param memberSchema schema of member to check.
+     * @return true if member is present.
+     */
+    abstract boolean checkMember(SdkSchema memberSchema);
 
-    boolean allSet();
+    /**
+     * Checks if all required members are set.
+     *
+     * @return true if all required members are present.
+     */
+    abstract boolean allSet();
 
-    Set<String> getMissingMembers();
+    /**
+     * Gets all missing, required members.
+     *
+     * @return set of missing, required members.
+     */
+    abstract Set<String> getMissingMembers();
 
     /**
      * Returns the {@link PresenceTracker} to use for validating the presence.
@@ -31,7 +52,7 @@ public sealed interface PresenceTracker {
      */
     static PresenceTracker of(SdkSchema schema) {
         if (schema.requiredMemberCount == 0) {
-            return new PresenceTracker.NoOpPresenceTracker();
+            return NoOpPresenceTracker.INSTANCE;
         } else if (schema.requiredMemberCount < 64) {
             return new PresenceTracker.RequiredMemberPresenceTracker(schema);
         } else {
@@ -44,7 +65,8 @@ public sealed interface PresenceTracker {
      *
      * <p>Should be used for shapes with no required fields.
      */
-    final class NoOpPresenceTracker implements PresenceTracker {
+    private static final class NoOpPresenceTracker extends PresenceTracker {
+        private static final NoOpPresenceTracker INSTANCE = new NoOpPresenceTracker();
 
         @Override
         public void setMember(SdkSchema memberSchema) {
@@ -70,7 +92,7 @@ public sealed interface PresenceTracker {
     /**
      * Tracker for structures with less than 64 members
      */
-    final class RequiredMemberPresenceTracker implements PresenceTracker {
+    private static final class RequiredMemberPresenceTracker extends PresenceTracker {
         private long setBitfields = 0L;
         private final SdkSchema schema;
 
@@ -108,7 +130,7 @@ public sealed interface PresenceTracker {
     /**
      * Tracker for structures with greater than 64 required members.
      */
-    final class BigRequiredMemberPresenceTracker implements PresenceTracker {
+    private static final class BigRequiredMemberPresenceTracker extends PresenceTracker {
         private final BitSet bitSet;
         private final SdkSchema schema;
 
