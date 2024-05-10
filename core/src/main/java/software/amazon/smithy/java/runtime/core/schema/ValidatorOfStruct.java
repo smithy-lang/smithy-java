@@ -8,8 +8,6 @@ package software.amazon.smithy.java.runtime.core.schema;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -18,13 +16,14 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 /**
  * Validates structures that have required members and fewer than 64 total members.
  */
-final class ValidatorOfRequiredStruct implements ShapeSerializer {
+final class ValidatorOfStruct implements ShapeSerializer {
 
     private final Validator.ShapeValidator validator;
-    private long setBitfields = 0L;
+    private final PresenceTracker structValidator;
 
-    ValidatorOfRequiredStruct(Validator.ShapeValidator validator) {
+    ValidatorOfStruct(Validator.ShapeValidator validator, PresenceTracker structValidator) {
         this.validator = validator;
+        this.structValidator = structValidator;
     }
 
     static <T> void validate(
@@ -33,14 +32,18 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
         T structState,
         BiConsumer<T, ShapeSerializer> consumer
     ) {
-        var structValidator = new ValidatorOfRequiredStruct(validator);
-        consumer.accept(structState, structValidator);
-        checkResult(schema, structValidator.setBitfields, validator);
+        var tracker = PresenceTracker.of(schema);
+        consumer.accept(structState, new ValidatorOfStruct(validator, tracker));
+        checkResult(validator, schema, tracker);
     }
 
-    private static void checkResult(SdkSchema schema, long setBitfields, Validator.ShapeValidator validator) {
-        if (schema.requiredStructureMemberBitfield != setBitfields) {
-            for (var member : missingMembers(schema, setBitfields)) {
+    private static void checkResult(
+        Validator.ShapeValidator validator,
+        SdkSchema schema,
+        PresenceTracker tracker
+    ) {
+        if (!tracker.allSet()) {
+            for (var member : tracker.getMissingMembers()) {
                 validator.addError(
                     new ValidationError.RequiredValidationFailure(validator.createPath(), member, schema)
                 );
@@ -48,19 +51,9 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
         }
     }
 
-    private static Set<String> missingMembers(SdkSchema schema, long setBitfields) {
-        Set<String> result = new TreeSet<>();
-        for (var member : schema.members()) {
-            if (member.isRequiredByValidation() && (setBitfields & member.requiredByValidationBitmask) == 0L) {
-                result.add(member.memberName());
-            }
-        }
-        return result;
-    }
-
     @Override
     public void writeBoolean(SdkSchema member, boolean value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeBoolean(member, value);
         validator.popPath();
@@ -68,7 +61,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public void writeByte(SdkSchema member, byte value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeByte(member, value);
         validator.popPath();
@@ -76,7 +69,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public void writeShort(SdkSchema member, short value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeShort(member, value);
         validator.popPath();
@@ -84,7 +77,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public void writeInteger(SdkSchema member, int value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeInteger(member, value);
         validator.popPath();
@@ -92,7 +85,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public void writeLong(SdkSchema member, long value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeLong(member, value);
         validator.popPath();
@@ -100,7 +93,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public void writeFloat(SdkSchema member, float value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeFloat(member, value);
         validator.popPath();
@@ -108,7 +101,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public void writeDouble(SdkSchema member, double value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeDouble(member, value);
         validator.popPath();
@@ -116,7 +109,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public void writeBigInteger(SdkSchema member, BigInteger value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeBigInteger(member, value);
         validator.popPath();
@@ -124,7 +117,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public void writeBigDecimal(SdkSchema member, BigDecimal value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeBigDecimal(member, value);
         validator.popPath();
@@ -132,7 +125,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public void writeBlob(SdkSchema member, byte[] value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeBlob(member, value);
         validator.popPath();
@@ -140,7 +133,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public void writeString(SdkSchema member, String value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeString(member, value);
         validator.popPath();
@@ -148,7 +141,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public void writeTimestamp(SdkSchema member, Instant value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeTimestamp(member, value);
         validator.popPath();
@@ -156,7 +149,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public void writeDocument(SdkSchema member, Document value) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeDocument(value);
         validator.popPath();
@@ -164,7 +157,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public <T> void writeList(SdkSchema member, T state, BiConsumer<T, ShapeSerializer> consumer) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeList(member, state, consumer);
         validator.popPath();
@@ -172,7 +165,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public <T> void writeMap(SdkSchema member, T state, BiConsumer<T, MapSerializer> consumer) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeMap(member, state, consumer);
         validator.popPath();
@@ -180,7 +173,7 @@ final class ValidatorOfRequiredStruct implements ShapeSerializer {
 
     @Override
     public <T> void writeStruct(SdkSchema member, T structState, BiConsumer<T, ShapeSerializer> consumer) {
-        setBitfields |= member.requiredByValidationBitmask;
+        structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeStruct(member, structState, consumer);
         validator.popPath();

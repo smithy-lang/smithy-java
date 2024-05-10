@@ -33,13 +33,6 @@ import software.amazon.smithy.model.traits.SparseTrait;
  */
 public final class Validator {
 
-    enum StructValidation {
-        UNION,
-        REQUIRED,
-        BIG_REQUIRED,
-        NOT_STRUCT
-    }
-
     private final int maxDepth;
     private final int maxAllowedErrors;
 
@@ -226,11 +219,10 @@ public final class Validator {
             var previousCount = elementCount;
             currentSchema = schema;
             elementCount = 0; // note that we don't track the count of structure members.
-            switch (schema.structValidation) {
-                case REQUIRED -> ValidatorOfRequiredStruct.validate(this, schema, structState, consumer);
-                case BIG_REQUIRED -> ValidatorOfBigRequiredStruct.validate(this, schema, structState, consumer);
+            switch (schema.type()) {
+                case STRUCTURE -> ValidatorOfStruct.validate(this, schema, structState, consumer);
                 case UNION -> ValidatorOfUnion.validate(this, schema, structState, consumer);
-                case NOT_STRUCT -> checkType(schema, ShapeType.STRUCTURE); // this is guaranteed to fail type checking.
+                default -> checkType(schema, ShapeType.STRUCTURE); // this is guaranteed to fail type checking.
             }
             currentSchema = previousSchema;
             elementCount = previousCount;

@@ -64,7 +64,6 @@ public final class SdkSchema {
     final long maxLongConstraint;
     final double minDoubleConstraint;
     final double maxDoubleConstraint;
-    final Validator.StructValidation structValidation;
     final ValidatorOfString stringValidation;
     boolean isRequiredByValidation;
 
@@ -176,17 +175,11 @@ public final class SdkSchema {
         // We only need to use the slow version of required member validation if there are > 64 required members.
         this.requiredMemberCount = computeRequiredMemberCount(this.type, this.memberTarget, this.memberList);
 
-        structValidation = switch (type) {
-            case UNION -> Validator.StructValidation.UNION;
-            case STRUCTURE -> requiredMemberCount > 64
-                ? Validator.StructValidation.BIG_REQUIRED
-                : Validator.StructValidation.REQUIRED;
-            default -> Validator.StructValidation.NOT_STRUCT;
-        };
-
-        this.requiredStructureMemberBitfield = structValidation == Validator.StructValidation.REQUIRED
-            ? computeRequiredBitField(members())
-            : 0;
+        if ((requiredMemberCount > 0) && (requiredMemberCount < 64) && type == ShapeType.STRUCTURE) {
+            this.requiredStructureMemberBitfield = computeRequiredBitField(members());
+        } else {
+            this.requiredStructureMemberBitfield = 0;
+        }
     }
 
     private static Map<Class<? extends Trait>, Trait> createTraitMap(Trait[] traits) {
@@ -577,7 +570,7 @@ public final class SdkSchema {
          * @return Returns the builder.
          * @throws IllegalStateException if the schema is for a member.
          */
-        public Builder members(SdkSchema.Builder... members) {
+        public Builder members(Builder... members) {
             List<SdkSchema> built = new ArrayList<>(members.length);
             for (Builder member : members) {
                 built.add(member.id(id).build());
