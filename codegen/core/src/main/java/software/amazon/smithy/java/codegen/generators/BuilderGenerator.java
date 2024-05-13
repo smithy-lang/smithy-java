@@ -196,10 +196,9 @@ final class BuilderGenerator implements Runnable {
             writer.write(
                 """
                     public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
-                        this.${memberName:L} = ${memberName:L};${?tracked}
-                        tracker.setMember(${schemaName:L});
-                        ${/tracked}
-                        return this;
+                        this.${memberName:L} = ${memberName:L};
+                        ${?tracked}tracker.setMember(${schemaName:L});
+                        ${/tracked}return this;
                     }
                     """
             );
