@@ -8,6 +8,7 @@ use smithy.java.codegen.test.structures.members#BigIntegers
 use smithy.java.codegen.test.structures.members#Blobs
 use smithy.java.codegen.test.structures.members#Booleans
 use smithy.java.codegen.test.structures.members#Bytes
+use smithy.java.codegen.test.structures.members#ClientErrorCorrection
 use smithy.java.codegen.test.structures.members#Doubles
 use smithy.java.codegen.test.structures.members#Floats
 use smithy.java.codegen.test.structures.members#Integers
@@ -60,6 +61,8 @@ resource StructureShapes {
         // Timestamp members
         Timestamps
         // Exceptions
-        ExceptionOperation
+        ExceptionOperation,
+        // Error correction
+        ClientErrorCorrection
     ]
 }

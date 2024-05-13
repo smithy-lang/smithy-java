@@ -121,7 +121,7 @@ public abstract sealed class PresenceTracker {
 
         @Override
         public boolean checkMember(SdkSchema memberSchema) {
-            return (setBitfields & schema.memberIndex()) != 0;
+            return (setBitfields << ~schema.memberIndex()) < 0;
         }
 
         @Override

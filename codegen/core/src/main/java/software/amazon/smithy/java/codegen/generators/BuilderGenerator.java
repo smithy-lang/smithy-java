@@ -25,6 +25,7 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.*;
 import software.amazon.smithy.model.traits.DefaultTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 /**
@@ -62,6 +63,10 @@ final class BuilderGenerator implements Runnable {
         writer.putContext("tracker", PresenceTracker.class);
         writer.putContext("serdeException", SdkSerdeException.class);
         writer.putContext("sdkSchema", SdkSchema.class);
+        writer.putContext(
+            "needsErrorCorrection",
+            shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault)
+        );
         writer.write(
             """
                 public static Builder builder() {
@@ -85,6 +90,15 @@ final class BuilderGenerator implements Runnable {
                         tracker.validate();
                         return new ${shape:T}(this);
                     }
+                    ${?needsErrorCorrection}
+                    @Override
+                    public SdkShapeBuilder<${shape:T}> errorCorrection() {
+                        if (tracker.hasMissing()) {
+                            ${C|}
+                        }
+                        return this;
+                    }
+                    ${/needsErrorCorrection}
 
                     @Override
                     public Builder deserialize(${shapeDeserializer:T} decoder) {
@@ -105,30 +119,10 @@ final class BuilderGenerator implements Runnable {
 
             (Runnable) this::builderProperties,
             (Runnable) this::builderSetters,
+            (Runnable) this::errorCorrection,
             (Runnable) this::generateMemberSwitchCases
         );
         writer.popState();
-    }
-
-    private void generateMemberSwitchCases() {
-        int idx = 0;
-        for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {
-            var member = iter.next();
-            var target = model.expectShape(member.getTarget());
-            if (CodegenUtils.isStreamingBlob(target)) {
-                // Streaming blobs are not deserialized by the builder class.
-                continue;
-            }
-
-            writer.pushState();
-            writer.putContext("memberName", symbolProvider.toMemberName(member));
-            writer.write(
-                "case $L -> builder.${memberName:L}($C);",
-                idx,
-                new DeserializerGenerator(writer, member, symbolProvider, model, service, "de", "member")
-            );
-            writer.popState();
-        }
     }
 
     // Adds builder properties and initializers
@@ -161,6 +155,48 @@ final class BuilderGenerator implements Runnable {
     private void builderSetters() {
         for (var member : shape.members()) {
             new SetterVisitor(writer, symbolProvider, model, member).run();
+        }
+    }
+
+    private void errorCorrection() {
+        var visitor = new ErrorCorrectionVisitor(writer, symbolProvider, model);
+        for (var member : shape.members()) {
+            if (CodegenUtils.isRequiredWithNoDefault(member)) {
+                var memberName = symbolProvider.toMemberName(member);
+                var schemaName = CodegenUtils.toMemberSchemaName(memberName);
+                visitor.memberShape = member;
+                writer.openBlock("if (!tracker.checkMember($L)) {", "}", schemaName, () -> {
+                    // Primitive types will just use the default primitive value
+                    if (symbolProvider.toSymbol(member).expectProperty(SymbolProperties.IS_PRIMITIVE)
+                        && !model.expectShape(member.getTarget()).isBlobShape()
+                    ) {
+                        writer.write("tracker.setMember($1L);", schemaName);
+                    } else {
+                        writer.write("$L($C);", memberName, visitor);
+                    }
+                });
+            }
+        }
+    }
+
+    private void generateMemberSwitchCases() {
+        int idx = 0;
+        for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {
+            var member = iter.next();
+            var target = model.expectShape(member.getTarget());
+            if (CodegenUtils.isStreamingBlob(target)) {
+                // Streaming blobs are not deserialized by the builder class.
+                continue;
+            }
+
+            writer.pushState();
+            writer.putContext("memberName", symbolProvider.toMemberName(member));
+            writer.write(
+                "case $L -> builder.${memberName:L}($C);",
+                idx,
+                new DeserializerGenerator(writer, member, symbolProvider, model, service, "de", "member")
+            );
+            writer.popState();
         }
     }
 
@@ -526,6 +562,126 @@ final class BuilderGenerator implements Runnable {
             }
             writer.write("$T.parse($S)", Instant.class, defaultValue.expectStringNode().getValue());
             return null;
+        }
+    }
+
+    /**
+     * Returns the error correction value to use for a required field.
+     *
+     * @see <a href="https://smithy.io/2.0/spec/aggregate-types.html#client-error-correction">client error correction</a>
+     */
+    private static final class ErrorCorrectionVisitor extends ShapeVisitor.Default<Void> implements Runnable {
+        private final JavaWriter writer;
+        private final SymbolProvider symbolProvider;
+        private final Model model;
+        private MemberShape memberShape;
+
+        private ErrorCorrectionVisitor(JavaWriter writer, SymbolProvider symbolProvider, Model model) {
+            this.writer = writer;
+            this.symbolProvider = symbolProvider;
+            this.model = model;
+        }
+
+        @Override
+        public void run() {
+            memberShape.accept(this);
+        }
+
+        @Override
+        protected Void getDefault(Shape shape) {
+            throw new IllegalArgumentException("Could not generate error correction value for " + shape);
+        }
+
+        @Override
+        public Void blobShape(BlobShape blobShape) {
+            if (blobShape.hasTrait(StreamingTrait.class)) {
+                writer.writeInline("$T.ofEmpty()", DataStream.class);
+            } else {
+                writer.writeInlineWithNoFormatting("new byte[0]");
+            }
+            return null;
+        }
+
+        @Override
+        public Void listShape(ListShape listShape) {
+            writer.writeInline(
+                "$T.$L",
+                Collections.class,
+                symbolProvider.toSymbol(listShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)
+            );
+            return null;
+        }
+
+        @Override
+        public Void mapShape(MapShape mapShape) {
+            writer.writeInline(
+                "$T.$L",
+                Collections.class,
+                symbolProvider.toSymbol(mapShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)
+            );
+            return null;
+        }
+
+        @Override
+        public Void documentShape(DocumentShape documentShape) {
+            writer.writeInline("null");
+            return null;
+        }
+
+        @Override
+        public Void bigIntegerShape(BigIntegerShape bigIntegerShape) {
+            writer.writeInline("$T.ZERO", BigInteger.class);
+            return null;
+        }
+
+        @Override
+        public Void bigDecimalShape(BigDecimalShape bigDecimalShape) {
+            writer.writeInline("$T.ZERO", BigDecimal.class);
+            return null;
+        }
+
+        @Override
+        public Void stringShape(StringShape stringShape) {
+            writer.writeInline("\"\"");
+            return null;
+        }
+
+        @Override
+        public Void structureShape(StructureShape structureShape) {
+            // Attempts to make an empty structure member. This could fail if the nested struct
+            // has required members.
+            writer.writeInline("$T.builder().build()", symbolProvider.toSymbol(structureShape));
+            return null;
+        }
+
+        @Override
+        public Void unionShape(UnionShape unionShape) {
+            // TODO: Implement
+            return null;
+        }
+
+
+        @Override
+        public Void enumShape(EnumShape shape) {
+            // TODO: Implement
+            return null;
+        }
+
+        @Override
+        public Void intEnumShape(IntEnumShape shape) {
+            // TODO: Implement
+            return null;
+        }
+
+        @Override
+        public Void timestampShape(TimestampShape timestampShape) {
+            writer.write("$T.EPOCH", Instant.class);
+            return null;
+        }
+
+        @Override
+        public Void memberShape(MemberShape memberShape) {
+            return model.expectShape(memberShape.getTarget()).accept(this);
         }
     }
 }
