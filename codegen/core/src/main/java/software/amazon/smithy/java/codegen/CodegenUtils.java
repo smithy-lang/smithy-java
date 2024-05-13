@@ -206,7 +206,15 @@ public final class CodegenUtils {
             .collect(Collectors.toList());
     }
 
-    private static boolean isRequiredWithNoDefault(MemberShape memberShape) {
+    /**
+     * Checks if a member is required and has no default.
+     *
+     * <p>Required members with no default require presence tracking.
+     *
+     * @param memberShape member shape to check
+     * @return true if the member has the required trait and does not have a default.
+     */
+    public static boolean isRequiredWithNoDefault(MemberShape memberShape) {
         return memberShape.isRequired() && !memberShape.hasNonNullDefault();
     }
 }

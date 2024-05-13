@@ -9,10 +9,13 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Tracks the presence of required fields
  */
+@SmithyInternalApi
 public abstract sealed class PresenceTracker {
 
     /**
@@ -20,29 +23,32 @@ public abstract sealed class PresenceTracker {
      *
      * @param memberSchema schema of member to set
      */
-    abstract void setMember(SdkSchema memberSchema);
+    public abstract void setMember(SdkSchema memberSchema);
 
     /**
-     * Checks if a member is present.
+     * Checks if any required members are unset.
      *
-     * @param memberSchema schema of member to check.
-     * @return true if member is present.
+     * @return true if any required members are missing.
      */
-    abstract boolean checkMember(SdkSchema memberSchema);
-
-    /**
-     * Checks if all required members are set.
-     *
-     * @return true if all required members are present.
-     */
-    abstract boolean allSet();
+    public abstract boolean hasMissing();
 
     /**
      * Gets all missing, required members.
      *
      * @return set of missing, required members.
      */
-    abstract Set<String> getMissingMembers();
+    public abstract Set<String> getMissingMembers();
+
+    /**
+     * Checks if all required members are set and throws an exception if any are unset.
+     *
+     * @throws SdkSerdeException if any required members are not set.
+     */
+    public void validate() {
+        if (hasMissing()) {
+            throw new SdkSerdeException("Missing required members: " + getMissingMembers());
+        }
+    }
 
     /**
      * Returns the {@link PresenceTracker} to use for validating the presence.
@@ -50,7 +56,7 @@ public abstract sealed class PresenceTracker {
      *
      * @return StructureValidator to use for validating required members.
      */
-    static PresenceTracker of(SdkSchema schema) {
+    public static PresenceTracker of(SdkSchema schema) {
         if (schema.requiredMemberCount == 0) {
             return NoOpPresenceTracker.INSTANCE;
         } else if (schema.requiredMemberCount <= 64) {
@@ -74,13 +80,8 @@ public abstract sealed class PresenceTracker {
         }
 
         @Override
-        public boolean checkMember(SdkSchema memberSchema) {
+        public boolean hasMissing() {
             return false;
-        }
-
-        @Override
-        public boolean allSet() {
-            return true;
         }
 
         @Override
@@ -106,13 +107,8 @@ public abstract sealed class PresenceTracker {
         }
 
         @Override
-        public boolean checkMember(SdkSchema schema) {
-            return (setBitfields & schema.memberIndex()) != 0;
-        }
-
-        @Override
-        public boolean allSet() {
-            return schema.requiredStructureMemberBitfield == setBitfields;
+        public boolean hasMissing() {
+            return schema.requiredStructureMemberBitfield != setBitfields;
         }
 
         @Override
@@ -147,21 +143,16 @@ public abstract sealed class PresenceTracker {
         }
 
         @Override
-        public boolean checkMember(SdkSchema memberSchema) {
-            return bitSet.get(memberSchema.memberIndex());
-        }
-
-        @Override
-        public boolean allSet() {
+        public boolean hasMissing() {
             if (bitSet.length() != schema.requiredMemberCount) {
-                return false;
+                return true;
             }
             for (var member : schema.members()) {
                 if (member.isRequiredByValidation() && !bitSet.get(member.memberIndex())) {
-                    return false;
+                    return true;
                 }
             }
-            return true;
+            return false;
         }
 
         @Override

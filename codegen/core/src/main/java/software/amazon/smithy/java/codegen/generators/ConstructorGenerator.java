@@ -14,7 +14,6 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.traits.ErrorTrait;
-import software.amazon.smithy.utils.SmithyBuilder;
 
 /**
  * Generates a constructor for a Java class.
@@ -55,23 +54,10 @@ final class ConstructorGenerator implements Runnable {
                     if (shape.hasTrait(ErrorTrait.class) && memberName.equals("message")) {
                         continue;
                     }
-                    writeMemberInitializer(member, memberName);
+                    writer.write("this.$L = $L;", memberName, getBuilderValue(member, memberName));
                 }
             }
         );
-    }
-
-    private void writeMemberInitializer(MemberShape member, String memberName) {
-        if (CodegenUtils.isNullableMember(member) || CodegenUtils.targetsCollection(model, member)) {
-            writer.write("this.$L = $L;", memberName, getBuilderValue(member, memberName));
-        } else {
-            writer.write(
-                "this.$1L = $2T.requiredState($1S, $3L);",
-                memberName,
-                SmithyBuilder.class,
-                getBuilderValue(member, memberName)
-            );
-        }
     }
 
     private String getBuilderValue(MemberShape member, String memberName) {
