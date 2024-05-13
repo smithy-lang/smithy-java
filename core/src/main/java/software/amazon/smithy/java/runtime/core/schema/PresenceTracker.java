@@ -26,6 +26,14 @@ public abstract sealed class PresenceTracker {
     public abstract void setMember(SdkSchema memberSchema);
 
     /**
+     * Checks if a member is present.
+     *
+     * @param memberSchema schema of member to check.
+     * @return true if member is present.
+     */
+    public abstract boolean checkMember(SdkSchema memberSchema);
+
+    /**
      * Checks if any required members are unset.
      *
      * @return true if any required members are missing.
@@ -80,6 +88,11 @@ public abstract sealed class PresenceTracker {
         }
 
         @Override
+        public boolean checkMember(SdkSchema memberSchema) {
+            return false;
+        }
+
+        @Override
         public boolean hasMissing() {
             return false;
         }
@@ -104,6 +117,11 @@ public abstract sealed class PresenceTracker {
         @Override
         public void setMember(SdkSchema memberSchema) {
             setBitfields |= memberSchema.requiredByValidationBitmask;
+        }
+
+        @Override
+        public boolean checkMember(SdkSchema memberSchema) {
+            return (setBitfields & schema.memberIndex()) != 0;
         }
 
         @Override
@@ -140,6 +158,11 @@ public abstract sealed class PresenceTracker {
             if (memberSchema.isRequiredByValidation()) {
                 bitSet.set(memberSchema.memberIndex());
             }
+        }
+
+        @Override
+        public boolean checkMember(SdkSchema memberSchema) {
+            return bitSet.get(memberSchema.memberIndex());
         }
 
         @Override
