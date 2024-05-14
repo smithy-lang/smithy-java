@@ -22,7 +22,7 @@ operation GetPersonImage {
         @httpHeader("Person-Name")
         $name
 
-        @default(null)
+        @required
         @httpPayload
         image: Stream
     }
@@ -37,12 +37,12 @@ operation PutPersonImage {
         $name
 
         @httpHeader("Tags")
-        tags: String
+        tags: ListOfString
 
         @httpQuery("MoreTags")
-        moreTags: String
+        moreTags: ListOfString
 
-        @default(null)
+        @required
         @httpPayload
         image: Stream
     }

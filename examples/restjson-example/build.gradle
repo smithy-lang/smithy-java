@@ -9,8 +9,8 @@ dependencies {
 }
 
 jmh {
-    warmupIterations = 2
-    iterations = 3
+    warmupIterations = 1
+    iterations = 1
     fork = 1
 }
 

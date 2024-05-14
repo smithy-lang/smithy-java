@@ -6,7 +6,6 @@ namespace smithy.example
 blob Stream
 
 @sensitive
-@timestampFormat("date-time")
 timestamp Birthday
 
 map MapListString {
@@ -14,31 +13,7 @@ map MapListString {
     value: ListOfString
 }
 
-map MapStringString {
-    key: String
-    value: String
-}
-
 list ListOfString {
     @length(min: 1)
     member: String
-}
-
-@uniqueItems
-list SetOfString {
-    member: String
-}
-
-structure Nested {
-    fieldA: String
-    fieldB: Integer
-}
-
-map MapOfStringMap {
-    key: String
-    value: MapStringString
-}
-
-list ListOfStringList {
-    member: ListOfString
 }
