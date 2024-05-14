@@ -217,4 +217,27 @@ public final class CodegenUtils {
     public static boolean isRequiredWithNoDefault(MemberShape memberShape) {
         return memberShape.isRequired() && !memberShape.hasNonNullDefault();
     }
+
+    /**
+     * Checks if a member shape requires a null check in the builder setter.
+     *
+     * <p>Non-primitive, required members need a null check.
+     */
+    public static boolean requiresSetterNullCheck(SymbolProvider provider, MemberShape memberShape) {
+        return memberShape.isRequired() && !provider.toSymbol(memberShape).expectProperty(SymbolProperties.IS_PRIMITIVE);
+    }
+
+    /**
+     * Primitives (excluding blobs) use the Java default for error correction and so do not need to be set.
+     *
+     * <p>Documents are also not set because they use a
+     *
+     * @return true if the member shape has a builtin default
+     */
+    public static boolean hasBuiltinDefault(SymbolProvider provider, Model model, MemberShape memberShape) {
+        var target = model.expectShape(memberShape.getTarget());
+        return (provider.toSymbol(memberShape).expectProperty(SymbolProperties.IS_PRIMITIVE)
+                || target.isDocumentShape())
+                && !target.isBlobShape();
+    }
 }

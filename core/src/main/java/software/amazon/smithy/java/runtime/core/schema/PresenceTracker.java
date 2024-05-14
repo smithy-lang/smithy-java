@@ -34,11 +34,11 @@ public abstract sealed class PresenceTracker {
     public abstract boolean checkMember(SdkSchema memberSchema);
 
     /**
-     * Checks if any required members are unset.
+     * Checks if all required members are set.
      *
-     * @return true if any required members are missing.
+     * @return false if any required members are missing.
      */
-    public abstract boolean hasMissing();
+    public abstract boolean allSet();
 
     /**
      * Gets all missing, required members.
@@ -53,7 +53,7 @@ public abstract sealed class PresenceTracker {
      * @throws SdkSerdeException if any required members are not set.
      */
     public void validate() {
-        if (hasMissing()) {
+        if (!allSet()) {
             throw new SdkSerdeException("Missing required members: " + getMissingMembers());
         }
     }
@@ -93,8 +93,8 @@ public abstract sealed class PresenceTracker {
         }
 
         @Override
-        public boolean hasMissing() {
-            return false;
+        public boolean allSet() {
+            return true;
         }
 
         @Override
@@ -125,8 +125,8 @@ public abstract sealed class PresenceTracker {
         }
 
         @Override
-        public boolean hasMissing() {
-            return schema.requiredStructureMemberBitfield != setBitfields;
+        public boolean allSet() {
+            return schema.requiredStructureMemberBitfield == setBitfields;
         }
 
         @Override
@@ -166,16 +166,16 @@ public abstract sealed class PresenceTracker {
         }
 
         @Override
-        public boolean hasMissing() {
+        public boolean allSet() {
             if (bitSet.length() != schema.requiredMemberCount) {
-                return true;
+                return false;
             }
             for (var member : schema.members()) {
                 if (member.isRequiredByValidation() && !bitSet.get(member.memberIndex())) {
-                    return true;
+                    return false;
                 }
             }
-            return false;
+            return true;
         }
 
         @Override

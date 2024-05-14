@@ -1236,24 +1236,6 @@ public class ValidatorTest {
         }
     }
 
-    @ParameterizedTest
-    @ValueSource(ints = {0, 1, 63, 64, 65, 128})
-    public void presenceTrackerType(int requiredFields) {
-        Class<?> expected;
-        if (requiredFields == 0) {
-            expected = PresenceTracker.NoOpPresenceTracker.class;
-        } else if (requiredFields <= 64) {
-            expected = PresenceTracker.RequiredMemberPresenceTracker.class;
-        } else {
-            expected = PresenceTracker.BigRequiredMemberPresenceTracker.class;
-        }
-
-        assertEquals(
-            expected,
-            PresenceTracker.of(createBigRequiredSchema(requiredFields, requiredFields, 0)).getClass()
-        );
-    }
-
     static List<Arguments> validatesRequiredMembersOfBigStructsProvider() {
         return Arrays.asList(
             // int totalMembers, int requiredCount, int defaultedCount, int failures
@@ -1269,7 +1251,7 @@ public class ValidatorTest {
         );
     }
 
-    private static SdkSchema createBigRequiredSchema(int totalMembers, int requiredCount, int defaultedCount) {
+    static SdkSchema createBigRequiredSchema(int totalMembers, int requiredCount, int defaultedCount) {
         var string = PreludeSchemas.STRING;
 
         SdkSchema.Builder[] members = new SdkSchema.Builder[totalMembers];

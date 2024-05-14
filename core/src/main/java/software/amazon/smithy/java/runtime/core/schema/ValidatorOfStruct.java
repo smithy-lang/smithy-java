@@ -42,7 +42,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
         SdkSchema schema,
         PresenceTracker tracker
     ) {
-        if (tracker.hasMissing()) {
+        if (!tracker.allSet()) {
             for (var member : tracker.getMissingMembers()) {
                 validator.addError(
                     new ValidationError.RequiredValidationFailure(validator.createPath(), member, schema)

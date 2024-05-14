@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Objects;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.SymbolProperties;
@@ -93,9 +94,12 @@ final class BuilderGenerator implements Runnable {
                     ${?needsErrorCorrection}
                     @Override
                     public SdkShapeBuilder<${shape:T}> errorCorrection() {
-                        if (tracker.hasMissing()) {
-                            ${C|}
+                        if (tracker.allSet()) {
+                            return this;
                         }
+
+                        ${C|}
+                        
                         return this;
                     }
                     ${/needsErrorCorrection}
@@ -166,10 +170,7 @@ final class BuilderGenerator implements Runnable {
                 var schemaName = CodegenUtils.toMemberSchemaName(memberName);
                 visitor.memberShape = member;
                 writer.openBlock("if (!tracker.checkMember($L)) {", "}", schemaName, () -> {
-                    // Primitive types will just use the default primitive value
-                    if (symbolProvider.toSymbol(member).expectProperty(SymbolProperties.IS_PRIMITIVE)
-                        && !model.expectShape(member.getTarget()).isBlobShape()
-                    ) {
+                    if (CodegenUtils.hasBuiltinDefault(symbolProvider, model, member)) {
                         writer.write("tracker.setMember($1L);", schemaName);
                     } else {
                         writer.write("$L($C);", memberName, visitor);
@@ -222,7 +223,9 @@ final class BuilderGenerator implements Runnable {
             writer.putContext("memberName", symbolProvider.toMemberName(memberShape));
             writer.putContext("memberSymbol", symbolProvider.toSymbol(memberShape));
             writer.putContext("tracked", CodegenUtils.isRequiredWithNoDefault(memberShape));
+            writer.putContext("check", CodegenUtils.requiresSetterNullCheck(symbolProvider, memberShape));
             writer.putContext("schemaName", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(memberShape)));
+            writer.putContext("objects", Objects.class);
             memberShape.accept(this);
             writer.popState();
         }
@@ -232,9 +235,9 @@ final class BuilderGenerator implements Runnable {
             writer.write(
                 """
                     public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
-                        this.${memberName:L} = ${memberName:L};
-                        ${?tracked}tracker.setMember(${schemaName:L});
-                        ${/tracked}return this;
+                        this.${memberName:L} = ${?check}${objects:T}.requireNonNull(${/check}${memberName:L}${?check}, "${memberName:L} cannot be null")${/check};${?tracked}
+                        tracker.setMember(${schemaName:L});${/tracked}
+                        return this;
                     }
                     """
             );
@@ -268,29 +271,40 @@ final class BuilderGenerator implements Runnable {
             writer.putContext("targetSymbol", symbolProvider.toSymbol(shape.getMember()));
 
             // Collection Replacement
-            writer.write(
-                """
-                    public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
-                        this.${memberName:L} = ${memberName:L} != null ? new ${collectionImpl:T}<>(${memberName:L}) : null;${?tracked}
-                        tracker.setMember(${schemaName:L});
-                        ${/tracked}
-                        return this;
-                    }
-                    """,
-                Collection.class
-            );
+            if (memberShape.isRequired()) {
+                writer.write(
+                        """
+                            public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
+                                this.${memberName:L} = new ${collectionImpl:T}<>(${objects:T}.requireNonNull(${memberName:L}, "${memberName:L} cannot be null"));${?tracked}
+                                tracker.setMember(${schemaName:L});${/tracked}
+                                return this;
+                            }
+                            """,
+                        Collection.class
+                );
+            } else {
+                writer.write(
+                        """
+                            public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
+                                this.${memberName:L} = ${memberName:L} != null ? new ${collectionImpl:T}<>(${memberName:L}) : null;
+                                return this;
+                            }
+                            """,
+                        Collection.class
+                );
+            }
+
 
             // Bulk Add
             writer.write(
                 """
                     public Builder addAll${memberName:U}($T<${targetSymbol:T}> ${memberName:L}) {
                         if (this.${memberName:L} == null) {
-                            this.${memberName:L} = new ${collectionImpl:T}<>(${memberName:L});
+                            this.${memberName:L} = new ${collectionImpl:T}<>(${memberName:L});${?tracked}
+                            tracker.setMember(${schemaName:L});${/tracked}
                         } else {
                             this.${memberName:L}.addAll(${memberName:L});
-                        }${?tracked}
-                        tracker.setMember(${schemaName:L});
-                        ${/tracked}
+                        }
                         return this;
                     }
                     """,
@@ -302,11 +316,10 @@ final class BuilderGenerator implements Runnable {
                 """
                     public Builder ${memberName:L}(${targetSymbol:T} ${memberName:L}) {
                         if (this.${memberName:L} == null) {
-                            this.${memberName:L} = new ${collectionImpl:T}<>();
+                            this.${memberName:L} = new ${collectionImpl:T}<>();${?tracked}
+                            tracker.setMember(${schemaName:L});${/tracked}
                         }
-                        this.${memberName:L}.add(${memberName:L});${?tracked}
-                        tracker.setMember(${schemaName:L});
-                        ${/tracked}
+                        this.${memberName:L}.add(${memberName:L});
                         return this;
                     }
                     """
@@ -317,11 +330,10 @@ final class BuilderGenerator implements Runnable {
                 """
                     public Builder ${memberName:L}(${targetSymbol:T}... ${memberName:L}) {
                         if (this.${memberName:L} == null) {
-                            this.${memberName:L} = new ${collectionImpl:T}<>();
+                            this.${memberName:L} = new ${collectionImpl:T}<>();${?tracked}
+                            tracker.setMember(${schemaName:L});${/tracked}
                         }
-                        $T.addAll(this.${memberName:L}, ${memberName:L});${?tracked}
-                        tracker.setMember(${schemaName:L});
-                        ${/tracked}
+                        $T.addAll(this.${memberName:L}, ${memberName:L});
                         return this;
                     }
                     """,
@@ -344,28 +356,37 @@ final class BuilderGenerator implements Runnable {
             writer.putContext("valueSymbol", symbolProvider.toSymbol(shape.getValue()));
 
             // Replace Map
-            writer.write(
-                """
-                    public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
-                        this.${memberName:L} = ${memberName:L} != null ? new ${collectionImpl:T}<>(${memberName:L}) : null;${?tracked}
-                        tracker.setMember(${schemaName:L});
-                        ${/tracked}
-                        return this;
-                    }
-                    """
-            );
+            if (memberShape.isRequired()) {
+                writer.write(
+                        """
+                            public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
+                                this.${memberName:L} = new ${collectionImpl:T}<>(${objects:T}.requireNonNull(${memberName:L}, "${memberName:L} cannot be null"));${?tracked}
+                                tracker.setMember(${schemaName:L});${/tracked}
+                                return this;
+                            }
+                            """
+                );
+            } else {
+                writer.write(
+                        """
+                            public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
+                                this.${memberName:L} = ${memberName:L} != null ? new ${collectionImpl:T}<>(${memberName:L}) : null;
+                                return this;
+                            }
+                            """
+                );
+            }
 
             // Add all items
             writer.write(
                 """
                     public Builder putAll${memberName:U}(${memberSymbol:T} ${memberName:L}) {
                         if (this.${memberName:L} == null) {
-                            this.${memberName:L} = new ${collectionImpl:T}<>(${memberName:L});
+                            this.${memberName:L} = new ${collectionImpl:T}<>(${memberName:L});${?tracked}
+                            tracker.setMember(${schemaName:L});${/tracked}
                         } else {
                             this.${memberName:L}.putAll(${memberName:L});
-                        }${?tracked}
-                        tracker.setMember(${schemaName:L});
-                        ${/tracked}
+                        }
                         return this;
                     }
                     """
@@ -376,11 +397,10 @@ final class BuilderGenerator implements Runnable {
                 """
                     public Builder put${memberName:U}(${keySymbol:T} key, ${valueSymbol:T} value) {
                        if (this.${memberName:L} == null) {
-                           this.${memberName:L} = new ${collectionImpl:T}<>();
+                           this.${memberName:L} = new ${collectionImpl:T}<>();${?tracked}
+                           tracker.setMember(${schemaName:L});${/tracked}
                        }
-                       this.${memberName:L}.put(key, value);${?tracked}
-                       tracker.setMember(${schemaName:L});
-                       ${/tracked}
+                       this.${memberName:L}.put(key, value);
                        return this;
                     }
                     """
