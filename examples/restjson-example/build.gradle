@@ -9,9 +9,10 @@ dependencies {
 }
 
 jmh {
-    warmupIterations = 2
-    iterations = 3
+    warmupIterations = 1
+    iterations = 5
     fork = 1
+    //profilers = ['async:libPath=/Users/hpm/async-profiler-3.0-macos/lib/libasyncProfiler.dylib;output=flamegraph', 'gc']
 }
 
 // TODO: eventually re-enable
