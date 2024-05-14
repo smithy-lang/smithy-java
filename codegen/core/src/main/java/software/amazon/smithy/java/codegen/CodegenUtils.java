@@ -224,7 +224,8 @@ public final class CodegenUtils {
      * <p>Non-primitive, required members need a null check.
      */
     public static boolean requiresSetterNullCheck(SymbolProvider provider, MemberShape memberShape) {
-        return memberShape.isRequired() && !provider.toSymbol(memberShape).expectProperty(SymbolProperties.IS_PRIMITIVE);
+        return memberShape.isRequired() && !provider.toSymbol(memberShape)
+            .expectProperty(SymbolProperties.IS_PRIMITIVE);
     }
 
     /**
@@ -237,7 +238,7 @@ public final class CodegenUtils {
     public static boolean hasBuiltinDefault(SymbolProvider provider, Model model, MemberShape memberShape) {
         var target = model.expectShape(memberShape.getTarget());
         return (provider.toSymbol(memberShape).expectProperty(SymbolProperties.IS_PRIMITIVE)
-                || target.isDocumentShape())
-                && !target.isBlobShape();
+            || target.isDocumentShape())
+            && !target.isBlobShape();
     }
 }

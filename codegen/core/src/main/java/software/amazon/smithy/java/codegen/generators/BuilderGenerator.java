@@ -99,7 +99,7 @@ final class BuilderGenerator implements Runnable {
                         }
 
                         ${C|}
-                        
+
                         return this;
                     }
                     ${/needsErrorCorrection}
@@ -273,24 +273,24 @@ final class BuilderGenerator implements Runnable {
             // Collection Replacement
             if (memberShape.isRequired()) {
                 writer.write(
-                        """
-                            public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
-                                this.${memberName:L} = new ${collectionImpl:T}<>(${objects:T}.requireNonNull(${memberName:L}, "${memberName:L} cannot be null"));${?tracked}
-                                tracker.setMember(${schemaName:L});${/tracked}
-                                return this;
-                            }
-                            """,
-                        Collection.class
+                    """
+                        public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
+                            this.${memberName:L} = new ${collectionImpl:T}<>(${objects:T}.requireNonNull(${memberName:L}, "${memberName:L} cannot be null"));${?tracked}
+                            tracker.setMember(${schemaName:L});${/tracked}
+                            return this;
+                        }
+                        """,
+                    Collection.class
                 );
             } else {
                 writer.write(
-                        """
-                            public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
-                                this.${memberName:L} = ${memberName:L} != null ? new ${collectionImpl:T}<>(${memberName:L}) : null;
-                                return this;
-                            }
-                            """,
-                        Collection.class
+                    """
+                        public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
+                            this.${memberName:L} = ${memberName:L} != null ? new ${collectionImpl:T}<>(${memberName:L}) : null;
+                            return this;
+                        }
+                        """,
+                    Collection.class
                 );
             }
 
@@ -358,22 +358,22 @@ final class BuilderGenerator implements Runnable {
             // Replace Map
             if (memberShape.isRequired()) {
                 writer.write(
+                    """
+                        public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
+                            this.${memberName:L} = new ${collectionImpl:T}<>(${objects:T}.requireNonNull(${memberName:L}, "${memberName:L} cannot be null"));${?tracked}
+                            tracker.setMember(${schemaName:L});${/tracked}
+                            return this;
+                        }
                         """
-                            public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
-                                this.${memberName:L} = new ${collectionImpl:T}<>(${objects:T}.requireNonNull(${memberName:L}, "${memberName:L} cannot be null"));${?tracked}
-                                tracker.setMember(${schemaName:L});${/tracked}
-                                return this;
-                            }
-                            """
                 );
             } else {
                 writer.write(
+                    """
+                        public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
+                            this.${memberName:L} = ${memberName:L} != null ? new ${collectionImpl:T}<>(${memberName:L}) : null;
+                            return this;
+                        }
                         """
-                            public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
-                                this.${memberName:L} = ${memberName:L} != null ? new ${collectionImpl:T}<>(${memberName:L}) : null;
-                                return this;
-                            }
-                            """
                 );
             }
 

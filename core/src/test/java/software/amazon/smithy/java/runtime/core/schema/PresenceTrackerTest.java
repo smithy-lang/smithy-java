@@ -1,3 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.runtime.core.schema;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -14,8 +19,9 @@ public class PresenceTrackerTest {
     @ParameterizedTest
     @ValueSource(ints = {1, 63, 64, 65, 128})
     void throwsUnsetMembers(int requiredFields) {
-        var exc = assertThrows(SdkSerdeException.class, () ->
-                PresenceTracker.of(createBigRequiredSchema(requiredFields, requiredFields, 0)).validate()
+        var exc = assertThrows(
+            SdkSerdeException.class,
+            () -> PresenceTracker.of(createBigRequiredSchema(requiredFields, requiredFields, 0)).validate()
         );
         for (var i = 0; i < requiredFields; i++) {
             assertTrue(exc.getMessage().contains("member" + i));
@@ -35,8 +41,8 @@ public class PresenceTrackerTest {
         }
 
         assertEquals(
-                expected,
-                PresenceTracker.of(createBigRequiredSchema(requiredFields, requiredFields, 0)).getClass()
+            expected,
+            PresenceTracker.of(createBigRequiredSchema(requiredFields, requiredFields, 0)).getClass()
         );
     }
 }
