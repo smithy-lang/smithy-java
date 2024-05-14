@@ -231,8 +231,9 @@ public final class CodegenUtils {
     /**
      * Primitives (excluding blobs) use the Java default for error correction and so do not need to be set.
      *
-     * <p>Documents are also not set because they use a
+     * <p>Documents are also not set because they use a null default for error correction.
      *
+     * @see <a href="https://smithy.io/2.0/spec/aggregate-types.html#client-error-correction">client error correction</a>
      * @return true if the member shape has a builtin default
      */
     public static boolean hasBuiltinDefault(SymbolProvider provider, Model model, MemberShape memberShape) {

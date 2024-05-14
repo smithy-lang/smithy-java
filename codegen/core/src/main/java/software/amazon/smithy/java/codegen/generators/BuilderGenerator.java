@@ -91,8 +91,8 @@ final class BuilderGenerator implements Runnable {
                         tracker.validate();
                         return new ${shape:T}(this);
                     }
-                    ${?needsErrorCorrection}
-                    @Override
+                    
+                    ${?needsErrorCorrection}@Override
                     public SdkShapeBuilder<${shape:T}> errorCorrection() {
                         if (tracker.allSet()) {
                             return this;
