@@ -14,6 +14,9 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -29,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.core.testmodels.Person;
@@ -1231,6 +1235,33 @@ public class ValidatorTest {
 
         for (var e : errors) {
             assertThat(e, instanceOf(ValidationError.RequiredValidationFailure.class));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 63, 64, 65, 128})
+    public void presenceTrackerType(int requiredFields) {
+        Class<?> expected;
+        if (requiredFields == 0) {
+            expected = PresenceTracker.NoOpPresenceTracker.class;
+        } else if (requiredFields <= 64) {
+            expected = PresenceTracker.RequiredMemberPresenceTracker.class;
+        } else {
+            expected = PresenceTracker.BigRequiredMemberPresenceTracker.class;
+        }
+
+        var schema = createBigRequiredSchema(requiredFields, requiredFields, 0);
+        var tracker = PresenceTracker.of(schema);
+        assertEquals(expected, tracker.getClass());
+
+        if (requiredFields > 0) {
+            tracker.setMember(schema.members().get(requiredFields - 1));
+            assertEquals(requiredFields == 1, tracker.allSet());
+            for (int i = 0; i < requiredFields - 1; i++) {
+                assertFalse(tracker.checkMember(schema.members().get(i)));
+            }
+
+            assertTrue(tracker.checkMember(schema.members().get(requiredFields - 1)));
         }
     }
 

@@ -104,7 +104,7 @@ public abstract sealed class PresenceTracker {
     }
 
     /**
-     * Tracker for structures with less than 64 members
+     * Tracker for structures with less than 65 required members
      */
     static final class RequiredMemberPresenceTracker extends PresenceTracker {
         private long setBitfields = 0L;
@@ -142,7 +142,7 @@ public abstract sealed class PresenceTracker {
     }
 
     /**
-     * Tracker for structures with greater than 64 required members.
+     * Tracker for structures with at least 65 required members.
      */
     static final class BigRequiredMemberPresenceTracker extends PresenceTracker {
         private final BitSet bitSet;
@@ -167,7 +167,7 @@ public abstract sealed class PresenceTracker {
 
         @Override
         public boolean allSet() {
-            if (bitSet.length() != schema.requiredMemberCount) {
+            if (bitSet.cardinality() != schema.requiredMemberCount) {
                 return false;
             }
             for (var member : schema.members()) {
