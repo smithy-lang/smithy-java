@@ -17,15 +17,16 @@ operation PutPerson {
     input := for Person {
         @httpLabel
         @required
+        @length(max: 7)
         $name
 
         @httpQuery("favoriteColor")
         $favoriteColor
 
         @jsonName("Age")
-        $age
+        @range(max: 150)
+        $age = 0
 
-        @default("1985-04-12T23:20:50.52Z")
         $birthday
 
         @notProperty
