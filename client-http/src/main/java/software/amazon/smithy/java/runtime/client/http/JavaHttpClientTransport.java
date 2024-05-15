@@ -11,6 +11,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.client.core.ClientCall;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
@@ -42,7 +43,7 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
     }
 
     @Override
-    public <I extends SerializableShape, O extends SerializableShape> O send(ClientCall<I, O> call) {
+    public <I extends SerializableShape, O extends SerializableShape> CompletableFuture<O> send(ClientCall<I, O> call) {
         return SraPipeline.send(call, protocol, request -> {
             LOGGER.log(System.Logger.Level.TRACE, "Sending HTTP request: %s", request.startLine());
             var javaRequest = createJavaRequest(call.context(), request);

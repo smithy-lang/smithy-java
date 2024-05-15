@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
@@ -79,17 +80,17 @@ public final class PersonDirectoryClient implements PersonDirectory {
     }
 
     @Override
-    public PutPersonOutput putPerson(PutPersonInput input, Context context) {
+    public CompletableFuture<PutPersonOutput> putPersonAsync(PutPersonInput input, Context context) {
         return call(input, null, null, new PutPerson(), context);
     }
 
     @Override
-    public PutPersonImageOutput putPersonImage(PutPersonImageInput input, Context context) {
+    public CompletableFuture<PutPersonImageOutput> putPersonImageAsync(PutPersonImageInput input, Context context) {
         return call(input, input.image(), null, new PutPersonImage(), context);
     }
 
     @Override
-    public GetPersonImageOutput getPersonImage(GetPersonImageInput input, Context context) {
+    public CompletableFuture<GetPersonImageOutput> getPersonImageAsync(GetPersonImageInput input, Context context) {
         return call(input, null, null, new GetPersonImage(), context);
     }
 
@@ -101,11 +102,11 @@ public final class PersonDirectoryClient implements PersonDirectory {
      * @param eventStream The event stream extracted from the input, or null. TODO: Implement.
      * @param operation   The operation shape.
      * @param context     Context of the call.
+     * @param <I>         Input shape.
+     * @param <O>         Output shape.
      * @return Returns the deserialized output.
-     * @param <I> Input shape.
-     * @param <O> Output shape.
      */
-    private <I extends SerializableShape, O extends SerializableShape> O call(
+    private <I extends SerializableShape, O extends SerializableShape> CompletableFuture<O> call(
         I input,
         DataStream inputStream,
         Object eventStream,

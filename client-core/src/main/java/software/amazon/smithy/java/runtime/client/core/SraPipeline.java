@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.client.core;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
@@ -66,7 +67,7 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
         this.responseKey = protocol.responseKey();
     }
 
-    public static <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> O send(
+    public static <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> CompletableFuture<O> send(
         ClientCall<I, O> call,
         ClientProtocol<RequestT, ResponseT> protocol,
         Function<RequestT, ResponseT> wireTransport
@@ -74,7 +75,7 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
         return new SraPipeline<>(call, protocol, wireTransport).send();
     }
 
-    private O send() {
+    private CompletableFuture<O> send() {
         var context = call.context();
         var input = call.input();
         var interceptor = call.interceptor();
@@ -112,7 +113,8 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
         request = interceptor.modifyBeforeTransmit(context, input, Context.value(requestKey, request)).value();
         interceptor.readBeforeTransmit(context, input, Context.value(requestKey, request));
         var response = wireTransport.apply(request);
-        return deserialize(call, request, response, interceptor);
+        O o = deserialize(call, request, response, interceptor);
+        return CompletableFuture.completedFuture(o);
     }
 
     @SuppressWarnings("unchecked")
