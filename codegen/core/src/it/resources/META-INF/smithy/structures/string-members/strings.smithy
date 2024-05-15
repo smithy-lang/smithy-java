@@ -7,6 +7,9 @@ operation Strings {
         @required
         requiredString: String
 
+        @default("default")
+        defaultString: String
+
         optionalString: String
     }
 }

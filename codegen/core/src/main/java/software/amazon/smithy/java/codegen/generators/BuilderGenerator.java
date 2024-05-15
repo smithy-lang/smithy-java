@@ -133,16 +133,11 @@ final class BuilderGenerator implements Runnable {
     // Adds builder properties and initializers
     private void builderProperties() {
         // Add any static default properties
-        generateStaticDefaults();
-
-        // Add non-static builder properties
-        generateInitializers();
-    }
-
-    private void generateStaticDefaults() {
         var defaultVisitor = new DefaultInitializerGenerator(writer, model, symbolProvider);
         for (var member : shape.members()) {
-            if (member.hasNonNullDefault()) {
+            if (member.hasNonNullDefault()
+                && symbolProvider.toSymbol(member).expectProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT)
+            ) {
                 defaultVisitor.member = member;
                 writer.write(
                     "private static final $T $L = $C;",
@@ -152,27 +147,33 @@ final class BuilderGenerator implements Runnable {
                 );
             }
         }
-    }
 
-    private void generateInitializers() {
+        // Add non-static builder properties
         for (var member : shape.members()) {
+            var memberName = symbolProvider.toMemberName(member);
             if (CodegenUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {
                 // Streaming blobs need a custom initializer
                 writer.write(
                     "private $1T $2L = $1T.ofEmpty();",
                     DataStream.class,
-                    symbolProvider.toMemberName(member)
+                    memberName
                 );
                 continue;
             }
             writer.pushState();
-            writer.putContext("isNullable", CodegenUtils.isNullableMember(member));
+            writer.putContext("nullable", CodegenUtils.isNullableMember(member));
             writer.putContext("default", member.hasNonNullDefault());
+            writer.putContext(
+                "static",
+                symbolProvider.toSymbol(member).expectProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT)
+            );
+            defaultVisitor.member = member;
             writer.write(
-                "private ${^isNullable}$1T${/isNullable}${?isNullable}$1B${/isNullable} $2L${?default} = $3L${/default};",
+                "private ${^nullable}$1T${/nullable}${?nullable}$1B${/nullable} $2L${?default} = ${?static}$3L${/static}${^static}$4C${/static}${/default};",
                 symbolProvider.toSymbol(member),
-                symbolProvider.toMemberName(member),
-                CodegenUtils.toDefaultValueName(symbolProvider.toMemberName(member))
+                memberName,
+                CodegenUtils.toDefaultValueName(memberName),
+                defaultVisitor
             );
             writer.popState();
         }

@@ -48,5 +48,10 @@ public final class SymbolProperties {
      */
     public static final Property<String> COLLECTION_EMPTY_METHOD = Property.named("collection-empty");
 
+    /**
+     * Indicates that a type should define a static default value.
+     */
+    public static final Property<Boolean> REQUIRES_STATIC_DEFAULT = Property.named("requires-static-default");
+
     private SymbolProperties() {}
 }

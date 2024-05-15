@@ -102,6 +102,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
             .toBuilder()
             .putProperty(SymbolProperties.IS_JAVA_ARRAY, true)
             .putProperty(SymbolProperties.IS_PRIMITIVE, true)
+            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
             .build();
     }
 
@@ -119,6 +120,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
                 .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableSet")
                 .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashSet.class)
                 .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptySet()")
+                .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
                 .addReference(listShape.getMember().accept(this))
                 .build();
         }
@@ -127,6 +129,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
             .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableList")
             .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, ArrayList.class)
             .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptyList()")
+            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
             .addReference(listShape.getMember().accept(this))
             .build();
     }
@@ -138,6 +141,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
             .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableMap")
             .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashMap.class)
             .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptyMap()")
+            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
             .addReference(mapShape.getKey().accept(this))
             .addReference(mapShape.getValue().accept(this))
             .build();
@@ -266,6 +270,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
         return Symbol.builder()
             .name(name)
             .putProperty(SymbolProperties.IS_PRIMITIVE, false)
+            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, true)
             .namespace(format("%s.model", packageNamespace), ".")
             .declarationFile(format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name))
             .build();

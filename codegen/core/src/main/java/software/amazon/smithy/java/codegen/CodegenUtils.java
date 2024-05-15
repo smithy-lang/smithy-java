@@ -58,6 +58,7 @@ public final class CodegenUtils {
             .name(clazz.getSimpleName())
             .namespace(clazz.getCanonicalName().replace("." + clazz.getSimpleName(), ""), ".")
             .putProperty(SymbolProperties.IS_PRIMITIVE, clazz.isPrimitive())
+            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, true)
             .build();
     }
 
@@ -72,6 +73,7 @@ public final class CodegenUtils {
         return fromClass(unboxed).toBuilder()
             .putProperty(SymbolProperties.IS_PRIMITIVE, true)
             .putProperty(SymbolProperties.BOXED_TYPE, fromClass(boxed))
+            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
             .build();
     }
 
