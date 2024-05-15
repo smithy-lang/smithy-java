@@ -13,7 +13,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import software.amazon.smithy.codegen.core.Symbol;
-import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
@@ -29,10 +28,8 @@ import software.amazon.smithy.model.loader.Prelude;
 import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
-import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.shapes.ShapeVisitor;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
@@ -180,7 +177,12 @@ public final class SharedSchemasGenerator
                 if (shape.isMapShape()) {
                     writeMapValueSerializerWrapper(writer, shape.asMapShape().get(), directive);
                 }
-                writeDeserializerMethod(writer, symbol, shape, directive);
+                writeDeserializerMethod(writer, symbol, shape);
+                if (shape.isMapShape()) {
+                    writeMapValueDeserializer(writer, symbol, shape.asMapShape().get(), directive);
+                } else {
+                    writeListMemberDeserializer(writer, symbol, shape.asListShape().get(), directive);
+                }
                 writer.popState();
             }
         }
@@ -253,8 +255,7 @@ public final class SharedSchemasGenerator
     private static void writeDeserializerMethod(
         JavaWriter writer,
         Symbol symbol,
-        Shape shape,
-        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive
+        Shape shape
     ) {
         writer.pushState();
         writer.putContext("shape", symbol);
@@ -263,20 +264,84 @@ public final class SharedSchemasGenerator
             "collectionImpl",
             symbol.expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
         );
+        writer.putContext("type", shape.isMapShape() ? "Value" : "Member");
+        writer.putContext("reader", shape.isMapShape() ? "readStringMap" : "readList");
         writer.write(
             """
                 static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
                     ${shape:T} result = new ${collectionImpl:T}<>();
-                    ${C|}
+                    deserializer.${reader:L}(schema, result, ${name:U}${type:L}Deserializer.INSTANCE);
                     return result;
                 }
+                """
+        );
+        writer.popState();
+    }
+
+    private void writeListMemberDeserializer(
+        JavaWriter writer,
+        Symbol symbol,
+        ListShape shape,
+        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive
+    ) {
+        var target = directive.model().expectShape(shape.getMember().getTarget());
+        writer.pushState();
+        writer.putContext("shape", symbol);
+        writer.putContext("shapeDeserializer", ShapeDeserializer.class);
+        writer.write(
+            """
+                private static final class ${name:U}MemberDeserializer implements ${shapeDeserializer:T}.ListMemberConsumer<${shape:T}> {
+                    static final ${name:U}MemberDeserializer INSTANCE = new ${name:U}MemberDeserializer();
+
+                    @Override
+                    public void accept(${shape:T} state, ${shapeDeserializer:T} deserializer) {
+                        state.add($C);
+                    }
+                }
                 """,
-            new DeserializationMethodVisitor(
+            new DeserializerGenerator(
                 writer,
+                target,
                 directive.symbolProvider(),
                 directive.model(),
                 directive.service(),
-                shape
+                "deserializer",
+                CodegenUtils.getSchemaType(writer, directive.symbolProvider(), target)
+            )
+        );
+        writer.popState();
+    }
+
+    private void writeMapValueDeserializer(
+        JavaWriter writer,
+        Symbol symbol,
+        MapShape shape,
+        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive
+    ) {
+        var target = directive.model().expectShape(shape.getValue().getTarget());
+        writer.pushState();
+        writer.putContext("shape", symbol);
+        writer.putContext("shapeDeserializer", ShapeDeserializer.class);
+        writer.putContext("key", directive.symbolProvider().toSymbol(shape.getKey()));
+        writer.write(
+            """
+                private static final class ${name:U}ValueDeserializer implements ${shapeDeserializer:T}.MapMemberConsumer<${key:T}, ${shape:T}> {
+                    static final ${name:U}ValueDeserializer INSTANCE = new ${name:U}ValueDeserializer();
+
+                    @Override
+                    public void accept(${shape:T} state, ${key:T} key, ${shapeDeserializer:T} deserializer) {
+                        state.put(key, $C);
+                    }
+                }
+                """,
+            new DeserializerGenerator(
+                writer,
+                target,
+                directive.symbolProvider(),
+                directive.model(),
+                directive.service(),
+                "deserializer",
+                CodegenUtils.getSchemaType(writer, directive.symbolProvider(), target)
             )
         );
         writer.popState();
@@ -296,81 +361,5 @@ public final class SharedSchemasGenerator
 
     private static String getFilename(JavaCodegenSettings settings) {
         return String.format("./%s/model/SharedSchemas.java", settings.packageNamespace().replace(".", "/"));
-    }
-
-    private static final class DeserializationMethodVisitor extends ShapeVisitor.Default<Void> implements Runnable {
-
-        private final JavaWriter writer;
-        private final SymbolProvider provider;
-        private final Model model;
-        private final ServiceShape service;
-        private final Shape shape;
-
-        private DeserializationMethodVisitor(
-            JavaWriter writer,
-            SymbolProvider provider,
-            Model model,
-            ServiceShape service,
-            Shape shape
-        ) {
-            this.writer = writer;
-            this.provider = provider;
-            this.model = model;
-            this.service = service;
-            this.shape = shape;
-        }
-
-        @Override
-        public void run() {
-            shape.accept(this);
-        }
-
-        @Override
-        protected Void getDefault(Shape shape) {
-            throw new IllegalArgumentException("Schema methods are only generated for maps and lists. Found " + shape);
-        }
-
-        @Override
-        public Void listShape(ListShape shape) {
-            var target = model.expectShape(shape.getMember().getTarget());
-            writer.write(
-                """
-                    deserializer.readList(schema, result, (listData, elem) -> {
-                        listData.add($C);
-                    });""",
-                new DeserializerGenerator(
-                    writer,
-                    target,
-                    provider,
-                    model,
-                    service,
-                    "elem",
-                    CodegenUtils.getSchemaType(writer, provider, target)
-                )
-            );
-            return null;
-        }
-
-        @Override
-        public Void mapShape(MapShape shape) {
-            // TODO: support maps with non-string keys
-            var target = model.expectShape(shape.getValue().getTarget());
-            writer.write(
-                """
-                    deserializer.readStringMap(schema, result, (mapData, key, val) -> {
-                        mapData.put(key, $C);
-                    });""",
-                new DeserializerGenerator(
-                    writer,
-                    target,
-                    provider,
-                    model,
-                    service,
-                    "val",
-                    CodegenUtils.getSchemaType(writer, provider, target)
-                )
-            );
-            return null;
-        }
     }
 }
