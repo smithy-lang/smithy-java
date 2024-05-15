@@ -242,4 +242,14 @@ public final class CodegenUtils {
             || target.isDocumentShape())
             && !target.isBlobShape();
     }
+
+    /**
+     * Gets the name to use when defining the default value of a member.
+     *
+     * @param memberName name of member to get default name for.
+     * @return Upper snake case name of default
+     */
+    public static String toDefaultValueName(String memberName) {
+        return CaseUtils.toSnakeCase(memberName).toUpperCase(Locale.ENGLISH) + "_DEFAULT";
+    }
 }
