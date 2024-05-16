@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -32,10 +33,10 @@ public class TypedDocumentTest {
             .build();
 
         return encoder -> {
-            encoder.writeStruct(structSchema, structSchema, (schema, s) -> {
+            encoder.writeStruct(SerializableStruct.create(structSchema, (schema, s) -> {
                 s.writeString(schema.member("a"), "1");
                 s.writeString(schema.member("b"), "2");
-            });
+            }));
         };
     }
 

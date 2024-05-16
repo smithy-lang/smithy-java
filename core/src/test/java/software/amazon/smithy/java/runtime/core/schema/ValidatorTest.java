@@ -241,10 +241,10 @@ public class ValidatorTest {
         Validator validator = Validator.builder().build();
 
         var errors = validator.validate(encoder -> {
-            encoder.writeStruct(struct, struct.member("a"), (member, serializer) -> {
+            encoder.writeStruct(SerializableStruct.create(struct, (schema, serializer) -> {
                 // write the first required member but leave out the rest.
-                serializer.writeString(member, "hi");
-            });
+                serializer.writeString(schema.member("a"), "hi");
+            }));
         });
 
         assertThat(errors, hasSize(2));
@@ -265,7 +265,7 @@ public class ValidatorTest {
 
         Validator validator = Validator.builder().build();
         var errors = validator.validate(encoder -> {
-            encoder.writeStruct(struct, null, (ignored, serializer) -> {});
+            encoder.writeStruct(SerializableStruct.create(struct, (schema, serializer) -> {}));
         });
 
         assertThat(errors, hasSize(1));
@@ -494,7 +494,9 @@ public class ValidatorTest {
     public void validatesUnionSetMember() {
         Validator validator = Validator.builder().build();
         var unionSchema = getTestUnionSchema();
-        var errors = validator.validate(s -> s.writeStruct(unionSchema, null, (ignored, serializer) -> {}));
+        var errors = validator.validate(s -> {
+            s.writeStruct(SerializableStruct.create(unionSchema, (schema, writer) -> {}));
+        });
 
         assertThat(errors, hasSize(1));
         assertThat(errors.get(0).path(), equalTo("/"));
@@ -507,10 +509,10 @@ public class ValidatorTest {
         var unionSchema = getTestUnionSchema();
 
         var errors = validator.validate(s -> {
-            s.writeStruct(unionSchema, unionSchema, (schema, serializer) -> {
+            s.writeStruct(SerializableStruct.create(unionSchema, (schema, serializer) -> {
                 serializer.writeString(schema.member("a"), "hi");
                 serializer.writeString(schema.member("b"), "byte");
-            });
+            }));
         });
 
         assertThat(errors, hasSize(1));
@@ -524,9 +526,9 @@ public class ValidatorTest {
         var unionSchema = getTestUnionSchema();
 
         var errors = validator.validate(s -> {
-            s.writeStruct(unionSchema, unionSchema, (schema, serializer) -> {
+            s.writeStruct(SerializableStruct.create(unionSchema, (schema, serializer) -> {
                 serializer.writeString(schema.member("a"), "ok!");
-            });
+            }));
         });
 
         assertThat(errors, empty());
@@ -538,9 +540,9 @@ public class ValidatorTest {
         var unionSchema = getTestUnionSchema();
 
         var errors = validator.validate(s -> {
-            s.writeStruct(unionSchema, unionSchema, (schema, serializer) -> {
+            s.writeStruct(SerializableStruct.create(unionSchema, (schema, serializer) -> {
                 serializer.writeString(schema.member("a"), "this is too long!");
-            });
+            }));
         });
 
         assertThat(errors, hasSize(1));
@@ -557,11 +559,11 @@ public class ValidatorTest {
         var unionSchema = getTestUnionSchema();
 
         var errors = validator.validate(s -> {
-            s.writeStruct(unionSchema, unionSchema, (schema, serializer) -> {
+            s.writeStruct(SerializableStruct.create(unionSchema, (schema, serializer) -> {
                 serializer.writeString(schema.member("a"), null); // ignore it
                 serializer.writeNull(schema.member("b"));         // ignore it
                 serializer.writeString(schema.member("c"), "ok"); // it's set, it's the only non-null value.
-            });
+            }));
         });
 
         assertThat(errors, empty());
@@ -611,9 +613,9 @@ public class ValidatorTest {
             .build();
 
         var errors = validator.validate(s -> {
-            s.writeStruct(schema, schema.member("foo"), (member, serializer) -> {
-                serializer.writeNull(member); // fine
-            });
+            s.writeStruct(SerializableStruct.create(schema, (passedSchema, serializer) -> {
+                serializer.writeNull(passedSchema.member("foo")); // fine
+            }));
         });
 
         assertThat(errors, empty());
@@ -766,9 +768,7 @@ public class ValidatorTest {
             Arguments.of(
                 ShapeType.STRUCTURE,
                 (Consumer<ShapeSerializer>) serializer -> serializer.writeStruct(
-                    PreludeSchemas.STRING,
-                    null,
-                    (ignored, s) -> {}
+                    SerializableStruct.create(PreludeSchemas.STRING, (a, b) -> {})
                 )
             ),
             Arguments.of(
@@ -1228,7 +1228,7 @@ public class ValidatorTest {
         Validator validator = Validator.builder().build();
 
         var errors = validator.validate(encoder -> {
-            encoder.writeStruct(struct, struct, (member, serializer) -> {});
+            encoder.writeStruct(SerializableStruct.create(struct, (schema, writer) -> {}));
         });
 
         assertThat(errors, hasSize(failures));

@@ -6,11 +6,10 @@
 package software.amazon.smithy.java.runtime.core.testmodels;
 
 import java.math.BigDecimal;
-import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
@@ -20,7 +19,7 @@ import software.amazon.smithy.model.traits.LengthTrait;
 import software.amazon.smithy.model.traits.RangeTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
 
-public final class ValidatedPojo implements SerializableShape {
+public final class ValidatedPojo implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#ValidatedPojo");
     private static final SdkSchema SCHEMA_STRING = SdkSchema.memberBuilder("string", PreludeSchemas.STRING)
@@ -74,23 +73,19 @@ public final class ValidatedPojo implements SerializableShape {
     }
 
     @Override
-    public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, this, InnerSerializer.INSTANCE);
+    public SdkSchema schema() {
+        return SCHEMA;
     }
 
-    private static final class InnerSerializer implements BiConsumer<ValidatedPojo, ShapeSerializer> {
-        private static final InnerSerializer INSTANCE = new InnerSerializer();
-
-        @Override
-        public void accept(ValidatedPojo pojo, ShapeSerializer st) {
-            if (pojo.string != null) {
-                st.writeString(SCHEMA_STRING, pojo.string);
-            }
-            if (pojo.boxedInteger != null) {
-                st.writeInteger(SCHEMA_BOXED_INTEGER, pojo.boxedInteger);
-            }
-            st.writeInteger(SCHEMA_INTEGER, pojo.integer);
+    @Override
+    public void serializeMembers(ShapeSerializer st) {
+        if (string != null) {
+            st.writeString(SCHEMA_STRING, string);
         }
+        if (boxedInteger != null) {
+            st.writeInteger(SCHEMA_BOXED_INTEGER, boxedInteger);
+        }
+        st.writeInteger(SCHEMA_INTEGER, integer);
     }
 
     public static final class Builder implements SdkShapeBuilder<ValidatedPojo> {

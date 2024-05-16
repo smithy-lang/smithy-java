@@ -8,14 +8,14 @@ package software.amazon.smithy.java.runtime.core.testmodels;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
-public final class Bird implements SerializableShape {
+public final class Bird implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Bird");
     private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
@@ -47,10 +47,13 @@ public final class Bird implements SerializableShape {
     }
 
     @Override
-    public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, this, (pojo, structSerializer) -> {
-            structSerializer.writeString(SCHEMA_NAME, pojo.name);
-        });
+    public SdkSchema schema() {
+        return SCHEMA;
+    }
+
+    @Override
+    public void serializeMembers(ShapeSerializer serializer) {
+        serializer.writeString(SCHEMA_NAME, name);
     }
 
     public static final class Builder implements SdkShapeBuilder<Bird> {

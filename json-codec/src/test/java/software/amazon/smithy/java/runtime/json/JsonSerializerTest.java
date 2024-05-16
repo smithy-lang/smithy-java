@@ -22,6 +22,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
@@ -82,6 +84,15 @@ public class JsonSerializerTest {
             Arguments.of(Document.createTimestamp(now), Double.toString(((double) now.toEpochMilli()) / 1000)),
             Arguments.of(Document.createList(List.of(Document.createString("a"))), "[\"a\"]"),
             Arguments.of(
+                Document.createList(
+                    List.of(
+                        Document.createList(List.of(Document.createString("a"), Document.createString("b"))),
+                        Document.createString("c")
+                    )
+                ),
+                "[[\"a\",\"b\"],\"c\"]"
+            ),
+            Arguments.of(
                 Document.createList(List.of(Document.createString("a"), Document.createString("b"))),
                 "[\"a\",\"b\"]"
             ),
@@ -133,10 +144,10 @@ public class JsonSerializerTest {
             var codec = JsonCodec.builder().useJsonName(useJsonName).build(); var output = new ByteArrayOutputStream()
         ) {
             try (var serializer = codec.createSerializer(output)) {
-                serializer.writeStruct(JsonTestData.BIRD, null, (state, ser) -> {
-                    ser.writeString(JsonTestData.BIRD.member("name"), "Toucan");
-                    ser.writeString(JsonTestData.BIRD.member("color"), "red");
-                });
+                serializer.writeStruct(SerializableStruct.create(JsonTestData.BIRD, (schema, ser) -> {
+                    ser.writeString(schema.member("name"), "Toucan");
+                    ser.writeString(schema.member("color"), "red");
+                }));
             }
             var result = output.toString(StandardCharsets.UTF_8);
             assertThat(result, equalTo(json));
@@ -148,5 +159,41 @@ public class JsonSerializerTest {
             Arguments.of(true, "{\"name\":\"Toucan\",\"Color\":\"red\"}"),
             Arguments.of(false, "{\"name\":\"Toucan\",\"color\":\"red\"}")
         );
+    }
+
+    @Test
+    public void writesNestedStructures() throws Exception {
+        try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeStruct(SerializableStruct.create(JsonTestData.BIRD, (schema, ser) -> {
+                    ser.writeStruct(schema.member("nested"), new NestedStruct());
+                }));
+            }
+            var result = output.toString(StandardCharsets.UTF_8);
+            assertThat(result, equalTo("{\"nested\":{\"number\":10}}"));
+        }
+    }
+
+    @Test
+    public void writesStructureUsingSerializableStruct() throws Exception {
+        try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeStruct(JsonTestData.NESTED, new NestedStruct());
+            }
+            var result = output.toString(StandardCharsets.UTF_8);
+            assertThat(result, equalTo("{\"number\":10}"));
+        }
+    }
+
+    private static final class NestedStruct implements SerializableStruct {
+        @Override
+        public SdkSchema schema() {
+            return JsonTestData.NESTED;
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {
+            serializer.writeInteger(JsonTestData.NESTED.member("number"), 10);
+        }
     }
 }

@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.StringJoiner;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.InterceptingSerializer;
@@ -77,7 +78,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     }
 
     @Override
-    public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
+    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
         boolean foundBody = false;
         for (var member : schema.members()) {
             if (bindingMatcher.match(member) == BindingMatcher.Binding.BODY) {
@@ -89,12 +90,10 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         if (foundBody) {
             shapeBodyOutput = new ByteArrayOutputStream();
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
-            shapeBodySerializer.writeStruct(schema, structState, (delegatedState, delegateStruct) -> {
-                consumer.accept(delegatedState, new BindingSerializer(this, delegateStruct));
-            });
+            struct.serializeMembers(new BindingSerializer(this, shapeBodySerializer));
             headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
         } else {
-            consumer.accept(structState, new BindingSerializer(this, null));
+            struct.serializeMembers(new BindingSerializer(this, null));
         }
     }
 

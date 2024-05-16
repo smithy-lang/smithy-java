@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
@@ -22,7 +23,7 @@ final class NullSerializer implements ShapeSerializer {
     static final NullSerializer INSTANCE = new NullSerializer();
 
     @Override
-    public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {}
+    public void writeStruct(SdkSchema schema, SerializableStruct struct) {}
 
     @Override
     public <T> void writeList(SdkSchema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {}

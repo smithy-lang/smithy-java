@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.IntConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
@@ -48,9 +49,9 @@ public final class ListSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
+    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
         beforeWrite();
-        delegate.writeStruct(schema, structState, consumer);
+        delegate.writeStruct(schema, struct);
     }
 
     @Override

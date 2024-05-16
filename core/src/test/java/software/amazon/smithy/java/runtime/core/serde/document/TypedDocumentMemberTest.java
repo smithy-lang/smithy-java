@@ -24,6 +24,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -38,7 +39,9 @@ public class TypedDocumentMemberTest {
             .build();
 
         SerializableShape serializableShape = encoder -> {
-            encoder.writeStruct(structSchema, structSchema, (schema, s) -> s.writeString(schema.member("foo"), "Hi"));
+            encoder.writeStruct(
+                SerializableStruct.create(structSchema, (schema, s) -> s.writeString(schema.member("foo"), "Hi"))
+            );
         };
 
         var document = Document.createTyped(serializableShape);
@@ -68,11 +71,15 @@ public class TypedDocumentMemberTest {
             .build();
 
         var document1 = Document.createTyped(encoder -> {
-            encoder.writeStruct(structSchema1, structSchema1, (schema, s) -> s.writeString(schema.member("foo"), "Hi"));
+            encoder.writeStruct(
+                SerializableStruct.create(structSchema1, (schema, s) -> s.writeString(schema.member("foo"), "Hi"))
+            );
         });
 
         var document2 = Document.createTyped(encoder -> {
-            encoder.writeStruct(structSchema2, structSchema2, (schema, s) -> s.writeInteger(schema.member("foo"), 1));
+            encoder.writeStruct(
+                SerializableStruct.create(structSchema2, (schema, s) -> s.writeInteger(schema.member("foo"), 1))
+            );
         });
 
         assertThat(document1.getMember("foo"), not(equalTo(null)));
@@ -106,9 +113,9 @@ public class TypedDocumentMemberTest {
             .members(SdkSchema.memberBuilder("a", targetSchema))
             .build();
         var document = Document.createTyped(encoder -> {
-            encoder.writeStruct(structSchema, null, (ignoredValue, serializer) -> {
-                writer.accept(structSchema.member("a"), serializer);
-            });
+            encoder.writeStruct(SerializableStruct.create(structSchema, (schema, serializer) -> {
+                writer.accept(schema.member("a"), serializer);
+            }));
         });
 
         assertThat(extractor.apply(document.getMember("a")), equalTo(value));
@@ -610,10 +617,10 @@ public class TypedDocumentMemberTest {
                     .build(),
                 "b",
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> {
-                    s.writeStruct(schema, schema, (passedSchema, ser) -> {
+                    s.writeStruct(SerializableStruct.create(schema, (passedSchema, ser) -> {
                         ser.writeString(passedSchema.member("foo"), "a");
                         ser.writeString(passedSchema.member("bar"), "b");
-                    });
+                    }));
                 },
                 (Function<Document, Object>) d -> d.getMember("bar").asString()
             )

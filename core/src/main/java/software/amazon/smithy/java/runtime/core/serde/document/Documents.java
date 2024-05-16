@@ -14,6 +14,7 @@ import java.util.Map;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -646,7 +647,7 @@ final class Documents {
         }
     }
 
-    record StructureDocument(SdkSchema schema, Map<String, Document> members) implements Document {
+    record StructureDocument(SdkSchema schema, Map<String, Document> members) implements Document, SerializableStruct {
         @Override
         public ShapeType type() {
             return ShapeType.STRUCTURE;
@@ -663,12 +664,21 @@ final class Documents {
         }
 
         @Override
+        public void serialize(ShapeSerializer serializer) {
+            // De-conflict Document and SerializableStruct default implementations.
+            Document.super.serialize(serializer);
+        }
+
+        @Override
         public void serializeContents(ShapeSerializer encoder) {
-            encoder.writeStruct(schema, members, (members, structSerializer) -> {
-                for (var entry : members.entrySet()) {
-                    entry.getValue().serializeContents(structSerializer);
-                }
-            });
+            encoder.writeStruct(schema, this);
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {
+            for (var entry : members.entrySet()) {
+                entry.getValue().serializeContents(serializer);
+            }
         }
     }
 
