@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.client.http;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -47,10 +46,15 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
         return SraPipeline.send(call, protocol, request -> {
             LOGGER.log(System.Logger.Level.TRACE, "Sending HTTP request: %s", request.startLine());
             var javaRequest = createJavaRequest(call.context(), request);
-            var response = sendRequest(javaRequest);
-            LOGGER.log(System.Logger.Level.TRACE, "Got HTTP response: %s", response.startLine());
-            call.context().put(HttpContext.HTTP_RESPONSE, response);
-            return response;
+            return sendRequest(javaRequest).thenApply(response -> {
+                LOGGER.log(System.Logger.Level.TRACE, "Got HTTP response: %s", response.startLine());
+                // TODO: Should this use protocol.responseKey()?
+                // TODO: Why is this put in context here?
+                // TODO: Why not in SraPipeline?
+                // TODO: HTTP_REQUEST is not put in context anywhere it seems?
+                call.context().put(HttpContext.HTTP_RESPONSE, response);
+                return response;
+            });
         });
     }
 
@@ -77,20 +81,9 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
         return httpRequestBuilder.build();
     }
 
-    private SmithyHttpResponse sendRequest(HttpRequest request) {
-        try {
-            var response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            LOGGER.log(
-                System.Logger.Level.TRACE,
-                "Got response: %s; headers: %s",
-                response,
-                response.headers().map()
-            );
-            return createSmithyResponse(response);
-        } catch (IOException | InterruptedException e) {
-            LOGGER.log(System.Logger.Level.ERROR, "Error sending request: %sl %s", request, e.getMessage());
-            throw new RuntimeException(e); // TODO: Networking related error handling.
-        }
+    private CompletableFuture<SmithyHttpResponse> sendRequest(HttpRequest request) {
+        return client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
+            .thenApply(this::createSmithyResponse);
     }
 
     private SmithyHttpResponse createSmithyResponse(HttpResponse<InputStream> response) {

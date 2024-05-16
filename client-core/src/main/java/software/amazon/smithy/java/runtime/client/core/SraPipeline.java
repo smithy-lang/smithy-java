@@ -53,12 +53,12 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     private final ClientProtocol<RequestT, ResponseT> protocol;
     private final Context.Key<RequestT> requestKey;
     private final Context.Key<ResponseT> responseKey;
-    private final Function<RequestT, ResponseT> wireTransport;
+    private final Function<RequestT, CompletableFuture<ResponseT>> wireTransport;
 
     private SraPipeline(
         ClientCall<I, O> call,
         ClientProtocol<RequestT, ResponseT> protocol,
-        Function<RequestT, ResponseT> wireTransport
+        Function<RequestT, CompletableFuture<ResponseT>> wireTransport
     ) {
         this.call = call;
         this.protocol = protocol;
@@ -70,7 +70,7 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     public static <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> CompletableFuture<O> send(
         ClientCall<I, O> call,
         ClientProtocol<RequestT, ResponseT> protocol,
-        Function<RequestT, ResponseT> wireTransport
+        Function<RequestT, CompletableFuture<ResponseT>> wireTransport
     ) {
         return new SraPipeline<>(call, protocol, wireTransport).send();
     }
@@ -112,9 +112,11 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
 
         request = interceptor.modifyBeforeTransmit(context, input, Context.value(requestKey, request)).value();
         interceptor.readBeforeTransmit(context, input, Context.value(requestKey, request));
-        var response = wireTransport.apply(request);
-        O o = deserialize(call, request, response, interceptor);
-        return CompletableFuture.completedFuture(o);
+
+        RequestT finalRequest = request;
+
+        return wireTransport.apply(finalRequest)
+            .thenApply(response -> deserialize(call, finalRequest, response, interceptor));
     }
 
     @SuppressWarnings("unchecked")
