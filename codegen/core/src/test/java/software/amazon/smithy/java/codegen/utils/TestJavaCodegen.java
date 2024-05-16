@@ -13,6 +13,8 @@ import software.amazon.smithy.codegen.core.directed.DirectedCodegen;
 import software.amazon.smithy.codegen.core.directed.GenerateEnumDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateErrorDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateIntEnumDirective;
+import software.amazon.smithy.codegen.core.directed.GenerateListDirective;
+import software.amazon.smithy.codegen.core.directed.GenerateMapDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateStructureDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateUnionDirective;
@@ -21,7 +23,10 @@ import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.generators.ExceptionGenerator;
+import software.amazon.smithy.java.codegen.generators.ListGenerator;
+import software.amazon.smithy.java.codegen.generators.MapGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
+import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
@@ -53,10 +58,9 @@ public class TestJavaCodegen implements
     }
 
     @Override
-    public void customizeBeforeShapeGeneration(
-        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive
-    ) {
+    public void customizeBeforeIntegrations(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         new SharedSchemasGenerator().accept(directive);
+        new SharedSerdeGenerator().accept(directive);
     }
 
     @Override
@@ -78,6 +82,16 @@ public class TestJavaCodegen implements
     @Override
     public void generateUnion(GenerateUnionDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // TODO
+    }
+
+    @Override
+    public void generateList(GenerateListDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        new ListGenerator().accept(directive);
+    }
+
+    @Override
+    public void generateMap(GenerateMapDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        new MapGenerator().accept(directive);
     }
 
     @Override

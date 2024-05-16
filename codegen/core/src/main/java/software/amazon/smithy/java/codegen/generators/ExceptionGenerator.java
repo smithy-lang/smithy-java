@@ -72,7 +72,7 @@ public final class ExceptionGenerator
                 new ConstructorGenerator(writer, shape, directive.symbolProvider(), directive.model()),
                 new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()),
                 writer.consumer(JavaWriter::writeToString),
-                new SerializerGenerator(
+                new StructureSerializerGenerator(
                     writer,
                     directive.symbolProvider(),
                     directive.model(),

@@ -13,7 +13,10 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.client.generators.OperationGenerator;
 import software.amazon.smithy.java.codegen.generators.ExceptionGenerator;
+import software.amazon.smithy.java.codegen.generators.ListGenerator;
+import software.amazon.smithy.java.codegen.generators.MapGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
+import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
@@ -45,13 +48,6 @@ public class DirectedJavaClientCodegen implements
     }
 
     @Override
-    public void customizeBeforeShapeGeneration(
-        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive
-    ) {
-        new SharedSchemasGenerator().accept(directive);
-    }
-
-    @Override
     public void generateService(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // TODO
     }
@@ -78,6 +74,16 @@ public class DirectedJavaClientCodegen implements
     }
 
     @Override
+    public void generateList(GenerateListDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        new ListGenerator().accept(directive);
+    }
+
+    @Override
+    public void generateMap(GenerateMapDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        new MapGenerator().accept(directive);
+    }
+
+    @Override
     public void generateEnumShape(GenerateEnumDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // TODO
     }
@@ -85,5 +91,11 @@ public class DirectedJavaClientCodegen implements
     @Override
     public void generateIntEnumShape(GenerateIntEnumDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // TODO
+    }
+
+    @Override
+    public void customizeBeforeIntegrations(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        new SharedSchemasGenerator().accept(directive);
+        new SharedSerdeGenerator().accept(directive);
     }
 }

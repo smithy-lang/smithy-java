@@ -80,7 +80,7 @@ public final class StructureGenerator
                 writer.consumer(JavaWriter::writeToString),
                 new EqualsGenerator(writer, directive.shape(), directive.symbolProvider()),
                 new HashCodeGenerator(writer, directive.shape(), directive.symbolProvider()),
-                new SerializerGenerator(
+                new StructureSerializerGenerator(
                     writer,
                     directive.symbolProvider(),
                     directive.model(),

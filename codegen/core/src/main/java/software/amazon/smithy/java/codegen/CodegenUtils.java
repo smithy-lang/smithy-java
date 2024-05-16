@@ -254,4 +254,24 @@ public final class CodegenUtils {
     public static String toDefaultValueName(String memberName) {
         return CaseUtils.toSnakeCase(memberName).toUpperCase(Locale.ENGLISH) + "_DEFAULT";
     }
+
+    /**
+     * Gets the file name to use for the SharedSchema utility class
+     *
+     * @param settings Settings to use for package namespace
+     * @return schema file name
+     */
+    public static String getSerdeFileName(JavaCodegenSettings settings) {
+        return String.format("./%s/model/SharedSchemas.java", settings.packageNamespace().replace(".", "/"));
+    }
+
+    /**
+     * Gets the namespace to use for generated pojo files
+     *
+     * @param settings Settings to use for package namespace
+     * @return schema file namespace
+     */
+    public static String getModelNamespace(JavaCodegenSettings settings) {
+        return settings.packageNamespace() + ".model";
+    }
 }

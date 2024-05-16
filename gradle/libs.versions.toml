@@ -1,7 +1,7 @@
 [versions]
 junit5 = "5.10.2"
 hamcrest = "2.1"
-smithy = "1.48.0"
+smithy = "1.49.0"
 jmh = "0.7.2"
 jsoniter = "0.9.23"
 test-logger-plugin = "4.0.0"
