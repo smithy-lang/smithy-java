@@ -71,6 +71,6 @@ public interface SmithyHttpMessage {
             String value = fieldAndValues[i + 1];
             current.computeIfAbsent(field, f -> new ArrayList<>()).add(value);
         }
-        return withAddedHeaders(HttpHeaders.of(current, (k, v) -> true));
+        return withHeaders(HttpHeaders.of(current, (k, v) -> true));
     }
 }
