@@ -35,7 +35,7 @@ public final class SharedSerdeGenerator
                              */
                             final class SharedSerde {
 
-                                ${L@sharedSerde}
+                                ${L@sharedSerde|}
 
                                 private SharedSerde() {}
                             }

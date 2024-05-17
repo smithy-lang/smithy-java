@@ -256,13 +256,13 @@ public final class CodegenUtils {
     }
 
     /**
-     * Gets the file name to use for the SharedSchema utility class
+     * Gets the file name to use for the SharedSerde utility class
      *
      * @param settings Settings to use for package namespace
-     * @return schema file name
+     * @return serde file name
      */
     public static String getSerdeFileName(JavaCodegenSettings settings) {
-        return String.format("./%s/model/SharedSchemas.java", settings.packageNamespace().replace(".", "/"));
+        return String.format("./%s/model/SharedSerde.java", settings.packageNamespace().replace(".", "/"));
     }
 
     /**
