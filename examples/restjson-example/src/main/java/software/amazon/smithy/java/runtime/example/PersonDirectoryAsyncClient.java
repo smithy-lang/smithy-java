@@ -9,39 +9,70 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
+import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
+import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
+import software.amazon.smithy.java.runtime.client.core.ApiCallTimeoutTransport;
+import software.amazon.smithy.java.runtime.client.core.ClientCall;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.Context;
+import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
+import software.amazon.smithy.java.runtime.core.schema.SdkOperation;
+import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
+import software.amazon.smithy.java.runtime.core.serde.DataStream;
+import software.amazon.smithy.java.runtime.example.model.GetPersonImage;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
-import software.amazon.smithy.java.runtime.example.model.PersonDirectory;
 import software.amazon.smithy.java.runtime.example.model.PersonDirectoryAsync;
+import software.amazon.smithy.java.runtime.example.model.PutPerson;
+import software.amazon.smithy.java.runtime.example.model.PutPersonImage;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonOutput;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 // Example of a potentially generated client.
-public final class PersonDirectoryClient implements PersonDirectory {
+public final class PersonDirectoryAsyncClient implements PersonDirectoryAsync {
 
-    private final PersonDirectoryAsync asyncClient;
+    private final EndpointResolver endpointResolver;
+    private final ClientTransport transport;
+    private final TypeRegistry typeRegistry;
+    private final ClientInterceptor interceptor;
+    private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
+    private final AuthSchemeResolver authSchemeResolver;
+    private final IdentityResolvers identityResolvers;
 
-    private PersonDirectoryClient(Builder builder) {
-        PersonDirectoryAsyncClient.Builder syncClientBuilder = PersonDirectoryAsyncClient.builder()
-            .transport(builder.transport)
-            .endpointResolver(builder.endpointResolver)
-            .authSchemeResolver(builder.authSchemeResolver)
-            .identityResolvers(builder.identityResolvers);
+    private PersonDirectoryAsyncClient(Builder builder) {
+        this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
+        this.transport = new ApiCallTimeoutTransport(Objects.requireNonNull(builder.transport, "transport is null"));
+        // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
+        this.interceptor = ClientInterceptor.chain(builder.interceptors);
 
-        builder.interceptors.forEach(syncClientBuilder::addInterceptor);
-        builder.supportedAuthSchemes.forEach(syncClientBuilder::putSupportedAuthSchemes);
+        // By default, support NoAuthAuthScheme
+        AuthScheme<Object, Identity> noAuthAuthScheme = AuthScheme.noAuthAuthScheme();
+        this.supportedAuthSchemes.add(noAuthAuthScheme);
+        this.supportedAuthSchemes.addAll(builder.supportedAuthSchemes);
 
-        asyncClient = syncClientBuilder.build();
+        // TODO: Better defaults? Require these?
+        AuthSchemeResolver defaultAuthSchemeResolver = params -> List.of(
+            new AuthSchemeOption(noAuthAuthScheme.schemeId(), null, null)
+        );
+        this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, defaultAuthSchemeResolver);
+        this.identityResolvers = IdentityResolvers.of(builder.identityResolvers);
+
+        // Here is where you would register errors bound to the service on the registry.
+        // ...
+        this.typeRegistry = TypeRegistry.builder().build();
     }
 
     public static Builder builder() {
@@ -49,18 +80,62 @@ public final class PersonDirectoryClient implements PersonDirectory {
     }
 
     @Override
-    public PutPersonOutput putPerson(PutPersonInput input, Context context) {
-        return asyncClient.putPerson(input, context).join();
+    public CompletableFuture<PutPersonOutput> putPerson(PutPersonInput input, Context context) {
+        return call(input, null, null, new PutPerson(), context);
     }
 
     @Override
-    public PutPersonImageOutput putPersonImage(PutPersonImageInput input, Context context) {
-        return asyncClient.putPersonImage(input, context).join();
+    public CompletableFuture<PutPersonImageOutput> putPersonImage(PutPersonImageInput input, Context context) {
+        return call(input, input.image(), null, new PutPersonImage(), context);
     }
 
     @Override
-    public GetPersonImageOutput getPersonImage(GetPersonImageInput input, Context context) {
-        return asyncClient.getPersonImage(input, context).join();
+    public CompletableFuture<GetPersonImageOutput> getPersonImage(GetPersonImageInput input, Context context) {
+        return call(input, null, null, new GetPersonImage(), context);
+    }
+
+    /**
+     * Performs the actual RPC call.
+     *
+     * @param input       Input to send.
+     * @param inputStream Any kind of data stream extracted from the input, or null.
+     * @param eventStream The event stream extracted from the input, or null. TODO: Implement.
+     * @param operation   The operation shape.
+     * @param context     Context of the call.
+     * @param <I>         Input shape.
+     * @param <O>         Output shape.
+     * @return Returns the deserialized output.
+     */
+    private <I extends SerializableShape, O extends SerializableShape> CompletableFuture<O> call(
+        I input,
+        DataStream inputStream,
+        Object eventStream,
+        SdkOperation<I, O> operation,
+        Context context
+    ) {
+        // Create a copy of the type registry that adds the errors this operation can encounter.
+        TypeRegistry operationRegistry = TypeRegistry.builder()
+            .putAllTypes(typeRegistry, operation.typeRegistry())
+            .build();
+
+        return transport.send(
+            ClientCall.<I, O>builder()
+                .input(input)
+                .operation(operation)
+                .endpointResolver(endpointResolver)
+                .context(context)
+                .requestInputStream(inputStream)
+                .requestEventStream(eventStream)
+                .interceptor(interceptor)
+                .supportedAuthSchemes(supportedAuthSchemes)
+                .authSchemeResolver(authSchemeResolver)
+                .identityResolvers(identityResolvers)
+                .errorCreator((c, id) -> {
+                    ShapeId shapeId = ShapeId.from(id);
+                    return operationRegistry.create(shapeId, ModeledSdkException.class);
+                })
+                .build()
+        );
     }
 
     public static final class Builder {
@@ -189,8 +264,8 @@ public final class PersonDirectoryClient implements PersonDirectory {
          *
          * @return the created client.
          */
-        public PersonDirectoryClient build() {
-            return new PersonDirectoryClient(this);
+        public PersonDirectoryAsyncClient build() {
+            return new PersonDirectoryAsyncClient(this);
         }
     }
 }
