@@ -12,7 +12,7 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
@@ -27,12 +27,12 @@ public final class StructureGenerator
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
             writer.putContext("shape", directive.symbol());
-            writer.putContext("serializable", SerializableShape.class);
+            writer.putContext("serializableStruct", SerializableStruct.class);
             writer.putContext("biConsumer", BiConsumer.class);
-            writer.putContext("serializer", ShapeSerializer.class);
+            writer.putContext("shapeSerializer", ShapeSerializer.class);
             writer.write(
                 """
-                    public final class ${shape:T} implements ${serializable:T} {
+                    public final class ${shape:T} implements ${serializableStruct:T} {
                         ${C|}
 
                         ${C|}
@@ -50,17 +50,13 @@ public final class StructureGenerator
                         ${C|}
 
                         @Override
-                        public void serialize(${serializer:T} serializer) {
-                            serializer.writeStruct(SCHEMA, this, InnerSerializer.INSTANCE);
+                        public SdkSchema schema() {
+                            return SCHEMA;
                         }
 
-                        static final class InnerSerializer implements ${biConsumer:T}<${shape:T}, ${serializer:T}> {
-                            static final InnerSerializer INSTANCE = new InnerSerializer();
-
-                            @Override
-                            public void accept(${shape:T} shape, ${serializer:T} serializer) {
-                                ${C|}
-                            }
+                        @Override
+                        public void serializeMembers(${shapeSerializer:T} serializer) {
+                            ${C|}
                         }
 
                         ${C|}

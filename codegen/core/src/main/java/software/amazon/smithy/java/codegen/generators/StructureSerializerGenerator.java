@@ -19,26 +19,13 @@ import software.amazon.smithy.model.traits.ErrorTrait;
  * {@link software.amazon.smithy.java.runtime.core.schema.SerializableShape#serialize(ShapeSerializer)}
  * method for a structure class.
  */
-final class StructureSerializerGenerator implements Runnable {
-    private final JavaWriter writer;
-    private final SymbolProvider symbolProvider;
-    private final Model model;
-    private final StructureShape shape;
-    private final ServiceShape service;
-
-    public StructureSerializerGenerator(
-        JavaWriter writer,
-        SymbolProvider symbolProvider,
-        Model model,
-        StructureShape shape,
-        ServiceShape service
-    ) {
-        this.writer = writer;
-        this.symbolProvider = symbolProvider;
-        this.model = model;
-        this.shape = shape;
-        this.service = service;
-    }
+record StructureSerializerGenerator(
+    JavaWriter writer,
+    SymbolProvider symbolProvider,
+    Model model,
+    StructureShape shape,
+    ServiceShape service
+) implements Runnable {
 
     @Override
     public void run() {
@@ -59,7 +46,7 @@ final class StructureSerializerGenerator implements Runnable {
                 model,
                 member,
                 "serializer",
-                "shape." + stateName,
+                stateName,
                 service
             );
 
@@ -67,7 +54,7 @@ final class StructureSerializerGenerator implements Runnable {
                 // If the member is nullable, check for existence first.
                 writer.write(
                     """
-                        if (shape.$L != null) {
+                        if ($L != null) {
                             ${C|};
                         }""",
                     stateName,

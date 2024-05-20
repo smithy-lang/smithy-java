@@ -28,7 +28,7 @@ public final class ExceptionGenerator
             writer.putContext("shape", directive.symbol());
             writer.putContext("sdkException", ModeledSdkException.class);
             writer.putContext("biConsumer", BiConsumer.class);
-            writer.putContext("serializer", ShapeSerializer.class);
+            writer.putContext("shapeSerializer", ShapeSerializer.class);
             writer.write(
                 """
                     public final class ${shape:T} extends ${sdkException:T} {
@@ -36,7 +36,6 @@ public final class ExceptionGenerator
 
                         ${C|}
 
-                       private static final InnerSerializer INNER_SERIALIZER = new InnerSerializer();
                         ${C|}
 
                         ${C|}
@@ -46,15 +45,13 @@ public final class ExceptionGenerator
                         ${C|}
 
                         @Override
-                        public void serialize(${serializer:T} serializer) {
-                            serializer.writeStruct(SCHEMA, this, INNER_SERIALIZER);
+                        public SdkSchema schema() {
+                            return SCHEMA;
                         }
 
-                        private static final class InnerSerializer implements ${biConsumer:T}<${shape:T}, ${serializer:T}> {
-                            @Override
-                            public void accept(${shape:T} shape, ${serializer:T} serializer) {
-                                ${C|}
-                            }
+                        @Override
+                        public void serializeMembers(${shapeSerializer:T} serializer) {
+                            ${C|}
                         }
 
                         ${C|}

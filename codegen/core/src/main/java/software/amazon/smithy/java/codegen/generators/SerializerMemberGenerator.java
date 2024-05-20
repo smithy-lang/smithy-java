@@ -175,10 +175,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void structureShape(StructureShape structureShape) {
-        writer.write(
-            "${serializer:L}.writeStruct(${schema:L}, ${state:L}, $T.InnerSerializer.INSTANCE)",
-            provider.toSymbol(structureShape)
-        );
+        writer.write("${serializer:L}.writeStruct(${schema:L}, ${state:L})");
         return null;
     }
 
