@@ -75,7 +75,7 @@ public final class ListGenerator
                                 @Override
                                 public void accept(${shape:T} state, ${shapeDeserializer:T} deserializer) {
                                     ${?unique}if (${/unique}state.add($C)${^unique};${/unique}${?unique}) {
-                                        throw new ${serdeException:T}("Member must have unique items.");
+                                        throw new ${serdeException:T}("Member must have unique items");
                                     }${/unique}
                                 }
                             }
