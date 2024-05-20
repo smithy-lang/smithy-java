@@ -250,7 +250,6 @@ final class BuilderGenerator implements Runnable {
                     }
                     """, DataStream.class);
             }
-
             writer.write(
                 """
                     public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
@@ -311,8 +310,9 @@ final class BuilderGenerator implements Runnable {
             // so we do not need to check the default value. See:
             // https://github.com/smithy-lang/smithy/blob/main/designs/defaults-and-model-evolution.md
             writer.write(
-                "new $T<>()",
-                symbolProvider.toSymbol(listShape).expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
+                "$T.$L",
+                Collections.class,
+                symbolProvider.toSymbol(listShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)
             );
             return null;
         }
@@ -323,8 +323,9 @@ final class BuilderGenerator implements Runnable {
             // so we do not need to check the default value. See:
             // https://github.com/smithy-lang/smithy/blob/main/designs/defaults-and-model-evolution.md
             writer.write(
-                "new $T<>()",
-                symbolProvider.toSymbol(mapShape).expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
+                "$T.$L",
+                Collections.class,
+                symbolProvider.toSymbol(mapShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)
             );
             return null;
         }

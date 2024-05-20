@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.server;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ public class ServiceBuilderTest {
         @Override
         public CompletableFuture<GetBeerOutput> getBeer(GetBeerInput input, RequestContext context) {
             return CompletableFuture.completedFuture(
-                GetBeerOutput.builder().value(Beer.builder().id(input.id()).name("TestBeer").build()).build()
+                GetBeerOutput.builder().value(List.of(Beer.builder().id(input.id()).name("TestBeer").build())).build()
             );
         }
     }
