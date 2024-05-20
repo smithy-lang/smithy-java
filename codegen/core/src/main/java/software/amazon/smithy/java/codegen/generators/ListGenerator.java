@@ -58,7 +58,7 @@ public final class ListGenerator
                                 @Override
                                 public void accept(${shape:T} values, ${shapeSerializer:T} serializer) {
                                     for (var value : values) {
-                                        ${1C|};
+                                        ${C|};
                                     }
                                 }
                             }
@@ -74,9 +74,8 @@ public final class ListGenerator
 
                                 @Override
                                 public void accept(${shape:T} state, ${shapeDeserializer:T} deserializer) {
-                                    ${?unique}if (${/unique}state.add($2C)${^unique};${/unique}${?unique}) {
-                                        throw new ${serdeException:T}("Duplicate item in unique list "
-                                            + $2C);
+                                    ${?unique}if (${/unique}state.add($C)${^unique};${/unique}${?unique}) {
+                                        throw new ${serdeException:T}("Member must have unique items.");
                                     }${/unique}
                                 }
                             }

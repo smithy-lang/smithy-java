@@ -156,7 +156,7 @@ public class SerdeTest {
             );
 
             var exc = assertThrows(SdkSerdeException.class, () -> SetsInput.builder().deserialize(de));
-            assertTrue(exc.getMessage().contains("b"));
+            assertTrue(exc.getMessage().contains("Member must have unique items."));
         }
     }
 
