@@ -79,10 +79,9 @@ public final class ListGenerator
                             writer,
                             directive.symbolProvider(),
                             directive.model(),
+                            directive.service(),
                             directive.shape().getMember(),
-                            "serializer",
-                            "value",
-                            directive.service()
+                            "value"
                         ),
                         new DeserializerGenerator(
                             writer,

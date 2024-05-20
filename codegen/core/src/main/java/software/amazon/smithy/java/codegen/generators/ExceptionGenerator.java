@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.directed.GenerateErrorDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -13,7 +12,6 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -27,56 +25,66 @@ public final class ExceptionGenerator
             writer.pushState(new ClassSection(shape));
             writer.putContext("shape", directive.symbol());
             writer.putContext("sdkException", ModeledSdkException.class);
-            writer.putContext("biConsumer", BiConsumer.class);
-            writer.putContext("shapeSerializer", ShapeSerializer.class);
-            writer.write(
-                """
-                    public final class ${shape:T} extends ${sdkException:T} {
-                        ${C|}
-
-                        ${C|}
-
-                        ${C|}
-
-                        ${C|}
-
-                        ${C|}
-
-                        ${C|}
-
-                        @Override
-                        public SdkSchema schema() {
-                            return SCHEMA;
-                        }
-
-                        @Override
-                        public void serializeMembers(${shapeSerializer:T} serializer) {
-                            ${C|}
-                        }
-
-                        ${C|}
-                    }
-                    """,
-                writer.consumer(w -> w.writeIdString(shape)),
+            writer.putContext("id", writer.consumer(w -> w.writeIdString(shape)));
+            writer.putContext(
+                "schemas",
                 new SchemaGenerator(
                     writer,
                     directive.shape(),
                     directive.symbolProvider(),
                     directive.model(),
                     directive.context()
-                ),
-                new PropertyGenerator(writer, shape, directive.symbolProvider()),
-                new ConstructorGenerator(writer, shape, directive.symbolProvider(), directive.model()),
-                new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()),
-                writer.consumer(JavaWriter::writeToString),
+                )
+            );
+            writer.putContext("properties", new PropertyGenerator(writer, shape, directive.symbolProvider()));
+            writer.putContext(
+                "constructor",
+                new ConstructorGenerator(writer, shape, directive.symbolProvider(), directive.model())
+            );
+            writer.putContext(
+                "getters",
+                new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model())
+            );
+            writer.putContext("toString", writer.consumer(JavaWriter::writeToString));
+            writer.putContext(
+                "memberSerializer",
                 new StructureSerializerGenerator(
                     writer,
                     directive.symbolProvider(),
                     directive.model(),
                     directive.shape(),
                     directive.service()
-                ),
+                )
+            );
+            writer.putContext(
+                "builder",
                 new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.service())
+            );
+            writer.write(
+                """
+                    public final class ${shape:T} extends ${sdkException:T} {
+                        ${id:C|}
+
+                        ${schemas:C|}
+
+                        ${properties:C|}
+
+                        ${constructor:C|}
+
+                        ${getters:C|}
+
+                        ${toString:C|}
+
+                        @Override
+                        public SdkSchema schema() {
+                            return SCHEMA;
+                        }
+
+                        ${memberSerializer:C|}
+
+                        ${builder:C|}
+                    }
+                    """
             );
             writer.popState();
         });

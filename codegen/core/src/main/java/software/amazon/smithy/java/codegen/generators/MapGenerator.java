@@ -101,10 +101,9 @@ public class MapGenerator
                             writer,
                             directive.symbolProvider(),
                             directive.model(),
+                            directive.service(),
                             directive.shape().getValue(),
-                            "serializer",
-                            "values",
-                            directive.service()
+                            "values"
                         ),
                         new DeserializerGenerator(
                             writer,

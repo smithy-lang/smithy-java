@@ -29,40 +29,32 @@ record StructureSerializerGenerator(
 
     @Override
     public void run() {
+        writer.pushState();
+        writer.putContext("shapeSerializer", ShapeSerializer.class);
         boolean isError = shape.hasTrait(ErrorTrait.class);
-        for (var member : shape.members()) {
-            var target = model.expectShape(member.getTarget());
-            // Streaming blobs are not handled by deserialize method
-            if (CodegenUtils.isStreamingBlob(target)) {
-                continue;
-            }
+        writer.write("@Override");
+        writer.openBlock("public void serializeMembers(${shapeSerializer:T} serializer) {", "}", () -> {
+            for (var member : shape.members()) {
+                var target = model.expectShape(member.getTarget());
+                // Streaming blobs are not handled by deserialize method
+                if (CodegenUtils.isStreamingBlob(target)) {
+                    continue;
+                }
+                var memberName = symbolProvider.toMemberName(member);
+                // if the shape is an error we need to use the `getMessage()` method for message field.
+                var state = isError && memberName.equals("message") ? "getMessage()" : memberName;
 
-            var memberName = symbolProvider.toMemberName(member);
-            // if the shape is an error we need to use the `getMessage()` method for message field.
-            var stateName = isError && memberName.equals("message") ? "getMessage()" : memberName;
-            var memberVisitor = new SerializerMemberGenerator(
-                writer,
-                symbolProvider,
-                model,
-                member,
-                "serializer",
-                stateName,
-                service
-            );
-
-            if (CodegenUtils.isNullableMember(member)) {
-                // If the member is nullable, check for existence first.
-                writer.write(
-                    """
-                        if ($L != null) {
-                            ${C|};
-                        }""",
-                    stateName,
-                    memberVisitor
-                );
-            } else {
-                writer.write("${C|};", memberVisitor);
+                writer.pushState();
+                writer.putContext("nullable", CodegenUtils.isNullableMember(member));
+                writer.putContext("memberName", memberName);
+                writer.write("""
+                    ${?nullable}if (${memberName:L} != null) {
+                        ${/nullable}${C|};${?nullable}
+                    }${/nullable}
+                    """, new SerializerMemberGenerator(writer, symbolProvider, model, service, member, state));
+                writer.popState();
             }
-        }
+        });
+        writer.popState();
     }
 }

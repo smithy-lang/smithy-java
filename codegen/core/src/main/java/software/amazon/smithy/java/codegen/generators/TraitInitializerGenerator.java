@@ -83,18 +83,18 @@ record TraitInitializerGenerator(JavaWriter writer, Shape shape, Set<ShapeId> ru
         writer.pushState();
         writer.putContext("shapeId", ShapeId.class);
         writer.putContext("node", Node.class);
+        writer.putContext("name", traitProviderClass.getSimpleName());
+        writer.putContext("type", traitProviderClass);
+        writer.putContext("id", trait.toShapeId());
         if (traitProviderClass.isMemberClass()) {
             writer.putContext("enclosing", traitProviderClass.getEnclosingClass());
         }
         writer.writeInline(
             """
-                new ${?enclosing}${enclosing:T}.$1L${/enclosing}${^enclosing}$2T${/enclosing}().createTrait(
-                    ${shapeId:T}.from($3S),
-                    ${4C|}
+                new ${?enclosing}${enclosing:T}.${name:L}${/enclosing}${^enclosing}${type:T}${/enclosing}().createTrait(
+                    ${shapeId:T}.from(${id:S}),
+                    ${C|}
                 )""",
-            traitProviderClass.getSimpleName(),
-            traitProviderClass,
-            trait.toShapeId(),
             writer.consumer(w -> trait.toNode().accept(new NodeWriter(writer)))
         );
         writer.popState();

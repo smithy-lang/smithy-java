@@ -54,6 +54,9 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
         writer.pushState();
         writer.putContext("schemaClass", SdkSchema.class);
         writer.putContext("shapeTypeClass", ShapeType.class);
+        writer.putContext("shapeId", shape.toShapeId());
+        writer.putContext("shapeType", shape.getType().name());
+        writer.putContext("traitInitializer", new TraitInitializerGenerator(writer, shape, context.runtimeTraits()));
         shape.accept(this);
         writer.popState();
     }
@@ -63,13 +66,10 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
         writer.write(
             """
                 ${schemaClass:T}.builder()
-                    .type(${shapeTypeClass:T}.$1L)
-                    .id($2S)${3C}
+                    .type(${shapeTypeClass:T}.${shapeType:L})
+                    .id(${shapeId:S})${traitInitializer:C}
                     .build();
-                """,
-            shape.getType().name(),
-            shape.toShapeId(),
-            new TraitInitializerGenerator(writer, shape, context.runtimeTraits())
+                """
         );
         return null;
     }
@@ -79,16 +79,13 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
         writer.write(
             """
                 ${schemaClass:T}.builder()
-                    .type(${shapeTypeClass:T}.LIST)
-                    .id($1S)${2C}
-                    .members(${3C})
+                    .type(${shapeTypeClass:T}.${shapeType:L})
+                    .id(${shapeId:S})${traitInitializer:C}
+                    .members(${C})
                     .build();
                 """,
-            shape.toShapeId(),
-            new TraitInitializerGenerator(writer, shape, context.runtimeTraits()),
             (Runnable) () -> shape.getMember().accept(this)
         );
-
         return null;
     }
 
@@ -97,16 +94,14 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
         writer.write(
             """
                 ${schemaClass:T}.builder()
-                    .type(${shapeTypeClass:T}.MAP)
-                    .id($1S)${2C}
+                    .type(${shapeTypeClass:T}.${shapeType:L})
+                    .id(${shapeId:S})${traitInitializer:C}
                     .members(
-                            ${3C|},
-                            ${4C|}
+                            ${C|},
+                            ${C|}
                     )
                     .build();
                 """,
-            shape.toShapeId(),
-            new TraitInitializerGenerator(writer, shape, context.runtimeTraits()),
             (Runnable) () -> shape.getKey().accept(this),
             (Runnable) () -> shape.getValue().accept(this)
         );
@@ -118,7 +113,7 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
         for (var member : shape.members()) {
             writeNestedMemberSchema(member);
         }
-        writer.pushState();
+
         // Add the member schema names to the context, so we can iterate through them
         writer.putContext(
             "memberSchemas",
@@ -132,16 +127,13 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
             """
                 static final ${schemaClass:T} SCHEMA = ${schemaClass:T}.builder()
                     .id(ID)
-                    .type(${shapeTypeClass:T}.$1L)${2C}
+                    .type(${shapeTypeClass:T}.${shapeType:L})${traitInitializer:C}
                     ${?memberSchemas}.members(${#memberSchemas}
                         ${value:L}${^key.last},${/key.last}${/memberSchemas}
                     )
                     ${/memberSchemas}.build();
-                """,
-            shape.getType().toString().toUpperCase(),
-            new TraitInitializerGenerator(writer, shape, context.runtimeTraits())
+                """
         );
-        writer.popState();
 
         return null;
     }
@@ -149,28 +141,29 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
     @Override
     public Void memberShape(MemberShape shape) {
         var target = model.expectShape(shape.getTarget());
-        writer.write(
-            "${schemaClass:T}.memberBuilder($1S, $2L)${3C}",
-            symbolProvider.toMemberName(shape),
-            CodegenUtils.getSchemaType(writer, symbolProvider, target),
-            new TraitInitializerGenerator(writer, shape, context.runtimeTraits())
-        );
+        writer.putContext("member", symbolProvider.toMemberName(shape));
+        writer.putContext("schema", CodegenUtils.getSchemaType(writer, symbolProvider, target));
+        writer.write("${schemaClass:T}.memberBuilder(${member:S}, ${schema:L})${traitInitializer:C}");
+
         return null;
     }
 
     private void writeNestedMemberSchema(MemberShape member) {
         var memberName = symbolProvider.toMemberName(member);
         var target = model.expectShape(member.getTarget());
+
+        writer.pushState();
+        writer.putContext("schema", CodegenUtils.getSchemaType(writer, symbolProvider, target));
+        writer.putContext("memberName", memberName);
+        writer.putContext("name", CodegenUtils.toMemberSchemaName(memberName));
         writer.write(
             """
-                private static final ${schemaClass:T} $1L = ${schemaClass:T}.memberBuilder($2S, $3L)
-                    .id(ID)${4C}
+                private static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.memberBuilder(${memberName:S}, ${schema:L})
+                    .id(ID)${C}
                     .build();
                 """,
-            CodegenUtils.toMemberSchemaName(memberName),
-            memberName,
-            CodegenUtils.getSchemaType(writer, symbolProvider, target),
             new TraitInitializerGenerator(writer, member, context.runtimeTraits())
         );
+        writer.popState();
     }
 }

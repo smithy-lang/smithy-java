@@ -22,18 +22,7 @@ import software.amazon.smithy.model.traits.ErrorTrait;
 /**
  * Generates getters for a shape.
  */
-final class GetterGenerator implements Runnable {
-    private final JavaWriter writer;
-    private final Shape shape;
-    private final SymbolProvider symbolProvider;
-    private final Model model;
-
-    GetterGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) {
-        this.shape = shape;
-        this.symbolProvider = symbolProvider;
-        this.writer = writer;
-        this.model = model;
-    }
+record GetterGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) implements Runnable {
 
     @Override
     public void run() {

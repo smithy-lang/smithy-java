@@ -13,17 +13,7 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 
-final class HashCodeGenerator implements Runnable {
-
-    private final JavaWriter writer;
-    private final Shape shape;
-    private final SymbolProvider symbolProvider;
-
-    HashCodeGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) {
-        this.writer = writer;
-        this.shape = shape;
-        this.symbolProvider = symbolProvider;
-    }
+record HashCodeGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements Runnable {
 
     @Override
     public void run() {

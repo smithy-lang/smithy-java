@@ -38,12 +38,6 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
     @Override
     default void close() {}
 
-    // TODO: Remove this once codegen has been updated.
-    @Deprecated
-    default <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
-        throw new UnsupportedOperationException();
-    }
-
     /**
      * Writes a structure or union using the given member schema.
      *

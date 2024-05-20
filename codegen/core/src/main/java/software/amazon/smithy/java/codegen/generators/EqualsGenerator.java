@@ -14,16 +14,7 @@ import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 
-final class EqualsGenerator implements Runnable {
-    private final JavaWriter writer;
-    private final Shape shape;
-    private final SymbolProvider symbolProvider;
-
-    EqualsGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) {
-        this.writer = writer;
-        this.shape = shape;
-        this.symbolProvider = symbolProvider;
-    }
+record EqualsGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements Runnable {
 
     @Override
     public void run() {
@@ -66,20 +57,19 @@ final class EqualsGenerator implements Runnable {
         while (iter.hasNext()) {
             var member = iter.next();
             var memberSymbol = symbolProvider.toSymbol(member);
-
+            writer.pushState();
+            writer.putContext("memberName", symbolProvider.toMemberName(member));
             // Use `==` instead of `equals` for unboxed primitives
             if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE) && !CodegenUtils.isNullableMember(member)) {
-                writer.writeInline("$1L == that.$1L", symbolProvider.toMemberName(member));
+                writer.writeInline("${memberName:L} == that.${memberName:L}");
             } else {
-                Class<?> comparator = CodegenUtils.isJavaArray(memberSymbol)
-                    ? Arrays.class
-                    : Objects.class;
-                writer.writeInline("$1T.equals($2L, that.$2L)", comparator, symbolProvider.toMemberName(member));
+                Class<?> comparator = CodegenUtils.isJavaArray(memberSymbol) ? Arrays.class : Objects.class;
+                writer.writeInline("$T.equals(${memberName:L}, that.${memberName:L})", comparator);
             }
-
             if (iter.hasNext()) {
                 writer.writeInlineWithNoFormatting(writer.getNewline() + "&& ");
             }
+            writer.popState();
         }
     }
 }
