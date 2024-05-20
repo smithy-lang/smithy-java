@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 import software.amazon.smithy.codegen.core.SymbolProvider;
@@ -181,7 +180,7 @@ final class BuilderGenerator implements Runnable {
 
     private void builderSetters() {
         for (var member : shape.members()) {
-            new SetterVisitor(writer, symbolProvider, model, member).run();
+            new SetterGenerator(writer, symbolProvider, model, member).run();
         }
     }
 
@@ -227,18 +226,9 @@ final class BuilderGenerator implements Runnable {
     /**
      *  Generates Builder setter methods for a member shape
      */
-    private static final class SetterVisitor extends ShapeVisitor.Default<Void> implements Runnable {
-        private final JavaWriter writer;
-        private final SymbolProvider symbolProvider;
-        private final Model model;
-        private final MemberShape memberShape;
-
-        private SetterVisitor(JavaWriter writer, SymbolProvider symbolProvider, Model model, MemberShape memberShape) {
-            this.writer = writer;
-            this.symbolProvider = symbolProvider;
-            this.model = model;
-            this.memberShape = memberShape;
-        }
+    private record SetterGenerator(
+        JavaWriter writer, SymbolProvider symbolProvider, Model model, MemberShape memberShape
+    ) implements Runnable {
 
         @Override
         public void run() {
@@ -249,12 +239,18 @@ final class BuilderGenerator implements Runnable {
             writer.putContext("check", CodegenUtils.requiresSetterNullCheck(symbolProvider, memberShape));
             writer.putContext("schemaName", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(memberShape)));
             writer.putContext("objects", Objects.class);
-            memberShape.accept(this);
-            writer.popState();
-        }
 
-        @Override
-        protected Void getDefault(Shape shape) {
+            // If streaming blob then a setter must be added to allow
+            // operation to set on builder.
+            if (CodegenUtils.isStreamingBlob(model.expectShape(memberShape.getTarget()))) {
+                writer.write("""
+                    @Override
+                    public void setDataStream($T stream) {
+                        ${memberName:L}(stream);
+                    }
+                    """, DataStream.class);
+            }
+
             writer.write(
                 """
                     public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
@@ -264,177 +260,8 @@ final class BuilderGenerator implements Runnable {
                     }
                     """
             );
-            return null;
-        }
-
-        @Override
-        public Void blobShape(BlobShape shape) {
-            getDefault(shape);
-
-            // If streaming blob then a setter must be added to allow
-            // operation to set on builder.
-            if (CodegenUtils.isStreamingBlob(shape)) {
-                writer.write("""
-                    @Override
-                    public void setDataStream($T stream) {
-                        ${memberName:L}(stream);
-                    }
-                    """, DataStream.class);
-            }
-            return null;
-        }
-
-        @Override
-        public Void listShape(ListShape shape) {
-            writer.pushState();
-            writer.putContext(
-                "collectionImpl",
-                symbolProvider.toSymbol(memberShape).expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
-            );
-            writer.putContext("targetSymbol", symbolProvider.toSymbol(shape.getMember()));
-
-            // Collection Replacement
-            if (memberShape.isRequired()) {
-                writer.write(
-                    """
-                        public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
-                            this.${memberName:L} = new ${collectionImpl:T}<>(${objects:T}.requireNonNull(${memberName:L}, "${memberName:L} cannot be null"));${?tracked}
-                            tracker.setMember(${schemaName:L});${/tracked}
-                            return this;
-                        }
-                        """,
-                    Collection.class
-                );
-            } else {
-                writer.write(
-                    """
-                        public Builder ${memberName:L}($T<${targetSymbol:T}> ${memberName:L}) {
-                            this.${memberName:L} = ${memberName:L} != null ? new ${collectionImpl:T}<>(${memberName:L}) : null;
-                            return this;
-                        }
-                        """,
-                    Collection.class
-                );
-            }
-
-
-            // Bulk Add
-            writer.write(
-                """
-                    public Builder addAll${memberName:U}($T<${targetSymbol:T}> ${memberName:L}) {
-                        if (this.${memberName:L} == null) {
-                            this.${memberName:L} = new ${collectionImpl:T}<>(${memberName:L});${?tracked}
-                            tracker.setMember(${schemaName:L});${/tracked}
-                        } else {
-                            this.${memberName:L}.addAll(${memberName:L});
-                        }
-                        return this;
-                    }
-                    """,
-                Collection.class
-            );
-
-            // Set one
-            writer.write(
-                """
-                    public Builder ${memberName:L}(${targetSymbol:T} ${memberName:L}) {
-                        if (this.${memberName:L} == null) {
-                            this.${memberName:L} = new ${collectionImpl:T}<>();${?tracked}
-                            tracker.setMember(${schemaName:L});${/tracked}
-                        }
-                        this.${memberName:L}.add(${memberName:L});
-                        return this;
-                    }
-                    """
-            );
-
-            // Set with varargs
-            writer.write(
-                """
-                    public Builder ${memberName:L}(${targetSymbol:T}... ${memberName:L}) {
-                        if (this.${memberName:L} == null) {
-                            this.${memberName:L} = new ${collectionImpl:T}<>();${?tracked}
-                            tracker.setMember(${schemaName:L});${/tracked}
-                        }
-                        $T.addAll(this.${memberName:L}, ${memberName:L});
-                        return this;
-                    }
-                    """,
-                Collections.class
-            );
 
             writer.popState();
-
-            return null;
-        }
-
-        @Override
-        public Void mapShape(MapShape shape) {
-            writer.pushState();
-            writer.putContext(
-                "collectionImpl",
-                symbolProvider.toSymbol(memberShape).expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
-            );
-            writer.putContext("keySymbol", symbolProvider.toSymbol(shape.getKey()));
-            writer.putContext("valueSymbol", symbolProvider.toSymbol(shape.getValue()));
-
-            // Replace Map
-            if (memberShape.isRequired()) {
-                writer.write(
-                    """
-                        public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
-                            this.${memberName:L} = new ${collectionImpl:T}<>(${objects:T}.requireNonNull(${memberName:L}, "${memberName:L} cannot be null"));${?tracked}
-                            tracker.setMember(${schemaName:L});${/tracked}
-                            return this;
-                        }
-                        """
-                );
-            } else {
-                writer.write(
-                    """
-                        public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
-                            this.${memberName:L} = ${memberName:L} != null ? new ${collectionImpl:T}<>(${memberName:L}) : null;
-                            return this;
-                        }
-                        """
-                );
-            }
-
-            // Add all items
-            writer.write(
-                """
-                    public Builder putAll${memberName:U}(${memberSymbol:T} ${memberName:L}) {
-                        if (this.${memberName:L} == null) {
-                            this.${memberName:L} = new ${collectionImpl:T}<>(${memberName:L});${?tracked}
-                            tracker.setMember(${schemaName:L});${/tracked}
-                        } else {
-                            this.${memberName:L}.putAll(${memberName:L});
-                        }
-                        return this;
-                    }
-                    """
-            );
-
-            // Set one
-            writer.write(
-                """
-                    public Builder put${memberName:U}(${keySymbol:T} key, ${valueSymbol:T} value) {
-                       if (this.${memberName:L} == null) {
-                           this.${memberName:L} = new ${collectionImpl:T}<>();${?tracked}
-                           tracker.setMember(${schemaName:L});${/tracked}
-                       }
-                       this.${memberName:L}.put(key, value);
-                       return this;
-                    }
-                    """
-            );
-            writer.popState();
-            return null;
-        }
-
-        @Override
-        public Void memberShape(MemberShape shape) {
-            return model.expectShape(shape.getTarget()).accept(this);
         }
     }
 

@@ -117,7 +117,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
         if (listShape.hasTrait(UniqueItemsTrait.class)) {
             return CodegenUtils.fromClass(Set.class)
                 .toBuilder()
-                .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableSet")
+                .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, "unmodifiableSet")
                 .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashSet.class)
                 .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptySet()")
                 .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
@@ -126,7 +126,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
         }
         return CodegenUtils.fromClass(List.class)
             .toBuilder()
-            .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableList")
+            .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, "unmodifiableList")
             .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, ArrayList.class)
             .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptyList()")
             .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
@@ -138,7 +138,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
     public Symbol mapShape(MapShape mapShape) {
         return CodegenUtils.fromClass(Map.class)
             .toBuilder()
-            .putProperty(SymbolProperties.COLLECTION_COPY_METHOD, "unmodifiableMap")
+            .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, "unmodifiableMap")
             .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashMap.class)
             .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptyMap()")
             .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
