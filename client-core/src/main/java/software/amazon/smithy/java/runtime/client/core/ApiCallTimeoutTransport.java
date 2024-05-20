@@ -11,7 +11,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import software.amazon.smithy.java.runtime.core.schema.SdkException;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
  * A {@link ClientTransport} that wraps another transport to time out a request if it takes longer than
@@ -31,7 +31,7 @@ public final class ApiCallTimeoutTransport implements ClientTransport {
     }
 
     @Override
-    public <I extends SerializableShape, O extends SerializableShape> O send(ClientCall<I, O> call) {
+    public <I extends SerializableStruct, O extends SerializableStruct> O send(ClientCall<I, O> call) {
         var timeout = call.context().get(CallContext.API_CALL_TIMEOUT);
 
         if (timeout == null) {

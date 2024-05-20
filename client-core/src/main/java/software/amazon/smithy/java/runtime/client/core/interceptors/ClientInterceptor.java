@@ -12,7 +12,7 @@ import java.util.List;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.Either;
 import software.amazon.smithy.java.runtime.core.schema.SdkException;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
  * An interceptor allows injecting code into the clien'ts request execution pipeline.
@@ -77,7 +77,7 @@ public interface ClientInterceptor {
      * @param input The modeled input of the call.
      * @param <I> Input type.
      */
-    default <I extends SerializableShape> void readBeforeExecution(Context context, I input) {}
+    default <I extends SerializableStruct> void readBeforeExecution(Context context, I input) {}
 
     /**
      * A hook called before the input message is serialized into a transport message.
@@ -102,7 +102,7 @@ public interface ClientInterceptor {
      * @return the updated input.
      * @param <I> Input type.
      */
-    default <I extends SerializableShape> I modifyBeforeSerialization(Context context, I input) {
+    default <I extends SerializableStruct> I modifyBeforeSerialization(Context context, I input) {
         return input;
     }
 
@@ -122,7 +122,7 @@ public interface ClientInterceptor {
      * @param input The modeled input of the call.
      * @param <I> Input type.
      */
-    default <I extends SerializableShape> void readBeforeSerialization(Context context, I input) {}
+    default <I extends SerializableStruct> void readBeforeSerialization(Context context, I input) {}
 
     /**
      * A hook called after the input message is marshalled into a protocol-specific request.
@@ -143,7 +143,7 @@ public interface ClientInterceptor {
      * @param <I> Input type.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <I extends SerializableShape, RequestT> void readAfterSerialization(
+    default <I extends SerializableStruct, RequestT> void readAfterSerialization(
         Context context,
         I input,
         Value<RequestT> request
@@ -167,7 +167,7 @@ public interface ClientInterceptor {
      * @param <I> Input type.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <I extends SerializableShape, RequestT> Value<RequestT> modifyBeforeRetryLoop(
+    default <I extends SerializableStruct, RequestT> Value<RequestT> modifyBeforeRetryLoop(
         Context context,
         I input,
         Value<RequestT> request
@@ -195,7 +195,7 @@ public interface ClientInterceptor {
      * @param <I> Input type.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <I extends SerializableShape, RequestT> void readBeforeAttempt(
+    default <I extends SerializableStruct, RequestT> void readBeforeAttempt(
         Context context,
         I input,
         Value<RequestT> request
@@ -221,7 +221,7 @@ public interface ClientInterceptor {
      * @param <I> Input type.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <I extends SerializableShape, RequestT> Value<RequestT> modifyBeforeSigning(
+    default <I extends SerializableStruct, RequestT> Value<RequestT> modifyBeforeSigning(
         Context context,
         I input,
         Value<RequestT> request
@@ -247,7 +247,7 @@ public interface ClientInterceptor {
      * @param <I>Input type.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <I extends SerializableShape, RequestT> void readBeforeSigning(
+    default <I extends SerializableStruct, RequestT> void readBeforeSigning(
         Context context,
         I input,
         Value<RequestT> request
@@ -271,7 +271,7 @@ public interface ClientInterceptor {
      * @param <I> Input type.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <I extends SerializableShape, RequestT> void readAfterSigning(
+    default <I extends SerializableStruct, RequestT> void readAfterSigning(
         Context context,
         I input,
         Value<RequestT> request
@@ -299,7 +299,7 @@ public interface ClientInterceptor {
      * @param <I> Input type.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <I extends SerializableShape, RequestT> Value<RequestT> modifyBeforeTransmit(
+    default <I extends SerializableStruct, RequestT> Value<RequestT> modifyBeforeTransmit(
         Context context,
         I input,
         Value<RequestT> request
@@ -326,7 +326,7 @@ public interface ClientInterceptor {
      * @param <I> Input type.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <I extends SerializableShape, RequestT> void readBeforeTransmit(
+    default <I extends SerializableStruct, RequestT> void readBeforeTransmit(
         Context context,
         I input,
         Value<RequestT> request
@@ -355,7 +355,7 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableShape, RequestT, ResponseT> void readAfterTransmit(
+    default <I extends SerializableStruct, RequestT, ResponseT> void readAfterTransmit(
         Context context,
         I input,
         Value<RequestT> request,
@@ -386,7 +386,7 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableShape, RequestT, ResponseT> Value<ResponseT> modifyBeforeDeserialization(
+    default <I extends SerializableStruct, RequestT, ResponseT> Value<ResponseT> modifyBeforeDeserialization(
         Context context,
         I input,
         Value<RequestT> request,
@@ -417,7 +417,7 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableShape, RequestT, ResponseT> void readBeforeDeserialization(
+    default <I extends SerializableStruct, RequestT, ResponseT> void readBeforeDeserialization(
         Context context,
         I input,
         Value<RequestT> request,
@@ -447,7 +447,7 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> void readAfterDeserialization(
+    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> void readAfterDeserialization(
         Context context,
         I input,
         Value<RequestT> request,
@@ -478,7 +478,7 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> Either<SdkException, O> modifyBeforeAttemptCompletion(
+    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<SdkException, O> modifyBeforeAttemptCompletion(
         Context context,
         I input,
         Value<RequestT> request,
@@ -512,7 +512,7 @@ public interface ClientInterceptor {
      * @param <RequestT>  Protocol-specific request type.
      * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> void readAfterAttempt(
+    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> void readAfterAttempt(
         Context context,
         I input,
         Value<RequestT> request,
@@ -544,7 +544,7 @@ public interface ClientInterceptor {
      * @param <RequestT>  Protocol-specific request type.
      * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> Either<SdkException, O> modifyBeforeCompletion(
+    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<SdkException, O> modifyBeforeCompletion(
         Context context,
         I input,
         Value<RequestT> requestIfAvailable,
@@ -578,7 +578,7 @@ public interface ClientInterceptor {
      * @param <RequestT>  Protocol-specific request type.
      * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> void readAfterExecution(
+    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> void readAfterExecution(
         Context context,
         I input,
         Value<RequestT> requestIfAvailable,

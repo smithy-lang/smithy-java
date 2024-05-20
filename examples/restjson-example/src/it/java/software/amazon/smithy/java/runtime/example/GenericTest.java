@@ -18,7 +18,7 @@ import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
@@ -147,7 +147,7 @@ public class GenericTest {
     public void supportsInterceptors() throws Exception {
         var interceptor = new ClientInterceptor() {
             @Override
-            public <I extends SerializableShape, RequestT> void readBeforeTransmit(
+            public <I extends SerializableStruct, RequestT> void readBeforeTransmit(
                 Context context,
                 I input,
                 Context.Value<RequestT> request
@@ -156,7 +156,7 @@ public class GenericTest {
             }
 
             @Override
-            public <I extends SerializableShape, RequestT> Context.Value<RequestT> modifyBeforeTransmit(
+            public <I extends SerializableStruct, RequestT> Context.Value<RequestT> modifyBeforeTransmit(
                 Context context,
                 I input,
                 Context.Value<RequestT> request

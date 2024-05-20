@@ -42,6 +42,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
@@ -101,7 +102,7 @@ public class SerdeTest {
 
     @ParameterizedTest
     @MethodSource("source")
-    <T extends SerializableShape> void pojoToDocumentRoundTrip(T pojo) {
+    <T extends SerializableStruct> void pojoToDocumentRoundTrip(T pojo) {
         var document = Document.createTyped(pojo);
         SdkShapeBuilder<T> builder = getBuilder(pojo);
         document.deserializeInto(builder);

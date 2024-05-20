@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.Either;
 import software.amazon.smithy.java.runtime.core.schema.SdkException;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 final class ClientInterceptorChain implements ClientInterceptor {
 
@@ -24,7 +24,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape> void readBeforeExecution(Context context, I input) {
+    public <I extends SerializableStruct> void readBeforeExecution(Context context, I input) {
         applyToEachThrowLastError(interceptor -> interceptor.readBeforeExecution(context, input));
     }
 
@@ -48,7 +48,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape> I modifyBeforeSerialization(Context context, I input) {
+    public <I extends SerializableStruct> I modifyBeforeSerialization(Context context, I input) {
         for (var interceptor : interceptors) {
             input = interceptor.modifyBeforeSerialization(context, input);
         }
@@ -56,14 +56,14 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape> void readBeforeSerialization(Context context, I input) {
+    public <I extends SerializableStruct> void readBeforeSerialization(Context context, I input) {
         for (var interceptor : interceptors) {
             interceptor.readBeforeSerialization(context, input);
         }
     }
 
     @Override
-    public <I extends SerializableShape, RequestT> void readAfterSerialization(
+    public <I extends SerializableStruct, RequestT> void readAfterSerialization(
         Context context,
         I input,
         Value<RequestT> request
@@ -74,7 +74,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, RequestT> Value<RequestT> modifyBeforeRetryLoop(
+    public <I extends SerializableStruct, RequestT> Value<RequestT> modifyBeforeRetryLoop(
         Context context,
         I input,
         Value<RequestT> request
@@ -86,7 +86,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, RequestT> void readBeforeAttempt(
+    public <I extends SerializableStruct, RequestT> void readBeforeAttempt(
         Context context,
         I input,
         Value<RequestT> request
@@ -95,7 +95,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, RequestT> Value<RequestT> modifyBeforeSigning(
+    public <I extends SerializableStruct, RequestT> Value<RequestT> modifyBeforeSigning(
         Context context,
         I input,
         Value<RequestT> request
@@ -107,7 +107,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, RequestT> void readBeforeSigning(
+    public <I extends SerializableStruct, RequestT> void readBeforeSigning(
         Context context,
         I input,
         Value<RequestT> request
@@ -118,7 +118,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, RequestT> void readAfterSigning(
+    public <I extends SerializableStruct, RequestT> void readAfterSigning(
         Context context,
         I input,
         Value<RequestT> request
@@ -129,7 +129,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, RequestT> Value<RequestT> modifyBeforeTransmit(
+    public <I extends SerializableStruct, RequestT> Value<RequestT> modifyBeforeTransmit(
         Context context,
         I input,
         Value<RequestT> request
@@ -141,7 +141,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, RequestT> void readBeforeTransmit(
+    public <I extends SerializableStruct, RequestT> void readBeforeTransmit(
         Context context,
         I input,
         Value<RequestT> request
@@ -152,7 +152,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, RequestT, ResponseT> void readAfterTransmit(
+    public <I extends SerializableStruct, RequestT, ResponseT> void readAfterTransmit(
         Context context,
         I input,
         Value<RequestT> request,
@@ -164,7 +164,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, RequestT, ResponseT> Value<ResponseT> modifyBeforeDeserialization(
+    public <I extends SerializableStruct, RequestT, ResponseT> Value<ResponseT> modifyBeforeDeserialization(
         Context context,
         I input,
         Value<RequestT> request,
@@ -177,7 +177,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, RequestT, ResponseT> void readBeforeDeserialization(
+    public <I extends SerializableStruct, RequestT, ResponseT> void readBeforeDeserialization(
         Context context,
         I input,
         Value<RequestT> request,
@@ -189,7 +189,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> void readAfterDeserialization(
+    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> void readAfterDeserialization(
         Context context,
         I input,
         Value<RequestT> request,
@@ -202,7 +202,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> Either<SdkException, O> modifyBeforeAttemptCompletion(
+    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<SdkException, O> modifyBeforeAttemptCompletion(
         Context context,
         I input,
         Value<RequestT> request,
@@ -216,7 +216,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> void readAfterAttempt(
+    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> void readAfterAttempt(
         Context context,
         I input,
         Value<RequestT> request,
@@ -229,7 +229,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> Either<SdkException, O> modifyBeforeCompletion(
+    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<SdkException, O> modifyBeforeCompletion(
         Context context,
         I input,
         Value<RequestT> requestIfAvailable,
@@ -249,7 +249,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> void readAfterExecution(
+    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> void readAfterExecution(
         Context context,
         I input,
         Value<RequestT> requestIfAvailable,

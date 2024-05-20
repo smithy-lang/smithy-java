@@ -25,7 +25,7 @@ import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkOperation;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImage;
@@ -105,7 +105,7 @@ public final class PersonDirectoryClient implements PersonDirectory {
      * @param <I> Input shape.
      * @param <O> Output shape.
      */
-    private <I extends SerializableShape, O extends SerializableShape> O call(
+    private <I extends SerializableStruct, O extends SerializableStruct> O call(
         I input,
         DataStream inputStream,
         Object eventStream,
