@@ -16,7 +16,6 @@ dependencies {
     implementation(project(":codegen:client"))
     implementation(libs.smithy.codegen)
     api(libs.smithy.aws.traits)
-    testImplementation(project(":codegen:core").sourceSets.test.output)
 }
 
 // Execute building of Java classes using an executable class

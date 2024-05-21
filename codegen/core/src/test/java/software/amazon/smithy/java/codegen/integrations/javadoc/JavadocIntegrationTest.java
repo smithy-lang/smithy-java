@@ -95,7 +95,7 @@ public class JavadocIntegrationTest {
              */
             @Deprecated(since = "1.3")
             @SmithyGenerated
-            public final class DeprecatedInput implements SerializableShape {
+            public final class DeprecatedInput implements SerializableStruct {
             """));
 
         // Check that member headers match expected
@@ -132,7 +132,7 @@ public class JavadocIntegrationTest {
         var fileContents = getFileStringForClass("SmithyGeneratedInput");
         assertThat(fileContents, containsString("""
             @SmithyGenerated
-            public final class SmithyGeneratedInput implements SerializableShape {
+            public final class SmithyGeneratedInput implements SerializableStruct {
             """));
     }
 
@@ -144,7 +144,7 @@ public class JavadocIntegrationTest {
              * @since 4.5
              */
             @SmithyGenerated
-            public final class SinceInput implements SerializableShape {
+            public final class SinceInput implements SerializableStruct {
             """));
         assertThat(fileContents, containsString("""
                 /**
@@ -163,7 +163,7 @@ public class JavadocIntegrationTest {
              * @see <a href="https://example.com">Example</a>
              */
             @SmithyGenerated
-            public final class ExternalDocumentationInput implements SerializableShape {
+            public final class ExternalDocumentationInput implements SerializableStruct {
             """));
         assertThat(fileContents, containsString("""
                 /**
@@ -179,7 +179,7 @@ public class JavadocIntegrationTest {
         assertThat(fileContents, containsString("""
             @SmithyUnstableApi
             @SmithyGenerated
-            public final class UnstableInput implements SerializableShape {
+            public final class UnstableInput implements SerializableStruct {
             """));
         assertThat(fileContents, containsString("""
                 @SmithyUnstableApi
@@ -203,7 +203,7 @@ public class JavadocIntegrationTest {
             @SmithyUnstableApi
             @Deprecated(since = "sometime")
             @SmithyGenerated
-            public final class RollupInput implements SerializableShape {
+            public final class RollupInput implements SerializableStruct {
             """));
         assertThat(fileContents, containsString("""
                 /**

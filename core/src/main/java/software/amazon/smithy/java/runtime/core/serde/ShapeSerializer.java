@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
@@ -38,16 +39,21 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
     default void close() {}
 
     /**
+     * Writes a structure or union using the given member schema.
+     *
+     * @param schema A member schema that targets the given struct.
+     * @param struct Structure to serialize.
+     */
+    void writeStruct(SdkSchema schema, SerializableStruct struct);
+
+    /**
      * Writes a structure or union.
      *
-     * <p>Each shape written to the given consumer <em>must</em> use a schema that has a member name.
-     * The member name is used to write field names.
-     *
-     * @param schema      Schema to serialize.
-     * @param structState State to pass into the consumer.
-     * @param consumer    Receives the struct serializer and writes members.
+     * @param struct Structure to serialize.
      */
-    <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer);
+    default void writeStruct(SerializableStruct struct) {
+        writeStruct(struct.schema(), struct);
+    }
 
     /**
      * Begin a list and write zero or more values into it using the provided serializer.

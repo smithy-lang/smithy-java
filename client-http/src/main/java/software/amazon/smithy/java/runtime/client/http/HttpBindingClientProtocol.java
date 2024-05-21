@@ -12,7 +12,7 @@ import software.amazon.smithy.java.runtime.client.core.ClientCall;
 import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
@@ -47,7 +47,7 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
     }
 
     @Override
-    public <I extends SerializableShape, O extends SerializableShape> O deserializeResponse(
+    public <I extends SerializableStruct, O extends SerializableStruct> O deserializeResponse(
         ClientCall<I, O> call,
         SmithyHttpRequest request,
         SmithyHttpResponse response

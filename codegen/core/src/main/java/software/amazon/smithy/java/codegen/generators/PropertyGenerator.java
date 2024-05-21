@@ -14,17 +14,7 @@ import software.amazon.smithy.model.traits.ErrorTrait;
 /**
  * Generates properties for a Java class from Smithy shape members
  */
-final class PropertyGenerator implements Runnable {
-
-    private final JavaWriter writer;
-    private final Shape shape;
-    private final SymbolProvider symbolProvider;
-
-    PropertyGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) {
-        this.writer = writer;
-        this.shape = shape;
-        this.symbolProvider = symbolProvider;
-    }
+record PropertyGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements Runnable {
 
     @Override
     public void run() {

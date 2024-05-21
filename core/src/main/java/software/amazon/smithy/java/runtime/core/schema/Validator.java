@@ -213,15 +213,15 @@ public final class Validator {
         }
 
         @Override
-        public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
+        public void writeStruct(SdkSchema schema, SerializableStruct struct) {
             // Track the current schema and count.
             var previousSchema = currentSchema;
             var previousCount = elementCount;
             currentSchema = schema;
             elementCount = 0; // note that we don't track the count of structure members.
             switch (schema.type()) {
-                case STRUCTURE -> ValidatorOfStruct.validate(this, schema, structState, consumer);
-                case UNION -> ValidatorOfUnion.validate(this, schema, structState, consumer);
+                case STRUCTURE -> ValidatorOfStruct.validate(this, schema, struct);
+                case UNION -> ValidatorOfUnion.validate(this, schema, struct);
                 default -> checkType(schema, ShapeType.STRUCTURE); // this is guaranteed to fail type checking.
             }
             currentSchema = previousSchema;

@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
@@ -42,13 +43,13 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
+    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
         if (schema.type() != ShapeType.STRUCTURE && schema.type() != ShapeType.UNION) {
             throw new SdkSerdeException("Expected a structure or union for this document, but found " + schema);
         }
 
         Map<String, Document> members = new LinkedHashMap<>();
-        consumer.accept(structState, new StructureParser(members));
+        struct.serializeMembers(new StructureParser(members));
 
         setResult(new Documents.StructureDocument(schema, members));
     }

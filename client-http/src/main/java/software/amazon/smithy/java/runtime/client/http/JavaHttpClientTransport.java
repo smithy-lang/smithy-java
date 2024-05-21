@@ -16,7 +16,7 @@ import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.SraPipeline;
 import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
@@ -42,7 +42,9 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
     }
 
     @Override
-    public <I extends SerializableShape, O extends SerializableShape> CompletableFuture<O> send(ClientCall<I, O> call) {
+    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> send(
+        ClientCall<I, O> call
+    ) {
         return SraPipeline.send(call, protocol, request -> {
             LOGGER.log(System.Logger.Level.TRACE, "Sending HTTP request: %s", request.startLine());
             var javaRequest = createJavaRequest(call.context(), request);

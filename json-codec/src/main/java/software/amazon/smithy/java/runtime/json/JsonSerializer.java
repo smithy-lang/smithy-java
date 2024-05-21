@@ -15,6 +15,7 @@ import java.util.Base64;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
@@ -23,9 +24,9 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 final class JsonSerializer implements ShapeSerializer {
 
-    private JsonStream stream;
-    private final JsonFieldMapper fieldMapper;
-    private final TimestampResolver timestampResolver;
+    JsonStream stream;
+    final JsonFieldMapper fieldMapper;
+    final TimestampResolver timestampResolver;
     private final Consumer<JsonStream> returnHandle;
 
     JsonSerializer(
@@ -165,10 +166,10 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
+    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
         try {
             stream.writeObjectStart();
-            consumer.accept(structState, new JsonStructSerializer(this, stream, fieldMapper));
+            struct.serializeMembers(new JsonStructSerializer(this));
             stream.writeObjectEnd();
         } catch (JsonException | IOException e) {
             throw new SdkSerdeException(e);

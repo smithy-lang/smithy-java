@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
@@ -36,8 +37,8 @@ public abstract class InterceptingSerializer implements ShapeSerializer {
     protected void after(SdkSchema schema) {}
 
     @Override
-    public final <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
-        before(schema).writeStruct(schema, structState, consumer);
+    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+        before(schema).writeStruct(schema, struct);
         after(schema);
     }
 

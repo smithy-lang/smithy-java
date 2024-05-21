@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.testmodels.Bird;
 import software.amazon.smithy.java.runtime.core.testmodels.Person;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -71,8 +72,8 @@ public class ToStringSerializerTest {
             .build();
 
         var str = ToStringSerializer.serialize(e -> {
-            e.writeStruct(schema, null, (ignored, ser) -> {
-                ser.writeMap(schema.member("foo"), mapSchema, (innerMapSchema, map) -> {
+            e.writeStruct(SerializableStruct.create(schema, (s, ser) -> {
+                ser.writeMap(s.member("foo"), mapSchema, (innerMapSchema, map) -> {
                     map.writeEntry(innerMapSchema.member("key"), "a", innerMapSchema, (mapSchema2, ms) -> {
                         ms.writeString(mapSchema2.member("value"), "hi");
                     });
@@ -80,7 +81,7 @@ public class ToStringSerializerTest {
                         ms.writeNull(mapSchema2.member("value"));
                     });
                 });
-            });
+            }));
         });
 
         assertThat(str, equalTo("Struct[foo={*REDACTED*=*REDACTED*, *REDACTED*=null}]"));
@@ -100,9 +101,9 @@ public class ToStringSerializerTest {
             .build();
 
         var str = ToStringSerializer.serialize(e -> {
-            e.writeStruct(schema, schema.member("foo"), (member, ser) -> {
-                ser.writeBlob(member, "abc".getBytes(StandardCharsets.UTF_8));
-            });
+            e.writeStruct(SerializableStruct.create(schema, (s, ser) -> {
+                ser.writeBlob(s.member("foo"), "abc".getBytes(StandardCharsets.UTF_8));
+            }));
         });
 
         assertThat(str, equalTo("Struct[foo=*REDACTED*]"));

@@ -7,7 +7,7 @@ package software.amazon.smithy.java.runtime.client.core;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
  * A {@link ClientTransport} that wraps another transport to time out a request if it takes longer than
@@ -27,7 +27,9 @@ public final class ApiCallTimeoutTransport implements ClientTransport {
     }
 
     @Override
-    public <I extends SerializableShape, O extends SerializableShape> CompletableFuture<O> send(ClientCall<I, O> call) {
+    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> send(
+        ClientCall<I, O> call
+    ) {
         // TODO: How to handle API_CALL_TIMEOUT with async. For now making this noop.
         return delegate.send(call);
 //        var timeout = call.context().get(CallContext.API_CALL_TIMEOUT);

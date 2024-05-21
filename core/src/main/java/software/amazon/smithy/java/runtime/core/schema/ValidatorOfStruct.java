@@ -26,22 +26,9 @@ final class ValidatorOfStruct implements ShapeSerializer {
         this.structValidator = structValidator;
     }
 
-    static <T> void validate(
-        Validator.ShapeValidator validator,
-        SdkSchema schema,
-        T structState,
-        BiConsumer<T, ShapeSerializer> consumer
-    ) {
+    static void validate(Validator.ShapeValidator validator, SdkSchema schema, SerializableStruct struct) {
         var tracker = PresenceTracker.of(schema);
-        consumer.accept(structState, new ValidatorOfStruct(validator, tracker));
-        checkResult(validator, schema, tracker);
-    }
-
-    private static void checkResult(
-        Validator.ShapeValidator validator,
-        SdkSchema schema,
-        PresenceTracker tracker
-    ) {
+        struct.serializeMembers(new ValidatorOfStruct(validator, tracker));
         if (!tracker.allSet()) {
             for (var member : tracker.getMissingMembers()) {
                 validator.addError(
@@ -172,10 +159,10 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeStruct(SdkSchema member, T structState, BiConsumer<T, ShapeSerializer> consumer) {
+    public void writeStruct(SdkSchema member, SerializableStruct struct) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
-        validator.writeStruct(member, structState, consumer);
+        validator.writeStruct(member, struct);
         validator.popPath();
     }
 

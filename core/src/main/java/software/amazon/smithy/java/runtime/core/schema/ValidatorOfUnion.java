@@ -27,14 +27,9 @@ final class ValidatorOfUnion implements ShapeSerializer {
         this.schema = schema;
     }
 
-    static <T> void validate(
-        Validator.ShapeValidator validator,
-        SdkSchema schema,
-        T unionState,
-        BiConsumer<T, ShapeSerializer> consumer
-    ) {
+    static void validate(Validator.ShapeValidator validator, SdkSchema schema, SerializableStruct struct) {
         var unionValidator = new ValidatorOfUnion(validator, schema);
-        consumer.accept(unionState, unionValidator);
+        struct.serializeMembers(unionValidator);
         unionValidator.checkResult();
     }
 
@@ -201,10 +196,10 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeStruct(SdkSchema member, T structState, BiConsumer<T, ShapeSerializer> consumer) {
-        validator.pushPath(member.memberName());
+    public void writeStruct(SdkSchema member, SerializableStruct struct) {
+        validator.pushPath(member);
         if (validateSetValue(member)) {
-            validator.writeStruct(member, structState, consumer);
+            validator.writeStruct(member, struct);
         }
         validator.popPath();
     }

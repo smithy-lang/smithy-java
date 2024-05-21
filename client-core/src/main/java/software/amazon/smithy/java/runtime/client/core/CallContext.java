@@ -12,7 +12,7 @@ import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.SdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
  * Context parameters made available to underlying transports like HTTP clients.
@@ -21,12 +21,12 @@ public final class CallContext {
     /**
      * Contains the input of the operation being sent.
      */
-    public static final Context.Key<SerializableShape> INPUT = Context.key("Input shape");
+    public static final Context.Key<SerializableStruct> INPUT = Context.key("Input shape");
 
     /**
      * Deserialized output of the call.
      */
-    public static final Context.Key<SerializableShape> OUTPUT = Context.key("Output");
+    public static final Context.Key<SerializableStruct> OUTPUT = Context.key("Output");
 
     /**
      * Error encountered by the call that will be thrown.
@@ -37,16 +37,6 @@ public final class CallContext {
      * Contains the schema of the operation being sent.
      */
     public static final Context.Key<SdkSchema> OPERATION_SCHEMA = Context.key("Operation schema");
-
-    /**
-     * Contains the input schema of the operation being sent.
-     */
-    public static final Context.Key<SdkSchema> INPUT_SCHEMA = Context.key("Input schema");
-
-    /**
-     * Contains the output schema of the operation being sent.
-     */
-    public static final Context.Key<SdkSchema> OUTPUT_SCHEMA = Context.key("Output schema");
 
     /**
      * The total amount of time to wait for an API call to complete, including retries, and serialization.

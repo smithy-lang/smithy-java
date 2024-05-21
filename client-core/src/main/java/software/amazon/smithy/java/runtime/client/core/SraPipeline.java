@@ -21,7 +21,7 @@ import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolverP
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.Either;
 import software.amazon.smithy.java.runtime.core.schema.SdkException;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
  * Handles the requests/response pipeline to turn an input into a request, emit the appropriate SRA interceptors,
@@ -36,7 +36,7 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
  */
 // TODO: Should more of this class be separated out into pieces (like resolving auth)?
 // TODO: Implement the real SRA interceptors workflow and error handling.
-public final class SraPipeline<I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> {
+public final class SraPipeline<I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> {
 
     private static final System.Logger LOGGER = System.getLogger(SraPipeline.class.getName());
     private static final URI UNRESOLVED;
@@ -67,7 +67,7 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
         this.responseKey = protocol.responseKey();
     }
 
-    public static <I extends SerializableShape, O extends SerializableShape, RequestT, ResponseT> CompletableFuture<O> send(
+    public static <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> CompletableFuture<O> send(
         ClientCall<I, O> call,
         ClientProtocol<RequestT, ResponseT> protocol,
         Function<RequestT, CompletableFuture<ResponseT>> wireTransport
@@ -120,7 +120,7 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     }
 
     @SuppressWarnings("unchecked")
-    private <I extends SerializableShape, O extends SerializableShape> ResolvedScheme<?, RequestT> resolveAuthScheme(
+    private <I extends SerializableStruct, O extends SerializableStruct> ResolvedScheme<?, RequestT> resolveAuthScheme(
         ClientCall<I, O> call,
         RequestT request
     ) {
@@ -169,7 +169,7 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
         }
     }
 
-    private <I extends SerializableShape, O extends SerializableShape> O deserialize(
+    private <I extends SerializableStruct, O extends SerializableStruct> O deserialize(
         ClientCall<I, O> call,
         RequestT request,
         ResponseT response,
@@ -262,7 +262,9 @@ public final class SraPipeline<I extends SerializableShape, O extends Serializab
     }
 
     // TODO: Add more parameters here somehow from the caller.
-    private <I extends SerializableShape, O extends SerializableShape> Endpoint resolveEndpoint(ClientCall<I, O> call) {
+    private <I extends SerializableStruct, O extends SerializableStruct> Endpoint resolveEndpoint(
+        ClientCall<I, O> call
+    ) {
         var operation = call.operation().schema();
         var request = EndpointResolverParams.builder().operationName(operation.id().getName()).build();
         return call.endpointResolver().resolveEndpoint(request);

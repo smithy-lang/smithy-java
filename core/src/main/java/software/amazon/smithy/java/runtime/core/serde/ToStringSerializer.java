@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 
@@ -47,9 +48,9 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeStruct(SdkSchema schema, T structState, BiConsumer<T, ShapeSerializer> consumer) {
+    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
         builder.append(schema.id().getName()).append('[');
-        consumer.accept(structState, new StructureWriter(this));
+        struct.serializeMembers(new StructureWriter(this));
         builder.append(']');
     }
 

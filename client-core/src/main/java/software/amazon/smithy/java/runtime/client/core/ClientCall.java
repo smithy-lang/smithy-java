@@ -24,7 +24,7 @@ import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkOperation;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 
 /**
@@ -33,7 +33,7 @@ import software.amazon.smithy.java.runtime.core.serde.DataStream;
  * @param <I> Input to send.
  * @param <O> Output to return.
  */
-public final class ClientCall<I extends SerializableShape, O extends SerializableShape> {
+public final class ClientCall<I extends SerializableStruct, O extends SerializableStruct> {
 
     private final I input;
     private final EndpointResolver endpointResolver;
@@ -67,8 +67,6 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
         // Initialize the context.
         context.put(CallContext.INPUT, input());
         context.put(CallContext.OPERATION_SCHEMA, operation().schema());
-        context.put(CallContext.INPUT_SCHEMA, operation().inputSchema());
-        context.put(CallContext.OUTPUT_SCHEMA, operation().outputSchema());
         context.put(CallContext.CLIENT_INTERCEPTOR, interceptor());
     }
 
@@ -79,7 +77,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
      * @param <I> Input type.
      * @param <O> Output type.
      */
-    public static <I extends SerializableShape, O extends SerializableShape> Builder<I, O> builder() {
+    public static <I extends SerializableStruct, O extends SerializableStruct> Builder<I, O> builder() {
         return new Builder<>();
     }
 
@@ -215,7 +213,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
      * @param <I> Input to send.
      * @param <O> Expected output.
      */
-    public static final class Builder<I extends SerializableShape, O extends SerializableShape> {
+    public static final class Builder<I extends SerializableStruct, O extends SerializableStruct> {
 
         private I input;
         private EndpointResolver endpointResolver;
@@ -230,8 +228,7 @@ public final class ClientCall<I extends SerializableShape, O extends Serializabl
         private Object requestEventStream;
         private ExecutorService executor;
 
-        private Builder() {
-        }
+        private Builder() {}
 
         /**
          * Set the input of the call.

@@ -12,7 +12,7 @@ import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -21,7 +21,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.RequiredTrait;
 
-public final class PojoWithValidatedCollection implements SerializableShape {
+public final class PojoWithValidatedCollection implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#PojoWithValidatedCollection");
 
@@ -83,18 +83,14 @@ public final class PojoWithValidatedCollection implements SerializableShape {
     }
 
     @Override
-    public void serialize(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA, this, InnerSerializer.INSTANCE);
+    public SdkSchema schema() {
+        return SCHEMA;
     }
 
-    private static final class InnerSerializer implements BiConsumer<PojoWithValidatedCollection, ShapeSerializer> {
-        private static final InnerSerializer INSTANCE = new InnerSerializer();
-
-        @Override
-        public void accept(PojoWithValidatedCollection pojo, ShapeSerializer st) {
-            st.writeList(SCHEMA_LIST, pojo.list, InnerListSerializer.INSTANCE);
-            st.writeMap(SCHEMA_MAP, pojo.map, InnerMapSerializer.INSTANCE);
-        }
+    @Override
+    public void serializeMembers(ShapeSerializer st) {
+        st.writeList(SCHEMA_LIST, list, InnerListSerializer.INSTANCE);
+        st.writeMap(SCHEMA_MAP, map, InnerMapSerializer.INSTANCE);
     }
 
     private static final class InnerListSerializer implements BiConsumer<List<ValidatedPojo>, ShapeSerializer> {

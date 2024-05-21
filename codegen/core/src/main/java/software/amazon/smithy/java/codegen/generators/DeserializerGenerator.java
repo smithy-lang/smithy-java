@@ -62,8 +62,8 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     @Override
     public void run() {
         writer.pushState();
-        writer.putContext("deserializer", deserializer);
         writer.putContext("schemaName", schemaName);
+        writer.putContext("deserializer", deserializer);
         shape.accept(this);
         writer.popState();
     }
@@ -83,7 +83,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     @Override
     public Void listShape(ListShape listShape) {
         writer.write(
-            "SharedSchemas.deserialize$L(${schemaName:L}, ${deserializer:L})",
+            "SharedSerde.deserialize$L(${schemaName:L}, ${deserializer:L})",
             CodegenUtils.getDefaultName(listShape, service)
         );
         return null;
@@ -92,7 +92,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     @Override
     public Void mapShape(MapShape mapShape) {
         writer.write(
-            "SharedSchemas.deserialize$L(${schemaName:L}, ${deserializer:L})",
+            "SharedSerde.deserialize$L(${schemaName:L}, ${deserializer:L})",
             CodegenUtils.getDefaultName(mapShape, service)
         );
         return null;

@@ -21,19 +21,8 @@ import software.amazon.smithy.model.traits.ErrorTrait;
  * <p>The constructor expects to take only one argument, a static {@code Builder} class
  * Use the {@link BuilderGenerator} class to generate this static builder.
  */
-final class ConstructorGenerator implements Runnable {
-
-    private final JavaWriter writer;
-    private final Shape shape;
-    private final SymbolProvider symbolProvider;
-    private final Model model;
-
-    ConstructorGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) {
-        this.writer = writer;
-        this.shape = shape;
-        this.symbolProvider = symbolProvider;
-        this.model = model;
-    }
+record ConstructorGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) implements
+    Runnable {
 
     @Override
     public void run() {
