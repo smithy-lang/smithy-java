@@ -26,7 +26,7 @@ import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkOperation;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImage;
@@ -106,7 +106,7 @@ public final class PersonDirectoryAsyncClient implements PersonDirectoryAsync {
      * @param <O>         Output shape.
      * @return Returns the deserialized output.
      */
-    private <I extends SerializableShape, O extends SerializableShape> CompletableFuture<O> call(
+    private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
         I input,
         DataStream inputStream,
         Object eventStream,
