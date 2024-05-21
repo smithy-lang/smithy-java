@@ -71,7 +71,7 @@ public final class JavaCodegenSettings {
         if (!file.exists()) {
             throw new CodegenException("Header file " + file.getAbsolutePath() + " does not exist.");
         }
-        LOGGER.log(System.Logger.Level.TRACE, "Reading header file: %s", file.getAbsolutePath());
+        LOGGER.log(System.Logger.Level.TRACE, () -> "Reading header file: " + file.getAbsolutePath());
         return IoUtils.readUtf8File(file.getAbsolutePath());
     }
 

@@ -32,7 +32,7 @@ public final class SymbolProperties {
      * Method on {@link java.util.Collection} to use to create an immutable copy of the collection type
      * a symbol represents.
      */
-    public static final Property<String> COLLECTION_COPY_METHOD = Property.named("collection-factory");
+    public static final Property<String> COLLECTION_IMMUTABLE_WRAPPER = Property.named("collection-wrapper");
 
     /**
      * Class to use when instantiating a new instance of a collection.

@@ -5,13 +5,9 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-import java.util.Collections;
 import software.amazon.smithy.codegen.core.SymbolProvider;
-import software.amazon.smithy.java.codegen.CodegenUtils;
-import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.traits.ErrorTrait;
 
@@ -43,31 +39,9 @@ record ConstructorGenerator(JavaWriter writer, Shape shape, SymbolProvider symbo
                     if (shape.hasTrait(ErrorTrait.class) && memberName.equals("message")) {
                         continue;
                     }
-                    writer.write("this.$L = $L;", memberName, getBuilderValue(member, memberName));
+                    writer.write("this.$L = builder.$L;", memberName, memberName);
                 }
             }
-        );
-    }
-
-    private String getBuilderValue(MemberShape member, String memberName) {
-        // If the member requires a builderRef we need to copy that builder ref value rather than use it directly.
-        var memberSymbol = symbolProvider.toSymbol(member);
-        if (memberSymbol.getProperty(SymbolProperties.COLLECTION_COPY_METHOD).isEmpty()) {
-            return writer.format("builder.$L", memberName);
-        }
-        if (CodegenUtils.isNullableMember(member)) {
-            return writer.format(
-                "builder.$1L != null ? $2T.$3L(builder.$1L) : null",
-                memberName,
-                Collections.class,
-                memberSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD)
-            );
-        }
-        return writer.format(
-            "$T.$L(builder.$L)",
-            Collections.class,
-            memberSymbol.expectProperty(SymbolProperties.COLLECTION_COPY_METHOD),
-            memberName
         );
     }
 }

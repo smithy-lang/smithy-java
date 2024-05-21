@@ -87,51 +87,39 @@ record GetterGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProv
         private void writeCollectionGetter(Shape shape) {
             writer.pushState(new GetterSection(member));
             var shapeSymbol = symbolProvider.toSymbol(shape);
-            // If the collection is nullable use an empty collection if null
-            if (CodegenUtils.isNullableMember(member)) {
-                writer.write(
+            writer.putContext("symbol", shapeSymbol);
+            writer.putContext("memberName", symbolProvider.toMemberName(member));
+            writer.putContext("empty", shapeSymbol.expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD));
+            writer.putContext("wrapper", shapeSymbol.expectProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER));
+            writer.putContext("collections", Collections.class);
+            writer.putContext("isNullable", CodegenUtils.isNullableMember(member));
+            writer.write(
+                """
+                    public ${symbol:T} ${memberName:L}() {${?isNullable}
+                        if (${memberName:L} == null) {
+                            return ${collections:T}.${empty:L};
+                        }${/isNullable}
+                        return ${collections:T}.${wrapper:L}(${memberName:L});
+                    }
                     """
-                        public $1T $2L() {
-                            return $2L != null ? $2L : $3T.$4L;
-                        }
-                        """,
-                    shapeSymbol,
-                    symbolProvider.toMemberName(member),
-                    Collections.class,
-                    shapeSymbol.expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)
-                );
-            } else {
-                writer.write(
+            );
+
+            // Write has-er to allow users to check if a given collection was set. Required collections must always be
+            // set
+            writer.write(
+                """
+                    public boolean has${memberName:U}() {
+                        return ${?isNullable}${memberName:L} != null${/isNullable}${^isNullable}true${/isNullable};
+                    }
                     """
-                        public $1T $2L() {
-                            return $2L;
-                        }
-                        """,
-                    shapeSymbol,
-                    symbolProvider.toMemberName(member)
-                );
-            }
+            );
+
             writer.popState();
-            writeHasCollection();
         }
 
         @Override
         public Void memberShape(MemberShape shape) {
             return model.expectShape(shape.getTarget()).accept(this);
-        }
-
-        private void writeHasCollection() {
-            // If the member targets a collection shape and is optional then generate an unwrapped
-            // getter as a convenience method as well.
-            var memberName = symbolProvider.toMemberName(member);
-            writer.write(
-                """
-                    public boolean has$1U() {
-                        return $1L != null;
-                    }
-                    """,
-                memberName
-            );
         }
     }
 }

@@ -46,10 +46,10 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
         ClientCall<I, O> call
     ) {
         return SraPipeline.send(call, protocol, request -> {
-            LOGGER.log(System.Logger.Level.TRACE, "Sending HTTP request: %s", request.startLine());
+            LOGGER.log(System.Logger.Level.TRACE, () -> "Sending HTTP request: " + request.startLine());
             var javaRequest = createJavaRequest(call.context(), request);
             return sendRequest(javaRequest).thenApply(response -> {
-                LOGGER.log(System.Logger.Level.TRACE, "Got HTTP response: %s", response.startLine());
+                LOGGER.log(System.Logger.Level.TRACE, () -> "Got HTTP response: " + response.startLine());
                 // TODO: Should this use protocol.responseKey()?
                 // TODO: Why is this put in context here?
                 // TODO: Why not in SraPipeline?
@@ -91,9 +91,7 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
     private SmithyHttpResponse createSmithyResponse(HttpResponse<InputStream> response) {
         LOGGER.log(
             System.Logger.Level.TRACE,
-            "Got response: %s; headers: %s",
-            response,
-            response.headers().map()
+            () -> "Got response: " + response + "; headers: " + response.headers().map()
         );
         return SmithyHttpResponse.builder()
             .httpVersion(javaToSmithyVersion(response.version()))

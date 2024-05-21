@@ -54,8 +54,6 @@ public class NamingTest {
         // Java map uses fully qualified name
         var expectedJavaMapGetter = """
                 public java.util.Map<String, String> javaMap() {
-                    return javaMap != null ? javaMap : Collections.emptyMap();
-                }
             """;
         assertTrue(fileStr.contains(expectedJavaMapGetter));
 
@@ -74,8 +72,6 @@ public class NamingTest {
         // Java map uses fully qualified name
         var expectedJavaListGetter = """
                 public java.util.List<String> javaList() {
-                    return javaList != null ? javaList : Collections.emptyList();
-                }
             """;
         assertTrue(fileStr.contains(expectedJavaListGetter));
 

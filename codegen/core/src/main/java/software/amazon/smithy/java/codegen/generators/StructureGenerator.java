@@ -62,6 +62,10 @@ public final class StructureGenerator
                 "builder",
                 new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.service())
             );
+            writer.putContext(
+                "toBuilder",
+                new ToBuilderGenerator(writer, shape, directive.symbolProvider(), directive.model())
+            );
             writer.write(
                 """
                     public final class ${shape:T} implements ${serializableStruct:T} {
@@ -89,6 +93,8 @@ public final class StructureGenerator
                         ${memberSerializer:C|}
 
                         ${builder:C|}
+
+                        ${toBuilder:C|}
                     }
                     """
             );

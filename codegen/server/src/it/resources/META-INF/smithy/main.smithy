@@ -18,11 +18,18 @@ operation Echo {
 }
 
 structure EchoInput {
-    string: String
+    value: EchoPayload
 }
 
 structure EchoOutput {
+    value: EchoPayload
+}
+
+structure EchoPayload {
     string: String
+    @required
+    @default(0)
+    echoCount: Integer
 }
 
 structure Beer {
