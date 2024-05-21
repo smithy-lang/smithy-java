@@ -82,15 +82,12 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                         // Read the payload into a byte buffer to deserialize a shape in the body.
                         LOGGER.log(
                             System.Logger.Level.TRACE,
-                            "Reading %s body to bytes for structured payload",
-                            schema
+                            () -> "Reading " + schema + " body to bytes for structured payload"
                         );
                         var bytes = body.readToBytes(MAX_IN_MEMORY_PAYLOAD);
                         LOGGER.log(
                             System.Logger.Level.TRACE,
-                            "Deserializing the payload of %s via %s",
-                            schema,
-                            payloadCodec.getMediaType()
+                            () -> "Deserializing the payload of " + schema + " via " + payloadCodec.getMediaType()
                         );
                         structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bytes));
                     } else if (member.memberTarget().type() == ShapeType.BLOB) {
@@ -110,9 +107,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
             var bytes = readPayloadBytes();
             LOGGER.log(
                 System.Logger.Level.TRACE,
-                "Deserializing the structured body of %s via %s",
-                schema,
-                payloadCodec.getMediaType()
+                () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
             );
             payloadCodec.createDeserializer(bytes).readStruct(schema, bodyMembers, (body, m, de) -> {
                 if (!body.contains(m.id().getName())) {
@@ -121,9 +116,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
             });
             LOGGER.log(
                 System.Logger.Level.TRACE,
-                "Deserialized the structured body of %s via %s",
-                schema,
-                payloadCodec.getMediaType()
+                () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
             );
         }
     }
