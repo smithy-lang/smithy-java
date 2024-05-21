@@ -157,5 +157,13 @@ public final class BooleansInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredBoolean(this.requiredBoolean);
+        builder.optionalBoolean(this.optionalBoolean);
+        return builder;
+    }
+
 }
 

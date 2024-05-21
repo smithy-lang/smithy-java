@@ -186,5 +186,14 @@ public final class FloatsInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredFloat(this.requiredFloat);
+        builder.optionalFloat(this.optionalFloat);
+        builder.defaultFloat(this.defaultFloat);
+        return builder;
+    }
+
 }
 

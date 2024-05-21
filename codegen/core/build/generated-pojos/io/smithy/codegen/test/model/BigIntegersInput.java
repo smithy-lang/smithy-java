@@ -188,5 +188,14 @@ public final class BigIntegersInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredBigInteger(this.requiredBigInteger);
+        builder.optionalBigInteger(this.optionalBigInteger);
+        builder.defaultBigInteger(this.defaultBigInteger);
+        return builder;
+    }
+
 }
 

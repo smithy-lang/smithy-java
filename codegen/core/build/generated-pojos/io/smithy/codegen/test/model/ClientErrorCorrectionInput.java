@@ -263,7 +263,6 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
     }
 
     public List<String> list() {
-
         return Collections.unmodifiableList(list);
     }
 
@@ -272,7 +271,6 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
     }
 
     public Map<String, String> map() {
-
         return Collections.unmodifiableMap(map);
     }
 
@@ -606,5 +604,28 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.booleanMember(this.booleanMember);
+        builder.bigDecimal(this.bigDecimal);
+        builder.bigInteger(this.bigInteger);
+        builder.byteMember(this.byteMember);
+        builder.doubleMember(this.doubleMember);
+        builder.floatMember(this.floatMember);
+        builder.integer(this.integer);
+        builder.longMember(this.longMember);
+        builder.shortMember(this.shortMember);
+        builder.string(this.string);
+        builder.blob(this.blob);
+        builder.streamingBlob(this.streamingBlob);
+        builder.document(this.document);
+        builder.list(this.list);
+        builder.map(this.map);
+        builder.structure(this.structure);
+        builder.timestamp(this.timestamp);
+        return builder;
+    }
+
 }
 

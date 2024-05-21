@@ -126,5 +126,12 @@ public final class ListWithStructsInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.listOfStructs(this.listOfStructs);
+        return builder;
+    }
+
 }
 

@@ -141,5 +141,13 @@ public final class Nested implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.fieldA(this.fieldA);
+        builder.fieldB(this.fieldB);
+        return builder;
+    }
+
 }
 

@@ -66,7 +66,6 @@ public final class MapsInput implements SerializableStruct {
     }
 
     public Map<String, String> requiredMap() {
-
         return Collections.unmodifiableMap(requiredMap);
     }
 
@@ -86,7 +85,6 @@ public final class MapsInput implements SerializableStruct {
     }
 
     public Map<String, String> defaultMap() {
-
         return Collections.unmodifiableMap(defaultMap);
     }
 
@@ -205,5 +203,14 @@ public final class MapsInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredMap(this.requiredMap);
+        builder.optionalMap(this.optionalMap);
+        builder.defaultMap(this.defaultMap);
+        return builder;
+    }
+
 }
 
