@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.auth.api.scheme;
 
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
@@ -55,10 +56,12 @@ final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
     }
 
     private static class NullIdentityResolver implements IdentityResolver<Identity> {
-        public static final Identity NULL_IDENTITY = new Identity() {};
+        public static final CompletableFuture<Identity> NULL_IDENTITY = CompletableFuture.completedFuture(
+            new Identity() {}
+        );
 
         @Override
-        public Identity resolveIdentity(AuthProperties requestProperties) {
+        public CompletableFuture<Identity> resolveIdentity(AuthProperties requestProperties) {
             return NULL_IDENTITY;
         }
 

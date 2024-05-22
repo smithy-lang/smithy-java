@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.auth.api.identity;
 
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 
 /**
@@ -18,10 +19,10 @@ public interface IdentityResolver<IdentityT extends Identity> {
      * return null.
      *
      * @param requestProperties The request properties used to resolve an Identity.
-     * @return the resolved identity.
+     * @return a CompletableFuture for the resolved identity.
      * @throws IdentityNotFoundException when an identity cannot be resolved.
      */
-    IdentityT resolveIdentity(AuthProperties requestProperties);
+    CompletableFuture<IdentityT> resolveIdentity(AuthProperties requestProperties);
 
     /**
      * Retrieve the class of the identity resolved by this identity resolver.
