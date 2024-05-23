@@ -108,17 +108,19 @@ public final class SraPipeline<I extends SerializableStruct, O extends Serializa
         RequestT reqBeforeEndpointResolution = request;
         return resolveEndpoint(call)
             .thenApply(endpoint -> protocol.setServiceEndpoint(reqBeforeEndpointResolution, endpoint))
-            .thenCompose(reqBeforeSigning -> resolvedAuthScheme.sign(reqBeforeSigning).thenApply(r -> {
-                interceptor.readAfterSigning(context, input, Context.value(requestKey, r));
+            .thenCompose(resolvedAuthScheme::sign)
+            .thenApply(req -> {
+                interceptor.readAfterSigning(context, input, Context.value(requestKey, req));
 
-                r = interceptor.modifyBeforeTransmit(context, input, Context.value(requestKey, r)).value();
-                interceptor.readBeforeTransmit(context, input, Context.value(requestKey, r));
+                req = interceptor.modifyBeforeTransmit(context, input, Context.value(requestKey, req)).value();
+                interceptor.readBeforeTransmit(context, input, Context.value(requestKey, req));
 
-                return r;
-            }).thenCompose(finalRequest -> {
-                CompletableFuture<ResponseT> responseCF = wireTransport.apply(finalRequest);
-                return responseCF.thenApply(response -> deserialize(call, finalRequest, response, interceptor));
-            }));
+                return req;
+            })
+            .thenCompose(
+                finalRequest -> wireTransport.apply(finalRequest)
+                    .thenApply(response -> deserialize(call, finalRequest, response, interceptor))
+            );
     }
 
     @SuppressWarnings("unchecked")
