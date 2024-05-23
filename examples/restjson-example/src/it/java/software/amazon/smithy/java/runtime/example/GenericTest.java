@@ -10,6 +10,7 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
@@ -23,6 +24,7 @@ import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.runtime.example.model.ExampleUnion;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PersonDirectory;
@@ -141,6 +143,64 @@ public class GenericTest {
 
         // Dump out the copy of the shape.
         System.out.println(codec.serializeToString(copy));
+    }
+
+    @Test
+    public void unionSerde() {
+        ExampleUnion union = ExampleUnion.builder()
+            .integerValue(1)
+            .build();
+
+        JsonCodec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
+
+        // Use a helper to serialize the shape into string.
+        String jsonString = codec.serializeToString(union);
+
+        // Use a helper to deserialize directly into a builder and create the shape.
+        ExampleUnion copy = codec.deserializeShape(jsonString, ExampleUnion.builder());
+
+        // Dump out the copy of the shape.
+        System.out.println(codec.serializeToString(copy));
+    }
+
+    @Test
+    public void unionDeser() {
+        JsonCodec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
+        String intJson = "{\"integer\":1}";
+        String stringJson = "{\"string\":\"string\"}";
+        String unknownJson = "{\"unknown\":1}";
+
+        ExampleUnion intValue = codec.deserializeShape(intJson, ExampleUnion.builder());
+        ExampleUnion stringValue = codec.deserializeShape(stringJson, ExampleUnion.builder());
+        // Doesn't work yet b/c deserializer just skips unknown members
+        //ExampleUnion unknownValue = codec.deserializeShape(unknownJson, ExampleUnion.builder());
+
+        Assertions.assertInstanceOf(ExampleUnion.IntegerValue.class, intValue);
+        Assertions.assertInstanceOf(ExampleUnion.StringValue.class, stringValue);
+        //Assertions.assertInstanceOf(ExampleUnion.UnknownValue.class, unknownValue);
+
+        // Example usage
+        Assertions.assertEquals(intValue.accept(new ExampleHandler()), "Int value: 1");
+        Assertions.assertEquals(stringValue.accept(new ExampleHandler()), "String value: string");
+
+    }
+
+    private static final class ExampleHandler implements ExampleUnion.Visitor<String> {
+
+        @Override
+        public String getDefault(ExampleUnion value) {
+            return "Not actually reachable";
+        }
+
+        @Override
+        public String visitStringValue(ExampleUnion.StringValue value) {
+            return "String value: " + value.value();
+        }
+
+        @Override
+        public String visitIntegerValue(ExampleUnion.IntegerValue value) {
+            return "Int value: " + value.value();
+        }
     }
 
     @Test
