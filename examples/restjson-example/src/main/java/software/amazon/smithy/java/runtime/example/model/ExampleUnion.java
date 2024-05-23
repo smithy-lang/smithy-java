@@ -119,7 +119,7 @@ public abstract class ExampleUnion implements SerializableStruct {
     public static final class $Unknown extends ExampleUnion {
         private final Document value;
 
-        public $Unknown(Document value) {
+        private $Unknown(Document value) {
             super(Member.$UNKNOWN);
             this.value = value;
         }
