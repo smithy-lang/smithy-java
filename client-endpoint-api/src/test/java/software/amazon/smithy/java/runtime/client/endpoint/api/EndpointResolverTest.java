@@ -15,8 +15,10 @@ public class EndpointResolverTest {
         EndpointResolver resolver = EndpointResolver
             .staticEndpoint(Endpoint.builder().uri("https://example.com").build());
 
+        Endpoint endpoint = resolver.resolveEndpoint(EndpointResolverParams.builder().operationName("Foo").build())
+            .join();
         MatcherAssert.assertThat(
-            resolver.resolveEndpoint(EndpointResolverParams.builder().operationName("Foo").build()).uri().toString(),
+            endpoint.uri().toString(),
             Matchers.equalTo("https://example.com")
         );
     }

@@ -105,21 +105,20 @@ public final class SraPipeline<I extends SerializableStruct, O extends Serializa
         });
 
         // TODO: what to do with supportedAuthSchemes of an endpoint?
-        // TODO: resolveEndpoint may need to go inside async block to allow for identity based endpoint resolution
-        Endpoint endpoint = resolveEndpoint(call);
-        request = protocol.setServiceEndpoint(request, endpoint);
+        RequestT reqBeforeEndpointResolution = request;
+        return resolveEndpoint(call)
+            .thenApply(endpoint -> protocol.setServiceEndpoint(reqBeforeEndpointResolution, endpoint))
+            .thenCompose(reqBeforeSigning -> resolvedAuthScheme.sign(reqBeforeSigning).thenApply(r -> {
+                interceptor.readAfterSigning(context, input, Context.value(requestKey, r));
 
-        return resolvedAuthScheme.sign(request).thenApply(r -> {
-            interceptor.readAfterSigning(context, input, Context.value(requestKey, r));
+                r = interceptor.modifyBeforeTransmit(context, input, Context.value(requestKey, r)).value();
+                interceptor.readBeforeTransmit(context, input, Context.value(requestKey, r));
 
-            r = interceptor.modifyBeforeTransmit(context, input, Context.value(requestKey, r)).value();
-            interceptor.readBeforeTransmit(context, input, Context.value(requestKey, r));
-
-            return r;
-        }).thenCompose(finalRequest -> {
-            CompletableFuture<ResponseT> responseCF = wireTransport.apply(finalRequest);
-            return responseCF.thenApply(response -> deserialize(call, finalRequest, response, interceptor));
-        });
+                return r;
+            }).thenCompose(finalRequest -> {
+                CompletableFuture<ResponseT> responseCF = wireTransport.apply(finalRequest);
+                return responseCF.thenApply(response -> deserialize(call, finalRequest, response, interceptor));
+            }));
     }
 
     @SuppressWarnings("unchecked")
@@ -264,7 +263,7 @@ public final class SraPipeline<I extends SerializableStruct, O extends Serializa
     }
 
     // TODO: Add more parameters here somehow from the caller.
-    private <I extends SerializableStruct, O extends SerializableStruct> Endpoint resolveEndpoint(
+    private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<Endpoint> resolveEndpoint(
         ClientCall<I, O> call
     ) {
         var operation = call.operation().schema();

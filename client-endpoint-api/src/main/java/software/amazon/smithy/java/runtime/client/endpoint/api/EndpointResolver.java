@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.runtime.client.endpoint.api;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Resolves an endpoint for an operation.
  */
@@ -14,9 +16,9 @@ public interface EndpointResolver {
      * Resolves an endpoint using the provided parameters.
      *
      * @param params The parameters used during endpoint resolution.
-     * @return the resolved endpoint.
+     * @return a CompletableFuture for the resolved endpoint.
      */
-    Endpoint resolveEndpoint(EndpointResolverParams params);
+    CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params);
 
     /**
      * Create an endpoint resolver that always returns the same endpoint.
@@ -25,6 +27,6 @@ public interface EndpointResolver {
      * @return the endpoint resolver.
      */
     static EndpointResolver staticEndpoint(Endpoint endpoint) {
-        return params -> endpoint;
+        return params -> CompletableFuture.completedFuture(endpoint);
     }
 }
