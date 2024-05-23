@@ -33,7 +33,7 @@ public interface ExampleUnion extends SerializableStruct {
 
     SdkSchema SCHEMA = SdkSchema.builder()
         .id(ID)
-        .type(ShapeType.STRUCTURE)
+        .type(ShapeType.UNION)
         .members(
             SCHEMA_STRING_VALUE,
             SCHEMA_INTEGER_VALUE
