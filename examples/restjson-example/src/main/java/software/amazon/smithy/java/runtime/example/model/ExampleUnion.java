@@ -56,7 +56,7 @@ public interface ExampleUnion extends SerializableStruct {
         return null;
     }
 
-    default Document unknownValue() {
+    default Document $unknownValue() {
         return null;
     }
 
@@ -124,7 +124,7 @@ public interface ExampleUnion extends SerializableStruct {
         }
 
         @Override
-        public Document unknownValue() {
+        public Document $unknownValue() {
             return value;
         }
     }

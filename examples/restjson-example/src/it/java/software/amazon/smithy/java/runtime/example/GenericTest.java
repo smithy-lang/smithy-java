@@ -23,7 +23,6 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.example.model.ExampleUnion;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
@@ -186,18 +185,11 @@ public class GenericTest {
     }
 
     private String exampleHandling(ExampleUnion union) {
-        switch (union.type()) {
-            case STRING_VALUE -> {
-                return "String: " + union.stringValue();
-            }
-            case INTEGER_VALUE -> {
-                return "Integer: " + union.integerValue();
-            }
-            case $UNKNOWN -> {
-                return "Unknown: " + union.unknownValue();
-            }
-            default -> throw new RuntimeException("OOPS!");
-        }
+        return switch (union.type()) {
+            case STRING_VALUE -> "String: " + union.stringValue();
+            case INTEGER_VALUE -> "Integer: " + union.integerValue();
+            default -> throw new RuntimeException("EEEK!");
+        };
     }
 
     @Test
