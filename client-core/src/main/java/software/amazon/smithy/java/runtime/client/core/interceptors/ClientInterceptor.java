@@ -15,7 +15,7 @@ import software.amazon.smithy.java.runtime.core.schema.SdkException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
- * An interceptor allows injecting code into the clien'ts request execution pipeline.
+ * An interceptor allows injecting code into the client's request execution pipeline.
  *
  * <p>Terminology:
  *
