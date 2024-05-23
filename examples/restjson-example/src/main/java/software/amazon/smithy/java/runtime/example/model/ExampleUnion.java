@@ -79,7 +79,7 @@ public abstract class ExampleUnion implements SerializableStruct {
     }
 
     public static final class StringValue extends ExampleUnion {
-        private final String value;
+        private final transient String value;
 
         public StringValue(String value) {
             super(Member.STRING_VALUE);
@@ -98,7 +98,7 @@ public abstract class ExampleUnion implements SerializableStruct {
     }
 
     public static final class IntegerValue extends ExampleUnion {
-        private final int value;
+        private final transient int value;
 
         public IntegerValue(int value) {
             super(Member.INTEGER_VALUE);
@@ -117,7 +117,7 @@ public abstract class ExampleUnion implements SerializableStruct {
     }
 
     public static final class $Unknown extends ExampleUnion {
-        private final Document value;
+        private final transient Document value;
 
         private $Unknown(Document value) {
             super(Member.$UNKNOWN);
