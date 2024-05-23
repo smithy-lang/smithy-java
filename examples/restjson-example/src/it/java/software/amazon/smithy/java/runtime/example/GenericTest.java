@@ -23,6 +23,7 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.example.model.ExampleUnion;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
@@ -180,26 +181,22 @@ public class GenericTest {
         //Assertions.assertInstanceOf(ExampleUnion.UnknownValue.class, unknownValue);
 
         // Example usage
-        Assertions.assertEquals(intValue.accept(new ExampleHandler()), "Int value: 1");
-        Assertions.assertEquals(stringValue.accept(new ExampleHandler()), "String value: string");
-
+        Assertions.assertEquals(exampleHandling(intValue), "Integer: 1");
+        Assertions.assertEquals(exampleHandling(stringValue), "String: string");
     }
 
-    private static final class ExampleHandler implements ExampleUnion.Visitor<String> {
-
-        @Override
-        public String getDefault(ExampleUnion value) {
-            return "Not actually reachable";
-        }
-
-        @Override
-        public String visitStringValue(ExampleUnion.StringValue value) {
-            return "String value: " + value.value();
-        }
-
-        @Override
-        public String visitIntegerValue(ExampleUnion.IntegerValue value) {
-            return "Int value: " + value.value();
+    private String exampleHandling(ExampleUnion union) {
+        switch (union.type()) {
+            case STRING_VALUE -> {
+                return "String: " + union.stringValue();
+            }
+            case INTEGER_VALUE -> {
+                return "Integer: " + union.integerValue();
+            }
+            case UNKNOWN -> {
+                return "Unknown: " + union.unknownValue();
+            }
+            default -> throw new RuntimeException("OOPS!");
         }
     }
 

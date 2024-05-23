@@ -40,27 +40,25 @@ public interface ExampleUnion extends SerializableStruct {
         )
         .build();
 
-    /**
-     * Visitor used to dispatch on union types.
-     * @param <R> Value to return.
-     */
-    interface Visitor<R> {
-        R getDefault(ExampleUnion value);
-
-        default R visitStringValue(StringValue value) {
-            return getDefault(value);
-        }
-
-        default R visitIntegerValue(IntegerValue value) {
-            return getDefault(value);
-        }
-
-        default R visitUnknownValue(UnknownValue value) {
-            return getDefault(value);
-        }
+    enum Member {
+        STRING_VALUE,
+        INTEGER_VALUE,
+        UNKNOWN
     }
 
-    <R> R accept(Visitor<R> visitor);
+    Member type();
+
+    default String stringValue() {
+        return null;
+    }
+
+    default Integer integerValue() {
+        return null;
+    }
+
+    default Document unknownValue() {
+        return null;
+    }
 
     record StringValue(String value) implements ExampleUnion {
 
@@ -75,12 +73,17 @@ public interface ExampleUnion extends SerializableStruct {
         }
 
         @Override
-        public <R> R accept(Visitor<R> visitor) {
-            return visitor.visitStringValue(this);
+        public Member type() {
+            return Member.STRING_VALUE;
+        }
+
+        @Override
+        public String stringValue() {
+            return value;
         }
     }
 
-    record IntegerValue(Integer value) implements ExampleUnion {
+    record IntegerValue(int value) implements ExampleUnion {
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
@@ -93,8 +96,13 @@ public interface ExampleUnion extends SerializableStruct {
         }
 
         @Override
-        public <R> R accept(Visitor<R> visitor) {
-            return visitor.visitIntegerValue(this);
+        public Member type() {
+            return Member.INTEGER_VALUE;
+        }
+
+        @Override
+        public Integer integerValue() {
+            return value;
         }
     }
 
@@ -111,8 +119,13 @@ public interface ExampleUnion extends SerializableStruct {
         }
 
         @Override
-        public <R> R accept(Visitor<R> visitor) {
-            return visitor.visitUnknownValue(this);
+        public Member type() {
+            return Member.UNKNOWN;
+        }
+
+        @Override
+        public Document unknownValue() {
+            return value;
         }
     }
 
