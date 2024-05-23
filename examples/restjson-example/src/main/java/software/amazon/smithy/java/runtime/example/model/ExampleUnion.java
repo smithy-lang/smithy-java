@@ -18,20 +18,20 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
-public interface ExampleUnion extends SerializableStruct {
-    ShapeId ID = ShapeId.from("smithy.foo#ExampleUnion");
+public abstract class ExampleUnion implements SerializableStruct {
+    private static final ShapeId ID = ShapeId.from("smithy.foo#ExampleUnion");
 
-    SdkSchema SCHEMA_STRING_VALUE = SdkSchema.memberBuilder("string", PreludeSchemas.STRING)
+    private static final SdkSchema SCHEMA_STRING_VALUE = SdkSchema.memberBuilder("string", PreludeSchemas.STRING)
         .id(ID)
         .traits()
         .build();
 
-    SdkSchema SCHEMA_INTEGER_VALUE = SdkSchema.memberBuilder("integer", PreludeSchemas.INTEGER)
+    private static final SdkSchema SCHEMA_INTEGER_VALUE = SdkSchema.memberBuilder("integer", PreludeSchemas.INTEGER)
         .id(ID)
         .traits()
         .build();
 
-    SdkSchema SCHEMA = SdkSchema.builder()
+    static final SdkSchema SCHEMA = SdkSchema.builder()
         .id(ID)
         .type(ShapeType.UNION)
         .members(
@@ -40,41 +40,55 @@ public interface ExampleUnion extends SerializableStruct {
         )
         .build();
 
-    enum Member {
+    private final Member type;
+
+    private ExampleUnion(Member type) {
+        this.type = type;
+    }
+
+    public Member type() {
+        return type;
+    }
+
+    @Override
+    public String toString() {
+        return ToStringSerializer.serialize(this);
+    }
+
+    public enum Member {
         STRING_VALUE,
         INTEGER_VALUE,
         $UNKNOWN
     }
 
-    Member type();
+    @Override
+    public SdkSchema schema() {
+        return SCHEMA;
+    }
 
-    default String stringValue() {
+    public String stringValue() {
         return null;
     }
 
-    default Integer integerValue() {
+    public Integer integerValue() {
         return null;
     }
 
-    default Document $unknownValue() {
+    public Document $unknownValue() {
         return null;
     }
 
-    record StringValue(String value) implements ExampleUnion {
+    public static final class StringValue extends ExampleUnion {
+        private final String value;
+
+        public StringValue(String value) {
+            super(Member.STRING_VALUE);
+            this.value = value;
+        }
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeString(SCHEMA_STRING_VALUE, value);
-        }
-
-        @Override
-        public String toString() {
-            return ToStringSerializer.serialize(this);
-        }
-
-        @Override
-        public Member type() {
-            return Member.STRING_VALUE;
         }
 
         @Override
@@ -83,21 +97,17 @@ public interface ExampleUnion extends SerializableStruct {
         }
     }
 
-    record IntegerValue(int value) implements ExampleUnion {
+    public static final class IntegerValue extends ExampleUnion {
+        private final int value;
+
+        public IntegerValue(int value) {
+            super(Member.INTEGER_VALUE);
+            this.value = value;
+        }
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeInteger(SCHEMA_INTEGER_VALUE, value);
-        }
-
-        @Override
-        public String toString() {
-            return ToStringSerializer.serialize(this);
-        }
-
-        @Override
-        public Member type() {
-            return Member.INTEGER_VALUE;
         }
 
         @Override
@@ -106,21 +116,17 @@ public interface ExampleUnion extends SerializableStruct {
         }
     }
 
-    record $Unknown(Document value) implements ExampleUnion {
+    public static final class $Unknown extends ExampleUnion {
+        private final Document value;
+
+        public $Unknown(Document value) {
+            super(Member.$UNKNOWN);
+            this.value = value;
+        }
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeDocument(value);
-        }
-
-        @Override
-        public String toString() {
-            return ToStringSerializer.serialize(this);
-        }
-
-        @Override
-        public Member type() {
-            return Member.$UNKNOWN;
         }
 
         @Override
@@ -129,19 +135,14 @@ public interface ExampleUnion extends SerializableStruct {
         }
     }
 
-    @Override
-    default SdkSchema schema() {
-        return SCHEMA;
-    }
-
-    static Builder builder() {
+    public static Builder builder() {
         return new Builder();
     }
 
     /**
      * Builder
      */
-    final class Builder implements SdkShapeBuilder<ExampleUnion> {
+    public static final class Builder implements SdkShapeBuilder<ExampleUnion> {
 
         private ExampleUnion value;
 
