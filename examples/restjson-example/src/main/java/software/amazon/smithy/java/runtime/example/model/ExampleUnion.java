@@ -43,7 +43,7 @@ public interface ExampleUnion extends SerializableStruct {
     enum Member {
         STRING_VALUE,
         INTEGER_VALUE,
-        UNKNOWN
+        $UNKNOWN
     }
 
     Member type();
@@ -106,7 +106,7 @@ public interface ExampleUnion extends SerializableStruct {
         }
     }
 
-    record UnknownValue(Document value) implements ExampleUnion {
+    record $Unknown(Document value) implements ExampleUnion {
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
@@ -120,7 +120,7 @@ public interface ExampleUnion extends SerializableStruct {
 
         @Override
         public Member type() {
-            return Member.UNKNOWN;
+            return Member.$UNKNOWN;
         }
 
         @Override
@@ -180,7 +180,7 @@ public interface ExampleUnion extends SerializableStruct {
         // Should not be settable intentionally
         private void unknown(Document value) {
             checkForExistingValue();
-            this.value = new UnknownValue(value);
+            this.value = new $Unknown(value);
         }
 
         private static final class InnerDeserializer implements ShapeDeserializer.StructMemberConsumer<Builder> {

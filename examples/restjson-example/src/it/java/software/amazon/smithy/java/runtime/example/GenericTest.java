@@ -193,7 +193,7 @@ public class GenericTest {
             case INTEGER_VALUE -> {
                 return "Integer: " + union.integerValue();
             }
-            case UNKNOWN -> {
+            case $UNKNOWN -> {
                 return "Unknown: " + union.unknownValue();
             }
             default -> throw new RuntimeException("OOPS!");
