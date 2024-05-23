@@ -50,11 +50,6 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
             var javaRequest = createJavaRequest(call.context(), request);
             return sendRequest(javaRequest).thenApply(response -> {
                 LOGGER.log(System.Logger.Level.TRACE, () -> "Got HTTP response: " + response.startLine());
-                // TODO: Should this use protocol.responseKey()?
-                // TODO: Why is this put in context here?
-                // TODO: Why not in SraPipeline?
-                // TODO: HTTP_REQUEST is not put in context anywhere it seems?
-                call.context().put(HttpContext.HTTP_RESPONSE, response);
                 return response;
             });
         });
