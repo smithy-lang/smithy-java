@@ -26,6 +26,7 @@ use smithy.java.codegen.test.structures.members#Shorts
 use smithy.java.codegen.test.structures.members#Strings
 use smithy.java.codegen.test.structures.members#Structures
 use smithy.java.codegen.test.structures.members#Timestamps
+use smithy.java.codegen.test.structures.members#Unions
 
 resource StructureShapes {
     operations: [
@@ -60,6 +61,8 @@ resource StructureShapes {
         Structures,
         // Timestamp members
         Timestamps
+        // Union members
+        Unions,
         // Exceptions
         ExceptionOperation,
         // Error correction

@@ -26,12 +26,16 @@ import io.smithy.codegen.test.model.MapsInput;
 import io.smithy.codegen.test.model.Nested;
 import io.smithy.codegen.test.model.NestedListsInput;
 import io.smithy.codegen.test.model.NestedMapsInput;
+import io.smithy.codegen.test.model.OtherUnion;
 import io.smithy.codegen.test.model.SetsInput;
 import io.smithy.codegen.test.model.ShortsInput;
 import io.smithy.codegen.test.model.SimpleException;
 import io.smithy.codegen.test.model.StringsInput;
+import io.smithy.codegen.test.model.Struct;
 import io.smithy.codegen.test.model.StructuresInput;
 import io.smithy.codegen.test.model.TimestampsInput;
+import io.smithy.codegen.test.model.UnionType;
+import io.smithy.codegen.test.model.UnionsInput;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -99,7 +103,29 @@ public class SerdeTest {
                 .requiredStruct(Nested.builder().fieldA("a").fieldB(2).build())
                 .build(),
             // Timestamp
-            TimestampsInput.builder().requiredTimestamp(Instant.ofEpochMilli(111111111L)).build()
+            TimestampsInput.builder().requiredTimestamp(Instant.ofEpochMilli(111111111L)).build(),
+            // Union
+            UnionsInput.builder().requiredUnion(new UnionType.BooleanValueMember(true)).build(),
+            UnionsInput.builder().requiredUnion(new UnionType.ListValueMember(List.of("a", "b"))).build(),
+            UnionsInput.builder().requiredUnion(new UnionType.MapValueMember(Map.of("a", "b", "c", "d"))).build(),
+            UnionsInput.builder().requiredUnion(new UnionType.BigDecimalValueMember(BigDecimal.valueOf(1L))).build(),
+            UnionsInput.builder().requiredUnion(new UnionType.BigIntegerValueMember(BigInteger.valueOf(1L))).build(),
+            UnionsInput.builder().requiredUnion(new UnionType.ByteValueMember((byte) 1)).build(),
+            UnionsInput.builder().requiredUnion(new UnionType.DoubleValueMember(1.1)).build(),
+            UnionsInput.builder().requiredUnion(new UnionType.FloatValueMember(1f)).build(),
+            UnionsInput.builder().requiredUnion(new UnionType.IntegerValueMember(1)).build(),
+            UnionsInput.builder().requiredUnion(new UnionType.LongValueMember(1L)).build(),
+            UnionsInput.builder().requiredUnion(new UnionType.ShortValueMember((short) 1)).build(),
+            UnionsInput.builder().requiredUnion(new UnionType.StringValueMember("string")).build(),
+            UnionsInput.builder()
+                .requiredUnion(new UnionType.StructureValueMember(Struct.builder().field("a").build()))
+                .build(),
+            UnionsInput.builder()
+                .requiredUnion(new UnionType.TimestampValueMember(Instant.ofEpochMilli(111111)))
+                .build(),
+            UnionsInput.builder()
+                .requiredUnion(new UnionType.UnionValueMember(new OtherUnion.StrMember("string")))
+                .build()
         );
     }
 
