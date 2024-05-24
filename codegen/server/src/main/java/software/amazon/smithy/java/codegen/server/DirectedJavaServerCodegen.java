@@ -22,12 +22,12 @@ import software.amazon.smithy.codegen.core.directed.GenerateUnionDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
-import software.amazon.smithy.java.codegen.generators.ExceptionGenerator;
 import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
+import software.amazon.smithy.java.codegen.generators.UnionGenerator;
 import software.amazon.smithy.java.codegen.server.generators.OperationInterfaceGenerator;
 import software.amazon.smithy.java.codegen.server.generators.ServiceGenerator;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -77,18 +77,18 @@ public class DirectedJavaServerCodegen implements
 
     @Override
     public void generateStructure(GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new StructureGenerator().accept(directive);
+        new StructureGenerator<>().accept(directive);
 
     }
 
     @Override
     public void generateError(GenerateErrorDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new ExceptionGenerator().accept(directive);
+        new StructureGenerator<>().accept(directive);
     }
 
     @Override
     public void generateUnion(GenerateUnionDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        // TODO
+        new UnionGenerator().accept(directive);
     }
 
     @Override

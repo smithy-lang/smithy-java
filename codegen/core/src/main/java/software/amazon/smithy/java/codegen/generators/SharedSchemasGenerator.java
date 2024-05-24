@@ -95,9 +95,7 @@ public final class SharedSchemasGenerator
                 );
             }
         }
-        writer.openBlock("static {", "}", () -> {
-            writeDeferred(writer, directive, deferred);
-        });
+        writer.openBlock("static {", "}", () -> writeDeferred(writer, directive, deferred));
         writer.popState();
     }
 

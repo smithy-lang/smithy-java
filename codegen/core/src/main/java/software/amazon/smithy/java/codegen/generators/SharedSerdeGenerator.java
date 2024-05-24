@@ -27,22 +27,20 @@ public final class SharedSerdeGenerator
             .useFileWriter(
                 CodegenUtils.getSerdeFileName(directive.settings()),
                 CodegenUtils.getModelNamespace(directive.settings()),
-                writer -> {
-                    writer.write(
-                        """
-                            /**
-                             * Defines shared serialization and deserialization methods for map and list shapes.
-                             */
-                            final class SharedSerde {
+                writer -> writer.write(
+                    """
+                        /**
+                         * Defines shared serialization and deserialization methods for map and list shapes.
+                         */
+                        final class SharedSerde {
 
-                                ${L@sharedSerde|}
+                            ${L@sharedSerde|}
 
-                                private SharedSerde() {}
-                            }
-                            """,
-                        ""
-                    );
-                }
+                            private SharedSerde() {}
+                        }
+                        """,
+                    ""
+                )
             );
     }
 }

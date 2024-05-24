@@ -8,15 +8,27 @@ package software.amazon.smithy.java.codegen.server;
 import software.amazon.smithy.codegen.core.Property;
 import software.amazon.smithy.codegen.core.Symbol;
 
+/**
+ * TODO: DOCS
+ */
 public final class ServerSymbolProperties {
 
     private ServerSymbolProperties() {
 
     }
 
+    /**
+     * TODO: DOCS
+     */
     public static final Property<Symbol> ASYNC_STUB_OPERATION = Property.named("async-stub-operation");
 
+    /**
+     * TODO: DOCS
+     */
     public static final Property<Symbol> STUB_OPERATION = Property.named("stub-operation");
 
+    /**
+     * TODO: DOCS
+     */
     public static final Property<String> OPERATION_FIELD_NAME = Property.named("operation-field-name");
 }
