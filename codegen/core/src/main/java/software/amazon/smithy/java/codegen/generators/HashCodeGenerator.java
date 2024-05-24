@@ -13,6 +13,9 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 
+/**
+ * Generates an {@code hashCode} implementation for structure shapes.
+ */
 record HashCodeGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements Runnable {
 
     @Override

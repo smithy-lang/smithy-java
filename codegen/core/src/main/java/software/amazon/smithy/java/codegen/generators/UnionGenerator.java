@@ -26,8 +26,10 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.UnionShape;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
-public class UnionGenerator
+@SmithyInternalApi
+public final class UnionGenerator
     implements Consumer<GenerateUnionDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     @Override

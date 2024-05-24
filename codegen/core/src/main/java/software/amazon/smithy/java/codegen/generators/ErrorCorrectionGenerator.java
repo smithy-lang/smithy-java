@@ -33,7 +33,9 @@ import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.StreamingTrait;
 
 /**
- * TODO: docs
+ * Generates an error correction implementation for structures with required, non-default members.
+ *
+ * @see <a href="https://smithy.io/2.0/spec/aggregate-types.html#client-error-correction">client error correction</a>
  */
 record ErrorCorrectionGenerator(JavaWriter writer, SymbolProvider symbolProvider, Model model, StructureShape shape)
     implements Runnable {
@@ -80,11 +82,7 @@ record ErrorCorrectionGenerator(JavaWriter writer, SymbolProvider symbolProvider
         }
     }
 
-    /**
-     * Returns the error correction value to use for a required field.
-     *
-     * @see <a href="https://smithy.io/2.0/spec/aggregate-types.html#client-error-correction">client error correction</a>
-     */
+
     private static final class ErrorCorrectionVisitor extends ShapeVisitor.Default<Void> implements Runnable {
         private final JavaWriter writer;
         private final SymbolProvider symbolProvider;

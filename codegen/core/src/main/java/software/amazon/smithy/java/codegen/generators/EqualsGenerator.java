@@ -14,6 +14,9 @@ import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 
+/**
+ * Generates an {@code equals} implementation for structure shapes.
+ */
 record EqualsGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements Runnable {
 
     @Override

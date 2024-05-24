@@ -10,9 +10,7 @@ import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 
 /**
- * TODO: DOCS
- * @param writer
- * @param shape
+ * Generates a {@code build()} method implementation for structure shapes.
  */
 record StructureBuilderBuildGenerator(JavaWriter writer, Shape shape) implements Runnable {
     @Override

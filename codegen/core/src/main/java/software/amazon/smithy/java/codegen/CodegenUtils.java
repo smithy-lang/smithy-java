@@ -276,9 +276,10 @@ public final class CodegenUtils {
     }
 
     /**
-     * TODO: docs
-     * @param provider
-     * @return
+     * Gets the uppers snake case name to use for an enum variant for a member shape.
+     *
+     * @param provider symbol provider
+     * @param memberShape member shape to get enum name for
      */
     public static String getEnumVariantName(SymbolProvider provider, MemberShape memberShape) {
         return CaseUtils.toSnakeCase(provider.toMemberName(memberShape)).toUpperCase(Locale.ENGLISH);
