@@ -17,6 +17,7 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
+import software.amazon.smithy.java.codegen.sections.UnionMemberSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
@@ -169,7 +170,7 @@ public final class UnionGenerator
             writer.putContext("objects", Objects.class);
             for (var member : shape.members()) {
                 writer.pushState();
-                // TODO: ensure these variants have docs added?
+                writer.injectSection(new ClassSection(member));
                 var memberSymbol = symbolProvider.toSymbol(member);
                 writer.putContext("member", memberSymbol);
                 writer.putContext("memberName", symbolProvider.toMemberName(member));

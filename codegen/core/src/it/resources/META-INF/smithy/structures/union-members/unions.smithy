@@ -15,6 +15,7 @@ operation Unions {
 union UnionType {
     blobValue: Blob
     booleanValue: Boolean
+    /// Some docs
     listValue: ListOfStrings
     mapValue: StringMap
     bigDecimalValue: BigDecimal
