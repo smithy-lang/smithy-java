@@ -1,3 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.runtime.example.model;
 
 import java.util.Map;
@@ -20,20 +25,23 @@ public final class Attitude implements SerializableShape {
     public static final Attitude REALISTIC = new Attitude(Type.REALISTIC, "realistic");
 
     private static final Map<String, Attitude> valueMap = Map.of(
-            OPTIMISTIC.value, OPTIMISTIC,
-            PESSIMISTIC.value, PESSIMISTIC,
-            REALISTIC.value, REALISTIC
+        OPTIMISTIC.value,
+        OPTIMISTIC,
+        PESSIMISTIC.value,
+        PESSIMISTIC,
+        REALISTIC.value,
+        REALISTIC
     );
 
     static final SdkSchema SCHEMA = SdkSchema.builder()
-            .id(ID)
-            .type(ShapeType.ENUM)
-            .stringEnumValues(
-                    OPTIMISTIC.value,
-                    PESSIMISTIC.value,
-                    REALISTIC.value
-            )
-            .build();
+        .id(ID)
+        .type(ShapeType.ENUM)
+        .stringEnumValues(
+            OPTIMISTIC.value,
+            PESSIMISTIC.value,
+            REALISTIC.value
+        )
+        .build();
 
     private final String value;
     private final Type type;
