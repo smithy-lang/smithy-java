@@ -102,20 +102,6 @@ public class DocumentTest {
         );
     }
 
-    @Test
-    public void convertsStringToBytes() {
-        var doc = Document.createString("Hi");
-
-        assertThat(doc.asBlob(), equalTo("Hi".getBytes(StandardCharsets.UTF_8)));
-    }
-
-    @Test
-    public void convertsByteToString() {
-        var doc = Document.createBlob("Hi".getBytes(StandardCharsets.UTF_8));
-
-        assertThat(doc.asString(), equalTo("Hi"));
-    }
-
     @ParameterizedTest
     @MethodSource("invalidConversionSupplier")
     public void throwsOnInvalidConversion(Document value, Consumer<Document> call) {
