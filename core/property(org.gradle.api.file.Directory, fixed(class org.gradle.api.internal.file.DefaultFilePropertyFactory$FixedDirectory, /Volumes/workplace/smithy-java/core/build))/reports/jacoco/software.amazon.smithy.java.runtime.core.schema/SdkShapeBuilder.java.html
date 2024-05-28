@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SdkShapeBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.schema</a> &gt; <span class="el_source">SdkShapeBuilder.java</span></div><h1>SdkShapeBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.schema;
+
+import software.amazon.smithy.java.runtime.core.serde.DataStream;
+import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+import software.amazon.smithy.utils.SmithyBuilder;
+
+/**
+ * Builds deserializable shapes.
+ *
+ * @param &lt;T&gt; Shape to build.
+ */
+public interface SdkShapeBuilder&lt;T extends SerializableShape&gt; extends SmithyBuilder&lt;T&gt; {
+    /**
+     * Set a stream of data on the shape, if allowed.
+     *
+     * @param stream Stream to set.
+     * @throws UnsupportedOperationException if the shape has no stream.
+     */
+    default void setDataStream(DataStream stream) {
+<span class="nc" id="L25">        throw new UnsupportedOperationException(&quot;This shape does not have a stream: &quot; + getClass().getName());</span>
+    }
+
+    /**
+     * Set an event stream on the shape, if allowed.
+     *
+     * &lt;p&gt;TODO: Implement event streams.
+     *
+     * @param eventStream Event stream to set.
+     * @throws UnsupportedOperationException if the shape has not event stream.
+     */
+    default void setEventStream(Object eventStream) {
+<span class="nc" id="L37">        throw new UnsupportedOperationException(&quot;This shape does not have an event stream: &quot; + getClass().getName());</span>
+    }
+
+    /**
+     * Deserializes data from the given decoder into the state of the builder.
+     *
+     * @param decoder Decoder used to deserialize the shape.
+     */
+    SdkShapeBuilder&lt;T&gt; deserialize(ShapeDeserializer decoder);
+
+    /**
+     * Performs any necessary error correction before the shape can be built.
+     *
+     * &lt;p&gt;For example, a shape might be missing a required number member, and error correction would set the
+     * member to zero to allow the shape to build.
+     *
+     * @return Returns the builder.
+     */
+    default SdkShapeBuilder&lt;T&gt; errorCorrection() {
+<span class="fc" id="L56">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

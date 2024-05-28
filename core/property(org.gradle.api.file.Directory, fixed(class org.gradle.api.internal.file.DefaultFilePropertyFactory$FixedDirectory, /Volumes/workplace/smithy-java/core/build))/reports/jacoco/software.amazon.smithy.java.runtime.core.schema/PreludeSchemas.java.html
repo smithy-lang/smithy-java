@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreludeSchemas.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.schema</a> &gt; <span class="el_source">PreludeSchemas.java</span></div><h1>PreludeSchemas.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.schema;
+
+import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.DefaultTrait;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
+
+/**
+ * {@link SdkSchema} definitions for the Smithy prelude
+ */
+public final class PreludeSchemas {
+<span class="fc" id="L17">    public static final SdkSchema BLOB = SdkSchema.builder().type(ShapeType.BLOB).id(&quot;smithy.api#Blob&quot;).build();</span>
+<span class="fc" id="L18">    public static final SdkSchema BOOLEAN = SdkSchema.builder()</span>
+<span class="fc" id="L19">        .type(ShapeType.BOOLEAN)</span>
+<span class="fc" id="L20">        .id(&quot;smithy.api#Boolean&quot;)</span>
+<span class="fc" id="L21">        .build();</span>
+<span class="fc" id="L22">    public static final SdkSchema STRING = SdkSchema.builder().type(ShapeType.STRING).id(&quot;smithy.api#String&quot;).build();</span>
+<span class="fc" id="L23">    public static final SdkSchema TIMESTAMP = SdkSchema.builder()</span>
+<span class="fc" id="L24">        .type(ShapeType.TIMESTAMP)</span>
+<span class="fc" id="L25">        .id(&quot;smithy.api#Timestamp&quot;)</span>
+<span class="fc" id="L26">        .build();</span>
+<span class="fc" id="L27">    public static final SdkSchema BYTE = SdkSchema.builder().type(ShapeType.BYTE).id(&quot;smithy.api#Byte&quot;).build();</span>
+<span class="fc" id="L28">    public static final SdkSchema SHORT = SdkSchema.builder().type(ShapeType.SHORT).id(&quot;smithy.api#Short&quot;).build();</span>
+<span class="fc" id="L29">    public static final SdkSchema INTEGER = SdkSchema.builder()</span>
+<span class="fc" id="L30">        .type(ShapeType.INTEGER)</span>
+<span class="fc" id="L31">        .id(&quot;smithy.api#Integer&quot;)</span>
+<span class="fc" id="L32">        .build();</span>
+<span class="fc" id="L33">    public static final SdkSchema LONG = SdkSchema.builder().type(ShapeType.LONG).id(&quot;smithy.api#Long&quot;).build();</span>
+<span class="fc" id="L34">    public static final SdkSchema FLOAT = SdkSchema.builder().type(ShapeType.FLOAT).id(&quot;smithy.api#Float&quot;).build();</span>
+<span class="fc" id="L35">    public static final SdkSchema DOUBLE = SdkSchema.builder().type(ShapeType.DOUBLE).id(&quot;smithy.api#Double&quot;).build();</span>
+<span class="fc" id="L36">    public static final SdkSchema BIG_INTEGER = SdkSchema.builder()</span>
+<span class="fc" id="L37">        .type(ShapeType.BIG_INTEGER)</span>
+<span class="fc" id="L38">        .id(&quot;smithy.api#BigInteger&quot;)</span>
+<span class="fc" id="L39">        .build();</span>
+<span class="fc" id="L40">    public static final SdkSchema BIG_DECIMAL = SdkSchema.builder()</span>
+<span class="fc" id="L41">        .type(ShapeType.BIG_DECIMAL)</span>
+<span class="fc" id="L42">        .id(&quot;smithy.api#BigDecimal&quot;)</span>
+<span class="fc" id="L43">        .build();</span>
+<span class="fc" id="L44">    public static final SdkSchema DOCUMENT = SdkSchema.builder()</span>
+<span class="fc" id="L45">        .type(ShapeType.DOCUMENT)</span>
+<span class="fc" id="L46">        .id(&quot;smithy.api#Document&quot;)</span>
+<span class="fc" id="L47">        .build();</span>
+
+    // Primitive types
+<span class="fc" id="L50">    public static final SdkSchema PRIMITIVE_BOOLEAN = SdkSchema.builder()</span>
+<span class="fc" id="L51">        .type(ShapeType.BOOLEAN)</span>
+<span class="fc" id="L52">        .id(&quot;smithy.api#PrimitiveBoolean&quot;)</span>
+<span class="fc" id="L53">        .traits(new DefaultTrait(Node.from(false)))</span>
+<span class="fc" id="L54">        .build();</span>
+<span class="fc" id="L55">    public static final SdkSchema PRIMITIVE_BYTE = SdkSchema.builder()</span>
+<span class="fc" id="L56">        .type(ShapeType.BYTE)</span>
+<span class="fc" id="L57">        .id(&quot;smithy.api#PrimitiveByte&quot;)</span>
+<span class="fc" id="L58">        .traits(new DefaultTrait(Node.from(0)))</span>
+<span class="fc" id="L59">        .build();</span>
+<span class="fc" id="L60">    public static final SdkSchema PRIMITIVE_SHORT = SdkSchema.builder()</span>
+<span class="fc" id="L61">        .type(ShapeType.SHORT)</span>
+<span class="fc" id="L62">        .id(&quot;smithy.api#PrimitiveShort&quot;)</span>
+<span class="fc" id="L63">        .traits(new DefaultTrait(Node.from(0)))</span>
+<span class="fc" id="L64">        .build();</span>
+<span class="fc" id="L65">    public static final SdkSchema PRIMITIVE_INTEGER = SdkSchema.builder()</span>
+<span class="fc" id="L66">        .type(ShapeType.INTEGER)</span>
+<span class="fc" id="L67">        .id(&quot;smithy.api#PrimitiveInteger&quot;)</span>
+<span class="fc" id="L68">        .traits(new DefaultTrait(Node.from(0)))</span>
+<span class="fc" id="L69">        .build();</span>
+<span class="fc" id="L70">    public static final SdkSchema PRIMITIVE_LONG = SdkSchema.builder()</span>
+<span class="fc" id="L71">        .type(ShapeType.LONG)</span>
+<span class="fc" id="L72">        .id(&quot;smithy.api#PrimitiveLong&quot;)</span>
+<span class="fc" id="L73">        .traits(new DefaultTrait(Node.from(0)))</span>
+<span class="fc" id="L74">        .build();</span>
+<span class="fc" id="L75">    public static final SdkSchema PRIMITIVE_FLOAT = SdkSchema.builder()</span>
+<span class="fc" id="L76">        .type(ShapeType.FLOAT)</span>
+<span class="fc" id="L77">        .id(&quot;smithy.api#PrimitiveFloat&quot;)</span>
+<span class="fc" id="L78">        .traits(new DefaultTrait(Node.from(0)))</span>
+<span class="fc" id="L79">        .build();</span>
+<span class="fc" id="L80">    public static final SdkSchema PRIMITIVE_DOUBLE = SdkSchema.builder()</span>
+<span class="fc" id="L81">        .type(ShapeType.DOUBLE)</span>
+<span class="fc" id="L82">        .id(&quot;smithy.api#PrimitiveDouble&quot;)</span>
+<span class="fc" id="L83">        .traits(new DefaultTrait(Node.from(0)))</span>
+<span class="fc" id="L84">        .build();</span>
+<span class="fc" id="L85">    public static final SdkSchema UNIT = SdkSchema.builder()</span>
+<span class="fc" id="L86">        .type(ShapeType.STRUCTURE)</span>
+<span class="fc" id="L87">        .id(&quot;smithy.api#Unit&quot;)</span>
+<span class="fc" id="L88">        .traits(new UnitTypeTrait())</span>
+<span class="fc" id="L89">        .build();</span>
+
+    private PreludeSchemas() {
+        // Class should not be instantiated.
+    }
+
+    /**
+     * Returns the most appropriate prelude schema based on the given type.
+     *
+     * &lt;p&gt;Numeric and boolean types return the nullable value
+     * (e.g., {@link #INTEGER} and not {@link #PRIMITIVE_INTEGER}).
+     *
+     * &lt;p&gt;Types with no corresponding prelude schema (e.g., LIST, STRUCTURE, UNION), are returned as a
+     * {@link #DOCUMENT} schema.
+     *
+     * @param type Type to compute a schema from.
+     * @return the schema type.
+     */
+    public static SdkSchema getSchemaForType(ShapeType type) {
+<span class="fc bfc" id="L108" title="All 13 branches covered.">        return switch (type) {</span>
+<span class="fc" id="L109">            case BOOLEAN -&gt; PreludeSchemas.BOOLEAN;</span>
+<span class="fc" id="L110">            case BYTE -&gt; PreludeSchemas.BYTE;</span>
+<span class="fc" id="L111">            case SHORT -&gt; PreludeSchemas.SHORT;</span>
+<span class="fc" id="L112">            case INTEGER, INT_ENUM -&gt; PreludeSchemas.INTEGER;</span>
+<span class="fc" id="L113">            case LONG -&gt; PreludeSchemas.LONG;</span>
+<span class="fc" id="L114">            case FLOAT -&gt; PreludeSchemas.FLOAT;</span>
+<span class="fc" id="L115">            case DOUBLE -&gt; PreludeSchemas.DOUBLE;</span>
+<span class="fc" id="L116">            case BIG_INTEGER -&gt; PreludeSchemas.BIG_INTEGER;</span>
+<span class="fc" id="L117">            case BIG_DECIMAL -&gt; PreludeSchemas.BIG_DECIMAL;</span>
+<span class="fc" id="L118">            case STRING, ENUM -&gt; PreludeSchemas.STRING;</span>
+<span class="fc" id="L119">            case BLOB -&gt; PreludeSchemas.BLOB;</span>
+<span class="fc" id="L120">            case TIMESTAMP -&gt; PreludeSchemas.TIMESTAMP;</span>
+<span class="fc" id="L121">            default -&gt; PreludeSchemas.DOCUMENT;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

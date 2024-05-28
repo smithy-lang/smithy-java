@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CodeGenerationContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen</a> &gt; <span class="el_source">CodeGenerationContext.java</span></div><h1>CodeGenerationContext.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import software.amazon.smithy.build.FileManifest;
+import software.amazon.smithy.codegen.core.CodegenContext;
+import software.amazon.smithy.codegen.core.CodegenException;
+import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.WriterDelegator;
+import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.AuthDefinitionTrait;
+import software.amazon.smithy.model.traits.DefaultTrait;
+import software.amazon.smithy.model.traits.EndpointTrait;
+import software.amazon.smithy.model.traits.ErrorTrait;
+import software.amazon.smithy.model.traits.EventHeaderTrait;
+import software.amazon.smithy.model.traits.EventPayloadTrait;
+import software.amazon.smithy.model.traits.HostLabelTrait;
+import software.amazon.smithy.model.traits.IdempotencyTokenTrait;
+import software.amazon.smithy.model.traits.JsonNameTrait;
+import software.amazon.smithy.model.traits.LengthTrait;
+import software.amazon.smithy.model.traits.MediaTypeTrait;
+import software.amazon.smithy.model.traits.PatternTrait;
+import software.amazon.smithy.model.traits.ProtocolDefinitionTrait;
+import software.amazon.smithy.model.traits.RangeTrait;
+import software.amazon.smithy.model.traits.RequiredTrait;
+import software.amazon.smithy.model.traits.RequiresLengthTrait;
+import software.amazon.smithy.model.traits.RetryableTrait;
+import software.amazon.smithy.model.traits.SensitiveTrait;
+import software.amazon.smithy.model.traits.SparseTrait;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
+import software.amazon.smithy.model.traits.UniqueItemsTrait;
+import software.amazon.smithy.model.traits.XmlAttributeTrait;
+import software.amazon.smithy.model.traits.XmlFlattenedTrait;
+import software.amazon.smithy.model.traits.XmlNameTrait;
+import software.amazon.smithy.model.traits.XmlNamespaceTrait;
+import software.amazon.smithy.utils.SmithyUnstableApi;
+
+/**
+ * Contextual information that is made available during most parts of Java code generation.
+ */
+@SmithyUnstableApi
+public class CodeGenerationContext
+    implements CodegenContext&lt;JavaCodegenSettings, JavaWriter, JavaCodegenIntegration&gt; {
+
+<span class="fc" id="L56">    private static final List&lt;ShapeId&gt; PRELUDE_RUNTIME_TRAITS = List.of(</span>
+        // Validation Traits
+        LengthTrait.ID,
+        PatternTrait.ID,
+        RangeTrait.ID,
+        RequiredTrait.ID,
+        SensitiveTrait.ID,
+        IdempotencyTokenTrait.ID,
+        SparseTrait.ID,
+        UniqueItemsTrait.ID,
+        RequiresLengthTrait.ID,
+        RetryableTrait.ID,
+        ErrorTrait.ID,
+        DefaultTrait.ID,
+        // Base Prelude Protocol traits
+        JsonNameTrait.ID,
+        TimestampFormatTrait.ID,
+        MediaTypeTrait.ID,
+        XmlNameTrait.ID,
+        XmlFlattenedTrait.ID,
+        XmlAttributeTrait.ID,
+        XmlNamespaceTrait.ID,
+        EventHeaderTrait.ID,
+        EventPayloadTrait.ID,
+        HostLabelTrait.ID,
+        EndpointTrait.ID
+    );
+
+    private final Model model;
+    private final JavaCodegenSettings settings;
+    private final SymbolProvider symbolProvider;
+    private final FileManifest fileManifest;
+    private final List&lt;JavaCodegenIntegration&gt; integrations;
+    private final WriterDelegator&lt;JavaWriter&gt; writerDelegator;
+    private final Set&lt;ShapeId&gt; runtimeTraits;
+
+    public CodeGenerationContext(
+        Model model,
+        JavaCodegenSettings settings,
+        SymbolProvider symbolProvider,
+        FileManifest fileManifest,
+        List&lt;JavaCodegenIntegration&gt; integrations
+<span class="fc" id="L98">    ) {</span>
+<span class="fc" id="L99">        this.model = model;</span>
+<span class="fc" id="L100">        this.settings = settings;</span>
+<span class="fc" id="L101">        this.symbolProvider = symbolProvider;</span>
+<span class="fc" id="L102">        this.fileManifest = fileManifest;</span>
+<span class="fc" id="L103">        this.integrations = integrations;</span>
+<span class="fc" id="L104">        this.writerDelegator = new WriterDelegator&lt;&gt;(fileManifest, symbolProvider, new JavaWriter.Factory(settings));</span>
+<span class="fc" id="L105">        this.runtimeTraits = collectRuntimeTraits();</span>
+<span class="fc" id="L106">    }</span>
+
+    @Override
+    public Model model() {
+<span class="fc" id="L110">        return model;</span>
+    }
+
+    @Override
+    public JavaCodegenSettings settings() {
+<span class="fc" id="L115">        return settings;</span>
+    }
+
+    @Override
+    public SymbolProvider symbolProvider() {
+<span class="fc" id="L120">        return symbolProvider;</span>
+    }
+
+    @Override
+    public FileManifest fileManifest() {
+<span class="nc" id="L125">        return fileManifest;</span>
+    }
+
+    @Override
+    public WriterDelegator&lt;JavaWriter&gt; writerDelegator() {
+<span class="fc" id="L130">        return writerDelegator;</span>
+    }
+
+    @Override
+    public List&lt;JavaCodegenIntegration&gt; integrations() {
+<span class="nc" id="L135">        return integrations;</span>
+    }
+
+    public Set&lt;ShapeId&gt; runtimeTraits() {
+<span class="fc" id="L139">        return runtimeTraits;</span>
+    }
+
+    /**
+     * Determines the &quot;runtime traits&quot; for a service, i.e. traits that should be included in Shape schemas.
+     *
+     * &lt;p&gt;Runtime traits are added from the following sources:
+     * &lt;dl&gt;
+     *     &lt;dt&gt;Protocol-generic prelude traits&lt;/dt&gt;
+     *     &lt;dd&gt;Static list of prelude traits that should be included regardless of protocol.&lt;/dd&gt;
+     *     &lt;dt&gt;Protocol traits&lt;/dt&gt;
+     *     &lt;dd&gt;Traits supported explicitly by protocols the service uses should be included in Schemas.&lt;/dd&gt;
+     *     &lt;dt&gt;AuthScheme traits&lt;/dt&gt;
+     *     &lt;dd&gt;Traits supported explicitly by auth schemes used by the service should be included in Schemas.&lt;/dd&gt;
+     * &lt;/dl&gt;
+     *
+     * @return Set of trait ShapeId's to include in generated Schemas.
+     */
+    private Set&lt;ShapeId&gt; collectRuntimeTraits() {
+<span class="fc" id="L158">        ServiceShape shape = model.expectShape(settings.service())</span>
+<span class="fc" id="L159">            .asServiceShape()</span>
+<span class="fc" id="L160">            .orElseThrow(</span>
+<span class="nc" id="L161">                () -&gt; new CodegenException(</span>
+                    &quot;Expected shapeId: &quot;
+<span class="nc" id="L163">                        + settings.service() + &quot; to be a service shape.&quot;</span>
+                )
+            );
+
+        // Add all default runtime traits from the prelude
+<span class="fc" id="L168">        Set&lt;ShapeId&gt; traits = new HashSet&lt;&gt;(PRELUDE_RUNTIME_TRAITS);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        for (var entry : shape.getAllTraits().entrySet()) {</span>
+<span class="fc" id="L170">            Shape traitShape = model.expectShape(entry.getKey());</span>
+            // Add all traits supported by a protocol the service supports
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (traitShape.hasTrait(ProtocolDefinitionTrait.class)) {</span>
+<span class="fc" id="L173">                var protocolDef = traitShape.expectTrait(ProtocolDefinitionTrait.class);</span>
+<span class="fc" id="L174">                traits.addAll(protocolDef.getTraits());</span>
+            }
+            // Add all traits supported by auth schemes the service supports
+<span class="fc bfc" id="L177" title="All 2 branches covered.">            if (traitShape.hasTrait(AuthDefinitionTrait.class)) {</span>
+<span class="fc" id="L178">                var authDef = traitShape.expectTrait(AuthDefinitionTrait.class);</span>
+<span class="fc" id="L179">                traits.addAll(authDef.getTraits());</span>
+            }
+<span class="fc" id="L181">        }</span>
+
+<span class="fc" id="L183">        return Collections.unmodifiableSet(traits);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

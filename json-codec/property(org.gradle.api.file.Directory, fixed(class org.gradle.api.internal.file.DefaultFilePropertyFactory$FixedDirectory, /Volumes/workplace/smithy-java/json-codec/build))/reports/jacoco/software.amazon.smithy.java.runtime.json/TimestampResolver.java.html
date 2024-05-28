@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TimestampResolver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">json-codec</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.json</a> &gt; <span class="el_source">TimestampResolver.java</span></div><h1>TimestampResolver.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.json;
+
+import com.jsoniter.any.Any;
+import com.jsoniter.spi.JsonException;
+import java.time.Instant;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
+
+/**
+ * Resolves the timestamp format to use for a shape.
+ */
+sealed interface TimestampResolver {
+    /**
+     * Determine the formatter of a shape.
+     *
+     * @param schema Shape to resolve.
+     * @return resolved formatter.
+     */
+    TimestampFormatter resolve(SdkSchema schema);
+
+    /**
+     * Get the default formatter.
+     *
+     * @return default formatter.
+     */
+    TimestampFormatter defaultFormat();
+
+    /**
+     * Reusable method to parse timestamps from an iterator using a specific formatter.
+     *
+     * @param any    JSON any type to read from.
+     * @param format Formatter used to parse the timestamp.
+     * @return the parsed Instant.
+     * @throws SdkSerdeException if the timestamp format or type is invalid.
+     */
+    static Instant readTimestamp(Any any, TimestampFormatter format) {
+        try {
+<span class="fc bfc" id="L48" title="All 3 branches covered.">            return switch (any.valueType()) {</span>
+<span class="fc" id="L49">                case NUMBER -&gt; format.readFromNumber(any.toDouble());</span>
+<span class="fc" id="L50">                case STRING -&gt; format.readFromString(any.toString(), true);</span>
+                default -&gt; {
+<span class="fc" id="L52">                    throw new SdkSerdeException(</span>
+<span class="fc" id="L53">                        &quot;Expected a timestamp, but found &quot; + any.valueType().toString().toLowerCase(Locale.ENGLISH)</span>
+                    );
+                }
+            };
+<span class="nc" id="L57">        } catch (JsonException e) {</span>
+<span class="nc" id="L58">            throw new SdkSerdeException(e);</span>
+        }
+    }
+
+    /**
+     * Always returns the same default timestamp format and ignores the timestampFormat trait.
+     */
+<span class="fc" id="L65">    record StaticFormat(TimestampFormatter defaultFormat) implements TimestampResolver {</span>
+        @Override
+        public TimestampFormatter resolve(SdkSchema schema) {
+<span class="fc" id="L68">            return defaultFormat;</span>
+        }
+
+        @Override
+        public TimestampFormatter defaultFormat() {
+            return defaultFormat;
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L78">            return &quot;TimestampResolver{useTimestampFormat=false; default=&quot; + defaultFormat + '}';</span>
+        }
+    }
+
+    /**
+     * Uses the timestampFormat trait if present, otherwise uses a configurable default format.
+     */
+    final class UseTimestampFormatTrait implements TimestampResolver {
+<span class="fc" id="L86">        private final ConcurrentHashMap&lt;SdkSchema, TimestampFormatter&gt; cache = new ConcurrentHashMap&lt;&gt;();</span>
+        private final TimestampFormatter defaultFormat;
+
+<span class="fc" id="L89">        UseTimestampFormatTrait(TimestampFormatter defaultFormat) {</span>
+<span class="fc" id="L90">            this.defaultFormat = defaultFormat;</span>
+<span class="fc" id="L91">        }</span>
+
+        @Override
+        public TimestampFormatter defaultFormat() {
+<span class="nc" id="L95">            return defaultFormat;</span>
+        }
+
+        @Override
+        public TimestampFormatter resolve(SdkSchema schema) {
+<span class="fc" id="L100">            return cache.computeIfAbsent(schema, s -&gt; {</span>
+<span class="fc" id="L101">                var trait = schema.getTrait(TimestampFormatTrait.class);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">                return trait != null ? TimestampFormatter.of(trait) : defaultFormat;</span>
+            });
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L108">            return &quot;TimestampResolver{useTimestampFormat=true; default=&quot; + defaultFormat + '}';</span>
+        }
+
+        @Override
+        public boolean equals(Object o) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (this == o) {</span>
+<span class="nc" id="L114">                return true;</span>
+<span class="pc bpc" id="L115" title="2 of 4 branches missed.">            } else if (o == null || getClass() != o.getClass()) {</span>
+<span class="fc" id="L116">                return false;</span>
+            } else {
+<span class="nc" id="L118">                return defaultFormat.equals(((UseTimestampFormatTrait) o).defaultFormat);</span>
+            }
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L124">            return Objects.hash(defaultFormat);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

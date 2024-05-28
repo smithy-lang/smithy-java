@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SerializerMemberGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.generators</a> &gt; <span class="el_source">SerializerMemberGenerator.java</span></div><h1>SerializerMemberGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.generators;
+
+import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.BigDecimalShape;
+import software.amazon.smithy.model.shapes.BigIntegerShape;
+import software.amazon.smithy.model.shapes.BlobShape;
+import software.amazon.smithy.model.shapes.BooleanShape;
+import software.amazon.smithy.model.shapes.ByteShape;
+import software.amazon.smithy.model.shapes.DocumentShape;
+import software.amazon.smithy.model.shapes.DoubleShape;
+import software.amazon.smithy.model.shapes.FloatShape;
+import software.amazon.smithy.model.shapes.IntegerShape;
+import software.amazon.smithy.model.shapes.ListShape;
+import software.amazon.smithy.model.shapes.LongShape;
+import software.amazon.smithy.model.shapes.MapShape;
+import software.amazon.smithy.model.shapes.MemberShape;
+import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.ShapeVisitor;
+import software.amazon.smithy.model.shapes.ShortShape;
+import software.amazon.smithy.model.shapes.StringShape;
+import software.amazon.smithy.model.shapes.StructureShape;
+import software.amazon.smithy.model.shapes.TimestampShape;
+import software.amazon.smithy.model.shapes.UnionShape;
+import software.amazon.smithy.model.traits.ErrorTrait;
+
+final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor&lt;Void&gt; implements
+    Runnable {
+    private final JavaWriter writer;
+    private final SymbolProvider provider;
+    private final Model model;
+    private final ServiceShape service;
+    private final MemberShape memberShape;
+    private final String state;
+
+    SerializerMemberGenerator(
+        JavaWriter writer,
+        SymbolProvider provider,
+        Model model,
+        ServiceShape service,
+        MemberShape memberShape,
+        String state
+<span class="fc" id="L50">    ) {</span>
+<span class="fc" id="L51">        this.writer = writer;</span>
+<span class="fc" id="L52">        this.provider = provider;</span>
+<span class="fc" id="L53">        this.model = model;</span>
+<span class="fc" id="L54">        this.service = service;</span>
+<span class="fc" id="L55">        this.memberShape = memberShape;</span>
+<span class="fc" id="L56">        this.state = state;</span>
+<span class="fc" id="L57">    }</span>
+
+    @Override
+    public void run() {
+<span class="fc" id="L61">        writer.pushState();</span>
+<span class="fc" id="L62">        var memberName = provider.toMemberName(memberShape);</span>
+<span class="fc" id="L63">        writer.putContext(&quot;memberName&quot;, memberName);</span>
+<span class="fc" id="L64">        var container = model.expectShape(memberShape.getContainer());</span>
+<span class="fc" id="L65">        var target = model.expectShape(memberShape.getTarget());</span>
+<span class="fc bfc" id="L66" title="All 4 branches covered.">        if (container.isListShape() || container.isMapShape()) {</span>
+<span class="fc" id="L67">            writer.putContext(&quot;schema&quot;, CodegenUtils.getSchemaType(writer, provider, target));</span>
+        } else {
+<span class="fc" id="L69">            writer.putContext(&quot;schema&quot;, CodegenUtils.toMemberSchemaName(memberName));</span>
+        }
+<span class="fc" id="L71">        writer.putContext(&quot;state&quot;, state);</span>
+<span class="fc" id="L72">        memberShape.accept(this);</span>
+<span class="fc" id="L73">        writer.popState();</span>
+<span class="fc" id="L74">    }</span>
+
+    @Override
+    public Void blobShape(BlobShape blobShape) {
+        // Streaming Blobs do not generate a member serializer
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (CodegenUtils.isStreamingBlob(blobShape)) {</span>
+<span class="nc" id="L80">            return null;</span>
+        }
+<span class="nc" id="L82">        writer.write(&quot;serializer.writeBlob(${schema:L}, ${state:L})&quot;);</span>
+<span class="nc" id="L83">        return null;</span>
+    }
+
+    @Override
+    public Void booleanShape(BooleanShape booleanShape) {
+<span class="nc" id="L88">        writer.write(&quot;serializer.writeBoolean(${schema:L}, ${state:L})&quot;);</span>
+<span class="nc" id="L89">        return null;</span>
+    }
+
+    @Override
+    public Void listShape(ListShape listShape) {
+<span class="fc" id="L94">        writer.write(</span>
+            &quot;serializer.writeList(${schema:L}, ${state:L}, SharedSerde.$USerializer.INSTANCE)&quot;,
+<span class="fc" id="L96">            CodegenUtils.getDefaultName(listShape, service)</span>
+        );
+<span class="fc" id="L98">        return null;</span>
+    }
+
+    @Override
+    public Void mapShape(MapShape mapShape) {
+<span class="fc" id="L103">        writer.write(</span>
+            &quot;serializer.writeMap(${schema:L}, ${state:L}, SharedSerde.$USerializer.INSTANCE)&quot;,
+<span class="fc" id="L105">            CodegenUtils.getDefaultName(mapShape, service)</span>
+        );
+<span class="fc" id="L107">        return null;</span>
+    }
+
+    @Override
+    public Void byteShape(ByteShape byteShape) {
+<span class="fc" id="L112">        writer.write(&quot;serializer.writeByte(${schema:L}, ${state:L})&quot;);</span>
+<span class="fc" id="L113">        return null;</span>
+    }
+
+    @Override
+    public Void shortShape(ShortShape shortShape) {
+<span class="nc" id="L118">        writer.write(&quot;serializer.writeShort(${schema:L}, ${state:L})&quot;);</span>
+<span class="nc" id="L119">        return null;</span>
+    }
+
+    @Override
+    public Void integerShape(IntegerShape integerShape) {
+<span class="nc" id="L124">        writer.write(&quot;serializer.writeInteger(${schema:L}, ${state:L})&quot;);</span>
+<span class="nc" id="L125">        return null;</span>
+    }
+
+    @Override
+    public Void longShape(LongShape longShape) {
+<span class="nc" id="L130">        writer.write(&quot;serializer.writeLong(${schema:L}, ${state:L})&quot;);</span>
+<span class="nc" id="L131">        return null;</span>
+    }
+
+    @Override
+    public Void floatShape(FloatShape floatShape) {
+<span class="nc" id="L136">        writer.write(&quot;serializer.writeFloat(${schema:L}, ${state:L})&quot;);</span>
+<span class="nc" id="L137">        return null;</span>
+    }
+
+    @Override
+    public Void documentShape(DocumentShape documentShape) {
+<span class="nc" id="L142">        writer.write(&quot;serializer.writeDocument(${schema:L}, ${state:L})&quot;);</span>
+<span class="nc" id="L143">        return null;</span>
+    }
+
+    @Override
+    public Void doubleShape(DoubleShape doubleShape) {
+<span class="fc" id="L148">        writer.write(&quot;serializer.writeDouble(${schema:L}, ${state:L})&quot;);</span>
+<span class="fc" id="L149">        return null;</span>
+    }
+
+    @Override
+    public Void bigIntegerShape(BigIntegerShape bigIntegerShape) {
+<span class="nc" id="L154">        writer.write(&quot;serializer.writeBigInteger(${schema:L}, ${state:L})&quot;);</span>
+<span class="nc" id="L155">        return null;</span>
+    }
+
+    @Override
+    public Void bigDecimalShape(BigDecimalShape bigDecimalShape) {
+<span class="nc" id="L160">        writer.write(&quot;serializer.writeBigDecimal(${schema:L}, ${state:L})&quot;);</span>
+<span class="nc" id="L161">        return null;</span>
+    }
+
+    @Override
+    public Void stringShape(StringShape stringShape) {
+<span class="fc" id="L166">        writer.write(&quot;serializer.writeString(${schema:L}, ${state:L})&quot;);</span>
+<span class="fc" id="L167">        return null;</span>
+    }
+
+    @Override
+    public Void structureShape(StructureShape structureShape) {
+<span class="fc" id="L172">        writer.write(&quot;serializer.writeStruct(${schema:L}, ${state:L})&quot;);</span>
+<span class="fc" id="L173">        return null;</span>
+    }
+
+    @Override
+    public Void unionShape(UnionShape unionShape) {
+<span class="nc" id="L178">        writer.write(&quot;${memberName:L}.serialize(serializer)&quot;);</span>
+<span class="nc" id="L179">        return null;</span>
+    }
+
+    @Override
+    public Void memberShape(MemberShape shape) {
+        // The error `message` member must be accessed from parent class.
+<span class="pc bpc" id="L185" title="3 of 4 branches missed.">        if (memberShape.hasTrait(ErrorTrait.class) &amp;&amp; provider.toMemberName(memberShape).equals(&quot;message&quot;)) {</span>
+<span class="nc" id="L186">            writer.write(&quot;serializer.writeString(SCHEMA_MESSAGE, ${state:L}.getMessage())&quot;);</span>
+<span class="nc" id="L187">            return null;</span>
+        }
+<span class="fc" id="L189">        return model.expectShape(memberShape.getTarget()).accept(this);</span>
+    }
+
+    @Override
+    public Void timestampShape(TimestampShape timestampShape) {
+<span class="nc" id="L194">        writer.write(&quot;serializer.writeTimestamp(${schema:L}, ${state:L})&quot;);</span>
+<span class="nc" id="L195">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

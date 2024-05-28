@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SerializableStruct.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.schema</a> &gt; <span class="el_source">SerializableStruct.java</span></div><h1>SerializableStruct.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.schema;
+
+import java.util.function.BiConsumer;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+
+/**
+ * A structure or union shape.
+ */
+public interface SerializableStruct extends SerializableShape {
+
+    @Override
+    default void serialize(ShapeSerializer encoder) {
+<span class="fc" id="L18">        encoder.writeStruct(schema(), this);</span>
+<span class="fc" id="L19">    }</span>
+
+    /**
+     * Get the schema of the shape.
+     *
+     * @return the schema.
+     */
+    SdkSchema schema();
+
+    /**
+     * Serializes the members of the structure or union.
+     *
+     * @param serializer Serializer to write to.
+     */
+    void serializeMembers(ShapeSerializer serializer);
+
+    /**
+     * Create a serializable struct from a schema and BiConsumer.
+     *
+     * @param schema Schema of the structure / union.
+     * @param memberWriter BiConsumer that writes members to the given serializer.
+     * @return the created SerializableStruct.
+     */
+    static SerializableStruct create(SdkSchema schema, BiConsumer&lt;SdkSchema, ShapeSerializer&gt; memberWriter) {
+<span class="fc" id="L43">        return new SerializableStruct() {</span>
+            @Override
+            public SdkSchema schema() {
+<span class="fc" id="L46">                return schema;</span>
+            }
+
+            @Override
+            public void serializeMembers(ShapeSerializer serializer) {
+<span class="fc" id="L51">                memberWriter.accept(schema, serializer);</span>
+<span class="fc" id="L52">            }</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JavaWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.writer</a> &gt; <span class="el_source">JavaWriter.java</span></div><h1>JavaWriter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.writer;
+
+import java.util.Set;
+import java.util.function.BiFunction;
+import software.amazon.smithy.codegen.core.Symbol;
+import software.amazon.smithy.codegen.core.SymbolReference;
+import software.amazon.smithy.codegen.core.SymbolWriter;
+import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.SymbolProperties;
+import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
+import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.utils.SmithyUnstableApi;
+import software.amazon.smithy.utils.StringUtils;
+
+/**
+ * Writer for java code generation
+ *
+ * TODO: update docs
+ */
+@SmithyUnstableApi
+public class JavaWriter extends DeferredSymbolWriter&lt;JavaWriter, JavaImportContainer&gt; {
+    private final String packageNamespace;
+    private final JavaCodegenSettings settings;
+
+    public JavaWriter(JavaCodegenSettings settings, String packageNamespace) {
+<span class="fc" id="L33">        super(new JavaImportContainer(packageNamespace));</span>
+
+<span class="fc" id="L35">        this.packageNamespace = packageNamespace;</span>
+<span class="fc" id="L36">        this.settings = settings;</span>
+
+        // Ensure extraneous white space is trimmed
+<span class="fc" id="L39">        trimBlankLines();</span>
+<span class="fc" id="L40">        trimTrailingSpaces();</span>
+
+        // Formatters
+<span class="fc" id="L43">        putFormatter('T', new JavaTypeFormatter());</span>
+<span class="fc" id="L44">        putFormatter('B', new BoxedTypeFormatter());</span>
+<span class="fc" id="L45">        putFormatter('U', new CapitalizingFormatter());</span>
+<span class="fc" id="L46">    }</span>
+
+    // Java does not support aliases, so just import normally
+    private void addImport(Symbol symbol) {
+<span class="fc" id="L50">        addImport(symbol, symbol.getName());</span>
+<span class="fc" id="L51">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L55">        putNameContext();</span>
+<span class="fc" id="L56">        return format(</span>
+            &quot;&quot;&quot;
+                $L
+
+                package $L;
+
+                $L
+                $L
+                &quot;&quot;&quot;,
+<span class="fc" id="L65">            settings.header(),</span>
+            packageNamespace,
+<span class="fc" id="L67">            getImportContainer(),</span>
+<span class="fc" id="L68">            super.toString()</span>
+        );
+    }
+
+    public void newLine() {
+<span class="fc" id="L73">        writeInlineWithNoFormatting(getNewline());</span>
+<span class="fc" id="L74">    }</span>
+
+    /**
+     * Writes the ID string constant for a shape class.
+     *
+     * @param shape Shape to write ID for
+     */
+    public void writeIdString(Shape shape) {
+<span class="fc" id="L82">        write(&quot;public static final $1T ID = $1T.from($2S);&quot;, ShapeId.class, shape.getId());</span>
+<span class="fc" id="L83">    }</span>
+
+    /**
+     * Writes the toString method for a serializable Class.
+     */
+    public void writeToString() {
+<span class="fc" id="L89">        write(&quot;&quot;&quot;</span>
+            @Override
+            public $T toString() {
+                return $T.serialize(this);
+            }
+            &quot;&quot;&quot;, String.class, ToStringSerializer.class);
+<span class="fc" id="L95">    }</span>
+
+    private void putNameContext() {
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (final Set&lt;Symbol&gt; duplicates : symbolTable.values()) {</span>
+            // If the duplicates list has more than one entry
+            // then duplicates are present, and we need to de-duplicate the names
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (duplicates.size() &gt; 1) {</span>
+<span class="fc" id="L102">                duplicates.forEach(dupe -&gt; putContext(dupe.getFullName(), deduplicate(dupe)));</span>
+            } else {
+<span class="fc" id="L104">                Symbol symbol = duplicates.iterator().next();</span>
+<span class="fc" id="L105">                putContext(symbol.getFullName().replace(&quot;[]&quot;, &quot;Array&quot;), symbol.getName());</span>
+            }
+<span class="fc" id="L107">        }</span>
+<span class="fc" id="L108">    }</span>
+
+    private String deduplicate(Symbol dupe) {
+        // If we are in the namespace of a Symbol, use its
+        // short name, otherwise use the full name
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (dupe.getNamespace().equals(packageNamespace)) {</span>
+<span class="fc" id="L114">            return dupe.getName();</span>
+        }
+<span class="fc" id="L116">        return dupe.getFullName();</span>
+    }
+
+    /**
+     * A factory class to create {@link JavaWriter}s.
+     */
+    public static final class Factory implements SymbolWriter.Factory&lt;JavaWriter&gt; {
+
+        private final JavaCodegenSettings settings;
+
+        /**
+         * @param settings The python plugin settings.
+         */
+<span class="fc" id="L129">        public Factory(JavaCodegenSettings settings) {</span>
+<span class="fc" id="L130">            this.settings = settings;</span>
+<span class="fc" id="L131">        }</span>
+
+        @Override
+        public JavaWriter apply(String filename, String namespace) {
+<span class="fc" id="L135">            return new JavaWriter(settings, namespace);</span>
+        }
+    }
+
+
+    /**
+     * Implements a formatter for {@code $T} that formats Java types.
+     */
+<span class="fc" id="L143">    private final class JavaTypeFormatter implements BiFunction&lt;Object, String, String&gt; {</span>
+        @Override
+        public String apply(Object type, String indent) {
+            Symbol typeSymbol;
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (type instanceof Symbol s) {</span>
+<span class="fc" id="L148">                typeSymbol = s;</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            } else if (type instanceof Class&lt;?&gt; c) {</span>
+<span class="fc" id="L150">                typeSymbol = CodegenUtils.fromClass(c);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            } else if (type instanceof SymbolReference r) {</span>
+<span class="nc" id="L152">                typeSymbol = r.getSymbol();</span>
+            } else {
+<span class="nc" id="L154">                throw new IllegalArgumentException(</span>
+                    &quot;Invalid type provided for $T. Expected a Symbol or Class&quot;
+                        + &quot; but found: `&quot; + type + &quot;`.&quot;
+                );
+            }
+
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (typeSymbol.getReferences().isEmpty()) {</span>
+<span class="fc" id="L161">                return getPlaceholder(typeSymbol);</span>
+            }
+
+            // Add type references as type references (ex. `Map&lt;KeyType, ValueType&gt;`)
+<span class="fc" id="L165">            putContext(&quot;refs&quot;, typeSymbol.getReferences());</span>
+<span class="fc" id="L166">            String output = format(</span>
+                &quot;$L&lt;${#refs}${value:B}${^key.last}, ${/key.last}${/refs}&gt;&quot;,
+<span class="fc" id="L168">                getPlaceholder(typeSymbol)</span>
+            );
+<span class="fc" id="L170">            removeContext(&quot;refs&quot;);</span>
+<span class="fc" id="L171">            return output;</span>
+        }
+
+        private String getPlaceholder(Symbol symbol) {
+            // Add symbol to import container and symbol table
+<span class="fc" id="L176">            var normalizedSymbol = normalizeSymbol(symbol);</span>
+<span class="fc" id="L177">            addImport(normalizedSymbol);</span>
+<span class="fc" id="L178">            addToSymbolTable(normalizedSymbol);</span>
+
+            // Return a placeholder value that will be filled when toString is called
+            // [] is replaced with &quot;Array&quot; to ensure array types don't break formatter.
+<span class="fc" id="L182">            return format(&quot;$${$L:L}&quot;, symbol.getFullName().replace(&quot;[]&quot;, &quot;Array&quot;));</span>
+        }
+    }
+
+    /**
+     * Implements a formatter for {@code $B} that formats Java types, preferring a boxed version of a type if available.
+     */
+<span class="fc" id="L189">    private final class BoxedTypeFormatter implements BiFunction&lt;Object, String, String&gt; {</span>
+<span class="fc" id="L190">        private final JavaTypeFormatter javaTypeFormatter = new JavaTypeFormatter();</span>
+
+        @Override
+        public String apply(Object type, String indent) {
+            Symbol typeSymbol;
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            if (type instanceof Symbol s) {</span>
+<span class="fc" id="L196">                typeSymbol = s;</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            } else if (type instanceof Class&lt;?&gt; c) {</span>
+<span class="nc" id="L198">                typeSymbol = CodegenUtils.fromClass(c);</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            } else if (type instanceof SymbolReference r) {</span>
+<span class="fc" id="L200">                typeSymbol = r.getSymbol();</span>
+            } else {
+<span class="nc" id="L202">                throw new IllegalArgumentException(</span>
+                    &quot;Invalid type provided for $B. Expected a Symbol or Class&quot;
+                        + &quot; but found: `&quot; + type + &quot;`.&quot;
+                );
+            }
+
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            if (typeSymbol.getProperty(SymbolProperties.BOXED_TYPE).isPresent()) {</span>
+<span class="fc" id="L209">                typeSymbol = typeSymbol.expectProperty(SymbolProperties.BOXED_TYPE);</span>
+            }
+
+<span class="fc" id="L212">            return javaTypeFormatter.apply(typeSymbol, indent);</span>
+        }
+    }
+
+    /**
+     * Implements a formatter for {@code $U} that capitalizes the first letter of a string literal.
+     */
+    private static final class CapitalizingFormatter implements BiFunction&lt;Object, String, String&gt; {
+        @Override
+        public String apply(Object type, String indent) {
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (type instanceof String s) {</span>
+<span class="fc" id="L223">                return StringUtils.capitalize(s);</span>
+            }
+<span class="nc" id="L225">            throw new IllegalArgumentException(</span>
+                &quot;Invalid type provided for $U. Expected a String but found: `&quot;
+                    + type + &quot;`.&quot;
+            );
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HashCodeGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.generators</a> &gt; <span class="el_source">HashCodeGenerator.java</span></div><h1>HashCodeGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.generators;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.model.shapes.Shape;
+
+<span class="fc" id="L16">record HashCodeGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements Runnable {</span>
+
+    @Override
+    public void run() {
+<span class="fc" id="L20">        writer.write(</span>
+            &quot;&quot;&quot;
+                @Override
+                public int hashCode() {
+                    ${C|}
+                }
+                &quot;&quot;&quot;,
+            (Runnable) this::generate
+        );
+<span class="fc" id="L29">    }</span>
+
+    private void generate() {
+<span class="fc" id="L32">        List&lt;String&gt; arrayMemberNames = shape.members()</span>
+<span class="fc" id="L33">            .stream()</span>
+<span class="fc" id="L34">            .filter(member -&gt; CodegenUtils.isJavaArray(symbolProvider.toSymbol(member)))</span>
+<span class="fc" id="L35">            .map(symbolProvider::toMemberName)</span>
+<span class="fc" id="L36">            .toList();</span>
+<span class="fc" id="L37">        List&lt;String&gt; objectMemberNames = shape.members()</span>
+<span class="fc" id="L38">            .stream()</span>
+<span class="fc" id="L39">            .map(symbolProvider::toMemberName)</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            .filter(name -&gt; !arrayMemberNames.contains(name))</span>
+<span class="fc" id="L41">            .toList();</span>
+<span class="fc" id="L42">        writer.pushState();</span>
+<span class="fc" id="L43">        writer.putContext(&quot;arr&quot;, arrayMemberNames);</span>
+<span class="fc" id="L44">        writer.putContext(&quot;obj&quot;, objectMemberNames);</span>
+
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (arrayMemberNames.isEmpty()) {</span>
+<span class="fc" id="L47">            writer.write(</span>
+                &quot;return $T.hash(${#obj}${value:L}${^key.last}, ${/key.last}${/obj});&quot;,
+                Objects.class
+            );
+        } else {
+<span class="nc" id="L52">            writer.write(</span>
+                &quot;&quot;&quot;
+                    int result = $T.hash(${#obj}${value:L}${^key.last}, ${/key.last}${/obj});
+                    result = 31 * result${#arr} + $T.hashCode(${value:L})${/arr};
+                    return result;
+                    &quot;&quot;&quot;,
+                Objects.class,
+                Arrays.class
+            );
+        }
+<span class="fc" id="L62">        writer.popState();</span>
+<span class="fc" id="L63">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

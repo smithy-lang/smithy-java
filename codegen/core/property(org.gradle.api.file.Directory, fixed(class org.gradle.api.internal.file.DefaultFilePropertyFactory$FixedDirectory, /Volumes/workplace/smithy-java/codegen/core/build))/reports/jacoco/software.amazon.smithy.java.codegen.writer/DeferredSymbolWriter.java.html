@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeferredSymbolWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.writer</a> &gt; <span class="el_source">DeferredSymbolWriter.java</span></div><h1>DeferredSymbolWriter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.writer;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import software.amazon.smithy.codegen.core.ImportContainer;
+import software.amazon.smithy.codegen.core.Symbol;
+import software.amazon.smithy.codegen.core.SymbolWriter;
+import software.amazon.smithy.utils.ListUtils;
+
+
+public abstract class DeferredSymbolWriter&lt;W extends SymbolWriter&lt;W, I&gt;, I extends ImportContainer&gt; extends
+    SymbolWriter&lt;W, I&gt; {
+
+<span class="fc" id="L21">    protected final Map&lt;String, Set&lt;Symbol&gt;&gt; symbolTable = new HashMap&lt;&gt;();</span>
+
+    public DeferredSymbolWriter(I importContainer) {
+<span class="fc" id="L24">        super(importContainer);</span>
+<span class="fc" id="L25">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L29">        return format(super.toString());</span>
+    }
+
+    /**
+     * Add symbol to symbol table, so potential type name conflicts can be detected and
+     * handled.
+     *
+     * @param symbol Symbol to add to symbol table.
+     */
+    protected void addToSymbolTable(Symbol symbol) {
+<span class="fc" id="L39">        Set&lt;Symbol&gt; nameSet = symbolTable.computeIfAbsent(symbol.getName(), n -&gt; new HashSet&lt;&gt;());</span>
+
+<span class="fc" id="L41">        nameSet.add(symbol);</span>
+<span class="fc" id="L42">    }</span>
+
+    /**
+     * Replace Symbol with version with no type references to avoid false positive duplicates.
+     *
+     * @param symbol Symbol to normalize
+     * @return normalized symbol
+     */
+    protected static Symbol normalizeSymbol(Symbol symbol) {
+<span class="fc" id="L51">        return symbol.toBuilder().references(ListUtils.of()).build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

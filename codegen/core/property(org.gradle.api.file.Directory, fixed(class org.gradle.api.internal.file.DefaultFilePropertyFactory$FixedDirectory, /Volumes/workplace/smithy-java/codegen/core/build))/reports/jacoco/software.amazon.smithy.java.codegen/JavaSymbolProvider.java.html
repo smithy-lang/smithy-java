@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JavaSymbolProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen</a> &gt; <span class="el_source">JavaSymbolProvider.java</span></div><h1>JavaSymbolProvider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen;
+
+import static java.lang.String.format;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import software.amazon.smithy.codegen.core.CodegenException;
+import software.amazon.smithy.codegen.core.Symbol;
+import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.runtime.core.serde.DataStream;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.BigDecimalShape;
+import software.amazon.smithy.model.shapes.BigIntegerShape;
+import software.amazon.smithy.model.shapes.BlobShape;
+import software.amazon.smithy.model.shapes.BooleanShape;
+import software.amazon.smithy.model.shapes.ByteShape;
+import software.amazon.smithy.model.shapes.DocumentShape;
+import software.amazon.smithy.model.shapes.DoubleShape;
+import software.amazon.smithy.model.shapes.EnumShape;
+import software.amazon.smithy.model.shapes.FloatShape;
+import software.amazon.smithy.model.shapes.IntEnumShape;
+import software.amazon.smithy.model.shapes.IntegerShape;
+import software.amazon.smithy.model.shapes.ListShape;
+import software.amazon.smithy.model.shapes.LongShape;
+import software.amazon.smithy.model.shapes.MapShape;
+import software.amazon.smithy.model.shapes.MemberShape;
+import software.amazon.smithy.model.shapes.OperationShape;
+import software.amazon.smithy.model.shapes.ResourceShape;
+import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeVisitor;
+import software.amazon.smithy.model.shapes.ShortShape;
+import software.amazon.smithy.model.shapes.StringShape;
+import software.amazon.smithy.model.shapes.StructureShape;
+import software.amazon.smithy.model.shapes.TimestampShape;
+import software.amazon.smithy.model.shapes.UnionShape;
+import software.amazon.smithy.model.traits.StreamingTrait;
+import software.amazon.smithy.model.traits.UniqueItemsTrait;
+import software.amazon.smithy.utils.CaseUtils;
+
+/**
+ * Maps Smithy types to Java Symbols
+ */
+public class JavaSymbolProvider implements ShapeVisitor&lt;Symbol&gt;, SymbolProvider {
+
+<span class="fc" id="L60">    private static final System.Logger LOGGER = System.getLogger(JavaSymbolProvider.class.getName());</span>
+
+    private final Model model;
+    private final ServiceShape service;
+    private final String packageNamespace;
+
+<span class="fc" id="L66">    public JavaSymbolProvider(Model model, ServiceShape service, String packageNamespace) {</span>
+<span class="fc" id="L67">        this.model = model;</span>
+<span class="fc" id="L68">        this.service = service;</span>
+<span class="fc" id="L69">        this.packageNamespace = packageNamespace;</span>
+<span class="fc" id="L70">    }</span>
+
+    @Override
+    public Symbol toSymbol(Shape shape) {
+<span class="fc" id="L74">        Symbol symbol = shape.accept(this);</span>
+<span class="pc" id="L75">        LOGGER.log(System.Logger.Level.TRACE, () -&gt; &quot;Creating symbol from &quot; + shape + &quot;: &quot; + symbol);</span>
+<span class="fc" id="L76">        return symbol;</span>
+
+    }
+
+    @Override
+    public String toMemberName(MemberShape shape) {
+<span class="fc" id="L82">        Shape containerShape = model.expectShape(shape.getContainer());</span>
+<span class="pc bpc" id="L83" title="2 of 4 branches missed.">        if (containerShape.isEnumShape() || containerShape.isIntEnumShape()) {</span>
+<span class="nc" id="L84">            return CaseUtils.toSnakeCase(CodegenUtils.MEMBER_ESCAPER.escape(shape.getMemberName()))</span>
+<span class="nc" id="L85">                .toUpperCase(Locale.ENGLISH);</span>
+        }
+
+        // If a member name contains an underscore, convert to camel case
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (shape.getMemberName().contains(&quot;_&quot;)) {</span>
+<span class="nc" id="L90">            return CodegenUtils.MEMBER_ESCAPER.escape(CaseUtils.toCamelCase(shape.getMemberName()));</span>
+        }
+
+<span class="fc" id="L93">        return CodegenUtils.MEMBER_ESCAPER.escape(shape.getMemberName());</span>
+    }
+
+    @Override
+    public Symbol blobShape(BlobShape blobShape) {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (blobShape.hasTrait(StreamingTrait.class)) {</span>
+<span class="nc" id="L99">            return CodegenUtils.fromClass(DataStream.class);</span>
+        }
+<span class="nc" id="L101">        return CodegenUtils.fromClass(byte[].class)</span>
+<span class="nc" id="L102">            .toBuilder()</span>
+<span class="nc" id="L103">            .putProperty(SymbolProperties.IS_JAVA_ARRAY, true)</span>
+<span class="nc" id="L104">            .putProperty(SymbolProperties.IS_PRIMITIVE, true)</span>
+<span class="nc" id="L105">            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)</span>
+<span class="nc" id="L106">            .build();</span>
+    }
+
+    @Override
+    public Symbol booleanShape(BooleanShape booleanShape) {
+<span class="nc" id="L111">        return CodegenUtils.fromBoxedClass(boolean.class, Boolean.class);</span>
+    }
+
+    @Override
+    public Symbol listShape(ListShape listShape) {
+        // Lists with unique Items are treated as Sequenced Sets
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (listShape.hasTrait(UniqueItemsTrait.class)) {</span>
+<span class="nc" id="L118">            return CodegenUtils.fromClass(Set.class)</span>
+<span class="nc" id="L119">                .toBuilder()</span>
+<span class="nc" id="L120">                .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, &quot;unmodifiableSet&quot;)</span>
+<span class="nc" id="L121">                .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashSet.class)</span>
+<span class="nc" id="L122">                .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, &quot;emptySet()&quot;)</span>
+<span class="nc" id="L123">                .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)</span>
+<span class="nc" id="L124">                .addReference(listShape.getMember().accept(this))</span>
+<span class="nc" id="L125">                .build();</span>
+        }
+<span class="fc" id="L127">        return CodegenUtils.fromClass(List.class)</span>
+<span class="fc" id="L128">            .toBuilder()</span>
+<span class="fc" id="L129">            .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, &quot;unmodifiableList&quot;)</span>
+<span class="fc" id="L130">            .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, ArrayList.class)</span>
+<span class="fc" id="L131">            .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, &quot;emptyList()&quot;)</span>
+<span class="fc" id="L132">            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)</span>
+<span class="fc" id="L133">            .addReference(listShape.getMember().accept(this))</span>
+<span class="fc" id="L134">            .build();</span>
+    }
+
+    @Override
+    public Symbol mapShape(MapShape mapShape) {
+<span class="fc" id="L139">        return CodegenUtils.fromClass(Map.class)</span>
+<span class="fc" id="L140">            .toBuilder()</span>
+<span class="fc" id="L141">            .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, &quot;unmodifiableMap&quot;)</span>
+<span class="fc" id="L142">            .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashMap.class)</span>
+<span class="fc" id="L143">            .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, &quot;emptyMap()&quot;)</span>
+<span class="fc" id="L144">            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)</span>
+<span class="fc" id="L145">            .addReference(mapShape.getKey().accept(this))</span>
+<span class="fc" id="L146">            .addReference(mapShape.getValue().accept(this))</span>
+<span class="fc" id="L147">            .build();</span>
+    }
+
+    @Override
+    public Symbol byteShape(ByteShape byteShape) {
+<span class="fc" id="L152">        return CodegenUtils.fromBoxedClass(byte.class, Byte.class);</span>
+    }
+
+    @Override
+    public Symbol shortShape(ShortShape shortShape) {
+<span class="nc" id="L157">        return CodegenUtils.fromBoxedClass(short.class, Short.class);</span>
+    }
+
+    @Override
+    public Symbol integerShape(IntegerShape integerShape) {
+<span class="nc" id="L162">        return CodegenUtils.fromBoxedClass(int.class, Integer.class);</span>
+    }
+
+    @Override
+    public Symbol intEnumShape(IntEnumShape shape) {
+<span class="nc" id="L167">        return getJavaClassSymbol(shape);</span>
+    }
+
+    @Override
+    public Symbol longShape(LongShape longShape) {
+<span class="nc" id="L172">        return CodegenUtils.fromBoxedClass(long.class, Long.class);</span>
+    }
+
+    @Override
+    public Symbol floatShape(FloatShape floatShape) {
+<span class="nc" id="L177">        return CodegenUtils.fromBoxedClass(float.class, Float.class);</span>
+    }
+
+    @Override
+    public Symbol documentShape(DocumentShape documentShape) {
+<span class="nc" id="L182">        return CodegenUtils.fromClass(Document.class);</span>
+    }
+
+    @Override
+    public Symbol doubleShape(DoubleShape doubleShape) {
+<span class="fc" id="L187">        return CodegenUtils.fromBoxedClass(double.class, Double.class);</span>
+    }
+
+    @Override
+    public Symbol bigIntegerShape(BigIntegerShape bigIntegerShape) {
+<span class="nc" id="L192">        return CodegenUtils.fromClass(BigInteger.class);</span>
+    }
+
+    @Override
+    public Symbol bigDecimalShape(BigDecimalShape bigDecimalShape) {
+<span class="nc" id="L197">        return CodegenUtils.fromClass(BigDecimal.class);</span>
+    }
+
+    @Override
+    public Symbol timestampShape(TimestampShape timestampShape) {
+<span class="nc" id="L202">        return CodegenUtils.fromClass(Instant.class);</span>
+    }
+
+    @Override
+    public Symbol stringShape(StringShape stringShape) {
+<span class="fc" id="L207">        return CodegenUtils.fromClass(String.class);</span>
+    }
+
+    @Override
+    public Symbol memberShape(MemberShape memberShape) {
+<span class="fc" id="L212">        return toSymbol(</span>
+<span class="fc" id="L213">            model.getShape(memberShape.getTarget())</span>
+<span class="fc" id="L214">                .orElseThrow(</span>
+<span class="nc" id="L215">                    () -&gt; new CodegenException(</span>
+<span class="nc" id="L216">                        &quot;Could not find shape &quot; + memberShape.getTarget() + &quot; targeted by &quot;</span>
+                            + memberShape
+                    )
+                )
+        );
+    }
+
+    @Override
+    public Symbol operationShape(OperationShape operationShape) {
+<span class="fc" id="L225">        return getJavaClassSymbol(operationShape);</span>
+    }
+
+    @Override
+    public Symbol resourceShape(ResourceShape resourceShape) {
+        // Resource shapes do not generate a Java type
+<span class="nc" id="L231">        return null;</span>
+    }
+
+    @Override
+    public Symbol serviceShape(ServiceShape serviceShape) {
+        // TODO: implement
+<span class="fc" id="L237">        return null;</span>
+    }
+
+    @Override
+    public Symbol enumShape(EnumShape shape) {
+<span class="nc" id="L242">        return getJavaClassSymbol(shape);</span>
+    }
+
+    @Override
+    public Symbol structureShape(StructureShape structureShape) {
+<span class="fc" id="L247">        return getJavaClassSymbol(structureShape);</span>
+    }
+
+    @Override
+    public Symbol unionShape(UnionShape unionShape) {
+<span class="nc" id="L252">        return getJavaClassSymbol(unionShape);</span>
+    }
+
+    protected Model getModel() {
+<span class="nc" id="L256">        return model;</span>
+    }
+
+    protected ServiceShape getService() {
+<span class="nc" id="L260">        return service;</span>
+    }
+
+    protected String getPackageNamespace() {
+<span class="nc" id="L264">        return packageNamespace;</span>
+    }
+
+
+    private Symbol getJavaClassSymbol(Shape shape) {
+<span class="fc" id="L269">        String name = CodegenUtils.getDefaultName(shape, service);</span>
+<span class="fc" id="L270">        return Symbol.builder()</span>
+<span class="fc" id="L271">            .name(name)</span>
+<span class="fc" id="L272">            .putProperty(SymbolProperties.IS_PRIMITIVE, false)</span>
+<span class="fc" id="L273">            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, true)</span>
+<span class="fc" id="L274">            .namespace(format(&quot;%s.model&quot;, packageNamespace), &quot;.&quot;)</span>
+<span class="fc" id="L275">            .declarationFile(format(&quot;./%s/model/%s.java&quot;, packageNamespace.replace(&quot;.&quot;, &quot;/&quot;), name))</span>
+<span class="fc" id="L276">            .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

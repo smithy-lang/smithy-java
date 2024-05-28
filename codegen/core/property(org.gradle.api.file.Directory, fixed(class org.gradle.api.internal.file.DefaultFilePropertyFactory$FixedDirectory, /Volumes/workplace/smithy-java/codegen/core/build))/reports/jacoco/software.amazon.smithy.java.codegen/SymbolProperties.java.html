@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymbolProperties.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen</a> &gt; <span class="el_source">SymbolProperties.java</span></div><h1>SymbolProperties.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen;
+
+import software.amazon.smithy.codegen.core.Property;
+import software.amazon.smithy.codegen.core.Symbol;
+
+public final class SymbolProperties {
+    /**
+     * The boxed version of a primitive symbol.
+     *
+     * &lt;p&gt;This is the symbol that should be used if a primitive type is nullable.
+     * For example a Symbol representing an {@code int} would have a Symbol
+     * representing a {@code Integer} as the value of this property.
+     */
+<span class="fc" id="L19">    public static final Property&lt;Symbol&gt; BOXED_TYPE = Property.named(&quot;boxed-type&quot;);</span>
+
+    /**
+     * Indicates if a symbol represents a Java primitive type.
+     */
+<span class="fc" id="L24">    public static final Property&lt;Boolean&gt; IS_PRIMITIVE = Property.named(&quot;is-primitive&quot;);</span>
+
+    /**
+     * Indicates if a symbol represents a Java array such as {@code byte[]}.
+     */
+<span class="fc" id="L29">    public static final Property&lt;Boolean&gt; IS_JAVA_ARRAY = Property.named(&quot;is-java-array&quot;);</span>
+
+    /**
+     * Method on {@link java.util.Collection} to use to create an immutable copy of the collection type
+     * a symbol represents.
+     */
+<span class="fc" id="L35">    public static final Property&lt;String&gt; COLLECTION_IMMUTABLE_WRAPPER = Property.named(&quot;collection-wrapper&quot;);</span>
+
+    /**
+     * Class to use when instantiating a new instance of a collection.
+     *
+     * &lt;p&gt;For example, a Symbol representing a {@link java.util.List} might specify the {@link java.util.ArrayList}
+     * class as its implementing class.
+     */
+<span class="fc" id="L43">    public static final Property&lt;Class&lt;?&gt;&gt; COLLECTION_IMPLEMENTATION_CLASS = Property.named(&quot;collection-impl-class&quot;);</span>
+
+    /**
+     * Method on {@link java.util.Collection} to use to create an empty version of the collection type
+     * a symbol represents.
+     */
+<span class="fc" id="L49">    public static final Property&lt;String&gt; COLLECTION_EMPTY_METHOD = Property.named(&quot;collection-empty&quot;);</span>
+
+    /**
+     * Indicates that a type should define a static default value.
+     */
+<span class="fc" id="L54">    public static final Property&lt;Boolean&gt; REQUIRES_STATIC_DEFAULT = Property.named(&quot;requires-static-default&quot;);</span>
+
+    private SymbolProperties() {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

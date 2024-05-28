@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>URIBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.uri</a> &gt; <span class="el_source">URIBuilder.java</span></div><h1>URIBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.uri;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+
+/**
+ * A builder for a {@link URI}.
+ *
+ * &lt;p&gt;All methods of this builder expect that the provided values are valid for their components and are already
+ * percent-encoded where necessary.
+ */
+<span class="fc" id="L17">public final class URIBuilder {</span>
+
+    private String scheme;
+    private String userInfo;
+    private String host;
+<span class="fc" id="L22">    private int port = -1;</span>
+    private String path; // this shouldn't default to &quot;/&quot;
+    private String query;
+    private String fragment;
+
+    /**
+     * Create a builder from a URI.
+     *
+     * @param uri URI to decompose into a builder.
+     * @return Returns the builder.
+     */
+    public static URIBuilder of(URI uri) {
+<span class="fc" id="L34">        URIBuilder builder = new URIBuilder();</span>
+<span class="fc" id="L35">        builder.scheme(uri.getScheme());</span>
+<span class="fc" id="L36">        builder.userInfo(uri.getRawUserInfo());</span>
+<span class="fc" id="L37">        builder.host(uri.getHost());</span>
+<span class="fc" id="L38">        builder.port(uri.getPort());</span>
+<span class="fc" id="L39">        builder.path(uri.getRawPath());</span>
+<span class="fc" id="L40">        builder.query(uri.getRawQuery());</span>
+<span class="fc" id="L41">        builder.fragment(uri.getRawFragment());</span>
+<span class="fc" id="L42">        return builder;</span>
+    }
+
+    /**
+     * Builds the URI from the components.
+     *
+     * @return Returns the built URI.
+     * @throws IllegalArgumentException if the URI cannot be built.
+     * @throws NullPointerException if parts of the URI are missing.
+     */
+    public URI build() {
+        try {
+<span class="fc" id="L54">            return new URI(buildString());</span>
+<span class="nc" id="L55">        } catch (URISyntaxException e) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(e);</span>
+        }
+    }
+
+    private String buildString() {
+<span class="fc" id="L61">        final StringBuilder builder = new StringBuilder();</span>
+
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (this.scheme != null) {</span>
+<span class="fc" id="L64">            builder.append(this.scheme).append(':');</span>
+        }
+
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (this.host != null) {</span>
+<span class="fc" id="L68">            builder.append(&quot;//&quot;);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (userInfo != null) {</span>
+<span class="nc" id="L70">                builder.append(userInfo).append('@');</span>
+            }
+<span class="fc" id="L72">            builder.append(host);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            if (port &gt;= 0) {</span>
+<span class="nc" id="L74">                builder.append(':').append(port);</span>
+            }
+        }
+
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (path != null) {</span>
+<span class="pc bpc" id="L79" title="3 of 6 branches missed.">            if (host != null &amp;&amp; !path.isEmpty() &amp;&amp; !path.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L80">                builder.append('/');</span>
+            }
+<span class="fc" id="L82">            builder.append(this.path);</span>
+        }
+
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (query != null) {</span>
+<span class="fc" id="L86">            builder.append('?').append(query);</span>
+        }
+
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (fragment != null) {</span>
+<span class="nc" id="L90">            builder.append('#').append(fragment);</span>
+        }
+
+<span class="fc" id="L93">        return builder.toString();</span>
+    }
+
+    public URIBuilder scheme(String scheme) {
+<span class="fc" id="L97">        this.scheme = scheme;</span>
+<span class="fc" id="L98">        return this;</span>
+    }
+
+    public URIBuilder userInfo(String userInfo) {
+<span class="fc" id="L102">        this.userInfo = userInfo;</span>
+<span class="fc" id="L103">        return this;</span>
+    }
+
+    public URIBuilder host(String host) {
+<span class="fc" id="L107">        this.host = host;</span>
+<span class="fc" id="L108">        return this;</span>
+    }
+
+    public URIBuilder port(int port) {
+<span class="fc" id="L112">        this.port = port;</span>
+<span class="fc" id="L113">        return this;</span>
+    }
+
+    public URIBuilder path(String path) {
+<span class="fc" id="L117">        this.path = path;</span>
+<span class="fc" id="L118">        return this;</span>
+    }
+
+    public URIBuilder query(String query) {
+<span class="fc" id="L122">        this.query = query;</span>
+<span class="fc" id="L123">        return this;</span>
+    }
+
+    public URIBuilder fragment(String fragment) {
+<span class="fc" id="L127">        this.fragment = fragment;</span>
+<span class="fc" id="L128">        return this;</span>
+    }
+
+    /**
+     * Concatenate the given raw path string onto the URI, adding a &quot;/&quot; if necessary.
+     *
+     * @param path Path to concatenate onto the URI.
+     * @return Returns the builder.
+     */
+    public URIBuilder concatPath(String path) {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (this.path.endsWith(&quot;/&quot;)) {</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (path.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L140">                this.path += path.substring(1);</span>
+            } else {
+<span class="nc" id="L142">                this.path += path;</span>
+            }
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        } else if (path.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L145">            this.path += path;</span>
+        } else {
+<span class="nc" id="L147">            this.path += &quot;/&quot; + path;</span>
+        }
+<span class="nc" id="L149">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

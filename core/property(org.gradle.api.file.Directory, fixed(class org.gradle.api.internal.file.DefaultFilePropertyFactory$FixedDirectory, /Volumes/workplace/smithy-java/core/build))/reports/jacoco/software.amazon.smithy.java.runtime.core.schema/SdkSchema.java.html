@@ -1,0 +1,686 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SdkSchema.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.schema</a> &gt; <span class="el_source">SdkSchema.java</span></div><h1>SdkSchema.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.schema;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Set;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.DefaultTrait;
+import software.amazon.smithy.model.traits.LengthTrait;
+import software.amazon.smithy.model.traits.PatternTrait;
+import software.amazon.smithy.model.traits.RangeTrait;
+import software.amazon.smithy.model.traits.RequiredTrait;
+import software.amazon.smithy.model.traits.Trait;
+import software.amazon.smithy.utils.SmithyBuilder;
+
+/**
+ * Describes a generated shape with important metadata from a Smithy model.
+ *
+ * &lt;p&gt;Various constraint traits are precomputed based on the presence of traits exposed by this class to aid in the
+ * performance of validation to avoid computing constraints and hashmap lookups by trait class.
+ *
+ * &lt;p&gt;Note: when creating a structure schema, all required members must come before optional members.
+ */
+public final class SdkSchema {
+
+    private final ShapeId id;
+    private final ShapeType type;
+    private final Map&lt;Class&lt;? extends Trait&gt;, Trait&gt; traits;
+    private final Map&lt;String, SdkSchema&gt; members;
+    private final List&lt;SdkSchema&gt; memberList;
+    private volatile int hashCode;
+
+    private final String memberName;
+    private final SdkSchema memberTarget;
+
+    /**
+     * The position of the member in a containing shape's {@link #members()} return value.
+     */
+<span class="fc" id="L52">    private int memberIndex = -1;</span>
+
+    private final Set&lt;String&gt; stringEnumValues;
+    private final Set&lt;Integer&gt; intEnumValues;
+
+    // The following variables are used to speed up validation and prevent looking up constraints over and over.
+    final int requiredMemberCount;
+    final long minLengthConstraint;
+    final long maxLengthConstraint;
+    final BigDecimal minRangeConstraint;
+    final BigDecimal maxRangeConstraint;
+    final long minLongConstraint;
+    final long maxLongConstraint;
+    final double minDoubleConstraint;
+    final double maxDoubleConstraint;
+    final ValidatorOfString stringValidation;
+    boolean isRequiredByValidation;
+
+    /**
+     * The bitmask to use for this member to compute a required member bitfield. This value will match the memberIndex
+     * if the member is required and has no default value. It will be zero if isRequiredByValidation == false.
+     */
+    long requiredByValidationBitmask;
+
+    /**
+     * The result of creating a bitfield of the memberIndex of every required member with no default value.
+     * This allows for an inexpensive comparison for required structure member validation.
+     */
+    final long requiredStructureMemberBitfield;
+
+<span class="fc" id="L82">    private SdkSchema(Builder builder) {</span>
+<span class="fc" id="L83">        this.id = Objects.requireNonNull(builder.id, &quot;id is null&quot;);</span>
+<span class="fc" id="L84">        this.type = Objects.requireNonNull(builder.type, &quot;type is null&quot;);</span>
+<span class="fc" id="L85">        this.traits = createTraitMap(builder.traits);</span>
+
+        // Member setting.s
+<span class="fc" id="L88">        this.memberName = builder.memberName;</span>
+<span class="fc" id="L89">        this.memberTarget = builder.memberTarget;</span>
+<span class="fc" id="L90">        this.members = MemberContainers.of(</span>
+            this.type,
+            builder.members,
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            this.memberTarget != null ? this.memberTarget.members : null</span>
+        );
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        this.memberList = builder.members == null ? Collections.emptyList() : List.copyOf(members.values());</span>
+        // Validation requires the member is present if it's required and has no default value.
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        this.isRequiredByValidation = memberName != null</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            &amp;&amp; !hasTrait(DefaultTrait.class)</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            &amp;&amp; hasTrait(RequiredTrait.class);</span>
+
+<span class="fc" id="L101">        this.stringEnumValues = builder.stringEnumValues;</span>
+<span class="fc" id="L102">        this.intEnumValues = builder.intEnumValues;</span>
+
+        // Precompute an allowed range, setting Long.MIN and Long.MAX when missing.
+<span class="fc" id="L105">        var lengthTrait = getTrait(LengthTrait.class);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (lengthTrait == null) {</span>
+<span class="fc" id="L107">            minLengthConstraint = Long.MIN_VALUE;</span>
+<span class="fc" id="L108">            maxLengthConstraint = Long.MAX_VALUE;</span>
+        } else {
+<span class="fc" id="L110">            minLengthConstraint = lengthTrait.getMin().orElse(Long.MIN_VALUE);</span>
+<span class="fc" id="L111">            maxLengthConstraint = lengthTrait.getMax().orElse(Long.MAX_VALUE);</span>
+        }
+
+        // If the shape is a string or enum, pre-compute necessary validation (or no-op if not a string/enum).
+<span class="fc" id="L115">        stringValidation = createStringValidator(this, lengthTrait);</span>
+
+        // Range traits use BigDecimal, so use null when missing rather than any kind of default.
+<span class="fc" id="L118">        var rangeTrait = getTrait(RangeTrait.class);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (rangeTrait != null) {</span>
+<span class="fc" id="L120">            this.minRangeConstraint = rangeTrait.getMin().orElse(null);</span>
+<span class="fc" id="L121">            this.maxRangeConstraint = rangeTrait.getMax().orElse(null);</span>
+        } else {
+<span class="fc" id="L123">            this.minRangeConstraint = null;</span>
+<span class="fc" id="L124">            this.maxRangeConstraint = null;</span>
+        }
+
+        // Pre-compute allowable ranges so this doesn't have to be looked up during validation.
+        // BigInteger and BigDecimal just use the rangeConstraint BigDecimal directly.
+<span class="fc bfc" id="L129" title="All 7 branches covered.">        switch (type) {</span>
+            case BYTE -&gt; {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">                minLongConstraint = minRangeConstraint == null ? Byte.MIN_VALUE : minRangeConstraint.byteValue();</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                maxLongConstraint = maxRangeConstraint == null ? Byte.MAX_VALUE : maxRangeConstraint.byteValue();</span>
+<span class="fc" id="L133">                minDoubleConstraint = Double.MIN_VALUE;</span>
+<span class="fc" id="L134">                maxDoubleConstraint = Double.MAX_VALUE;</span>
+<span class="fc" id="L135">            }</span>
+            case SHORT -&gt; {
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                minLongConstraint = minRangeConstraint == null ? Short.MIN_VALUE : minRangeConstraint.shortValue();</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">                maxLongConstraint = maxRangeConstraint == null ? Short.MAX_VALUE : maxRangeConstraint.shortValue();</span>
+<span class="fc" id="L139">                minDoubleConstraint = Double.MIN_VALUE;</span>
+<span class="fc" id="L140">                maxDoubleConstraint = Double.MAX_VALUE;</span>
+<span class="fc" id="L141">            }</span>
+            case INTEGER -&gt; {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                minLongConstraint = minRangeConstraint == null ? Integer.MIN_VALUE : minRangeConstraint.intValue();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                maxLongConstraint = maxRangeConstraint == null ? Integer.MAX_VALUE : maxRangeConstraint.intValue();</span>
+<span class="fc" id="L145">                minDoubleConstraint = Double.MIN_VALUE;</span>
+<span class="fc" id="L146">                maxDoubleConstraint = Double.MAX_VALUE;</span>
+<span class="fc" id="L147">            }</span>
+            case LONG -&gt; {
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                minLongConstraint = minRangeConstraint == null ? Long.MIN_VALUE : minRangeConstraint.longValue();</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                maxLongConstraint = maxRangeConstraint == null ? Long.MAX_VALUE : maxRangeConstraint.longValue();</span>
+<span class="fc" id="L151">                minDoubleConstraint = Double.MIN_VALUE;</span>
+<span class="fc" id="L152">                maxDoubleConstraint = Double.MAX_VALUE;</span>
+<span class="fc" id="L153">            }</span>
+            case FLOAT -&gt; {
+<span class="fc" id="L155">                minLongConstraint = Long.MIN_VALUE;</span>
+<span class="fc" id="L156">                maxLongConstraint = Long.MAX_VALUE;</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                minDoubleConstraint = minRangeConstraint == null ? Float.MIN_VALUE : minRangeConstraint.floatValue();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                maxDoubleConstraint = maxRangeConstraint == null ? Float.MAX_VALUE : maxRangeConstraint.floatValue();</span>
+<span class="fc" id="L159">            }</span>
+            case DOUBLE -&gt; {
+<span class="fc" id="L161">                minLongConstraint = Long.MIN_VALUE;</span>
+<span class="fc" id="L162">                maxLongConstraint = Long.MAX_VALUE;</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                minDoubleConstraint = minRangeConstraint == null ? Double.MIN_VALUE : minRangeConstraint.doubleValue();</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">                maxDoubleConstraint = maxRangeConstraint == null ? Double.MAX_VALUE : maxRangeConstraint.doubleValue();</span>
+<span class="fc" id="L165">            }</span>
+            default -&gt; {
+<span class="fc" id="L167">                minLongConstraint = Long.MIN_VALUE;</span>
+<span class="fc" id="L168">                maxLongConstraint = Long.MAX_VALUE;</span>
+<span class="fc" id="L169">                minDoubleConstraint = Double.MIN_VALUE;</span>
+<span class="fc" id="L170">                maxDoubleConstraint = Double.MAX_VALUE;</span>
+            }
+        }
+
+        // Pre-compute where the shape contains any members marked as required.
+        // We only need to use the slow version of required member validation if there are &gt; 64 required members.
+<span class="fc" id="L176">        this.requiredMemberCount = computeRequiredMemberCount(this.type, this.memberTarget, this.memberList);</span>
+
+<span class="pc bpc" id="L178" title="1 of 6 branches missed.">        if ((requiredMemberCount &gt; 0) &amp;&amp; (requiredMemberCount &lt;= 64) &amp;&amp; type == ShapeType.STRUCTURE) {</span>
+<span class="fc" id="L179">            this.requiredStructureMemberBitfield = computeRequiredBitField(members());</span>
+        } else {
+<span class="fc" id="L181">            this.requiredStructureMemberBitfield = 0;</span>
+        }
+<span class="fc" id="L183">    }</span>
+
+    private static Map&lt;Class&lt;? extends Trait&gt;, Trait&gt; createTraitMap(Trait[] traits) {
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (traits == null) {</span>
+<span class="fc" id="L187">            return Map.of();</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        } else if (traits.length == 1) {</span>
+<span class="fc" id="L189">            return Map.of(traits[0].getClass(), traits[0]);</span>
+        } else {
+<span class="fc" id="L191">            var result = new HashMap&lt;Class&lt;? extends Trait&gt;, Trait&gt;(traits.length);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            for (Trait trait : traits) {</span>
+<span class="fc" id="L193">                result.put(trait.getClass(), trait);</span>
+            }
+<span class="fc" id="L195">            return Collections.unmodifiableMap(result);</span>
+        }
+    }
+
+    private static ValidatorOfString createStringValidator(SdkSchema schema, LengthTrait lengthTrait) {
+<span class="fc" id="L200">        List&lt;ValidatorOfString&gt; stringValidators = null;</span>
+
+<span class="fc bfc" id="L202" title="All 4 branches covered.">        if (schema.type == ShapeType.STRING || schema.type == ShapeType.ENUM) {</span>
+<span class="fc" id="L203">            stringValidators = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            if (lengthTrait != null) {</span>
+<span class="fc" id="L206">                stringValidators.add(</span>
+                    new ValidatorOfString.LengthStringValidator(
+<span class="fc" id="L208">                        lengthTrait.getMin().orElse(Long.MIN_VALUE),</span>
+<span class="fc" id="L209">                        lengthTrait.getMax().orElse(Long.MAX_VALUE)</span>
+                    )
+                );
+            }
+
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (!schema.stringEnumValues.isEmpty()) {</span>
+<span class="fc" id="L215">                stringValidators.add(ValidatorOfString.EnumStringValidator.INSTANCE);</span>
+            }
+
+<span class="fc" id="L218">            var patternTrait = schema.getTrait(PatternTrait.class);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (patternTrait != null) {</span>
+<span class="fc" id="L220">                stringValidators.add(new ValidatorOfString.PatternStringValidator(patternTrait.getPattern()));</span>
+            }
+        }
+
+<span class="fc" id="L224">        return ValidatorOfString.of(stringValidators);</span>
+    }
+
+    private static int computeRequiredMemberCount(ShapeType type, SdkSchema memberTarget, List&lt;SdkSchema&gt; members) {
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (memberTarget != null) {</span>
+<span class="fc" id="L229">            return memberTarget.requiredMemberCount;</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        } else if (type != ShapeType.STRUCTURE) {</span>
+<span class="fc" id="L231">            return 0;</span>
+        } else {
+<span class="fc" id="L233">            int result = 0;</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            for (var member : members) {</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">                if (member.isRequiredByValidation) {</span>
+<span class="fc" id="L236">                    result++;</span>
+                }
+<span class="fc" id="L238">            }</span>
+<span class="fc" id="L239">            return result;</span>
+        }
+    }
+
+    private static long computeRequiredBitField(Collection&lt;SdkSchema&gt; members) {
+<span class="fc" id="L244">        long setFields = 0L;</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        for (SdkSchema member : members) {</span>
+<span class="fc" id="L246">            setFields |= member.requiredByValidationBitmask;</span>
+<span class="fc" id="L247">        }</span>
+<span class="fc" id="L248">        return setFields;</span>
+    }
+
+    private void setMemberIndex(int memberIndex) {
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (this.memberIndex != -1) {</span>
+<span class="nc" id="L253">            throw new IllegalStateException(</span>
+                &quot;Member schema already has an assigned member index of &quot;
+                    + this.memberIndex + &quot;. Members cannot be reused across shapes. Member: &quot; + this
+            );
+        }
+
+<span class="fc" id="L259">        hashCode = 0; // reset the hashcode</span>
+<span class="fc" id="L260">        this.memberIndex = memberIndex;</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        requiredByValidationBitmask = isRequiredByValidation ? 1L &lt;&lt; memberIndex : 0L;</span>
+<span class="fc" id="L262">    }</span>
+
+    /**
+     * Creates a builder for a non-member.
+     *
+     * @return Returns the created builder.
+     */
+    public static Builder builder() {
+<span class="fc" id="L270">        return new Builder();</span>
+    }
+
+    /**
+     * Create a builder for a member.
+     *
+     * @param memberName   Name of the member.
+     * @param memberTarget Schema the member targets.
+     * @return Returns the member builder.
+     * @throws IllegalArgumentException if {@code memberIndex} is less than 1.
+     */
+    public static Builder memberBuilder(String memberName, SdkSchema memberTarget) {
+<span class="fc" id="L282">        Builder builder = builder();</span>
+<span class="fc" id="L283">        builder.memberTarget = Objects.requireNonNull(memberTarget, &quot;memberTarget is null&quot;);</span>
+<span class="fc" id="L284">        builder.memberName = Objects.requireNonNull(memberName, &quot;memberName is null&quot;);</span>
+<span class="fc" id="L285">        builder.type = memberTarget.type;</span>
+<span class="fc" id="L286">        return builder;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L291">        return &quot;SdkSchema{id='&quot; + id + '\'' + &quot;, type=&quot; + type + '}';</span>
+    }
+
+    /**
+     * Get the shape ID of the shape.
+     *
+     * @return Return the shape ID.
+     */
+    public ShapeId id() {
+<span class="fc" id="L300">        return id;</span>
+    }
+
+    /**
+     * Get the schema shape type.
+     * &lt;p&gt;
+     * Note that this will never return MEMBER as a type. Schema members act as if they are the target type.
+     *
+     * @return Returns the schema shape type.
+     */
+    public ShapeType type() {
+<span class="fc" id="L311">        return type;</span>
+    }
+
+    /**
+     * Check if the schema is for a member.
+     *
+     * @return Returns true if this is a member.
+     */
+    public boolean isMember() {
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        return memberName != null;</span>
+    }
+
+    /**
+     * Get the name of the member if the schema is for a member, or null if not.
+     *
+     * @return Returns the member name or null if not a member.
+     */
+    public String memberName() {
+<span class="fc" id="L329">        return memberName;</span>
+    }
+
+    /**
+     * The position of the member in the containing shape's list of members &lt;em&gt;at this point in time&lt;/em&gt;.
+     *
+     * &lt;p&gt;This index is not stable over time; it can change between versions of a published JAR for a shape.
+     * Do not serialize the member index itself, rely on it for persistence, or assume it will be the same across
+     * versions of a JAR. This value is primarily used for
+     *
+     * @return the member index of this schema starting from 1. 0 is used when a shape is not a member.
+     */
+    public int memberIndex() {
+<span class="fc" id="L342">        return memberIndex;</span>
+    }
+
+    /**
+     * Get the target of the member, or null if the schema is not a member.
+     *
+     * @return Member target.
+     */
+    public SdkSchema memberTarget() {
+<span class="nc" id="L351">        return memberTarget;</span>
+    }
+
+    /**
+     * Get a trait if present.
+     *
+     * @param trait Trait to get.
+     * @return Returns the trait, or null if not found.
+     * @param &lt;T&gt; Trait type to get.
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T extends Trait&gt; T getTrait(Class&lt;T&gt; trait) {
+<span class="fc" id="L363">        var t = (T) traits.get(trait);</span>
+<span class="fc bfc" id="L364" title="All 4 branches covered.">        if (t == null &amp;&amp; isMember()) {</span>
+<span class="fc" id="L365">            return memberTarget.getTrait(trait);</span>
+        }
+<span class="fc" id="L367">        return t;</span>
+    }
+
+    /**
+     * Check if the schema has a trait.
+     *
+     * @param trait Trait to check for.
+     * @return true if the trait is found.
+     * @param &lt;T&gt; Trait type.
+     */
+    public &lt;T extends Trait&gt; boolean hasTrait(Class&lt;T&gt; trait) {
+<span class="fc bfc" id="L378" title="All 6 branches covered.">        return traits.containsKey(trait) || (isMember() &amp;&amp; memberTarget.hasTrait(trait));</span>
+    }
+
+    /**
+     * Requires that the given trait type is found and returns it.
+     *
+     * @param trait Trait type to get.
+     * @return Returns the found value.
+     * @param &lt;T&gt; Trait to get.
+     * @throws NoSuchElementException if the value does not exist.
+     */
+    public &lt;T extends Trait&gt; T expectTrait(Class&lt;T&gt; trait) {
+<span class="fc" id="L390">        var t = getTrait(trait);</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L392">            throw new NoSuchElementException(&quot;Expected trait not found: &quot; + trait.getName());</span>
+        }
+<span class="fc" id="L394">        return t;</span>
+    }
+
+    /**
+     * Gets the members of the schema.
+     *
+     * @return Returns the members.
+     */
+    public List&lt;SdkSchema&gt; members() {
+<span class="fc" id="L403">        return memberList;</span>
+    }
+
+    /**
+     * Get a member by name or return a default value.
+     *
+     * @param memberName Member by name to get.
+     * @return Returns the found member or null if not found.
+     */
+    public SdkSchema member(String memberName) {
+<span class="fc" id="L413">        return members.get(memberName);</span>
+    }
+
+    /**
+     * Returns true if this is a required member with no default value.
+     *
+     * @return true if required.
+     */
+    boolean isRequiredByValidation() {
+<span class="fc" id="L422">        return isRequiredByValidation;</span>
+    }
+
+    /**
+     * Get the allowed values of the string.
+     *
+     * @return allowed string values (only relevant if not empty).
+     */
+    public Set&lt;String&gt; stringEnumValues() {
+<span class="fc" id="L431">        return stringEnumValues;</span>
+    }
+
+    /**
+     * Get the allowed integer values of an integer.
+     *
+     * @return allowed integer values (only relevant if not empty).
+     */
+    public Set&lt;Integer&gt; intEnumValues() {
+<span class="fc" id="L440">        return intEnumValues;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="fc bfc" id="L445" title="All 2 branches covered.">        if (this == o) {</span>
+<span class="fc" id="L446">            return true;</span>
+        }
+<span class="pc bpc" id="L448" title="2 of 4 branches missed.">        if (o == null || getClass() != o.getClass()) {</span>
+<span class="nc" id="L449">            return false;</span>
+        }
+<span class="fc" id="L451">        SdkSchema sdkSchema = (SdkSchema) o;</span>
+<span class="pc bpc" id="L452" title="5 of 6 branches missed.">        return memberIndex == sdkSchema.memberIndex &amp;&amp; Objects.equals(id, sdkSchema.id)</span>
+            &amp;&amp; type == sdkSchema.type
+<span class="nc bnc" id="L454" title="All 2 branches missed.">            &amp;&amp; Objects.equals(traits, sdkSchema.traits)</span>
+<span class="nc bnc" id="L455" title="All 2 branches missed.">            &amp;&amp; Objects.equals(members, sdkSchema.members)</span>
+<span class="nc bnc" id="L456" title="All 2 branches missed.">            &amp;&amp; Objects.equals(stringEnumValues, sdkSchema.stringEnumValues)</span>
+<span class="nc bnc" id="L457" title="All 2 branches missed.">            &amp;&amp; Objects.equals(intEnumValues, sdkSchema.intEnumValues)</span>
+<span class="nc bnc" id="L458" title="All 2 branches missed.">            &amp;&amp; Objects.equals(memberName, sdkSchema.memberName)</span>
+<span class="pc bnc" id="L459" title="All 2 branches missed.">            &amp;&amp; Objects.equals(memberTarget, sdkSchema.memberTarget);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L464">        var code = hashCode;</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        if (code == 0) {</span>
+<span class="fc" id="L466">            code = Objects.hash(</span>
+                id,
+                type,
+                traits,
+                members,
+                stringEnumValues,
+                intEnumValues,
+                memberName,
+                memberTarget,
+<span class="fc" id="L475">                memberIndex</span>
+            );
+<span class="fc" id="L477">            hashCode = code;</span>
+        }
+<span class="fc" id="L479">        return code;</span>
+    }
+
+<span class="fc" id="L482">    public static final class Builder implements SmithyBuilder&lt;SdkSchema&gt; {</span>
+
+        private ShapeId id;
+        private ShapeType type;
+        private Trait[] traits;
+        private List&lt;SdkSchema&gt; members;
+        private String memberName;
+        private SdkSchema memberTarget;
+
+<span class="fc" id="L491">        private Set&lt;String&gt; stringEnumValues = Collections.emptySet();</span>
+<span class="fc" id="L492">        private Set&lt;Integer&gt; intEnumValues = Collections.emptySet();</span>
+
+        @Override
+        public SdkSchema build() {
+<span class="fc" id="L496">            return new SdkSchema(this);</span>
+        }
+
+        /**
+         * Set the shape ID.
+         *
+         * &lt;p&gt;For members, this is the container shape ID without the member name.
+         *
+         * @param id Shape ID to set.
+         * @return Returns the builder.
+         */
+        public Builder id(String id) {
+<span class="fc" id="L508">            return id(ShapeId.from(id));</span>
+        }
+
+        /**
+         * Set the shape ID.
+         *
+         * &lt;p&gt;For members, this is the container shape ID without the member name.
+         *
+         * @param id Shape ID to set.
+         * @return Returns the builder.
+         */
+        public Builder id(ShapeId id) {
+<span class="fc" id="L520">            this.id = id;</span>
+<span class="fc bfc" id="L521" title="All 2 branches covered.">            if (memberName != null) {</span>
+<span class="fc" id="L522">                this.id = id.withMember(memberName);</span>
+            }
+<span class="fc" id="L524">            return this;</span>
+        }
+
+        /**
+         * Set the shape type.
+         *
+         * @param type Type to set.
+         * @return Returns the builder.
+         * @throws IllegalArgumentException when member, service, or resource types are given.
+         */
+        public Builder type(ShapeType type) {
+<span class="pc bpc" id="L535" title="1 of 2 branches missed.">            switch (type) {</span>
+<span class="nc" id="L536">                case MEMBER, SERVICE, RESOURCE -&gt; throw new IllegalStateException(&quot;Cannot set schema type to &quot; + type);</span>
+            }
+<span class="fc" id="L538">            this.type = type;</span>
+<span class="fc" id="L539">            return this;</span>
+        }
+
+        /**
+         * Set traits on the shape.
+         *
+         * @param traits Traits to set.
+         * @return Returns the builder.
+         */
+        public Builder traits(Trait... traits) {
+<span class="fc" id="L549">            this.traits = traits;</span>
+<span class="fc" id="L550">            return this;</span>
+        }
+
+        /**
+         * Set members on the shape.
+         *
+         * @param members Members to set.
+         * @return Returns the builder.
+         * @throws IllegalStateException if the schema is for a member.
+         */
+        public Builder members(SdkSchema... members) {
+<span class="fc" id="L561">            List&lt;SdkSchema&gt; result = new ArrayList&lt;&gt;(members.length);</span>
+<span class="fc" id="L562">            Collections.addAll(result, members);</span>
+<span class="fc" id="L563">            return membersWithOwnedList(result);</span>
+        }
+
+        /**
+         * Set members on the shape using builders.
+         *
+         * @param members Members to set, and the ID of the current builder is used.
+         * @return Returns the builder.
+         * @throws IllegalStateException if the schema is for a member.
+         */
+        public Builder members(Builder... members) {
+<span class="fc" id="L574">            List&lt;SdkSchema&gt; built = new ArrayList&lt;&gt;(members.length);</span>
+<span class="fc bfc" id="L575" title="All 2 branches covered.">            for (Builder member : members) {</span>
+<span class="fc" id="L576">                built.add(member.id(id).build());</span>
+            }
+<span class="fc" id="L578">            return membersWithOwnedList(built);</span>
+        }
+
+        /**
+         * Set members on the shape.
+         *
+         * @param members Members to set.
+         * @return Returns the builder.
+         * @throws IllegalStateException if the schema is for a member, or if the member is owned by another shape.
+         */
+        public Builder members(List&lt;SdkSchema&gt; members) {
+<span class="nc" id="L589">            return membersWithOwnedList(new ArrayList&lt;&gt;(members));</span>
+        }
+
+        // Given a list that the builder owns and is free to mutate and keep, sort the members and store them.
+        private Builder membersWithOwnedList(List&lt;SdkSchema&gt; members) {
+<span class="pc bpc" id="L594" title="1 of 2 branches missed.">            if (memberTarget != null) {</span>
+<span class="nc" id="L595">                throw new IllegalStateException(&quot;Cannot add members to a member&quot;);</span>
+            }
+
+            // Sort members to ensure that required members with no default come before other members.
+<span class="fc" id="L599">            members.sort((a, b) -&gt; {</span>
+<span class="fc bfc" id="L600" title="All 4 branches covered.">                if (a.isRequiredByValidation &amp;&amp; !b.isRequiredByValidation) {</span>
+<span class="fc" id="L601">                    return -1;</span>
+<span class="fc bfc" id="L602" title="All 2 branches covered.">                } else if (a.isRequiredByValidation) {</span>
+<span class="fc" id="L603">                    return 0;</span>
+                } else {
+<span class="fc" id="L605">                    return 1;</span>
+                }
+            });
+
+            // Assign the member index for each, checking to ensure members aren't illegally shared across shapes.
+<span class="fc" id="L610">            int index = 0;</span>
+<span class="fc bfc" id="L611" title="All 2 branches covered.">            for (var member : members) {</span>
+<span class="fc" id="L612">                member.setMemberIndex(index++);</span>
+<span class="fc" id="L613">            }</span>
+
+<span class="fc" id="L615">            this.members = members;</span>
+<span class="fc" id="L616">            return this;</span>
+        }
+
+        /**
+         * Set the allowed string enum values of an ENUM shape.
+         *
+         * &lt;p&gt;Enum values are stored on the schema in this way rather than as separate members to unify the enum trait
+         * and enum shapes, to simplify the Smithy data model and represent enums as strings, and to reduce the amount
+         * of complexity involved in validating string values against enums (for example, no need to iterate over enum
+         * members to determine if a member has a matching value).
+         *
+         * @param stringEnumValues Allowed string values.
+         * @return the builder.
+         * @throws SdkException if type has not been set or is not equal to ENUM or STRING.
+         */
+        public Builder stringEnumValues(Set&lt;String&gt; stringEnumValues) {
+<span class="pc bpc" id="L632" title="1 of 4 branches missed.">            if (type != ShapeType.STRING &amp;&amp; type != ShapeType.ENUM) {</span>
+<span class="fc" id="L633">                throw new SdkException(&quot;Can only set enum values for STRING or ENUM types&quot;);</span>
+            }
+<span class="fc" id="L635">            this.stringEnumValues = Objects.requireNonNull(stringEnumValues);</span>
+<span class="fc" id="L636">            return this;</span>
+        }
+
+        /**
+         * Set the allowed string enum values of a STRING or ENUM shape.
+         *
+         * @param stringEnumValues Allowed string values.
+         * @return the builder.
+         * @throws SdkException if type has not been set or is not equal to ENUM or STRING.
+         */
+        public Builder stringEnumValues(String... stringEnumValues) {
+<span class="fc" id="L647">            Set&lt;String&gt; values = new LinkedHashSet&lt;&gt;(stringEnumValues.length);</span>
+<span class="fc" id="L648">            Collections.addAll(values, stringEnumValues);</span>
+<span class="fc" id="L649">            return stringEnumValues(values);</span>
+        }
+
+        /**
+         * Set the allowed intEnum values of an INT_ENUM shape.
+         *
+         * &lt;p&gt;IntEnum values are stored on the schema in this way rather than as separate members to simplify the
+         * Smithy data model and represent intEnums as integers, and to reduce the amount of complexity involved in
+         * validating number values against int enum values (for example, no need to iterate over members to determine
+         * if a member has a matching value).
+         *
+         * @param intEnumValues Allowed int values.
+         * @return the builder.
+         * @throws SdkException if type has not been set or is not equal to INT_ENUM.
+         */
+        public Builder intEnumValues(Set&lt;Integer&gt; intEnumValues) {
+<span class="fc bfc" id="L665" title="All 2 branches covered.">            if (type != ShapeType.INT_ENUM) {</span>
+<span class="fc" id="L666">                throw new SdkException(&quot;Can only set intEnum values for INT_ENUM types&quot;);</span>
+            }
+<span class="fc" id="L668">            this.intEnumValues = Objects.requireNonNull(intEnumValues);</span>
+<span class="fc" id="L669">            return this;</span>
+        }
+
+        /**
+         * Set the allowed intEnum values of an INT_ENUM shape.
+         *
+         * @param intEnumValues Allowed int values.
+         * @return the builder.
+         * @throws SdkException if type has not been set or is not equal to INT_ENUM.
+         */
+        public Builder intEnumValues(Integer... intEnumValues) {
+<span class="fc" id="L680">            Set&lt;Integer&gt; values = new LinkedHashSet&lt;&gt;(intEnumValues.length);</span>
+<span class="fc" id="L681">            Collections.addAll(values, intEnumValues);</span>
+<span class="fc" id="L682">            return intEnumValues(values);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ServiceGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">server</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.server.generators</a> &gt; <span class="el_source">ServiceGenerator.java</span></div><h1>ServiceGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.server.generators;
+
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import software.amazon.smithy.codegen.core.Symbol;
+import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
+import software.amazon.smithy.java.codegen.CodeGenerationContext;
+import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.sections.ClassSection;
+import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
+import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.server.core.Operation;
+import software.amazon.smithy.java.server.core.Service;
+import software.amazon.smithy.java.server.core.exceptions.UnknownOperationException;
+import software.amazon.smithy.model.knowledge.TopDownIndex;
+import software.amazon.smithy.model.shapes.ServiceShape;
+
+<span class="nc" id="L25">public class ServiceGenerator implements</span>
+    Consumer&lt;GenerateServiceDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt;&gt; {
+
+    @Override
+    public void accept(
+        GenerateServiceDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive
+    ) {
+<span class="nc" id="L32">        ServiceShape shape = directive.shape();</span>
+<span class="nc" id="L33">        TopDownIndex index = TopDownIndex.of(directive.model());</span>
+<span class="nc" id="L34">        List&lt;Symbol&gt; operations = index.getContainedOperations(shape)</span>
+<span class="nc" id="L35">            .stream()</span>
+<span class="nc" id="L36">            .map(directive.symbolProvider()::toSymbol)</span>
+<span class="nc" id="L37">            .toList();</span>
+<span class="nc" id="L38">        directive.context().writerDelegator().useShapeWriter(shape, writer -&gt; {</span>
+<span class="nc" id="L39">            writer.pushState(new ClassSection(shape));</span>
+<span class="nc" id="L40">            writer.putContext(&quot;operationHolder&quot;, Operation.class);</span>
+<span class="nc" id="L41">            writer.putContext(&quot;serviceType&quot;, Service.class);</span>
+<span class="nc" id="L42">            writer.putContext(&quot;service&quot;, directive.symbol());</span>
+<span class="nc" id="L43">            writer.write(</span>
+                &quot;&quot;&quot;
+                    public final class ${service:T} implements ${serviceType:T} {
+
+                        ${C|}
+
+                        ${C|}
+
+                        ${C|}
+
+                        ${C|}
+
+                        @Override
+                        public &lt;I, O&gt; ${operationHolder:T}&lt;I, O&gt; getOperation(String operationName) {
+                            ${C|}
+                        }
+                    }
+                    &quot;&quot;&quot;,
+<span class="nc" id="L61">                writer.consumer(w -&gt; w.writeIdString(shape)),</span>
+<span class="nc" id="L62">                new PropertyGenerator(writer, shape, directive.symbolProvider(), operations, false),</span>
+<span class="nc" id="L63">                new ConstructorGenerator(writer, shape, directive.symbolProvider(), operations),</span>
+<span class="nc" id="L64">                new BuilderGenerator(writer, shape, directive.symbolProvider(), operations),</span>
+<span class="nc" id="L65">                new GetOperationGenerator(writer, shape, directive.symbolProvider(), operations)</span>
+            );
+<span class="nc" id="L67">            writer.popState();</span>
+<span class="nc" id="L68">        });</span>
+
+
+<span class="nc" id="L71">    }</span>
+
+<span class="nc" id="L73">    private record PropertyGenerator(</span>
+        JavaWriter writer, ServiceShape serviceShape, SymbolProvider symbolProvider,
+        List&lt;Symbol&gt; operations, boolean notFinal
+    ) implements Runnable {
+
+        @Override
+        public void run() {
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            for (Symbol operation : operations) {</span>
+<span class="nc" id="L81">                var operationName = operation.getProperty(ServerSymbolProperties.OPERATION_FIELD_NAME);</span>
+<span class="nc" id="L82">                writer.pushState();</span>
+<span class="nc" id="L83">                writer.putContext(&quot;notFinal&quot;, notFinal);</span>
+<span class="nc" id="L84">                writer.write(</span>
+                    &quot;private${^notFinal} final${/notFinal} $T $L;&quot;,
+                    Operation.class,
+                    operationName
+                );
+<span class="nc" id="L89">                writer.popState();</span>
+<span class="nc" id="L90">            }</span>
+<span class="nc" id="L91">        }</span>
+    }
+
+<span class="nc" id="L94">    private record ConstructorGenerator(</span>
+        JavaWriter writer, ServiceShape serviceShape, SymbolProvider symbolProvider,
+        List&lt;Symbol&gt; operations
+    ) implements Runnable {
+        @Override
+        public void run() {
+<span class="nc" id="L100">            writer.write(</span>
+                &quot;&quot;&quot;
+                    private ${service:T}(Builder builder) {
+                        ${C|}
+                    }
+                    &quot;&quot;&quot;,
+<span class="nc" id="L106">                writer.consumer(w -&gt; {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                    for (Symbol operation : operations) {</span>
+<span class="nc" id="L108">                        var operationName = operation.getProperty(ServerSymbolProperties.OPERATION_FIELD_NAME);</span>
+<span class="nc" id="L109">                        w.write(&quot;this.$1L = builder.$1L;&quot;, operationName);</span>
+<span class="nc" id="L110">                    }</span>
+<span class="nc" id="L111">                })</span>
+            );
+<span class="nc" id="L113">        }</span>
+    }
+
+<span class="nc" id="L116">    private record BuilderGenerator(</span>
+        JavaWriter writer, ServiceShape serviceShape, SymbolProvider symbolProvider,
+        List&lt;Symbol&gt; operations
+    ) implements Runnable {
+
+        @Override
+        public void run() {
+<span class="nc" id="L123">            List&lt;String&gt; stages = operations.stream()</span>
+<span class="nc" id="L124">                .map(symbol -&gt; symbol.getName() + &quot;Stage&quot;)</span>
+<span class="nc" id="L125">                .collect(Collectors.toList());</span>
+<span class="nc" id="L126">            stages.add(&quot;BuildStage&quot;);</span>
+<span class="nc" id="L127">            writer.pushState();</span>
+<span class="nc" id="L128">            writer.putContext(&quot;stages&quot;, stages);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            for (int i = 0; i &lt; stages.size() - 1; i++) {</span>
+<span class="nc" id="L130">                writer.pushState();</span>
+<span class="nc" id="L131">                writer.putContext(&quot;curStage&quot;, stages.get(i));</span>
+<span class="nc" id="L132">                writer.putContext(&quot;nextStage&quot;, stages.get(i + 1));</span>
+<span class="nc" id="L133">                Symbol operation = operations.get(i);</span>
+<span class="nc" id="L134">                Symbol syncOperation = operation.expectProperty(ServerSymbolProperties.STUB_OPERATION);</span>
+<span class="nc" id="L135">                Symbol asyncOperation = operation.expectProperty(ServerSymbolProperties.ASYNC_STUB_OPERATION);</span>
+<span class="nc" id="L136">                writer.putContext(&quot;operation&quot;, operation);</span>
+<span class="nc" id="L137">                writer.write(&quot;&quot;&quot;</span>
+                    public interface ${curStage:L} {
+                        ${nextStage:L} add${operation:T}Operation($T operation);
+                        ${nextStage:L} add${operation:T}Operation($T operation);
+                    }
+                    &quot;&quot;&quot;, syncOperation, asyncOperation);
+<span class="nc" id="L143">                writer.popState();</span>
+            }
+<span class="nc" id="L145">            writer.write(&quot;&quot;&quot;</span>
+                public interface BuildStage {
+                    ${service:T} build();
+                }
+                &quot;&quot;&quot;);
+<span class="nc" id="L150">            writer.write(&quot;&quot;&quot;</span>
+                public static $L builder() {
+                    return new Builder();
+                }
+<span class="nc" id="L154">                &quot;&quot;&quot;, stages.get(0));</span>
+<span class="nc" id="L155">            writer.write(</span>
+                &quot;&quot;&quot;
+                    private final static class Builder implements ${#stages}${value:L}${^key.last}, ${/key.last}${/stages} {
+
+                        ${C|}
+
+                        ${C|}
+
+                        public ${service:T} build() {
+                            return new ${service:T}(this);
+                        }
+                    }
+                    &quot;&quot;&quot;,
+                new PropertyGenerator(writer, serviceShape, symbolProvider, operations, true),
+<span class="nc" id="L169">                (Runnable) () -&gt; this.generateStages(stages)</span>
+            );
+<span class="nc" id="L171">            writer.popState();</span>
+
+<span class="nc" id="L173">        }</span>
+
+        private void generateStages(List&lt;String&gt; stages) {
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            for (int i = 0; i &lt; operations.size(); i++) {</span>
+<span class="nc" id="L177">                Symbol operation = operations.get(i);</span>
+<span class="nc" id="L178">                String operationFieldName = operation.expectProperty(</span>
+                    ServerSymbolProperties.OPERATION_FIELD_NAME
+                );
+<span class="nc" id="L181">                String nextStage = stages.get(i + 1);</span>
+<span class="nc" id="L182">                Symbol syncOperation = operation.expectProperty(ServerSymbolProperties.STUB_OPERATION);</span>
+<span class="nc" id="L183">                Symbol asyncOperation = operation.expectProperty(ServerSymbolProperties.ASYNC_STUB_OPERATION);</span>
+<span class="nc" id="L184">                writer.pushState();</span>
+<span class="nc" id="L185">                writer.putContext(&quot;operationFieldName&quot;, operationFieldName);</span>
+<span class="nc" id="L186">                writer.putContext(&quot;nextStage&quot;, nextStage);</span>
+<span class="nc" id="L187">                writer.putContext(&quot;operation&quot;, operation);</span>
+<span class="nc" id="L188">                writer.putContext(&quot;asyncOperationType&quot;, asyncOperation);</span>
+<span class="nc" id="L189">                writer.putContext(&quot;syncOperationType&quot;, syncOperation);</span>
+<span class="nc" id="L190">                writer.write(</span>
+                    &quot;&quot;&quot;
+                        @Override
+                        public ${nextStage:L} add${operation:T}Operation(${asyncOperationType:T} operation) {
+                            this.${operationFieldName:L} = new $1T&lt;&gt;(&quot;${operation:T}&quot;, true, operation::${operationFieldName:L});
+                            return this;
+                        }
+
+                        @Override
+                        public ${nextStage:L} add${operation:T}Operation(${syncOperationType:T} operation) {
+                            this.${operationFieldName:L} = new $1T&lt;&gt;(&quot;${operation:T}&quot;, false, operation::${operationFieldName:L});
+                            return this;
+                        }
+                        &quot;&quot;&quot;,
+                    Operation.class
+                );
+<span class="nc" id="L206">                writer.popState();</span>
+            }
+<span class="nc" id="L208">        }</span>
+    }
+
+<span class="nc" id="L211">    private record GetOperationGenerator(</span>
+        JavaWriter writer, ServiceShape serviceShape, SymbolProvider symbolProvider,
+        List&lt;Symbol&gt; operations
+    ) implements Runnable {
+
+        @Override
+        public void run() {
+<span class="nc" id="L218">            writer.openBlock(&quot;return switch (operationName) {&quot;, &quot;};&quot;, () -&gt; {</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">                for (Symbol operation : operations) {</span>
+<span class="nc" id="L220">                    writer.write(</span>
+                        &quot;case $S -&gt; $L;&quot;,
+<span class="nc" id="L222">                        operation.getName(),</span>
+<span class="nc" id="L223">                        operation.expectProperty(ServerSymbolProperties.OPERATION_FIELD_NAME)</span>
+                    );
+<span class="nc" id="L225">                }</span>
+<span class="nc" id="L226">                writer.write(</span>
+                    &quot;default -&gt; throw new $T(\&quot;Unknown operation name: \&quot; + operationName);&quot;,
+                    UnknownOperationException.class
+                );
+<span class="nc" id="L230">            });</span>
+
+<span class="nc" id="L232">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

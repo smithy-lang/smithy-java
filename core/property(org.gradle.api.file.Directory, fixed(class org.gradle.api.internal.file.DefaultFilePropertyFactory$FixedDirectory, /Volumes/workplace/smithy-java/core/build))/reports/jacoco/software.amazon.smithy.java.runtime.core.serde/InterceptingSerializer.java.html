@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterceptingSerializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.serde</a> &gt; <span class="el_source">InterceptingSerializer.java</span></div><h1>InterceptingSerializer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.serde;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.util.function.BiConsumer;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
+
+/**
+ * Intercepts serialization before and after each write.
+ *
+ * &lt;p&gt;{@link #before(SdkSchema)} is responsible for returning the {@link ShapeSerializer} used to actually perform a
+ * write, making the method act as a router between serializers, predicated on the given schema.
+ */
+<span class="fc" id="L22">public abstract class InterceptingSerializer implements ShapeSerializer {</span>
+
+    /**
+     * Called before writing and returns the writer to delegate to.
+     *
+     * @param schema Schema of the shape about to be written.
+     * @return the serializer that is to be used to write this schema.
+     */
+    protected abstract ShapeSerializer before(SdkSchema schema);
+
+    /**
+     * Called after the delegated serializer is called.
+     *
+     * @param schema Schema that was serialized.
+     */
+<span class="fc" id="L37">    protected void after(SdkSchema schema) {}</span>
+
+    @Override
+    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+<span class="fc" id="L41">        before(schema).writeStruct(schema, struct);</span>
+<span class="fc" id="L42">        after(schema);</span>
+<span class="fc" id="L43">    }</span>
+
+    @Override
+    public final &lt;T&gt; void writeList(SdkSchema schema, T listState, BiConsumer&lt;T, ShapeSerializer&gt; consumer) {
+<span class="fc" id="L47">        before(schema).writeList(schema, listState, consumer);</span>
+<span class="fc" id="L48">        after(schema);</span>
+<span class="fc" id="L49">    }</span>
+
+    @Override
+    public final &lt;T&gt; void writeMap(SdkSchema schema, T mapState, BiConsumer&lt;T, MapSerializer&gt; consumer) {
+<span class="fc" id="L53">        before(schema).writeMap(schema, mapState, consumer);</span>
+<span class="fc" id="L54">        after(schema);</span>
+<span class="fc" id="L55">    }</span>
+
+    @Override
+    public final void writeBoolean(SdkSchema schema, boolean value) {
+<span class="fc" id="L59">        before(schema).writeBoolean(schema, value);</span>
+<span class="fc" id="L60">        after(schema);</span>
+<span class="fc" id="L61">    }</span>
+
+    @Override
+    public final void writeShort(SdkSchema schema, short value) {
+<span class="fc" id="L65">        before(schema).writeShort(schema, value);</span>
+<span class="fc" id="L66">        after(schema);</span>
+<span class="fc" id="L67">    }</span>
+
+    @Override
+    public final void writeByte(SdkSchema schema, byte value) {
+<span class="fc" id="L71">        before(schema).writeByte(schema, value);</span>
+<span class="fc" id="L72">        after(schema);</span>
+<span class="fc" id="L73">    }</span>
+
+    @Override
+    public final void writeInteger(SdkSchema schema, int value) {
+<span class="fc" id="L77">        before(schema).writeInteger(schema, value);</span>
+<span class="fc" id="L78">        after(schema);</span>
+<span class="fc" id="L79">    }</span>
+
+    @Override
+    public final void writeLong(SdkSchema schema, long value) {
+<span class="fc" id="L83">        before(schema).writeLong(schema, value);</span>
+<span class="fc" id="L84">        after(schema);</span>
+<span class="fc" id="L85">    }</span>
+
+    @Override
+    public final void writeFloat(SdkSchema schema, float value) {
+<span class="fc" id="L89">        before(schema).writeFloat(schema, value);</span>
+<span class="fc" id="L90">        after(schema);</span>
+<span class="fc" id="L91">    }</span>
+
+    @Override
+    public final void writeDouble(SdkSchema schema, double value) {
+<span class="fc" id="L95">        before(schema).writeDouble(schema, value);</span>
+<span class="fc" id="L96">        after(schema);</span>
+<span class="fc" id="L97">    }</span>
+
+    @Override
+    public final void writeBigInteger(SdkSchema schema, BigInteger value) {
+<span class="fc" id="L101">        before(schema).writeBigInteger(schema, value);</span>
+<span class="fc" id="L102">        after(schema);</span>
+<span class="fc" id="L103">    }</span>
+
+    @Override
+    public final void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+<span class="fc" id="L107">        before(schema).writeBigDecimal(schema, value);</span>
+<span class="fc" id="L108">        after(schema);</span>
+<span class="fc" id="L109">    }</span>
+
+    @Override
+    public final void writeString(SdkSchema schema, String value) {
+<span class="fc" id="L113">        before(schema).writeString(schema, value);</span>
+<span class="fc" id="L114">        after(schema);</span>
+<span class="fc" id="L115">    }</span>
+
+    @Override
+    public final void writeBlob(SdkSchema schema, byte[] value) {
+<span class="fc" id="L119">        before(schema).writeBlob(schema, value);</span>
+<span class="fc" id="L120">        after(schema);</span>
+<span class="fc" id="L121">    }</span>
+
+    @Override
+    public final void writeTimestamp(SdkSchema schema, Instant value) {
+<span class="fc" id="L125">        before(schema).writeTimestamp(schema, value);</span>
+<span class="fc" id="L126">        after(schema);</span>
+<span class="fc" id="L127">    }</span>
+
+    @Override
+    public final void writeDocument(SdkSchema schema, Document value) {
+<span class="nc" id="L131">        before(schema).writeDocument(schema, value);</span>
+<span class="nc" id="L132">        after(schema);</span>
+<span class="nc" id="L133">    }</span>
+
+    @Override
+    public final void writeDocument(Document value) {
+<span class="nc" id="L137">        ShapeSerializer.super.writeDocument(value);</span>
+<span class="nc" id="L138">    }</span>
+
+    @Override
+    public final void writeNull(SdkSchema schema) {
+<span class="nc" id="L142">        before(schema).writeNull(schema);</span>
+<span class="nc" id="L143">        after(schema);</span>
+<span class="nc" id="L144">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

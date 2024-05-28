@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonDocument.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">json-codec</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.json</a> &gt; <span class="el_source">JsonDocument.java</span></div><h1>JsonDocument.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.json;
+
+import com.jsoniter.ValueType;
+import com.jsoniter.any.Any;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.runtime.core.serde.document.DocumentDeserializer;
+import software.amazon.smithy.model.shapes.ShapeType;
+
+final class JsonDocument implements Document {
+
+<span class="fc" id="L31">    private static final SdkSchema STRING_MAP_KEY = SdkSchema.memberBuilder(&quot;key&quot;, PreludeSchemas.STRING)</span>
+<span class="fc" id="L32">        .id(PreludeSchemas.DOCUMENT.id())</span>
+<span class="fc" id="L33">        .build();</span>
+
+    private final Any any;
+    private final JsonFieldMapper fieldMapper;
+    private final TimestampResolver timestampResolver;
+    private final ShapeType type;
+    private final SdkSchema schema;
+
+    JsonDocument(
+        com.jsoniter.any.Any any,
+        JsonFieldMapper fieldMapper,
+        TimestampResolver timestampResolver
+<span class="fc" id="L45">    ) {</span>
+<span class="fc" id="L46">        this.any = any;</span>
+<span class="fc" id="L47">        this.fieldMapper = fieldMapper;</span>
+<span class="fc" id="L48">        this.timestampResolver = timestampResolver;</span>
+
+        // Determine the type from the underlying JSON value.
+<span class="pc bpc" id="L51" title="1 of 6 branches missed.">        this.type = switch (any.valueType()) {</span>
+            case NUMBER -&gt; {
+<span class="fc" id="L53">                String val = any.toString();</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                if (val.contains(&quot;.&quot;)) {</span>
+<span class="fc" id="L55">                    yield ShapeType.DOUBLE;</span>
+                } else {
+<span class="fc" id="L57">                    yield ShapeType.INTEGER;</span>
+                }
+            }
+<span class="fc" id="L60">            case ARRAY -&gt; ShapeType.LIST;</span>
+<span class="fc" id="L61">            case OBJECT -&gt; ShapeType.MAP;</span>
+<span class="fc" id="L62">            case STRING -&gt; ShapeType.STRING;</span>
+<span class="fc" id="L63">            case BOOLEAN -&gt; ShapeType.BOOLEAN;</span>
+            // The default case should never be reached.
+<span class="pc" id="L65">            default -&gt; throw new SdkSerdeException(&quot;Expected JSON document: &quot; + any.mustBeValid());</span>
+        };
+<span class="fc" id="L67">        this.schema = PreludeSchemas.getSchemaForType(type);</span>
+<span class="fc" id="L68">    }</span>
+
+    @Override
+    public ShapeType type() {
+<span class="fc" id="L72">        return type;</span>
+    }
+
+    @Override
+    public boolean asBoolean() {
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        return any.valueType() == ValueType.BOOLEAN ? any.toBoolean() : Document.super.asBoolean();</span>
+    }
+
+    @Override
+    public byte asByte() {
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        return any.valueType() == ValueType.NUMBER ? (byte) any.toInt() : Document.super.asByte();</span>
+    }
+
+    @Override
+    public short asShort() {
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        return any.valueType() == ValueType.NUMBER ? (short) any.toInt() : Document.super.asShort();</span>
+    }
+
+    @Override
+    public int asInteger() {
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        return any.valueType() == ValueType.NUMBER ? any.toInt() : Document.super.asInteger();</span>
+    }
+
+    @Override
+    public long asLong() {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        return any.valueType() == ValueType.NUMBER ? any.toLong() : Document.super.asLong();</span>
+    }
+
+    @Override
+    public float asFloat() {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        return any.valueType() == ValueType.NUMBER ? any.toFloat() : Document.super.asFloat();</span>
+    }
+
+    @Override
+    public double asDouble() {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        return any.valueType() == ValueType.NUMBER ? any.toDouble() : Document.super.asDouble();</span>
+    }
+
+    @Override
+    public BigInteger asBigInteger() {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        return any.valueType() == ValueType.NUMBER ? BigInteger.valueOf(any.toLong()) : Document.super.asBigInteger();</span>
+    }
+
+    @Override
+    public BigDecimal asBigDecimal() {
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        return any.valueType() == ValueType.NUMBER ? BigDecimal.valueOf(any.toDouble()) : Document.super.asBigDecimal();</span>
+    }
+
+    @Override
+    public String asString() {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        return any.valueType() == ValueType.STRING ? any.toString() : Document.super.asString();</span>
+    }
+
+    @Override
+    public byte[] asBlob() {
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (any.valueType() != ValueType.STRING) {</span>
+<span class="nc" id="L128">            return Document.super.asBlob(); // this always fails</span>
+        } else {
+            try {
+                // Base64 decode JSON blobs.
+<span class="fc" id="L132">                return Base64.getDecoder().decode(any.toString());</span>
+<span class="fc" id="L133">            } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L134">                throw new SdkSerdeException(&quot;Expected a base64 encoded blob value&quot;, e);</span>
+            }
+        }
+    }
+
+    @Override
+    public Instant asTimestamp() {
+        // Always use the default JSON timestamp format with untyped documents.
+<span class="fc" id="L142">        return TimestampResolver.readTimestamp(any, timestampResolver.defaultFormat());</span>
+    }
+
+    @Override
+    public List&lt;Document&gt; asList() {
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (any.valueType() != ValueType.ARRAY) {</span>
+<span class="nc" id="L148">            return Document.super.asList();</span>
+        }
+
+<span class="fc" id="L151">        List&lt;Document&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        for (var value : any) {</span>
+<span class="fc" id="L153">            result.add(new JsonDocument(value, fieldMapper, timestampResolver));</span>
+<span class="fc" id="L154">        }</span>
+
+<span class="fc" id="L156">        return result;</span>
+    }
+
+    @Override
+    public Map&lt;String, Document&gt; asStringMap() {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (any.valueType() != ValueType.OBJECT) {</span>
+<span class="nc" id="L162">            return Document.super.asStringMap();</span>
+        } else {
+<span class="fc" id="L164">            Map&lt;String, Document&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            for (var entry : any.asMap().entrySet()) {</span>
+<span class="fc" id="L166">                result.put(</span>
+<span class="fc" id="L167">                    entry.getKey(),</span>
+<span class="fc" id="L168">                    new JsonDocument(entry.getValue(), fieldMapper, timestampResolver)</span>
+                );
+<span class="fc" id="L170">            }</span>
+<span class="fc" id="L171">            return result;</span>
+        }
+    }
+
+    @Override
+    public Document getMember(String memberName) {
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (any.valueType() == ValueType.OBJECT) {</span>
+<span class="fc" id="L178">            var memberDocument = any.get(memberName);</span>
+<span class="pc bpc" id="L179" title="1 of 4 branches missed.">            if (memberDocument.valueType() != ValueType.NULL &amp;&amp; memberDocument.valueType() != ValueType.INVALID) {</span>
+<span class="fc" id="L180">                return new JsonDocument(memberDocument, fieldMapper, timestampResolver);</span>
+            }
+        }
+<span class="fc" id="L183">        return null;</span>
+    }
+
+    @Override
+    public void serializeContents(ShapeSerializer encoder) {
+<span class="pc bpc" id="L188" title="1 of 7 branches missed.">        switch (type()) {</span>
+<span class="fc" id="L189">            case BOOLEAN -&gt; encoder.writeBoolean(schema, asBoolean());</span>
+<span class="fc" id="L190">            case INTEGER -&gt; encoder.writeInteger(schema, asInteger());</span>
+<span class="fc" id="L191">            case DOUBLE -&gt; encoder.writeDouble(schema, asDouble());</span>
+<span class="fc" id="L192">            case STRING -&gt; encoder.writeString(schema, asString());</span>
+<span class="fc" id="L193">            case MAP -&gt; encoder.writeMap(schema, asStringMap(), (stringMap, mapSerializer) -&gt; {</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">                for (var entry : stringMap.entrySet()) {</span>
+<span class="fc" id="L195">                    mapSerializer.writeEntry(</span>
+                        STRING_MAP_KEY,
+<span class="fc" id="L197">                        entry.getKey(),</span>
+<span class="fc" id="L198">                        entry.getValue(),</span>
+                        Document::serializeContents
+                    );
+<span class="fc" id="L201">                }</span>
+<span class="fc" id="L202">            });</span>
+<span class="fc" id="L203">            case LIST -&gt; encoder.writeList(schema, asList(), (list, c) -&gt; {</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                for (Document entry : list) {</span>
+<span class="fc" id="L205">                    entry.serializeContents(c);</span>
+<span class="fc" id="L206">                }</span>
+<span class="fc" id="L207">            });</span>
+            // When type is set in the ctor, it only allows the above types; the default switch should never happen.
+<span class="nc" id="L209">            default -&gt; throw new SdkSerdeException(&quot;Cannot serialize unexpected JSON value: &quot; + any);</span>
+        }
+<span class="fc" id="L211">    }</span>
+
+    @Override
+    public &lt;T extends SerializableShape&gt; void deserializeInto(SdkShapeBuilder&lt;T&gt; builder) {
+<span class="fc" id="L215">        builder.deserialize(new JsonDocumentDeserializer(this));</span>
+<span class="fc" id="L216">    }</span>
+
+    // JSON documents are considered equal if they have the same Any and if they have the same JSON settings.
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L222">            return true;</span>
+<span class="pc bpc" id="L223" title="2 of 4 branches missed.">        } else if (o == null || getClass() != o.getClass()) {</span>
+<span class="nc" id="L224">            return false;</span>
+        }
+<span class="fc" id="L226">        JsonDocument that = (JsonDocument) o;</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        return type == that.type</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            &amp;&amp; fieldMapper.getClass() == that.fieldMapper.getClass()</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            &amp;&amp; timestampResolver.equals(that.timestampResolver)</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            &amp;&amp; any.equals(that.any);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L235">        return Objects.hash(type, any, timestampResolver);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L240">        return &quot;JsonDocument{any=&quot; + any + &quot;, timestampResolver=&quot; + timestampResolver</span>
+            + &quot;, memberToField=&quot; + fieldMapper + '}';
+    }
+
+    /**
+     * Customized version of DocumentDeserializer to account for the settings of the JSON codec.
+     */
+    private static final class JsonDocumentDeserializer extends DocumentDeserializer {
+
+        private final JsonDocument jsonDocument;
+
+        JsonDocumentDeserializer(JsonDocument value) {
+<span class="fc" id="L252">            super(value);</span>
+<span class="fc" id="L253">            this.jsonDocument = value;</span>
+<span class="fc" id="L254">        }</span>
+
+        @Override
+        protected DocumentDeserializer deserializer(Document nextValue) {
+<span class="fc" id="L258">            return new JsonDocumentDeserializer((JsonDocument) nextValue);</span>
+        }
+
+        @Override
+        public &lt;T&gt; void readStruct(SdkSchema schema, T state, StructMemberConsumer&lt;T&gt; structMemberConsumer) {
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            for (var member : schema.members()) {</span>
+<span class="fc" id="L264">                var nextValue = jsonDocument.getMember(jsonDocument.fieldMapper.memberToField(member));</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                if (nextValue != null) {</span>
+<span class="fc" id="L266">                    structMemberConsumer.accept(state, member, deserializer(nextValue));</span>
+                }
+<span class="fc" id="L268">            }</span>
+<span class="fc" id="L269">        }</span>
+
+        @Override
+        public Instant readTimestamp(SdkSchema schema) {
+<span class="fc" id="L273">            var format = jsonDocument.timestampResolver.resolve(schema);</span>
+<span class="fc" id="L274">            return TimestampResolver.readTimestamp(jsonDocument.any, format);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

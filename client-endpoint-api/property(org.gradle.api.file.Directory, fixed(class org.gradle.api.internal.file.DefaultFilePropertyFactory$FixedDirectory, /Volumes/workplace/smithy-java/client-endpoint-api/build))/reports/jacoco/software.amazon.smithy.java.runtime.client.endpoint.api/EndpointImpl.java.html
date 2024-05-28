@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EndpointImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">client-endpoint-api</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.client.endpoint.api</a> &gt; <span class="el_source">EndpointImpl.java</span></div><h1>EndpointImpl.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.client.endpoint.api;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+final class EndpointImpl implements Endpoint {
+
+    private final URI uri;
+    private final List&lt;EndpointAuthScheme&gt; authSchemes;
+    private final Map&lt;EndpointProperty&lt;?&gt;, Object&gt; properties;
+
+<span class="fc" id="L23">    private EndpointImpl(Builder builder) {</span>
+<span class="fc" id="L24">        this.uri = Objects.requireNonNull(builder.uri);</span>
+<span class="fc" id="L25">        this.authSchemes = List.copyOf(builder.authSchemes);</span>
+<span class="fc" id="L26">        this.properties = Map.copyOf(builder.properties);</span>
+<span class="fc" id="L27">    }</span>
+
+    @Override
+    public URI uri() {
+<span class="fc" id="L31">        return uri;</span>
+    }
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; T property(EndpointProperty&lt;T&gt; property) {
+<span class="nc" id="L37">        return (T) properties.get(property);</span>
+    }
+
+    @Override
+    public Set&lt;EndpointProperty&lt;?&gt;&gt; properties() {
+<span class="nc" id="L42">        return properties.keySet();</span>
+    }
+
+    @Override
+    public List&lt;EndpointAuthScheme&gt; authSchemes() {
+<span class="nc" id="L47">        return authSchemes;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L53">            return true;</span>
+        }
+<span class="nc bnc" id="L55" title="All 4 branches missed.">        if (o == null || getClass() != o.getClass()) {</span>
+<span class="nc" id="L56">            return false;</span>
+        }
+<span class="nc" id="L58">        EndpointImpl endpoint = (EndpointImpl) o;</span>
+<span class="nc bnc" id="L59" title="All 4 branches missed.">        return Objects.equals(uri, endpoint.uri) &amp;&amp; Objects.equals(authSchemes, endpoint.authSchemes)</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            &amp;&amp; Objects.equals(properties, endpoint.properties);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L65">        return Objects.hash(uri, authSchemes, properties);</span>
+    }
+
+<span class="fc" id="L68">    static final class Builder implements Endpoint.Builder {</span>
+
+        private URI uri;
+<span class="fc" id="L71">        private final List&lt;EndpointAuthScheme&gt; authSchemes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L72">        final Map&lt;EndpointProperty&lt;?&gt;, Object&gt; properties = new HashMap&lt;&gt;();</span>
+
+        @Override
+        public Builder uri(URI uri) {
+<span class="fc" id="L76">            this.uri = uri;</span>
+<span class="fc" id="L77">            return this;</span>
+        }
+
+        @Override
+        public Builder uri(String uri) {
+            try {
+<span class="fc" id="L83">                return uri(new URI(uri));</span>
+<span class="nc" id="L84">            } catch (URISyntaxException e) {</span>
+<span class="nc" id="L85">                throw new RuntimeException(e);</span>
+            }
+        }
+
+        @Override
+        public Builder addAuthScheme(EndpointAuthScheme authScheme) {
+<span class="nc" id="L91">            this.authSchemes.add(authScheme);</span>
+<span class="nc" id="L92">            return this;</span>
+        }
+
+        @Override
+        public &lt;T&gt; Builder putProperty(EndpointProperty&lt;T&gt; property, T value) {
+<span class="nc" id="L97">            properties.put(property, value);</span>
+<span class="nc" id="L98">            return this;</span>
+        }
+
+        @Override
+        public Endpoint build() {
+<span class="fc" id="L103">            return new EndpointImpl(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PresenceTracker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.schema</a> &gt; <span class="el_source">PresenceTracker.java</span></div><h1>PresenceTracker.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.schema;
+
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.Set;
+import java.util.TreeSet;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.utils.SmithyInternalApi;
+
+/**
+ * Tracks the presence of required fields
+ */
+@SmithyInternalApi
+<span class="fc" id="L19">public abstract sealed class PresenceTracker {</span>
+
+    /**
+     * Sets a member as present.
+     *
+     * @param memberSchema schema of member to set
+     */
+    public abstract void setMember(SdkSchema memberSchema);
+
+    /**
+     * Checks if a member is present.
+     *
+     * @param memberSchema schema of member to check.
+     * @return true if member is present.
+     */
+    public abstract boolean checkMember(SdkSchema memberSchema);
+
+    /**
+     * Checks if all required members are set.
+     *
+     * @return false if any required members are missing.
+     */
+    public abstract boolean allSet();
+
+    /**
+     * Gets all missing, required members.
+     *
+     * @return set of missing, required members.
+     */
+    public abstract Set&lt;String&gt; getMissingMembers();
+
+    /**
+     * Checks if all required members are set and throws an exception if any are unset.
+     *
+     * @throws SdkSerdeException if any required members are not set.
+     */
+    public void validate() {
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (!allSet()) {</span>
+<span class="fc" id="L57">            throw new SdkSerdeException(&quot;Missing required members: &quot; + getMissingMembers());</span>
+        }
+<span class="nc" id="L59">    }</span>
+
+    /**
+     * Returns the {@link PresenceTracker} to use for validating the presence.
+     * of required members.
+     *
+     * @return StructureValidator to use for validating required members.
+     */
+    public static PresenceTracker of(SdkSchema schema) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (schema.requiredMemberCount == 0) {</span>
+<span class="fc" id="L69">            return NoOpPresenceTracker.INSTANCE;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        } else if (schema.requiredMemberCount &lt;= 64) {</span>
+<span class="fc" id="L71">            return new PresenceTracker.RequiredMemberPresenceTracker(schema);</span>
+        } else {
+<span class="fc" id="L73">            return new PresenceTracker.BigRequiredMemberPresenceTracker(schema);</span>
+        }
+    }
+
+    /**
+     * NoOp tracker that does not track the presence of any members.
+     *
+     * &lt;p&gt;Should be used for shapes with no required fields.
+     */
+<span class="fc" id="L82">    static final class NoOpPresenceTracker extends PresenceTracker {</span>
+<span class="fc" id="L83">        private static final NoOpPresenceTracker INSTANCE = new NoOpPresenceTracker();</span>
+
+        @Override
+        public void setMember(SdkSchema memberSchema) {
+            // No required members to set.
+<span class="fc" id="L88">        }</span>
+
+        @Override
+        public boolean checkMember(SdkSchema memberSchema) {
+<span class="nc" id="L92">            return false;</span>
+        }
+
+        @Override
+        public boolean allSet() {
+<span class="fc" id="L97">            return true;</span>
+        }
+
+        @Override
+        public Set&lt;String&gt; getMissingMembers() {
+<span class="nc" id="L102">            return Collections.emptySet();</span>
+        }
+    }
+
+    /**
+     * Tracker for structures with less than 65 required members
+     */
+    static final class RequiredMemberPresenceTracker extends PresenceTracker {
+<span class="fc" id="L110">        private long setBitfields = 0L;</span>
+        private final SdkSchema schema;
+
+<span class="fc" id="L113">        RequiredMemberPresenceTracker(SdkSchema schema) {</span>
+<span class="fc" id="L114">            this.schema = schema;</span>
+<span class="fc" id="L115">        }</span>
+
+        @Override
+        public void setMember(SdkSchema memberSchema) {
+<span class="fc" id="L119">            setBitfields |= memberSchema.requiredByValidationBitmask;</span>
+<span class="fc" id="L120">        }</span>
+
+        @Override
+        public boolean checkMember(SdkSchema memberSchema) {
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            return (setBitfields &amp; memberSchema.requiredByValidationBitmask) != 0L;</span>
+        }
+
+        @Override
+        public boolean allSet() {
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            return schema.requiredStructureMemberBitfield == setBitfields;</span>
+        }
+
+        @Override
+        public Set&lt;String&gt; getMissingMembers() {
+<span class="fc" id="L134">            Set&lt;String&gt; result = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            for (var member : schema.members()) {</span>
+<span class="fc bfc" id="L136" title="All 4 branches covered.">                if (member.isRequiredByValidation() &amp;&amp; (setBitfields &amp; member.requiredByValidationBitmask) == 0L) {</span>
+<span class="fc" id="L137">                    result.add(member.memberName());</span>
+                }
+<span class="fc" id="L139">            }</span>
+<span class="fc" id="L140">            return result;</span>
+        }
+    }
+
+    /**
+     * Tracker for structures with at least 65 required members.
+     */
+    static final class BigRequiredMemberPresenceTracker extends PresenceTracker {
+        private final BitSet bitSet;
+        private final SdkSchema schema;
+
+<span class="fc" id="L151">        BigRequiredMemberPresenceTracker(SdkSchema schema) {</span>
+<span class="fc" id="L152">            this.schema = schema;</span>
+<span class="fc" id="L153">            this.bitSet = new BitSet(schema.members().size());</span>
+<span class="fc" id="L154">        }</span>
+
+        @Override
+        public void setMember(SdkSchema memberSchema) {
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            if (memberSchema.isRequiredByValidation()) {</span>
+<span class="fc" id="L159">                bitSet.set(memberSchema.memberIndex());</span>
+            }
+<span class="fc" id="L161">        }</span>
+
+        @Override
+        public boolean checkMember(SdkSchema memberSchema) {
+<span class="fc" id="L165">            return bitSet.get(memberSchema.memberIndex());</span>
+        }
+
+        @Override
+        public boolean allSet() {
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">            if (bitSet.cardinality() != schema.requiredMemberCount) {</span>
+<span class="fc" id="L171">                return false;</span>
+            }
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            for (var member : schema.members()) {</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">                if (member.isRequiredByValidation() &amp;&amp; !bitSet.get(member.memberIndex())) {</span>
+<span class="nc" id="L175">                    return false;</span>
+                }
+<span class="nc" id="L177">            }</span>
+<span class="nc" id="L178">            return true;</span>
+        }
+
+        @Override
+        public Set&lt;String&gt; getMissingMembers() {
+<span class="fc" id="L183">            Set&lt;String&gt; result = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            for (var member : schema.members()) {</span>
+<span class="pc bpc" id="L185" title="1 of 4 branches missed.">                if (member.isRequiredByValidation() &amp;&amp; !bitSet.get(member.memberIndex())) {</span>
+<span class="fc" id="L186">                    result.add(member.memberName());</span>
+                }
+<span class="fc" id="L188">            }</span>
+<span class="fc" id="L189">            return result;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

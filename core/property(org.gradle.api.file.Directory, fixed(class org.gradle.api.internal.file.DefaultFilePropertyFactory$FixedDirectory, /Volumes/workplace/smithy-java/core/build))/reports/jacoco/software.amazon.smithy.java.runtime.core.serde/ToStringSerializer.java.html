@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ToStringSerializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.serde</a> &gt; <span class="el_source">ToStringSerializer.java</span></div><h1>ToStringSerializer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.serde;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.util.function.BiConsumer;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.model.traits.SensitiveTrait;
+
+/**
+ * Implements the toString method for shapes, taking the sensitive trait into account.
+ */
+<span class="fc" id="L21">public final class ToStringSerializer implements ShapeSerializer {</span>
+
+<span class="fc" id="L23">    private final StringBuilder builder = new StringBuilder();</span>
+
+    public static String serialize(SerializableShape shape) {
+<span class="fc" id="L26">        ToStringSerializer serializer = new ToStringSerializer();</span>
+<span class="fc" id="L27">        shape.serialize(serializer);</span>
+<span class="fc" id="L28">        return serializer.toString();</span>
+    }
+
+    @Override
+    public void close() {
+<span class="nc" id="L33">        builder.setLength(0);</span>
+<span class="nc" id="L34">        builder.trimToSize();</span>
+<span class="nc" id="L35">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L39">        return builder.toString().trim();</span>
+    }
+
+    private void append(SdkSchema schema, Object value) {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (schema.hasTrait(SensitiveTrait.class)) {</span>
+<span class="fc" id="L44">            builder.append(&quot;*REDACTED*&quot;);</span>
+        } else {
+<span class="fc" id="L46">            builder.append(value);</span>
+        }
+<span class="fc" id="L48">    }</span>
+
+    @Override
+    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+<span class="fc" id="L52">        builder.append(schema.id().getName()).append('[');</span>
+<span class="fc" id="L53">        struct.serializeMembers(new StructureWriter(this));</span>
+<span class="fc" id="L54">        builder.append(']');</span>
+<span class="fc" id="L55">    }</span>
+
+    private static final class StructureWriter extends InterceptingSerializer {
+        private final ToStringSerializer toStringSerializer;
+<span class="fc" id="L59">        private boolean isFirst = true;</span>
+
+<span class="fc" id="L61">        private StructureWriter(ToStringSerializer toStringSerializer) {</span>
+<span class="fc" id="L62">            this.toStringSerializer = toStringSerializer;</span>
+<span class="fc" id="L63">        }</span>
+
+        @Override
+        protected ShapeSerializer before(SdkSchema schema) {
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (!isFirst) {</span>
+<span class="fc" id="L68">                toStringSerializer.builder.append(&quot;, &quot;);</span>
+            } else {
+<span class="fc" id="L70">                isFirst = false;</span>
+            }
+<span class="fc" id="L72">            toStringSerializer.builder.append(schema.memberName()).append('=');</span>
+<span class="fc" id="L73">            return toStringSerializer;</span>
+        }
+    }
+
+    @Override
+    public &lt;T&gt; void writeList(SdkSchema schema, T state, BiConsumer&lt;T, ShapeSerializer&gt; consumer) {
+<span class="fc" id="L79">        builder.append('[');</span>
+<span class="fc" id="L80">        consumer.accept(state, new ListSerializer(this, this::writeComma));</span>
+<span class="fc" id="L81">        builder.append(']');</span>
+<span class="fc" id="L82">    }</span>
+
+    private void writeComma(int position) {
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (position &gt; 0) {</span>
+<span class="fc" id="L86">            builder.append(&quot;, &quot;);</span>
+        }
+<span class="fc" id="L88">    }</span>
+
+    @Override
+    public &lt;T&gt; void writeMap(SdkSchema schema, T state, BiConsumer&lt;T, MapSerializer&gt; consumer) {
+<span class="fc" id="L92">        builder.append('{');</span>
+<span class="fc" id="L93">        consumer.accept(state, new ToStringMapSerializer(this));</span>
+<span class="fc" id="L94">        builder.append('}');</span>
+<span class="fc" id="L95">    }</span>
+
+    private static final class ToStringMapSerializer implements MapSerializer {
+        private final ToStringSerializer serializer;
+<span class="fc" id="L99">        private boolean isFirst = true;</span>
+
+<span class="fc" id="L101">        ToStringMapSerializer(ToStringSerializer serializer) {</span>
+<span class="fc" id="L102">            this.serializer = serializer;</span>
+<span class="fc" id="L103">        }</span>
+
+        @Override
+        public &lt;T&gt; void writeEntry(
+            SdkSchema keySchema,
+            String key,
+            T state,
+            BiConsumer&lt;T, ShapeSerializer&gt; valueSerializer
+        ) {
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            if (!isFirst) {</span>
+<span class="fc" id="L113">                serializer.builder.append(&quot;, &quot;);</span>
+            } else {
+<span class="fc" id="L115">                isFirst = false;</span>
+            }
+<span class="fc" id="L117">            serializer.append(keySchema, key);</span>
+<span class="fc" id="L118">            serializer.builder.append('=');</span>
+<span class="fc" id="L119">            valueSerializer.accept(state, serializer);</span>
+<span class="fc" id="L120">        }</span>
+    }
+
+    @Override
+    public void writeBoolean(SdkSchema schema, boolean value) {
+<span class="fc" id="L125">        append(schema, value);</span>
+<span class="fc" id="L126">    }</span>
+
+    @Override
+    public void writeShort(SdkSchema schema, short value) {
+<span class="fc" id="L130">        append(schema, value);</span>
+<span class="fc" id="L131">    }</span>
+
+    @Override
+    public void writeByte(SdkSchema schema, byte value) {
+<span class="fc" id="L135">        append(schema, value);</span>
+<span class="fc" id="L136">    }</span>
+
+    @Override
+    public void writeInteger(SdkSchema schema, int value) {
+<span class="fc" id="L140">        append(schema, value);</span>
+<span class="fc" id="L141">    }</span>
+
+    @Override
+    public void writeLong(SdkSchema schema, long value) {
+<span class="fc" id="L145">        append(schema, value);</span>
+<span class="fc" id="L146">    }</span>
+
+    @Override
+    public void writeFloat(SdkSchema schema, float value) {
+<span class="fc" id="L150">        builder.append(value);</span>
+<span class="fc" id="L151">    }</span>
+
+    @Override
+    public void writeDouble(SdkSchema schema, double value) {
+<span class="fc" id="L155">        append(schema, value);</span>
+<span class="fc" id="L156">    }</span>
+
+    @Override
+    public void writeBigInteger(SdkSchema schema, BigInteger value) {
+<span class="fc" id="L160">        append(schema, value);</span>
+<span class="fc" id="L161">    }</span>
+
+    @Override
+    public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+<span class="fc" id="L165">        append(schema, value);</span>
+<span class="fc" id="L166">    }</span>
+
+    @Override
+    public void writeString(SdkSchema schema, String value) {
+<span class="fc" id="L170">        append(schema, value);</span>
+<span class="fc" id="L171">    }</span>
+
+    @Override
+    public void writeBlob(SdkSchema schema, byte[] value) {
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (schema.hasTrait(SensitiveTrait.class)) {</span>
+<span class="fc" id="L176">            append(schema, value);</span>
+        } else {
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            for (var b : value) {</span>
+<span class="fc" id="L179">                builder.append(Integer.toHexString(b));</span>
+            }
+        }
+<span class="fc" id="L182">    }</span>
+
+    @Override
+    public void writeTimestamp(SdkSchema schema, Instant value) {
+<span class="fc" id="L186">        append(schema, value);</span>
+<span class="fc" id="L187">    }</span>
+
+    @Override
+    public void writeDocument(SdkSchema schema, Document value) {
+<span class="fc" id="L191">        builder.append(value.type()).append('.').append(&quot;Document[&quot;);</span>
+<span class="fc" id="L192">        value.serializeContents(this);</span>
+<span class="fc" id="L193">        builder.append(']');</span>
+<span class="fc" id="L194">    }</span>
+
+    @Override
+    public void writeNull(SdkSchema schema) {
+<span class="fc" id="L198">        builder.append(&quot;null&quot;);</span>
+<span class="fc" id="L199">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TypeRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.schema</a> &gt; <span class="el_source">TypeRegistry.java</span></div><h1>TypeRegistry.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.schema;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.utils.SmithyBuilder;
+
+/**
+ * Creates shapes and polymorphic shapes using a shape registry of shape IDs to builders.
+ */
+public final class TypeRegistry {
+
+<span class="fc" id="L21">    private record Entry&lt;T extends SerializableShape&gt;(Class&lt;T&gt; type, Supplier&lt;SdkShapeBuilder&lt;T&gt;&gt; supplier) {}</span>
+
+    private final Map&lt;ShapeId, Entry&lt;?&gt;&gt; supplierMap;
+
+<span class="fc" id="L25">    private TypeRegistry(Builder builder) {</span>
+<span class="fc" id="L26">        this.supplierMap = builder.supplierMap;</span>
+<span class="fc" id="L27">        builder.supplierMap = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L28">    }</span>
+
+    /**
+     * Create a builder to create a TypeRegistry.
+     *
+     * @return the created builder.
+     */
+    public static Builder builder() {
+<span class="fc" id="L36">        return new Builder();</span>
+    }
+
+    /**
+     * Create a shape builder only on the shape ID.
+     *
+     * @param shapeId Shape ID to attempt to create.
+     * @return the optionally created builder.
+     */
+    public Optional&lt;SdkShapeBuilder&lt;?&gt;&gt; create(ShapeId shapeId) {
+<span class="fc" id="L46">        var mapping = supplierMap.get(shapeId);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (mapping == null) {</span>
+<span class="fc" id="L48">            return Optional.empty();</span>
+        } else {
+<span class="fc" id="L50">            return Optional.ofNullable(mapping.supplier.get());</span>
+        }
+    }
+
+    /**
+     * Create a shape builder based on a shape ID and expected type.
+     *
+     * @param shapeId Shape ID to attempt to create.
+     * @param type    Shape class.
+     * @return the optionally created builder.
+     * @param &lt;T&gt; Shape type.
+     * @throws SdkSerdeException if the given type isn't compatible with the shape in the registry.
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T extends SerializableShape&gt; Optional&lt;SdkShapeBuilder&lt;T&gt;&gt; create(ShapeId shapeId, Class&lt;T&gt; type) {
+<span class="fc" id="L65">        var mapping = supplierMap.get(shapeId);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (mapping == null) {</span>
+<span class="fc" id="L67">            return Optional.empty();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        } else if (type.isAssignableFrom(mapping.type)) {</span>
+<span class="fc" id="L69">            return Optional.ofNullable((SdkShapeBuilder&lt;T&gt;) mapping.supplier.get());</span>
+        } else {
+<span class="fc" id="L71">            throw new SdkSerdeException(&quot;Polymorphic shape &quot; + shapeId + &quot; is not compatible with &quot; + type);</span>
+        }
+    }
+
+    /**
+     * Builder used to create a {@link TypeRegistry}.
+     */
+    public static final class Builder implements SmithyBuilder&lt;TypeRegistry&gt; {
+
+<span class="fc" id="L80">        private Map&lt;ShapeId, Entry&lt;?&gt;&gt; supplierMap = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L82">        private Builder() {}</span>
+
+        @Override
+        public TypeRegistry build() {
+<span class="fc" id="L86">            return new TypeRegistry(this);</span>
+        }
+
+        /**
+         * Put a shape into the registry.
+         *
+         * @param shapeId  ID of the shape.
+         * @param type     Shape class.
+         * @param supplier Supplier to create a new builder for this shape.
+         * @return the builder.
+         * @param &lt;T&gt; shape type.
+         */
+        public &lt;T extends SerializableShape&gt; Builder putType(
+            ShapeId shapeId,
+            Class&lt;T&gt; type,
+            Supplier&lt;SdkShapeBuilder&lt;T&gt;&gt; supplier
+        ) {
+<span class="fc" id="L103">            supplierMap.put(shapeId, new Entry&lt;&gt;(type, supplier));</span>
+<span class="fc" id="L104">            return this;</span>
+        }
+
+        /**
+         * Put all the types contained in other registries into this registry.
+         *
+         * @param others Registries to copy.
+         * @return the builder.
+         */
+        public Builder putAllTypes(TypeRegistry... others) {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            for (TypeRegistry other : others) {</span>
+<span class="nc" id="L115">                supplierMap.putAll(other.supplierMap);</span>
+            }
+<span class="nc" id="L117">            return this;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

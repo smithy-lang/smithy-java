@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ModeledSdkException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.schema</a> &gt; <span class="el_source">ModeledSdkException.java</span></div><h1>ModeledSdkException.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.schema;
+
+import software.amazon.smithy.model.shapes.ShapeId;
+
+/**
+ * The top-level exception that should be used to throw modeled errors from clients and servers.
+ */
+public abstract class ModeledSdkException extends SdkException implements SerializableStruct {
+
+    private final ShapeId shapeId;
+
+    public ModeledSdkException(ShapeId shapeId, String message) {
+<span class="nc" id="L18">        super(message);</span>
+<span class="nc" id="L19">        this.shapeId = shapeId;</span>
+<span class="nc" id="L20">    }</span>
+
+    public ModeledSdkException(ShapeId shapeId, String message, Fault errorType) {
+<span class="nc" id="L23">        super(message, errorType);</span>
+<span class="nc" id="L24">        this.shapeId = shapeId;</span>
+<span class="nc" id="L25">    }</span>
+
+    public ModeledSdkException(ShapeId shapeId, String message, Throwable cause) {
+<span class="nc" id="L28">        super(message, cause);</span>
+<span class="nc" id="L29">        this.shapeId = shapeId;</span>
+<span class="nc" id="L30">    }</span>
+
+    public ModeledSdkException(ShapeId shapeId, String message, Throwable cause, Fault errorType) {
+<span class="nc" id="L33">        super(message, cause, errorType);</span>
+<span class="nc" id="L34">        this.shapeId = shapeId;</span>
+<span class="nc" id="L35">    }</span>
+
+    /**
+     * Get the shape ID of error.
+     *
+     * @return Returns the error shape ID.
+     */
+    public final ShapeId getShapeId() {
+<span class="nc" id="L43">        return shapeId;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

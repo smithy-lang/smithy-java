@@ -1,0 +1,822 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Documents.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.serde.document</a> &gt; <span class="el_source">Documents.java</span></div><h1>Documents.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.serde.document;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.model.shapes.ShapeType;
+
+final class Documents {
+
+<span class="fc" id="L23">    static final SdkSchema LIST_SCHEMA = SdkSchema.builder()</span>
+<span class="fc" id="L24">        .id(PreludeSchemas.DOCUMENT.id())</span>
+<span class="fc" id="L25">        .type(ShapeType.LIST)</span>
+<span class="fc" id="L26">        .members(SdkSchema.memberBuilder(&quot;member&quot;, PreludeSchemas.DOCUMENT))</span>
+<span class="fc" id="L27">        .build();</span>
+
+<span class="fc" id="L29">    static final SdkSchema STR_MAP_SCHEMA = SdkSchema.builder()</span>
+<span class="fc" id="L30">        .id(PreludeSchemas.DOCUMENT.id())</span>
+<span class="fc" id="L31">        .type(ShapeType.MAP)</span>
+<span class="fc" id="L32">        .members(</span>
+<span class="fc" id="L33">            SdkSchema.memberBuilder(&quot;key&quot;, PreludeSchemas.STRING).id(PreludeSchemas.DOCUMENT.id()).build(),</span>
+<span class="fc" id="L34">            SdkSchema.memberBuilder(&quot;value&quot;, PreludeSchemas.DOCUMENT).id(PreludeSchemas.DOCUMENT.id()).build()</span>
+        )
+<span class="fc" id="L36">        .build();</span>
+
+    private Documents() {}
+
+<span class="fc" id="L40">    record BooleanDocument(SdkSchema schema, boolean value) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L43">            return ShapeType.BOOLEAN;</span>
+        }
+
+        @Override
+        public boolean asBoolean() {
+<span class="fc" id="L48">            return value;</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L53">            serializer.writeBoolean(schema, value);</span>
+<span class="fc" id="L54">        }</span>
+
+        @Override
+        public Document normalize() {
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            return schema == PreludeSchemas.BOOLEAN ? this : Document.super.normalize();</span>
+        }
+    }
+
+<span class="fc" id="L62">    record ByteDocument(SdkSchema schema, byte value) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L65">            return ShapeType.BYTE;</span>
+        }
+
+        @Override
+        public byte asByte() {
+<span class="fc" id="L70">            return value;</span>
+        }
+
+        @Override
+        public short asShort() {
+<span class="fc" id="L75">            return value;</span>
+        }
+
+        @Override
+        public int asInteger() {
+<span class="fc" id="L80">            return value;</span>
+        }
+
+        @Override
+        public long asLong() {
+<span class="fc" id="L85">            return value;</span>
+        }
+
+        @Override
+        public float asFloat() {
+<span class="fc" id="L90">            return value;</span>
+        }
+
+        @Override
+        public double asDouble() {
+<span class="fc" id="L95">            return value;</span>
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+<span class="fc" id="L100">            return BigInteger.valueOf(value);</span>
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+<span class="fc" id="L105">            return new BigDecimal(value);</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L110">            serializer.writeByte(schema, value);</span>
+<span class="fc" id="L111">        }</span>
+
+        @Override
+        public Document normalize() {
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            return schema == PreludeSchemas.BYTE ? this : Document.super.normalize();</span>
+        }
+    }
+
+<span class="fc" id="L119">    record ShortDocument(SdkSchema schema, short value) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L122">            return ShapeType.SHORT;</span>
+        }
+
+        @Override
+        public byte asByte() {
+<span class="fc" id="L127">            return (byte) value;</span>
+        }
+
+        @Override
+        public short asShort() {
+<span class="fc" id="L132">            return value;</span>
+        }
+
+        @Override
+        public int asInteger() {
+<span class="fc" id="L137">            return value;</span>
+        }
+
+        @Override
+        public long asLong() {
+<span class="fc" id="L142">            return value;</span>
+        }
+
+        @Override
+        public float asFloat() {
+<span class="fc" id="L147">            return value;</span>
+        }
+
+        @Override
+        public double asDouble() {
+<span class="fc" id="L152">            return value;</span>
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+<span class="fc" id="L157">            return BigInteger.valueOf(value);</span>
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+<span class="fc" id="L162">            return new BigDecimal(value);</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L167">            serializer.writeShort(schema, value);</span>
+<span class="fc" id="L168">        }</span>
+
+        @Override
+        public Document normalize() {
+<span class="nc bnc" id="L172" title="All 2 branches missed.">            return schema == PreludeSchemas.SHORT ? this : Document.super.normalize();</span>
+        }
+    }
+
+<span class="fc" id="L176">    record IntegerDocument(SdkSchema schema, int value) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L179">            return ShapeType.INTEGER;</span>
+        }
+
+        @Override
+        public byte asByte() {
+<span class="fc" id="L184">            return (byte) value;</span>
+        }
+
+        @Override
+        public short asShort() {
+<span class="fc" id="L189">            return (short) value;</span>
+        }
+
+        @Override
+        public int asInteger() {
+<span class="fc" id="L194">            return value;</span>
+        }
+
+        @Override
+        public long asLong() {
+<span class="fc" id="L199">            return value;</span>
+        }
+
+        @Override
+        public float asFloat() {
+<span class="fc" id="L204">            return value;</span>
+        }
+
+        @Override
+        public double asDouble() {
+<span class="fc" id="L209">            return value;</span>
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+<span class="fc" id="L214">            return BigInteger.valueOf(value);</span>
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+<span class="fc" id="L219">            return new BigDecimal(value);</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L224">            serializer.writeInteger(schema, value);</span>
+<span class="fc" id="L225">        }</span>
+
+        @Override
+        public Document normalize() {
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            return schema == PreludeSchemas.INTEGER ? this : Document.super.normalize();</span>
+        }
+    }
+
+<span class="fc" id="L233">    record LongDocument(SdkSchema schema, long value) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L236">            return ShapeType.LONG;</span>
+        }
+
+        @Override
+        public byte asByte() {
+<span class="fc" id="L241">            return (byte) value;</span>
+        }
+
+        @Override
+        public short asShort() {
+<span class="fc" id="L246">            return (short) value;</span>
+        }
+
+        @Override
+        public int asInteger() {
+<span class="fc" id="L251">            return (int) value;</span>
+        }
+
+        @Override
+        public long asLong() {
+<span class="fc" id="L256">            return value;</span>
+        }
+
+        @Override
+        public float asFloat() {
+<span class="fc" id="L261">            return value;</span>
+        }
+
+        @Override
+        public double asDouble() {
+<span class="fc" id="L266">            return value;</span>
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+<span class="fc" id="L271">            return BigInteger.valueOf(value);</span>
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+<span class="fc" id="L276">            return new BigDecimal(value);</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L281">            serializer.writeLong(schema, value);</span>
+<span class="fc" id="L282">        }</span>
+
+        @Override
+        public Document normalize() {
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            return schema == PreludeSchemas.LONG ? this : Document.super.normalize();</span>
+        }
+    }
+
+<span class="fc" id="L290">    record FloatDocument(SdkSchema schema, float value) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L293">            return ShapeType.FLOAT;</span>
+        }
+
+        @Override
+        public byte asByte() {
+<span class="fc" id="L298">            return (byte) value;</span>
+        }
+
+        @Override
+        public short asShort() {
+<span class="fc" id="L303">            return (short) value;</span>
+        }
+
+        @Override
+        public int asInteger() {
+<span class="fc" id="L308">            return (int) value;</span>
+        }
+
+        @Override
+        public long asLong() {
+<span class="fc" id="L313">            return (long) value;</span>
+        }
+
+        @Override
+        public float asFloat() {
+<span class="fc" id="L318">            return value;</span>
+        }
+
+        @Override
+        public double asDouble() {
+<span class="fc" id="L323">            return value;</span>
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+<span class="fc" id="L328">            return BigInteger.valueOf((long) value);</span>
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+<span class="fc" id="L333">            return new BigDecimal(value);</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L338">            serializer.writeFloat(schema, value);</span>
+<span class="fc" id="L339">        }</span>
+
+        @Override
+        public Document normalize() {
+<span class="nc bnc" id="L343" title="All 2 branches missed.">            return schema == PreludeSchemas.FLOAT ? this : Document.super.normalize();</span>
+        }
+    }
+
+<span class="fc" id="L347">    record DoubleDocument(SdkSchema schema, double value) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L350">            return ShapeType.DOUBLE;</span>
+        }
+
+        @Override
+        public byte asByte() {
+<span class="fc" id="L355">            return (byte) value;</span>
+        }
+
+        @Override
+        public short asShort() {
+<span class="fc" id="L360">            return (short) value;</span>
+        }
+
+        @Override
+        public int asInteger() {
+<span class="fc" id="L365">            return (int) value;</span>
+        }
+
+        @Override
+        public long asLong() {
+<span class="fc" id="L370">            return (long) value;</span>
+        }
+
+        @Override
+        public float asFloat() {
+<span class="fc" id="L375">            return (float) value;</span>
+        }
+
+        @Override
+        public double asDouble() {
+<span class="fc" id="L380">            return value;</span>
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+<span class="fc" id="L385">            return BigInteger.valueOf((long) value);</span>
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+<span class="fc" id="L390">            return new BigDecimal(value);</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L395">            serializer.writeDouble(schema, value);</span>
+<span class="fc" id="L396">        }</span>
+
+        @Override
+        public Document normalize() {
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            return schema == PreludeSchemas.DOUBLE ? this : Document.super.normalize();</span>
+        }
+    }
+
+<span class="fc" id="L404">    record BigIntegerDocument(SdkSchema schema, BigInteger value) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L407">            return ShapeType.BIG_INTEGER;</span>
+        }
+
+        @Override
+        public byte asByte() {
+<span class="fc" id="L412">            return value.byteValueExact();</span>
+        }
+
+        @Override
+        public short asShort() {
+<span class="fc" id="L417">            return value.shortValueExact();</span>
+        }
+
+        @Override
+        public int asInteger() {
+<span class="fc" id="L422">            return value.intValueExact();</span>
+        }
+
+        @Override
+        public long asLong() {
+<span class="fc" id="L427">            return value.longValueExact();</span>
+        }
+
+        @Override
+        public float asFloat() {
+<span class="fc" id="L432">            return value.floatValue();</span>
+        }
+
+        @Override
+        public double asDouble() {
+<span class="fc" id="L437">            return value.doubleValue();</span>
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+<span class="fc" id="L442">            return value;</span>
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+<span class="fc" id="L447">            return new BigDecimal(value);</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L452">            serializer.writeBigInteger(schema, value);</span>
+<span class="fc" id="L453">        }</span>
+
+        @Override
+        public Document normalize() {
+<span class="nc bnc" id="L457" title="All 2 branches missed.">            return schema == PreludeSchemas.BIG_INTEGER ? this : Document.super.normalize();</span>
+        }
+    }
+
+<span class="fc" id="L461">    record BigDecimalDocument(SdkSchema schema, BigDecimal value) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L464">            return ShapeType.BIG_DECIMAL;</span>
+        }
+
+        @Override
+        public byte asByte() {
+<span class="fc" id="L469">            return value.byteValueExact();</span>
+        }
+
+        @Override
+        public short asShort() {
+<span class="fc" id="L474">            return value.shortValueExact();</span>
+        }
+
+        @Override
+        public int asInteger() {
+<span class="fc" id="L479">            return value.intValueExact();</span>
+        }
+
+        @Override
+        public long asLong() {
+<span class="fc" id="L484">            return value.longValueExact();</span>
+        }
+
+        @Override
+        public float asFloat() {
+<span class="fc" id="L489">            return value.floatValue();</span>
+        }
+
+        @Override
+        public double asDouble() {
+<span class="fc" id="L494">            return value.doubleValue();</span>
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+<span class="fc" id="L499">            return value.toBigInteger();</span>
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+<span class="fc" id="L504">            return value;</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L509">            serializer.writeBigDecimal(schema, value);</span>
+<span class="fc" id="L510">        }</span>
+
+        @Override
+        public Document normalize() {
+<span class="nc bnc" id="L514" title="All 2 branches missed.">            return schema == PreludeSchemas.BIG_DECIMAL ? this : Document.super.normalize();</span>
+        }
+    }
+
+<span class="fc" id="L518">    record StringDocument(SdkSchema schema, String value) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L521">            return ShapeType.STRING;</span>
+        }
+
+        @Override
+        public String asString() {
+<span class="fc" id="L526">            return value;</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L531">            serializer.writeString(schema, value);</span>
+<span class="fc" id="L532">        }</span>
+
+        @Override
+        public Document normalize() {
+<span class="pc bpc" id="L536" title="1 of 2 branches missed.">            return schema == PreludeSchemas.STRING ? this : Document.super.normalize();</span>
+        }
+    }
+
+<span class="fc" id="L540">    record BlobDocument(SdkSchema schema, byte[] value) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L543">            return ShapeType.BLOB;</span>
+        }
+
+        @Override
+        public byte[] asBlob() {
+<span class="fc" id="L548">            return value;</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L553">            serializer.writeBlob(schema, value);</span>
+<span class="fc" id="L554">        }</span>
+
+        // Records don't generate this same equals behavior for byte arrays, so customize it.
+        @Override
+        public boolean equals(Object o) {
+<span class="fc bfc" id="L559" title="All 2 branches covered.">            if (this == o) {</span>
+<span class="fc" id="L560">                return true;</span>
+<span class="pc bpc" id="L561" title="2 of 4 branches missed.">            } else if (o == null || getClass() != o.getClass()) {</span>
+<span class="nc" id="L562">                return false;</span>
+            } else {
+<span class="fc" id="L564">                BlobDocument that = (BlobDocument) o;</span>
+<span class="fc" id="L565">                return Arrays.equals(value, that.value);</span>
+            }
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L571">            return Arrays.hashCode(value);</span>
+        }
+
+        @Override
+        public Document normalize() {
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">            return schema == PreludeSchemas.BLOB ? this : Document.super.normalize();</span>
+        }
+    }
+
+<span class="fc" id="L580">    record TimestampDocument(SdkSchema schema, Instant value) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L583">            return ShapeType.TIMESTAMP;</span>
+        }
+
+        @Override
+        public Instant asTimestamp() {
+<span class="fc" id="L588">            return value;</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L593">            serializer.writeTimestamp(schema, value);</span>
+<span class="fc" id="L594">        }</span>
+
+        @Override
+        public Document normalize() {
+<span class="nc bnc" id="L598" title="All 2 branches missed.">            return schema == PreludeSchemas.TIMESTAMP ? this : Document.super.normalize();</span>
+        }
+    }
+
+<span class="fc" id="L602">    record ListDocument(SdkSchema schema, List&lt;Document&gt; values) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L605">            return ShapeType.LIST;</span>
+        }
+
+        @Override
+        public List&lt;Document&gt; asList() {
+<span class="fc" id="L610">            return values;</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L615">            serializer.writeList(schema, values, (values, ser) -&gt; {</span>
+<span class="fc bfc" id="L616" title="All 2 branches covered.">                for (var element : values) {</span>
+<span class="fc" id="L617">                    element.serializeContents(ser);</span>
+<span class="fc" id="L618">                }</span>
+<span class="fc" id="L619">            });</span>
+<span class="fc" id="L620">        }</span>
+    }
+
+<span class="fc" id="L623">    record StringMapDocument(SdkSchema schema, Map&lt;String, Document&gt; members) implements Document {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L626">            return ShapeType.MAP;</span>
+        }
+
+        @Override
+        public Map&lt;String, Document&gt; asStringMap() {
+<span class="fc" id="L631">            return members;</span>
+        }
+
+        @Override
+        public Document getMember(String memberName) {
+<span class="fc" id="L636">            return members.get(memberName);</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L641">            serializer.writeMap(schema, members, (members, s) -&gt; {</span>
+<span class="fc" id="L642">                var key = schema.member(&quot;key&quot;);</span>
+<span class="fc bfc" id="L643" title="All 2 branches covered.">                for (var entry : members.entrySet()) {</span>
+<span class="fc" id="L644">                    s.writeEntry(key, entry.getKey(), entry.getValue(), Document::serializeContents);</span>
+<span class="fc" id="L645">                }</span>
+<span class="fc" id="L646">            });</span>
+<span class="fc" id="L647">        }</span>
+    }
+
+<span class="fc" id="L650">    record StructureDocument(SdkSchema schema, Map&lt;String, Document&gt; members) implements Document, SerializableStruct {</span>
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L653">            return ShapeType.STRUCTURE;</span>
+        }
+
+        @Override
+        public Document getMember(String memberName) {
+<span class="fc" id="L658">            return members.get(memberName);</span>
+        }
+
+        @Override
+        public Map&lt;String, Document&gt; asStringMap() {
+<span class="fc" id="L663">            return members;</span>
+        }
+
+        @Override
+        public void serialize(ShapeSerializer serializer) {
+            // De-conflict Document and SerializableStruct default implementations.
+<span class="nc" id="L669">            Document.super.serialize(serializer);</span>
+<span class="nc" id="L670">        }</span>
+
+        @Override
+        public void serializeContents(ShapeSerializer encoder) {
+<span class="nc" id="L674">            encoder.writeStruct(schema, this);</span>
+<span class="nc" id="L675">        }</span>
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {
+<span class="nc bnc" id="L679" title="All 2 branches missed.">            for (var entry : members.entrySet()) {</span>
+<span class="nc" id="L680">                entry.getValue().serializeContents(serializer);</span>
+<span class="nc" id="L681">            }</span>
+<span class="nc" id="L682">        }</span>
+    }
+
+    // If the document is only used to serialize a shape to a document, then the typed document nodes don't need
+    // to be created.
+    static final class LazilyCreatedTypedDocument implements Document {
+
+        private final SerializableShape shape;
+        private volatile transient Document createdDocument;
+
+<span class="fc" id="L692">        LazilyCreatedTypedDocument(SerializableShape shape) {</span>
+<span class="fc" id="L693">            this.shape = shape;</span>
+<span class="fc" id="L694">        }</span>
+
+        private Document getDocument() {
+<span class="fc" id="L697">            var result = createdDocument;</span>
+<span class="fc bfc" id="L698" title="All 2 branches covered.">            if (result == null) {</span>
+<span class="fc" id="L699">                var parser = new DocumentParser();</span>
+<span class="fc" id="L700">                shape.serialize(parser);</span>
+<span class="fc" id="L701">                this.createdDocument = result = parser.getResult();</span>
+            }
+<span class="fc" id="L703">            return result;</span>
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+<span class="fc" id="L708">            shape.serialize(serializer);</span>
+<span class="fc" id="L709">        }</span>
+
+        @Override
+        public ShapeType type() {
+<span class="fc" id="L713">            return getDocument().type();</span>
+        }
+
+        @Override
+        public boolean asBoolean() {
+<span class="fc" id="L718">            return getDocument().asBoolean();</span>
+        }
+
+        @Override
+        public byte asByte() {
+<span class="fc" id="L723">            return getDocument().asByte();</span>
+        }
+
+        @Override
+        public short asShort() {
+<span class="fc" id="L728">            return getDocument().asShort();</span>
+        }
+
+        @Override
+        public int asInteger() {
+<span class="fc" id="L733">            return getDocument().asInteger();</span>
+        }
+
+        @Override
+        public long asLong() {
+<span class="fc" id="L738">            return getDocument().asLong();</span>
+        }
+
+        @Override
+        public float asFloat() {
+<span class="fc" id="L743">            return getDocument().asFloat();</span>
+        }
+
+        @Override
+        public double asDouble() {
+<span class="fc" id="L748">            return getDocument().asDouble();</span>
+        }
+
+        @Override
+        public BigInteger asBigInteger() {
+<span class="fc" id="L753">            return getDocument().asBigInteger();</span>
+        }
+
+        @Override
+        public BigDecimal asBigDecimal() {
+<span class="fc" id="L758">            return getDocument().asBigDecimal();</span>
+        }
+
+        @Override
+        public Number asNumber() {
+<span class="nc" id="L763">            return getDocument().asNumber();</span>
+        }
+
+        @Override
+        public String asString() {
+<span class="fc" id="L768">            return getDocument().asString();</span>
+        }
+
+        @Override
+        public byte[] asBlob() {
+<span class="fc" id="L773">            return getDocument().asBlob();</span>
+        }
+
+        @Override
+        public Instant asTimestamp() {
+<span class="fc" id="L778">            return getDocument().asTimestamp();</span>
+        }
+
+        @Override
+        public List&lt;Document&gt; asList() {
+<span class="fc" id="L783">            return getDocument().asList();</span>
+        }
+
+        @Override
+        public Map&lt;String, Document&gt; asStringMap() {
+<span class="fc" id="L788">            return getDocument().asStringMap();</span>
+        }
+
+        @Override
+        public Document getMember(String memberName) {
+<span class="fc" id="L793">            return getDocument().getMember(memberName);</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="fc" id="L798">            return getDocument().toString();</span>
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+<span class="fc bfc" id="L803" title="All 2 branches covered.">            if (obj == this) {</span>
+<span class="fc" id="L804">                return true;</span>
+<span class="fc bfc" id="L805" title="All 2 branches covered.">            } else if (obj == null) {</span>
+<span class="fc" id="L806">                return false;</span>
+<span class="fc bfc" id="L807" title="All 2 branches covered.">            } else if (obj instanceof LazilyCreatedTypedDocument) {</span>
+<span class="fc" id="L808">                return getDocument().equals(((LazilyCreatedTypedDocument) obj).getDocument());</span>
+<span class="pc bpc" id="L809" title="1 of 2 branches missed.">            } else if (obj instanceof Document) {</span>
+<span class="nc" id="L810">                return getDocument().equals(obj);</span>
+            } else {
+<span class="fc" id="L812">                return false;</span>
+            }
+        }
+
+        @Override
+        public int hashCode() {
+<span class="fc" id="L818">            return getDocument().hashCode();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Validator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.schema</a> &gt; <span class="el_source">Validator.java</span></div><h1>Validator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.schema;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BiConsumer;
+import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
+import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.SparseTrait;
+
+/**
+ * Validates shapes.
+ *
+ * &lt;p&gt;Validation can be applied to any {@link SerializableShape}.
+ *
+ * &lt;pre&gt;{@code
+ * Validator validator = Validator.builder().build();
+ * List&lt;ValidationError&gt; errors = validator.validate(someShape);
+ * }&lt;/pre&gt;
+ *
+ * &lt;p&gt;Validator is thread safe.
+ */
+public final class Validator {
+
+    private final int maxDepth;
+    private final int maxAllowedErrors;
+
+<span class="fc" id="L39">    private Validator(Builder builder) {</span>
+<span class="fc" id="L40">        this.maxAllowedErrors = builder.maxAllowedErrors;</span>
+<span class="fc" id="L41">        this.maxDepth = builder.maxDepth;</span>
+<span class="fc" id="L42">    }</span>
+
+    /**
+     * Create a builder responsible for building a {@link Validator}.
+     *
+     * @return the created builder.
+     */
+    public static Builder builder() {
+<span class="fc" id="L50">        return new Builder();</span>
+    }
+
+    /**
+     * Validate a shape and return any encountered errors.
+     *
+     * @param shape Shape to validate.
+     * @return the validation errors produced by the shape.
+     */
+    public List&lt;ValidationError&gt; validate(SerializableShape shape) {
+<span class="fc" id="L60">        var shapeValidator = new ShapeValidator(maxAllowedErrors, maxDepth);</span>
+        try {
+<span class="fc" id="L62">            shape.serialize(shapeValidator);</span>
+<span class="fc" id="L63">            return shapeValidator.errors;</span>
+<span class="fc" id="L64">        } catch (ValidationShortCircuitException ignored) {</span>
+<span class="fc" id="L65">            return shapeValidator.errors;</span>
+        }
+    }
+
+    /**
+     * Builds a {@link  Validator}.
+     */
+    public static final class Builder {
+
+<span class="fc" id="L74">        private int maxDepth = 100;</span>
+<span class="fc" id="L75">        private int maxAllowedErrors = 100;</span>
+
+<span class="fc" id="L77">        private Builder() {}</span>
+
+        /**
+         * Build the {@link Validator}.
+         *
+         * @return the created Validator.
+         */
+        public Validator build() {
+<span class="fc" id="L85">            return new Validator(this);</span>
+        }
+
+        /**
+         * Set the maximum allowed depth of the evaluated value.
+         *
+         * @param maxDepth Max allowed depth (default is 100).
+         * @return the builder.
+         */
+        public Builder maxDepth(int maxDepth) {
+<span class="fc" id="L95">            this.maxDepth = maxDepth;</span>
+<span class="fc" id="L96">            return this;</span>
+        }
+
+        /**
+         * Set the maximum number of errors to find before giving up and returning.
+         *
+         * @param maxAllowedErrors Maximum number of errors to find before giving up (default is 100).
+         * @return the builder.
+         */
+        public Builder maxAllowedErrors(int maxAllowedErrors) {
+<span class="fc" id="L106">            this.maxAllowedErrors = maxAllowedErrors;</span>
+<span class="fc" id="L107">            return this;</span>
+        }
+    }
+
+    /**
+     * An error that short circuits further validation.
+     */
+    static final class ValidationShortCircuitException extends SdkSerdeException {
+        ValidationShortCircuitException() {
+<span class="fc" id="L116">            super(&quot;Stop further validation&quot;);</span>
+<span class="fc" id="L117">        }</span>
+    }
+
+    static final class ShapeValidator implements ShapeSerializer, MapSerializer {
+
+        private static final int STARTING_PATH_SIZE = 4;
+        private final int maxAllowedErrors;
+        private final int maxDepth;
+        private final ListSerializer listValidator;
+<span class="fc" id="L126">        private final List&lt;ValidationError&gt; errors = new ArrayList&lt;&gt;();</span>
+        private Object[] path;
+<span class="fc" id="L128">        private int depth = 0;</span>
+
+        /**
+         * Tracks the number of elements in a list or map.
+         *
+         * @see #currentSchema
+         */
+<span class="fc" id="L135">        private int elementCount = 0;</span>
+
+        /**
+         * Tracks the current shape being validated, used specifically to test that null values are permitted only in
+         * sparse collections. Each time the currentSchema is changed, the previous {@link #elementCount} and schema must
+         * be stored in a variable, the next shape is validated, and then the schema and count are restored.
+         */
+<span class="fc" id="L142">        private SdkSchema currentSchema = null;</span>
+
+<span class="fc" id="L144">        private ShapeValidator(int maxAllowedErrors, int maxDepth) {</span>
+<span class="fc" id="L145">            this.maxAllowedErrors = maxAllowedErrors;</span>
+<span class="fc" id="L146">            this.maxDepth = maxDepth;</span>
+
+            // The length of the path will never exceed the current depth + the maxDepth, removing a conditional in
+            // pushPath and ensuring we don't over-allocate. Default to 6 initially, but go lower if maxDepth is lower.
+<span class="fc" id="L150">            this.path = new Object[Math.min(STARTING_PATH_SIZE, maxDepth)];</span>
+
+            // Every list is validated with this serializer. Because it's reused, the element count of the list can't
+            // be used. Instead, the number of elements is tracked in the elementCount member of Validator.
+<span class="fc" id="L154">            listValidator = new ListSerializer(this, this::betweenListElements);</span>
+<span class="fc" id="L155">        }</span>
+
+        private void betweenListElements(int ignoredPosition) {
+<span class="fc" id="L158">            swapPath(elementCount);</span>
+<span class="fc" id="L159">            elementCount++;</span>
+<span class="fc" id="L160">        }</span>
+
+        private void resetValidatorState() {
+<span class="nc" id="L163">            elementCount = 0;</span>
+<span class="nc" id="L164">            currentSchema = null;</span>
+<span class="nc" id="L165">            depth = 0;</span>
+<span class="nc" id="L166">        }</span>
+
+        void pushPath(Object pathSegment) {
+            // Rather than check if the depth exceeds maxDepth _and_ if depth == path.length, we instead always
+            // ensure that the path length never exceeds maxDepth.
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (depth == path.length) {</span>
+                // Resize the path if needed by multiplying the size by 1.5.
+<span class="fc" id="L173">                int remainingDepth = maxDepth - depth;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                if (remainingDepth == 0) {</span>
+<span class="fc" id="L175">                    addError(new ValidationError.DepthValidationFailure(createPath(), maxDepth));</span>
+<span class="fc" id="L176">                    throw new Validator.ValidationShortCircuitException();</span>
+                } else {
+<span class="fc" id="L178">                    int newSize = Math.min(remainingDepth, depth + (depth &gt;&gt; 1));</span>
+<span class="fc" id="L179">                    Object[] resized = new Object[newSize];</span>
+<span class="fc" id="L180">                    System.arraycopy(path, 0, resized, 0, path.length);</span>
+<span class="fc" id="L181">                    path = resized;</span>
+                }
+            }
+
+<span class="fc" id="L185">            path[depth++] = pathSegment;</span>
+<span class="fc" id="L186">        }</span>
+
+        void swapPath(Object pathSegment) {
+<span class="fc" id="L189">            path[depth - 1] = pathSegment;</span>
+<span class="fc" id="L190">        }</span>
+
+        void popPath() {
+<span class="fc" id="L193">            depth--;</span>
+<span class="fc" id="L194">        }</span>
+
+        String createPath() {
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            if (depth == 0) {</span>
+<span class="fc" id="L198">                return &quot;/&quot;;</span>
+            } else {
+<span class="fc" id="L200">                StringBuilder builder = new StringBuilder();</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">                for (int i = 0; i &lt; depth; i++) {</span>
+<span class="fc" id="L202">                    builder.append('/').append(path[i].toString());</span>
+                }
+<span class="fc" id="L204">                return builder.toString();</span>
+            }
+        }
+
+        void addError(ValidationError error) {
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (errors.size() == maxAllowedErrors) {</span>
+<span class="fc" id="L210">                throw new Validator.ValidationShortCircuitException();</span>
+            }
+<span class="fc" id="L212">            errors.add(error);</span>
+<span class="fc" id="L213">        }</span>
+
+        @Override
+        public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+            // Track the current schema and count.
+<span class="fc" id="L218">            var previousSchema = currentSchema;</span>
+<span class="fc" id="L219">            var previousCount = elementCount;</span>
+<span class="fc" id="L220">            currentSchema = schema;</span>
+<span class="fc" id="L221">            elementCount = 0; // note that we don't track the count of structure members.</span>
+<span class="pc bpc" id="L222" title="1 of 3 branches missed.">            switch (schema.type()) {</span>
+<span class="fc" id="L223">                case STRUCTURE -&gt; ValidatorOfStruct.validate(this, schema, struct);</span>
+<span class="fc" id="L224">                case UNION -&gt; ValidatorOfUnion.validate(this, schema, struct);</span>
+<span class="nc" id="L225">                default -&gt; checkType(schema, ShapeType.STRUCTURE); // this is guaranteed to fail type checking.</span>
+            }
+<span class="fc" id="L227">            currentSchema = previousSchema;</span>
+<span class="fc" id="L228">            elementCount = previousCount;</span>
+<span class="fc" id="L229">        }</span>
+
+        @Override
+        public &lt;T&gt; void writeList(SdkSchema schema, T state, BiConsumer&lt;T, ShapeSerializer&gt; consumer) {
+<span class="fc" id="L233">            checkType(schema, ShapeType.LIST);</span>
+
+            // Track the current schema and count.
+<span class="fc" id="L236">            var previousSchema = currentSchema;</span>
+<span class="fc" id="L237">            var previousCount = elementCount;</span>
+<span class="fc" id="L238">            currentSchema = schema;</span>
+<span class="fc" id="L239">            elementCount = 0;</span>
+
+            // Push a preliminary value of null. Each list element will swap this path position with its index.
+<span class="fc" id="L242">            pushPath(null);</span>
+<span class="fc" id="L243">            consumer.accept(state, listValidator);</span>
+<span class="fc" id="L244">            popPath();</span>
+
+            // Grab the count and reset the schema and count.
+<span class="fc" id="L247">            var count = elementCount;</span>
+<span class="fc" id="L248">            currentSchema = previousSchema;</span>
+<span class="fc" id="L249">            elementCount = previousCount;</span>
+
+<span class="fc" id="L251">            checkListLength(schema, count);</span>
+<span class="fc" id="L252">        }</span>
+
+        private void checkListLength(SdkSchema schema, int count) {
+            // Ensure the list has an acceptable length.
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            if (count &lt; schema.minLengthConstraint) {</span>
+<span class="fc" id="L257">                addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            } else if (count &gt; schema.maxLengthConstraint) {</span>
+<span class="fc" id="L259">                addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));</span>
+            }
+<span class="fc" id="L261">        }</span>
+
+        @Override
+        public &lt;T&gt; void writeMap(SdkSchema schema, T state, BiConsumer&lt;T, MapSerializer&gt; consumer) {
+<span class="fc" id="L265">            checkType(schema, ShapeType.MAP);</span>
+
+            // Track the current schema and count.
+<span class="fc" id="L268">            var previousSchema = currentSchema;</span>
+<span class="fc" id="L269">            var previousCount = elementCount;</span>
+<span class="fc" id="L270">            currentSchema = schema;</span>
+<span class="fc" id="L271">            elementCount = 0;</span>
+
+            // Push a preliminary map key and key/value holder of null. These values are replaced as map keys and
+            // values are validated.
+<span class="fc" id="L275">            pushPath(null);</span>
+<span class="fc" id="L276">            pushPath(null);</span>
+<span class="fc" id="L277">            consumer.accept(state, this);</span>
+<span class="fc" id="L278">            popPath();</span>
+<span class="fc" id="L279">            popPath();</span>
+
+            // Grab the count and reset the schema and count.
+<span class="fc" id="L282">            var count = elementCount;</span>
+<span class="fc" id="L283">            currentSchema = previousSchema;</span>
+<span class="fc" id="L284">            elementCount = previousCount;</span>
+
+<span class="fc" id="L286">            checkMapLength(schema, count);</span>
+<span class="fc" id="L287">        }</span>
+
+        private void checkMapLength(SdkSchema schema, int count) {
+            // Ensure the map is properly sized.
+<span class="fc bfc" id="L291" title="All 2 branches covered.">            if (count &lt; schema.minLengthConstraint) {</span>
+<span class="fc" id="L292">                addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            } else if (count &gt; schema.maxLengthConstraint) {</span>
+<span class="fc" id="L294">                addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));</span>
+            }
+<span class="fc" id="L296">        }</span>
+
+        // MapSerializer implementation to write a map key.
+
+        @Override
+        public &lt;T&gt; void writeEntry(
+            SdkSchema keySchema,
+            String key,
+            T state,
+            BiConsumer&lt;T, ShapeSerializer&gt; valueSerializer
+        ) {
+<span class="fc" id="L307">            elementCount++;</span>
+<span class="fc" id="L308">            path[depth - 2] = key; // set /map/&lt;key&gt;</span>
+<span class="fc" id="L309">            path[depth - 1] = &quot;key&quot;; // set /map/&lt;key&gt;/key</span>
+<span class="fc" id="L310">            writeString(keySchema, key);</span>
+<span class="fc" id="L311">            path[depth - 1] = &quot;value&quot;; // set /map/&lt;key&gt;/value</span>
+<span class="fc" id="L312">            valueSerializer.accept(state, this);</span>
+<span class="fc" id="L313">        }</span>
+
+        @Override
+        public void writeBoolean(SdkSchema schema, boolean value) {
+<span class="nc" id="L317">            checkType(schema, ShapeType.BOOLEAN);</span>
+<span class="nc" id="L318">        }</span>
+
+        @Override
+        public void writeByte(SdkSchema schema, byte value) {
+<span class="fc" id="L322">            checkType(schema, ShapeType.BYTE);</span>
+<span class="fc" id="L323">            validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);</span>
+<span class="fc" id="L324">        }</span>
+
+        @Override
+        public void writeShort(SdkSchema schema, short value) {
+<span class="fc" id="L328">            checkType(schema, ShapeType.SHORT);</span>
+<span class="fc" id="L329">            validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);</span>
+<span class="fc" id="L330">        }</span>
+
+        @Override
+        public void writeInteger(SdkSchema schema, int value) {
+            // Validate range traits for normal integers, and validate intEnum for INT_ENUM values.
+<span class="pc bpc" id="L335" title="1 of 3 branches missed.">            switch (schema.type()) {</span>
+<span class="fc" id="L336">                case INTEGER -&gt; validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);</span>
+                case INT_ENUM -&gt; {
+<span class="pc bpc" id="L338" title="1 of 4 branches missed.">                    if (!schema.intEnumValues().isEmpty() &amp;&amp; !schema.intEnumValues().contains(value)) {</span>
+<span class="fc" id="L339">                        addError(new ValidationError.IntEnumValidationFailure(createPath(), value, schema));</span>
+                    }
+                }
+<span class="nc" id="L342">                default -&gt; checkType(schema, ShapeType.INTEGER); // it's invalid.</span>
+            }
+<span class="fc" id="L344">        }</span>
+
+        @Override
+        public void writeLong(SdkSchema schema, long value) {
+<span class="fc" id="L348">            checkType(schema, ShapeType.LONG);</span>
+<span class="fc" id="L349">            validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);</span>
+<span class="fc" id="L350">        }</span>
+
+        @Override
+        public void writeFloat(SdkSchema schema, float value) {
+<span class="fc" id="L354">            checkType(schema, ShapeType.FLOAT);</span>
+<span class="fc" id="L355">            validateRange(schema, value, schema.minDoubleConstraint, schema.maxDoubleConstraint);</span>
+<span class="fc" id="L356">        }</span>
+
+        @Override
+        public void writeDouble(SdkSchema schema, double value) {
+<span class="fc" id="L360">            checkType(schema, ShapeType.DOUBLE);</span>
+<span class="fc" id="L361">            validateRange(schema, value, schema.minDoubleConstraint, schema.maxDoubleConstraint);</span>
+<span class="fc" id="L362">        }</span>
+
+        @Override
+        public void writeBigInteger(SdkSchema schema, BigInteger value) {
+<span class="fc" id="L366">            checkType(schema, ShapeType.BIG_INTEGER);</span>
+<span class="pc bpc" id="L367" title="1 of 4 branches missed.">            if (schema.minRangeConstraint != null &amp;&amp; value.compareTo(schema.minRangeConstraint.toBigInteger()) &lt; 0) {</span>
+<span class="fc" id="L368">                emitRangeError(schema, value);</span>
+<span class="pc bpc" id="L369" title="1 of 4 branches missed.">            } else if (schema.maxRangeConstraint != null &amp;&amp; value.compareTo(</span>
+<span class="fc" id="L370">                schema.maxRangeConstraint.toBigInteger()</span>
+            ) &gt; 0) {
+<span class="fc" id="L372">                emitRangeError(schema, value);</span>
+            }
+<span class="fc" id="L374">        }</span>
+
+        @Override
+        public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+<span class="fc" id="L378">            checkType(schema, ShapeType.BIG_DECIMAL);</span>
+<span class="pc bpc" id="L379" title="1 of 4 branches missed.">            if (schema.minRangeConstraint != null &amp;&amp; value.compareTo(schema.minRangeConstraint) &lt; 0) {</span>
+<span class="fc" id="L380">                emitRangeError(schema, value);</span>
+<span class="pc bpc" id="L381" title="1 of 4 branches missed.">            } else if (schema.maxRangeConstraint != null &amp;&amp; value.compareTo(schema.maxRangeConstraint) &gt; 0) {</span>
+<span class="fc" id="L382">                emitRangeError(schema, value);</span>
+            }
+<span class="fc" id="L384">        }</span>
+
+        @Override
+        public void writeString(SdkSchema schema, String value) {
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">            switch (schema.type()) {</span>
+<span class="fc" id="L389">                case STRING, ENUM -&gt; schema.stringValidation.apply(schema, value, this);</span>
+<span class="nc" id="L390">                default -&gt; checkType(schema, ShapeType.STRING); // it's invalid, and calling this adds an error.</span>
+            }
+<span class="fc" id="L392">        }</span>
+
+        @Override
+        public void writeBlob(SdkSchema schema, byte[] value) {
+<span class="fc" id="L396">            checkType(schema, ShapeType.BLOB);</span>
+<span class="fc bfc" id="L397" title="All 4 branches covered.">            if (value.length &lt; schema.minLengthConstraint || value.length &gt; schema.maxLengthConstraint) {</span>
+<span class="fc" id="L398">                addError(new ValidationError.LengthValidationFailure(createPath(), value.length, schema));</span>
+            }
+<span class="fc" id="L400">        }</span>
+
+        @Override
+        public void writeTimestamp(SdkSchema schema, Instant value) {
+<span class="fc" id="L404">            checkType(schema, ShapeType.TIMESTAMP);</span>
+<span class="fc" id="L405">        }</span>
+
+        @Override
+        public void writeDocument(SdkSchema schema, Document document) {
+<span class="nc" id="L409">            checkType(schema, ShapeType.DOCUMENT);</span>
+<span class="nc" id="L410">        }</span>
+
+        @Override
+        public void writeNull(SdkSchema schema) {
+            // This class only needs to validate null values when the current shape under validation is a list or map.
+            // If it's a list or map, and it doesn't have the sparse trait, then null isn't allowed.
+            // Note that union and structure member validation is handled in other classes (e.g., ValidatorOfUnion).
+<span class="fc bfc" id="L417" title="All 2 branches covered.">            if (currentSchema != null) {</span>
+<span class="fc bfc" id="L418" title="All 4 branches covered.">                if (currentSchema.type() == ShapeType.MAP || currentSchema.type() == ShapeType.LIST) {</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">                    if (!currentSchema.hasTrait(SparseTrait.class)) {</span>
+<span class="fc" id="L420">                        addError(new ValidationError.SparseValidationFailure(createPath(), currentSchema));</span>
+                    }
+                }
+            }
+<span class="fc" id="L424">        }</span>
+
+        private void validateRange(SdkSchema schema, long value, long min, long max) {
+<span class="fc bfc" id="L427" title="All 4 branches covered.">            if (value &lt; min || value &gt; max) {</span>
+<span class="fc" id="L428">                emitRangeError(schema, value);</span>
+            }
+<span class="fc" id="L430">        }</span>
+
+        private void validateRange(SdkSchema schema, double value, double min, double max) {
+<span class="fc bfc" id="L433" title="All 4 branches covered.">            if (value &lt; min || value &gt; max) {</span>
+<span class="fc" id="L434">                emitRangeError(schema, value);</span>
+            }
+<span class="fc" id="L436">        }</span>
+
+        private void emitRangeError(SdkSchema schema, Number value) {
+<span class="fc" id="L439">            addError(new ValidationError.RangeValidationFailure(createPath(), value, schema));</span>
+<span class="fc" id="L440">        }</span>
+
+        private void checkType(SdkSchema schema, ShapeType type) {
+<span class="fc bfc" id="L443" title="All 2 branches covered.">            if (schema.type() != type) {</span>
+<span class="fc" id="L444">                addError(new ValidationError.TypeValidationFailure(createPath(), type, schema));</span>
+                // Stop any further validation if an incorrect type is given. This should only be encountered when data
+                // is emitted from something manually and not from an actual modeled shape.
+<span class="fc" id="L447">                throw new ValidationShortCircuitException();</span>
+            }
+<span class="fc" id="L449">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EndpointResolverParams.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">client-endpoint-api</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.client.endpoint.api</a> &gt; <span class="el_source">EndpointResolverParams.java</span></div><h1>EndpointResolverParams.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.client.endpoint.api;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Encapsulates endpoint resolver parameters.
+ */
+public final class EndpointResolverParams {
+
+    private final String operationName;
+    private final Map&lt;EndpointProperty&lt;?&gt;, Object&gt; immutableMap;
+
+<span class="fc" id="L21">    private EndpointResolverParams(Map&lt;EndpointProperty&lt;?&gt;, Object&gt; map, String operationName) {</span>
+<span class="fc" id="L22">        this.immutableMap = new HashMap&lt;&gt;(map);</span>
+<span class="fc" id="L23">        this.operationName = Objects.requireNonNull(operationName, &quot;operationName is null&quot;);</span>
+<span class="fc" id="L24">    }</span>
+
+    /**
+     * Create a new builder to build {@link EndpointResolverParams}.
+     *
+     * @return the builder.
+     */
+    public static Builder builder() {
+<span class="fc" id="L32">        return new Builder();</span>
+    }
+
+    /**
+     * Get the value of an EndpointProperty.
+     *
+     * @param property Endpoint property to get.
+     * @return the value or null if not found.
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; T property(EndpointProperty&lt;T&gt; property) {
+<span class="nc" id="L43">        return (T) immutableMap.get(property);</span>
+    }
+
+    /**
+     * Get all the properties available when resolving the endpoint.
+     *
+     * @return the properties.
+     */
+    public Set&lt;EndpointProperty&lt;?&gt;&gt; properties() {
+<span class="nc" id="L52">        return immutableMap.keySet();</span>
+    }
+
+    /**
+     * Get the name of the operation to resolve the endpoint for.
+     *
+     * @return name of the operation.
+     */
+    public String operationName() {
+<span class="nc" id="L61">        return operationName;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L67">            return true;</span>
+        }
+<span class="nc bnc" id="L69" title="All 4 branches missed.">        if (o == null || getClass() != o.getClass()) {</span>
+<span class="nc" id="L70">            return false;</span>
+        }
+<span class="nc" id="L72">        EndpointResolverParams params = (EndpointResolverParams) o;</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        return Objects.equals(operationName, params.operationName)</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            &amp;&amp; Objects.equals(immutableMap, params.immutableMap);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L79">        return Objects.hash(operationName, immutableMap);</span>
+    }
+
+    /**
+     * Create a builder from this {@link EndpointResolverParams}.
+     *
+     * @return the builder.
+     */
+    public Builder toBuilder() {
+<span class="nc" id="L88">        Builder builder = builder();</span>
+<span class="nc" id="L89">        builder.map.putAll(immutableMap);</span>
+<span class="nc" id="L90">        builder.operationName(operationName);</span>
+<span class="nc" id="L91">        return builder;</span>
+    }
+
+    /**
+     * Builder used to create and {@link EndpointResolverParams}.
+     */
+<span class="fc" id="L97">    public static final class Builder {</span>
+
+        private String operationName;
+<span class="fc" id="L100">        private final Map&lt;EndpointProperty&lt;?&gt;, Object&gt; map = new HashMap&lt;&gt;();</span>
+
+        /**
+         * Build the params.
+         * @return the built params.
+         */
+        public EndpointResolverParams build() {
+<span class="fc" id="L107">            return new EndpointResolverParams(map, operationName);</span>
+        }
+
+        /**
+         * Put a typed property on the params.
+         *
+         * @param property Property to set.
+         * @param value    Value to associate with the property.
+         * @return the builder.
+         * @param &lt;T&gt; Value type.
+         */
+        public &lt;T&gt; Builder putProperty(EndpointProperty&lt;T&gt; property, T value) {
+<span class="nc" id="L119">            map.put(property, value);</span>
+<span class="nc" id="L120">            return this;</span>
+        }
+
+        /**
+         * Set the name of the operation to resolve.
+         *
+         * @param operationName Name of the operation.
+         * @return the builder.
+         */
+        public Builder operationName(String operationName) {
+<span class="fc" id="L130">            this.operationName = operationName;</span>
+<span class="fc" id="L131">            return this;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

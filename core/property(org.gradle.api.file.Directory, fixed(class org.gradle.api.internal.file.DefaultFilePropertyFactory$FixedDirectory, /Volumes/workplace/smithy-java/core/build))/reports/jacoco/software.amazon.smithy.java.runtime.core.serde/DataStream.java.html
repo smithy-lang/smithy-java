@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DataStream.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.serde</a> &gt; <span class="el_source">DataStream.java</span></div><h1>DataStream.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.serde;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Optional;
+
+/**
+ * Abstraction for reading streams of data.
+ */
+public interface DataStream extends AutoCloseable {
+    /**
+     * Length of the data stream, if known.
+     *
+     * &lt;p&gt;Return a negative number to indicate an unknown length.
+     *
+     * @return Returns the content length if known, or a negative number if unknown.
+     */
+    long contentLength();
+
+    /**
+     * Check if the stream has a known content-length.
+     *
+     * @return true if the length is known.
+     */
+    default boolean hasKnownLength() {
+<span class="nc bnc" id="L36" title="All 2 branches missed.">        return contentLength() &gt;= 0;</span>
+    }
+
+    /**
+     * Returns the content-type of the data, if known.
+     *
+     * @return the optionally available content-type.
+     */
+    Optional&lt;String&gt; contentType();
+
+    /**
+     * Get the InputStream.
+     *
+     * @return the underlying InputStream.
+     */
+    InputStream inputStream();
+
+    /**
+     * Attempt to rewind the input stream to the beginning of the stream.
+     *
+     * @return Returns true if the stream could be rewound.
+     */
+    boolean rewind();
+
+    /**
+     * Close underlying resources, if necessary.
+     *
+     * &lt;p&gt;If the resource is already closed, this method does nothing.
+     */
+    @Override
+    default void close() {
+        try {
+<span class="nc" id="L68">            inputStream().close();</span>
+<span class="nc" id="L69">        } catch (IOException e) {</span>
+<span class="nc" id="L70">            throw new UncheckedIOException(&quot;Unable to close input stream in data stream&quot;, e);</span>
+<span class="nc" id="L71">        }</span>
+<span class="nc" id="L72">    }</span>
+
+    /**
+     * Read the contents of the stream to an in-memory byte array.
+     *
+     * @param maxLength Maximum number of bytes to read.
+     * @return Returns the in-memory byte array.
+     */
+    default byte[] readToBytes(int maxLength) {
+<span class="nc" id="L81">        try (InputStream stream = inputStream()) {</span>
+<span class="nc" id="L82">            return stream.readNBytes(maxLength);</span>
+<span class="nc" id="L83">        } catch (IOException e) {</span>
+<span class="nc" id="L84">            throw new UncheckedIOException(e);</span>
+        }
+    }
+
+    /**
+     * Read the contents of the stream to an in-memory String.
+     *
+     * @param maxLength Maximum number of bytes to read.
+     * @return Returns the in-memory string.
+     */
+    default String readToString(int maxLength) {
+<span class="nc" id="L95">        return new String(readToBytes(maxLength), StandardCharsets.UTF_8);</span>
+    }
+
+    /**
+     * Create an empty data stream.
+     *
+     * @return the empty data stream.
+     */
+    static DataStream ofEmpty() {
+<span class="nc" id="L104">        return new DataStream() {</span>
+            @Override
+            public long contentLength() {
+<span class="nc" id="L107">                return 0;</span>
+            }
+
+            @Override
+            public Optional&lt;String&gt; contentType() {
+<span class="nc" id="L112">                return Optional.empty();</span>
+            }
+
+            @Override
+            public InputStream inputStream() {
+<span class="nc" id="L117">                return InputStream.nullInputStream();</span>
+            }
+
+            @Override
+            public boolean rewind() {
+<span class="nc" id="L122">                return true;</span>
+            }
+        };
+    }
+
+    /**
+     * Create a data stream from an InputStream.
+     *
+     * @param inputStream InputStream to wrap.
+     * @return the non-rewindable data stream.
+     */
+    static DataStream ofInputStream(InputStream inputStream) {
+<span class="nc" id="L134">        return ofInputStream(inputStream, null);</span>
+    }
+
+    /**
+     * Create a data stream from an InputStream.
+     *
+     * @param inputStream InputStream to wrap.
+     * @param contentType Content-Type of the data stream if known, or null.
+     * @return the non-rewindable data stream.
+     */
+    static DataStream ofInputStream(InputStream inputStream, String contentType) {
+<span class="nc" id="L145">        return ofInputStream(inputStream, contentType, -1);</span>
+    }
+
+    /**
+     * Create a data stream from an InputStream.
+     *
+     * @param inputStream   InputStream to wrap.
+     * @param contentType   Content-Type of the data stream if known, or null.
+     * @param contentLength Bytes in the stream if known, or -1.
+     * @return the non-rewindable data stream.
+     */
+    static DataStream ofInputStream(InputStream inputStream, String contentType, long contentLength) {
+<span class="nc" id="L157">        return new DataStream() {</span>
+            @Override
+            public long contentLength() {
+<span class="nc" id="L160">                return contentLength;</span>
+            }
+
+            @Override
+            public Optional&lt;String&gt; contentType() {
+<span class="nc" id="L165">                return Optional.ofNullable(contentType);</span>
+            }
+
+            @Override
+            public InputStream inputStream() {
+<span class="nc" id="L170">                return inputStream;</span>
+            }
+
+            @Override
+            public boolean rewind() {
+<span class="nc" id="L175">                return false;</span>
+            }
+        };
+    }
+
+    /**
+     * Create a DataStream from an in-memory UTF-8 string.
+     *
+     * @param data Data to stream.
+     * @return the rewindable data stream.
+     */
+    static DataStream ofString(String data) {
+<span class="nc" id="L187">        return ofString(data, null);</span>
+    }
+
+    /**
+     * Create a DataStream from an in-memory UTF-8 string.
+     *
+     * @param data        Data to stream.
+     * @param contentType Content-Type of the data stream if known, or null.
+     * @return the rewindable data stream.
+     */
+    static DataStream ofString(String data, String contentType) {
+<span class="nc" id="L198">        return ofBytes(data.getBytes(StandardCharsets.UTF_8), contentType);</span>
+    }
+
+    /**
+     * Create a DataStream from an in-memory byte array.
+     *
+     * @param bytes Bytes to read.
+     * @return the rewindable data stream.
+     */
+    static DataStream ofBytes(byte[] bytes) {
+<span class="nc" id="L208">        return ofBytes(bytes, null);</span>
+    }
+
+    /**
+     * Create a DataStream from an in-memory byte array.
+     *
+     * @param bytes       Bytes to read.
+     * @param contentType Content-Type of the data stream if known, or null.
+     * @return the rewindable data stream.
+     */
+    static DataStream ofBytes(byte[] bytes, String contentType) {
+<span class="nc" id="L219">        var result = new DataStream() {</span>
+            private InputStream inputStream;
+
+            @Override
+            public long contentLength() {
+<span class="nc" id="L224">                return bytes.length;</span>
+            }
+
+            @Override
+            public Optional&lt;String&gt; contentType() {
+<span class="nc" id="L229">                return Optional.ofNullable(contentType);</span>
+            }
+
+            @Override
+            public InputStream inputStream() {
+<span class="nc" id="L234">                return inputStream;</span>
+            }
+
+            @Override
+            public boolean rewind() {
+<span class="nc" id="L239">                inputStream = new ByteArrayInputStream(bytes);</span>
+<span class="nc" id="L240">                return true;</span>
+            }
+        };
+<span class="nc" id="L243">        result.rewind();</span>
+<span class="nc" id="L244">        return result;</span>
+    }
+
+    /**
+     * Create a DataStream from a file on disk.
+     *
+     * &lt;p&gt;This implementation will attempt to probe the content-type of the file using
+     * {@link Files#probeContentType(Path)}. To avoid this, call {@link #ofFile(Path, String)} and pass in a null
+     * {@code contentType} argument.
+     *
+     * @param file File to read.
+     * @return the rewindable data stream.
+     */
+    static DataStream ofFile(Path file) {
+        try {
+<span class="nc" id="L259">            return ofFile(file, Files.probeContentType(file));</span>
+<span class="nc" id="L260">        } catch (IOException e) {</span>
+<span class="nc" id="L261">            throw new UncheckedIOException(e);</span>
+        }
+    }
+
+    /**
+     * Create a DataStream from a file on disk.
+     *
+     * @param file        File to read.
+     * @param contentType Content-Type of the data stream if known, or null.
+     * @return the rewindable data stream.
+     */
+    static DataStream ofFile(Path file, String contentType) {
+        try {
+<span class="nc" id="L274">            long initialLength = Files.size(file);</span>
+<span class="nc" id="L275">            InputStream initialStream = Files.newInputStream(file);</span>
+<span class="nc" id="L276">            return new DataStream() {</span>
+<span class="nc" id="L277">                private static final System.Logger LOGGER = System.getLogger(DataStream.class.getName());</span>
+<span class="nc" id="L278">                private long length = initialLength;</span>
+<span class="nc" id="L279">                private InputStream inputStream = initialStream;</span>
+
+                @Override
+                public long contentLength() {
+<span class="nc" id="L283">                    return length;</span>
+                }
+
+                @Override
+                public Optional&lt;String&gt; contentType() {
+<span class="nc" id="L288">                    return Optional.ofNullable(contentType);</span>
+                }
+
+                @Override
+                public InputStream inputStream() {
+<span class="nc" id="L293">                    return inputStream;</span>
+                }
+
+                @Override
+                public boolean rewind() {
+                    try {
+<span class="nc" id="L299">                        inputStream = Files.newInputStream(file);</span>
+<span class="nc" id="L300">                        length = Files.size(file);</span>
+<span class="nc" id="L301">                        return true;</span>
+<span class="nc" id="L302">                    } catch (IOException e) {</span>
+<span class="nc" id="L303">                        LOGGER.log(</span>
+                            System.Logger.Level.WARNING,
+<span class="nc" id="L305">                            () -&gt; &quot;Unable to rewind file data stream for &quot; + file + &quot;: &quot; + e.getMessage()</span>
+                        );
+<span class="nc" id="L307">                        return false;</span>
+                    }
+                }
+            };
+<span class="nc" id="L311">        } catch (IOException e) {</span>
+<span class="nc" id="L312">            throw new UncheckedIOException(&quot;Unable to open file for data stream &quot; + file + &quot;: &quot; + e.getMessage(), e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

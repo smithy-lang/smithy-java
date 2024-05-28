@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MemberContainers.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.schema</a> &gt; <span class="el_source">MemberContainers.java</span></div><h1>MemberContainers.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.schema;
+
+import java.util.AbstractMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import software.amazon.smithy.model.shapes.ShapeType;
+
+/**
+ * Holder for Map implementations of List and Map shapes to provide the most appropriate Map for a schema.
+ */
+final class MemberContainers {
+
+    private MemberContainers() {}
+
+    static Map&lt;String, SdkSchema&gt; of(ShapeType type, List&lt;SdkSchema&gt; members, Map&lt;String, SdkSchema&gt; targetMembers) {
+<span class="fc bfc" id="L23" title="All 4 branches covered.">        if (members == null || members.isEmpty()) {</span>
+            // Use the members of the target shape directly rather than needing to do a recursive resolution.
+<span class="fc bfc" id="L25" title="All 2 branches covered.">            return targetMembers != null ? targetMembers : Map.of();</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        } else if (type == ShapeType.LIST) {</span>
+<span class="fc" id="L27">            return new MemberContainers.ListMembers(members);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        } else if (type == ShapeType.MAP) {</span>
+<span class="fc" id="L29">            return MemberContainers.MapMembers.of(members);</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        } else if (members.size() == 1) {</span>
+            // Special case for shapes with a single member.
+<span class="fc" id="L32">            var member = members.get(0);</span>
+<span class="fc" id="L33">            return Map.of(member.memberName(), member);</span>
+        } else {
+<span class="fc" id="L35">            Map&lt;String, SdkSchema&gt; result = new LinkedHashMap&lt;&gt;(members.size());</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            for (SdkSchema member : members) {</span>
+<span class="fc" id="L37">                result.put(member.memberName(), member);</span>
+<span class="fc" id="L38">            }</span>
+<span class="fc" id="L39">            return result;</span>
+        }
+    }
+
+    /**
+     * Validates and stores list members that always have a single &quot;member&quot; member.
+     */
+    private static final class ListMembers extends AbstractMap&lt;String, SdkSchema&gt; {
+
+        private final SdkSchema member;
+        private final Set&lt;Entry&lt;String, SdkSchema&gt;&gt; entries;
+
+<span class="fc" id="L51">        ListMembers(List&lt;SdkSchema&gt; members) {</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            if (members.size() != 1) {</span>
+<span class="fc" id="L53">                throw new IllegalArgumentException(&quot;List shapes require exactly one member&quot;);</span>
+            }
+
+<span class="fc" id="L56">            this.member = members.get(0);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (!member.memberName().equals(&quot;member&quot;)) {</span>
+<span class="fc" id="L58">                throw new IllegalArgumentException(&quot;List shapes require a member named 'member'. Found &quot; + member);</span>
+            }
+
+<span class="fc" id="L61">            this.entries = Set.of(new SimpleImmutableEntry&lt;&gt;(&quot;member&quot;, member));</span>
+<span class="fc" id="L62">        }</span>
+
+        @Override
+        public boolean containsKey(Object key) {
+<span class="fc" id="L66">            return &quot;member&quot;.equals(key);</span>
+        }
+
+        @Override
+        public SdkSchema get(Object key) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            return &quot;member&quot;.equals(key) ? member : null;</span>
+        }
+
+        @Override
+        public Set&lt;Entry&lt;String, SdkSchema&gt;&gt; entrySet() {
+<span class="fc" id="L76">            return entries;</span>
+        }
+    }
+
+    /**
+     * Validates and stores map members that always have a &quot;key&quot; and &quot;value&quot; member, in that order.
+     */
+    private static final class MapMembers extends AbstractMap&lt;String, SdkSchema&gt; {
+
+        private final SdkSchema key;
+        private final SdkSchema value;
+        private final Set&lt;Entry&lt;String, SdkSchema&gt;&gt; entries;
+
+<span class="fc" id="L89">        private MapMembers(SdkSchema key, SdkSchema value) {</span>
+<span class="fc" id="L90">            this.key = key;</span>
+<span class="fc" id="L91">            this.value = value;</span>
+<span class="fc" id="L92">            this.entries = Set.of(new SimpleImmutableEntry&lt;&gt;(&quot;key&quot;, key), new SimpleImmutableEntry&lt;&gt;(&quot;value&quot;, value));</span>
+<span class="fc" id="L93">        }</span>
+
+        static MapMembers of(List&lt;SdkSchema&gt; members) {
+<span class="fc" id="L96">            int size = members.size();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            if (size != 2) {</span>
+<span class="fc" id="L98">                throw new IllegalArgumentException(&quot;Maps require exactly two members. Found: &quot; + members);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            } else if (!members.get(0).memberName().equals(&quot;key&quot;)) {</span>
+<span class="fc" id="L100">                throw new IllegalArgumentException(&quot;Maps require a key as the first member. Found: &quot; + members);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            } else if (!members.get(size - 1).memberName().equals(&quot;value&quot;)) {</span>
+<span class="fc" id="L102">                throw new IllegalArgumentException(&quot;Maps require a value as the second member. Found: &quot; + members);</span>
+            } else {
+<span class="fc" id="L104">                return new MapMembers(members.get(0), members.get(size - 1));</span>
+            }
+        }
+
+        @Override
+        public boolean containsKey(Object key) {
+<span class="fc bfc" id="L110" title="All 4 branches covered.">            return &quot;key&quot;.equals(key) || &quot;value&quot;.equals(key);</span>
+        }
+
+        @Override
+        public SdkSchema get(Object key) {
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (&quot;key&quot;.equals(key)) {</span>
+<span class="fc" id="L116">                return this.key;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            } else if (&quot;value&quot;.equals(key)) {</span>
+<span class="fc" id="L118">                return value;</span>
+            } else {
+<span class="fc" id="L120">                return null;</span>
+            }
+        }
+
+        @Override
+        public Set&lt;Entry&lt;String, SdkSchema&gt;&gt; entrySet() {
+<span class="fc" id="L126">            return entries;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

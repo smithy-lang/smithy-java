@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShapeDeserializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.serde</a> &gt; <span class="el_source">ShapeDeserializer.java</span></div><h1>ShapeDeserializer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.serde;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
+
+/**
+ * Deserializes a shape by emitted the Smithy data model from the shape, aided by schemas.
+ */
+public interface ShapeDeserializer extends AutoCloseable {
+
+    @Override
+<span class="nc" id="L20">    default void close() {}</span>
+
+    /**
+     * Attempt to read a boolean value.
+     *
+     * @param schema Schema of the shape.
+     * @return the read value.
+     */
+    boolean readBoolean(SdkSchema schema);
+
+    /**
+     * Attempt to read a blob value.
+     *
+     * @param schema Schema of the shape.
+     * @return the read value.
+     */
+    byte[] readBlob(SdkSchema schema);
+
+    /**
+     * Attempt to read a byte value.
+     *
+     * @param schema Schema of the shape.
+     * @return the read value.
+     */
+    byte readByte(SdkSchema schema);
+
+    /**
+     * Attempt to read a short value.
+     *
+     * @param schema Schema of the shape.
+     * @return the read value.
+     */
+    short readShort(SdkSchema schema);
+
+    /**
+     * Attempt to read an integer or intEnum value.
+     *
+     * @param schema Schema of the shape.
+     * @return the read value.
+     */
+    int readInteger(SdkSchema schema);
+
+    /**
+     * Attempt to read a long value.
+     *
+     * @param schema Schema of the shape.
+     * @return the read value.
+     */
+    long readLong(SdkSchema schema);
+
+    /**
+     * Attempt to read a float value.
+     *
+     * @param schema Schema of the shape.
+     * @return the read value.
+     */
+    float readFloat(SdkSchema schema);
+
+    /**
+     * Attempt to read a double value.
+     *
+     * @param schema Schema of the shape.
+     * @return the read value.
+     */
+    double readDouble(SdkSchema schema);
+
+    /**
+     * Attempt to read a bigInteger value.
+     *
+     * @param schema Schema of the shape.
+     * @return the read value.
+     */
+    BigInteger readBigInteger(SdkSchema schema);
+
+    /**
+     * Attempt to read a bigDecimal value.
+     *
+     * @param schema Schema of the shape.
+     * @return the read value.
+     */
+    BigDecimal readBigDecimal(SdkSchema schema);
+
+    /**
+     * Attempt to read a string or enum value.
+     *
+     * @param schema Schema of the shape.
+     * @return the read value.
+     */
+    String readString(SdkSchema schema);
+
+    /**
+     * Attempt to read a document value.
+     *
+     * @return the read value.
+     */
+    Document readDocument();
+
+    /**
+     * Attempt to read a timestamp value.
+     *
+     * @return the read value.
+     */
+    Instant readTimestamp(SdkSchema schema);
+
+    /**
+     * Attempt to read a structure or union value.
+     *
+     * @param schema   Schema of the shape.
+     * @param state    State to pass to the consumer.
+     * @param consumer Consumer that receives the state, member schema, and deserializer.
+     */
+    &lt;T&gt; void readStruct(SdkSchema schema, T state, StructMemberConsumer&lt;T&gt; consumer);
+
+    /**
+     * Attempt to read a list value.
+     *
+     * @param schema   Schema of the shape.
+     * @param state    State to pass to the consumer.
+     * @param consumer Consumer that receives the state and deserializer.
+     */
+    &lt;T&gt; void readList(SdkSchema schema, T state, ListMemberConsumer&lt;T&gt; consumer);
+
+    /**
+     * Attempt to read a map value.
+     *
+     * @param schema   Schema of the shape.
+     * @param state    State to pass to the consumer.
+     * @param consumer Consumer that receives the state, map key, and deserializer.
+     */
+    &lt;T&gt; void readStringMap(SdkSchema schema, T state, MapMemberConsumer&lt;String, T&gt; consumer);
+
+    /**
+     * Consumer of a structure member.
+     *
+     * @param &lt;T&gt; Passed in state value to avoid capturing external state.
+     */
+    @FunctionalInterface
+    interface StructMemberConsumer&lt;T&gt; {
+        void accept(T state, SdkSchema memberSchema, ShapeDeserializer memberDeserializer);
+    }
+
+    /**
+     * Consumer of list member.
+     *
+     * @param &lt;T&gt; Passed in state value to avoid capturing external state.
+     */
+    @FunctionalInterface
+    interface ListMemberConsumer&lt;T&gt; {
+        void accept(T state, ShapeDeserializer memberDeserializer);
+    }
+
+    /**
+     * Consumer of map member.
+     *
+     * @param &lt;T&gt; Passed in state value to avoid capturing external state.
+     */
+    @FunctionalInterface
+    interface MapMemberConsumer&lt;K, T&gt; {
+        void accept(T state, K key, ShapeDeserializer memberDeserializer);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

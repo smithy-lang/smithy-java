@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ValidatorOfStruct.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.schema</a> &gt; <span class="el_source">ValidatorOfStruct.java</span></div><h1>ValidatorOfStruct.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.schema;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.util.function.BiConsumer;
+import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
+
+/**
+ * Validates structures that have required members and fewer than 64 total members.
+ */
+final class ValidatorOfStruct implements ShapeSerializer {
+
+    private final Validator.ShapeValidator validator;
+    private final PresenceTracker structValidator;
+
+<span class="fc" id="L24">    ValidatorOfStruct(Validator.ShapeValidator validator, PresenceTracker structValidator) {</span>
+<span class="fc" id="L25">        this.validator = validator;</span>
+<span class="fc" id="L26">        this.structValidator = structValidator;</span>
+<span class="fc" id="L27">    }</span>
+
+    static void validate(Validator.ShapeValidator validator, SdkSchema schema, SerializableStruct struct) {
+<span class="fc" id="L30">        var tracker = PresenceTracker.of(schema);</span>
+<span class="fc" id="L31">        struct.serializeMembers(new ValidatorOfStruct(validator, tracker));</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (!tracker.allSet()) {</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            for (var member : tracker.getMissingMembers()) {</span>
+<span class="fc" id="L34">                validator.addError(</span>
+<span class="fc" id="L35">                    new ValidationError.RequiredValidationFailure(validator.createPath(), member, schema)</span>
+                );
+<span class="fc" id="L37">            }</span>
+        }
+<span class="fc" id="L39">    }</span>
+
+    @Override
+    public void writeBoolean(SdkSchema member, boolean value) {
+<span class="nc" id="L43">        structValidator.setMember(member);</span>
+<span class="nc" id="L44">        validator.pushPath(member.memberName());</span>
+<span class="nc" id="L45">        validator.writeBoolean(member, value);</span>
+<span class="nc" id="L46">        validator.popPath();</span>
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public void writeByte(SdkSchema member, byte value) {
+<span class="nc" id="L51">        structValidator.setMember(member);</span>
+<span class="nc" id="L52">        validator.pushPath(member.memberName());</span>
+<span class="nc" id="L53">        validator.writeByte(member, value);</span>
+<span class="nc" id="L54">        validator.popPath();</span>
+<span class="nc" id="L55">    }</span>
+
+    @Override
+    public void writeShort(SdkSchema member, short value) {
+<span class="nc" id="L59">        structValidator.setMember(member);</span>
+<span class="nc" id="L60">        validator.pushPath(member.memberName());</span>
+<span class="nc" id="L61">        validator.writeShort(member, value);</span>
+<span class="nc" id="L62">        validator.popPath();</span>
+<span class="nc" id="L63">    }</span>
+
+    @Override
+    public void writeInteger(SdkSchema member, int value) {
+<span class="fc" id="L67">        structValidator.setMember(member);</span>
+<span class="fc" id="L68">        validator.pushPath(member.memberName());</span>
+<span class="fc" id="L69">        validator.writeInteger(member, value);</span>
+<span class="fc" id="L70">        validator.popPath();</span>
+<span class="fc" id="L71">    }</span>
+
+    @Override
+    public void writeLong(SdkSchema member, long value) {
+<span class="nc" id="L75">        structValidator.setMember(member);</span>
+<span class="nc" id="L76">        validator.pushPath(member.memberName());</span>
+<span class="nc" id="L77">        validator.writeLong(member, value);</span>
+<span class="nc" id="L78">        validator.popPath();</span>
+<span class="nc" id="L79">    }</span>
+
+    @Override
+    public void writeFloat(SdkSchema member, float value) {
+<span class="nc" id="L83">        structValidator.setMember(member);</span>
+<span class="nc" id="L84">        validator.pushPath(member.memberName());</span>
+<span class="nc" id="L85">        validator.writeFloat(member, value);</span>
+<span class="nc" id="L86">        validator.popPath();</span>
+<span class="nc" id="L87">    }</span>
+
+    @Override
+    public void writeDouble(SdkSchema member, double value) {
+<span class="nc" id="L91">        structValidator.setMember(member);</span>
+<span class="nc" id="L92">        validator.pushPath(member.memberName());</span>
+<span class="nc" id="L93">        validator.writeDouble(member, value);</span>
+<span class="nc" id="L94">        validator.popPath();</span>
+<span class="nc" id="L95">    }</span>
+
+    @Override
+    public void writeBigInteger(SdkSchema member, BigInteger value) {
+<span class="nc" id="L99">        structValidator.setMember(member);</span>
+<span class="nc" id="L100">        validator.pushPath(member.memberName());</span>
+<span class="nc" id="L101">        validator.writeBigInteger(member, value);</span>
+<span class="nc" id="L102">        validator.popPath();</span>
+<span class="nc" id="L103">    }</span>
+
+    @Override
+    public void writeBigDecimal(SdkSchema member, BigDecimal value) {
+<span class="nc" id="L107">        structValidator.setMember(member);</span>
+<span class="nc" id="L108">        validator.pushPath(member.memberName());</span>
+<span class="nc" id="L109">        validator.writeBigDecimal(member, value);</span>
+<span class="nc" id="L110">        validator.popPath();</span>
+<span class="nc" id="L111">    }</span>
+
+    @Override
+    public void writeBlob(SdkSchema member, byte[] value) {
+<span class="nc" id="L115">        structValidator.setMember(member);</span>
+<span class="nc" id="L116">        validator.pushPath(member.memberName());</span>
+<span class="nc" id="L117">        validator.writeBlob(member, value);</span>
+<span class="nc" id="L118">        validator.popPath();</span>
+<span class="nc" id="L119">    }</span>
+
+    @Override
+    public void writeString(SdkSchema member, String value) {
+<span class="fc" id="L123">        structValidator.setMember(member);</span>
+<span class="fc" id="L124">        validator.pushPath(member.memberName());</span>
+<span class="fc" id="L125">        validator.writeString(member, value);</span>
+<span class="fc" id="L126">        validator.popPath();</span>
+<span class="fc" id="L127">    }</span>
+
+    @Override
+    public void writeTimestamp(SdkSchema member, Instant value) {
+<span class="fc" id="L131">        structValidator.setMember(member);</span>
+<span class="fc" id="L132">        validator.pushPath(member.memberName());</span>
+<span class="fc" id="L133">        validator.writeTimestamp(member, value);</span>
+<span class="fc" id="L134">        validator.popPath();</span>
+<span class="fc" id="L135">    }</span>
+
+    @Override
+    public void writeDocument(SdkSchema member, Document value) {
+<span class="nc" id="L139">        structValidator.setMember(member);</span>
+<span class="nc" id="L140">        validator.pushPath(member.memberName());</span>
+<span class="nc" id="L141">        validator.writeDocument(value);</span>
+<span class="nc" id="L142">        validator.popPath();</span>
+<span class="nc" id="L143">    }</span>
+
+    @Override
+    public &lt;T&gt; void writeList(SdkSchema member, T state, BiConsumer&lt;T, ShapeSerializer&gt; consumer) {
+<span class="fc" id="L147">        structValidator.setMember(member);</span>
+<span class="fc" id="L148">        validator.pushPath(member.memberName());</span>
+<span class="fc" id="L149">        validator.writeList(member, state, consumer);</span>
+<span class="fc" id="L150">        validator.popPath();</span>
+<span class="fc" id="L151">    }</span>
+
+    @Override
+    public &lt;T&gt; void writeMap(SdkSchema member, T state, BiConsumer&lt;T, MapSerializer&gt; consumer) {
+<span class="fc" id="L155">        structValidator.setMember(member);</span>
+<span class="fc" id="L156">        validator.pushPath(member.memberName());</span>
+<span class="fc" id="L157">        validator.writeMap(member, state, consumer);</span>
+<span class="fc" id="L158">        validator.popPath();</span>
+<span class="fc" id="L159">    }</span>
+
+    @Override
+    public void writeStruct(SdkSchema member, SerializableStruct struct) {
+<span class="nc" id="L163">        structValidator.setMember(member);</span>
+<span class="nc" id="L164">        validator.pushPath(member.memberName());</span>
+<span class="nc" id="L165">        validator.writeStruct(member, struct);</span>
+<span class="nc" id="L166">        validator.popPath();</span>
+<span class="nc" id="L167">    }</span>
+
+    @Override
+    public void writeNull(SdkSchema member) {
+        // A null member does not count as present so don't set the bitfield.
+<span class="fc" id="L172">        validator.pushPath(member.memberName());</span>
+<span class="fc" id="L173">        validator.writeNull(member);</span>
+<span class="fc" id="L174">        validator.popPath();</span>
+<span class="fc" id="L175">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

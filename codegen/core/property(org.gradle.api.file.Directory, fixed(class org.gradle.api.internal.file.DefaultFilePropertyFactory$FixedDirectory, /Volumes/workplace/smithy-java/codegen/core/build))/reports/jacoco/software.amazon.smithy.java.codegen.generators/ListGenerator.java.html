@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ListGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.generators</a> &gt; <span class="el_source">ListGenerator.java</span></div><h1>ListGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.generators;
+
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import software.amazon.smithy.codegen.core.directed.GenerateListDirective;
+import software.amazon.smithy.java.codegen.CodeGenerationContext;
+import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.SymbolProperties;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.model.traits.UniqueItemsTrait;
+import software.amazon.smithy.utils.SmithyInternalApi;
+
+/**
+ * Generates serializers and deserializers for List shapes.
+ */
+@SmithyInternalApi
+<span class="fc" id="L26">public final class ListGenerator</span>
+    implements Consumer&lt;GenerateListDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt;&gt; {
+
+    @Override
+    public void accept(GenerateListDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+<span class="fc" id="L31">        directive.context()</span>
+<span class="fc" id="L32">            .writerDelegator()</span>
+<span class="fc" id="L33">            .useFileWriter(</span>
+<span class="fc" id="L34">                CodegenUtils.getSerdeFileName(directive.settings()),</span>
+<span class="fc" id="L35">                CodegenUtils.getModelNamespace(directive.settings()),</span>
+<span class="fc" id="L36">                writer -&gt; writer.onSection(&quot;sharedSerde&quot;, t -&gt; {</span>
+
+<span class="fc" id="L38">                    var name = CodegenUtils.getDefaultName(directive.shape(), directive.service());</span>
+<span class="fc" id="L39">                    var target = directive.model().expectShape(directive.shape().getMember().getTarget());</span>
+<span class="fc" id="L40">                    writer.pushState();</span>
+<span class="fc" id="L41">                    writer.putContext(&quot;shape&quot;, directive.symbol());</span>
+<span class="fc" id="L42">                    writer.putContext(&quot;name&quot;, name);</span>
+<span class="fc" id="L43">                    writer.putContext(</span>
+                        &quot;collectionImpl&quot;,
+<span class="fc" id="L45">                        directive.symbol().expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)</span>
+                    );
+<span class="fc" id="L47">                    writer.putContext(&quot;schema&quot;, SdkSchema.class);</span>
+<span class="fc" id="L48">                    writer.putContext(&quot;biConsumer&quot;, BiConsumer.class);</span>
+<span class="fc" id="L49">                    writer.putContext(&quot;shapeSerializer&quot;, ShapeSerializer.class);</span>
+<span class="fc" id="L50">                    writer.putContext(&quot;shapeDeserializer&quot;, ShapeDeserializer.class);</span>
+<span class="fc" id="L51">                    writer.putContext(&quot;unique&quot;, directive.shape().hasTrait(UniqueItemsTrait.class));</span>
+<span class="fc" id="L52">                    writer.putContext(&quot;serdeException&quot;, SdkSerdeException.class);</span>
+<span class="fc" id="L53">                    writer.write(</span>
+                        &quot;&quot;&quot;
+                            static final class ${name:U}Serializer implements ${biConsumer:T}&lt;${shape:T}, ${shapeSerializer:T}&gt; {
+                                static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
+
+                                @Override
+                                public void accept(${shape:T} values, ${shapeSerializer:T} serializer) {
+                                    for (var value : values) {
+                                        ${C|};
+                                    }
+                                }
+                            }
+
+                            static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
+                                ${shape:T} result = new ${collectionImpl:T}&lt;&gt;();
+                                deserializer.readList(schema, result, ${name:U}MemberDeserializer.INSTANCE);
+                                return result;
+                            }
+
+                            private static final class ${name:U}MemberDeserializer implements ${shapeDeserializer:T}.ListMemberConsumer&lt;${shape:T}&gt; {
+                                static final ${name:U}MemberDeserializer INSTANCE = new ${name:U}MemberDeserializer();
+
+                                @Override
+                                public void accept(${shape:T} state, ${shapeDeserializer:T} deserializer) {
+                                    ${?unique}if (${/unique}state.add($C)${^unique};${/unique}${?unique}) {
+                                        throw new ${serdeException:T}(&quot;Member must have unique values&quot;);
+                                    }${/unique}
+                                }
+                            }
+                            &quot;&quot;&quot;,
+                        new SerializerMemberGenerator(
+                            writer,
+<span class="fc" id="L85">                            directive.symbolProvider(),</span>
+<span class="fc" id="L86">                            directive.model(),</span>
+<span class="fc" id="L87">                            directive.service(),</span>
+<span class="fc" id="L88">                            directive.shape().getMember(),</span>
+                            &quot;value&quot;
+                        ),
+                        new DeserializerGenerator(
+                            writer,
+                            target,
+<span class="fc" id="L94">                            directive.symbolProvider(),</span>
+<span class="fc" id="L95">                            directive.model(),</span>
+<span class="fc" id="L96">                            directive.service(),</span>
+                            &quot;deserializer&quot;,
+<span class="fc" id="L98">                            CodegenUtils.getSchemaType(writer, directive.symbolProvider(), target)</span>
+                        )
+                    );
+<span class="fc" id="L101">                    writer.popState();</span>
+<span class="fc" id="L102">                    writer.writeInlineWithNoFormatting(t);</span>
+<span class="fc" id="L103">                })</span>
+            );
+<span class="fc" id="L105">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

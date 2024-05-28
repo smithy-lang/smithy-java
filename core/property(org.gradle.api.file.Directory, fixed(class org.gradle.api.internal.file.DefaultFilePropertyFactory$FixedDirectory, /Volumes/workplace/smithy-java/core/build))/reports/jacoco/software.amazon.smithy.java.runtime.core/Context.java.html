@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Context.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core</a> &gt; <span class="el_source">Context.java</span></div><h1>Context.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core;
+
+import java.util.Iterator;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+/**
+ * A thread safe, mutable, typed context map.
+ */
+public interface Context {
+    /**
+     * A {@code Key} provides an identity-based, immutable token.
+     *
+     * &lt;p&gt;The token also contains a name used to describe the value.
+     */
+    final class Key&lt;T&gt; {
+        private final String name;
+
+        /**
+         * @param name Name of the value.
+         */
+<span class="fc" id="L30">        private Key(String name) {</span>
+<span class="fc" id="L31">            this.name = Objects.requireNonNull(name);</span>
+<span class="fc" id="L32">        }</span>
+
+        @Override
+        public String toString() {
+<span class="fc" id="L36">            return name;</span>
+        }
+    }
+
+    /**
+     * A binding of a key to a value.
+     *
+     * @param key   Key of the binding.
+     * @param value Value bound to the key.
+     * @param &lt;T&gt;   Value type.
+     */
+<span class="fc" id="L47">    record Value&lt;T&gt;(Key&lt;T&gt; key, T value) {</span>
+        /**
+         * Checks if the value uses the same key as {@code key}, ensuring that {@code T} and {@code U} are the same,
+         * and if so, supplies the given mapper with a type {@code U} and returns an updated {@code U}. If the entry
+         * does not use the same key, the original value is returned as-is.
+         *
+         * @param key Key to check for identity equality.
+         * @param mapper Mapper that accepts the value and returns an updated value. It is only invoked if compatible.
+         * @return the mapped result, or the original result if the entry does not use the given {@code key}.
+         * @param &lt;U&gt; Value type to supply to the mapper.
+         */
+        @SuppressWarnings(&quot;unchecked&quot;)
+        public &lt;U&gt; Value&lt;T&gt; mapIf(Key&lt;U&gt; key, Function&lt;U, U&gt; mapper) {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (key == this.key) {</span>
+<span class="fc" id="L61">                var mapped = (U) value;</span>
+<span class="fc" id="L62">                return (Value&lt;T&gt;) new Value&lt;&gt;(key, mapper.apply(mapped));</span>
+            } else {
+<span class="fc" id="L64">                return this;</span>
+            }
+        }
+
+        /**
+         * Get the value from the entry as {@code U} if it uses the given key, ensuring that {@code U} and {@code T}
+         * are the same.
+         *
+         * @param key Key to check for identity equality.
+         * @param consumer Consumer that accepts the value of the entry as a {@code U}.
+         * @param &lt;U&gt; Value type to supply to the consumer.
+         */
+        @SuppressWarnings(&quot;unchecked&quot;)
+        public &lt;U&gt; void getIf(Key&lt;U&gt; key, Consumer&lt;U&gt; consumer) {
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (key == this.key) {</span>
+<span class="fc" id="L79">                consumer.accept((U) value);</span>
+            }
+<span class="fc" id="L81">        }</span>
+    }
+
+    /**
+     * Create a new identity-based key to store in the context.
+     *
+     * @param name Name of the key.
+     * @return the created key.
+     * @param &lt;T&gt; Value type associated with the key.
+     */
+    static &lt;T&gt; Key&lt;T&gt; key(String name) {
+<span class="fc" id="L92">        return new Key&lt;&gt;(name);</span>
+    }
+
+    /**
+     * Create a new typed entry that combines a key and value.
+     *
+     * @param key   Key to set.
+     * @param value Value to set.
+     * @return the created entry.
+     * @param &lt;T&gt; Value type.
+     */
+    static &lt;T&gt; Value&lt;T&gt; value(Key&lt;T&gt; key, T value) {
+<span class="fc" id="L104">        return new Value&lt;&gt;(key, value);</span>
+    }
+
+    /**
+     * Set a Property.
+     *
+     * @param key   Property key.
+     * @param value Value to set.
+     * @param &lt;T&gt;   Value type.
+     */
+    &lt;T&gt; void put(Key&lt;T&gt; key, T value);
+
+    /**
+     * Get a property.
+     *
+     * @param key Property key to get by exact reference identity.
+     * @return    the value, or null if not present.
+     * @param &lt;T&gt; Value type.
+     */
+    &lt;T&gt; T get(Key&lt;T&gt; key);
+
+    /**
+     * Get a property and throw if it isn't present.
+     *
+     * @param key Property key to get by exact reference identity.
+     * @return the value
+     * @throws NullPointerException if the property isn't found.
+     * @param &lt;T&gt; Value type.
+     */
+    default &lt;T&gt; T expect(Key&lt;T&gt; key) {
+<span class="fc" id="L134">        T value = get(key);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L136">            throw new NullPointerException(&quot;Unknown context property: &quot; + key);</span>
+        }
+<span class="fc" id="L138">        return value;</span>
+    }
+
+    /**
+     * Get a property or set and get a default if not present.
+     *
+     * &lt;p&gt;The mapping function should not modify the context during computation.
+     *
+     * @param key Property key to get by exact reference identity.
+     * @param mappingFunction A function that computes a value for this key if the value is not assigned.
+     * @return the value assigned to the key.
+     * @param &lt;T&gt; Value type.
+     */
+    &lt;T&gt; T computeIfAbsent(Key&lt;T&gt; key, Function&lt;Key&lt;T&gt;, ? extends T&gt; mappingFunction);
+
+    /**
+     * Get the keys added to the context.
+     *
+     * @return the keys.
+     */
+    Iterator&lt;Key&lt;?&gt;&gt; keys();
+
+    /**
+     * Creates a thread-safe, mutable context map.
+     *
+     * @return the created context.
+     */
+    static Context create() {
+<span class="fc" id="L166">        return new Context() {</span>
+<span class="fc" id="L167">            private final ConcurrentMap&lt;Key&lt;?&gt;, Object&gt; attributes = new ConcurrentHashMap&lt;&gt;();</span>
+
+            @Override
+            public &lt;T&gt; void put(Key&lt;T&gt; key, T value) {
+<span class="fc" id="L171">                attributes.put(key, value);</span>
+<span class="fc" id="L172">            }</span>
+
+            @Override
+            @SuppressWarnings(&quot;unchecked&quot;)
+            public &lt;T&gt; T get(Key&lt;T&gt; key) {
+<span class="fc" id="L177">                return (T) attributes.get(key);</span>
+            }
+
+            @Override
+            public Iterator&lt;Key&lt;?&gt;&gt; keys() {
+<span class="fc" id="L182">                return attributes.keySet().iterator();</span>
+            }
+
+            @Override
+            @SuppressWarnings(&quot;unchecked&quot;)
+            public &lt;T&gt; T computeIfAbsent(Key&lt;T&gt; key, Function&lt;Key&lt;T&gt;, ? extends T&gt; mappingFunction) {
+<span class="fc" id="L188">                return (T) attributes.computeIfAbsent(key, k -&gt; mappingFunction.apply((Key&lt;T&gt;) k));</span>
+            }
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

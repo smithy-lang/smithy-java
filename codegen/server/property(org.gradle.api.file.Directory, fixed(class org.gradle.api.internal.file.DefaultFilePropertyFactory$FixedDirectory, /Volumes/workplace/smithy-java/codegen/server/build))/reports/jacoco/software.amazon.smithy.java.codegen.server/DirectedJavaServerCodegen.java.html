@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DirectedJavaServerCodegen.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">server</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.server</a> &gt; <span class="el_source">DirectedJavaServerCodegen.java</span></div><h1>DirectedJavaServerCodegen.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.server;
+
+import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.directed.CreateContextDirective;
+import software.amazon.smithy.codegen.core.directed.CreateSymbolProviderDirective;
+import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
+import software.amazon.smithy.codegen.core.directed.DirectedCodegen;
+import software.amazon.smithy.codegen.core.directed.GenerateEnumDirective;
+import software.amazon.smithy.codegen.core.directed.GenerateErrorDirective;
+import software.amazon.smithy.codegen.core.directed.GenerateIntEnumDirective;
+import software.amazon.smithy.codegen.core.directed.GenerateListDirective;
+import software.amazon.smithy.codegen.core.directed.GenerateMapDirective;
+import software.amazon.smithy.codegen.core.directed.GenerateOperationDirective;
+import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
+import software.amazon.smithy.codegen.core.directed.GenerateStructureDirective;
+import software.amazon.smithy.codegen.core.directed.GenerateUnionDirective;
+import software.amazon.smithy.java.codegen.CodeGenerationContext;
+import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
+import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.generators.ExceptionGenerator;
+import software.amazon.smithy.java.codegen.generators.ListGenerator;
+import software.amazon.smithy.java.codegen.generators.MapGenerator;
+import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
+import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
+import software.amazon.smithy.java.codegen.generators.StructureGenerator;
+import software.amazon.smithy.java.codegen.server.generators.OperationInterfaceGenerator;
+import software.amazon.smithy.java.codegen.server.generators.ServiceGenerator;
+import software.amazon.smithy.utils.SmithyUnstableApi;
+
+@SmithyUnstableApi
+<span class="nc" id="L36">public class DirectedJavaServerCodegen implements</span>
+    DirectedCodegen&lt;CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration&gt; {
+    @Override
+    public SymbolProvider createSymbolProvider(
+        CreateSymbolProviderDirective&lt;JavaCodegenSettings&gt; directive
+    ) {
+<span class="nc" id="L42">        return new ServiceJavaSymbolProvider(</span>
+<span class="nc" id="L43">            directive.model(),</span>
+<span class="nc" id="L44">            directive.service(),</span>
+<span class="nc" id="L45">            directive.settings().packageNamespace()</span>
+        );
+    }
+
+    @Override
+    public CodeGenerationContext createContext(
+        CreateContextDirective&lt;JavaCodegenSettings, JavaCodegenIntegration&gt; directive
+    ) {
+<span class="nc" id="L53">        return new CodeGenerationContext(</span>
+<span class="nc" id="L54">            directive.model(),</span>
+<span class="nc" id="L55">            directive.settings(),</span>
+<span class="nc" id="L56">            directive.symbolProvider(),</span>
+<span class="nc" id="L57">            directive.fileManifest(),</span>
+<span class="nc" id="L58">            directive.integrations()</span>
+        );
+    }
+
+    @Override
+    public void customizeBeforeIntegrations(CustomizeDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+<span class="nc" id="L64">        new SharedSchemasGenerator().accept(directive);</span>
+<span class="nc" id="L65">        new SharedSerdeGenerator().accept(directive);</span>
+<span class="nc" id="L66">    }</span>
+
+    @Override
+    public void generateService(GenerateServiceDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+<span class="nc" id="L70">        new ServiceGenerator().accept(directive);</span>
+<span class="nc" id="L71">    }</span>
+
+    @Override
+    public void generateOperation(GenerateOperationDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+<span class="nc" id="L75">        new OperationInterfaceGenerator().accept(directive);</span>
+<span class="nc" id="L76">    }</span>
+
+    @Override
+    public void generateStructure(GenerateStructureDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+<span class="nc" id="L80">        new StructureGenerator().accept(directive);</span>
+
+<span class="nc" id="L82">    }</span>
+
+    @Override
+    public void generateError(GenerateErrorDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+<span class="nc" id="L86">        new ExceptionGenerator().accept(directive);</span>
+<span class="nc" id="L87">    }</span>
+
+    @Override
+    public void generateUnion(GenerateUnionDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+        // TODO
+<span class="nc" id="L92">    }</span>
+
+    @Override
+    public void generateList(GenerateListDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+<span class="nc" id="L96">        new ListGenerator().accept(directive);</span>
+<span class="nc" id="L97">    }</span>
+
+    @Override
+    public void generateMap(GenerateMapDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+<span class="nc" id="L101">        new MapGenerator().accept(directive);</span>
+<span class="nc" id="L102">    }</span>
+
+    @Override
+    public void generateEnumShape(GenerateEnumDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+        // TODO
+<span class="nc" id="L107">    }</span>
+
+    @Override
+    public void generateIntEnumShape(GenerateIntEnumDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+        // TODO
+<span class="nc" id="L112">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

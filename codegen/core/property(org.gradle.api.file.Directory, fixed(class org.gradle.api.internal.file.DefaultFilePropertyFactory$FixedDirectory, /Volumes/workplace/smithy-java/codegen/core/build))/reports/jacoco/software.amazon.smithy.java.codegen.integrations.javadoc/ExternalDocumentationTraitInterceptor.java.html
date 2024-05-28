@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalDocumentationTraitInterceptor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.integrations.javadoc</a> &gt; <span class="el_source">ExternalDocumentationTraitInterceptor.java</span></div><h1>ExternalDocumentationTraitInterceptor.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.integrations.javadoc;
+
+import software.amazon.smithy.java.codegen.sections.JavadocSection;
+import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.model.traits.ExternalDocumentationTrait;
+import software.amazon.smithy.utils.CodeInterceptor;
+
+/**
+ * Adds Javadoc documentation for the {@link ExternalDocumentationTrait} using the {@code @see} Javadoc tag.
+ */
+<span class="fc" id="L16">final class ExternalDocumentationTraitInterceptor implements CodeInterceptor.Appender&lt;JavadocSection, JavaWriter&gt; {</span>
+    @Override
+    public void append(JavaWriter writer, JavadocSection section) {
+<span class="fc" id="L19">        var trait = section.shape().expectTrait(ExternalDocumentationTrait.class);</span>
+<span class="fc" id="L20">        writer.pushState();</span>
+<span class="fc" id="L21">        writer.putContext(&quot;links&quot;, trait.getUrls());</span>
+<span class="fc" id="L22">        writer.write(&quot;${#links}@see &lt;a href=${value:S}&gt;${key:L}&lt;/a&gt;${^key.last}\n${/key.last}${/links}&quot;);</span>
+<span class="fc" id="L23">        writer.popState();</span>
+<span class="fc" id="L24">    }</span>
+
+    @Override
+    public Class&lt;JavadocSection&gt; sectionType() {
+<span class="fc" id="L28">        return JavadocSection.class;</span>
+    }
+
+    @Override
+    public boolean isIntercepted(JavadocSection section) {
+<span class="fc" id="L33">        return section.shape().hasTrait(ExternalDocumentationTrait.class);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

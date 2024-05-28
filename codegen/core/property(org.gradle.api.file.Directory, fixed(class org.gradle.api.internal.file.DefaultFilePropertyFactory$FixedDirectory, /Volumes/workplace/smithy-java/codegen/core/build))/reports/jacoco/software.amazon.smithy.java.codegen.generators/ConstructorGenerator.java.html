@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConstructorGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.generators</a> &gt; <span class="el_source">ConstructorGenerator.java</span></div><h1>ConstructorGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.generators;
+
+import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.traits.ErrorTrait;
+
+/**
+ * Generates a constructor for a Java class.
+ *
+ * &lt;p&gt;The constructor expects to take only one argument, a static {@code Builder} class
+ * Use the {@link BuilderGenerator} class to generate this static builder.
+ */
+<span class="fc" id="L20">record ConstructorGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model) implements</span>
+    Runnable {
+
+    @Override
+    public void run() {
+<span class="fc" id="L25">        writer.openBlock(</span>
+            &quot;private $T(Builder builder) {&quot;,
+            &quot;}&quot;,
+<span class="fc" id="L28">            symbolProvider.toSymbol(shape),</span>
+            () -&gt; {
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">                if (shape.hasTrait(ErrorTrait.class)) {</span>
+<span class="nc" id="L31">                    writer.write(&quot;super(ID, builder.message);&quot;);</span>
+                }
+
+<span class="fc bfc" id="L34" title="All 2 branches covered.">                for (var member : shape.members()) {</span>
+<span class="fc" id="L35">                    var memberName = symbolProvider.toMemberName(member);</span>
+                    // Special case for error builders. Message is passed to
+                    // the super constructor. No initializer is created.
+                    // TODO: should this have a validator?
+<span class="pc bpc" id="L39" title="3 of 4 branches missed.">                    if (shape.hasTrait(ErrorTrait.class) &amp;&amp; memberName.equals(&quot;message&quot;)) {</span>
+<span class="nc" id="L40">                        continue;</span>
+                    }
+<span class="fc" id="L42">                    writer.write(&quot;this.$L = builder.$L;&quot;, memberName, memberName);</span>
+<span class="fc" id="L43">                }</span>
+<span class="fc" id="L44">            }</span>
+        );
+<span class="fc" id="L46">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

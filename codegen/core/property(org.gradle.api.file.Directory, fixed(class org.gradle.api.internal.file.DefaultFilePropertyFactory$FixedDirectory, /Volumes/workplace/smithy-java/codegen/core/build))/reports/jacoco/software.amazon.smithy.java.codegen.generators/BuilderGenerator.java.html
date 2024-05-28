@@ -1,0 +1,560 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BuilderGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.generators</a> &gt; <span class="el_source">BuilderGenerator.java</span></div><h1>BuilderGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.generators;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.Objects;
+import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.SymbolProperties;
+import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.core.schema.PresenceTracker;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.serde.DataStream;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.model.shapes.*;
+import software.amazon.smithy.model.traits.DefaultTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
+
+/**
+ * Generates a static nested {@code Builder} class for a Java class.
+ */
+final class BuilderGenerator implements Runnable {
+
+    private final JavaWriter writer;
+    private final Shape shape;
+    private final SymbolProvider symbolProvider;
+    private final Model model;
+    private final ServiceShape service;
+
+    public BuilderGenerator(
+        JavaWriter writer,
+        Shape shape,
+        SymbolProvider symbolProvider,
+        Model model,
+        ServiceShape service
+<span class="fc" id="L48">    ) {</span>
+<span class="fc" id="L49">        this.writer = writer;</span>
+<span class="fc" id="L50">        this.shape = shape;</span>
+<span class="fc" id="L51">        this.symbolProvider = symbolProvider;</span>
+<span class="fc" id="L52">        this.model = model;</span>
+<span class="fc" id="L53">        this.service = service;</span>
+<span class="fc" id="L54">    }</span>
+
+    @Override
+    public void run() {
+<span class="fc" id="L58">        writer.pushState();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        writer.putContext(&quot;hasMembers&quot;, !shape.members().isEmpty());</span>
+<span class="fc" id="L60">        writer.putContext(&quot;shape&quot;, symbolProvider.toSymbol(shape));</span>
+<span class="fc" id="L61">        writer.putContext(&quot;sdkShapeBuilder&quot;, SdkShapeBuilder.class);</span>
+<span class="fc" id="L62">        writer.putContext(&quot;shapeDeserializer&quot;, ShapeDeserializer.class);</span>
+<span class="fc" id="L63">        writer.putContext(&quot;tracker&quot;, PresenceTracker.class);</span>
+<span class="fc" id="L64">        writer.putContext(&quot;serdeException&quot;, SdkSerdeException.class);</span>
+<span class="fc" id="L65">        writer.putContext(&quot;sdkSchema&quot;, SdkSchema.class);</span>
+<span class="fc" id="L66">        writer.putContext(</span>
+            &quot;needsErrorCorrection&quot;,
+<span class="fc" id="L68">            shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault)</span>
+        );
+<span class="fc" id="L70">        writer.write(</span>
+            &quot;&quot;&quot;
+                public static Builder builder() {
+                    return new Builder();
+                }
+
+                /**
+                 * Builder for {@link ${shape:T}}.
+                 */
+                public static final class Builder implements ${sdkShapeBuilder:T}&lt;${shape:T}&gt; {
+                    ${C|}
+
+                    private final ${tracker:T} tracker = ${tracker:T}.of(SCHEMA);
+
+                    private Builder() {}
+
+                    ${C|}
+
+                    @Override
+                    public ${shape:T} build() {
+                        tracker.validate();
+                        return new ${shape:T}(this);
+                    }
+
+                    ${?needsErrorCorrection}@Override
+                    public SdkShapeBuilder&lt;${shape:T}&gt; errorCorrection() {
+                        if (tracker.allSet()) {
+                            return this;
+                        }
+
+                        ${C|}
+
+                        return this;
+                    }
+                    ${/needsErrorCorrection}
+
+                    @Override
+                    public Builder deserialize(${shapeDeserializer:T} decoder) {
+                        decoder.readStruct(SCHEMA, this, InnerDeserializer.INSTANCE);
+                        return this;
+                    }
+
+                    private static final class InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer&lt;Builder&gt; {
+                        private static final InnerDeserializer INSTANCE = new InnerDeserializer();
+
+                        @Override
+                        public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {
+                            ${?hasMembers}switch (member.memberIndex()) {
+                                ${C|}
+                            }${/hasMembers}
+                        }
+                    }
+                }&quot;&quot;&quot;,
+
+            (Runnable) this::builderProperties,
+            (Runnable) this::builderSetters,
+            (Runnable) this::errorCorrection,
+            (Runnable) this::generateMemberSwitchCases
+        );
+<span class="fc" id="L129">        writer.popState();</span>
+<span class="fc" id="L130">    }</span>
+
+    // Adds builder properties and initializers
+    private void builderProperties() {
+        // Add any static default properties
+<span class="fc" id="L135">        var defaultVisitor = new DefaultInitializerGenerator(writer, model, symbolProvider);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (var member : shape.members()) {</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            if (member.hasNonNullDefault()</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                &amp;&amp; symbolProvider.toSymbol(member).expectProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT)</span>
+            ) {
+<span class="nc" id="L140">                defaultVisitor.member = member;</span>
+<span class="nc" id="L141">                writer.write(</span>
+                    &quot;private static final $T $L = $C;&quot;,
+<span class="nc" id="L143">                    symbolProvider.toSymbol(member),</span>
+<span class="nc" id="L144">                    CodegenUtils.toDefaultValueName(symbolProvider.toMemberName(member)),</span>
+                    defaultVisitor
+                );
+            }
+<span class="fc" id="L148">        }</span>
+
+        // Add non-static builder properties
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (var member : shape.members()) {</span>
+<span class="fc" id="L152">            var memberName = symbolProvider.toMemberName(member);</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (CodegenUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {</span>
+                // Streaming blobs need a custom initializer
+<span class="nc" id="L155">                writer.write(</span>
+                    &quot;private $1T $2L = $1T.ofEmpty();&quot;,
+                    DataStream.class,
+                    memberName
+                );
+<span class="nc" id="L160">                continue;</span>
+            }
+<span class="fc" id="L162">            writer.pushState();</span>
+<span class="fc" id="L163">            writer.putContext(&quot;nullable&quot;, CodegenUtils.isNullableMember(member));</span>
+<span class="fc" id="L164">            writer.putContext(&quot;default&quot;, member.hasNonNullDefault());</span>
+<span class="fc" id="L165">            writer.putContext(</span>
+                &quot;static&quot;,
+<span class="fc" id="L167">                symbolProvider.toSymbol(member).expectProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT)</span>
+            );
+<span class="fc" id="L169">            defaultVisitor.member = member;</span>
+<span class="fc" id="L170">            writer.write(</span>
+                &quot;private ${^nullable}$1T${/nullable}${?nullable}$1B${/nullable} $2L${?default} = ${?static}$3L${/static}${^static}$4C${/static}${/default};&quot;,
+<span class="fc" id="L172">                symbolProvider.toSymbol(member),</span>
+                memberName,
+<span class="fc" id="L174">                CodegenUtils.toDefaultValueName(memberName),</span>
+                defaultVisitor
+            );
+<span class="fc" id="L177">            writer.popState();</span>
+<span class="fc" id="L178">        }</span>
+<span class="fc" id="L179">    }</span>
+
+    private void builderSetters() {
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (var member : shape.members()) {</span>
+<span class="fc" id="L183">            new SetterGenerator(writer, symbolProvider, model, member).run();</span>
+<span class="fc" id="L184">        }</span>
+<span class="fc" id="L185">    }</span>
+
+    private void errorCorrection() {
+<span class="nc" id="L188">        var visitor = new ErrorCorrectionVisitor(writer, symbolProvider, model);</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        for (var member : shape.members()) {</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            if (CodegenUtils.isRequiredWithNoDefault(member)) {</span>
+<span class="nc" id="L191">                var memberName = symbolProvider.toMemberName(member);</span>
+<span class="nc" id="L192">                var schemaName = CodegenUtils.toMemberSchemaName(memberName);</span>
+<span class="nc" id="L193">                visitor.memberShape = member;</span>
+<span class="nc" id="L194">                writer.openBlock(&quot;if (!tracker.checkMember($L)) {&quot;, &quot;}&quot;, schemaName, () -&gt; {</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                    if (CodegenUtils.hasBuiltinDefault(symbolProvider, model, member)) {</span>
+<span class="nc" id="L196">                        writer.write(&quot;tracker.setMember($1L);&quot;, schemaName);</span>
+                    } else {
+<span class="nc" id="L198">                        writer.write(&quot;$L($C);&quot;, memberName, visitor);</span>
+                    }
+<span class="nc" id="L200">                });</span>
+            }
+<span class="nc" id="L202">        }</span>
+<span class="nc" id="L203">    }</span>
+
+    private void generateMemberSwitchCases() {
+<span class="fc" id="L206">        int idx = 0;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {</span>
+<span class="fc" id="L208">            var member = iter.next();</span>
+<span class="fc" id="L209">            var target = model.expectShape(member.getTarget());</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            if (CodegenUtils.isStreamingBlob(target)) {</span>
+                // Streaming blobs are not deserialized by the builder class.
+<span class="nc" id="L212">                continue;</span>
+            }
+
+<span class="fc" id="L215">            writer.pushState();</span>
+<span class="fc" id="L216">            writer.putContext(&quot;memberName&quot;, symbolProvider.toMemberName(member));</span>
+<span class="fc" id="L217">            writer.write(</span>
+                &quot;case $L -&gt; builder.${memberName:L}($C);&quot;,
+<span class="fc" id="L219">                idx,</span>
+                new DeserializerGenerator(writer, member, symbolProvider, model, service, &quot;de&quot;, &quot;member&quot;)
+            );
+<span class="fc" id="L222">            writer.popState();</span>
+        }
+<span class="fc" id="L224">    }</span>
+
+    /**
+     *  Generates Builder setter methods for a member shape
+     */
+<span class="fc" id="L229">    private record SetterGenerator(</span>
+        JavaWriter writer, SymbolProvider symbolProvider, Model model, MemberShape memberShape
+    ) implements Runnable {
+
+        @Override
+        public void run() {
+<span class="fc" id="L235">            writer.pushState();</span>
+<span class="fc" id="L236">            writer.putContext(&quot;memberName&quot;, symbolProvider.toMemberName(memberShape));</span>
+<span class="fc" id="L237">            writer.putContext(&quot;memberSymbol&quot;, symbolProvider.toSymbol(memberShape));</span>
+<span class="fc" id="L238">            writer.putContext(&quot;tracked&quot;, CodegenUtils.isRequiredWithNoDefault(memberShape));</span>
+<span class="fc" id="L239">            writer.putContext(&quot;check&quot;, CodegenUtils.requiresSetterNullCheck(symbolProvider, memberShape));</span>
+<span class="fc" id="L240">            writer.putContext(&quot;schemaName&quot;, CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(memberShape)));</span>
+<span class="fc" id="L241">            writer.putContext(&quot;objects&quot;, Objects.class);</span>
+
+            // If streaming blob then a setter must be added to allow
+            // operation to set on builder.
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            if (CodegenUtils.isStreamingBlob(model.expectShape(memberShape.getTarget()))) {</span>
+<span class="nc" id="L246">                writer.write(&quot;&quot;&quot;</span>
+                    @Override
+                    public void setDataStream($T stream) {
+                        ${memberName:L}(stream);
+                    }
+                    &quot;&quot;&quot;, DataStream.class);
+            }
+<span class="fc" id="L253">            writer.write(</span>
+                &quot;&quot;&quot;
+                    public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
+                        this.${memberName:L} = ${?check}${objects:T}.requireNonNull(${/check}${memberName:L}${?check}, &quot;${memberName:L} cannot be null&quot;)${/check};${?tracked}
+                        tracker.setMember(${schemaName:L});${/tracked}
+                        return this;
+                    }
+                    &quot;&quot;&quot;
+            );
+
+<span class="fc" id="L263">            writer.popState();</span>
+<span class="fc" id="L264">        }</span>
+    }
+
+    /**
+     * Adds default values to builder properties.
+     */
+    private static final class DefaultInitializerGenerator extends ShapeVisitor.DataShapeVisitor&lt;Void&gt; implements
+        Runnable {
+        private final JavaWriter writer;
+        private final Model model;
+        private final SymbolProvider symbolProvider;
+        private MemberShape member;
+        private Node defaultValue;
+
+        DefaultInitializerGenerator(
+            JavaWriter writer,
+            Model model,
+            SymbolProvider symbolProvider
+<span class="fc" id="L282">        ) {</span>
+<span class="fc" id="L283">            this.writer = writer;</span>
+<span class="fc" id="L284">            this.model = model;</span>
+<span class="fc" id="L285">            this.symbolProvider = symbolProvider;</span>
+<span class="fc" id="L286">        }</span>
+
+        @Override
+        public void run() {
+<span class="nc bnc" id="L290" title="All 2 branches missed.">            if (member.hasNonNullDefault()) {</span>
+<span class="nc" id="L291">                this.defaultValue = member.expectTrait(DefaultTrait.class).toNode();</span>
+<span class="nc" id="L292">                member.accept(this);</span>
+            }
+<span class="nc" id="L294">        }</span>
+
+        @Override
+        public Void blobShape(BlobShape blobShape) {
+<span class="nc" id="L298">            throw new UnsupportedOperationException(&quot;Blob default value cannot be set.&quot;);</span>
+        }
+
+        @Override
+        public Void booleanShape(BooleanShape booleanShape) {
+<span class="nc" id="L303">            writer.write(&quot;$L&quot;, defaultValue.expectBooleanNode().getValue());</span>
+<span class="nc" id="L304">            return null;</span>
+        }
+
+        @Override
+        public Void listShape(ListShape listShape) {
+            // Note that Lists can _ONLY_ have empty maps as the default,
+            // so we do not need to check the default value. See:
+            // https://github.com/smithy-lang/smithy/blob/main/designs/defaults-and-model-evolution.md
+<span class="nc" id="L312">            writer.write(</span>
+                &quot;$T.$L&quot;,
+                Collections.class,
+<span class="nc" id="L315">                symbolProvider.toSymbol(listShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)</span>
+            );
+<span class="nc" id="L317">            return null;</span>
+        }
+
+        @Override
+        public Void mapShape(MapShape mapShape) {
+            // Note that Maps can _ONLY_ have empty maps as the default,
+            // so we do not need to check the default value. See:
+            // https://github.com/smithy-lang/smithy/blob/main/designs/defaults-and-model-evolution.md
+<span class="nc" id="L325">            writer.write(</span>
+                &quot;$T.$L&quot;,
+                Collections.class,
+<span class="nc" id="L328">                symbolProvider.toSymbol(mapShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)</span>
+            );
+<span class="nc" id="L330">            return null;</span>
+        }
+
+        @Override
+        public Void byteShape(ByteShape byteShape) {
+            // Bytes duplicate the integer toString method
+<span class="nc" id="L336">            writer.write(&quot;$L&quot;, defaultValue.expectNumberNode().getValue().intValue());</span>
+<span class="nc" id="L337">            return null;</span>
+        }
+
+        @Override
+        public Void shortShape(ShortShape shortShape) {
+            // Shorts duplicate the int toString method
+<span class="nc" id="L343">            writer.write(&quot;$L&quot;, defaultValue.expectNumberNode().getValue().intValue());</span>
+<span class="nc" id="L344">            return null;</span>
+        }
+
+        @Override
+        public Void integerShape(IntegerShape integerShape) {
+<span class="nc" id="L349">            writer.write(&quot;$L&quot;, defaultValue.expectNumberNode().getValue().intValue());</span>
+<span class="nc" id="L350">            return null;</span>
+        }
+
+        @Override
+        public Void longShape(LongShape longShape) {
+<span class="nc" id="L355">            writer.write(&quot;$LL&quot;, defaultValue.expectNumberNode().getValue().longValue());</span>
+<span class="nc" id="L356">            return null;</span>
+        }
+
+        @Override
+        public Void floatShape(FloatShape floatShape) {
+<span class="nc" id="L361">            writer.write(&quot;$Lf&quot;, defaultValue.expectNumberNode().getValue().floatValue());</span>
+<span class="nc" id="L362">            return null;</span>
+        }
+
+        @Override
+        public Void documentShape(DocumentShape documentShape) {
+<span class="nc" id="L367">            throw new UnsupportedOperationException(&quot;Document shape defaults cannot be set.&quot;);</span>
+        }
+
+        @Override
+        public Void doubleShape(DoubleShape doubleShape) {
+<span class="nc" id="L372">            writer.write(&quot;$L&quot;, defaultValue.expectNumberNode().getValue().doubleValue());</span>
+<span class="nc" id="L373">            return null;</span>
+        }
+
+        @Override
+        public Void bigIntegerShape(BigIntegerShape bigIntegerShape) {
+<span class="nc" id="L378">            writer.write(&quot;$T.valueOf($L)&quot;, BigInteger.class, defaultValue.expectNumberNode().getValue().intValue());</span>
+<span class="nc" id="L379">            return null;</span>
+        }
+
+        @Override
+        public Void bigDecimalShape(BigDecimalShape bigDecimalShape) {
+<span class="nc" id="L384">            writer.write(&quot;$T.valueOf($L)&quot;, BigDecimal.class, defaultValue.expectNumberNode().getValue().doubleValue());</span>
+<span class="nc" id="L385">            return null;</span>
+        }
+
+        @Override
+        public Void stringShape(StringShape stringShape) {
+<span class="nc" id="L390">            writer.write(&quot;$S&quot;, defaultValue.expectStringNode().getValue());</span>
+<span class="nc" id="L391">            return null;</span>
+        }
+
+        @Override
+        public Void structureShape(StructureShape structureShape) {
+<span class="nc" id="L396">            throw new UnsupportedOperationException(&quot;Structure shape defaults cannot be set.&quot;);</span>
+        }
+
+        @Override
+        public Void unionShape(UnionShape unionShape) {
+<span class="nc" id="L401">            throw new UnsupportedOperationException(&quot;Union shape defaults cannot be set.&quot;);</span>
+
+        }
+
+        @Override
+        public Void memberShape(MemberShape memberShape) {
+<span class="nc" id="L407">            return model.expectShape(memberShape.getTarget()).accept(this);</span>
+        }
+
+        @Override
+        public Void timestampShape(TimestampShape timestampShape) {
+            Instant value;
+<span class="nc bnc" id="L413" title="All 2 branches missed.">            if (member.hasTrait(TimestampFormatTrait.class)) {</span>
+<span class="nc bnc" id="L414" title="All 3 branches missed.">                value = switch (member.expectTrait(TimestampFormatTrait.class).getFormat()) {</span>
+<span class="nc" id="L415">                    case EPOCH_SECONDS -&gt; Instant.ofEpochMilli(defaultValue.expectNumberNode().getValue().longValue());</span>
+<span class="nc" id="L416">                    case HTTP_DATE -&gt; Instant.from(</span>
+<span class="nc" id="L417">                        DateTimeFormatter.RFC_1123_DATE_TIME.parse(defaultValue.expectStringNode().getValue())</span>
+                    );
+<span class="nc" id="L419">                    default -&gt; instantFromDefaultTimestamp(defaultValue);</span>
+                };
+            } else {
+<span class="nc" id="L422">                value = instantFromDefaultTimestamp(defaultValue);</span>
+            }
+<span class="nc" id="L424">            writer.write(&quot;$T.ofEpochMilli($LL)&quot;, Instant.class, value.toEpochMilli());</span>
+<span class="nc" id="L425">            return null;</span>
+        }
+
+        private static Instant instantFromDefaultTimestamp(Node defaultValue) {
+<span class="nc bnc" id="L429" title="All 2 branches missed.">            if (defaultValue.isNumberNode()) {</span>
+<span class="nc" id="L430">                return Instant.ofEpochSecond(defaultValue.expectNumberNode().getValue().longValue());</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">            } else if (defaultValue.isStringNode()) {</span>
+<span class="nc" id="L432">                return Instant.parse(defaultValue.expectStringNode().getValue());</span>
+            }
+<span class="nc" id="L434">            throw new IllegalArgumentException(</span>
+                &quot;Invalid timestamp value node: &quot; + defaultValue + &quot;Expected string or number&quot;
+            );
+        }
+    }
+
+    /**
+     * Returns the error correction value to use for a required field.
+     *
+     * @see &lt;a href=&quot;https://smithy.io/2.0/spec/aggregate-types.html#client-error-correction&quot;&gt;client error correction&lt;/a&gt;
+     */
+    private static final class ErrorCorrectionVisitor extends ShapeVisitor.Default&lt;Void&gt; implements Runnable {
+        private final JavaWriter writer;
+        private final SymbolProvider symbolProvider;
+        private final Model model;
+        private MemberShape memberShape;
+
+<span class="nc" id="L451">        private ErrorCorrectionVisitor(JavaWriter writer, SymbolProvider symbolProvider, Model model) {</span>
+<span class="nc" id="L452">            this.writer = writer;</span>
+<span class="nc" id="L453">            this.symbolProvider = symbolProvider;</span>
+<span class="nc" id="L454">            this.model = model;</span>
+<span class="nc" id="L455">        }</span>
+
+        @Override
+        public void run() {
+<span class="nc" id="L459">            memberShape.accept(this);</span>
+<span class="nc" id="L460">        }</span>
+
+        @Override
+        protected Void getDefault(Shape shape) {
+<span class="nc" id="L464">            throw new IllegalArgumentException(&quot;Could not generate error correction value for &quot; + shape);</span>
+        }
+
+        @Override
+        public Void blobShape(BlobShape blobShape) {
+<span class="nc bnc" id="L469" title="All 2 branches missed.">            if (blobShape.hasTrait(StreamingTrait.class)) {</span>
+<span class="nc" id="L470">                writer.writeInline(&quot;$T.ofEmpty()&quot;, DataStream.class);</span>
+            } else {
+<span class="nc" id="L472">                writer.writeInlineWithNoFormatting(&quot;new byte[0]&quot;);</span>
+            }
+<span class="nc" id="L474">            return null;</span>
+        }
+
+        @Override
+        public Void listShape(ListShape listShape) {
+<span class="nc" id="L479">            writer.writeInline(</span>
+                &quot;$T.$L&quot;,
+                Collections.class,
+<span class="nc" id="L482">                symbolProvider.toSymbol(listShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)</span>
+            );
+<span class="nc" id="L484">            return null;</span>
+        }
+
+        @Override
+        public Void mapShape(MapShape mapShape) {
+<span class="nc" id="L489">            writer.writeInline(</span>
+                &quot;$T.$L&quot;,
+                Collections.class,
+<span class="nc" id="L492">                symbolProvider.toSymbol(mapShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)</span>
+            );
+<span class="nc" id="L494">            return null;</span>
+        }
+
+        @Override
+        public Void documentShape(DocumentShape documentShape) {
+<span class="nc" id="L499">            writer.writeInline(&quot;null&quot;);</span>
+<span class="nc" id="L500">            return null;</span>
+        }
+
+        @Override
+        public Void bigIntegerShape(BigIntegerShape bigIntegerShape) {
+<span class="nc" id="L505">            writer.writeInline(&quot;$T.ZERO&quot;, BigInteger.class);</span>
+<span class="nc" id="L506">            return null;</span>
+        }
+
+        @Override
+        public Void bigDecimalShape(BigDecimalShape bigDecimalShape) {
+<span class="nc" id="L511">            writer.writeInline(&quot;$T.ZERO&quot;, BigDecimal.class);</span>
+<span class="nc" id="L512">            return null;</span>
+        }
+
+        @Override
+        public Void stringShape(StringShape stringShape) {
+<span class="nc" id="L517">            writer.writeInline(&quot;\&quot;\&quot;&quot;);</span>
+<span class="nc" id="L518">            return null;</span>
+        }
+
+        @Override
+        public Void structureShape(StructureShape structureShape) {
+            // Attempts to make an empty structure member. This could fail if the nested struct
+            // has required members.
+<span class="nc" id="L525">            writer.writeInline(&quot;$T.builder().build()&quot;, symbolProvider.toSymbol(structureShape));</span>
+<span class="nc" id="L526">            return null;</span>
+        }
+
+        @Override
+        public Void unionShape(UnionShape unionShape) {
+            // TODO: Implement
+<span class="nc" id="L532">            return null;</span>
+        }
+
+
+        @Override
+        public Void enumShape(EnumShape shape) {
+            // TODO: Implement
+<span class="nc" id="L539">            return null;</span>
+        }
+
+        @Override
+        public Void intEnumShape(IntEnumShape shape) {
+            // TODO: Implement
+<span class="nc" id="L545">            return null;</span>
+        }
+
+        @Override
+        public Void timestampShape(TimestampShape timestampShape) {
+<span class="nc" id="L550">            writer.write(&quot;$T.EPOCH&quot;, Instant.class);</span>
+<span class="nc" id="L551">            return null;</span>
+        }
+
+        @Override
+        public Void memberShape(MemberShape memberShape) {
+<span class="nc" id="L556">            return model.expectShape(memberShape.getTarget()).accept(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

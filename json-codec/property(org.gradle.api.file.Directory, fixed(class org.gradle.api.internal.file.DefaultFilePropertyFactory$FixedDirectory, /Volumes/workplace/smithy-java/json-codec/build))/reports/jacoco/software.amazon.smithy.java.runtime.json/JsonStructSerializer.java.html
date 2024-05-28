@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonStructSerializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">json-codec</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.json</a> &gt; <span class="el_source">JsonStructSerializer.java</span></div><h1>JsonStructSerializer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.json;
+
+import com.jsoniter.spi.JsonException;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.util.function.BiConsumer;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
+import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
+
+class JsonStructSerializer implements ShapeSerializer {
+
+    private final JsonSerializer parent;
+<span class="fc" id="L24">    private boolean firstValue = true;</span>
+
+<span class="fc" id="L26">    JsonStructSerializer(JsonSerializer parent) {</span>
+<span class="fc" id="L27">        this.parent = parent;</span>
+<span class="fc" id="L28">    }</span>
+
+    void startMember(SdkSchema member) {
+        try {
+            // Write commas when needed.
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            if (!firstValue) {</span>
+<span class="fc" id="L34">                parent.stream.writeMore();</span>
+            } else {
+<span class="fc" id="L36">                firstValue = false;</span>
+            }
+<span class="fc" id="L38">            parent.stream.writeObjectField(parent.fieldMapper.memberToField(member));</span>
+<span class="nc" id="L39">        } catch (JsonException | IOException e) {</span>
+<span class="nc" id="L40">            throw new SdkSerdeException(e);</span>
+<span class="fc" id="L41">        }</span>
+<span class="fc" id="L42">    }</span>
+
+    @Override
+    public void writeStruct(SdkSchema member, SerializableStruct struct) {
+<span class="fc" id="L46">        startMember(member);</span>
+<span class="fc" id="L47">        parent.writeStruct(member, struct);</span>
+<span class="fc" id="L48">    }</span>
+
+    @Override
+    public &lt;T&gt; void writeList(SdkSchema member, T listState, BiConsumer&lt;T, ShapeSerializer&gt; consumer) {
+<span class="nc" id="L52">        startMember(member);</span>
+<span class="nc" id="L53">        parent.writeList(member, listState, consumer);</span>
+<span class="nc" id="L54">    }</span>
+
+    @Override
+    public &lt;T&gt; void writeMap(SdkSchema member, T mapState, BiConsumer&lt;T, MapSerializer&gt; consumer) {
+<span class="nc" id="L58">        startMember(member);</span>
+<span class="nc" id="L59">        parent.writeMap(member, mapState, consumer);</span>
+<span class="nc" id="L60">    }</span>
+
+    @Override
+    public void writeBoolean(SdkSchema member, boolean value) {
+<span class="nc" id="L64">        startMember(member);</span>
+<span class="nc" id="L65">        parent.writeBoolean(member, value);</span>
+<span class="nc" id="L66">    }</span>
+
+    @Override
+    public void writeByte(SdkSchema member, byte value) {
+<span class="nc" id="L70">        startMember(member);</span>
+<span class="nc" id="L71">        parent.writeByte(member, value);</span>
+<span class="nc" id="L72">    }</span>
+
+    @Override
+    public void writeShort(SdkSchema member, short value) {
+<span class="nc" id="L76">        startMember(member);</span>
+<span class="nc" id="L77">        parent.writeShort(member, value);</span>
+<span class="nc" id="L78">    }</span>
+
+    @Override
+    public void writeInteger(SdkSchema member, int value) {
+<span class="fc" id="L82">        startMember(member);</span>
+<span class="fc" id="L83">        parent.writeInteger(member, value);</span>
+<span class="fc" id="L84">    }</span>
+
+    @Override
+    public void writeLong(SdkSchema member, long value) {
+<span class="nc" id="L88">        startMember(member);</span>
+<span class="nc" id="L89">        parent.writeLong(member, value);</span>
+<span class="nc" id="L90">    }</span>
+
+    @Override
+    public void writeFloat(SdkSchema member, float value) {
+<span class="nc" id="L94">        startMember(member);</span>
+<span class="nc" id="L95">        parent.writeFloat(member, value);</span>
+<span class="nc" id="L96">    }</span>
+
+    @Override
+    public void writeDouble(SdkSchema member, double value) {
+<span class="nc" id="L100">        startMember(member);</span>
+<span class="nc" id="L101">        parent.writeDouble(member, value);</span>
+<span class="nc" id="L102">    }</span>
+
+    @Override
+    public void writeBigInteger(SdkSchema member, BigInteger value) {
+<span class="nc" id="L106">        startMember(member);</span>
+<span class="nc" id="L107">        parent.writeBigInteger(member, value);</span>
+<span class="nc" id="L108">    }</span>
+
+    @Override
+    public void writeBigDecimal(SdkSchema member, BigDecimal value) {
+<span class="nc" id="L112">        startMember(member);</span>
+<span class="nc" id="L113">        parent.writeBigDecimal(member, value);</span>
+<span class="nc" id="L114">    }</span>
+
+    @Override
+    public void writeString(SdkSchema member, String value) {
+<span class="fc" id="L118">        startMember(member);</span>
+<span class="fc" id="L119">        parent.writeString(member, value);</span>
+<span class="fc" id="L120">    }</span>
+
+    @Override
+    public void writeBlob(SdkSchema member, byte[] value) {
+<span class="nc" id="L124">        startMember(member);</span>
+<span class="nc" id="L125">        parent.writeBlob(member, value);</span>
+<span class="nc" id="L126">    }</span>
+
+    @Override
+    public void writeTimestamp(SdkSchema member, Instant value) {
+<span class="nc" id="L130">        startMember(member);</span>
+<span class="nc" id="L131">        parent.writeTimestamp(member, value);</span>
+<span class="nc" id="L132">    }</span>
+
+    @Override
+    public void writeDocument(SdkSchema member, Document value) {
+<span class="nc" id="L136">        startMember(member);</span>
+<span class="nc" id="L137">        parent.writeDocument(member, value);</span>
+<span class="nc" id="L138">    }</span>
+
+    @Override
+    public void writeNull(SdkSchema member) {
+<span class="nc" id="L142">        startMember(member);</span>
+<span class="nc" id="L143">        parent.writeNull(member);</span>
+<span class="nc" id="L144">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpecificShapeDeserializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.serde</a> &gt; <span class="el_source">SpecificShapeDeserializer.java</span></div><h1>SpecificShapeDeserializer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.serde;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
+
+<span class="nc" id="L15">public abstract class SpecificShapeDeserializer implements ShapeDeserializer {</span>
+
+    /**
+     * Invoked when an unexpected shape is encountered.
+     *
+     * @param schema Unexpected encountered schema.
+     * @return Returns an exception to throw.
+     */
+    protected abstract RuntimeException throwForInvalidState(SdkSchema schema);
+
+    @Override
+    public byte[] readBlob(SdkSchema schema) {
+<span class="nc" id="L27">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+
+    public byte readByte(SdkSchema schema) {
+<span class="nc" id="L33">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+    public short readShort(SdkSchema schema) {
+<span class="nc" id="L38">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+    public int readInteger(SdkSchema schema) {
+<span class="nc" id="L43">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+    public long readLong(SdkSchema schema) {
+<span class="nc" id="L48">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+    public float readFloat(SdkSchema schema) {
+<span class="nc" id="L53">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+    public double readDouble(SdkSchema schema) {
+<span class="nc" id="L58">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+    public BigInteger readBigInteger(SdkSchema schema) {
+<span class="nc" id="L63">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+    public BigDecimal readBigDecimal(SdkSchema schema) {
+<span class="nc" id="L68">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+    public String readString(SdkSchema schema) {
+<span class="nc" id="L73">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+    public boolean readBoolean(SdkSchema schema) {
+<span class="nc" id="L78">        return false;</span>
+    }
+
+    @Override
+    public Document readDocument() {
+<span class="nc" id="L83">        throw throwForInvalidState(PreludeSchemas.DOCUMENT);</span>
+    }
+
+    @Override
+    public Instant readTimestamp(SdkSchema schema) {
+<span class="nc" id="L88">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+    public &lt;T&gt; void readStruct(SdkSchema schema, T state, StructMemberConsumer&lt;T&gt; consumer) {
+<span class="nc" id="L93">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+    public &lt;T&gt; void readList(SdkSchema schema, T state, ListMemberConsumer&lt;T&gt; consumer) {
+<span class="nc" id="L98">        throw throwForInvalidState(schema);</span>
+    }
+
+    @Override
+    public &lt;T&gt; void readStringMap(SdkSchema schema, T state, MapMemberConsumer&lt;String, T&gt; consumer) {
+<span class="nc" id="L103">        throw throwForInvalidState(schema);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

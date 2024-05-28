@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ListSerializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.serde</a> &gt; <span class="el_source">ListSerializer.java</span></div><h1>ListSerializer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.serde;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.function.BiConsumer;
+import java.util.function.IntConsumer;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
+
+/**
+ * Helper class that can be used to serialize content between values.
+ *
+ * &lt;p&gt;This class allows for easily injecting a separator between list values.
+ */
+public final class ListSerializer implements ShapeSerializer {
+
+    private final ShapeSerializer delegate;
+    private final IntConsumer beforeEachValue;
+<span class="fc" id="L27">    private int position = 0;</span>
+
+    /**
+     * @param delegate        Delegate that does the actual value serialization.
+     * @param beforeEachValue Invoked before each value and given the current position in the list.
+     */
+<span class="fc" id="L33">    public ListSerializer(ShapeSerializer delegate, IntConsumer beforeEachValue) {</span>
+<span class="fc" id="L34">        this.delegate = Objects.requireNonNull(delegate, &quot;delegate is null&quot;);</span>
+<span class="fc" id="L35">        this.beforeEachValue = Objects.requireNonNull(beforeEachValue, &quot;beforeEachValue is null&quot;);</span>
+<span class="fc" id="L36">    }</span>
+
+    private void beforeWrite() {
+<span class="fc" id="L39">        beforeEachValue.accept(position++);</span>
+<span class="fc" id="L40">    }</span>
+
+    /**
+     * Get the current index of the serializer where the next element would be written.
+     *
+     * @return the current index.
+     */
+    public int position() {
+<span class="fc" id="L48">        return position;</span>
+    }
+
+    @Override
+    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+<span class="fc" id="L53">        beforeWrite();</span>
+<span class="fc" id="L54">        delegate.writeStruct(schema, struct);</span>
+<span class="fc" id="L55">    }</span>
+
+    @Override
+    public &lt;T&gt; void writeList(SdkSchema schema, T state, BiConsumer&lt;T, ShapeSerializer&gt; consumer) {
+<span class="fc" id="L59">        beforeWrite();</span>
+<span class="fc" id="L60">        delegate.writeList(schema, state, consumer);</span>
+<span class="fc" id="L61">    }</span>
+
+    @Override
+    public &lt;T&gt; void writeMap(SdkSchema schema, T state, BiConsumer&lt;T, MapSerializer&gt; consumer) {
+<span class="nc" id="L65">        beforeWrite();</span>
+<span class="nc" id="L66">        delegate.writeMap(schema, state, consumer);</span>
+<span class="nc" id="L67">    }</span>
+
+    @Override
+    public void writeBoolean(SdkSchema schema, boolean value) {
+<span class="nc" id="L71">        beforeWrite();</span>
+<span class="nc" id="L72">        delegate.writeBoolean(schema, value);</span>
+<span class="nc" id="L73">    }</span>
+
+    @Override
+    public void writeShort(SdkSchema schema, short value) {
+<span class="nc" id="L77">        beforeWrite();</span>
+<span class="nc" id="L78">        delegate.writeShort(schema, value);</span>
+<span class="nc" id="L79">    }</span>
+
+    @Override
+    public void writeByte(SdkSchema schema, byte value) {
+<span class="nc" id="L83">        beforeWrite();</span>
+<span class="nc" id="L84">        delegate.writeByte(schema, value);</span>
+<span class="nc" id="L85">    }</span>
+
+    @Override
+    public void writeInteger(SdkSchema schema, int value) {
+<span class="fc" id="L89">        beforeWrite();</span>
+<span class="fc" id="L90">        delegate.writeInteger(schema, value);</span>
+<span class="fc" id="L91">    }</span>
+
+    @Override
+    public void writeLong(SdkSchema schema, long value) {
+<span class="nc" id="L95">        beforeWrite();</span>
+<span class="nc" id="L96">        delegate.writeLong(schema, value);</span>
+<span class="nc" id="L97">    }</span>
+
+    @Override
+    public void writeFloat(SdkSchema schema, float value) {
+<span class="nc" id="L101">        beforeWrite();</span>
+<span class="nc" id="L102">        delegate.writeFloat(schema, value);</span>
+<span class="nc" id="L103">    }</span>
+
+    @Override
+    public void writeDouble(SdkSchema schema, double value) {
+<span class="nc" id="L107">        beforeWrite();</span>
+<span class="nc" id="L108">        delegate.writeDouble(schema, value);</span>
+<span class="nc" id="L109">    }</span>
+
+    @Override
+    public void writeBigInteger(SdkSchema schema, BigInteger value) {
+<span class="nc" id="L113">        beforeWrite();</span>
+<span class="nc" id="L114">        delegate.writeBigInteger(schema, value);</span>
+<span class="nc" id="L115">    }</span>
+
+    @Override
+    public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+<span class="nc" id="L119">        beforeWrite();</span>
+<span class="nc" id="L120">        delegate.writeBigDecimal(schema, value);</span>
+<span class="nc" id="L121">    }</span>
+
+    @Override
+    public void writeString(SdkSchema schema, String value) {
+<span class="fc" id="L125">        beforeWrite();</span>
+<span class="fc" id="L126">        delegate.writeString(schema, value);</span>
+<span class="fc" id="L127">    }</span>
+
+    @Override
+    public void writeBlob(SdkSchema schema, byte[] value) {
+<span class="nc" id="L131">        beforeWrite();</span>
+<span class="nc" id="L132">        delegate.writeBlob(schema, value);</span>
+<span class="nc" id="L133">    }</span>
+
+    @Override
+    public void writeTimestamp(SdkSchema schema, Instant value) {
+<span class="nc" id="L137">        beforeWrite();</span>
+<span class="nc" id="L138">        delegate.writeTimestamp(schema, value);</span>
+<span class="nc" id="L139">    }</span>
+
+    @Override
+    public void writeDocument(SdkSchema schema, Document value) {
+<span class="nc" id="L143">        beforeWrite();</span>
+<span class="nc" id="L144">        delegate.writeDocument(schema, value);</span>
+<span class="nc" id="L145">    }</span>
+
+    @Override
+    public void writeNull(SdkSchema schema) {
+<span class="fc" id="L149">        beforeWrite();</span>
+<span class="fc" id="L150">        delegate.writeNull(schema);</span>
+<span class="fc" id="L151">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

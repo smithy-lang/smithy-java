@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExceptionGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.generators</a> &gt; <span class="el_source">ExceptionGenerator.java</span></div><h1>ExceptionGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.generators;
+
+import java.util.function.Consumer;
+import software.amazon.smithy.codegen.core.directed.GenerateErrorDirective;
+import software.amazon.smithy.java.codegen.CodeGenerationContext;
+import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.sections.ClassSection;
+import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
+import software.amazon.smithy.utils.SmithyInternalApi;
+
+@SmithyInternalApi
+<span class="nc" id="L18">public final class ExceptionGenerator</span>
+    implements Consumer&lt;GenerateErrorDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt;&gt; {
+
+    @Override
+    public void accept(GenerateErrorDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+<span class="nc" id="L23">        var shape = directive.shape();</span>
+<span class="nc" id="L24">        directive.context().writerDelegator().useShapeWriter(shape, writer -&gt; {</span>
+<span class="nc" id="L25">            writer.pushState(new ClassSection(shape));</span>
+<span class="nc" id="L26">            writer.putContext(&quot;shape&quot;, directive.symbol());</span>
+<span class="nc" id="L27">            writer.putContext(&quot;sdkException&quot;, ModeledSdkException.class);</span>
+<span class="nc" id="L28">            writer.putContext(&quot;id&quot;, writer.consumer(w -&gt; w.writeIdString(shape)));</span>
+<span class="nc" id="L29">            writer.putContext(</span>
+                &quot;schemas&quot;,
+                new SchemaGenerator(
+                    writer,
+<span class="nc" id="L33">                    directive.shape(),</span>
+<span class="nc" id="L34">                    directive.symbolProvider(),</span>
+<span class="nc" id="L35">                    directive.model(),</span>
+<span class="nc" id="L36">                    directive.context()</span>
+                )
+            );
+<span class="nc" id="L39">            writer.putContext(&quot;properties&quot;, new PropertyGenerator(writer, shape, directive.symbolProvider()));</span>
+<span class="nc" id="L40">            writer.putContext(</span>
+                &quot;constructor&quot;,
+<span class="nc" id="L42">                new ConstructorGenerator(writer, shape, directive.symbolProvider(), directive.model())</span>
+            );
+<span class="nc" id="L44">            writer.putContext(</span>
+                &quot;getters&quot;,
+<span class="nc" id="L46">                new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model())</span>
+            );
+<span class="nc" id="L48">            writer.putContext(&quot;toString&quot;, writer.consumer(JavaWriter::writeToString));</span>
+<span class="nc" id="L49">            writer.putContext(</span>
+                &quot;memberSerializer&quot;,
+                new StructureSerializerGenerator(
+                    writer,
+<span class="nc" id="L53">                    directive.symbolProvider(),</span>
+<span class="nc" id="L54">                    directive.model(),</span>
+<span class="nc" id="L55">                    directive.shape(),</span>
+<span class="nc" id="L56">                    directive.service()</span>
+                )
+            );
+<span class="nc" id="L59">            writer.putContext(</span>
+                &quot;builder&quot;,
+<span class="nc" id="L61">                new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.service())</span>
+            );
+<span class="nc" id="L63">            writer.write(</span>
+                &quot;&quot;&quot;
+                    public final class ${shape:T} extends ${sdkException:T} {
+                        ${id:C|}
+
+                        ${schemas:C|}
+
+                        ${properties:C|}
+
+                        ${constructor:C|}
+
+                        ${getters:C|}
+
+                        ${toString:C|}
+
+                        @Override
+                        public SdkSchema schema() {
+                            return SCHEMA;
+                        }
+
+                        ${memberSerializer:C|}
+
+                        ${builder:C|}
+                    }
+                    &quot;&quot;&quot;
+            );
+<span class="nc" id="L89">            writer.popState();</span>
+<span class="nc" id="L90">        });</span>
+<span class="nc" id="L91">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

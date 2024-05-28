@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EndpointAuthScheme.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">client-endpoint-api</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.client.endpoint.api</a> &gt; <span class="el_source">EndpointAuthScheme.java</span></div><h1>EndpointAuthScheme.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.client.endpoint.api;
+
+import java.util.Set;
+
+/**
+ * An authentication scheme supported for the endpoint.
+ */
+public interface EndpointAuthScheme {
+    /**
+     * The ID of the auth scheme (e.g., &quot;aws.auth#sigv4&quot;).
+     *
+     * @return the auth scheme ID.
+     */
+    String authSchemeId();
+
+    /**
+     * Get the value of an EndpointProperty for the EndpointAuthScheme.
+     *
+     * @param property Endpoint property to get.
+     * @return the value or null if not found.
+     */
+    &lt;T&gt; T property(EndpointProperty&lt;T&gt; property);
+
+    /**
+     * Get the properties of the EndpointAuthScheme.
+     *
+     * @return the properties.
+     */
+    Set&lt;EndpointProperty&lt;?&gt;&gt; properties();
+
+    /**
+     * Convert the EndpointAuthScheme to a builder.
+     *
+     * @return the created builder.
+     */
+    default Builder toBuilder() {
+<span class="nc" id="L42">        EndpointAuthSchemeImpl.Builder builder = new EndpointAuthSchemeImpl.Builder();</span>
+<span class="nc" id="L43">        builder.authSchemeId(authSchemeId());</span>
+<span class="nc" id="L44">        properties().forEach(k -&gt; builder.properties.put(k, property(k)));</span>
+<span class="nc" id="L45">        return builder;</span>
+    }
+
+    /**
+     * Create a builder for {@link EndpointAuthScheme}.
+     *
+     * @return the builder.
+     */
+    static Builder builder() {
+<span class="nc" id="L54">        return new EndpointAuthSchemeImpl.Builder();</span>
+    }
+
+    /**
+     * Builds an EndpointAuthScheme.
+     */
+    interface Builder {
+        /**
+         * Set the auth scheme ID.
+         *
+         * @param authSchemeId Auth scheme ID to set.
+         * @return the builder.
+         */
+        Builder authSchemeId(String authSchemeId);
+
+        /**
+         * Put a typed property on the EndpointAuthScheme.
+         *
+         * @param property Property to set.
+         * @param value    Value to associate with the property.
+         * @return the builder.
+         * @param &lt;T&gt; Value type.
+         */
+        &lt;T&gt; Builder putProperty(EndpointProperty&lt;T&gt; property, T value);
+
+        /**
+         * Create the {@link EndpointAuthScheme}.
+         *
+         * @return the created EndpointAuthScheme.
+         */
+        EndpointAuthScheme build();
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

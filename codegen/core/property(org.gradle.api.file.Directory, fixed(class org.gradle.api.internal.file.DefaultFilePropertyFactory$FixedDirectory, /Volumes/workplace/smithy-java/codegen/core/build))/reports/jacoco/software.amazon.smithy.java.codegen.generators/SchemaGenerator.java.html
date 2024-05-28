@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemaGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.generators</a> &gt; <span class="el_source">SchemaGenerator.java</span></div><h1>SchemaGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.generators;
+
+import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.CodeGenerationContext;
+import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.ListShape;
+import software.amazon.smithy.model.shapes.MapShape;
+import software.amazon.smithy.model.shapes.MemberShape;
+import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.shapes.ShapeVisitor;
+import software.amazon.smithy.model.shapes.StructureShape;
+import software.amazon.smithy.utils.SmithyInternalApi;
+
+/**
+ * Generates a schema constant for a given shape.
+ *
+ * &lt;p&gt;Member schemas are always generated as {@code private} while all other
+ * schema properties are generated as {@code package-private}.
+ */
+@SmithyInternalApi
+public final class SchemaGenerator extends ShapeVisitor.Default&lt;Void&gt; implements Runnable {
+
+    private final JavaWriter writer;
+    private final Shape shape;
+    private final SymbolProvider symbolProvider;
+    private final Model model;
+    private final CodeGenerationContext context;
+
+    public SchemaGenerator(
+        JavaWriter writer,
+        Shape shape,
+        SymbolProvider symbolProvider,
+        Model model,
+        CodeGenerationContext context
+<span class="fc" id="L44">    ) {</span>
+<span class="fc" id="L45">        this.writer = writer;</span>
+<span class="fc" id="L46">        this.shape = shape;</span>
+<span class="fc" id="L47">        this.symbolProvider = symbolProvider;</span>
+<span class="fc" id="L48">        this.model = model;</span>
+<span class="fc" id="L49">        this.context = context;</span>
+<span class="fc" id="L50">    }</span>
+
+    @Override
+    public void run() {
+<span class="fc" id="L54">        writer.pushState();</span>
+<span class="fc" id="L55">        writer.putContext(&quot;schemaClass&quot;, SdkSchema.class);</span>
+<span class="fc" id="L56">        writer.putContext(&quot;shapeTypeClass&quot;, ShapeType.class);</span>
+<span class="fc" id="L57">        writer.putContext(&quot;shapeId&quot;, shape.toShapeId());</span>
+<span class="fc" id="L58">        writer.putContext(&quot;shapeType&quot;, shape.getType().name());</span>
+<span class="fc" id="L59">        writer.putContext(&quot;traitInitializer&quot;, new TraitInitializerGenerator(writer, shape, context.runtimeTraits()));</span>
+<span class="fc" id="L60">        shape.accept(this);</span>
+<span class="fc" id="L61">        writer.popState();</span>
+<span class="fc" id="L62">    }</span>
+
+    @Override
+    protected Void getDefault(Shape shape) {
+<span class="nc" id="L66">        writer.write(</span>
+            &quot;&quot;&quot;
+                ${schemaClass:T}.builder()
+                    .type(${shapeTypeClass:T}.${shapeType:L})
+                    .id(${shapeId:S})${traitInitializer:C}
+                    .build();
+                &quot;&quot;&quot;
+        );
+<span class="nc" id="L74">        return null;</span>
+    }
+
+    @Override
+    public Void listShape(ListShape shape) {
+<span class="fc" id="L79">        writer.write(</span>
+            &quot;&quot;&quot;
+                ${schemaClass:T}.builder()
+                    .type(${shapeTypeClass:T}.${shapeType:L})
+                    .id(${shapeId:S})${traitInitializer:C}
+                    .members(${C})
+                    .build();
+                &quot;&quot;&quot;,
+<span class="fc" id="L87">            (Runnable) () -&gt; shape.getMember().accept(this)</span>
+        );
+<span class="fc" id="L89">        return null;</span>
+    }
+
+    @Override
+    public Void mapShape(MapShape shape) {
+<span class="fc" id="L94">        writer.write(</span>
+            &quot;&quot;&quot;
+                ${schemaClass:T}.builder()
+                    .type(${shapeTypeClass:T}.${shapeType:L})
+                    .id(${shapeId:S})${traitInitializer:C}
+                    .members(
+                            ${C|},
+                            ${C|}
+                    )
+                    .build();
+                &quot;&quot;&quot;,
+<span class="fc" id="L105">            (Runnable) () -&gt; shape.getKey().accept(this),</span>
+<span class="fc" id="L106">            (Runnable) () -&gt; shape.getValue().accept(this)</span>
+        );
+<span class="fc" id="L108">        return null;</span>
+    }
+
+    @Override
+    public Void structureShape(StructureShape shape) {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (var member : shape.members()) {</span>
+<span class="fc" id="L114">            writeNestedMemberSchema(member);</span>
+<span class="fc" id="L115">        }</span>
+
+        // Add the member schema names to the context, so we can iterate through them
+<span class="fc" id="L118">        writer.putContext(</span>
+            &quot;memberSchemas&quot;,
+<span class="fc" id="L120">            CodegenUtils.getSortedMembers(shape)</span>
+<span class="fc" id="L121">                .stream()</span>
+<span class="fc" id="L122">                .map(symbolProvider::toMemberName)</span>
+<span class="fc" id="L123">                .map(CodegenUtils::toMemberSchemaName)</span>
+<span class="fc" id="L124">                .toList()</span>
+        );
+<span class="fc" id="L126">        writer.write(</span>
+            &quot;&quot;&quot;
+                static final ${schemaClass:T} SCHEMA = ${schemaClass:T}.builder()
+                    .id(ID)
+                    .type(${shapeTypeClass:T}.${shapeType:L})${traitInitializer:C}
+                    ${?memberSchemas}.members(${#memberSchemas}
+                        ${value:L}${^key.last},${/key.last}${/memberSchemas}
+                    )
+                    ${/memberSchemas}.build();
+                &quot;&quot;&quot;
+        );
+
+<span class="fc" id="L138">        return null;</span>
+    }
+
+    @Override
+    public Void memberShape(MemberShape shape) {
+<span class="fc" id="L143">        var target = model.expectShape(shape.getTarget());</span>
+<span class="fc" id="L144">        writer.putContext(&quot;member&quot;, symbolProvider.toMemberName(shape));</span>
+<span class="fc" id="L145">        writer.putContext(&quot;schema&quot;, CodegenUtils.getSchemaType(writer, symbolProvider, target));</span>
+<span class="fc" id="L146">        writer.write(&quot;${schemaClass:T}.memberBuilder(${member:S}, ${schema:L})${traitInitializer:C}&quot;);</span>
+
+<span class="fc" id="L148">        return null;</span>
+    }
+
+    private void writeNestedMemberSchema(MemberShape member) {
+<span class="fc" id="L152">        var memberName = symbolProvider.toMemberName(member);</span>
+<span class="fc" id="L153">        var target = model.expectShape(member.getTarget());</span>
+
+<span class="fc" id="L155">        writer.pushState();</span>
+<span class="fc" id="L156">        writer.putContext(&quot;schema&quot;, CodegenUtils.getSchemaType(writer, symbolProvider, target));</span>
+<span class="fc" id="L157">        writer.putContext(&quot;memberName&quot;, memberName);</span>
+<span class="fc" id="L158">        writer.putContext(&quot;name&quot;, CodegenUtils.toMemberSchemaName(memberName));</span>
+<span class="fc" id="L159">        writer.write(</span>
+            &quot;&quot;&quot;
+                private static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.memberBuilder(${memberName:S}, ${schema:L})
+                    .id(ID)${C}
+                    .build();
+                &quot;&quot;&quot;,
+<span class="fc" id="L165">            new TraitInitializerGenerator(writer, member, context.runtimeTraits())</span>
+        );
+<span class="fc" id="L167">        writer.popState();</span>
+<span class="fc" id="L168">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

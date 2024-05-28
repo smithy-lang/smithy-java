@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TimestampFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.serde</a> &gt; <span class="el_source">TimestampFormatter.java</span></div><h1>TimestampFormatter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.serde;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
+
+/**
+ * Defines the serialization properties of a format.
+ *
+ * &lt;p&gt;Timestamp format implies an explicit formatting of a timestamp that isn't an abstraction.
+ * Because of this, we can generically implement the parsing and serialization properties of a format behind an
+ * interface. This interface currently requires that the value given to a format is either a string or a number.
+ */
+public interface TimestampFormatter {
+
+    /**
+     * Create a formatter from a timestamp format trait and the known prelude formats for date-time, epoch-seconds,
+     * and http-date.
+     *
+     * @param trait Trait to create the format from.
+     * @return Returns the created formatter.
+     * @throws SdkSerdeException for an unknown format.
+     */
+    static TimestampFormatter of(TimestampFormatTrait trait) {
+<span class="nc bnc" id="L35" title="All 4 branches missed.">        return switch (trait.getFormat()) {</span>
+<span class="nc" id="L36">            case DATE_TIME -&gt; Prelude.DATE_TIME;</span>
+<span class="nc" id="L37">            case EPOCH_SECONDS -&gt; Prelude.EPOCH_SECONDS;</span>
+<span class="nc" id="L38">            case HTTP_DATE -&gt; Prelude.HTTP_DATE;</span>
+<span class="nc" id="L39">            default -&gt; throw new SdkSerdeException(&quot;Unknown timestamp format: &quot; + trait.getFormat());</span>
+        };
+    }
+
+    /**
+     * Get the modeled timestamp format type.
+     *
+     * @return Return the format type.
+     */
+    TimestampFormatTrait.Format format();
+
+    /**
+     * Format the given Instant to a String.
+     *
+     * &lt;p&gt;If the instant normally serializes into a number, this method must return that number as a string.
+     *
+     * @param value Value to format.
+     * @return Returns the formatted string.
+     */
+    String writeString(Instant value);
+
+    /**
+     * Writes the timestamp value to given serializer using the underlying data format for the timestamp.
+     *
+     * &lt;p&gt;This method must not attempt to write a timestamp as that will cause infinite recursion. Instead, it
+     * should serialize the timestamp as a string or number to the given serializer. In other words: don't call
+     * writeTimestamp on the given serializer.
+     *
+     * @param schema     Schema of the timestamp.
+     * @param value      Timestamp value to serialize.
+     * @param serializer Where to serialize the data.
+     */
+    void writeToSerializer(SdkSchema schema, Instant value, ShapeSerializer serializer);
+
+    /**
+     * Parse a timestamp from a string.
+     *
+     * &lt;p&gt;This method must be able to parse the output of {@link #writeString(Instant)}.
+     *
+     * @param value Value to parse.
+     * @param strict Set to true to throw if the string value comes from a serialization format that should
+     *               serialize this format as a number.
+     * @return Returns the created Instant.
+     * @throws TimestampSyntaxError if the timestamp is not the right type or format.
+     */
+    Instant readFromString(String value, boolean strict);
+
+    /**
+     * Create the timestamp from a number, if possible.
+     *
+     * @param value Value to convert into a timestamp.
+     * @return Returns the created Instant.
+     * @throws TimestampSyntaxError if the timestamp is not the right type or format.
+     */
+    Instant readFromNumber(Number value);
+
+    /**
+     * Formats built into the Smithy prelude.
+     */
+<span class="nc" id="L98">    enum Prelude implements TimestampFormatter {</span>
+<span class="nc" id="L99">        EPOCH_SECONDS {</span>
+            @Override
+            public TimestampFormatTrait.Format format() {
+<span class="nc" id="L102">                return TimestampFormatTrait.Format.EPOCH_SECONDS;</span>
+            }
+
+            @Override
+            public String writeString(Instant value) {
+<span class="nc" id="L107">                return String.format(&quot;%.3f&quot;, ((double) value.toEpochMilli()) / 1000);</span>
+            }
+
+            @Override
+            public Instant readFromString(String value, boolean strict) {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                if (strict) {</span>
+<span class="nc" id="L113">                    throw new TimestampSyntaxError(format(), ExpectedType.NUMBER, value);</span>
+                }
+<span class="nc" id="L115">                return Instant.ofEpochMilli((long) (Double.parseDouble(value) * 1000));</span>
+            }
+
+            @Override
+            public Instant readFromNumber(Number value) {
+                // The most common types for serialized epoch-seconds, double/integer/long, are checked first.
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                if (value instanceof Double f) {</span>
+<span class="nc" id="L122">                    return Instant.ofEpochMilli((long) (f * 1000f));</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                } else if (value instanceof Integer i) {</span>
+<span class="nc" id="L124">                    return Instant.ofEpochMilli(i * 1000L);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                } else if (value instanceof Long l) {</span>
+<span class="nc" id="L126">                    return Instant.ofEpochMilli(l * 1000L);</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                } else if (value instanceof Byte b) {</span>
+<span class="nc" id="L128">                    return Instant.ofEpochMilli(b * 1000L);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                } else if (value instanceof Short s) {</span>
+<span class="nc" id="L130">                    return Instant.ofEpochMilli(s * 1000L);</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                } else if (value instanceof Float f) {</span>
+<span class="nc" id="L132">                    return Instant.ofEpochMilli((long) (f * 1000f));</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                } else if (value instanceof BigInteger bi) {</span>
+<span class="nc" id="L134">                    return Instant.ofEpochMilli(bi.longValue() * 1000);</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                } else if (value instanceof BigDecimal bd) {</span>
+<span class="nc" id="L136">                    return Instant.ofEpochMilli(bd.longValue() * 1000);</span>
+                } else {
+<span class="nc" id="L138">                    throw new TimestampSyntaxError(format(), ExpectedType.NUMBER, value);</span>
+                }
+            }
+
+            @Override
+            public void writeToSerializer(SdkSchema schema, Instant instant, ShapeSerializer serializer) {
+<span class="nc" id="L144">                double value = ((double) instant.toEpochMilli()) / 1000;</span>
+<span class="nc" id="L145">                serializer.writeDouble(schema, value);</span>
+<span class="nc" id="L146">            }</span>
+        },
+
+<span class="nc" id="L149">        DATE_TIME {</span>
+            @Override
+            public TimestampFormatTrait.Format format() {
+<span class="nc" id="L152">                return TimestampFormatTrait.Format.DATE_TIME;</span>
+            }
+
+            @Override
+            public String writeString(Instant value) {
+<span class="nc" id="L157">                return value.toString();</span>
+            }
+
+            @Override
+            public Instant readFromString(String value, boolean strict) {
+<span class="nc" id="L162">                return DateTimeFormatter.ISO_INSTANT.parse(value, Instant::from);</span>
+            }
+        },
+
+<span class="nc" id="L166">        HTTP_DATE {</span>
+            @Override
+            public TimestampFormatTrait.Format format() {
+<span class="nc" id="L169">                return TimestampFormatTrait.Format.HTTP_DATE;</span>
+            }
+
+            @Override
+            public String writeString(Instant value) {
+<span class="nc" id="L174">                return HTTP_DATE_FORMAT.format(value);</span>
+            }
+
+            @Override
+            public Instant readFromString(String value, boolean strict) {
+<span class="nc" id="L179">                return HTTP_DATE_FORMAT.parse(value, Instant::from);</span>
+            }
+        };
+
+<span class="nc" id="L183">        private static final DateTimeFormatter HTTP_DATE_FORMAT = DateTimeFormatter</span>
+<span class="nc" id="L184">            .ofPattern(&quot;EEE, dd MMM yyyy HH:mm:ss 'GMT'&quot;)</span>
+<span class="nc" id="L185">            .withZone(ZoneId.of(&quot;UTC&quot;))</span>
+<span class="nc" id="L186">            .withLocale(Locale.US);</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L190">            return format().toString();</span>
+        }
+
+        @Override
+        public void writeToSerializer(SdkSchema schema, Instant value, ShapeSerializer serializer) {
+<span class="nc" id="L195">            serializer.writeString(schema, writeString(value));</span>
+<span class="nc" id="L196">        }</span>
+
+        @Override
+        public Instant readFromNumber(Number value) {
+<span class="nc" id="L200">            throw new TimestampSyntaxError(format(), ExpectedType.STRING, value);</span>
+        }
+    }
+
+    /**
+     * The type expected when deserializing a timestamp.
+     *
+     * &lt;p&gt;This can be checked when {@link TimestampSyntaxError} is thrown.
+     */
+<span class="nc" id="L209">    enum ExpectedType {</span>
+<span class="nc" id="L210">        STRING,</span>
+<span class="nc" id="L211">        NUMBER</span>
+    }
+
+    /**
+     * Thrown when a timestamp format cannot be parsed.
+     */
+    final class TimestampSyntaxError extends SdkSerdeException {
+
+        private final TimestampFormatTrait.Format format;
+        private final ExpectedType expectedType;
+        private final Object value;
+
+        public TimestampSyntaxError(TimestampFormatTrait.Format format, ExpectedType expectedType, Object value) {
+<span class="nc" id="L224">            super(</span>
+<span class="nc" id="L225">                &quot;Expected a &quot; + expectedType + &quot; value for a &quot; + format.name() + &quot; timestamp, but found &quot; + value</span>
+<span class="nc" id="L226">                    .getClass()</span>
+<span class="nc" id="L227">                    .getSimpleName()</span>
+            );
+<span class="nc" id="L229">            this.format = format;</span>
+<span class="nc" id="L230">            this.expectedType = expectedType;</span>
+<span class="nc" id="L231">            this.value = value;</span>
+<span class="nc" id="L232">        }</span>
+
+        /**
+         * Get the timestamp format that failed to parse.
+         *
+         * @return timestamp format.
+         */
+        public TimestampFormatTrait.Format format() {
+<span class="nc" id="L240">            return format;</span>
+        }
+
+        /**
+         * Get the expected type the timestamp parser expected.
+         *
+         * @return the expected type.
+         */
+        public ExpectedType expectedType() {
+<span class="nc" id="L249">            return expectedType;</span>
+        }
+
+        /**
+         * Get the timestamp value that could not be parsed.
+         *
+         * @return timestamp value.
+         */
+        public Object value() {
+<span class="nc" id="L258">            return value;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

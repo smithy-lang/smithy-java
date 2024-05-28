@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SdkException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.schema</a> &gt; <span class="el_source">SdkException.java</span></div><h1>SdkException.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.schema;
+
+import java.util.Objects;
+
+/**
+ * The top-level exception that should be used to throw application-level errors from clients and servers.
+ *
+ * &lt;p&gt;This should be used in protocol error deserialization, throwing errors based on protocol-hints, network
+ * errors, and shape validation errors. It should not be used for illegal arguments, null argument validation,
+ * or other kinds of logic errors sufficiently covered by the Java standard library.
+ */
+public class SdkException extends RuntimeException {
+
+    /**
+     * The party that is at fault for the error, if any.
+     *
+     * &lt;p&gt;This kind of enum is used rather than top-level client/server errors that services extend from because
+     * services generate their own dedicated error hierarchies that all extend from a common base-class for the
+     * service.
+     */
+<span class="fc" id="L26">    public enum Fault {</span>
+        /**
+         * The client is at fault for this error (e.g., it omitted a require parameter or sent an invalid request).
+         */
+<span class="fc" id="L30">        CLIENT,</span>
+
+        /**
+         * The server is at fault (e.g., it was unable to connect to a database, or other unexpected errors occurred).
+         */
+<span class="fc" id="L35">        SERVER,</span>
+
+        /**
+         * The fault isn't necessarily client or server.
+         */
+<span class="fc" id="L40">        OTHER;</span>
+
+        /**
+         * Create a Fault based on an HTTP status code.
+         *
+         * @param statusCode HTTP status code to check.
+         * @return the created fault.
+         */
+        public static Fault ofHttpStatusCode(int statusCode) {
+<span class="nc bnc" id="L49" title="All 4 branches missed.">            if (statusCode &gt;= 400 &amp;&amp; statusCode &lt;= 499) {</span>
+<span class="nc" id="L50">                return SdkException.Fault.CLIENT;</span>
+<span class="nc bnc" id="L51" title="All 4 branches missed.">            } else if (statusCode &gt;= 500 &amp;&amp; statusCode &lt;= 599) {</span>
+<span class="nc" id="L52">                return SdkException.Fault.SERVER;</span>
+            } else {
+<span class="nc" id="L54">                return SdkException.Fault.OTHER;</span>
+            }
+        }
+    }
+
+    private final Fault errorType;
+
+    public SdkException(String message) {
+<span class="fc" id="L62">        this(message, Fault.OTHER);</span>
+<span class="fc" id="L63">    }</span>
+
+    public SdkException(String message, Fault errorType) {
+<span class="fc" id="L66">        super(message);</span>
+<span class="fc" id="L67">        this.errorType = Objects.requireNonNull(errorType);</span>
+<span class="fc" id="L68">    }</span>
+
+    public SdkException(String message, Throwable cause) {
+<span class="nc" id="L71">        this(message, cause, Fault.OTHER);</span>
+<span class="nc" id="L72">    }</span>
+
+    public SdkException(String message, Throwable cause, Fault errorType) {
+<span class="nc" id="L75">        super(message, cause);</span>
+<span class="nc" id="L76">        this.errorType = Objects.requireNonNull(errorType);</span>
+<span class="nc" id="L77">    }</span>
+
+    /**
+     * Get the error type for this exception.
+     *
+     * @return Returns the error type (e.g., client, server, etc).
+     */
+    public Fault getFault() {
+<span class="nc" id="L85">        return errorType;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

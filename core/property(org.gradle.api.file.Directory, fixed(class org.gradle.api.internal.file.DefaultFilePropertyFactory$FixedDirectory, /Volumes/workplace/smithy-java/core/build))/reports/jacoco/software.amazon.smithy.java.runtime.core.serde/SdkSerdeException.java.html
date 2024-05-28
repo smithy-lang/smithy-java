@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SdkSerdeException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.serde</a> &gt; <span class="el_source">SdkSerdeException.java</span></div><h1>SdkSerdeException.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.serde;
+
+import software.amazon.smithy.java.runtime.core.schema.SdkException;
+
+public class SdkSerdeException extends SdkException {
+    public SdkSerdeException(String message) {
+<span class="fc" id="L12">        super(message, Fault.OTHER);</span>
+<span class="fc" id="L13">    }</span>
+
+    public SdkSerdeException(Throwable cause) {
+<span class="nc" id="L16">        this(cause.getMessage(), cause);</span>
+<span class="nc" id="L17">    }</span>
+
+    public SdkSerdeException(String message, Throwable cause) {
+<span class="nc" id="L20">        super(message, cause, Fault.OTHER);</span>
+<span class="nc" id="L21">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

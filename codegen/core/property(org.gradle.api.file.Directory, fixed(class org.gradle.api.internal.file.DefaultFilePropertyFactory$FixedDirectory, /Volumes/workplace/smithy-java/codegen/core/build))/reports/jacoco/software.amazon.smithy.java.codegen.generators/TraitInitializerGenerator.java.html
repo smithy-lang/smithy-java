@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraitInitializerGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.generators</a> &gt; <span class="el_source">TraitInitializerGenerator.java</span></div><h1>TraitInitializerGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.generators;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ServiceLoader;
+import java.util.Set;
+import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.model.SourceLocation;
+import software.amazon.smithy.model.node.ArrayNode;
+import software.amazon.smithy.model.node.BooleanNode;
+import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.model.node.NodeVisitor;
+import software.amazon.smithy.model.node.NullNode;
+import software.amazon.smithy.model.node.NumberNode;
+import software.amazon.smithy.model.node.ObjectNode;
+import software.amazon.smithy.model.node.StringNode;
+import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.AnnotationTrait;
+import software.amazon.smithy.model.traits.StringListTrait;
+import software.amazon.smithy.model.traits.StringTrait;
+import software.amazon.smithy.model.traits.Trait;
+import software.amazon.smithy.model.traits.TraitService;
+
+<span class="fc" id="L30">record TraitInitializerGenerator(JavaWriter writer, Shape shape, Set&lt;ShapeId&gt; runtimeTraits) implements Runnable {</span>
+
+<span class="fc" id="L32">    private static final Map&lt;ShapeId, Class&lt;? extends TraitService&gt;&gt; serviceMap = new HashMap&lt;&gt;();</span>
+    static {
+        // Add all trait services to a map, so they can be queried for a provider class
+<span class="fc" id="L35">        ServiceLoader.load(TraitService.class, TraitInitializerGenerator.class.getClassLoader()).forEach((service) -&gt; {</span>
+<span class="fc" id="L36">            serviceMap.put(service.getShapeId(), service.getClass());</span>
+<span class="fc" id="L37">        });</span>
+<span class="fc" id="L38">    }</span>
+
+    @Override
+    public void run() {
+<span class="fc" id="L42">        var traitsToAdd = shape.getAllTraits().keySet().stream().filter(runtimeTraits::contains).toList();</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (traitsToAdd.isEmpty()) {</span>
+<span class="fc" id="L44">            return;</span>
+        }
+
+<span class="nc" id="L47">        writer.newLine();</span>
+<span class="nc" id="L48">        writer.indent();</span>
+<span class="nc" id="L49">        writer.openBlock(&quot;.traits(&quot;, &quot;)&quot;, () -&gt; {</span>
+<span class="nc" id="L50">            var iter = traitsToAdd.iterator();</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            while (iter.hasNext()) {</span>
+<span class="nc" id="L52">                var traitId = iter.next();</span>
+<span class="nc" id="L53">                Trait trait = shape.getAllTraits().get(traitId);</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                if (trait instanceof AnnotationTrait at) {</span>
+<span class="nc" id="L55">                    writer.writeInline(&quot;new $T()&quot;, at.getClass());</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">                } else if (trait instanceof StringTrait st) {</span>
+<span class="nc" id="L57">                    writer.writeInline(&quot;new $T($S)&quot;, st.getClass(), st.getValue());</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">                } else if (trait instanceof StringListTrait slt) {</span>
+<span class="nc" id="L59">                    writer.writeInline(</span>
+                        &quot;new $T($S, $T.NONE)&quot;,
+<span class="nc" id="L61">                        trait.getClass(),</span>
+<span class="nc" id="L62">                        slt.getValues(),</span>
+                        SourceLocation.class
+                    );
+                } else {
+<span class="nc" id="L66">                    traitFactoryInitializer(writer, trait);</span>
+                }
+
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                if (iter.hasNext()) {</span>
+<span class="nc" id="L70">                    writer.writeInline(&quot;,&quot;).newLine();</span>
+                }
+<span class="nc" id="L72">            }</span>
+<span class="nc" id="L73">            writer.newLine();</span>
+<span class="nc" id="L74">        });</span>
+<span class="nc" id="L75">        writer.dedent();</span>
+<span class="nc" id="L76">    }</span>
+
+    private void traitFactoryInitializer(JavaWriter writer, Trait trait) {
+<span class="nc" id="L79">        var traitProviderClass = serviceMap.get(trait.toShapeId());</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (traitProviderClass == null) {</span>
+<span class="nc" id="L81">            throw new UnsupportedOperationException(&quot;Could not find trait provider for &quot; + trait);</span>
+        }
+<span class="nc" id="L83">        writer.pushState();</span>
+<span class="nc" id="L84">        writer.putContext(&quot;shapeId&quot;, ShapeId.class);</span>
+<span class="nc" id="L85">        writer.putContext(&quot;node&quot;, Node.class);</span>
+<span class="nc" id="L86">        writer.putContext(&quot;name&quot;, traitProviderClass.getSimpleName());</span>
+<span class="nc" id="L87">        writer.putContext(&quot;type&quot;, traitProviderClass);</span>
+<span class="nc" id="L88">        writer.putContext(&quot;id&quot;, trait.toShapeId());</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (traitProviderClass.isMemberClass()) {</span>
+<span class="nc" id="L90">            writer.putContext(&quot;enclosing&quot;, traitProviderClass.getEnclosingClass());</span>
+        }
+<span class="nc" id="L92">        writer.writeInline(</span>
+            &quot;&quot;&quot;
+                new ${?enclosing}${enclosing:T}.${name:L}${/enclosing}${^enclosing}${type:T}${/enclosing}().createTrait(
+                    ${shapeId:T}.from(${id:S}),
+                    ${C|}
+                )&quot;&quot;&quot;,
+<span class="nc" id="L98">            writer.consumer(w -&gt; trait.toNode().accept(new NodeWriter(writer)))</span>
+        );
+<span class="nc" id="L100">        writer.popState();</span>
+<span class="nc" id="L101">    }</span>
+
+<span class="nc" id="L103">    private record NodeWriter(JavaWriter writer) implements NodeVisitor&lt;Void&gt; {</span>
+
+        @Override
+        public Void booleanNode(BooleanNode booleanNode) {
+<span class="nc" id="L107">            writer.writeInline(&quot;${node:T}.from($L)&quot;, booleanNode.getValue());</span>
+<span class="nc" id="L108">            return null;</span>
+        }
+
+        @Override
+        public Void numberNode(NumberNode numberNode) {
+<span class="nc" id="L113">            writer.writeInline(&quot;${node:T}.from($L)&quot;, numberNode.getValue());</span>
+<span class="nc" id="L114">            return null;</span>
+        }
+
+        @Override
+        public Void stringNode(StringNode stringNode) {
+<span class="nc" id="L119">            writer.writeInline(&quot;${node:T}.from($S)&quot;, stringNode.getValue());</span>
+<span class="nc" id="L120">            return null;</span>
+        }
+
+        @Override
+        public Void objectNode(ObjectNode objectNode) {
+<span class="nc" id="L125">            writer.write(&quot;${node:T}.objectNodeBuilder()&quot;);</span>
+<span class="nc" id="L126">            writer.indent();</span>
+<span class="nc" id="L127">            var memberWriter = new MemberNodeWriter(writer);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            for (var memberEntry : objectNode.getStringMap().entrySet()) {</span>
+<span class="nc" id="L129">                writer.write(</span>
+                    &quot;.withMember($S, $C)&quot;,
+<span class="nc" id="L131">                    memberEntry.getKey(),</span>
+<span class="nc" id="L132">                    (Runnable) () -&gt; memberEntry.getValue().accept(memberWriter)</span>
+                );
+<span class="nc" id="L134">            }</span>
+<span class="nc" id="L135">            writer.writeWithNoFormatting(&quot;.build()&quot;);</span>
+<span class="nc" id="L136">            writer.dedent();</span>
+<span class="nc" id="L137">            return null;</span>
+        }
+
+        @Override
+        public Void arrayNode(ArrayNode arrayNode) {
+<span class="nc" id="L142">            writer.write(&quot;$T.builder()&quot;, ArrayNode.class);</span>
+<span class="nc" id="L143">            writer.indent();</span>
+<span class="nc" id="L144">            var memberWriter = new MemberNodeWriter(writer);</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            for (var element : arrayNode.getElements()) {</span>
+<span class="nc" id="L146">                writer.write(&quot;.withValue($C)&quot;, (Runnable) () -&gt; element.accept(memberWriter));</span>
+<span class="nc" id="L147">            }</span>
+<span class="nc" id="L148">            writer.writeWithNoFormatting(&quot;.build()&quot;);</span>
+<span class="nc" id="L149">            writer.dedent();</span>
+
+<span class="nc" id="L151">            return null;</span>
+        }
+
+        @Override
+        public Void nullNode(NullNode nullNode) {
+<span class="nc" id="L156">            writer.write(&quot;${node:T}.nullNode()&quot;);</span>
+<span class="nc" id="L157">            return null;</span>
+        }
+    }
+
+<span class="nc" id="L161">    private record MemberNodeWriter(JavaWriter writer) implements NodeVisitor&lt;Void&gt; {</span>
+
+        @Override
+        public Void booleanNode(BooleanNode booleanNode) {
+<span class="nc" id="L165">            writer.writeInline(&quot;$L&quot;, booleanNode.getValue());</span>
+<span class="nc" id="L166">            return null;</span>
+        }
+
+        @Override
+        public Void nullNode(NullNode nullNode) {
+<span class="nc" id="L171">            writer.writeInlineWithNoFormatting(&quot;null&quot;);</span>
+<span class="nc" id="L172">            return null;</span>
+        }
+
+        @Override
+        public Void numberNode(NumberNode numberNode) {
+<span class="nc" id="L177">            writer.writeInline(&quot;$L&quot;, numberNode.getValue());</span>
+<span class="nc" id="L178">            return null;</span>
+        }
+
+        @Override
+        public Void objectNode(ObjectNode objectNode) {
+<span class="nc" id="L183">            writer.write(&quot;${node:T}.objectNodeBuilder()&quot;);</span>
+<span class="nc" id="L184">            writer.indent();</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">            for (var memberEntry : objectNode.getStringMap().entrySet()) {</span>
+<span class="nc" id="L186">                writer.write(</span>
+                    &quot;.withMember($S, $C)&quot;,
+<span class="nc" id="L188">                    memberEntry.getKey(),</span>
+<span class="nc" id="L189">                    (Runnable) () -&gt; memberEntry.getValue().accept(this)</span>
+                );
+<span class="nc" id="L191">            }</span>
+<span class="nc" id="L192">            writer.writeWithNoFormatting(&quot;.build()&quot;);</span>
+<span class="nc" id="L193">            writer.dedent();</span>
+<span class="nc" id="L194">            return null;</span>
+        }
+
+        @Override
+        public Void arrayNode(ArrayNode arrayNode) {
+<span class="nc" id="L199">            writer.write(&quot;$T.builder&quot;, ArrayNode.class);</span>
+<span class="nc" id="L200">            writer.indent();</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">            for (var element : arrayNode.getElements()) {</span>
+<span class="nc" id="L202">                writer.write(&quot;.withValue($C)&quot;, (Runnable) () -&gt; element.accept(this));</span>
+<span class="nc" id="L203">            }</span>
+<span class="nc" id="L204">            writer.writeWithNoFormatting(&quot;.build()&quot;);</span>
+<span class="nc" id="L205">            writer.dedent();</span>
+<span class="nc" id="L206">            return null;</span>
+        }
+
+        @Override
+        public Void stringNode(StringNode stringNode) {
+<span class="nc" id="L211">            writer.write(&quot;$S&quot;, stringNode.getValue());</span>
+<span class="nc" id="L212">            return null;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

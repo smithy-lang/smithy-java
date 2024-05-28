@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonFieldMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">json-codec</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.json</a> &gt; <span class="el_source">JsonFieldMapper.java</span></div><h1>JsonFieldMapper.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.json;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.model.traits.JsonNameTrait;
+
+/**
+ * Provides a mapping to and from members and JSON field names.
+ */
+sealed interface JsonFieldMapper {
+    /**
+     * Determines the schema of a member inside a container based on a JSON field name.
+     *
+     * @param container Container that contains members.
+     * @param field     JSON object field name.
+     * @return the resolved member schema or null if not found.
+     */
+    SdkSchema fieldToMember(SdkSchema container, String field);
+
+    /**
+     * Converts a member schema a JSON object field name.
+     *
+     * @param member Member to convert to a field.
+     * @return the resolved object field name.
+     */
+    String memberToField(SdkSchema member);
+
+    /**
+     * Uses the member name and ignores the jsonName trait.
+     */
+<span class="fc" id="L38">    final class UseMemberName implements JsonFieldMapper {</span>
+<span class="fc" id="L39">        static final UseMemberName INSTANCE = new UseMemberName();</span>
+
+        @Override
+        public SdkSchema fieldToMember(SdkSchema container, String field) {
+<span class="fc" id="L43">            return container.member(field);</span>
+        }
+
+        @Override
+        public String memberToField(SdkSchema member) {
+<span class="fc" id="L48">            return member.memberName();</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L53">            return &quot;FieldMapper{useJsonName=false}&quot;;</span>
+        }
+    }
+
+    /**
+     * Uses the jsonName trait if present, otherwise falls back to the member name.
+     */
+<span class="fc" id="L60">    final class UseJsonNameTrait implements JsonFieldMapper {</span>
+
+<span class="fc" id="L62">        private final Map&lt;SdkSchema, Map&lt;String, SdkSchema&gt;&gt; jsonNameCache = new ConcurrentHashMap&lt;&gt;();</span>
+
+        @Override
+        public SdkSchema fieldToMember(SdkSchema container, String field) {
+<span class="fc" id="L66">            return jsonNameCache.computeIfAbsent(container, schema -&gt; {</span>
+<span class="fc" id="L67">                Map&lt;String, SdkSchema&gt; map = new HashMap&lt;&gt;(schema.members().size());</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                for (SdkSchema m : schema.members()) {</span>
+<span class="fc" id="L69">                    var jsonName = m.getTrait(JsonNameTrait.class);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">                    if (jsonName != null) {</span>
+<span class="fc" id="L71">                        map.put(jsonName.getValue(), m);</span>
+                    } else {
+<span class="fc" id="L73">                        map.put(m.memberName(), m);</span>
+                    }
+<span class="fc" id="L75">                }</span>
+<span class="fc" id="L76">                return map;</span>
+<span class="fc" id="L77">            }).get(field);</span>
+        }
+
+        @Override
+        public String memberToField(SdkSchema member) {
+<span class="fc" id="L82">            var jsonName = member.getTrait(JsonNameTrait.class);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            return jsonName == null ? member.memberName() : jsonName.getValue();</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L88">            return &quot;FieldMapper{useJsonName=true}&quot;;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

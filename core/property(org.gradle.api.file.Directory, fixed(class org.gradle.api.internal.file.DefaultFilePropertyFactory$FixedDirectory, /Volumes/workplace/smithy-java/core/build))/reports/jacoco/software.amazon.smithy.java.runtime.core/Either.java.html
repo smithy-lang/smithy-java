@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Either.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core</a> &gt; <span class="el_source">Either.java</span></div><h1>Either.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core;
+
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Predicate;
+
+/**
+ * A value that is either left or right.
+ *
+ * &lt;p&gt;Either is right-biased; map, filter, and other operations operate on the right value and are ignored if it's
+ * the left value.
+ *
+ * @param &lt;L&gt; The left value type.
+ * @param &lt;R&gt; The right value type.
+ */
+public final class Either&lt;L, R&gt; {
+
+    private final L left;
+    private final R right;
+
+<span class="fc" id="L27">    private Either(L left, R right) {</span>
+<span class="fc" id="L28">        this.left = left;</span>
+<span class="fc" id="L29">        this.right = right;</span>
+<span class="fc" id="L30">    }</span>
+
+    /**
+     * Create a left Either.
+     *
+     * @param left Value to set.
+     * @return the created Either.
+     * @param &lt;L&gt; Left value type.
+     * @param &lt;R&gt; Right value type.
+     * @throws NullPointerException if left is null.
+     */
+    public static &lt;L, R&gt; Either&lt;L, R&gt; left(L left) {
+<span class="fc" id="L42">        return new Either&lt;&gt;(Objects.requireNonNull(left, &quot;left cannot be null&quot;), null);</span>
+    }
+
+    /**
+     * Create a right Either.
+     *
+     * @param right Value to set.
+     * @return the created Either.
+     * @param &lt;L&gt; Left value type.
+     * @param &lt;R&gt; Right value type.
+     * @throws NullPointerException if right is null.
+     */
+    public static &lt;L, R&gt; Either&lt;L, R&gt; right(R right) {
+<span class="fc" id="L55">        return new Either&lt;&gt;(null, Objects.requireNonNull(right, &quot;right cannot be null&quot;));</span>
+    }
+
+    /**
+     * Get the left value if set, or null if not.
+     *
+     * @return the left value or null.
+     */
+    public L left() {
+<span class="fc" id="L64">        return left;</span>
+    }
+
+    /**
+     * Get the right value if set, or null if not.
+     *
+     * @return the right value.
+     */
+    public R right() {
+<span class="fc" id="L73">        return right;</span>
+    }
+
+    /**
+     * Check if the left value is set.
+     *
+     * @return true if left.
+     */
+    public boolean isLeft() {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        return left != null;</span>
+    }
+
+    /**
+     * Check if the right value is set.
+     *
+     * @return true if right.
+     */
+    public boolean isRight() {
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        return right != null;</span>
+    }
+
+    /**
+     * Swap the either so that left becomes right and right becomes left.
+     *
+     * @return the swapped Either.
+     */
+    public Either&lt;R, L&gt; swap() {
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (isLeft()) {</span>
+<span class="fc" id="L101">            return right(left());</span>
+        } else {
+<span class="fc" id="L103">            return left(right());</span>
+        }
+    }
+
+    /**
+     * Tests if the right value matches the predicate, and if so returns an optional of this Either.
+     *
+     * @param predicate Predicate to test the right value.
+     * @return the optional Either.
+     */
+    public Optional&lt;Either&lt;L, R&gt;&gt; filter(Predicate&lt;? super R&gt; predicate) {
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">        if (isLeft() || !predicate.test(right())) {</span>
+<span class="fc" id="L115">            return Optional.empty();</span>
+        } else {
+<span class="fc" id="L117">            return Optional.of(this);</span>
+        }
+    }
+
+    /**
+     * Map over the right value of the Either and return a new Either, or do nothing if left.
+     *
+     * @param mapper Mapper to apply to the right value.
+     * @return the either.
+     * @param &lt;U&gt; Updated value type.
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;U&gt; Either&lt;L, U&gt; map(Function&lt;? super R, ? extends U&gt; mapper) {
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (isLeft()) {</span>
+<span class="fc" id="L131">            return (Either&lt;L, U&gt;) this;</span>
+        } else {
+<span class="fc" id="L133">            return Either.right(mapper.apply(right()));</span>
+        }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (this == o) {</span>
+<span class="fc" id="L140">            return true;</span>
+        }
+<span class="fc bfc" id="L142" title="All 4 branches covered.">        if (o == null || getClass() != o.getClass()) {</span>
+<span class="fc" id="L143">            return false;</span>
+        }
+<span class="fc" id="L145">        Either&lt;?, ?&gt; either = (Either&lt;?, ?&gt;) o;</span>
+<span class="fc bfc" id="L146" title="All 4 branches covered.">        return Objects.equals(left, either.left) &amp;&amp; Objects.equals(right, either.right);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L151">        return Objects.hash(isLeft(), isRight());</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L156">        return &quot;Either{left=&quot; + left + &quot;, right=&quot; + right + '}';</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

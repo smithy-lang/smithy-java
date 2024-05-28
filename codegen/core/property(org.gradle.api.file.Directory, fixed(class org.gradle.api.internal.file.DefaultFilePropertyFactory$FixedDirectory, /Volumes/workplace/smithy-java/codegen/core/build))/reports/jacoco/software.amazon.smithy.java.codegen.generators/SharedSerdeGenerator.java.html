@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SharedSerdeGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.generators</a> &gt; <span class="el_source">SharedSerdeGenerator.java</span></div><h1>SharedSerdeGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.generators;
+
+import java.util.function.Consumer;
+import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
+import software.amazon.smithy.java.codegen.CodeGenerationContext;
+import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.utils.SmithyInternalApi;
+
+
+/**
+ * Generates a {@code SharedSerde} utility class that contains all unattached schemas for the model.
+ */
+@SmithyInternalApi
+<span class="fc" id="L20">public final class SharedSerdeGenerator</span>
+    implements Consumer&lt;CustomizeDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt;&gt; {
+
+    @Override
+    public void accept(CustomizeDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+<span class="fc" id="L25">        directive.context()</span>
+<span class="fc" id="L26">            .writerDelegator()</span>
+<span class="fc" id="L27">            .useFileWriter(</span>
+<span class="fc" id="L28">                CodegenUtils.getSerdeFileName(directive.settings()),</span>
+<span class="fc" id="L29">                CodegenUtils.getModelNamespace(directive.settings()),</span>
+                writer -&gt; {
+<span class="fc" id="L31">                    writer.write(</span>
+                        &quot;&quot;&quot;
+                            /**
+                             * Defines shared serialization and deserialization methods for map and list shapes.
+                             */
+                            final class SharedSerde {
+
+                                ${L@sharedSerde|}
+
+                                private SharedSerde() {}
+                            }
+                            &quot;&quot;&quot;,
+                        &quot;&quot;
+                    );
+<span class="fc" id="L45">                }</span>
+            );
+<span class="fc" id="L47">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JavadocFormatterInterceptor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.integrations.javadoc</a> &gt; <span class="el_source">JavadocFormatterInterceptor.java</span></div><h1>JavadocFormatterInterceptor.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.integrations.javadoc;
+
+import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import software.amazon.smithy.java.codegen.sections.JavadocSection;
+import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.utils.CodeInterceptor;
+import software.amazon.smithy.utils.StringUtils;
+
+/**
+ * This interceptor will format any text written into a javadoc section into the correct multi-line
+ * comment-style.
+ *
+ * &lt;p&gt;This interceptor should be the last javadoc interceptor to run, so it can pick up the text
+ * run by other interceptors for formatting.
+ */
+<span class="fc" id="L23">final class JavadocFormatterInterceptor implements CodeInterceptor&lt;JavadocSection, JavaWriter&gt; {</span>
+    private static final int MAX_LINE_LENGTH = 100;
+<span class="fc" id="L25">    private static final Pattern PATTERN = Pattern.compile(&quot;&lt;([a-z]+)*&gt;.*?&lt;/\\1&gt;&quot;, Pattern.DOTALL);</span>
+
+    @Override
+    public Class&lt;JavadocSection&gt; sectionType() {
+<span class="fc" id="L29">        return JavadocSection.class;</span>
+    }
+
+    @Override
+    public void write(JavaWriter writer, String previousText, JavadocSection section) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (!previousText.isEmpty()) {</span>
+<span class="fc" id="L35">            writeDocStringContents(writer, previousText);</span>
+        }
+<span class="fc" id="L37">    }</span>
+
+    private void writeDocStringContents(JavaWriter writer, String contents) {
+<span class="fc" id="L40">        writer.writeWithNoFormatting(&quot;/**&quot;);</span>
+
+        // Split out any HTML-tag wrapped sections as we do not want to wrap
+        // any customer documentation with tags
+<span class="fc" id="L44">        Matcher matcher = PATTERN.matcher(contents);</span>
+<span class="fc" id="L45">        int lastMatchPos = 0;</span>
+<span class="fc" id="L46">        writer.writeInlineWithNoFormatting(&quot; * &quot;);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        while (matcher.find()) {</span>
+            // write all contents up to the match.
+<span class="fc" id="L49">            writeDocstringLine(writer, contents.substring(lastMatchPos, matcher.start()));</span>
+
+            // write match contents
+<span class="fc" id="L52">            writer.writeInlineWithNoFormatting(</span>
+<span class="fc" id="L53">                contents.substring(matcher.start(), matcher.end()).replace(&quot;\n&quot;, &quot;\n * &quot;)</span>
+            );
+<span class="fc" id="L55">            lastMatchPos = matcher.end();</span>
+        }
+
+        // Write out all remaining contents
+<span class="fc" id="L59">        writeDocstringLine(writer, contents.substring(lastMatchPos));</span>
+<span class="fc" id="L60">        writer.writeWithNoFormatting(&quot;\n */&quot;);</span>
+<span class="fc" id="L61">    }</span>
+
+    private void writeDocstringLine(JavaWriter writer, String string) {
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (Scanner it = new Scanner(string); it.hasNextLine();) {</span>
+<span class="fc" id="L65">            var s = it.nextLine();</span>
+<span class="fc" id="L66">            writer.writeInlineWithNoFormatting(</span>
+<span class="fc" id="L67">                StringUtils.wrap(</span>
+                    s,
+                    MAX_LINE_LENGTH,
+<span class="fc" id="L70">                    writer.getNewline() + &quot; * &quot;,</span>
+                    false
+                )
+            );
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            if (it.hasNextLine()) {</span>
+<span class="fc" id="L75">                writer.writeInlineWithNoFormatting(writer.getNewline() + &quot; * &quot;);</span>
+            }
+<span class="fc" id="L77">        }</span>
+<span class="fc" id="L78">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Endpoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">client-endpoint-api</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.client.endpoint.api</a> &gt; <span class="el_source">Endpoint.java</span></div><h1>Endpoint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.client.endpoint.api;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * A resolved endpoint.
+ */
+public interface Endpoint {
+    /**
+     * The endpoint URI.
+     *
+     * @return URI of the endpoint.
+     */
+    URI uri();
+
+    /**
+     * Get the value of an EndpointProperty for the endpoint.
+     *
+     * &lt;p&gt;For example, in some AWS use cases, this might contain HTTP headers to add to each request.
+     *
+     * @param property Endpoint property to get.
+     * @return the value or null if not found.
+     */
+    &lt;T&gt; T property(EndpointProperty&lt;T&gt; property);
+
+    /**
+     * Get the properties of the endpoint.
+     *
+     * @return the properties.
+     */
+    Set&lt;EndpointProperty&lt;?&gt;&gt; properties();
+
+    /**
+     * Get the list of auth scheme overrides for the endpoint.
+     *
+     * @return the auth schemes overrides.
+     */
+    List&lt;EndpointAuthScheme&gt; authSchemes();
+
+    /**
+     * Convert the endpoint to a builder.
+     *
+     * @return the builder.
+     */
+    default Builder toBuilder() {
+<span class="nc" id="L54">        var builder = new EndpointImpl.Builder();</span>
+<span class="nc" id="L55">        builder.uri(uri());</span>
+<span class="nc" id="L56">        properties().forEach(k -&gt; builder.properties.put(k, property(k)));</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        for (EndpointAuthScheme authScheme : authSchemes()) {</span>
+<span class="nc" id="L58">            builder.addAuthScheme(authScheme);</span>
+<span class="nc" id="L59">        }</span>
+<span class="nc" id="L60">        return builder;</span>
+    }
+
+    /**
+     * Create a builder used to build an {@link Endpoint}.
+     *
+     * @return the created builder.
+     */
+    static Builder builder() {
+<span class="fc" id="L69">        return new EndpointImpl.Builder();</span>
+    }
+
+    /**
+     * Builder to create an {@link Endpoint}.
+     */
+    interface Builder {
+
+        /**
+         * Set the URI of the endpoint.
+         *
+         * @param uri URI to set.
+         * @return the builder.
+         */
+        Builder uri(URI uri);
+
+        /**
+         * Set the URI of the endpoint.
+         *
+         * @param uri URI to set.
+         * @return the builder.
+         */
+        default Builder uri(String uri) {
+            try {
+<span class="nc" id="L93">                return uri(new URI(uri));</span>
+<span class="nc" id="L94">            } catch (URISyntaxException e) {</span>
+<span class="nc" id="L95">                throw new RuntimeException(e);</span>
+            }
+        }
+
+        /**
+         * Add an auth scheme override to the endpoint.
+         *
+         * @param authScheme Auth scheme override to add.
+         * @return the builder.
+         */
+        Builder addAuthScheme(EndpointAuthScheme authScheme);
+
+        /**
+         * Put a typed property on the endpoint.
+         *
+         * @param property Property to set.
+         * @param value    Value to associate with the property.
+         * @return the builder.
+         * @param &lt;T&gt; Value type.
+         */
+        &lt;T&gt; Builder putProperty(EndpointProperty&lt;T&gt; property, T value);
+
+        /**
+         * Create the endpoint.
+         *
+         * @return the created endpoint.
+         */
+        Endpoint build();
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

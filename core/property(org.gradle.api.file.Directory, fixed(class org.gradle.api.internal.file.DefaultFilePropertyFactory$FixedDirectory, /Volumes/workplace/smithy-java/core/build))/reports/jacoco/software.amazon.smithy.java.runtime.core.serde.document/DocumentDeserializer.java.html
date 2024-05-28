@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DocumentDeserializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.serde.document</a> &gt; <span class="el_source">DocumentDeserializer.java</span></div><h1>DocumentDeserializer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.serde.document;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.Instant;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+
+/**
+ * A deserializer for Document types.
+ *
+ * &lt;p&gt;This class was designed to be extended so that codecs can customize how data is extracted from documents.
+ */
+public class DocumentDeserializer implements ShapeDeserializer {
+
+    private final Document value;
+
+<span class="fc" id="L23">    public DocumentDeserializer(Document value) {</span>
+<span class="fc" id="L24">        this.value = value;</span>
+<span class="fc" id="L25">    }</span>
+
+    /**
+     * Create a DocumentDeserializer to recursively deserialize a value.
+     *
+     * @param value Value to deserialize.
+     * @return the created deserializer.
+     */
+    protected DocumentDeserializer deserializer(Document value) {
+<span class="fc" id="L34">        return new DocumentDeserializer(value);</span>
+    }
+
+    @Override
+    public String readString(SdkSchema schema) {
+<span class="fc" id="L39">        return value.asString();</span>
+    }
+
+    @Override
+    public boolean readBoolean(SdkSchema schema) {
+<span class="fc" id="L44">        return value.asBoolean();</span>
+    }
+
+    @Override
+    public byte[] readBlob(SdkSchema schema) {
+<span class="fc" id="L49">        return value.asBlob();</span>
+    }
+
+    @Override
+    public byte readByte(SdkSchema schema) {
+<span class="fc" id="L54">        return value.asByte();</span>
+    }
+
+    @Override
+    public short readShort(SdkSchema schema) {
+<span class="fc" id="L59">        return value.asShort();</span>
+    }
+
+    @Override
+    public int readInteger(SdkSchema schema) {
+<span class="fc" id="L64">        return value.asInteger();</span>
+    }
+
+    @Override
+    public long readLong(SdkSchema schema) {
+<span class="fc" id="L69">        return value.asLong();</span>
+    }
+
+    @Override
+    public float readFloat(SdkSchema schema) {
+<span class="fc" id="L74">        return value.asFloat();</span>
+    }
+
+    @Override
+    public double readDouble(SdkSchema schema) {
+<span class="fc" id="L79">        return value.asDouble();</span>
+    }
+
+    @Override
+    public BigInteger readBigInteger(SdkSchema schema) {
+<span class="fc" id="L84">        return value.asBigInteger();</span>
+    }
+
+    @Override
+    public BigDecimal readBigDecimal(SdkSchema schema) {
+<span class="fc" id="L89">        return value.asBigDecimal();</span>
+    }
+
+    @Override
+    public Instant readTimestamp(SdkSchema schema) {
+<span class="fc" id="L94">        return value.asTimestamp();</span>
+    }
+
+    @Override
+    public Document readDocument() {
+<span class="fc" id="L99">        return value;</span>
+    }
+
+    @Override
+    public &lt;T&gt; void readStruct(SdkSchema schema, T state, StructMemberConsumer&lt;T&gt; structMemberConsumer) {
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (var memberSchema : schema.members()) {</span>
+<span class="fc" id="L105">            var memberValue = value.getMember(memberSchema.memberName());</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (memberValue != null) {</span>
+<span class="fc" id="L107">                structMemberConsumer.accept(state, memberSchema, deserializer(memberValue));</span>
+            }
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">    }</span>
+
+    @Override
+    public &lt;T&gt; void readList(SdkSchema schema, T state, ListMemberConsumer&lt;T&gt; listMemberConsumer) {
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (var element : value.asList()) {</span>
+<span class="fc" id="L115">            listMemberConsumer.accept(state, deserializer(element));</span>
+<span class="fc" id="L116">        }</span>
+<span class="fc" id="L117">    }</span>
+
+    @Override
+    public &lt;T&gt; void readStringMap(SdkSchema schema, T state, MapMemberConsumer&lt;String, T&gt; mapMemberConsumer) {
+<span class="fc" id="L121">        var map = value.asStringMap();</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (var entry : map.entrySet()) {</span>
+<span class="fc" id="L123">            mapMemberConsumer.accept(state, entry.getKey(), deserializer(entry.getValue()));</span>
+<span class="fc" id="L124">        }</span>
+<span class="fc" id="L125">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

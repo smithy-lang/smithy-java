@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>QueryStringBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.core.uri</a> &gt; <span class="el_source">QueryStringBuilder.java</span></div><h1>QueryStringBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.core.uri;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Used to build a query string from key value pair parameters.
+ */
+<span class="nc" id="L14">public final class QueryStringBuilder {</span>
+
+<span class="nc" id="L16">    private final List&lt;String&gt; values = new ArrayList&lt;&gt;();</span>
+
+    /**
+     * Clears the contents of the query string builder.
+     */
+    public void clear() {
+<span class="nc" id="L22">        values.clear();</span>
+<span class="nc" id="L23">    }</span>
+
+    /**
+     * Add a query string parameter and value to the query string.
+     * &lt;p&gt;
+     * The given key and value will be percent-encoded. If the value is already percent-encoded, it will be
+     * double percent-encoded.
+     *
+     * @param key   Key of the parameter.
+     * @param value Value of the parameter (or null).
+     */
+    public void put(String key, String value) {
+<span class="nc" id="L35">        values.add(key);</span>
+<span class="nc" id="L36">        values.add(value);</span>
+<span class="nc" id="L37">    }</span>
+
+    /**
+     * Check if the query string is empty.
+     *
+     * @return Returns true if empty.
+     */
+    public boolean isEmpty() {
+<span class="nc" id="L45">        return values.isEmpty();</span>
+    }
+
+    /**
+     * Get the query string as a percent-encoded query string (e.g., {@code &quot;foo=bar&amp;baz=test%20test&quot;}).
+     *
+     * @return Returns the percent-encoded query string.
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L55">        StringBuilder result = new StringBuilder();</span>
+<span class="nc" id="L56">        write(result);</span>
+<span class="nc" id="L57">        return result.toString();</span>
+    }
+
+    /**
+     * Write the query string directly to a string builder.
+     *
+     * @param sink Where to write.
+     */
+    public void write(StringBuilder sink) {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        for (int i = 0; i &lt; values.size(); i += 2) {</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L68">                sink.append('&amp;');</span>
+            }
+<span class="nc" id="L70">            encode(values.get(i), sink);</span>
+<span class="nc" id="L71">            sink.append('=');</span>
+<span class="nc" id="L72">            encode(values.get(i + 1), sink);</span>
+        }
+<span class="nc" id="L74">    }</span>
+
+    private void encode(String raw, StringBuilder builder) {
+<span class="nc" id="L77">        URLEncoding.encodeUnreserved(raw, builder);</span>
+<span class="nc" id="L78">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

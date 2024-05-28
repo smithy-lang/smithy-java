@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SharedSchemasGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen.generators</a> &gt; <span class="el_source">SharedSchemasGenerator.java</span></div><h1>SharedSchemasGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen.generators;
+
+import java.util.Collection;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
+import software.amazon.smithy.java.codegen.CodeGenerationContext;
+import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.loader.Prelude;
+import software.amazon.smithy.model.shapes.MemberShape;
+import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.utils.SmithyInternalApi;
+
+/**
+ * Generates a {@code SharedSchemas} utility class that contains all unattached schemas for the model.
+ */
+@SmithyInternalApi
+<span class="fc" id="L31">public final class SharedSchemasGenerator</span>
+    implements Consumer&lt;CustomizeDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt;&gt; {
+
+    // Types that generate their own schemas
+<span class="fc" id="L35">    private static final EnumSet&lt;ShapeType&gt; EXCLUDED_TYPES = EnumSet.of(</span>
+        ShapeType.RESOURCE,
+        ShapeType.SERVICE,
+        ShapeType.UNION,
+        ShapeType.ENUM,
+        ShapeType.INT_ENUM,
+        ShapeType.STRUCTURE,
+        ShapeType.MEMBER,
+        ShapeType.OPERATION
+    );
+
+    @Override
+    public void accept(CustomizeDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive) {
+<span class="fc" id="L48">        directive.context()</span>
+<span class="fc" id="L49">            .writerDelegator()</span>
+<span class="fc" id="L50">            .useFileWriter(</span>
+<span class="fc" id="L51">                getFilename(directive.settings()),</span>
+<span class="fc" id="L52">                CodegenUtils.getModelNamespace(directive.settings()),</span>
+                writer -&gt; {
+<span class="fc" id="L54">                    var shapesToGenerate = getCommonShapes(directive.connectedShapes().values());</span>
+<span class="fc" id="L55">                    writer.write(</span>
+                        &quot;&quot;&quot;
+                            /**
+                             * Defines shared shapes across the model package that are not part of another code-generated type.
+                             */
+                            final class SharedSchemas {
+
+                                ${C|}
+
+                                private SharedSchemas() {}
+                            }
+                            &quot;&quot;&quot;,
+<span class="fc" id="L67">                        writer.consumer(w -&gt; this.generateSchemas(w, directive, shapesToGenerate))</span>
+                    );
+<span class="fc" id="L69">                }</span>
+            );
+<span class="fc" id="L71">    }</span>
+
+    private void generateSchemas(
+        JavaWriter writer,
+        CustomizeDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive,
+        Set&lt;Shape&gt; shapes
+    ) {
+<span class="fc" id="L78">        Set&lt;Shape&gt; deferred = deferredShapes(directive.model(), shapes);</span>
+<span class="fc" id="L79">        writer.pushState();</span>
+<span class="fc" id="L80">        writer.putContext(&quot;schemaClass&quot;, SdkSchema.class);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (var shape : shapes) {</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            if (deferred.contains(shape)) {</span>
+<span class="nc" id="L83">                writer.write(&quot;static final ${schemaClass:T} $L;&quot;, CodegenUtils.toSchemaName(shape));</span>
+            } else {
+<span class="fc" id="L85">                writer.write(</span>
+                    &quot;static final ${schemaClass:T} $L = ${C}&quot;,
+<span class="fc" id="L87">                    CodegenUtils.toSchemaName(shape),</span>
+                    new SchemaGenerator(
+                        writer,
+                        shape,
+<span class="fc" id="L91">                        directive.symbolProvider(),</span>
+<span class="fc" id="L92">                        directive.model(),</span>
+<span class="fc" id="L93">                        directive.context()</span>
+                    )
+                );
+            }
+<span class="fc" id="L97">        }</span>
+<span class="fc" id="L98">        writer.openBlock(&quot;static {&quot;, &quot;}&quot;, () -&gt; {</span>
+<span class="fc" id="L99">            writeDeferred(writer, directive, deferred);</span>
+<span class="fc" id="L100">        });</span>
+<span class="fc" id="L101">        writer.popState();</span>
+<span class="fc" id="L102">    }</span>
+
+    private void writeDeferred(
+        JavaWriter writer,
+        CustomizeDirective&lt;CodeGenerationContext, JavaCodegenSettings&gt; directive,
+        Set&lt;Shape&gt; shapes
+    ) {
+<span class="fc" id="L109">        Set&lt;Shape&gt; deferred = deferredShapes(directive.model(), shapes);</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        for (var shape : shapes) {</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (deferred.contains(shape)) {</span>
+<span class="nc" id="L112">                continue;</span>
+            }
+<span class="nc" id="L114">            writer.write(</span>
+                &quot;$L = ${C}&quot;,
+<span class="nc" id="L116">                CodegenUtils.toSchemaName(shape),</span>
+                new SchemaGenerator(
+                    writer,
+                    shape,
+<span class="nc" id="L120">                    directive.symbolProvider(),</span>
+<span class="nc" id="L121">                    directive.model(),</span>
+<span class="nc" id="L122">                    directive.context()</span>
+                )
+            );
+<span class="nc" id="L125">        }</span>
+
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (!deferred.isEmpty()) {</span>
+<span class="nc" id="L128">            writeDeferred(writer, directive, deferred);</span>
+        }
+<span class="fc" id="L130">    }</span>
+
+    private Set&lt;Shape&gt; deferredShapes(Model model, Set&lt;Shape&gt; shapes) {
+<span class="fc" id="L133">        Set&lt;Shape&gt; deferred = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (var shape : shapes) {</span>
+<span class="fc" id="L135">            boolean isDeferred = shape.members()</span>
+<span class="fc" id="L136">                .stream()</span>
+<span class="fc" id="L137">                .map(MemberShape::getTarget)</span>
+<span class="fc" id="L138">                .map(model::expectShape)</span>
+<span class="fc" id="L139">                .anyMatch(shapes::contains);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            if (isDeferred) {</span>
+<span class="nc" id="L141">                deferred.add(shape);</span>
+            }
+<span class="fc" id="L143">        }</span>
+<span class="fc" id="L144">        return deferred;</span>
+    }
+
+    /**
+     * Loops through service closure and finds all shapes that will not generate their own schemas
+     *
+     * @return shapes that need a shared schema definition
+     */
+    private static Set&lt;Shape&gt; getCommonShapes(Collection&lt;Shape&gt; connectedShapes) {
+<span class="fc" id="L153">        return connectedShapes.stream()</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            .filter(s -&gt; !EXCLUDED_TYPES.contains(s.getType()))</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            .filter(s -&gt; !Prelude.isPreludeShape(s))</span>
+<span class="fc" id="L156">            .collect(Collectors.toSet());</span>
+    }
+
+    private static String getFilename(JavaCodegenSettings settings) {
+<span class="fc" id="L160">        return String.format(&quot;./%s/model/SharedSchemas.java&quot;, settings.packageNamespace().replace(&quot;.&quot;, &quot;/&quot;));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

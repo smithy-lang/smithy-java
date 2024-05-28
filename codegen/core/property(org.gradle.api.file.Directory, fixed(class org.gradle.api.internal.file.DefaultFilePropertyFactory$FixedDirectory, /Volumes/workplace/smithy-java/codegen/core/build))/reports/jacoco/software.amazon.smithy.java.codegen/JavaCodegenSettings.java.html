@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JavaCodegenSettings.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">core</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.codegen</a> &gt; <span class="el_source">JavaCodegenSettings.java</span></div><h1>JavaCodegenSettings.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.codegen;
+
+import java.io.File;
+import java.util.List;
+import java.util.Objects;
+import software.amazon.smithy.codegen.core.CodegenException;
+import software.amazon.smithy.model.node.ObjectNode;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.utils.IoUtils;
+import software.amazon.smithy.utils.SmithyUnstableApi;
+
+/**
+ * Settings for {@code JavaCodegenPlugin}.
+ */
+@SmithyUnstableApi
+public final class JavaCodegenSettings {
+<span class="fc" id="L22">    private static final System.Logger LOGGER = System.getLogger(JavaCodegenSettings.class.getName());</span>
+
+    private static final String SERVICE = &quot;service&quot;;
+    private static final String NAMESPACE = &quot;namespace&quot;;
+    private static final String HEADER_FILE = &quot;headerFile&quot;;
+
+    private final ShapeId service;
+    private final String packageNamespace;
+    private final String header;
+
+<span class="fc" id="L32">    JavaCodegenSettings(ShapeId service, String packageNamespace, String headerFile, String sourceLocation) {</span>
+<span class="fc" id="L33">        this.service = Objects.requireNonNull(service);</span>
+<span class="fc" id="L34">        this.packageNamespace = Objects.requireNonNull(packageNamespace);</span>
+<span class="fc" id="L35">        this.header = getHeader(headerFile, Objects.requireNonNull(sourceLocation));</span>
+<span class="fc" id="L36">    }</span>
+
+    /**
+     * Creates a settings object from a plugin settings node
+     *
+     * @param settingsNode Settings node to load
+     * @return Parsed settings
+     */
+    public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
+<span class="fc" id="L45">        settingsNode.warnIfAdditionalProperties(List.of(SERVICE, NAMESPACE, HEADER_FILE));</span>
+<span class="fc" id="L46">        return new JavaCodegenSettings(</span>
+<span class="fc" id="L47">            settingsNode.expectStringMember(SERVICE).expectShapeId(),</span>
+<span class="fc" id="L48">            settingsNode.expectStringMember(NAMESPACE).getValue(),</span>
+<span class="fc" id="L49">            settingsNode.getStringMemberOrDefault(HEADER_FILE, null),</span>
+<span class="fc" id="L50">            settingsNode.getSourceLocation().getFilename()</span>
+        );
+    }
+
+    public ShapeId service() {
+<span class="fc" id="L55">        return service;</span>
+    }
+
+    public String packageNamespace() {
+<span class="fc" id="L59">        return packageNamespace;</span>
+    }
+
+    public String header() {
+<span class="fc" id="L63">        return header;</span>
+    }
+
+    private static String getHeader(String headerFile, String sourceLocation) {
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (headerFile == null) {</span>
+<span class="fc" id="L68">            return null;</span>
+        }
+<span class="nc" id="L70">        var file = new File(new File(sourceLocation).getParent(), headerFile);</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (!file.exists()) {</span>
+<span class="nc" id="L72">            throw new CodegenException(&quot;Header file &quot; + file.getAbsolutePath() + &quot; does not exist.&quot;);</span>
+        }
+<span class="nc" id="L74">        LOGGER.log(System.Logger.Level.TRACE, () -&gt; &quot;Reading header file: &quot; + file.getAbsolutePath());</span>
+<span class="nc" id="L75">        return IoUtils.readUtf8File(file.getAbsolutePath());</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonCodec.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">json-codec</a> &gt; <a href="index.source.html" class="el_package">software.amazon.smithy.java.runtime.json</a> &gt; <span class="el_source">JsonCodec.java</span></div><h1>JsonCodec.java</h1><pre class="source lang-java linenums">/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.json;
+
+import com.jsoniter.JsonIterator;
+import com.jsoniter.output.JsonStream;
+import java.io.OutputStream;
+import java.util.Objects;
+import software.amazon.smithy.java.runtime.core.serde.Codec;
+import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
+import software.amazon.smithy.model.traits.JsonNameTrait;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
+
+/**
+ * Handles JSON serialization and deserialization.
+ *
+ * &lt;p&gt;Support for using {@link JsonNameTrait} can be enabled using {@link Builder#useJsonName(boolean)}.
+ *
+ * &lt;p&gt;Support for respecting the {@link TimestampFormatTrait} can be enabled using
+ * {@link Builder#useTimestampFormat(boolean)}. The default timestamp format of epoch-seconds can be changed using
+ * {@link Builder#defaultTimestampFormat(TimestampFormatter)}.
+ *
+ * &lt;p&gt;Blobs are base64 encoded as strings.
+ */
+public final class JsonCodec implements Codec {
+
+    private final TimestampResolver timestampResolver;
+    private final JsonFieldMapper fieldMapper;
+
+<span class="fc" id="L35">    private JsonCodec(Builder builder) {</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        timestampResolver = builder.useTimestampFormat</span>
+<span class="fc" id="L37">            ? new TimestampResolver.UseTimestampFormatTrait(builder.defaultTimestampFormat)</span>
+<span class="fc" id="L38">            : new TimestampResolver.StaticFormat(builder.defaultTimestampFormat);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        fieldMapper = builder.useJsonName</span>
+<span class="fc" id="L40">            ? new JsonFieldMapper.UseJsonNameTrait()</span>
+<span class="fc" id="L41">            : JsonFieldMapper.UseMemberName.INSTANCE;</span>
+<span class="fc" id="L42">    }</span>
+
+    public static Builder builder() {
+<span class="fc" id="L45">        return new Builder();</span>
+    }
+
+    @Override
+    public String getMediaType() {
+<span class="nc" id="L50">        return &quot;application/json&quot;;</span>
+    }
+
+    @Override
+    public ShapeSerializer createSerializer(OutputStream sink) {
+<span class="fc" id="L55">        var stream = createStream(sink);</span>
+<span class="fc" id="L56">        return new JsonSerializer(stream, fieldMapper, timestampResolver, this::returnStream);</span>
+    }
+
+    @Override
+    public ShapeDeserializer createDeserializer(byte[] source) {
+<span class="fc" id="L61">        return new JsonDeserializer(createIterator(source), timestampResolver, fieldMapper, this::returnIterator);</span>
+    }
+
+    // TODO: Implement virtual thread friendly pooling (JsonIter's pooling is done using ThreadLocals).
+    private JsonStream createStream(OutputStream sink) {
+<span class="fc" id="L66">        return new JsonStream(sink, 1024);</span>
+    }
+
+    private JsonIterator createIterator(byte[] source) {
+<span class="fc" id="L70">        return JsonIterator.parse(source);</span>
+    }
+
+    private void returnStream(JsonStream stream) {
+        // TODO: Implement pooling.
+<span class="fc" id="L75">    }</span>
+
+    private void returnIterator(JsonIterator iterator) {
+        // TODO: Implement pooling.
+<span class="nc" id="L79">    }</span>
+
+    public static final class Builder {
+        private boolean useJsonName;
+<span class="fc" id="L83">        private boolean useTimestampFormat = false;</span>
+<span class="fc" id="L84">        private TimestampFormatter defaultTimestampFormat = TimestampFormatter.Prelude.EPOCH_SECONDS;</span>
+
+<span class="fc" id="L86">        private Builder() {}</span>
+
+        public JsonCodec build() {
+<span class="fc" id="L89">            return new JsonCodec(this);</span>
+        }
+
+        public Builder useJsonName(boolean useJsonName) {
+<span class="fc" id="L93">            this.useJsonName = useJsonName;</span>
+<span class="fc" id="L94">            return this;</span>
+        }
+
+        public Builder useTimestampFormat(boolean useTimestampFormat) {
+<span class="fc" id="L98">            this.useTimestampFormat = useTimestampFormat;</span>
+<span class="fc" id="L99">            return this;</span>
+        }
+
+        public Builder defaultTimestampFormat(TimestampFormatter defaultTimestampFormat) {
+<span class="fc" id="L103">            this.defaultTimestampFormat = Objects.requireNonNull(defaultTimestampFormat);</span>
+<span class="fc" id="L104">            return this;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
