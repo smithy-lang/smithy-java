@@ -1,15 +1,13 @@
 plugins {
-    id 'smithy-java.module-conventions'
-    id "smithy-java.integ-test-conventions"
+    id("smithy-java.module-conventions")
+    id("smithy-java.integ-test-conventions")
 }
 
 description = "This module provides the core codegen functionality for Smithy java"
 group = "software.amazon.smithy.java.codegen"
 
-ext {
-    displayName = "Smithy :: Java :: Codegen :: Core"
-    moduleName = "software.amazon.smithy.java.codegen"
-}
+extra["displayName"] = "Smithy :: Java :: Codegen :: Core"
+extra["moduleName"] = "software.amazon.smithy.java.codegen"
 
 dependencies {
     implementation(libs.smithy.codegen)
@@ -19,10 +17,10 @@ dependencies {
 
 // Execute building of Java classes using an executable class
 // These classes will then be used by integration tests and benchmarks
-var generatedPojoDir = "$buildDir/generated-pojos"
-tasks.register("generatePojos", JavaExec) {
+val generatedPojoDir = "${layout.buildDirectory.get()}/generated-pojos"
+tasks.register<JavaExec>("generatePojos") {
     dependsOn("test")
-    classpath = sourceSets.test.runtimeClasspath + sourceSets.test.output + sourceSets.it.resources.getSourceDirectories()
+    classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.getSourceDirectories()
     mainClass = "software.amazon.smithy.java.codegen.utils.TestJavaCodegenRunner"
     environment("service", "smithy.java.codegen.test#TestService")
     environment("namespace", "io.smithy.codegen.test")
@@ -30,7 +28,13 @@ tasks.register("generatePojos", JavaExec) {
 }
 
 // Add generated POJOs to integ tests and jmh benchmark
-sourceSets.it.java.srcDirs += generatedPojoDir
+sourceSets {
+    it {
+        java {
+            srcDir(generatedPojoDir)
+        }
+    }
+}
 
 tasks {
     integ {

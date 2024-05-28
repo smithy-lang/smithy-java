@@ -1,14 +1,12 @@
 plugins {
-    id 'smithy-java.module-conventions'
+    id("smithy-java.module-conventions")
     alias(libs.plugins.jmh)
 }
 
 description = "This module provides the core functionality for Smithy java"
 
-ext {
-    displayName = "Smithy :: Java :: Core"
-    moduleName = "software.amazon.smithy.java.core"
-}
+extra["displayName"] = "Smithy :: Java :: Core"
+extra["moduleName"] = "software.amazon.smithy.java.core"
 
 dependencies {
     api(libs.smithy.model)

@@ -1,12 +1,18 @@
 import com.github.spotbugs.snom.Effort
 import java.util.regex.Pattern
+import org.gradle.api.Project
+import org.gradle.api.provider.Provider
+import org.gradle.kotlin.dsl.the
 
 plugins {
-    id 'java-library'
-    id 'com.adarshr.test-logger'
-    id 'com.github.spotbugs'
-    id 'com.diffplug.spotless'
+    `java-library`
+    id("com.adarshr.test-logger")
+    id("com.github.spotbugs")
+    id("com.diffplug.spotless")
 }
+
+// Workaround per: https://github.com/gradle/gradle/issues/15383
+val Project.libs get() = the<org.gradle.accessors.dm.LibrariesForLibs>()
 
 java {
     toolchain {
@@ -27,7 +33,7 @@ dependencies {
     testImplementation(libs.assertj.core)
 }
 
-tasks.named('test') {
+tasks.withType<Test> {
     useJUnitPlatform()
 }
 
@@ -69,7 +75,7 @@ spotless {
 
         // Static first, then everything else alphabetically
         removeUnusedImports()
-        importOrder('\\#', '')
+        importOrder("\\#", "")
     }
 }
 

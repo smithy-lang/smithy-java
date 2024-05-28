@@ -1,14 +1,12 @@
 plugins {
-    id "smithy-java.codegen-plugin-conventions"
-    id "smithy-java.integ-test-conventions"
+    id("smithy-java.codegen-plugin-conventions")
+    id("smithy-java.integ-test-conventions")
 }
 
 description = "This module provides the codegen plugin for Smithy java server codegen"
 
-ext {
-    displayName = "Smithy :: Java :: Codegen :: Server"
-    moduleName = "software.amazon.smithy.java.codegen.server"
-}
+extra["displayName"] = "Smithy :: Java :: Codegen :: Server"
+extra["moduleName"] = "software.amazon.smithy.java.codegen.server"
 
 dependencies {
     implementation(project(":server-core"))
@@ -20,11 +18,11 @@ dependencies {
 
 // Execute building of Java classes using an executable class
 // These classes will then be used by integration tests and benchmarks
-var generatedSrcDir = layout.buildDirectory.dir("generated-src").get()
-var generateSrcTask = tasks.register("generateSources", JavaExec) {
+val generatedSrcDir = layout.buildDirectory.dir("generated-src").get()
+val generateSrcTask = tasks.register<JavaExec>("generateSources") {
     delete(files(generatedSrcDir))
     dependsOn("test")
-    classpath = sourceSets.test.runtimeClasspath + sourceSets.test.output + sourceSets.it.resources.getSourceDirectories()
+    classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.getSourceDirectories()
     mainClass = "software.amazon.smithy.java.codegen.server.TestServerJavaCodegenRunner"
     environment("service", "smithy.java.codegen.server.test#TestService")
     environment("namespace", "smithy.java.codegen.server.test")
@@ -32,7 +30,13 @@ var generateSrcTask = tasks.register("generateSources", JavaExec) {
 }
 
 // Add generated POJOs to integ tests and jmh benchmark
-sourceSets.it.java.srcDirs += generatedSrcDir
+sourceSets {
+    it {
+        java {
+            srcDir(generatedSrcDir)
+        }
+    }
+}
 
 tasks {
     integ {
