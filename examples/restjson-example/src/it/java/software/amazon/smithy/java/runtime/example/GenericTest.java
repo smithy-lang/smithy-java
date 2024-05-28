@@ -23,6 +23,7 @@ import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.runtime.example.model.Attitude;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PersonDirectory;
@@ -175,4 +176,30 @@ public class GenericTest {
         GetPersonImageOutput output = client.getPersonImage(input);
         System.out.println(output.image().readToString(1000));
     }
+
+
+    @Test
+    public void enumSerde() {
+        Attitude attitude = Attitude.OPTIMISTIC;
+
+        JsonCodec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
+
+        String jsonString = codec.serializeToString(attitude);
+        Attitude copy = codec.deserializeShape(jsonString, Attitude.builder());
+
+        System.out.println(codec.serializeToString(copy));
+    }
+
+
+    @Test
+    void enumUsage() {
+        Attitude value = Attitude.valueOf("pessimistic");
+        switch (value.type()) {
+            case OPTIMISTIC -> System.out.println(":)");
+            case PESSIMISTIC -> System.out.println(":(");
+            case REALISTIC -> System.out.println(":|");
+            default -> throw new RuntimeException("OOPS!");
+        }
+    }
+
 }
