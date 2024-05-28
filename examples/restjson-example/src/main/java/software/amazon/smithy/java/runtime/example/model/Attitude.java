@@ -56,13 +56,8 @@ public final class Attitude implements SerializableShape {
         return type;
     }
 
-    public static Attitude of(String value) {
-        return switch (value) {
-            case "optimistic" -> OPTIMISTIC;
-            case "pessimistic" -> PESSIMISTIC;
-            case "realistic" -> REALISTIC;
-            default -> new Attitude(Type.$UNKNOWN, value);
-        };
+    public static Attitude unknown(String value) {
+        return new Attitude(Type.$UNKNOWN, value);
     }
 
     @Override
@@ -89,7 +84,12 @@ public final class Attitude implements SerializableShape {
 
         @Override
         public Attitude build() {
-            return Attitude.of(value);
+            return switch (value) {
+                case "optimistic" -> OPTIMISTIC;
+                case "pessimistic" -> PESSIMISTIC;
+                case "realistic" -> REALISTIC;
+                default -> new Attitude(Type.$UNKNOWN, value);
+            };
         }
     }
 }
