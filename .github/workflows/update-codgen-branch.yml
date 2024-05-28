@@ -24,9 +24,9 @@ jobs:
 
       - name: Rebase on main and setup
         run: |
-          git pull -r origin main
           git config --global user.email "github-aws-smithy-automation@amazon.com"
           git config --global user.name "Smithy Automation"
+          git pull -r origin main
         env:
           GITHUB_TOKEN: ${{ secrets.PR_TOKEN }}
 
