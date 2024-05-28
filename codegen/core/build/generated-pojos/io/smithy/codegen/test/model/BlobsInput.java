@@ -192,5 +192,14 @@ public final class BlobsInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredBlob(this.requiredBlob);
+        builder.optionalBlob(this.optionalBlob);
+        builder.streamingBlob(this.streamingBlob);
+        return builder;
+    }
+
 }
 

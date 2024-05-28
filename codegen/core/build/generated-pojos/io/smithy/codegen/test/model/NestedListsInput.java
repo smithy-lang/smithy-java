@@ -187,5 +187,14 @@ public final class NestedListsInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.listOfLists(this.listOfLists);
+        builder.listOfListOfList(this.listOfListOfList);
+        builder.listOfMaps(this.listOfMaps);
+        return builder;
+    }
+
 }
 

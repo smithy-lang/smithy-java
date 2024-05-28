@@ -186,5 +186,14 @@ public final class IntegersInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredInt(this.requiredInt);
+        builder.optionalInt(this.optionalInt);
+        builder.defaultInt(this.defaultInt);
+        return builder;
+    }
+
 }
 
