@@ -1,0 +1,46 @@
+name: Updates the main-codegen branch if any codegen updates are merged.
+on:
+  pull_request:
+    branches: ["main"]
+    types: [closed]
+    paths: ["codegen/**"]
+
+jobs:
+  update-on-merge:
+    if: ${{ github.event.pull_request.merged }}
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main-codegen
+
+      - uses: gradle/wrapper-validation-action@v2
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'corretto'
+
+      - name: Rebase on main and setup
+        run: |
+          git pull -r origin main
+          git config --global user.email "github-aws-smithy-automation@amazon.com"
+          git config --global user.name "Smithy Automation"
+        env:
+          GITHUB_TOKEN: ${{ secrets.PR_TOKEN }}
+
+      - name: Rebuild project
+        run: ./gradlew clean build --stacktrace
+
+      # TODO: Add server and client generation
+      - name: Add generated files
+        run: |
+          git add -f codegen/core/build/generated-pojos/
+
+      - name: Create and push update
+        run: |
+          git commit -m "Update generated code for PR: ${{ github.event.pull_request.number }}"
+          git push -f -u origin main-codegen
+        env:
+          GITHUB_TOKEN: ${{ secrets.PR_TOKEN }}
