@@ -136,21 +136,6 @@ public class TypedDocumentMemberTest {
                 (Function<Document, Object>) Document::asString
             ),
             Arguments.of(
-                ShapeType.STRING,
-                "a".getBytes(StandardCharsets.UTF_8),
-                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeString(schema, "a"),
-                (Function<Document, Object>) Document::asBlob
-            ),
-            Arguments.of(
-                ShapeType.BLOB,
-                "a",
-                (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBlob(
-                    schema,
-                    "a".getBytes(StandardCharsets.UTF_8)
-                ),
-                (Function<Document, Object>) Document::asString
-            ),
-            Arguments.of(
                 ShapeType.BLOB,
                 "a".getBytes(StandardCharsets.UTF_8),
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> s.writeBlob(

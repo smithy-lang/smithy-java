@@ -7,7 +7,6 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,8 +53,6 @@ import software.amazon.smithy.model.shapes.ShapeType;
  * <p>Document types are a protocol-agnostic view of untyped data. Protocol codecs should attempt to smooth over
  * protocol incompatibilities with the Smithy data model. If a protocol serializes a blob as a base64 encoded string,
  * then calling {@link #asBlob()} should automatically base64 decode the value and return the underlying bytes.
- * Conversely, if a document contains binary encoded data and {@link #asString()} is called, the document should
- * automatically attempt to return a UTF-8 string from the bytes.
  *
  * <h3>Typed documents</h3>
  *
@@ -256,30 +253,20 @@ public interface Document extends SerializableShape {
     /**
      * Get the string value of the Document if it is a string.
      *
-     * <p>If the document is a blob, implementations should attempt to UTF-8 decode the blob value into a string.
-     *
      * @return the string value.
      * @throws SdkSerdeException if the Document is not a string.
      */
     default String asString() {
-        if (type() == ShapeType.BLOB) {
-            return new String(asBlob(), StandardCharsets.UTF_8);
-        }
         throw new SdkSerdeException("Expected a string document, but found " + type());
     }
 
     /**
      * Get the Document as a blob if the Document is a blob.
      *
-     * <p>If the document is a string, implementations should return the UTF-8 bytes of the string.
-     *
      * @return the bytes of the blob.
      * @throws SdkSerdeException if the Document is not a blob.
      */
     default byte[] asBlob() {
-        if (type() == ShapeType.STRING) {
-            return asString().getBytes(StandardCharsets.UTF_8);
-        }
         throw new SdkSerdeException("Expected a blob document, but found " + type());
     }
 
