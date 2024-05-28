@@ -217,5 +217,15 @@ public final class NestedMapsInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.mapOfStringMap(this.mapOfStringMap);
+        builder.mapOfMapOfStringMap(this.mapOfMapOfStringMap);
+        builder.mapOfStringList(this.mapOfStringList);
+        builder.mapOfMapList(this.mapOfMapList);
+        return builder;
+    }
+
 }
 

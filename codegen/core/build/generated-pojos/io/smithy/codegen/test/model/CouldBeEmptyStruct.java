@@ -118,5 +118,12 @@ public final class CouldBeEmptyStruct implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.fieldA(this.fieldA);
+        return builder;
+    }
+
 }
 

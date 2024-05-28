@@ -156,5 +156,13 @@ public final class StructuresInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredStruct(this.requiredStruct);
+        builder.optionalStruct(this.optionalStruct);
+        return builder;
+    }
+
 }
 

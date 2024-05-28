@@ -186,5 +186,14 @@ public final class LongsInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredLongs(this.requiredLongs);
+        builder.optionalLongs(this.optionalLongs);
+        builder.defaultShort(this.defaultShort);
+        return builder;
+    }
+
 }
 
