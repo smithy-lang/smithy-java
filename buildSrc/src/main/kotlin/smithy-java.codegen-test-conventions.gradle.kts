@@ -1,7 +1,7 @@
 plugins {
-    id 'smithy-java.java-conventions'
-    id "smithy-java.integ-test-conventions"
-    id 'software.amazon.smithy.gradle.smithy-base'
+    id("smithy-java.java-conventions")
+    id("smithy-java.integ-test-conventions")
+    id("software.amazon.smithy.gradle.smithy-base")
 }
 
 dependencies {

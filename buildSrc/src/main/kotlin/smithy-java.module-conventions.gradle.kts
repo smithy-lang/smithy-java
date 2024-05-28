@@ -1,10 +1,10 @@
 
 plugins {
-    id 'smithy-java.java-conventions'
-    id 'jacoco'
+    id("smithy-java.java-conventions")
+    id("jacoco")
 }
 
-def smithyJavaVersion = project.file("${project.rootDir}/VERSION").getText().replace(System.lineSeparator(), "")
+val smithyJavaVersion = project.file("${project.rootDir}/VERSION").readText().replace(System.lineSeparator(), "")
 
 group = "software.amazon.smithy.java"
 version = smithyJavaVersion
@@ -14,7 +14,7 @@ version = smithyJavaVersion
  * ============================
  */
 // Reusable license copySpec
-def licenseSpec = copySpec {
+val licenseSpec = copySpec {
     from("${project.rootDir}/LICENSE")
     from("${project.rootDir}/NOTICE")
 }
@@ -24,34 +24,31 @@ def licenseSpec = copySpec {
  * ============================
  */
 // Build a javadoc JAR too.
-tasks.register('javadocJar', Jar) {
-    from {
-        tasks.javadoc
-    }
-    archiveClassifier = "javadoc"
+tasks.register<Jar>("javadocJar") {
+    from(tasks.named("javadoc"))
+    archiveClassifier.set("javadoc")
 }
 
 // TODO: Remove this once package is ready for docs
 // Suppress warnings in javadocs
-tasks.withType(Javadoc).configureEach {
+tasks.withType<Javadoc>() {
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:-html", "-quiet")
 }
 
 // Include an Automatic-Module-Name in all JARs.
-afterEvaluate { project ->
-    tasks.withType(Jar).configureEach {
+afterEvaluate {
+    val moduleName: String by extra
+    tasks.withType<Jar>() {
         metaInf.with(licenseSpec)
-        inputs.property("moduleName", project.ext["moduleName"])
+        inputs.property("moduleName", moduleName)
         manifest {
-            attributes "Automatic-Module-Name": project.ext["moduleName"]
+            attributes(mapOf("Automatic-Module-Name" to moduleName))
         }
     }
 }
 
 // Always run javadoc after build.
-tasks.named("build") {
-    dependsOn(tasks.named("javadoc"))
-}
+tasks["build"].dependsOn(tasks["javadoc"])
 
 /*
  * Code coverage
@@ -60,15 +57,13 @@ tasks.named("build") {
  * Create code coverage reports after running tests.
  */
 // Always run the jacoco test report after testing.
-tasks.named("test") {
-    finalizedBy(tasks.named("jacocoTestReport"))
-}
+tasks["test"].finalizedBy(tasks["jacocoTestReport"])
 
 // Configure jacoco to generate an HTML report.
 tasks.jacocoTestReport {
     reports {
         xml.required.set(false)
         csv.required.set(false)
-        html.outputLocation.set(file("$buildDir/reports/jacoco"))
+        html.outputLocation.set(file("${layout.buildDirectory.get()}/reports/jacoco"))
     }
 }

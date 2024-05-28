@@ -1,13 +1,11 @@
 plugins {
-    id 'smithy-java.module-conventions'
+    id("smithy-java.module-conventions")
 }
 
 description = "This module provides client HTTP functionality"
 
-ext {
-    displayName = "Smithy :: Java :: Client Http"
-    moduleName = "software.amazon.smithy.java.client-http"
-}
+extra["displayName"] = "Smithy :: Java :: Client Http"
+extra["moduleName"] = "software.amazon.smithy.java.client-http"
 
 dependencies {
     api(project(":http-binding"))

@@ -1,13 +1,11 @@
 plugins {
-    id 'smithy-java.module-conventions'
+    id("smithy-java.module-conventions")
 }
 
 description = "This module provides the core client functionality"
 
-ext {
-    displayName = "Smithy :: Java :: Client Core"
-    moduleName = "software.amazon.smithy.java.client-core"
-}
+extra["displayName"] = "Smithy :: Java :: Client Core"
+extra["moduleName"] = "software.amazon.smithy.java.client-core"
 
 dependencies {
     api(project(":core"))
