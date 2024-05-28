@@ -186,5 +186,14 @@ public final class ShortsInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredShort(this.requiredShort);
+        builder.optionalShort(this.optionalShort);
+        builder.defaultShort(this.defaultShort);
+        return builder;
+    }
+
 }
 

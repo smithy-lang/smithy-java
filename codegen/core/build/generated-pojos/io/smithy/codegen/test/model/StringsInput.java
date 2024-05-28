@@ -187,5 +187,14 @@ public final class StringsInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredString(this.requiredString);
+        builder.defaultString(this.defaultString);
+        builder.optionalString(this.optionalString);
+        return builder;
+    }
+
 }
 

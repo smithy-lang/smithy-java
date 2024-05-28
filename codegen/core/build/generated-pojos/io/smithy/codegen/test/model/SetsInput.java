@@ -69,7 +69,6 @@ public final class SetsInput implements SerializableStruct {
      * Required set with no default value
      */
     public Set<String> requiredList() {
-
         return Collections.unmodifiableSet(requiredList);
     }
 
@@ -81,7 +80,6 @@ public final class SetsInput implements SerializableStruct {
      * Set with a default value. Sets can only ever have empty defaults.
      */
     public Set<String> listWithDefault() {
-
         return Collections.unmodifiableSet(listWithDefault);
     }
 
@@ -214,5 +212,14 @@ public final class SetsInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredList(this.requiredList);
+        builder.listWithDefault(this.listWithDefault);
+        builder.optionalList(this.optionalList);
+        return builder;
+    }
+
 }
 

@@ -186,5 +186,14 @@ public final class BytesInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredByte(this.requiredByte);
+        builder.optionalByte(this.optionalByte);
+        builder.defaultByte(this.defaultByte);
+        return builder;
+    }
+
 }
 

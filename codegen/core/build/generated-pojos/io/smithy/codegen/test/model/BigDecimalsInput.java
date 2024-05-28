@@ -188,5 +188,14 @@ public final class BigDecimalsInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredBigDecimal(this.requiredBigDecimal);
+        builder.optionalBigDecimal(this.optionalBigDecimal);
+        builder.defaultBigDecimal(this.defaultBigDecimal);
+        return builder;
+    }
+
 }
 

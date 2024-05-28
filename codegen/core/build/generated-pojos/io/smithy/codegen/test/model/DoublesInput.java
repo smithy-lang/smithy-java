@@ -186,5 +186,14 @@ public final class DoublesInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredDouble(this.requiredDouble);
+        builder.optionalDouble(this.optionalDouble);
+        builder.defaultDouble(this.defaultDouble);
+        return builder;
+    }
+
 }
 

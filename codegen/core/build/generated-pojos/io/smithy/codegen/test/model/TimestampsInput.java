@@ -188,5 +188,14 @@ public final class TimestampsInput implements SerializableStruct {
             }
         }
     }
+
+    public Builder toBuilder() {
+        var builder =  new Builder();
+        builder.requiredTimestamp(this.requiredTimestamp);
+        builder.optionalTimestamp(this.optionalTimestamp);
+        builder.defaultTimestamp(this.defaultTimestamp);
+        return builder;
+    }
+
 }
 
