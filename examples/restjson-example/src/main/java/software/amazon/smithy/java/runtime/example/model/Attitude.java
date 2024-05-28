@@ -24,15 +24,6 @@ public final class Attitude implements SerializableShape {
     public static final Attitude PESSIMISTIC = new Attitude(Type.PESSIMISTIC, "pessimistic");
     public static final Attitude REALISTIC = new Attitude(Type.REALISTIC, "realistic");
 
-    private static final Map<String, Attitude> valueMap = Map.of(
-        OPTIMISTIC.value,
-        OPTIMISTIC,
-        PESSIMISTIC.value,
-        PESSIMISTIC,
-        REALISTIC.value,
-        REALISTIC
-    );
-
     static final SdkSchema SCHEMA = SdkSchema.builder()
         .id(ID)
         .type(ShapeType.ENUM)
@@ -67,7 +58,21 @@ public final class Attitude implements SerializableShape {
     }
 
     public static Attitude valueOf(String value) {
-        return valueMap.getOrDefault(value, new Attitude(Type.$UNKNOWN, value));
+        return switch (value) {
+            case "OPTIMISTIC" -> OPTIMISTIC;
+            case "PESSIMISTIC" -> PESSIMISTIC;
+            case "REALISTIC" -> REALISTIC;
+            default -> new Attitude(Type.$UNKNOWN, "");
+        };
+    }
+
+    public static Attitude of(String value) {
+        return switch (value) {
+            case "optimistic" -> OPTIMISTIC;
+            case "pessimistic" -> PESSIMISTIC;
+            case "realistic" -> REALISTIC;
+            default -> new Attitude(Type.$UNKNOWN, value);
+        };
     }
 
     @Override
@@ -94,7 +99,7 @@ public final class Attitude implements SerializableShape {
 
         @Override
         public Attitude build() {
-            return Attitude.valueOf(value);
+            return Attitude.of(value);
         }
     }
 }

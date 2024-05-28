@@ -193,7 +193,7 @@ public class GenericTest {
 
     @Test
     void enumUsage() {
-        Attitude value = Attitude.valueOf("pessimistic");
+        Attitude value = Attitude.of("pessimistic");
         switch (value.type()) {
             case OPTIMISTIC -> System.out.println(":)");
             case PESSIMISTIC -> System.out.println(":(");
