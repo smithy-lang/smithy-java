@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.example.model;
 
-import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
