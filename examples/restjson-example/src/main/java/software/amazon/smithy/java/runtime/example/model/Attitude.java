@@ -56,15 +56,6 @@ public final class Attitude implements SerializableShape {
         return type;
     }
 
-    public static Attitude valueOf(String value) {
-        return switch (value) {
-            case "OPTIMISTIC" -> OPTIMISTIC;
-            case "PESSIMISTIC" -> PESSIMISTIC;
-            case "REALISTIC" -> REALISTIC;
-            default -> new Attitude(Type.$UNKNOWN, "");
-        };
-    }
-
     public static Attitude of(String value) {
         return switch (value) {
             case "optimistic" -> OPTIMISTIC;
