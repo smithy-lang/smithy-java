@@ -141,6 +141,7 @@ public interface Document extends SerializableShape {
      *
      * @return the byte value.
      * @throws SdkSerdeException if the Document is not a number.
+     * @throws ArithmeticException if the value is out of range for this type.
      */
     default byte asByte() {
         throw new SdkSerdeException("Expected a byte document, but found " + type());
@@ -153,6 +154,7 @@ public interface Document extends SerializableShape {
      *
      * @return the short value.
      * @throws SdkSerdeException if the Document is not a number.
+     * @throws ArithmeticException if the value is out of range for this type.
      */
     default short asShort() {
         throw new SdkSerdeException("Expected a short document, but found " + type());
@@ -165,6 +167,7 @@ public interface Document extends SerializableShape {
      *
      * @return the integer value.
      * @throws SdkSerdeException if the Document is not a number.
+     * @throws ArithmeticException if the value is out of range for this type.
      */
     default int asInteger() {
         throw new SdkSerdeException("Expected an integer document, but found " + type());
@@ -177,6 +180,7 @@ public interface Document extends SerializableShape {
      *
      * @return the long value.
      * @throws SdkSerdeException if the Document is not a number.
+     * @throws ArithmeticException if the value is out of range for this type.
      */
     default long asLong() {
         throw new SdkSerdeException("Expected a long document, but found " + type());
@@ -189,6 +193,7 @@ public interface Document extends SerializableShape {
      *
      * @return the float value.
      * @throws SdkSerdeException if the Document is not a number.
+     * @throws ArithmeticException if the value is out of range for this type.
      */
     default float asFloat() {
         throw new SdkSerdeException("Expected a float document, but found " + type());
@@ -201,6 +206,7 @@ public interface Document extends SerializableShape {
      *
      * @return the double value.
      * @throws SdkSerdeException if the Document is not a number.
+     * @throws ArithmeticException if the value is out of range for this type.
      */
     default double asDouble() {
         throw new SdkSerdeException("Expected a double document, but found " + type());
