@@ -12,12 +12,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.build.MockManifest;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.build.SmithyBuildPlugin;
+import software.amazon.smithy.build.model.ProjectionConfig;
 import software.amazon.smithy.java.codegen.utils.TestJavaCodegenPlugin;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.ObjectNode;
@@ -30,6 +33,13 @@ public class JavadocIntegrationTest {
 
     @BeforeEach
     public void setup() {
+        Map<String, ObjectNode> plugins = new HashMap<>();
+        plugins.put("integrations", ObjectNode.builder().withMember("nullableannotation-integration",
+                        ObjectNode.builder().withMember("nullableAnnotation", "TEST").build())
+                .build());
+        ProjectionConfig projections = ProjectionConfig.builder()
+                .plugins(plugins).build();
+
         var model = Model.assembler()
             .addImport(TEST_FILE)
             .assemble()
@@ -42,6 +52,7 @@ public class JavadocIntegrationTest {
                     .withMember("namespace", "test.smithy.codegen")
                     .build()
             )
+            .projection("projections", projections)
             .model(model)
             .build();
         SmithyBuildPlugin plugin = new TestJavaCodegenPlugin();

@@ -1,1 +1,2 @@
 software.amazon.smithy.java.codegen.integrations.javadoc.JavadocIntegration
+software.amazon.smithy.java.codegen.integrations.nullableannotation.NullableAnnotationIntegration
