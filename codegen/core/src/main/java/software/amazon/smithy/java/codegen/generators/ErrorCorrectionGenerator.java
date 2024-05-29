@@ -169,7 +169,8 @@ record ErrorCorrectionGenerator(JavaWriter writer, SymbolProvider symbolProvider
 
         @Override
         public Void unionShape(UnionShape unionShape) {
-            writer.writeInline("new $T.$$$$Unknown(null)", symbolProvider.toSymbol(unionShape));
+            // TODO: implement for unions
+            writer.writeInline("null");
             return null;
         }
 

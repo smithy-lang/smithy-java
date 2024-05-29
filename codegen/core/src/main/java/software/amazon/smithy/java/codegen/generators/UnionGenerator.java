@@ -149,11 +149,7 @@ public final class UnionGenerator
                     """);
                 writer.popState();
             }
-            writer.write("""
-                public ${document:T} $$$$unknown() {
-                    return null;
-                }
-                """);
+            // TODO: Add in unknown variant
             writer.popState();
         }
     }
@@ -209,26 +205,7 @@ public final class UnionGenerator
                 );
                 writer.popState();
             }
-            writer.write("""
-                public static final class $$$$Unknown extends ${shape:T} {
-                    private final transient ${document:T} value;
-
-                    $$$$Unknown (${document:T} value) {
-                        super(Member.$$$$UNKNOWN);
-                        this.value = value;
-                    }
-
-                    @Override
-                    public void serializeMembers(${shapeSerializer:T} serializer) {
-                        serializer.writeDocument(value);
-                    }
-
-                    @Override
-                    public ${document:T} $$$$unknown() {
-                        return value;
-                    }
-                }
-                """);
+            // TODO: Add in unknown variant
             writer.popState();
         }
     }
@@ -272,12 +249,8 @@ public final class UnionGenerator
                         throw new ${serdeException:T}("Only one value may be set for unions");
                     }
                 }
-
-                private void $$$$unknown(${document:T} value) {
-                    checkForExistingValue();
-                    this.value = new $$$$Unknown(value);
-                }
                 """);
+            // TODO: Add unknown setter
             writer.popState();
         }
     }
