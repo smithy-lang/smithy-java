@@ -144,10 +144,13 @@ public class JsonSerializerTest {
             var codec = JsonCodec.builder().useJsonName(useJsonName).build(); var output = new ByteArrayOutputStream()
         ) {
             try (var serializer = codec.createSerializer(output)) {
-                serializer.writeStruct(SerializableStruct.create(JsonTestData.BIRD, (schema, ser) -> {
-                    ser.writeString(schema.member("name"), "Toucan");
-                    ser.writeString(schema.member("color"), "red");
-                }));
+                serializer.writeStruct(
+                    JsonTestData.BIRD,
+                    SerializableStruct.create(JsonTestData.BIRD, (schema, ser) -> {
+                        ser.writeString(schema.member("name"), "Toucan");
+                        ser.writeString(schema.member("color"), "red");
+                    })
+                );
             }
             var result = output.toString(StandardCharsets.UTF_8);
             assertThat(result, equalTo(json));
@@ -165,9 +168,12 @@ public class JsonSerializerTest {
     public void writesNestedStructures() throws Exception {
         try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
-                serializer.writeStruct(SerializableStruct.create(JsonTestData.BIRD, (schema, ser) -> {
-                    ser.writeStruct(schema.member("nested"), new NestedStruct());
-                }));
+                serializer.writeStruct(
+                    JsonTestData.BIRD,
+                    SerializableStruct.create(JsonTestData.BIRD, (schema, ser) -> {
+                        ser.writeStruct(schema.member("nested"), new NestedStruct());
+                    })
+                );
             }
             var result = output.toString(StandardCharsets.UTF_8);
             assertThat(result, equalTo("{\"nested\":{\"number\":10}}"));
@@ -187,8 +193,8 @@ public class JsonSerializerTest {
 
     private static final class NestedStruct implements SerializableStruct {
         @Override
-        public SdkSchema schema() {
-            return JsonTestData.NESTED;
+        public void serialize(ShapeSerializer encoder) {
+            encoder.writeStruct(JsonTestData.NESTED, this);
         }
 
         @Override

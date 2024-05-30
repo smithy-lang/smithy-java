@@ -138,7 +138,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     public void writeDocument(SdkSchema member, Document value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
-        validator.writeDocument(value);
+        validator.writeDocument(member, value);
         validator.popPath();
     }
 

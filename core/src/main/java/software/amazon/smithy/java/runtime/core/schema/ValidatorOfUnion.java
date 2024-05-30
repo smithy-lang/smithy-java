@@ -172,7 +172,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     public void writeDocument(SdkSchema member, Document value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member, value)) {
-            validator.writeDocument(value);
+            validator.writeDocument(member, value);
         }
         validator.popPath();
     }

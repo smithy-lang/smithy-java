@@ -72,7 +72,7 @@ public class ToStringSerializerTest {
             .build();
 
         var str = ToStringSerializer.serialize(e -> {
-            e.writeStruct(SerializableStruct.create(schema, (s, ser) -> {
+            e.writeStruct(schema, SerializableStruct.create(schema, (s, ser) -> {
                 ser.writeMap(s.member("foo"), mapSchema, (innerMapSchema, map) -> {
                     map.writeEntry(innerMapSchema.member("key"), "a", innerMapSchema, (mapSchema2, ms) -> {
                         ms.writeString(mapSchema2.member("value"), "hi");
@@ -101,7 +101,7 @@ public class ToStringSerializerTest {
             .build();
 
         var str = ToStringSerializer.serialize(e -> {
-            e.writeStruct(SerializableStruct.create(schema, (s, ser) -> {
+            e.writeStruct(schema, SerializableStruct.create(schema, (s, ser) -> {
                 ser.writeBlob(s.member("foo"), "abc".getBytes(StandardCharsets.UTF_8));
             }));
         });

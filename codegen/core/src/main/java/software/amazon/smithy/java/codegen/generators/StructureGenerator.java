@@ -48,7 +48,6 @@ public final class StructureGenerator
             writer.putContext("equals", new EqualsGenerator(writer, directive.shape(), directive.symbolProvider()));
             writer.putContext("hashCode", new HashCodeGenerator(writer, directive.shape(), directive.symbolProvider()));
             writer.putContext("toString", writer.consumer(JavaWriter::writeToString));
-            writer.putContext("schemaGetter", writer.consumer(JavaWriter::writeSchemaGetter));
             writer.putContext(
                 "memberSerializer",
                 new StructureSerializerGenerator(
@@ -100,8 +99,6 @@ public final class StructureGenerator
                         ${equals:C|}
 
                         ${hashCode:C|}
-
-                        ${schemaGetter:C|}
 
                         ${memberSerializer:C|}
 

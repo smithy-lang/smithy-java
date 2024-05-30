@@ -33,7 +33,7 @@ public class TypedDocumentTest {
             .build();
 
         return encoder -> {
-            encoder.writeStruct(SerializableStruct.create(structSchema, (schema, s) -> {
+            encoder.writeStruct(structSchema, SerializableStruct.create(structSchema, (schema, s) -> {
                 s.writeString(schema.member("a"), "1");
                 s.writeString(schema.member("b"), "2");
             }));

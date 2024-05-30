@@ -114,8 +114,8 @@ public final class Person implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer encoder) {
+        encoder.writeStruct(SCHEMA, this);
     }
 
     @Override

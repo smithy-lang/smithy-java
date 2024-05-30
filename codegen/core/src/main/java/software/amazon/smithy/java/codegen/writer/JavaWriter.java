@@ -13,7 +13,6 @@ import software.amazon.smithy.codegen.core.SymbolWriter;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -115,22 +114,6 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
             return dupe.getName();
         }
         return dupe.getFullName();
-    }
-
-    /**
-     * TODO: Docs
-     * @param writer
-     */
-    public void writeSchemaGetter() {
-        pushState();
-        putContext("sdkSchema", SdkSchema.class);
-        write("""
-            @Override
-            public ${sdkSchema:T} schema() {
-                return SCHEMA;
-            }
-            """);
-        popState();
     }
 
     public void writeBuilderGetter() {

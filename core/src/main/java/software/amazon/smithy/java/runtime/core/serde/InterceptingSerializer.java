@@ -133,11 +133,6 @@ public abstract class InterceptingSerializer implements ShapeSerializer {
     }
 
     @Override
-    public final void writeDocument(Document value) {
-        ShapeSerializer.super.writeDocument(value);
-    }
-
-    @Override
     public final void writeNull(SdkSchema schema) {
         before(schema).writeNull(schema);
         after(schema);

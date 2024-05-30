@@ -40,6 +40,7 @@ public class TypedDocumentMemberTest {
 
         SerializableShape serializableShape = encoder -> {
             encoder.writeStruct(
+                structSchema,
                 SerializableStruct.create(structSchema, (schema, s) -> s.writeString(schema.member("foo"), "Hi"))
             );
         };
@@ -72,12 +73,14 @@ public class TypedDocumentMemberTest {
 
         var document1 = Document.createTyped(encoder -> {
             encoder.writeStruct(
+                structSchema1,
                 SerializableStruct.create(structSchema1, (schema, s) -> s.writeString(schema.member("foo"), "Hi"))
             );
         });
 
         var document2 = Document.createTyped(encoder -> {
             encoder.writeStruct(
+                structSchema2,
                 SerializableStruct.create(structSchema2, (schema, s) -> s.writeInteger(schema.member("foo"), 1))
             );
         });
@@ -113,7 +116,7 @@ public class TypedDocumentMemberTest {
             .members(SdkSchema.memberBuilder("a", targetSchema))
             .build();
         var document = Document.createTyped(encoder -> {
-            encoder.writeStruct(SerializableStruct.create(structSchema, (schema, serializer) -> {
+            encoder.writeStruct(structSchema, SerializableStruct.create(structSchema, (schema, serializer) -> {
                 writer.accept(schema.member("a"), serializer);
             }));
         });
@@ -602,7 +605,7 @@ public class TypedDocumentMemberTest {
                     .build(),
                 "b",
                 (BiConsumer<SdkSchema, ShapeSerializer>) (schema, s) -> {
-                    s.writeStruct(SerializableStruct.create(schema, (passedSchema, ser) -> {
+                    s.writeStruct(schema, SerializableStruct.create(schema, (passedSchema, ser) -> {
                         ser.writeString(passedSchema.member("foo"), "a");
                         ser.writeString(passedSchema.member("bar"), "b");
                     }));
