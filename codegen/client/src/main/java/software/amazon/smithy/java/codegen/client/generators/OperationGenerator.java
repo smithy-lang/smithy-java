@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.client.generators;
 
 import java.util.function.Consumer;
+import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateOperationDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
@@ -16,7 +17,10 @@ import software.amazon.smithy.java.runtime.core.schema.SdkOperation;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
+import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.OperationShape;
+import software.amazon.smithy.model.shapes.ServiceShape;
+
 
 public class OperationGenerator
     implements Consumer<GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings>> {
@@ -29,18 +33,34 @@ public class OperationGenerator
             var input = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getInputShape()));
             var output = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getOutputShape()));
             writer.pushState(new ClassSection(shape));
+            writer.putContext("shape", directive.symbol());
+            writer.putContext("sdkOperation", SdkOperation.class);
             writer.putContext("inputType", input);
             writer.putContext("outputType", output);
             writer.putContext("sdkSchema", SdkSchema.class);
             writer.putContext("sdkShapeBuilder", SdkShapeBuilder.class);
             writer.putContext("typeRegistry", TypeRegistry.class);
+            writer.putContext(
+                "schema",
+                new SchemaGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.context())
+            );
+            writer.putContext(
+                "typeRegistrySection",
+                new TypeRegistryGenerator(
+                    writer,
+                    shape,
+                    directive.symbolProvider(),
+                    directive.model(),
+                    directive.service()
+                )
+            );
             writer.write(
                 """
-                    public final class $T implements $T<${inputType:T}, ${outputType:T}> {
+                    public final class ${shape:T} implements ${sdkOperation:T}<${inputType:T}, ${outputType:T}> {
 
-                        static final ${sdkSchema:T} SCHEMA = ${C}
+                        static final ${sdkSchema:T} SCHEMA = ${schema:C}
 
-                        ${C|}
+                        ${typeRegistrySection:C|}
 
                         @Override
                         public ${sdkShapeBuilder:T}<${inputType:T}> inputBuilder() {
@@ -72,30 +92,32 @@ public class OperationGenerator
                             return typeRegistry;
                         }
                     }
-                    """,
-                directive.symbol(),
-                SdkOperation.class,
-                new SchemaGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.context()),
-                writer.consumer(w -> writeTypeRegistry(w, shape, directive))
+                    """
             );
             writer.popState();
         });
     }
 
-    private static void writeTypeRegistry(
+
+    private record TypeRegistryGenerator(
         JavaWriter writer,
         OperationShape shape,
-        GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive
-    ) {
-        writer.write("private final ${typeRegistry:T} typeRegistry = ${typeRegistry:T}.builder()");
-        writer.indent();
-        writer.write(".putType(${inputType:T}.ID, ${inputType:T}.class, ${inputType:T}::builder)");
-        writer.write(".putType(${outputType:T}.ID, ${outputType:T}.class, ${outputType:T}::builder)");
-        for (var errorId : shape.getErrors(directive.service())) {
-            var errorShape = directive.model().expectShape(errorId);
-            writer.write(".putType($1T.ID, $1T.class, $1T::builder)", directive.symbolProvider().toSymbol(errorShape));
+        SymbolProvider symbolProvider,
+        Model model,
+        ServiceShape service
+    ) implements Runnable {
+        @Override
+        public void run() {
+            writer.write("private final ${typeRegistry:T} typeRegistry = ${typeRegistry:T}.builder()");
+            writer.indent();
+            writer.write(".putType(${inputType:T}.ID, ${inputType:T}.class, ${inputType:T}::builder)");
+            writer.write(".putType(${outputType:T}.ID, ${outputType:T}.class, ${outputType:T}::builder)");
+            for (var errorId : shape.getErrors(service)) {
+                var errorShape = model.expectShape(errorId);
+                writer.write(".putType($1T.ID, $1T.class, $1T::builder)", symbolProvider.toSymbol(errorShape));
+            }
+            writer.writeWithNoFormatting(".build();");
+            writer.dedent();
         }
-        writer.writeWithNoFormatting(".build();");
-        writer.dedent();
     }
 }

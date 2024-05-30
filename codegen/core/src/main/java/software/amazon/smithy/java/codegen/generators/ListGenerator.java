@@ -50,6 +50,29 @@ public final class ListGenerator
                     writer.putContext("shapeDeserializer", ShapeDeserializer.class);
                     writer.putContext("unique", directive.shape().hasTrait(UniqueItemsTrait.class));
                     writer.putContext("serdeException", SdkSerdeException.class);
+                    writer.putContext(
+                        "memberSerializer",
+                        new SerializerMemberGenerator(
+                            writer,
+                            directive.symbolProvider(),
+                            directive.model(),
+                            directive.service(),
+                            directive.shape().getMember(),
+                            "value"
+                        )
+                    );
+                    writer.putContext(
+                        "memberDeserializer",
+                        new DeserializerGenerator(
+                            writer,
+                            target,
+                            directive.symbolProvider(),
+                            directive.model(),
+                            directive.service(),
+                            "deserializer",
+                            CodegenUtils.getSchemaType(writer, directive.symbolProvider(), target)
+                        )
+                    );
                     writer.write(
                         """
                             static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:T}, ${shapeSerializer:T}> {
@@ -58,7 +81,7 @@ public final class ListGenerator
                                 @Override
                                 public void accept(${shape:T} values, ${shapeSerializer:T} serializer) {
                                     for (var value : values) {
-                                        ${C|};
+                                        ${memberSerializer:C|};
                                     }
                                 }
                             }
@@ -74,29 +97,12 @@ public final class ListGenerator
 
                                 @Override
                                 public void accept(${shape:T} state, ${shapeDeserializer:T} deserializer) {
-                                    ${?unique}if (${/unique}state.add($C)${^unique};${/unique}${?unique}) {
+                                    ${?unique}if (${/unique}state.add($memberDeserializer:C)${^unique};${/unique}${?unique}) {
                                         throw new ${serdeException:T}("Member must have unique values");
                                     }${/unique}
                                 }
                             }
-                            """,
-                        new SerializerMemberGenerator(
-                            writer,
-                            directive.symbolProvider(),
-                            directive.model(),
-                            directive.service(),
-                            directive.shape().getMember(),
-                            "value"
-                        ),
-                        new DeserializerGenerator(
-                            writer,
-                            target,
-                            directive.symbolProvider(),
-                            directive.model(),
-                            directive.service(),
-                            "deserializer",
-                            CodegenUtils.getSchemaType(writer, directive.symbolProvider(), target)
-                        )
+                            """
                     );
                     writer.popState();
                     writer.writeInlineWithNoFormatting(t);

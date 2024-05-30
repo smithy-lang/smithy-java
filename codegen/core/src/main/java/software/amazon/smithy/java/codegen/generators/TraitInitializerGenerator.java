@@ -32,9 +32,8 @@ record TraitInitializerGenerator(JavaWriter writer, Shape shape, Set<ShapeId> ru
     private static final Map<ShapeId, Class<? extends TraitService>> serviceMap = new HashMap<>();
     static {
         // Add all trait services to a map, so they can be queried for a provider class
-        ServiceLoader.load(TraitService.class, TraitInitializerGenerator.class.getClassLoader()).forEach((service) -> {
-            serviceMap.put(service.getShapeId(), service.getClass());
-        });
+        ServiceLoader.load(TraitService.class, TraitInitializerGenerator.class.getClassLoader())
+            .forEach((service) -> serviceMap.put(service.getShapeId(), service.getClass()));
     }
 
     @Override

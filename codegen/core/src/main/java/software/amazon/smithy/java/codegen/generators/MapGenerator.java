@@ -55,6 +55,29 @@ public class MapGenerator
                     writer.putContext("mapSerializer", MapSerializer.class);
                     writer.putContext("shapeSerializer", ShapeSerializer.class);
                     writer.putContext("shapeDeserializer", ShapeDeserializer.class);
+                    writer.putContext(
+                        "memberSerializer",
+                        new SerializerMemberGenerator(
+                            writer,
+                            directive.symbolProvider(),
+                            directive.model(),
+                            directive.service(),
+                            directive.shape().getValue(),
+                            "values"
+                        )
+                    );
+                    writer.putContext(
+                        "memberDeserializer",
+                        new DeserializerGenerator(
+                            writer,
+                            value,
+                            directive.symbolProvider(),
+                            directive.model(),
+                            directive.service(),
+                            "deserializer",
+                            valueSchema
+                        )
+                    );
                     writer.write(
                         """
                             static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:T}, ${mapSerializer:T}> {
@@ -78,7 +101,7 @@ public class MapGenerator
 
                                 @Override
                                 public void accept(${value:T} values, ${shapeSerializer:T} serializer) {
-                                    ${C|};
+                                    ${memberSerializer:C|};
                                 }
                             }
 
@@ -93,27 +116,10 @@ public class MapGenerator
 
                                 @Override
                                 public void accept(${shape:T} state, ${key:T} key, ${shapeDeserializer:T} deserializer) {
-                                    state.put(key, $C);
+                                    state.put(key, $memberDeserializer:C);
                                 }
                             }
-                            """,
-                        new SerializerMemberGenerator(
-                            writer,
-                            directive.symbolProvider(),
-                            directive.model(),
-                            directive.service(),
-                            directive.shape().getValue(),
-                            "values"
-                        ),
-                        new DeserializerGenerator(
-                            writer,
-                            value,
-                            directive.symbolProvider(),
-                            directive.model(),
-                            directive.service(),
-                            "deserializer",
-                            valueSchema
-                        )
+                            """
                     );
                     writer.popState();
 

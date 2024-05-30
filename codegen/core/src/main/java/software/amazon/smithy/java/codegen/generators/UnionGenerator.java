@@ -25,6 +25,7 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
@@ -40,7 +41,7 @@ public final class UnionGenerator
             writer.putContext("shape", directive.symbol());
             writer.putContext("serializableStruct", SerializableStruct.class);
             writer.putContext("document", Document.class);
-            writer.putContext("id", writer.consumer(w -> w.writeIdString(shape)));
+            writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(
                 "schemas",
                 new SchemaGenerator(
@@ -52,7 +53,7 @@ public final class UnionGenerator
                 )
             );
             writer.putContext("memberEnum", new MemberEnumGenerator(writer, directive.symbolProvider(), shape));
-            writer.putContext("toString", writer.consumer(JavaWriter::writeToString));
+            writer.putContext("toString", new ToStringGenerator(writer));
             writer.putContext("valueCasters", new ValueCasterGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext(
                 "valueClasses",
@@ -64,17 +65,17 @@ public final class UnionGenerator
                     shape
                 )
             );
-            writer.putContext("builderGetter", writer.consumer(JavaWriter::writeBuilderGetter));
             writer.putContext(
                 "builder",
-                new BuilderGenerator(writer, directive.symbolProvider(), directive.model(), directive.service(), shape)
+                new UnionBuilderGenerator(
+                    writer,
+                    shape,
+                    directive.symbolProvider(),
+                    directive.model(),
+                    directive.service()
+                )
             );
-
             // Register inner templates for builder generator
-            writer.putContext("builderProperties", writer.consumer(w -> w.write("private ${shape:T} value;")));
-            writer.putContext("builderSetters", new BuilderSetterGenerator(writer, directive.symbolProvider(), shape));
-            writer.putContext("errorCorrection", (Runnable) () -> {});
-            writer.putContext("buildMethod", writer.consumer(UnionGenerator::generateBuildMethod));
             writer.write("""
                 public abstract class ${shape:T} implements ${serializableStruct:T} {
                     ${id:C|}
@@ -98,8 +99,6 @@ public final class UnionGenerator
                     ${valueCasters:C|}
 
                     ${valueClasses:C|}
-
-                    ${builderGetter:C|}
 
                     ${builder:C|}
                 }
@@ -212,51 +211,6 @@ public final class UnionGenerator
         }
     }
 
-    private static void generateBuildMethod(JavaWriter writer) {
-        writer.pushState();
-        writer.putContext("objects", Objects.class);
-        writer.write("""
-            @Override
-            public ${shape:T} build() {
-                return ${objects:T}.requireNonNull(value, "no union value set");
-            }
-            """);
-        writer.popState();
-    }
-
-    private record BuilderSetterGenerator(JavaWriter writer, SymbolProvider provider, UnionShape shape) implements
-        Runnable {
-
-        @Override
-        public void run() {
-            for (var member : shape.members()) {
-                writer.pushState();
-                writer.putContext("memberName", provider.toMemberName(member));
-                writer.putContext("member", provider.toSymbol(member));
-                writer.write("""
-                    public Builder ${memberName:L}(${member:T} value) {
-                        checkForExistingValue();
-                        this.value = new ${memberName:U}Member(value);
-                        return this;
-                    }
-                    """);
-                writer.popState();
-            }
-
-            writer.pushState();
-            writer.putContext("serdeException", SdkSerdeException.class);
-            writer.write("""
-                private void checkForExistingValue() {
-                    if (this.value != null) {
-                        throw new ${serdeException:T}("Only one value may be set for unions");
-                    }
-                }
-                """);
-            // TODO: Add unknown setter
-            writer.popState();
-        }
-    }
-
     private record HashCodeGenerator(JavaWriter writer, SymbolProvider symbolProvider, MemberShape shape) implements
         Runnable {
         @Override
@@ -318,6 +272,66 @@ public final class UnionGenerator
                 Class<?> comparator = CodegenUtils.isJavaArray(memberSymbol) ? Arrays.class : Objects.class;
                 writer.writeInline("$T.equals(value, that.value)", comparator);
             }
+        }
+    }
+
+    private static final class UnionBuilderGenerator extends BuilderGenerator {
+
+        UnionBuilderGenerator(
+            JavaWriter writer,
+            Shape shape,
+            SymbolProvider symbolProvider,
+            Model model,
+            ServiceShape service
+        ) {
+            super(writer, shape, symbolProvider, model, service);
+        }
+
+        @Override
+        protected void generateProperties(JavaWriter writer) {
+            writer.write("private ${shape:T} value;");
+        }
+
+        @Override
+        protected void generateSetters(JavaWriter writer) {
+            for (var member : shape.members()) {
+                writer.pushState();
+                writer.putContext("memberName", symbolProvider.toMemberName(member));
+                writer.putContext("member", symbolProvider.toSymbol(member));
+                writer.write("""
+                    public Builder ${memberName:L}(${member:T} value) {
+                        checkForExistingValue();
+                        this.value = new ${memberName:U}Member(value);
+                        return this;
+                    }
+                    """);
+                writer.popState();
+            }
+
+            writer.pushState();
+            writer.putContext("serdeException", SdkSerdeException.class);
+            writer.write("""
+                private void checkForExistingValue() {
+                    if (this.value != null) {
+                        throw new ${serdeException:T}("Only one value may be set for unions");
+                    }
+                }
+                """);
+            // TODO: Add unknown setter
+            writer.popState();
+        }
+
+        @Override
+        protected void generateBuild(JavaWriter writer) {
+            writer.pushState();
+            writer.putContext("objects", Objects.class);
+            writer.write("""
+                @Override
+                public ${shape:T} build() {
+                    return ${objects:T}.requireNonNull(value, "no union value set");
+                }
+                """);
+            writer.popState();
         }
     }
 }

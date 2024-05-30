@@ -13,9 +13,6 @@ import software.amazon.smithy.codegen.core.SymbolWriter;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
-import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
-import software.amazon.smithy.model.shapes.Shape;
-import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 import software.amazon.smithy.utils.StringUtils;
 
@@ -73,27 +70,6 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         writeInlineWithNoFormatting(getNewline());
     }
 
-    /**
-     * Writes the ID string constant for a shape class.
-     *
-     * @param shape Shape to write ID for
-     */
-    public void writeIdString(Shape shape) {
-        write("public static final $1T ID = $1T.from($2S);", ShapeId.class, shape.getId());
-    }
-
-    /**
-     * Writes the toString method for a serializable Class.
-     */
-    public void writeToString() {
-        write("""
-            @Override
-            public $T toString() {
-                return $T.serialize(this);
-            }
-            """, String.class, ToStringSerializer.class);
-    }
-
     private void putNameContext() {
         for (final Set<Symbol> duplicates : symbolTable.values()) {
             // If the duplicates list has more than one entry
@@ -114,14 +90,6 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
             return dupe.getName();
         }
         return dupe.getFullName();
-    }
-
-    public void writeBuilderGetter() {
-        writeWithNoFormatting("""
-            public static Builder builder() {
-                return new Builder();
-            }
-            """);
     }
 
     /**

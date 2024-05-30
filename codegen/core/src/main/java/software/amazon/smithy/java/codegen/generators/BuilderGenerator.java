@@ -6,31 +6,50 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.codegen.core.SymbolProvider;
-import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
-import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.*;
 
 /**
  * Generates a static nested {@code Builder} class for a Java class.
  */
-record BuilderGenerator(
-    JavaWriter writer,
-    SymbolProvider symbolProvider,
-    Model model,
-    ServiceShape service,
-    Shape shape
-) implements Runnable {
+abstract class BuilderGenerator implements Runnable {
+    private final JavaWriter writer;
+    protected final Shape shape;
+    protected final SymbolProvider symbolProvider;
+    protected final Model model;
+    protected final ServiceShape service;
+
+    protected BuilderGenerator(
+        JavaWriter writer,
+        Shape shape,
+        SymbolProvider symbolProvider,
+        Model model,
+        ServiceShape service
+    ) {
+        this.writer = writer;
+        this.shape = shape;
+        this.symbolProvider = symbolProvider;
+        this.model = model;
+        this.service = service;
+    }
 
     @Override
     public void run() {
         writer.pushState();
         writer.putContext("sdkShapeBuilder", SdkShapeBuilder.class);
+        writer.putContext("builderProperties", writer.consumer(this::generateProperties));
+        writer.putContext("builderSetters", writer.consumer(this::generateSetters));
+        writer.putContext("buildMethod", writer.consumer(this::generateBuild));
+        writer.putContext("errorCorrection", writer.consumer(this::generateErrorCorrection));
+        writer.putContext("deserializer", writer.consumer(this::generateDeserialization));
         writer.write(
             """
+                public static Builder builder() {
+                    return new Builder();
+                }
+
                 /**
                  * Builder for {@link ${shape:T}}.
                  */
@@ -45,60 +64,28 @@ record BuilderGenerator(
 
                     ${errorCorrection:C|}
 
-                    ${C|}
-                }""",
-            (Runnable) this::generateDeser
+                    ${deserializer:C|}
+                }"""
         );
         writer.popState();
     }
 
-    private void generateDeser() {
-        writer.pushState();
-        writer.putContext("shapeDeserializer", ShapeDeserializer.class);
-        writer.putContext("sdkSchema", SdkSchema.class);
-        writer.putContext("hasMembers", !shape.members().isEmpty());
-        writer.write(
-            """
-                @Override
-                public Builder deserialize(${shapeDeserializer:T} decoder) {
-                    decoder.readStruct(SCHEMA, this, InnerDeserializer.INSTANCE);
-                    return this;
-                }
-
-                private static final class InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer<Builder> {
-                    private static final InnerDeserializer INSTANCE = new InnerDeserializer();
-
-                    @Override
-                    public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {
-                        ${?hasMembers}switch (member.memberIndex()) {
-                            ${C|}
-                        }${/hasMembers}
-                    }
-                }
-                """,
-            (Runnable) this::generateMemberSwitchCases
-        );
-        writer.popState();
+    /**
+     * Generates an error correction implementation for shapes with required, non-default members.
+     *
+     * @see <a href="https://smithy.io/2.0/spec/aggregate-types.html#client-error-correction">client error correction</a>
+     */
+    protected void generateErrorCorrection(JavaWriter writer) {
+        // Do not generate error correction by default
     }
 
-    private void generateMemberSwitchCases() {
-        int idx = 0;
-        for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {
-            var member = iter.next();
-            var target = model.expectShape(member.getTarget());
-            if (CodegenUtils.isStreamingBlob(target)) {
-                // Streaming blobs are not deserialized by the builder class.
-                continue;
-            }
-
-            writer.pushState();
-            writer.putContext("memberName", symbolProvider.toMemberName(member));
-            writer.write(
-                "case $L -> builder.${memberName:L}($C);",
-                idx,
-                new DeserializerGenerator(writer, member, symbolProvider, model, service, "de", "member")
-            );
-            writer.popState();
-        }
+    protected void generateDeserialization(JavaWriter writer) {
+        writer.write("${C|}", new StructureDeserializerGenerator(writer, shape, symbolProvider, model, service));
     }
+
+    protected abstract void generateProperties(JavaWriter writer);
+
+    protected abstract void generateSetters(JavaWriter writer);
+
+    protected abstract void generateBuild(JavaWriter writer);
 }

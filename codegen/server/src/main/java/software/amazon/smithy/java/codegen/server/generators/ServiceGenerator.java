@@ -13,6 +13,7 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.generators.IdStringGenerator;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -40,17 +41,26 @@ public class ServiceGenerator implements
             writer.putContext("operationHolder", Operation.class);
             writer.putContext("serviceType", Service.class);
             writer.putContext("service", directive.symbol());
+            writer.putContext("id", new IdStringGenerator(writer, shape));
+            writer.putContext(
+                "properties",
+                new PropertyGenerator(writer, shape, directive.symbolProvider(), operations, false)
+            );
+            writer.putContext(
+                "constructor",
+                new ConstructorGenerator(writer, shape, directive.symbolProvider(), operations)
+            );
+            writer.putContext("builder", new BuilderGenerator(writer, shape, directive.symbolProvider(), operations));
             writer.write(
                 """
                     public final class ${service:T} implements ${serviceType:T} {
+                        ${id:C|}
 
-                        ${C|}
+                        ${properties:C|}
 
-                        ${C|}
+                        ${constructor:C|}
 
-                        ${C|}
-
-                        ${C|}
+                        ${builder:C|}
 
                         @Override
                         public <I, O> ${operationHolder:T}<I, O> getOperation(String operationName) {
@@ -58,10 +68,6 @@ public class ServiceGenerator implements
                         }
                     }
                     """,
-                writer.consumer(w -> w.writeIdString(shape)),
-                new PropertyGenerator(writer, shape, directive.symbolProvider(), operations, false),
-                new ConstructorGenerator(writer, shape, directive.symbolProvider(), operations),
-                new BuilderGenerator(writer, shape, directive.symbolProvider(), operations),
                 new GetOperationGenerator(writer, shape, directive.symbolProvider(), operations)
             );
             writer.popState();
