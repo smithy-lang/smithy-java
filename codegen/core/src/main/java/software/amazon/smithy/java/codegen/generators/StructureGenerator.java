@@ -48,6 +48,7 @@ public final class StructureGenerator
             writer.putContext("equals", new EqualsGenerator(writer, directive.shape(), directive.symbolProvider()));
             writer.putContext("hashCode", new HashCodeGenerator(writer, directive.shape(), directive.symbolProvider()));
             writer.putContext("toString", writer.consumer(JavaWriter::writeToString));
+            writer.putContext("schemaGetter", writer.consumer(JavaWriter::writeSchemaGetter));
             writer.putContext(
                 "memberSerializer",
                 new StructureSerializerGenerator(
@@ -58,10 +59,25 @@ public final class StructureGenerator
                     directive.service()
                 )
             );
+            writer.putContext("builderGetter", writer.consumer(JavaWriter::writeBuilderGetter));
             writer.putContext(
                 "builder",
-                new BuilderGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.service())
+                new BuilderGenerator(writer, directive.symbolProvider(), directive.model(), directive.service(), shape)
             );
+            // Register inner templates for builder generator
+            writer.putContext(
+                "builderProperties",
+                new StructureBuilderPropertyGenerator(writer, directive.symbolProvider(), directive.model(), shape)
+            );
+            writer.putContext(
+                "builderSetters",
+                new StructureBuilderSetterGenerator(writer, directive.symbolProvider(), directive.model(), shape)
+            );
+            writer.putContext(
+                "errorCorrection",
+                new ErrorCorrectionGenerator(writer, directive.symbolProvider(), directive.model(), shape)
+            );
+            writer.putContext("buildMethod", new StructureBuilderBuildGenerator(writer, shape));
             writer.putContext(
                 "toBuilder",
                 new ToBuilderGenerator(writer, shape, directive.symbolProvider(), directive.model())
@@ -85,12 +101,11 @@ public final class StructureGenerator
 
                         ${hashCode:C|}
 
-                        @Override
-                        public SdkSchema schema() {
-                            return SCHEMA;
-                        }
+                        ${schemaGetter:C|}
 
                         ${memberSerializer:C|}
+
+                        ${builderGetter:C|}
 
                         ${builder:C|}
 

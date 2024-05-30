@@ -28,6 +28,7 @@ import software.amazon.smithy.java.codegen.generators.MapGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
+import software.amazon.smithy.java.codegen.generators.UnionGenerator;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -81,7 +82,7 @@ public class TestJavaCodegen implements
 
     @Override
     public void generateUnion(GenerateUnionDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        // TODO
+        new UnionGenerator().accept(directive);
     }
 
     @Override

@@ -18,6 +18,7 @@ import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.shapes.ShapeVisitor;
 import software.amazon.smithy.model.shapes.StructureShape;
+import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
@@ -110,6 +111,17 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
 
     @Override
     public Void structureShape(StructureShape shape) {
+        generateStructMemberSchemas(shape);
+        return null;
+    }
+
+    @Override
+    public Void unionShape(UnionShape shape) {
+        generateStructMemberSchemas(shape);
+        return null;
+    }
+
+    private void generateStructMemberSchemas(Shape shape) {
         for (var member : shape.members()) {
             writeNestedMemberSchema(member);
         }
@@ -134,8 +146,6 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
                     ${/memberSchemas}.build();
                 """
         );
-
-        return null;
     }
 
     @Override

@@ -175,7 +175,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void unionShape(UnionShape unionShape) {
-        writer.write("${memberName:L}.serialize(serializer)");
+        writer.write("serializer.writeStruct(${schema:L}, ${state:L})");
         return null;
     }
 

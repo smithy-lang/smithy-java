@@ -22,6 +22,7 @@ structures/string-members/strings.smithy
 structures/structure-members/structures.smithy
 structures/timestamp-members/timestamps.smithy
 structures/error-correction/error-correction.smithy
+structures/union-members/unions.smithy
 exceptions/exceptions.smithy
 exceptions/simple-exception.smithy
 exceptions/exception-with-string-field.smithy

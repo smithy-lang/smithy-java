@@ -9,9 +9,7 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.StructureShape;
-import software.amazon.smithy.utils.SmithyInternalApi;
 
-@SmithyInternalApi
 final class ToBuilderGenerator implements Runnable {
     private final JavaWriter writer;
     private final StructureShape shape;

@@ -37,6 +37,9 @@ sourceSets {
 }
 
 tasks {
+    test {
+        finalizedBy("integ")
+    }
     integ {
         dependsOn("generatePojos")
     }

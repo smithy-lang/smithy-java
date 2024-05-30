@@ -180,7 +180,7 @@ public final class CodegenUtils {
             return writer.format("$T.$L", PreludeSchemas.class, shape.getType().name());
         } else if (shape.isStructureShape() || shape.isUnionShape()) {
             // Shapes that generate a class have their schemas as static properties on that class
-            return writer.format("$T.$L", provider.toSymbol(shape), toSchemaName(shape));
+            return writer.format("$T.SCHEMA", provider.toSymbol(shape));
         }
         return writer.format("SharedSchemas.$L", toSchemaName(shape));
     }
@@ -273,5 +273,15 @@ public final class CodegenUtils {
      */
     public static String getModelNamespace(JavaCodegenSettings settings) {
         return settings.packageNamespace() + ".model";
+    }
+
+    /**
+     * Gets the uppers snake case name to use for an enum variant for a member shape.
+     *
+     * @param provider symbol provider
+     * @param memberShape member shape to get enum name for
+     */
+    public static String getEnumVariantName(SymbolProvider provider, MemberShape memberShape) {
+        return CaseUtils.toSnakeCase(provider.toMemberName(memberShape)).toUpperCase(Locale.ENGLISH);
     }
 }
