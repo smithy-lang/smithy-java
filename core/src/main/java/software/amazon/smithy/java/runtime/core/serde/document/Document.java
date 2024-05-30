@@ -94,7 +94,7 @@ public interface Document extends SerializableShape {
      */
     @Override
     default void serialize(ShapeSerializer serializer) {
-        serializer.writeDocument(this);
+        serializer.writeDocument(PreludeSchemas.DOCUMENT, this);
     }
 
     /**

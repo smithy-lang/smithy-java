@@ -12,19 +12,6 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
  * A structure or union shape.
  */
 public interface SerializableStruct extends SerializableShape {
-
-    @Override
-    default void serialize(ShapeSerializer encoder) {
-        encoder.writeStruct(schema(), this);
-    }
-
-    /**
-     * Get the schema of the shape.
-     *
-     * @return the schema.
-     */
-    SdkSchema schema();
-
     /**
      * Serializes the members of the structure or union.
      *
@@ -42,8 +29,8 @@ public interface SerializableStruct extends SerializableShape {
     static SerializableStruct create(SdkSchema schema, BiConsumer<SdkSchema, ShapeSerializer> memberWriter) {
         return new SerializableStruct() {
             @Override
-            public SdkSchema schema() {
-                return schema;
+            public void serialize(ShapeSerializer encoder) {
+                encoder.writeStruct(schema, this);
             }
 
             @Override

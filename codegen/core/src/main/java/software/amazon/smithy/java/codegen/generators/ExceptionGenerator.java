@@ -56,7 +56,6 @@ public final class ExceptionGenerator
                     directive.service()
                 )
             );
-            writer.putContext("schemaGetter", writer.consumer(JavaWriter::writeSchemaGetter));
             writer.putContext("builderGetter", writer.consumer(JavaWriter::writeBuilderGetter));
             writer.putContext(
                 "builder",
@@ -90,8 +89,6 @@ public final class ExceptionGenerator
                         ${getters:C|}
 
                         ${toString:C|}
-
-                        ${schemaGetter:C|}
 
                         ${memberSerializer:C|}
 

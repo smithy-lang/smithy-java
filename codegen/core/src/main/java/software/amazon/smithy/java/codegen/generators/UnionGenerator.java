@@ -52,7 +52,6 @@ public final class UnionGenerator
                 )
             );
             writer.putContext("memberEnum", new MemberEnumGenerator(writer, directive.symbolProvider(), shape));
-            writer.putContext("schemaGetter", writer.consumer(JavaWriter::writeSchemaGetter));
             writer.putContext("toString", writer.consumer(JavaWriter::writeToString));
             writer.putContext("valueCasters", new ValueCasterGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext(
@@ -93,8 +92,6 @@ public final class UnionGenerator
                     }
 
                     ${memberEnum:C|}
-
-                    ${schemaGetter:C|}
 
                     ${toString:C|}
 
@@ -185,6 +182,11 @@ public final class UnionGenerator
                             public ${memberName:U}Member(${member:T} value) {
                                 super(Member.${enumValue:L});
                                 this.value = ${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Union value cannot be null")${/primitive};
+                            }
+
+                            @Override
+                            public void serialize(${shapeSerializer:T} serializer) {
+                                serializer.writeStruct(SCHEMA, this);
                             }
 
                             @Override

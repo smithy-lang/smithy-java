@@ -31,30 +31,44 @@ record StructureSerializerGenerator(
     public void run() {
         writer.pushState();
         writer.putContext("shapeSerializer", ShapeSerializer.class);
-        boolean isError = shape.hasTrait(ErrorTrait.class);
-        writer.write("@Override");
-        writer.openBlock("public void serializeMembers(${shapeSerializer:T} serializer) {", "}", () -> {
-            for (var member : shape.members()) {
-                var target = model.expectShape(member.getTarget());
-                // Streaming blobs are not handled by deserialize method
-                if (CodegenUtils.isStreamingBlob(target)) {
-                    continue;
-                }
-                var memberName = symbolProvider.toMemberName(member);
-                // if the shape is an error we need to use the `getMessage()` method for message field.
-                var state = isError && memberName.equals("message") ? "getMessage()" : memberName;
+        writer.putContext("writeMemberSerialization", writer.consumer(this::writeMemberSerialization));
 
-                writer.pushState();
-                writer.putContext("nullable", CodegenUtils.isNullableMember(member));
-                writer.putContext("memberName", memberName);
-                writer.write("""
-                    ${?nullable}if (${memberName:L} != null) {
-                        ${/nullable}${C|};${?nullable}
-                    }${/nullable}
-                    """, new SerializerMemberGenerator(writer, symbolProvider, model, service, member, state));
-                writer.popState();
+        writer.write("""
+            @Override
+            public void serialize(${shapeSerializer:T} serializer) {
+                serializer.writeStruct(SCHEMA, this);
             }
-        });
+
+            @Override
+            public void serializeMembers(${shapeSerializer:T} serializer) {
+                ${writeMemberSerialization:C|}
+            }
+            """);
         writer.popState();
+    }
+
+    private void writeMemberSerialization(JavaWriter w) {
+        boolean isError = shape.hasTrait(ErrorTrait.class);
+
+        for (var member : shape.members()) {
+            var target = model.expectShape(member.getTarget());
+            // Streaming blobs are not handled by deserialize method
+            if (CodegenUtils.isStreamingBlob(target)) {
+                continue;
+            }
+            var memberName = symbolProvider.toMemberName(member);
+            // if the shape is an error we need to use the `getMessage()` method for message field.
+            var state = isError && memberName.equals("message") ? "getMessage()" : memberName;
+
+            w.pushState();
+            w.putContext("nullable", CodegenUtils.isNullableMember(member));
+            w.putContext("memberName", memberName);
+            w.write("""
+                ${?nullable}if (${memberName:L} != null) {
+                    ${/nullable}${C|};${?nullable}
+                }${/nullable}
+                """, new SerializerMemberGenerator(w, symbolProvider, model, service, member, state));
+            w.popState();
+        }
     }
 }

@@ -47,15 +47,6 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
     void writeStruct(SdkSchema schema, SerializableStruct struct);
 
     /**
-     * Writes a structure or union.
-     *
-     * @param struct Structure to serialize.
-     */
-    default void writeStruct(SerializableStruct struct) {
-        writeStruct(struct.schema(), struct);
-    }
-
-    /**
      * Begin a list and write zero or more values into it using the provided serializer.
      *
      * @param schema    List schema.
@@ -174,29 +165,11 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      *
      * <p>The underlying contents of the document can be serialized using {@link Document#serializeContents}.
      *
-     * @param schema Schema of the shape. Generally this is {@link PreludeSchemas#DOCUMENT} unless the document
-     *               wraps a modeled shape.
+     * @param schema Schema of the shape. Generally, this should be set to {@link PreludeSchemas#DOCUMENT} unless the
+     *               document wraps a modeled shape.
      * @param value  Value to serialize.
      */
     void writeDocument(SdkSchema schema, Document value);
-
-    /**
-     * Serialize a document shape using the schema {@link PreludeSchemas#DOCUMENT}.
-     *
-     * <p>This method is simply a shorter way to call:
-     *
-     * <pre>
-     * serializer.writeDocument(PreludeSchemas.DOCUMENT, value);
-     * </pre>
-     *
-     * <p>This method should not be used when writing structures because member names are used when writing
-     * structures, and the prelude schema for documents has no member name.
-     *
-     * @param value  Value to serialize.
-     */
-    default void writeDocument(Document value) {
-        writeDocument(PreludeSchemas.DOCUMENT, value);
-    }
 
     /**
      * Writes a null value.

@@ -116,10 +116,4 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
     public void writeNull(SdkSchema schema) {
         throw throwForInvalidState("Unexpected null value written for " + schema, schema);
     }
-
-    // Delegates to writing with a schema. Only override writing a document with a schema.
-    @Override
-    public final void writeDocument(Document value) {
-        ShapeSerializer.super.writeDocument(value);
-    }
 }
