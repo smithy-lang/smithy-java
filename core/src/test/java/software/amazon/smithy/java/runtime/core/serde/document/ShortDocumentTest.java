@@ -9,6 +9,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
@@ -63,5 +64,10 @@ public class ShortDocumentTest {
         assertThat(document.asLong(), equalTo(1L));
         assertThat(document.asFloat(), equalTo(1f));
         assertThat(document.asDouble(), equalTo(1.0));
+    }
+
+    @Test
+    public void detectsOverflow() {
+        Assertions.assertThrows(ArithmeticException.class, () -> Document.createShort(Short.MAX_VALUE).asByte());
     }
 }
