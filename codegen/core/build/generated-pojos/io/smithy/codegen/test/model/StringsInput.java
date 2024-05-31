@@ -100,8 +100,8 @@ public final class StringsInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -125,11 +125,10 @@ public final class StringsInput implements SerializableStruct {
      */
     public static final class Builder implements SdkShapeBuilder<StringsInput> {
         private static final String DEFAULT_STRING_DEFAULT = "default";
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private String requiredString;
         private String defaultString = DEFAULT_STRING_DEFAULT;
         private String optionalString;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -160,11 +159,9 @@ public final class StringsInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_REQUIRED_STRING)) {
                 requiredString("");
             }
-
             return this;
         }
 
@@ -186,6 +183,7 @@ public final class StringsInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

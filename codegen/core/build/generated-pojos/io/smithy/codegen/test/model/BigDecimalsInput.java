@@ -101,8 +101,8 @@ public final class BigDecimalsInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -126,11 +126,10 @@ public final class BigDecimalsInput implements SerializableStruct {
      */
     public static final class Builder implements SdkShapeBuilder<BigDecimalsInput> {
         private static final BigDecimal DEFAULT_BIG_DECIMAL_DEFAULT = BigDecimal.valueOf(1.0);
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private BigDecimal requiredBigDecimal;
         private BigDecimal optionalBigDecimal;
         private BigDecimal defaultBigDecimal = DEFAULT_BIG_DECIMAL_DEFAULT;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -161,11 +160,9 @@ public final class BigDecimalsInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_REQUIRED_BIG_DECIMAL)) {
                 requiredBigDecimal(BigDecimal.ZERO);
             }
-
             return this;
         }
 
@@ -187,6 +184,7 @@ public final class BigDecimalsInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

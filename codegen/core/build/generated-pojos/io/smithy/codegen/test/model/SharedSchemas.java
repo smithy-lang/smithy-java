@@ -12,10 +12,72 @@ import software.amazon.smithy.model.traits.UniqueItemsTrait;
  */
 final class SharedSchemas {
 
+    static final SdkSchema LIST_OF_STRING_LIST;
+    static final SdkSchema MAP_OF_MAP_LIST;
+    static final SdkSchema MAP_OF_STRING_MAP;
+    static final SdkSchema LIST_OF_MAPS;
+    static final SdkSchema CORRECTED_MAP = SdkSchema.builder()
+        .type(ShapeType.MAP)
+        .id("smithy.java.codegen.test.structures.members#CorrectedMap")
+        .members(
+                SdkSchema.memberBuilder("key", PreludeSchemas.STRING),
+                SdkSchema.memberBuilder("value", PreludeSchemas.STRING)
+        )
+        .build();
+
+    static final SdkSchema CORRECTED_LIST = SdkSchema.builder()
+        .type(ShapeType.LIST)
+        .id("smithy.java.codegen.test.structures.members#CorrectedList")
+        .members(SdkSchema.memberBuilder("member", PreludeSchemas.STRING))
+        .build();
+
     static final SdkSchema MAP_OF_STRING_LIST;
+    static final SdkSchema MAP_STRING_STRING = SdkSchema.builder()
+        .type(ShapeType.MAP)
+        .id("smithy.java.codegen.test.structures.members#MapStringString")
+        .members(
+                SdkSchema.memberBuilder("key", PreludeSchemas.STRING),
+                SdkSchema.memberBuilder("value", PreludeSchemas.STRING)
+        )
+        .build();
+
     static final SdkSchema LIST_OF_STRINGS = SdkSchema.builder()
         .type(ShapeType.LIST)
         .id("smithy.java.codegen.test.structures.members#ListOfStrings")
+        .members(SdkSchema.memberBuilder("member", PreludeSchemas.STRING))
+        .build();
+
+    static final SdkSchema NESTED_STREAMING_BLOB = SdkSchema.builder()
+        .type(ShapeType.BLOB)
+        .id("smithy.java.codegen.test.structures.members#NestedStreamingBlob")
+        .build();
+
+    static final SdkSchema LIST_OF_LIST_OF_STRING_LIST;
+    static final SdkSchema MAP_OF_MAP_OF_STRING_MAP;
+    static final SdkSchema LIST_OF_STRUCT = SdkSchema.builder()
+        .type(ShapeType.LIST)
+        .id("smithy.java.codegen.test.structures.members#ListOfStruct")
+        .members(SdkSchema.memberBuilder("member", Nested.SCHEMA))
+        .build();
+
+    static final SdkSchema STREAMING_BLOB = SdkSchema.builder()
+        .type(ShapeType.BLOB)
+        .id("smithy.java.codegen.test.structures.members#StreamingBlob")
+        .build();
+
+    static final SdkSchema STRING_MAP = SdkSchema.builder()
+        .type(ShapeType.MAP)
+        .id("smithy.java.codegen.test.structures.members#StringMap")
+        .members(
+                SdkSchema.memberBuilder("key", PreludeSchemas.STRING),
+                SdkSchema.memberBuilder("value", PreludeSchemas.STRING)
+        )
+        .build();
+
+    static final SdkSchema MAP_LIST;
+    static final SdkSchema LIST_OF_STRING = SdkSchema.builder()
+        .type(ShapeType.LIST)
+        .id("smithy.java.codegen.test.structures.members#ListOfString")
         .members(SdkSchema.memberBuilder("member", PreludeSchemas.STRING))
         .build();
 
@@ -29,22 +91,6 @@ final class SharedSchemas {
         .traits(
             new UniqueItemsTrait()
         ))
-        .build();
-
-    static final SdkSchema MAP_OF_MAP_OF_STRING_MAP;
-    static final SdkSchema LIST_OF_STRING = SdkSchema.builder()
-        .type(ShapeType.LIST)
-        .id("smithy.java.codegen.test.structures.members#ListOfString")
-        .members(SdkSchema.memberBuilder("member", PreludeSchemas.STRING))
-        .build();
-
-    static final SdkSchema CORRECTED_MAP = SdkSchema.builder()
-        .type(ShapeType.MAP)
-        .id("smithy.java.codegen.test.structures.members#CorrectedMap")
-        .members(
-                SdkSchema.memberBuilder("key", PreludeSchemas.STRING),
-                SdkSchema.memberBuilder("value", PreludeSchemas.STRING)
-        )
         .build();
 
     static final SdkSchema STRING_LIST = SdkSchema.builder()
@@ -62,72 +108,11 @@ final class SharedSchemas {
         )
         .build();
 
-    static final SdkSchema MAP_OF_STRING_MAP;
-    static final SdkSchema STRING_MAP = SdkSchema.builder()
-        .type(ShapeType.MAP)
-        .id("smithy.java.codegen.test.structures.members#StringMap")
-        .members(
-                SdkSchema.memberBuilder("key", PreludeSchemas.STRING),
-                SdkSchema.memberBuilder("value", PreludeSchemas.STRING)
-        )
-        .build();
-
-    static final SdkSchema LIST_OF_STRING_LIST;
-    static final SdkSchema MAP_OF_MAP_LIST;
-    static final SdkSchema NESTED_STREAMING_BLOB = SdkSchema.builder()
-        .type(ShapeType.BLOB)
-        .id("smithy.java.codegen.test.structures.members#NestedStreamingBlob")
-        .build();
-
-    static final SdkSchema LIST_OF_STRUCT = SdkSchema.builder()
-        .type(ShapeType.LIST)
-        .id("smithy.java.codegen.test.structures.members#ListOfStruct")
-        .members(SdkSchema.memberBuilder("member", Nested.SCHEMA))
-        .build();
-
-    static final SdkSchema LIST_OF_LIST_OF_STRING_LIST;
-    static final SdkSchema MAP_STRING_STRING = SdkSchema.builder()
-        .type(ShapeType.MAP)
-        .id("smithy.java.codegen.test.structures.members#MapStringString")
-        .members(
-                SdkSchema.memberBuilder("key", PreludeSchemas.STRING),
-                SdkSchema.memberBuilder("value", PreludeSchemas.STRING)
-        )
-        .build();
-
-    static final SdkSchema STREAMING_BLOB = SdkSchema.builder()
-        .type(ShapeType.BLOB)
-        .id("smithy.java.codegen.test.structures.members#StreamingBlob")
-        .build();
-
-    static final SdkSchema LIST_OF_MAPS;
-    static final SdkSchema MAP_LIST;
-    static final SdkSchema CORRECTED_LIST = SdkSchema.builder()
-        .type(ShapeType.LIST)
-        .id("smithy.java.codegen.test.structures.members#CorrectedList")
-        .members(SdkSchema.memberBuilder("member", PreludeSchemas.STRING))
-        .build();
-
     static {
-        MAP_OF_STRING_LIST = SdkSchema.builder()
-            .type(ShapeType.MAP)
-            .id("smithy.java.codegen.test.structures.members#MapOfStringList")
-            .members(
-                    SdkSchema.memberBuilder("key", PreludeSchemas.STRING),
-                    SdkSchema.memberBuilder("value", SharedSchemas.STRING_LIST)
-            )
-            .build();
-
-        LIST_OF_MAPS = SdkSchema.builder()
+        LIST_OF_STRING_LIST = SdkSchema.builder()
             .type(ShapeType.LIST)
-            .id("smithy.java.codegen.test.structures.members#ListOfMaps")
-            .members(SdkSchema.memberBuilder("member", SharedSchemas.STRING_STRING_MAP))
-            .build();
-
-        MAP_LIST = SdkSchema.builder()
-            .type(ShapeType.LIST)
-            .id("smithy.java.codegen.test.structures.members#MapList")
-            .members(SdkSchema.memberBuilder("member", SharedSchemas.STRING_MAP))
+            .id("smithy.java.codegen.test.structures.members#ListOfStringList")
+            .members(SdkSchema.memberBuilder("member", SharedSchemas.LIST_OF_STRING))
             .build();
 
         MAP_OF_STRING_MAP = SdkSchema.builder()
@@ -139,19 +124,25 @@ final class SharedSchemas {
             )
             .build();
 
-        LIST_OF_STRING_LIST = SdkSchema.builder()
+        LIST_OF_MAPS = SdkSchema.builder()
             .type(ShapeType.LIST)
-            .id("smithy.java.codegen.test.structures.members#ListOfStringList")
-            .members(SdkSchema.memberBuilder("member", SharedSchemas.LIST_OF_STRING))
+            .id("smithy.java.codegen.test.structures.members#ListOfMaps")
+            .members(SdkSchema.memberBuilder("member", SharedSchemas.STRING_STRING_MAP))
             .build();
 
-        MAP_OF_MAP_OF_STRING_MAP = SdkSchema.builder()
+        MAP_OF_STRING_LIST = SdkSchema.builder()
             .type(ShapeType.MAP)
-            .id("smithy.java.codegen.test.structures.members#MapOfMapOfStringMap")
+            .id("smithy.java.codegen.test.structures.members#MapOfStringList")
             .members(
                     SdkSchema.memberBuilder("key", PreludeSchemas.STRING),
-                    SdkSchema.memberBuilder("value", SharedSchemas.MAP_OF_STRING_MAP)
+                    SdkSchema.memberBuilder("value", SharedSchemas.STRING_LIST)
             )
+            .build();
+
+        MAP_LIST = SdkSchema.builder()
+            .type(ShapeType.LIST)
+            .id("smithy.java.codegen.test.structures.members#MapList")
+            .members(SdkSchema.memberBuilder("member", SharedSchemas.STRING_MAP))
             .build();
 
         MAP_OF_MAP_LIST = SdkSchema.builder()
@@ -167,6 +158,15 @@ final class SharedSchemas {
             .type(ShapeType.LIST)
             .id("smithy.java.codegen.test.structures.members#ListOfListOfStringList")
             .members(SdkSchema.memberBuilder("member", SharedSchemas.LIST_OF_STRING_LIST))
+            .build();
+
+        MAP_OF_MAP_OF_STRING_MAP = SdkSchema.builder()
+            .type(ShapeType.MAP)
+            .id("smithy.java.codegen.test.structures.members#MapOfMapOfStringMap")
+            .members(
+                    SdkSchema.memberBuilder("key", PreludeSchemas.STRING),
+                    SdkSchema.memberBuilder("value", SharedSchemas.MAP_OF_STRING_MAP)
+            )
             .build();
 
     }

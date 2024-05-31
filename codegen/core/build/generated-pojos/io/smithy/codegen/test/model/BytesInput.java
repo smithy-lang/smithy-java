@@ -100,8 +100,8 @@ public final class BytesInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -124,11 +124,10 @@ public final class BytesInput implements SerializableStruct {
      * Builder for {@link BytesInput}.
      */
     public static final class Builder implements SdkShapeBuilder<BytesInput> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private byte requiredByte;
         private Byte optionalByte;
         private byte defaultByte = 1;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -159,11 +158,9 @@ public final class BytesInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_REQUIRED_BYTE)) {
                 tracker.setMember(SCHEMA_REQUIRED_BYTE);
             }
-
             return this;
         }
 
@@ -185,6 +182,7 @@ public final class BytesInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

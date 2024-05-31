@@ -16,17 +16,17 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.utils.SmithyGenerated;
 
 @SmithyGenerated
-public final class StructuresInput implements SerializableStruct {
-    public static final ShapeId ID = ShapeId.from("smithy.java.codegen.test.structures.members#StructuresInput");
+public final class UnionsInput implements SerializableStruct {
+    public static final ShapeId ID = ShapeId.from("smithy.java.codegen.test.structures.members#UnionsInput");
 
-    private static final SdkSchema SCHEMA_REQUIRED_STRUCT = SdkSchema.memberBuilder("requiredStruct", Nested.SCHEMA)
+    private static final SdkSchema SCHEMA_REQUIRED_UNION = SdkSchema.memberBuilder("requiredUnion", UnionType.SCHEMA)
         .id(ID)
         .traits(
             new RequiredTrait()
         )
         .build();
 
-    private static final SdkSchema SCHEMA_OPTIONAL_STRUCT = SdkSchema.memberBuilder("optionalStruct", Nested.SCHEMA)
+    private static final SdkSchema SCHEMA_OPTIONAL_UNION = SdkSchema.memberBuilder("optionalUnion", UnionType.SCHEMA)
         .id(ID)
         .build();
 
@@ -34,25 +34,25 @@ public final class StructuresInput implements SerializableStruct {
         .id(ID)
         .type(ShapeType.STRUCTURE)
         .members(
-            SCHEMA_REQUIRED_STRUCT,
-            SCHEMA_OPTIONAL_STRUCT
+            SCHEMA_REQUIRED_UNION,
+            SCHEMA_OPTIONAL_UNION
         )
         .build();
 
-    private transient final Nested requiredStruct;
-    private transient final Nested optionalStruct;
+    private transient final UnionType requiredUnion;
+    private transient final UnionType optionalUnion;
 
-    private StructuresInput(Builder builder) {
-        this.requiredStruct = builder.requiredStruct;
-        this.optionalStruct = builder.optionalStruct;
+    private UnionsInput(Builder builder) {
+        this.requiredUnion = builder.requiredUnion;
+        this.optionalUnion = builder.optionalUnion;
     }
 
-    public Nested requiredStruct() {
-        return requiredStruct;
+    public UnionType requiredUnion() {
+        return requiredUnion;
     }
 
-    public Nested optionalStruct() {
-        return optionalStruct;
+    public UnionType optionalUnion() {
+        return optionalUnion;
     }
 
     @Override
@@ -68,14 +68,14 @@ public final class StructuresInput implements SerializableStruct {
         if (other == null || getClass() != other.getClass()) {
             return false;
         }
-        StructuresInput that = (StructuresInput) other;
-        return Objects.equals(requiredStruct, that.requiredStruct)
-               && Objects.equals(optionalStruct, that.optionalStruct);
+        UnionsInput that = (UnionsInput) other;
+        return Objects.equals(requiredUnion, that.requiredUnion)
+               && Objects.equals(optionalUnion, that.optionalUnion);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(requiredStruct, optionalStruct);
+        return Objects.hash(requiredUnion, optionalUnion);
     }
 
     @Override
@@ -85,10 +85,10 @@ public final class StructuresInput implements SerializableStruct {
 
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
-        serializer.writeStruct(SCHEMA_REQUIRED_STRUCT, requiredStruct);
+        serializer.writeStruct(SCHEMA_REQUIRED_UNION, requiredUnion);
 
-        if (optionalStruct != null) {
-            serializer.writeStruct(SCHEMA_OPTIONAL_STRUCT, optionalStruct);
+        if (optionalUnion != null) {
+            serializer.writeStruct(SCHEMA_OPTIONAL_UNION, optionalUnion);
         }
 
     }
@@ -98,39 +98,39 @@ public final class StructuresInput implements SerializableStruct {
     }
 
     /**
-     * Builder for {@link StructuresInput}.
+     * Builder for {@link UnionsInput}.
      */
-    public static final class Builder implements SdkShapeBuilder<StructuresInput> {
+    public static final class Builder implements SdkShapeBuilder<UnionsInput> {
         private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
-        private Nested requiredStruct;
-        private Nested optionalStruct;
+        private UnionType requiredUnion;
+        private UnionType optionalUnion;
 
         private Builder() {}
 
-        public Builder requiredStruct(Nested requiredStruct) {
-            this.requiredStruct = Objects.requireNonNull(requiredStruct, "requiredStruct cannot be null");
-            tracker.setMember(SCHEMA_REQUIRED_STRUCT);
+        public Builder requiredUnion(UnionType requiredUnion) {
+            this.requiredUnion = Objects.requireNonNull(requiredUnion, "requiredUnion cannot be null");
+            tracker.setMember(SCHEMA_REQUIRED_UNION);
             return this;
         }
 
-        public Builder optionalStruct(Nested optionalStruct) {
-            this.optionalStruct = optionalStruct;
+        public Builder optionalUnion(UnionType optionalUnion) {
+            this.optionalUnion = optionalUnion;
             return this;
         }
 
         @Override
-        public StructuresInput build() {
+        public UnionsInput build() {
             tracker.validate();
-            return new StructuresInput(this);
+            return new UnionsInput(this);
         }
 
         @Override
-        public SdkShapeBuilder<StructuresInput> errorCorrection() {
+        public SdkShapeBuilder<UnionsInput> errorCorrection() {
             if (tracker.allSet()) {
                 return this;
             }
-            if (!tracker.checkMember(SCHEMA_REQUIRED_STRUCT)) {
-                requiredStruct(Nested.builder().build());
+            if (!tracker.checkMember(SCHEMA_REQUIRED_UNION)) {
+                requiredUnion(null);
             }
             return this;
         }
@@ -147,8 +147,8 @@ public final class StructuresInput implements SerializableStruct {
             @Override
             public void accept(Builder builder, SdkSchema member, ShapeDeserializer de) {
                 switch (member.memberIndex()) {
-                    case 0 -> builder.requiredStruct(Nested.builder().deserialize(de).build());
-                    case 1 -> builder.optionalStruct(Nested.builder().deserialize(de).build());
+                    case 0 -> builder.requiredUnion(UnionType.builder().deserialize(de).build());
+                    case 1 -> builder.optionalUnion(UnionType.builder().deserialize(de).build());
                 }
             }
         }
@@ -157,8 +157,8 @@ public final class StructuresInput implements SerializableStruct {
 
     public Builder toBuilder() {
         var builder =  new Builder();
-        builder.requiredStruct(this.requiredStruct);
-        builder.optionalStruct(this.optionalStruct);
+        builder.requiredUnion(this.requiredUnion);
+        builder.optionalUnion(this.optionalUnion);
         return builder;
     }
 

@@ -72,8 +72,8 @@ public final class ListWithStructsInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -92,9 +92,8 @@ public final class ListWithStructsInput implements SerializableStruct {
      * Builder for {@link ListWithStructsInput}.
      */
     public static final class Builder implements SdkShapeBuilder<ListWithStructsInput> {
-        private List<Nested> listOfStructs;
-
         private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
+        private List<Nested> listOfStructs;
 
         private Builder() {}
 
@@ -105,7 +104,6 @@ public final class ListWithStructsInput implements SerializableStruct {
 
         @Override
         public ListWithStructsInput build() {
-            tracker.validate();
             return new ListWithStructsInput(this);
         }
 
@@ -125,6 +123,7 @@ public final class ListWithStructsInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

@@ -101,8 +101,8 @@ public final class BigIntegersInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -126,11 +126,10 @@ public final class BigIntegersInput implements SerializableStruct {
      */
     public static final class Builder implements SdkShapeBuilder<BigIntegersInput> {
         private static final BigInteger DEFAULT_BIG_INTEGER_DEFAULT = BigInteger.valueOf(1);
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private BigInteger requiredBigInteger;
         private BigInteger optionalBigInteger;
         private BigInteger defaultBigInteger = DEFAULT_BIG_INTEGER_DEFAULT;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -161,11 +160,9 @@ public final class BigIntegersInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_REQUIRED_BIG_INTEGER)) {
                 requiredBigInteger(BigInteger.ZERO);
             }
-
             return this;
         }
 
@@ -187,6 +184,7 @@ public final class BigIntegersInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

@@ -100,8 +100,8 @@ public final class IntegersInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -124,11 +124,10 @@ public final class IntegersInput implements SerializableStruct {
      * Builder for {@link IntegersInput}.
      */
     public static final class Builder implements SdkShapeBuilder<IntegersInput> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private int requiredInt;
         private Integer optionalInt;
         private int defaultInt = 1;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -159,11 +158,9 @@ public final class IntegersInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_REQUIRED_INT)) {
                 tracker.setMember(SCHEMA_REQUIRED_INT);
             }
-
             return this;
         }
 
@@ -185,6 +182,7 @@ public final class IntegersInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

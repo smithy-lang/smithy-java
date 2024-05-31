@@ -61,8 +61,8 @@ public final class ExceptionWithExtraStringException extends ModeledSdkException
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -83,10 +83,9 @@ public final class ExceptionWithExtraStringException extends ModeledSdkException
      * Builder for {@link ExceptionWithExtraStringException}.
      */
     public static final class Builder implements SdkShapeBuilder<ExceptionWithExtraStringException> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private String message;
         private String extra;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -112,11 +111,9 @@ public final class ExceptionWithExtraStringException extends ModeledSdkException
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_MESSAGE)) {
                 message("");
             }
-
             return this;
         }
 
@@ -137,6 +134,8 @@ public final class ExceptionWithExtraStringException extends ModeledSdkException
                 }
             }
         }
+
     }
+
 }
 

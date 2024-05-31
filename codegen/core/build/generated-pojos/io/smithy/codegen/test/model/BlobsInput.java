@@ -100,8 +100,8 @@ public final class BlobsInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -122,11 +122,10 @@ public final class BlobsInput implements SerializableStruct {
      * Builder for {@link BlobsInput}.
      */
     public static final class Builder implements SdkShapeBuilder<BlobsInput> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private byte[] requiredBlob;
         private byte[] optionalBlob;
         private DataStream streamingBlob = DataStream.ofEmpty();
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -163,14 +162,12 @@ public final class BlobsInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_REQUIRED_BLOB)) {
                 requiredBlob(new byte[0]);
             }
             if (!tracker.checkMember(SCHEMA_STREAMING_BLOB)) {
                 streamingBlob(DataStream.ofEmpty());
             }
-
             return this;
         }
 
@@ -191,6 +188,7 @@ public final class BlobsInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

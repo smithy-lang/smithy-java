@@ -64,8 +64,8 @@ public final class CouldBeEmptyStruct implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -84,9 +84,8 @@ public final class CouldBeEmptyStruct implements SerializableStruct {
      * Builder for {@link CouldBeEmptyStruct}.
      */
     public static final class Builder implements SdkShapeBuilder<CouldBeEmptyStruct> {
-        private String fieldA;
-
         private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
+        private String fieldA;
 
         private Builder() {}
 
@@ -97,7 +96,6 @@ public final class CouldBeEmptyStruct implements SerializableStruct {
 
         @Override
         public CouldBeEmptyStruct build() {
-            tracker.validate();
             return new CouldBeEmptyStruct(this);
         }
 
@@ -117,6 +115,7 @@ public final class CouldBeEmptyStruct implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {
