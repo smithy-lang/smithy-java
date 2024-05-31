@@ -5,9 +5,14 @@
 
 package software.amazon.smithy.java.runtime.core.serde.streaming;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
@@ -182,5 +187,32 @@ public interface StreamPublisher extends Flow.Publisher<ByteBuffer> {
      */
     static StreamPublisher ofBytes(byte[] bytes, String contentType) {
         return ofHttpRequestPublisher(HttpRequest.BodyPublishers.ofByteArray(bytes), contentType);
+    }
+
+    static StreamPublisher ofInputStream(InputStream inputStream) {
+        return ofInputStream(inputStream, null);
+    }
+
+    // TODO: This looks like it is always contentLength = -1. If the length of the InputStream is known, can it be used?
+    static StreamPublisher ofInputStream(InputStream inputStream, String contentType) {
+        return ofHttpRequestPublisher(HttpRequest.BodyPublishers.ofInputStream(() -> inputStream), contentType);
+    }
+
+    static StreamPublisher ofFile(Path file) {
+        String contentType;
+        try {
+            contentType = Files.probeContentType(file);
+        } catch (IOException e) {
+            contentType = null;
+        }
+        return ofFile(file, contentType);
+    }
+
+    static StreamPublisher ofFile(Path file, String contentType) {
+        try {
+            return ofHttpRequestPublisher(HttpRequest.BodyPublishers.ofFile(file), contentType);
+        } catch (FileNotFoundException e) {
+            throw new UncheckedIOException("File not found: " + file, e);
+        }
     }
 }

@@ -56,7 +56,11 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
     }
 
     private HttpRequest createJavaRequest(Context context, SmithyHttpRequest request) {
-        var bodyPublisher = HttpRequest.BodyPublishers.ofInputStream(request.body()::inputStream);
+        // TODO: Is there a need for knowing the contentLength and explicitly using noBody()?
+//        var bodyPublisher = request.body().contentLength() == 0
+//                ? HttpRequest.BodyPublishers.noBody()
+//                : HttpRequest.BodyPublishers.fromPublisher(request.body());
+        var bodyPublisher = HttpRequest.BodyPublishers.fromPublisher(request.body().publisher());
 
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder()
             .version(smithyToHttpVersion(request.httpVersion()))
@@ -79,6 +83,7 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
     }
 
     private CompletableFuture<SmithyHttpResponse> sendRequest(HttpRequest request) {
+        // TODO: change to HttpResponse.BodyHandlers.ofPublisher()
         return client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
             .thenApply(this::createSmithyResponse);
     }

@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.runtime.http.api;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.HttpHeaders;
 
@@ -47,11 +45,12 @@ public interface SmithyHttpRequest extends SmithyHttpMessage, AutoCloseable {
      */
     @Override
     default void close() {
-        try {
-            body().inputStream().close();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        // TODO: should SmithyHttpMessage be AutoCloseable anymore?
+//        try {
+//            body().publisher().close();
+//        } catch (IOException e) {
+//            throw new UncheckedIOException(e);
+//        }
     }
 
     @Override

@@ -5,7 +5,8 @@
 
 package software.amazon.smithy.java.runtime.http.api;
 
-import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.util.concurrent.Flow;
 
 /**
  * A rewindable stream of data for HTTP requests.
@@ -16,8 +17,9 @@ public interface ContentStream {
      */
     ContentStream EMPTY = new ContentStream() {
         @Override
-        public InputStream inputStream() {
-            return InputStream.nullInputStream();
+        public Flow.Publisher<ByteBuffer> publisher() {
+            // TODO: Is this a valid "empty" publisher?
+            return subscriber -> {};
         }
 
         @Override
@@ -26,13 +28,15 @@ public interface ContentStream {
         }
     };
 
+    // TODO: change to publisher
     /**
-     * Get the InputStream.
+     * Get the Flow.Publisher of ByteBuffer.
      *
-     * @return the underlying InputStream.
+     * @return the underlying Publisher.
      */
-    InputStream inputStream();
+    Flow.Publisher<ByteBuffer> publisher();
 
+    // TODO: Not sure if this needs to be rewindable with Flow?
     /**
      * Attempt to rewind the input stream to the beginning of the stream.
      *

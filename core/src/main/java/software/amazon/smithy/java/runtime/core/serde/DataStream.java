@@ -5,14 +5,16 @@
 
 package software.amazon.smithy.java.runtime.core.serde;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.concurrent.Flow;
+import software.amazon.smithy.java.runtime.core.serde.streaming.StreamPublisher;
 
 /**
  * Abstraction for reading streams of data.
@@ -44,12 +46,24 @@ public interface DataStream extends AutoCloseable {
     Optional<String> contentType();
 
     /**
+     * Get the Flow.Publisher of ByteBuffer.
+     *
+     * @return the underlying Publisher.
+     */
+     Flow.Publisher<ByteBuffer> publisher();
+
+    // TODO: Does inputStream make sense?
+    /**
      * Get the InputStream.
      *
      * @return the underlying InputStream.
      */
-    InputStream inputStream();
+//    InputStream inputStream();
+    default InputStream inputStream() {
+        return null;
+    }
 
+    // TODO: Does rewind make sense?
     /**
      * Attempt to rewind the input stream to the beginning of the stream.
      *
@@ -57,6 +71,7 @@ public interface DataStream extends AutoCloseable {
      */
     boolean rewind();
 
+    // TODO: Does close make sense?
     /**
      * Close underlying resources, if necessary.
      *
@@ -77,6 +92,7 @@ public interface DataStream extends AutoCloseable {
      * @param maxLength Maximum number of bytes to read.
      * @return Returns the in-memory byte array.
      */
+    // TODO: seems blocking. do we need to remove?
     default byte[] readToBytes(int maxLength) {
         try (InputStream stream = inputStream()) {
             return stream.readNBytes(maxLength);
@@ -91,6 +107,7 @@ public interface DataStream extends AutoCloseable {
      * @param maxLength Maximum number of bytes to read.
      * @return Returns the in-memory string.
      */
+    // TODO: seems blocking. do we need to remove?
     default String readToString(int maxLength) {
         return new String(readToBytes(maxLength), StandardCharsets.UTF_8);
     }
@@ -101,27 +118,7 @@ public interface DataStream extends AutoCloseable {
      * @return the empty data stream.
      */
     static DataStream ofEmpty() {
-        return new DataStream() {
-            @Override
-            public long contentLength() {
-                return 0;
-            }
-
-            @Override
-            public Optional<String> contentType() {
-                return Optional.empty();
-            }
-
-            @Override
-            public InputStream inputStream() {
-                return InputStream.nullInputStream();
-            }
-
-            @Override
-            public boolean rewind() {
-                return true;
-            }
-        };
+        return ofPublisher(StreamPublisher.ofEmpty());
     }
 
     /**
@@ -154,27 +151,8 @@ public interface DataStream extends AutoCloseable {
      * @return the non-rewindable data stream.
      */
     static DataStream ofInputStream(InputStream inputStream, String contentType, long contentLength) {
-        return new DataStream() {
-            @Override
-            public long contentLength() {
-                return contentLength;
-            }
-
-            @Override
-            public Optional<String> contentType() {
-                return Optional.ofNullable(contentType);
-            }
-
-            @Override
-            public InputStream inputStream() {
-                return inputStream;
-            }
-
-            @Override
-            public boolean rewind() {
-                return false;
-            }
-        };
+        // TODO: contentLength is ignored right now, but maybe StreamPublisher.ofInputStream should take it in
+        return ofPublisher(StreamPublisher.ofInputStream(inputStream, contentType));
     }
 
     /**
@@ -216,32 +194,7 @@ public interface DataStream extends AutoCloseable {
      * @return the rewindable data stream.
      */
     static DataStream ofBytes(byte[] bytes, String contentType) {
-        var result = new DataStream() {
-            private InputStream inputStream;
-
-            @Override
-            public long contentLength() {
-                return bytes.length;
-            }
-
-            @Override
-            public Optional<String> contentType() {
-                return Optional.ofNullable(contentType);
-            }
-
-            @Override
-            public InputStream inputStream() {
-                return inputStream;
-            }
-
-            @Override
-            public boolean rewind() {
-                inputStream = new ByteArrayInputStream(bytes);
-                return true;
-            }
-        };
-        result.rewind();
-        return result;
+        return ofPublisher(StreamPublisher.ofBytes(bytes));
     }
 
     /**
@@ -255,11 +208,13 @@ public interface DataStream extends AutoCloseable {
      * @return the rewindable data stream.
      */
     static DataStream ofFile(Path file) {
+        String contentType;
         try {
-            return ofFile(file, Files.probeContentType(file));
+            contentType = Files.probeContentType(file);
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            contentType = null;
         }
+        return ofFile(file, contentType);
     }
 
     /**
@@ -270,46 +225,30 @@ public interface DataStream extends AutoCloseable {
      * @return the rewindable data stream.
      */
     static DataStream ofFile(Path file, String contentType) {
-        try {
-            long initialLength = Files.size(file);
-            InputStream initialStream = Files.newInputStream(file);
-            return new DataStream() {
-                private static final System.Logger LOGGER = System.getLogger(DataStream.class.getName());
-                private long length = initialLength;
-                private InputStream inputStream = initialStream;
+        return ofPublisher(StreamPublisher.ofFile(file, contentType));
+    }
 
-                @Override
-                public long contentLength() {
-                    return length;
-                }
+    static DataStream ofPublisher(StreamPublisher publisher) {
+        return new DataStream() {
+            @Override
+            public long contentLength() {
+                return publisher.contentLength();
+            }
 
-                @Override
-                public Optional<String> contentType() {
-                    return Optional.ofNullable(contentType);
-                }
+            @Override
+            public Optional<String> contentType() {
+                return publisher.contentType();
+            }
 
-                @Override
-                public InputStream inputStream() {
-                    return inputStream;
-                }
+            @Override
+            public Flow.Publisher<ByteBuffer> publisher() {
+                return publisher;
+            }
 
-                @Override
-                public boolean rewind() {
-                    try {
-                        inputStream = Files.newInputStream(file);
-                        length = Files.size(file);
-                        return true;
-                    } catch (IOException e) {
-                        LOGGER.log(
-                            System.Logger.Level.WARNING,
-                            () -> "Unable to rewind file data stream for " + file + ": " + e.getMessage()
-                        );
-                        return false;
-                    }
-                }
-            };
-        } catch (IOException e) {
-            throw new UncheckedIOException("Unable to open file for data stream " + file + ": " + e.getMessage(), e);
-        }
+            @Override
+            public boolean rewind() {
+                return false;
+            }
+        };
     }
 }
