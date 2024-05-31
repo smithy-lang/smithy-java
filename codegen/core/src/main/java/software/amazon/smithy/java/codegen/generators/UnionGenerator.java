@@ -299,7 +299,7 @@ public final class UnionGenerator
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
                 writer.putContext("member", symbolProvider.toSymbol(member));
                 writer.write("""
-                    public Builder ${memberName:L}(${member:T} value) {
+                    public BuildStage ${memberName:L}(${member:T} value) {
                         checkForExistingValue();
                         this.value = new ${memberName:U}Member(value);
                         return this;
@@ -319,6 +319,20 @@ public final class UnionGenerator
                 """);
             // TODO: Add unknown setter
             writer.popState();
+        }
+
+        @Override
+        protected List<String> stageInterfaces() {
+            return List.of("BuildStage");
+        }
+
+        @Override
+        protected void generateStages(JavaWriter writer) {
+            writer.write("""
+                public static interface BuildStage {
+                    ${shape:T} build();
+                }
+                """);
         }
 
         @Override

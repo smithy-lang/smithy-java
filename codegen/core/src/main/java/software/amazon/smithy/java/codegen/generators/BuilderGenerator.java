@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.List;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
@@ -44,8 +45,18 @@ abstract class BuilderGenerator implements Runnable {
         writer.putContext("buildMethod", writer.consumer(this::generateBuild));
         writer.putContext("errorCorrection", writer.consumer(this::generateErrorCorrection));
         writer.putContext("deserializer", writer.consumer(this::generateDeserialization));
+        boolean isStaged = !this.stageInterfaces().isEmpty();
+        writer.putContext("isStaged", isStaged);
+        if (isStaged) {
+            writer.putContext("stages", this.stageInterfaces());
+            writer.putContext("stageGen", writer.consumer(this::generateStages));
+        }
         writer.write(
             """
+                ${?isStaged}
+                ${stageGen:C|}
+
+                ${/isStaged}
                 public static Builder builder() {
                     return new Builder();
                 }
@@ -53,7 +64,7 @@ abstract class BuilderGenerator implements Runnable {
                 /**
                  * Builder for {@link ${shape:T}}.
                  */
-                public static final class Builder implements ${sdkShapeBuilder:T}<${shape:T}> {
+                public static final class Builder implements ${sdkShapeBuilder:T}<${shape:T}>${?isStaged}, ${#stages}${value:L}${^key.last}, ${/key.last}${/stages}${/isStaged} {
                     ${builderProperties:C|}
 
                     private Builder() {}
@@ -88,4 +99,12 @@ abstract class BuilderGenerator implements Runnable {
     protected abstract void generateSetters(JavaWriter writer);
 
     protected abstract void generateBuild(JavaWriter writer);
+
+    protected void generateStages(JavaWriter writer) {
+        // Do not generate stages by default
+    }
+
+    protected List<String> stageInterfaces() {
+        return List.of();
+    }
 }
