@@ -211,7 +211,7 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeDocument(SdkSchema schema, Document value) {
         // Document values in JSON are serialized inline by receiving the data model contents of the document.
-        value.serializeContents(this);
+        value.serializeContents(new TypedDocumentSerializer(this));
     }
 
     @Override
