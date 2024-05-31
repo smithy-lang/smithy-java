@@ -20,7 +20,9 @@ import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JsonSerializer implements ShapeSerializer {
 
@@ -169,7 +171,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeStruct(SdkSchema schema, SerializableStruct struct) {
         try {
             stream.writeObjectStart();
-            struct.serializeMembers(new JsonStructSerializer(this));
+            struct.serializeMembers(new JsonStructSerializer(this, true));
             stream.writeObjectEnd();
         } catch (JsonException | IOException e) {
             throw new SdkSerdeException(e);
@@ -211,7 +213,24 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeDocument(SdkSchema schema, Document value) {
         // Document values in JSON are serialized inline by receiving the data model contents of the document.
-        value.serializeContents(this);
+        if (value.type() != ShapeType.STRUCTURE) {
+            value.serializeContents(this);
+        } else {
+            value.serializeContents(new SpecificShapeSerializer() {
+                @Override
+                public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+                    try {
+                        stream.writeObjectStart();
+                        stream.writeObjectField("__type");
+                        stream.writeVal(schema.id().toString());
+                        struct.serializeMembers(new JsonStructSerializer(JsonSerializer.this, false));
+                        stream.writeObjectEnd();
+                    } catch (IOException | JsonException e) {
+                        throw new SdkSerdeException(e);
+                    }
+                }
+            });
+        }
     }
 
     @Override

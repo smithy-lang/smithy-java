@@ -21,10 +21,11 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 class JsonStructSerializer implements ShapeSerializer {
 
     private final JsonSerializer parent;
-    private boolean firstValue = true;
+    private boolean firstValue;
 
-    JsonStructSerializer(JsonSerializer parent) {
+    JsonStructSerializer(JsonSerializer parent, boolean isFirstValue) {
         this.parent = parent;
+        this.firstValue = isFirstValue;
     }
 
     void startMember(SdkSchema member) {

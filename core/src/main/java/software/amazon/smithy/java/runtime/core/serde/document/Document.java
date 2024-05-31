@@ -538,7 +538,9 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document createTyped(SerializableShape shape) {
-        return new Documents.LazilyCreatedTypedDocument(shape);
+        var parser = new DocumentParser();
+        shape.serialize(parser);
+        return parser.getResult();
     }
 
     /**

@@ -190,6 +190,7 @@ public class DocumentTest {
             .build();
         var doc = Document.createTyped(person);
 
+        assertThat(doc.getMember("__type").asString(), equalTo(Person.ID.toString()));
         assertThat(doc.getMember("name").asString(), equalTo("A"));
         assertThat(doc.getMember("age").asInteger(), equalTo(1));
         assertThat(doc.getMember("binary").asBlob(), equalTo("hi".getBytes(StandardCharsets.UTF_8)));

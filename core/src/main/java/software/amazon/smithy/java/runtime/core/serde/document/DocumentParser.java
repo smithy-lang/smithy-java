@@ -44,23 +44,21 @@ final class DocumentParser implements ShapeSerializer {
 
     @Override
     public void writeStruct(SdkSchema schema, SerializableStruct struct) {
-        if (schema.type() != ShapeType.STRUCTURE && schema.type() != ShapeType.UNION) {
-            throw new SdkSerdeException("Expected a structure or union for this document, but found " + schema);
+        if (schema.type() == ShapeType.STRUCTURE) {
+            setResult(new Documents.LazyStructure(schema, struct));
+        } else {
+            var parser = new StructureParser();
+            struct.serializeMembers(parser);
+            setResult(new Documents.StructureDocument(schema, parser.members()));
         }
-
-        Map<String, Document> members = new LinkedHashMap<>();
-        struct.serializeMembers(new StructureParser(members));
-
-        setResult(new Documents.StructureDocument(schema, members));
     }
 
-    private static final class StructureParser extends InterceptingSerializer {
+    /**
+     * Parses a structure's members. Nested structures are parsed into LazyStructures.
+     */
+    static final class StructureParser extends InterceptingSerializer {
         private final DocumentParser parser = new DocumentParser();
-        private final Map<String, Document> members;
-
-        private StructureParser(Map<String, Document> members) {
-            this.members = members;
-        }
+        private final Map<String, Document> members = new LinkedHashMap<>();
 
         @Override
         protected ShapeSerializer before(SdkSchema schema) {
@@ -70,6 +68,10 @@ final class DocumentParser implements ShapeSerializer {
         @Override
         protected void after(SdkSchema schema) {
             members.put(schema.memberName(), parser.getResult());
+        }
+
+        Map<String, Document> members() {
+            return members;
         }
     }
 

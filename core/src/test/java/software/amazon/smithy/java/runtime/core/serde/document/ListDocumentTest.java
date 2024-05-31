@@ -53,9 +53,19 @@ public class ListDocumentTest {
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
+            public void writeDocument(SdkSchema schema, Document value) {
+                value.serializeContents(this);
+            }
+
+            @Override
             public <T> void writeList(SdkSchema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
                 assertThat(schema.type(), equalTo(ShapeType.LIST));
                 consumer.accept(listState, new SpecificShapeSerializer() {
+                    @Override
+                    public void writeDocument(SdkSchema schema, Document value) {
+                        value.serializeContents(this);
+                    }
+
                     @Override
                     public void writeString(SdkSchema schema, String value) {
                         assertThat(schema, equalTo(PreludeSchemas.STRING));

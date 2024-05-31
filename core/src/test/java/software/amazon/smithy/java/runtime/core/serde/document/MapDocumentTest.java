@@ -59,6 +59,11 @@ public class MapDocumentTest {
         var keys = new ArrayList<>();
         map.serializeContents(new SpecificShapeSerializer() {
             @Override
+            public void writeDocument(SdkSchema schema, Document value) {
+                value.serializeContents(this);
+            }
+
+            @Override
             public <T> void writeMap(SdkSchema schema, T state, BiConsumer<T, MapSerializer> consumer) {
                 assertThat(schema.type(), equalTo(ShapeType.MAP));
                 consumer.accept(state, new MapSerializer() {
@@ -71,6 +76,11 @@ public class MapDocumentTest {
                     ) {
                         keys.add(key);
                         valueSerializer.accept(mapState, new SpecificShapeSerializer() {
+                            @Override
+                            public void writeDocument(SdkSchema schema, Document value) {
+                                value.serializeContents(this);
+                            }
+
                             @Override
                             public void writeInteger(SdkSchema schema, int value) {
                                 assertThat(schema, equalTo(PreludeSchemas.INTEGER));

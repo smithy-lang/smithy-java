@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -666,7 +665,7 @@ final class Documents {
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeList(schema, values, (values, ser) -> {
                 for (var element : values) {
-                    element.serializeContents(ser);
+                    element.serialize(ser);
                 }
             });
         }
@@ -693,7 +692,7 @@ final class Documents {
             serializer.writeMap(schema, members, (members, s) -> {
                 var key = schema.member("key");
                 for (var entry : members.entrySet()) {
-                    s.writeEntry(key, entry.getKey(), entry.getValue(), Document::serializeContents);
+                    s.writeEntry(key, entry.getKey(), entry.getValue(), Document::serialize);
                 }
             });
         }
@@ -721,6 +720,7 @@ final class Documents {
             Document.super.serialize(serializer);
         }
 
+        // Note that this method is never actually called right now because LazyStructure doesn't delegate to it.
         @Override
         public void serializeContents(ShapeSerializer encoder) {
             encoder.writeStruct(schema, this);
@@ -729,110 +729,39 @@ final class Documents {
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             for (var entry : members.entrySet()) {
-                entry.getValue().serializeContents(serializer);
+                entry.getValue().serialize(serializer);
             }
         }
     }
 
-    // If the document is only used to serialize a shape to a document, then the typed document nodes don't need
-    // to be created.
-    static final class LazilyCreatedTypedDocument implements Document {
+    /**
+     * A document that wraps a shape and a schema, lazily creating the document only if needed.
+     */
+    static final class LazyStructure implements Document {
 
-        private final SerializableShape shape;
+        private final SdkSchema schema;
+        private final SerializableStruct struct;
         private volatile transient Document createdDocument;
 
-        LazilyCreatedTypedDocument(SerializableShape shape) {
-            this.shape = shape;
+        LazyStructure(SdkSchema schema, SerializableStruct struct) {
+            this.schema = schema;
+            this.struct = struct;
         }
 
         private Document getDocument() {
             var result = createdDocument;
             if (result == null) {
-                var parser = new DocumentParser();
-                shape.serialize(parser);
-                this.createdDocument = result = parser.getResult();
+                var parser = new DocumentParser.StructureParser();
+                struct.serializeMembers(parser);
+                result = new StructureDocument(schema, parser.members());
+                createdDocument = result;
             }
             return result;
         }
 
         @Override
-        public void serializeContents(ShapeSerializer serializer) {
-            shape.serialize(serializer);
-        }
-
-        @Override
         public ShapeType type() {
-            return getDocument().type();
-        }
-
-        @Override
-        public boolean asBoolean() {
-            return getDocument().asBoolean();
-        }
-
-        @Override
-        public byte asByte() {
-            return getDocument().asByte();
-        }
-
-        @Override
-        public short asShort() {
-            return getDocument().asShort();
-        }
-
-        @Override
-        public int asInteger() {
-            return getDocument().asInteger();
-        }
-
-        @Override
-        public long asLong() {
-            return getDocument().asLong();
-        }
-
-        @Override
-        public float asFloat() {
-            return getDocument().asFloat();
-        }
-
-        @Override
-        public double asDouble() {
-            return getDocument().asDouble();
-        }
-
-        @Override
-        public BigInteger asBigInteger() {
-            return getDocument().asBigInteger();
-        }
-
-        @Override
-        public BigDecimal asBigDecimal() {
-            return getDocument().asBigDecimal();
-        }
-
-        @Override
-        public Number asNumber() {
-            return getDocument().asNumber();
-        }
-
-        @Override
-        public String asString() {
-            return getDocument().asString();
-        }
-
-        @Override
-        public byte[] asBlob() {
-            return getDocument().asBlob();
-        }
-
-        @Override
-        public Instant asTimestamp() {
-            return getDocument().asTimestamp();
-        }
-
-        @Override
-        public List<Document> asList() {
-            return getDocument().asList();
+            return ShapeType.STRUCTURE;
         }
 
         @Override
@@ -842,7 +771,11 @@ final class Documents {
 
         @Override
         public Document getMember(String memberName) {
-            return getDocument().getMember(memberName);
+            if (memberName.equals("__type")) {
+                return Document.createString(schema.id().toString());
+            } else {
+                return getDocument().getMember(memberName);
+            }
         }
 
         @Override
@@ -856,8 +789,8 @@ final class Documents {
                 return true;
             } else if (obj == null) {
                 return false;
-            } else if (obj instanceof LazilyCreatedTypedDocument) {
-                return getDocument().equals(((LazilyCreatedTypedDocument) obj).getDocument());
+            } else if (obj instanceof LazyStructure) {
+                return getDocument().equals(((LazyStructure) obj).getDocument());
             } else if (obj instanceof Document) {
                 return getDocument().equals(obj);
             } else {
@@ -868,6 +801,11 @@ final class Documents {
         @Override
         public int hashCode() {
             return getDocument().hashCode();
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+            struct.serialize(serializer);
         }
     }
 }

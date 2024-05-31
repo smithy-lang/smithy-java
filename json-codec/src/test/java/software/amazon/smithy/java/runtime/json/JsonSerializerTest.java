@@ -191,6 +191,46 @@ public class JsonSerializerTest {
         }
     }
 
+    @Test
+    public void writesDunderTypeAndMoreMembers() throws Exception {
+        var struct = new NestedStruct();
+        var document = Document.createTyped(struct);
+        try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                document.serialize(serializer);
+            }
+            var result = output.toString(StandardCharsets.UTF_8);
+            assertThat(result, equalTo("{\"__type\":\"smithy.example#Nested\",\"number\":10}"));
+        }
+    }
+
+    @Test
+    public void writesNestedDunderType() throws Exception {
+        var struct = new NestedStruct();
+        var document = Document.createTyped(struct);
+        var map = Document.createStringMap(Map.of("a", document));
+        try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                map.serialize(serializer);
+            }
+            var result = output.toString(StandardCharsets.UTF_8);
+            assertThat(result, equalTo("{\"a\":{\"__type\":\"smithy.example#Nested\",\"number\":10}}"));
+        }
+    }
+
+    @Test
+    public void writesDunderTypeForEmptyStruct() throws Exception {
+        var struct = new EmptyStruct();
+        var document = Document.createTyped(struct);
+        try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                document.serialize(serializer);
+            }
+            var result = output.toString(StandardCharsets.UTF_8);
+            assertThat(result, equalTo("{\"__type\":\"smithy.example#Nested\"}"));
+        }
+    }
+
     private static final class NestedStruct implements SerializableStruct {
         @Override
         public void serialize(ShapeSerializer encoder) {
@@ -201,5 +241,15 @@ public class JsonSerializerTest {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeInteger(JsonTestData.NESTED.member("number"), 10);
         }
+    }
+
+    private static final class EmptyStruct implements SerializableStruct {
+        @Override
+        public void serialize(ShapeSerializer encoder) {
+            encoder.writeStruct(JsonTestData.NESTED, this);
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {}
     }
 }
