@@ -23,6 +23,8 @@ import java.util.concurrent.Flow;
  * <p>This interface is essentially a {@link Flow.Publisher} that potentially knows the amount of data contained
  * in the stream and the stream's content type.
  */
+// TODO: Is it ok for the implementation to be dependent on java.net.http.HttpRequest.BodyPublishers?
+// TODO: Is it ok for core to have dependency on java.net.http? even after http-api module split
 public interface StreamPublisher extends Flow.Publisher<ByteBuffer> {
     /**
      * Get the content length of the publisher.

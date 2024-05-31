@@ -24,6 +24,8 @@ import java.util.concurrent.Flow;
  *
  * @param <T> Result to transform the published data into.
  */
+// TODO: Is it ok for the implementation to be dependent on java.net.http.HttpRequest.BodySubscribers?
+// TODO: Is it ok for core to have dependency on java.net.http? even after http-api module split
 public interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
     /**
      * Returns a {@code CompletionStage} which when completed will return the created result. This method can be called
