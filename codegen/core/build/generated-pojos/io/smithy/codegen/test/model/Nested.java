@@ -76,8 +76,8 @@ public final class Nested implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -100,10 +100,9 @@ public final class Nested implements SerializableStruct {
      * Builder for {@link Nested}.
      */
     public static final class Builder implements SdkShapeBuilder<Nested> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private String fieldA;
         private Integer fieldB;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -119,7 +118,6 @@ public final class Nested implements SerializableStruct {
 
         @Override
         public Nested build() {
-            tracker.validate();
             return new Nested(this);
         }
 
@@ -140,6 +138,7 @@ public final class Nested implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

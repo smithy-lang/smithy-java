@@ -101,8 +101,8 @@ public final class TimestampsInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -126,11 +126,10 @@ public final class TimestampsInput implements SerializableStruct {
      */
     public static final class Builder implements SdkShapeBuilder<TimestampsInput> {
         private static final Instant DEFAULT_TIMESTAMP_DEFAULT = Instant.ofEpochMilli(482196050520L);
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private Instant requiredTimestamp;
         private Instant optionalTimestamp;
         private Instant defaultTimestamp = DEFAULT_TIMESTAMP_DEFAULT;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -161,11 +160,9 @@ public final class TimestampsInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_REQUIRED_TIMESTAMP)) {
                 requiredTimestamp(Instant.EPOCH);
             }
-
             return this;
         }
 
@@ -187,6 +184,7 @@ public final class TimestampsInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

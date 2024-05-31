@@ -100,8 +100,8 @@ public final class DoublesInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -124,11 +124,10 @@ public final class DoublesInput implements SerializableStruct {
      * Builder for {@link DoublesInput}.
      */
     public static final class Builder implements SdkShapeBuilder<DoublesInput> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private double requiredDouble;
         private Double optionalDouble;
         private double defaultDouble = 1.0;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -159,11 +158,9 @@ public final class DoublesInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_REQUIRED_DOUBLE)) {
                 tracker.setMember(SCHEMA_REQUIRED_DOUBLE);
             }
-
             return this;
         }
 
@@ -185,6 +182,7 @@ public final class DoublesInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

@@ -117,8 +117,8 @@ public final class MapsInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -141,11 +141,10 @@ public final class MapsInput implements SerializableStruct {
      * Builder for {@link MapsInput}.
      */
     public static final class Builder implements SdkShapeBuilder<MapsInput> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private Map<String, String> requiredMap;
         private Map<String, String> optionalMap;
         private Map<String, String> defaultMap = Collections.emptyMap();
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -176,11 +175,9 @@ public final class MapsInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_REQUIRED_MAP)) {
                 requiredMap(Collections.emptyMap());
             }
-
             return this;
         }
 
@@ -202,6 +199,7 @@ public final class MapsInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

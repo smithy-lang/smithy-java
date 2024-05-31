@@ -328,8 +328,8 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -376,6 +376,7 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
      * Builder for {@link ClientErrorCorrectionInput}.
      */
     public static final class Builder implements SdkShapeBuilder<ClientErrorCorrectionInput> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private boolean booleanMember;
         private BigDecimal bigDecimal;
         private BigInteger bigInteger;
@@ -393,8 +394,6 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
         private Map<String, String> map;
         private CouldBeEmptyStruct structure;
         private Instant timestamp;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -516,7 +515,6 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_BOOLEAN_MEMBER)) {
                 tracker.setMember(SCHEMA_BOOLEAN_MEMBER);
             }
@@ -568,7 +566,6 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
             if (!tracker.checkMember(SCHEMA_TIMESTAMP)) {
                 timestamp(Instant.EPOCH);
             }
-
             return this;
         }
 
@@ -603,6 +600,7 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

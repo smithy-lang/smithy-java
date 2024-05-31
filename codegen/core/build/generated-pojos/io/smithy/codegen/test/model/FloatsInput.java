@@ -100,8 +100,8 @@ public final class FloatsInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -124,11 +124,10 @@ public final class FloatsInput implements SerializableStruct {
      * Builder for {@link FloatsInput}.
      */
     public static final class Builder implements SdkShapeBuilder<FloatsInput> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private float requiredFloat;
         private Float optionalFloat;
         private float defaultFloat = 1.0f;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -159,11 +158,9 @@ public final class FloatsInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_REQUIRED_FLOAT)) {
                 tracker.setMember(SCHEMA_REQUIRED_FLOAT);
             }
-
             return this;
         }
 
@@ -185,6 +182,7 @@ public final class FloatsInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

@@ -111,8 +111,8 @@ public final class NestedListsInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -139,11 +139,10 @@ public final class NestedListsInput implements SerializableStruct {
      * Builder for {@link NestedListsInput}.
      */
     public static final class Builder implements SdkShapeBuilder<NestedListsInput> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private List<List<String>> listOfLists;
         private List<List<List<String>>> listOfListOfList;
         private List<Map<String, String>> listOfMaps;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -164,7 +163,6 @@ public final class NestedListsInput implements SerializableStruct {
 
         @Override
         public NestedListsInput build() {
-            tracker.validate();
             return new NestedListsInput(this);
         }
 
@@ -186,6 +184,7 @@ public final class NestedListsInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

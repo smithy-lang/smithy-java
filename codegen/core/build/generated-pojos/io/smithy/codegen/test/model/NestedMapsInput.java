@@ -130,8 +130,8 @@ public final class NestedMapsInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -162,12 +162,11 @@ public final class NestedMapsInput implements SerializableStruct {
      * Builder for {@link NestedMapsInput}.
      */
     public static final class Builder implements SdkShapeBuilder<NestedMapsInput> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private Map<String, Map<String, String>> mapOfStringMap;
         private Map<String, Map<String, Map<String, String>>> mapOfMapOfStringMap;
         private Map<String, List<String>> mapOfStringList;
         private Map<String, List<Map<String, String>>> mapOfMapList;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -193,7 +192,6 @@ public final class NestedMapsInput implements SerializableStruct {
 
         @Override
         public NestedMapsInput build() {
-            tracker.validate();
             return new NestedMapsInput(this);
         }
 
@@ -216,6 +214,7 @@ public final class NestedMapsInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

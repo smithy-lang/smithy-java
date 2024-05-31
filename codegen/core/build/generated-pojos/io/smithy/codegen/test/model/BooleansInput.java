@@ -80,8 +80,8 @@ public final class BooleansInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -102,10 +102,9 @@ public final class BooleansInput implements SerializableStruct {
      * Builder for {@link BooleansInput}.
      */
     public static final class Builder implements SdkShapeBuilder<BooleansInput> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private boolean requiredBoolean;
         private Boolean optionalBoolean;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -131,11 +130,9 @@ public final class BooleansInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_REQUIRED_BOOLEAN)) {
                 tracker.setMember(SCHEMA_REQUIRED_BOOLEAN);
             }
-
             return this;
         }
 
@@ -156,6 +153,7 @@ public final class BooleansInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {

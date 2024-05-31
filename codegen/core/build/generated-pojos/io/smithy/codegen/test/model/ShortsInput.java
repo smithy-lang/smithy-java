@@ -100,8 +100,8 @@ public final class ShortsInput implements SerializableStruct {
     }
 
     @Override
-    public SdkSchema schema() {
-        return SCHEMA;
+    public void serialize(ShapeSerializer serializer) {
+        serializer.writeStruct(SCHEMA, this);
     }
 
     @Override
@@ -124,11 +124,10 @@ public final class ShortsInput implements SerializableStruct {
      * Builder for {@link ShortsInput}.
      */
     public static final class Builder implements SdkShapeBuilder<ShortsInput> {
+        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
         private short requiredShort;
         private Short optionalShort;
         private short defaultShort = 1;
-
-        private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
 
         private Builder() {}
 
@@ -159,11 +158,9 @@ public final class ShortsInput implements SerializableStruct {
             if (tracker.allSet()) {
                 return this;
             }
-
             if (!tracker.checkMember(SCHEMA_REQUIRED_SHORT)) {
                 tracker.setMember(SCHEMA_REQUIRED_SHORT);
             }
-
             return this;
         }
 
@@ -185,6 +182,7 @@ public final class ShortsInput implements SerializableStruct {
                 }
             }
         }
+
     }
 
     public Builder toBuilder() {
