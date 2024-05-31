@@ -886,6 +886,10 @@ public abstract class UnionType implements SerializableStruct {
         }
     }
 
+    public static interface BuildStage {
+        UnionType build();
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -893,102 +897,102 @@ public abstract class UnionType implements SerializableStruct {
     /**
      * Builder for {@link UnionType}.
      */
-    public static final class Builder implements SdkShapeBuilder<UnionType> {
+    public static final class Builder implements SdkShapeBuilder<UnionType>, BuildStage {
         private UnionType value;
 
         private Builder() {}
 
-        public Builder blobValue(byte[] value) {
+        public BuildStage blobValue(byte[] value) {
             checkForExistingValue();
             this.value = new BlobValueMember(value);
             return this;
         }
 
-        public Builder booleanValue(boolean value) {
+        public BuildStage booleanValue(boolean value) {
             checkForExistingValue();
             this.value = new BooleanValueMember(value);
             return this;
         }
 
-        public Builder listValue(List<String> value) {
+        public BuildStage listValue(List<String> value) {
             checkForExistingValue();
             this.value = new ListValueMember(value);
             return this;
         }
 
-        public Builder mapValue(Map<String, String> value) {
+        public BuildStage mapValue(Map<String, String> value) {
             checkForExistingValue();
             this.value = new MapValueMember(value);
             return this;
         }
 
-        public Builder bigDecimalValue(BigDecimal value) {
+        public BuildStage bigDecimalValue(BigDecimal value) {
             checkForExistingValue();
             this.value = new BigDecimalValueMember(value);
             return this;
         }
 
-        public Builder bigIntegerValue(BigInteger value) {
+        public BuildStage bigIntegerValue(BigInteger value) {
             checkForExistingValue();
             this.value = new BigIntegerValueMember(value);
             return this;
         }
 
-        public Builder byteValue(byte value) {
+        public BuildStage byteValue(byte value) {
             checkForExistingValue();
             this.value = new ByteValueMember(value);
             return this;
         }
 
-        public Builder doubleValue(double value) {
+        public BuildStage doubleValue(double value) {
             checkForExistingValue();
             this.value = new DoubleValueMember(value);
             return this;
         }
 
-        public Builder floatValue(float value) {
+        public BuildStage floatValue(float value) {
             checkForExistingValue();
             this.value = new FloatValueMember(value);
             return this;
         }
 
-        public Builder integerValue(int value) {
+        public BuildStage integerValue(int value) {
             checkForExistingValue();
             this.value = new IntegerValueMember(value);
             return this;
         }
 
-        public Builder longValue(long value) {
+        public BuildStage longValue(long value) {
             checkForExistingValue();
             this.value = new LongValueMember(value);
             return this;
         }
 
-        public Builder shortValue(short value) {
+        public BuildStage shortValue(short value) {
             checkForExistingValue();
             this.value = new ShortValueMember(value);
             return this;
         }
 
-        public Builder stringValue(String value) {
+        public BuildStage stringValue(String value) {
             checkForExistingValue();
             this.value = new StringValueMember(value);
             return this;
         }
 
-        public Builder structureValue(Struct value) {
+        public BuildStage structureValue(Struct value) {
             checkForExistingValue();
             this.value = new StructureValueMember(value);
             return this;
         }
 
-        public Builder timestampValue(Instant value) {
+        public BuildStage timestampValue(Instant value) {
             checkForExistingValue();
             this.value = new TimestampValueMember(value);
             return this;
         }
 
-        public Builder unionValue(OtherUnion value) {
+        public BuildStage unionValue(OtherUnion value) {
             checkForExistingValue();
             this.value = new UnionValueMember(value);
             return this;

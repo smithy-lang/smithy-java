@@ -149,6 +149,10 @@ public abstract class OtherUnion implements SerializableStruct {
         }
     }
 
+    public static interface BuildStage {
+        OtherUnion build();
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -156,18 +160,18 @@ public abstract class OtherUnion implements SerializableStruct {
     /**
      * Builder for {@link OtherUnion}.
      */
-    public static final class Builder implements SdkShapeBuilder<OtherUnion> {
+    public static final class Builder implements SdkShapeBuilder<OtherUnion>, BuildStage {
         private OtherUnion value;
 
         private Builder() {}
 
-        public Builder str(String value) {
+        public BuildStage str(String value) {
             checkForExistingValue();
             this.value = new StrMember(value);
             return this;
         }
 
-        public Builder intMember(int value) {
+        public BuildStage intMember(int value) {
             checkForExistingValue();
             this.value = new IntMemberMember(value);
             return this;
