@@ -53,5 +53,10 @@ public final class SymbolProperties {
      */
     public static final Property<Boolean> REQUIRES_STATIC_DEFAULT = Property.named("requires-static-default");
 
+    /**
+     * Symbol representing the value type of Enum or IntEnum Shape
+     */
+    public static final Property<Symbol> ENUM_VALUE_TYPE = Property.named("enum-value-type");
+
     private SymbolProperties() {}
 }

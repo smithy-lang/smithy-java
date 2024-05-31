@@ -52,9 +52,6 @@ operation ClientErrorCorrection {
         map: CorrectedMap
 
         @required
-        structure: CouldBeEmptyStruct
-
-        @required
         timestamp: Timestamp
     }
 }

@@ -16,7 +16,9 @@ import software.amazon.smithy.model.shapes.BooleanShape;
 import software.amazon.smithy.model.shapes.ByteShape;
 import software.amazon.smithy.model.shapes.DocumentShape;
 import software.amazon.smithy.model.shapes.DoubleShape;
+import software.amazon.smithy.model.shapes.EnumShape;
 import software.amazon.smithy.model.shapes.FloatShape;
+import software.amazon.smithy.model.shapes.IntEnumShape;
 import software.amazon.smithy.model.shapes.IntegerShape;
 import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.LongShape;
@@ -117,6 +119,12 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     }
 
     @Override
+    public Void intEnumShape(IntEnumShape shape) {
+        delegateDeser();
+        return null;
+    }
+
+    @Override
     public Void longShape(LongShape longShape) {
         writer.write("${deserializer:L}.readLong(${schemaName:L})");
         return null;
@@ -159,14 +167,20 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     }
 
     @Override
+    public Void enumShape(EnumShape shape) {
+        delegateDeser();
+        return null;
+    }
+
+    @Override
     public Void structureShape(StructureShape structureShape) {
-        writer.write("$T.builder().deserialize(${deserializer:L}).build()", symbolProvider.toSymbol(shape));
+        delegateDeser();
         return null;
     }
 
     @Override
     public Void unionShape(UnionShape unionShape) {
-        writer.write("$T.builder().deserialize(${deserializer:L}).build()", symbolProvider.toSymbol(shape));
+        delegateDeser();
         return null;
     }
 
@@ -174,6 +188,10 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     public Void timestampShape(TimestampShape timestampShape) {
         writer.write("${deserializer:L}.readTimestamp(${schemaName:L})");
         return null;
+    }
+
+    private void delegateDeser() {
+        writer.write("$T.builder().deserialize(${deserializer:L}).build()", symbolProvider.toSymbol(shape));
     }
 
     @Override

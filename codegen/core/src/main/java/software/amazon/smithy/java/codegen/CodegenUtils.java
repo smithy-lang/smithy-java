@@ -178,7 +178,7 @@ public final class CodegenUtils {
     public static String getSchemaType(JavaWriter writer, SymbolProvider provider, Shape shape) {
         if (Prelude.isPreludeShape(shape)) {
             return writer.format("$T.$L", PreludeSchemas.class, shape.getType().name());
-        } else if (shape.isStructureShape() || shape.isUnionShape()) {
+        } else if (shape.isStructureShape() || shape.isUnionShape() || shape.isIntEnumShape() || shape.isEnumShape()) {
             // Shapes that generate a class have their schemas as static properties on that class
             return writer.format("$T.SCHEMA", provider.toSymbol(shape));
         }
@@ -282,6 +282,16 @@ public final class CodegenUtils {
      * @param memberShape member shape to get enum name for
      */
     public static String getEnumVariantName(SymbolProvider provider, MemberShape memberShape) {
-        return CaseUtils.toSnakeCase(provider.toMemberName(memberShape)).toUpperCase(Locale.ENGLISH);
+        return toUpperSnakeCase(provider.toMemberName(memberShape));
+    }
+
+    /**
+     * TODO: Docs
+     * @param string
+     * @return
+     */
+    public static String toUpperSnakeCase(String string) {
+        return CaseUtils.toSnakeCase(string).toUpperCase(Locale.ENGLISH);
+
     }
 }

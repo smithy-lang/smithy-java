@@ -16,13 +16,16 @@ import software.amazon.smithy.model.shapes.BooleanShape;
 import software.amazon.smithy.model.shapes.ByteShape;
 import software.amazon.smithy.model.shapes.DocumentShape;
 import software.amazon.smithy.model.shapes.DoubleShape;
+import software.amazon.smithy.model.shapes.EnumShape;
 import software.amazon.smithy.model.shapes.FloatShape;
+import software.amazon.smithy.model.shapes.IntEnumShape;
 import software.amazon.smithy.model.shapes.IntegerShape;
 import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.LongShape;
 import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeVisitor;
 import software.amazon.smithy.model.shapes.ShortShape;
 import software.amazon.smithy.model.shapes.StringShape;
@@ -37,7 +40,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     private final SymbolProvider provider;
     private final Model model;
     private final ServiceShape service;
-    private final MemberShape memberShape;
+    private final Shape shape;
     private final String state;
 
     SerializerMemberGenerator(
@@ -45,31 +48,23 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
         SymbolProvider provider,
         Model model,
         ServiceShape service,
-        MemberShape memberShape,
+        Shape shape,
         String state
     ) {
         this.writer = writer;
         this.provider = provider;
         this.model = model;
         this.service = service;
-        this.memberShape = memberShape;
+        this.shape = shape;
         this.state = state;
     }
 
     @Override
     public void run() {
         writer.pushState();
-        var memberName = provider.toMemberName(memberShape);
-        writer.putContext("memberName", memberName);
-        var container = model.expectShape(memberShape.getContainer());
-        var target = model.expectShape(memberShape.getTarget());
-        if (container.isListShape() || container.isMapShape()) {
-            writer.putContext("schema", CodegenUtils.getSchemaType(writer, provider, target));
-        } else {
-            writer.putContext("schema", CodegenUtils.toMemberSchemaName(memberName));
-        }
         writer.putContext("state", state);
-        memberShape.accept(this);
+        writer.putContext("schema", "SCHEMA");
+        shape.accept(this);
         writer.popState();
     }
 
@@ -126,6 +121,12 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     }
 
     @Override
+    public Void intEnumShape(IntEnumShape shape) {
+        writer.write("serializer.writeInteger(${schema:L}, ${state:L}.value())");
+        return null;
+    }
+
+    @Override
     public Void longShape(LongShape longShape) {
         writer.write("serializer.writeLong(${schema:L}, ${state:L})");
         return null;
@@ -168,6 +169,12 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     }
 
     @Override
+    public Void enumShape(EnumShape shape) {
+        writer.write("serializer.writeString(${schema:L}, ${state:L}.value())");
+        return null;
+    }
+
+    @Override
     public Void structureShape(StructureShape structureShape) {
         writer.write("serializer.writeStruct(${schema:L}, ${state:L})");
         return null;
@@ -180,11 +187,19 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     }
 
     @Override
-    public Void memberShape(MemberShape shape) {
+    public Void memberShape(MemberShape memberShape) {
         // The error `message` member must be accessed from parent class.
-        if (memberShape.hasTrait(ErrorTrait.class) && provider.toMemberName(memberShape).equals("message")) {
+        var memberName = provider.toMemberName(memberShape);
+        if (memberShape.hasTrait(ErrorTrait.class) && memberName.equals("message")) {
             writer.write("serializer.writeString(SCHEMA_MESSAGE, ${state:L}.getMessage())");
             return null;
+        }
+        var container = model.expectShape(memberShape.getContainer());
+        var target = model.expectShape(memberShape.getTarget());
+        if (container.isListShape() || container.isMapShape()) {
+            writer.putContext("schema", CodegenUtils.getSchemaType(writer, provider, target));
+        } else {
+            writer.putContext("schema", CodegenUtils.toMemberSchemaName(memberName));
         }
         return model.expectShape(memberShape.getTarget()).accept(this);
     }

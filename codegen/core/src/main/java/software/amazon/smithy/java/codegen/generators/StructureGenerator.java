@@ -36,9 +36,7 @@ import software.amazon.smithy.model.shapes.BooleanShape;
 import software.amazon.smithy.model.shapes.ByteShape;
 import software.amazon.smithy.model.shapes.DocumentShape;
 import software.amazon.smithy.model.shapes.DoubleShape;
-import software.amazon.smithy.model.shapes.EnumShape;
 import software.amazon.smithy.model.shapes.FloatShape;
-import software.amazon.smithy.model.shapes.IntEnumShape;
 import software.amazon.smithy.model.shapes.IntegerShape;
 import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.LongShape;
@@ -462,6 +460,12 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         private void writeErrorCorrectionMembers(JavaWriter writer) {
             var visitor = new ErrorCorrectionVisitor(writer, symbolProvider, model);
             for (var member : shape.members()) {
+                var target = model.expectShape(member.getTarget());
+                if (target.isStructureShape() || target.isEnumShape() || target.isIntEnumShape() || target
+                    .isUnionShape()) {
+                    // Skip unions, structs, and enums
+                    continue;
+                }
                 if (CodegenUtils.isRequiredWithNoDefault(member)) {
                     var memberName = symbolProvider.toMemberName(member);
                     var schemaName = CodegenUtils.toMemberSchemaName(memberName);
@@ -551,34 +555,6 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             @Override
             public Void stringShape(StringShape stringShape) {
                 writer.writeInline("\"\"");
-                return null;
-            }
-
-            @Override
-            public Void structureShape(StructureShape structureShape) {
-                // Attempts to make an empty structure member. This could fail if the nested struct
-                // has required members.
-                writer.writeInline("$T.builder().build()", symbolProvider.toSymbol(structureShape));
-                return null;
-            }
-
-            @Override
-            public Void unionShape(UnionShape unionShape) {
-                // TODO: implement for unions
-                writer.writeInline("null");
-                return null;
-            }
-
-
-            @Override
-            public Void enumShape(EnumShape shape) {
-                // TODO: Implement
-                return null;
-            }
-
-            @Override
-            public Void intEnumShape(IntEnumShape shape) {
-                // TODO: Implement
                 return null;
             }
 

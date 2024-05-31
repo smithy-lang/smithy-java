@@ -11,6 +11,8 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.EnumShape;
+import software.amazon.smithy.model.shapes.IntEnumShape;
 import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
@@ -105,6 +107,43 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
                 """,
             (Runnable) () -> shape.getKey().accept(this),
             (Runnable) () -> shape.getValue().accept(this)
+        );
+        return null;
+    }
+
+    @Override
+    public Void intEnumShape(IntEnumShape shape) {
+        writer.putContext("variants", shape.getEnumValues().keySet());
+        writer.write(
+            """
+                static final ${schemaClass:T} SCHEMA = ${schemaClass:T}.builder()
+                    .id(ID)
+                    .type(${shapeTypeClass:T}.${shapeType:L})${traitInitializer:C}
+                    .intEnumValues(
+                        ${#variants}${value:L}.value${^key.last},
+                        ${/key.last}${/variants}
+                    )
+                    .build();
+                """
+        );
+        return null;
+    }
+
+    // TODO: handle string enums?
+    @Override
+    public Void enumShape(EnumShape shape) {
+        writer.putContext("variants", shape.getEnumValues().keySet());
+        writer.write(
+            """
+                static final ${schemaClass:T} SCHEMA = ${schemaClass:T}.builder()
+                    .id(ID)
+                    .type(${shapeTypeClass:T}.${shapeType:L})${traitInitializer:C}
+                    .stringEnumValues(
+                        ${#variants}${value:L}.value${^key.last},
+                        ${/key.last}${/variants}
+                    )
+                    .build();
+                """
         );
         return null;
     }

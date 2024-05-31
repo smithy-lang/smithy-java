@@ -23,6 +23,8 @@ structures/structure-members/structures.smithy
 structures/timestamp-members/timestamps.smithy
 structures/error-correction/error-correction.smithy
 structures/union-members/unions.smithy
+structures/enum-members/enums.smithy
+structures/int-enum-members/int-enums.smithy
 exceptions/exceptions.smithy
 exceptions/simple-exception.smithy
 exceptions/exception-with-string-field.smithy

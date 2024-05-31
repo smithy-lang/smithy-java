@@ -16,8 +16,12 @@ import io.smithy.codegen.test.model.BlobsInput;
 import io.smithy.codegen.test.model.BooleansInput;
 import io.smithy.codegen.test.model.BytesInput;
 import io.smithy.codegen.test.model.DoublesInput;
+import io.smithy.codegen.test.model.EnumType;
+import io.smithy.codegen.test.model.EnumsInput;
 import io.smithy.codegen.test.model.ExceptionWithExtraStringException;
 import io.smithy.codegen.test.model.FloatsInput;
+import io.smithy.codegen.test.model.IntEnumType;
+import io.smithy.codegen.test.model.IntEnumsInput;
 import io.smithy.codegen.test.model.IntegersInput;
 import io.smithy.codegen.test.model.ListWithStructsInput;
 import io.smithy.codegen.test.model.ListsInput;
@@ -125,7 +129,11 @@ public class SerdeTest {
                 .build(),
             UnionsInput.builder()
                 .requiredUnion(new UnionType.UnionValueMember(new OtherUnion.StrMember("string")))
-                .build()
+                .build(),
+            // String enums
+            EnumsInput.builder().requiredEnum(EnumType.OPTION_ONE).build(),
+            // Int enums
+            IntEnumsInput.builder().requiredEnum(IntEnumType.OPTION_ONE).build()
         );
     }
 

@@ -11,7 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import io.smithy.codegen.test.model.ClientErrorCorrectionInput;
-import io.smithy.codegen.test.model.CouldBeEmptyStruct;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -43,6 +42,5 @@ public class ClientErrorCorrectionTest {
         assertEquals(corrected.list(), List.of());
         assertEquals(corrected.map(), Map.of());
         assertEquals(corrected.timestamp(), Instant.EPOCH);
-        assertEquals(corrected.structure(), CouldBeEmptyStruct.builder().build());
     }
 }

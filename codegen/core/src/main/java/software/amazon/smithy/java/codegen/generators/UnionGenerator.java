@@ -5,9 +5,7 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.SymbolProvider;
@@ -52,7 +50,7 @@ public final class UnionGenerator
                     directive.context()
                 )
             );
-            writer.putContext("memberEnum", new MemberEnumGenerator(writer, directive.symbolProvider(), shape));
+            writer.putContext("memberEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext("toString", new ToStringGenerator(writer));
             writer.putContext("valueCasters", new ValueCasterGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext(
@@ -82,13 +80,13 @@ public final class UnionGenerator
 
                     ${schemas:C|}
 
-                    private final Member type;
+                    private final Type type;
 
-                    private ${shape:T}(Member type) {
+                    private ${shape:T}(Type type) {
                         this.type = type;
                     }
 
-                    public Member type() {
+                    public Type type() {
                         return type;
                     }
 
@@ -107,27 +105,6 @@ public final class UnionGenerator
         });
     }
 
-    private record MemberEnumGenerator(JavaWriter writer, SymbolProvider symbolProvider, UnionShape shape) implements
-        Runnable {
-        @Override
-        public void run() {
-            List<String> enumList = new ArrayList<>();
-            enumList.add("$$UNKNOWN");
-            shape.members()
-                .stream()
-                .map(member -> CodegenUtils.getEnumVariantName(symbolProvider, member))
-                .forEach(enumList::add);
-            writer.pushState();
-            writer.putContext("variants", enumList);
-            writer.write("""
-                public enum Member {
-                    ${#variants}${value:L}${^key.last},
-                    ${/key.last}${/variants}
-                }
-                """);
-            writer.popState();
-        }
-    }
 
     private record ValueCasterGenerator(JavaWriter writer, SymbolProvider symbolProvider, UnionShape shape) implements
         Runnable {
@@ -179,7 +156,7 @@ public final class UnionGenerator
                             private final transient ${member:T} value;
 
                             public ${memberName:U}Member(${member:T} value) {
-                                super(Member.${enumValue:L});
+                                super(Type.${enumValue:L});
                                 this.value = ${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Union value cannot be null")${/primitive};
                             }
 

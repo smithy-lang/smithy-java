@@ -164,7 +164,9 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
 
     @Override
     public Symbol intEnumShape(IntEnumShape shape) {
-        return getJavaClassSymbol(shape);
+        return getJavaClassSymbol(shape).toBuilder()
+            .putProperty(SymbolProperties.ENUM_VALUE_TYPE, integerShape(shape))
+            .build();
     }
 
     @Override
@@ -239,7 +241,9 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
 
     @Override
     public Symbol enumShape(EnumShape shape) {
-        return getJavaClassSymbol(shape);
+        return getJavaClassSymbol(shape).toBuilder()
+            .putProperty(SymbolProperties.ENUM_VALUE_TYPE, stringShape(shape))
+            .build();
     }
 
     @Override

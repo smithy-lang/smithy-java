@@ -10,7 +10,9 @@ use smithy.java.codegen.test.structures.members#Booleans
 use smithy.java.codegen.test.structures.members#Bytes
 use smithy.java.codegen.test.structures.members#ClientErrorCorrection
 use smithy.java.codegen.test.structures.members#Doubles
+use smithy.java.codegen.test.structures.members#Enums
 use smithy.java.codegen.test.structures.members#Floats
+use smithy.java.codegen.test.structures.members#IntEnums
 use smithy.java.codegen.test.structures.members#Integers
 use smithy.java.codegen.test.structures.members#ListWithStructs
 use smithy.java.codegen.test.structures.members#Lists
@@ -63,6 +65,9 @@ resource StructureShapes {
         Timestamps
         // Union members
         Unions,
+        // Enum Members
+        Enums,
+        IntEnums,
         // Exceptions
         ExceptionOperation,
         // Error correction
