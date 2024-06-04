@@ -5,9 +5,6 @@
 
 package software.amazon.smithy.java.runtime.http.api;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.net.http.HttpHeaders;
 
 public interface SmithyHttpResponse extends SmithyHttpMessage, AutoCloseable {
@@ -42,7 +39,7 @@ public interface SmithyHttpResponse extends SmithyHttpMessage, AutoCloseable {
      *
      * @return Returns the response body.
      */
-    InputStream body();
+    ContentStream body();
 
     /**
      * Create a new response from this response with the given body.
@@ -50,7 +47,7 @@ public interface SmithyHttpResponse extends SmithyHttpMessage, AutoCloseable {
      * @param body Body to set.
      * @return Returns the new response.
      */
-    SmithyHttpMessage withBody(InputStream body);
+    SmithyHttpMessage withBody(ContentStream body);
 
     /**
      * Close underlying resources, if necessary.
@@ -59,11 +56,12 @@ public interface SmithyHttpResponse extends SmithyHttpMessage, AutoCloseable {
      */
     @Override
     default void close() {
-        try {
-            body().close();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        // TODO: should SmithyHttpMessage be AutoCloseable anymore?
+//        try {
+//            body().close();
+//        } catch (IOException e) {
+//            throw new UncheckedIOException(e);
+//        }
     }
 
     static Builder builder() {
@@ -73,7 +71,7 @@ public interface SmithyHttpResponse extends SmithyHttpMessage, AutoCloseable {
     final class Builder {
 
         int statusCode;
-        InputStream body;
+        ContentStream body;
         HttpHeaders headers;
         SmithyHttpVersion httpVersion = SmithyHttpVersion.HTTP_1_1;
 
@@ -90,7 +88,7 @@ public interface SmithyHttpResponse extends SmithyHttpMessage, AutoCloseable {
             return this;
         }
 
-        public Builder body(InputStream body) {
+        public Builder body(ContentStream body) {
             this.body = body;
             return this;
         }

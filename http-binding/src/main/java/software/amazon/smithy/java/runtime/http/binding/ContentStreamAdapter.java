@@ -20,11 +20,16 @@ public final class ContentStreamAdapter implements ContentStream {
 
     @Override
     public Flow.Publisher<ByteBuffer> publisher() {
-        return delegate.publisher();
+        return delegate;
     }
 
     @Override
     public boolean rewind() {
         return delegate.rewind();
+    }
+
+    // TODO: Too hacky?
+    DataStream delegate() {
+        return delegate;
     }
 }

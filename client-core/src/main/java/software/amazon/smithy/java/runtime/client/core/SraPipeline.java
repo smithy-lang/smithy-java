@@ -119,7 +119,7 @@ public final class SraPipeline<I extends SerializableStruct, O extends Serializa
             })
             .thenCompose(
                 finalRequest -> wireTransport.apply(finalRequest)
-                    .thenApply(response -> deserialize(call, finalRequest, response, interceptor))
+                    .thenCompose(response -> deserialize(call, finalRequest, response, interceptor))
             );
     }
 
@@ -175,7 +175,7 @@ public final class SraPipeline<I extends SerializableStruct, O extends Serializa
         }
     }
 
-    private <I extends SerializableStruct, O extends SerializableStruct> O deserialize(
+    private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserialize(
         ClientCall<I, O> call,
         RequestT request,
         ResponseT response,
@@ -212,56 +212,58 @@ public final class SraPipeline<I extends SerializableStruct, O extends Serializa
             Context.value(responseKey, response)
         );
 
-        var shape = protocol.deserializeResponse(call, request, modifiedResponse);
-        context.put(CallContext.OUTPUT, shape);
-        Either<SdkException, O> result = Either.right(shape);
+        return protocol.deserializeResponse(call, request, modifiedResponse)
+            .thenApply(shape -> {
+                context.put(CallContext.OUTPUT, shape);
+                Either<SdkException, O> result = Either.right(shape);
 
-        interceptor.readAfterDeserialization(
-            context,
-            input,
-            Context.value(requestKey, request),
-            Context.value(responseKey, response),
-            result
-        );
+                interceptor.readAfterDeserialization(
+                    context,
+                    input,
+                    Context.value(requestKey, request),
+                    Context.value(responseKey, response),
+                    result
+                );
 
-        result = interceptor.modifyBeforeAttemptCompletion(
-            context,
-            input,
-            Context.value(requestKey, request),
-            Context.value(responseKey, response),
-            result
-        );
+                result = interceptor.modifyBeforeAttemptCompletion(
+                    context,
+                    input,
+                    Context.value(requestKey, request),
+                    Context.value(responseKey, response),
+                    result
+                );
 
-        interceptor.readAfterAttempt(
-            context,
-            input,
-            Context.value(requestKey, request),
-            Context.value(responseKey, response),
-            result
-        );
+                interceptor.readAfterAttempt(
+                    context,
+                    input,
+                    Context.value(requestKey, request),
+                    Context.value(responseKey, response),
+                    result
+                );
 
-        // End of retry loop
-        result = interceptor.modifyBeforeCompletion(
-            context,
-            input,
-            Context.value(requestKey, request),
-            Context.value(responseKey, response),
-            result
-        );
+                // End of retry loop
+                result = interceptor.modifyBeforeCompletion(
+                    context,
+                    input,
+                    Context.value(requestKey, request),
+                    Context.value(responseKey, response),
+                    result
+                );
 
-        interceptor.readAfterExecution(
-            context,
-            input,
-            Context.value(requestKey, request),
-            Context.value(responseKey, response),
-            result
-        );
+                interceptor.readAfterExecution(
+                    context,
+                    input,
+                    Context.value(requestKey, request),
+                    Context.value(responseKey, response),
+                    result
+                );
 
-        if (result.isRight()) {
-            return result.right();
-        } else {
-            throw result.left();
-        }
+                if (result.isRight()) {
+                    return result.right();
+                } else {
+                    throw result.left();
+                }
+            });
     }
 
     // TODO: Add more parameters here somehow from the caller.

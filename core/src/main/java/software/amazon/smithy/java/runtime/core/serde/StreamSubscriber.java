@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.core.serde.streaming;
+package software.amazon.smithy.java.runtime.core.serde;
 
 import java.io.InputStream;
 import java.net.http.HttpResponse;
@@ -17,13 +17,14 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
 /**
- * Subscribes to a {@link StreamPublisher} to transform it into a result.
+ * Subscribes to a {@link DataStream} to transform it into a result.
  *
  * <p>Note: this class and factory methods are heavily based on {@link HttpResponse.BodySubscriber} and typically
  * leverages its implementations.
  *
  * @param <T> Result to transform the published data into.
  */
+// TODO: Should this be renamed? Should this be a public interface?
 // TODO: Is it ok for the implementation to be dependent on java.net.http.HttpRequest.BodySubscribers?
 // TODO: Is it ok for core to have dependency on java.net.http? even after http-api module split
 public interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {

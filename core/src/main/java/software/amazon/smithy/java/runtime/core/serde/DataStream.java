@@ -5,21 +5,25 @@
 
 package software.amazon.smithy.java.runtime.core.serde;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
-import software.amazon.smithy.java.runtime.core.serde.streaming.StreamPublisher;
 
 /**
  * Abstraction for reading streams of data.
  */
-public interface DataStream extends AutoCloseable {
+// TODO: Is it ok for the implementation to be dependent on java.net.http.HttpRequest.BodyPublishers?
+// TODO: Is it ok for core to have dependency on java.net.http? even after http-api module split
+public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
     /**
      * Length of the data stream, if known.
      *
@@ -45,24 +49,6 @@ public interface DataStream extends AutoCloseable {
      */
     Optional<String> contentType();
 
-    /**
-     * Get the Flow.Publisher of ByteBuffer.
-     *
-     * @return the underlying Publisher.
-     */
-     Flow.Publisher<ByteBuffer> publisher();
-
-    // TODO: Does inputStream make sense?
-    /**
-     * Get the InputStream.
-     *
-     * @return the underlying InputStream.
-     */
-//    InputStream inputStream();
-    default InputStream inputStream() {
-        return null;
-    }
-
     // TODO: Does rewind make sense?
     /**
      * Attempt to rewind the input stream to the beginning of the stream.
@@ -79,38 +65,38 @@ public interface DataStream extends AutoCloseable {
      */
     @Override
     default void close() {
-        try {
-            inputStream().close();
-        } catch (IOException e) {
-            throw new UncheckedIOException("Unable to close input stream in data stream", e);
-        }
+//        try {
+//            inputStream().close();
+//        } catch (IOException e) {
+//            throw new UncheckedIOException("Unable to close input stream in data stream", e);
+//        }
     }
 
-    /**
-     * Read the contents of the stream to an in-memory byte array.
-     *
-     * @param maxLength Maximum number of bytes to read.
-     * @return Returns the in-memory byte array.
-     */
-    // TODO: seems blocking. do we need to remove?
-    default byte[] readToBytes(int maxLength) {
-        try (InputStream stream = inputStream()) {
-            return stream.readNBytes(maxLength);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    /**
-     * Read the contents of the stream to an in-memory String.
-     *
-     * @param maxLength Maximum number of bytes to read.
-     * @return Returns the in-memory string.
-     */
-    // TODO: seems blocking. do we need to remove?
-    default String readToString(int maxLength) {
-        return new String(readToBytes(maxLength), StandardCharsets.UTF_8);
-    }
+//    /**
+//     * Read the contents of the stream to an in-memory byte array.
+//     *
+//     * @param maxLength Maximum number of bytes to read.
+//     * @return Returns the in-memory byte array.
+//     */
+//    // TODO: seems blocking. do we need to remove?
+//    default byte[] readToBytes(int maxLength) {
+//        try (InputStream stream = inputStream()) {
+//            return stream.readNBytes(maxLength);
+//        } catch (IOException e) {
+//            throw new UncheckedIOException(e);
+//        }
+//    }
+//
+//    /**
+//     * Read the contents of the stream to an in-memory String.
+//     *
+//     * @param maxLength Maximum number of bytes to read.
+//     * @return Returns the in-memory string.
+//     */
+//    // TODO: seems blocking. do we need to remove?
+//    default String readToString(int maxLength) {
+//        return new String(readToBytes(maxLength), StandardCharsets.UTF_8);
+//    }
 
     /**
      * Create an empty data stream.
@@ -118,7 +104,7 @@ public interface DataStream extends AutoCloseable {
      * @return the empty data stream.
      */
     static DataStream ofEmpty() {
-        return ofPublisher(StreamPublisher.ofEmpty());
+        return ofHttpRequestPublisher(HttpRequest.BodyPublishers.noBody(), null);
     }
 
     /**
@@ -151,8 +137,7 @@ public interface DataStream extends AutoCloseable {
      * @return the non-rewindable data stream.
      */
     static DataStream ofInputStream(InputStream inputStream, String contentType, long contentLength) {
-        // TODO: contentLength is ignored right now, but maybe StreamPublisher.ofInputStream should take it in
-        return ofPublisher(StreamPublisher.ofInputStream(inputStream, contentType));
+        return ofPublisher(HttpRequest.BodyPublishers.ofInputStream(() -> inputStream), contentType, contentLength);
     }
 
     /**
@@ -194,7 +179,7 @@ public interface DataStream extends AutoCloseable {
      * @return the rewindable data stream.
      */
     static DataStream ofBytes(byte[] bytes, String contentType) {
-        return ofPublisher(StreamPublisher.ofBytes(bytes));
+        return ofHttpRequestPublisher(HttpRequest.BodyPublishers.ofByteArray(bytes), contentType);
     }
 
     /**
@@ -225,24 +210,47 @@ public interface DataStream extends AutoCloseable {
      * @return the rewindable data stream.
      */
     static DataStream ofFile(Path file, String contentType) {
-        return ofPublisher(StreamPublisher.ofFile(file, contentType));
+        try {
+            return ofHttpRequestPublisher(HttpRequest.BodyPublishers.ofFile(file), contentType);
+        } catch (FileNotFoundException e) {
+            throw new UncheckedIOException("File not found: " + file, e);
+        }
     }
 
-    static DataStream ofPublisher(StreamPublisher publisher) {
+    /**
+     * Creates a DataStream that emits data from a {@link HttpRequest.BodyPublisher}.
+     *
+     * @param publisher   HTTP request body publisher to stream.
+     * @param contentType Content-Type to associate with the stream. Can be set to null.
+     * @return The created DataStream.
+     */
+    static DataStream ofHttpRequestPublisher(HttpRequest.BodyPublisher publisher, String contentType) {
+        return ofPublisher(publisher, contentType, publisher.contentLength());
+    }
+
+    /**
+     * Creates a StreamPublisher that emits data from a {@link Flow.Publisher}.
+     *
+     * @param publisher   Publisher to stream.
+     * @param contentType Content-Type to associate with the stream. Can be null.
+     * @param contentLength Content length of the stream. Use -1 for unknown, and 0 or greater for the byte length.
+     * @return the created StreamPublisher.
+     */
+    static DataStream ofPublisher(Flow.Publisher<ByteBuffer> publisher, String contentType, long contentLength) {
         return new DataStream() {
             @Override
             public long contentLength() {
-                return publisher.contentLength();
+                return contentLength;
             }
 
             @Override
             public Optional<String> contentType() {
-                return publisher.contentType();
+                return Optional.ofNullable(contentType);
             }
 
             @Override
-            public Flow.Publisher<ByteBuffer> publisher() {
-                return publisher;
+            public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+                publisher.subscribe(subscriber);
             }
 
             @Override
@@ -250,5 +258,51 @@ public interface DataStream extends AutoCloseable {
                 return false;
             }
         };
+    }
+
+    /**
+     * Transform the stream into another value using the given {@link StreamSubscriber}.
+     *
+     * @param subscriber Subscriber used to transform the stream.
+     * @return the eventually transformed result.
+     * @param <T> Value to transform into.
+     */
+    default <T> CompletionStage<T> transform(StreamSubscriber<T> subscriber) {
+        subscribe(subscriber);
+        return subscriber.result();
+    }
+
+    // TODO: Make these return CompletableFuture directly?
+    // TODO: Have sync/async versions of these in DataStream directly. asBytesAsync/asBytesCf and asBytes with join()?
+    /**
+     * Read the contents of the stream into a byte array.
+     *
+     * @return the CompletionStage that contains the read byte array.
+     */
+    default CompletionStage<byte[]> asBytes() {
+        return transform(StreamSubscriber.ofByteArray());
+    }
+
+    /**
+     * Attempts to read the contents of the stream into a UTF-8 string.
+     *
+     * @return the CompletionStage that contains the string.
+     */
+    default CompletionStage<String> asString() {
+        return transform(StreamSubscriber.ofString());
+    }
+
+    /**
+     * Convert the stream into a blocking {@link InputStream}.
+     *
+     * @apiNote To ensure that all resources associated with the corresponding exchange are properly released the
+     * caller must ensure to either read all bytes until EOF is reached, or call {@link InputStream#close} if it is
+     * unable or unwilling to do so. Calling {@code close} before exhausting the stream may cause the underlying
+     * connection to be closed and prevent it from being reused for subsequent operations.
+     *
+     * @return Returns the CompletionStage that contains the blocking {@code InputStream}.
+     */
+    default CompletionStage<InputStream> asInputStream() {
+        return transform(StreamSubscriber.ofInputStream());
     }
 }

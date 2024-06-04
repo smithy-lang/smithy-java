@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.client.core;
 
 import java.net.URI;
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.SdkException;
@@ -66,7 +67,7 @@ public interface ClientProtocol<RequestT, ResponseT> {
      * @return the deserialized output shape.
      * @throws SdkException if an error occurs, including deserialized modeled errors and protocol errors.
      */
-    <I extends SerializableStruct, O extends SerializableStruct> O deserializeResponse(
+    <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
         ClientCall<I, O> call,
         RequestT request,
         ResponseT response

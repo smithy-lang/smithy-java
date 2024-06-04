@@ -93,7 +93,7 @@ public final class ResponseSerializer {
         return SmithyHttpResponse.builder()
             .statusCode(serializer.getResponseStatus())
             .headers(serializer.getHeaders())
-            .body(serializer.getBody().inputStream())
+            .body(new ContentStreamAdapter(serializer.getBody()))
             .build();
     }
 }

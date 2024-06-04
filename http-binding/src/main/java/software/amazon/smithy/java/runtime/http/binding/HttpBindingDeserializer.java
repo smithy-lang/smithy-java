@@ -9,6 +9,8 @@ import java.net.http.HttpHeaders;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
@@ -29,7 +31,6 @@ import software.amazon.smithy.utils.SmithyBuilder;
 final class HttpBindingDeserializer extends SpecificShapeDeserializer implements ShapeDeserializer {
 
     private static final System.Logger LOGGER = System.getLogger(HttpBindingDeserializer.class.getName());
-    private static final int MAX_IN_MEMORY_PAYLOAD = 134_217_728; // 128 MB.
     private final Codec payloadCodec;
     private final HttpHeaders headers;
     private final String requestRawQueryString;
@@ -39,6 +40,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private final BindingMatcher bindingMatcher;
     private final DataStream body;
     private final SdkShapeBuilder<?> shapeBuilder;
+    private CompletableFuture<Void> bodyDeserializationCf;
 
     private HttpBindingDeserializer(Builder builder) {
         this.shapeBuilder = Objects.requireNonNull(builder.shapeBuilder, "shapeBuilder not set");
@@ -84,12 +86,15 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                             System.Logger.Level.TRACE,
                             () -> "Reading " + schema + " body to bytes for structured payload"
                         );
-                        var bytes = body.readToBytes(MAX_IN_MEMORY_PAYLOAD);
-                        LOGGER.log(
-                            System.Logger.Level.TRACE,
-                            () -> "Deserializing the payload of " + schema + " via " + payloadCodec.getMediaType()
-                        );
-                        structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bytes));
+                        // TODO: validateMediaType here?
+                        CompletionStage<byte[]> asBytes = body.asBytes();
+                        bodyDeserializationCf = asBytes.thenAccept(bytes -> {
+                            LOGGER.log(
+                                System.Logger.Level.TRACE,
+                                () -> "Deserializing the payload of " + schema + " via " + payloadCodec.getMediaType()
+                            );
+                            structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bytes));
+                        }).toCompletableFuture();
                     } else if (member.memberTarget().type() == ShapeType.BLOB) {
                         // Set the payload on shape builder directly. This will fail for misconfigured shapes.
                         shapeBuilder.setDataStream(body);
@@ -103,22 +108,32 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
 
         // Now parse members in the payload of body.
         if (!bodyMembers.isEmpty()) {
+            validateMediaType();
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
-            var bytes = readPayloadBytes();
-            LOGGER.log(
-                System.Logger.Level.TRACE,
-                () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
-            );
-            payloadCodec.createDeserializer(bytes).readStruct(schema, bodyMembers, (body, m, de) -> {
-                if (!body.contains(m.id().getName())) {
-                    body.structMemberConsumer.accept(body.state, m, de);
-                }
-            });
-            LOGGER.log(
-                System.Logger.Level.TRACE,
-                () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
-            );
+            CompletionStage<byte[]> asBytes = body.asBytes();
+            bodyDeserializationCf = asBytes.thenAccept(bytes -> {
+                LOGGER.log(
+                    System.Logger.Level.TRACE,
+                    () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
+                );
+                payloadCodec.createDeserializer(bytes).readStruct(schema, bodyMembers, (body, m, de) -> {
+                    if (!body.contains(m.id().getName())) {
+                        body.structMemberConsumer.accept(body.state, m, de);
+                    }
+                });
+                LOGGER.log(
+                    System.Logger.Level.TRACE,
+                    () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
+                );
+            }).toCompletableFuture();
         }
+    }
+
+    // TODO: rename to completeBodyDeserialization()?
+    public CompletableFuture<Void> finishParsingBody() {
+        // TODO: Should this return CompletableFuture.completedFuture(body) like in `flow` branch?
+        // return Objects.requireNonNullElseGet(bodyCf, () -> CompletableFuture.completedFuture(body));
+        return Objects.requireNonNullElse(bodyDeserializationCf, CompletableFuture.completedFuture(null));
     }
 
     /**
@@ -135,22 +150,12 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         }
     }
 
-    private byte[] readPayloadBytes() {
+    private void validateMediaType() {
         // Validate the media-type matches the codec.
         String contentType = headers.firstValue("content-type").orElse("");
         if (!contentType.equals(payloadCodec.getMediaType())) {
-            throw new SdkSerdeException(
-                "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec.toString()
-            );
+            throw new SdkSerdeException("Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec);
         }
-
-        // Ensure the content-length is in the allowable range.
-        var contentLength = headers.firstValue("content-length").map(Long::valueOf).orElse(0L);
-        if (contentLength > MAX_IN_MEMORY_PAYLOAD) {
-            throw new SdkSerdeException("Content-Length too large " + contentLength);
-        }
-
-        return body.readToBytes(MAX_IN_MEMORY_PAYLOAD);
     }
 
     static final class Builder implements SmithyBuilder<HttpBindingDeserializer> {

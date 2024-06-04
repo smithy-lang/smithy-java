@@ -5,21 +5,25 @@
 
 package software.amazon.smithy.java.runtime.client.http;
 
-import java.io.InputStream;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.client.core.ClientCall;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.SraPipeline;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
+import software.amazon.smithy.java.runtime.http.binding.ContentStreamAdapter;
 
 /**
  * A client transport that uses Java's built-in {@link HttpClient} and protocols that use {@link SmithyHttpRequest}
@@ -83,21 +87,29 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
     }
 
     private CompletableFuture<SmithyHttpResponse> sendRequest(HttpRequest request) {
-        // TODO: change to HttpResponse.BodyHandlers.ofPublisher()
-        return client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
+        return client.sendAsync(request, HttpResponse.BodyHandlers.ofPublisher())
             .thenApply(this::createSmithyResponse);
     }
 
-    private SmithyHttpResponse createSmithyResponse(HttpResponse<InputStream> response) {
+    private SmithyHttpResponse createSmithyResponse(HttpResponse<Flow.Publisher<List<ByteBuffer>>> response) {
         LOGGER.log(
             System.Logger.Level.TRACE,
             () -> "Got response: " + response + "; headers: " + response.headers().map()
         );
+        var responsePublisher = response.body();
+        var contentType = response.headers().firstValue("content-type").orElse(null);
+        var contentLength = response.headers().firstValue("content-length").map(Long::valueOf).orElse(-1L);
+
+        // Flatten the List<ByteBuffer> to ByteBuffer.
+        var flattenedByteBufferPublisher = new ListByteBufferToByteBuffer(responsePublisher);
+        var dataStream = DataStream.ofPublisher(flattenedByteBufferPublisher, contentType, contentLength);
+        var contentStream = new ContentStreamAdapter(dataStream);
+
         return SmithyHttpResponse.builder()
             .httpVersion(javaToSmithyVersion(response.version()))
             .statusCode(response.statusCode())
             .headers(response.headers())
-            .body(response.body())
+            .body(contentStream)
             .build();
     }
 
@@ -115,5 +127,33 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
             case HTTP_2 -> SmithyHttpVersion.HTTP_2;
             default -> throw new UnsupportedOperationException("Unsupported HTTP version: " + version);
         };
+    }
+
+    private record ListByteBufferToByteBuffer(Flow.Publisher<List<ByteBuffer>> originalPublisher)
+        implements Flow.Publisher<ByteBuffer> {
+        @Override
+        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+            originalPublisher.subscribe(new Flow.Subscriber<>() {
+                @Override
+                public void onSubscribe(Flow.Subscription subscription) {
+                    subscriber.onSubscribe(subscription);
+                }
+
+                @Override
+                public void onNext(List<ByteBuffer> item) {
+                    item.forEach(subscriber::onNext);
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    subscriber.onError(throwable);
+                }
+
+                @Override
+                public void onComplete() {
+                    subscriber.onComplete();
+                }
+            });
+        }
     }
 }

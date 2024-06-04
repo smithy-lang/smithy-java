@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.client.http;
 import java.net.URI;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.client.core.ClientCall;
 import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkException;
@@ -47,33 +48,37 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct> O deserializeResponse(
+    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
         ClientCall<I, O> call,
         SmithyHttpRequest request,
         SmithyHttpResponse response
     ) {
         if (!isSuccess(response)) {
-            throw createError(call, response);
+            LOGGER.log(System.Logger.Level.TRACE, () -> "Deserializing error response with " + getClass().getName());
+            return createError(call, response).thenApply(e -> {
+                throw e;
+            });
         }
 
         LOGGER.log(System.Logger.Level.TRACE, () -> "Deserializing successful response with " + getClass().getName());
 
         var outputBuilder = call.createOutputBuilder(call.context(), call.operation().outputSchema().id().toString());
-        HttpBinding.responseDeserializer()
+        return HttpBinding.responseDeserializer()
             .payloadCodec(codec)
             .outputShapeBuilder(outputBuilder)
             .response(response)
-            .deserialize();
+            .deserialize()
+            .thenApply(ignore -> {
+                O output = outputBuilder.errorCorrection().build();
 
-        O output = outputBuilder.errorCorrection().build();
+                // TODO: error handling from the builder.
+                LOGGER.log(
+                    System.Logger.Level.TRACE,
+                    () -> "Successfully built " + output + " from HTTP response with " + getClass().getName()
+                );
 
-        // TODO: error handling from the builder.
-        LOGGER.log(
-            System.Logger.Level.TRACE,
-            () -> "Successfully built " + output + " from HTTP response with " + getClass().getName()
-        );
-
-        return outputBuilder.errorCorrection().build();
+                return output;
+            });
     }
 
     private boolean isSuccess(SmithyHttpResponse response) {
@@ -88,7 +93,10 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
      * @param response HTTP response to deserialize.
      * @return Returns the deserialized error.
      */
-    protected SdkException createError(ClientCall<?, ?> call, SmithyHttpResponse response) {
+    protected CompletableFuture<? extends SdkException> createError(
+        ClientCall<?, ?> call,
+        SmithyHttpResponse response
+    ) {
         return response.headers()
             // Grab the error ID from the header first.
             .firstValue(X_AMZN_ERROR_TYPE)
@@ -100,7 +108,9 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
             // Attempt to match the extracted error ID to a modeled error type.
             .flatMap(
                 errorId -> call.createExceptionBuilder(call.context(), errorId)
-                    .<SdkException>map(error -> createModeledException(codec, response, error))
+                    .<CompletableFuture<? extends SdkException>>map(
+                        error -> createModeledException(codec, response, error)
+                    )
             )
             // If no error was matched, then create an error from protocol hints.
             .orElseGet(() -> {
@@ -109,16 +119,18 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
             });
     }
 
-    private ModeledSdkException createModeledException(
+    private CompletableFuture<ModeledSdkException> createModeledException(
         Codec codec,
         SmithyHttpResponse response,
         SdkShapeBuilder<ModeledSdkException> error
     ) {
-        HttpBinding.responseDeserializer()
+        return HttpBinding.responseDeserializer()
             .payloadCodec(codec)
             .errorShapeBuilder(error)
             .response(response)
-            .deserialize();
-        return error.errorCorrection().build();
+            .deserialize()
+            .thenApply(ignore -> {
+                return error.errorCorrection().build();
+            });
     }
 }

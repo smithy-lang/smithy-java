@@ -38,7 +38,7 @@ public class ClientErrorCorrectionTest {
         assertEquals(corrected.shortMember(), (short) 0);
         assertArrayEquals(corrected.blob(), new byte[0]);
         assertEquals(corrected.streamingBlob().contentLength(), 0);
-        assertArrayEquals(corrected.streamingBlob().inputStream().readAllBytes(), new byte[0]);
+        corrected.streamingBlob().asBytes().thenAccept(bytes -> assertArrayEquals(bytes, new byte[0]));
         assertNull(corrected.document());
         assertEquals(corrected.list(), List.of());
         assertEquals(corrected.map(), Map.of());

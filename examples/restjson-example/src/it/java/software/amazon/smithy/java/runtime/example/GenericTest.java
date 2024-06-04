@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.example;
 
-import java.io.InputStream;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -54,7 +53,7 @@ public class GenericTest {
     }
 
     @Test
-    public void getPersonImage() throws Exception {
+    public void getPersonImage() {
         PersonDirectory client = PersonDirectoryClient.builder()
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
             .endpoint("https://httpbin.org")
@@ -63,9 +62,7 @@ public class GenericTest {
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
         GetPersonImageOutput output = client.getPersonImage(input);
 
-        try (InputStream is = output.image().inputStream()) {
-            System.out.println(new String(is.readAllBytes(), StandardCharsets.UTF_8));
-        }
+        System.out.println(output.image().asString().toCompletableFuture().join());
     }
 
     @Test
@@ -173,6 +170,6 @@ public class GenericTest {
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
         GetPersonImageOutput output = client.getPersonImage(input);
-        System.out.println(output.image().readToString(1000));
+        System.out.println(output.image().asString().toCompletableFuture().join());
     }
 }
