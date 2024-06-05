@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.SymbolProvider;
