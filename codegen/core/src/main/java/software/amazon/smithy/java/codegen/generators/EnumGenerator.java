@@ -63,6 +63,8 @@ public class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationContext
                 )
             );
             writer.putContext("toString", new ToStringGenerator(writer));
+            writer.putContext("equals", new EqualsGenerator(writer, shape));
+            writer.putContext("hashCode", new HashCodeGenerator(writer, shape));
             writer.putContext(
                 "builder",
                 new EnumBuilderGenerator(
@@ -93,6 +95,10 @@ public class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationContext
                         ${serializer:C|}
 
                         ${toString:C|}
+
+                        ${equals:C|}
+
+                        ${hashCode:C|}
 
                         ${builder:C|}
                     }
@@ -171,6 +177,43 @@ public class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationContext
                 @Override
                 public void serialize(${shapeSerializer:T} serializer) {
                     ${serializerBody:C|};
+                }
+                """);
+            writer.popState();
+        }
+    }
+
+    private record EqualsGenerator(JavaWriter writer, Shape shape) implements Runnable {
+        @Override
+        public void run() {
+            writer.pushState();
+            writer.putContext("object", Object.class);
+            writer.putContext("int", shape.isIntEnumShape());
+            writer.write("""
+                @Override
+                public boolean equals(${object:T} other) {
+                    if (other == this) {
+                        return true;
+                    }
+                    if (other == null || getClass() != other.getClass()) {
+                        return false;
+                    }
+                    ${shape:T} that = (${shape:T}) other;
+                    return this.value${?int} == ${/int}${^int}.equals(${/int}that.value${^int})${/int};
+                }""");
+            writer.popState();
+        }
+    }
+
+    private record HashCodeGenerator(JavaWriter writer, Shape shape) implements Runnable {
+        @Override
+        public void run() {
+            writer.pushState();
+            writer.putContext("int", shape.isIntEnumShape());
+            writer.write("""
+                @Override
+                public int hashCode() {
+                    return ${?int}value${/int}${^int}value.hashCode()${/int};
                 }
                 """);
             writer.popState();
