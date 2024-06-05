@@ -36,7 +36,9 @@ import software.amazon.smithy.model.shapes.BooleanShape;
 import software.amazon.smithy.model.shapes.ByteShape;
 import software.amazon.smithy.model.shapes.DocumentShape;
 import software.amazon.smithy.model.shapes.DoubleShape;
+import software.amazon.smithy.model.shapes.EnumShape;
 import software.amazon.smithy.model.shapes.FloatShape;
+import software.amazon.smithy.model.shapes.IntEnumShape;
 import software.amazon.smithy.model.shapes.IntegerShape;
 import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.LongShape;
@@ -461,9 +463,8 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             var visitor = new ErrorCorrectionVisitor(writer, symbolProvider, model);
             for (var member : shape.members()) {
                 var target = model.expectShape(member.getTarget());
-                if (target.isStructureShape() || target.isEnumShape() || target.isIntEnumShape() || target
-                    .isUnionShape()) {
-                    // Skip unions, structs, and enums
+                if (target.isStructureShape() || target.isUnionShape()) {
+                    // Skip unions and structs
                     continue;
                 }
                 if (CodegenUtils.isRequiredWithNoDefault(member)) {
@@ -535,6 +536,12 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             }
 
             @Override
+            public Void intEnumShape(IntEnumShape shape) {
+                writer.writeInline("$T.unknown(0)", symbolProvider.toSymbol(shape));
+                return null;
+            }
+
+            @Override
             public Void documentShape(DocumentShape documentShape) {
                 writer.writeInline("null");
                 return null;
@@ -555,6 +562,12 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             @Override
             public Void stringShape(StringShape stringShape) {
                 writer.writeInline("\"\"");
+                return null;
+            }
+
+            @Override
+            public Void enumShape(EnumShape shape) {
+                writer.writeInline("$T.unknown(\"\")", symbolProvider.toSymbol(shape));
                 return null;
             }
 
