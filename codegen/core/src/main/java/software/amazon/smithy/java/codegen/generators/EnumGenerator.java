@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.ShapeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -40,7 +41,8 @@ public class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationContext
             var shapeSymbol = directive.symbolProvider().toSymbol(shape);
             writer.putContext("shape", shapeSymbol);
             writer.putContext("serializableShape", SerializableShape.class);
-            writer.putContext("value", shapeSymbol.expectProperty(SymbolProperties.ENUM_VALUE_TYPE));
+            var valueSymbol = shapeSymbol.expectProperty(SymbolProperties.ENUM_VALUE_TYPE);
+            writer.putContext("value", valueSymbol);
 
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext("staticImpls", new StaticImplGenerator(writer, shape, directive.symbolProvider()));
@@ -49,7 +51,7 @@ public class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationContext
                 new SchemaGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.context())
             );
             writer.putContext("properties", writer.consumer(EnumGenerator::writeProperties));
-            writer.putContext("constructor", writer.consumer(EnumGenerator::writeConstructor));
+            writer.putContext("constructor", new ConstructorGenerator(writer, valueSymbol));
             writer.putContext("innerEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext("getters", writer.consumer(EnumGenerator::writeGetters));
             writer.putContext(
@@ -63,8 +65,8 @@ public class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationContext
                 )
             );
             writer.putContext("toString", new ToStringGenerator(writer));
-            writer.putContext("equals", new EqualsGenerator(writer, shape));
-            writer.putContext("hashCode", new HashCodeGenerator(writer, shape));
+            writer.putContext("equals", new EqualsGenerator(writer, valueSymbol));
+            writer.putContext("hashCode", new HashCodeGenerator(writer, valueSymbol));
             writer.putContext(
                 "builder",
                 new EnumBuilderGenerator(
@@ -134,16 +136,23 @@ public class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationContext
             """);
     }
 
-    private static void writeConstructor(JavaWriter writer) {
-        writer.pushState();
-        writer.putContext("objects", Objects.class);
-        writer.write("""
-            private ${shape:T}(Type type, ${value:T} value) {
-                this.type = ${objects:T}.requireNonNull(type, "type cannot be null");
-                this.value = ${objects:T}.requireNonNull(value, "value cannot be null");
-            }
-            """);
-        writer.popState();
+    private record ConstructorGenerator(JavaWriter writer, Symbol value) implements
+        Runnable {
+        @Override
+        public void run() {
+            writer.pushState();
+            writer.putContext("objects", Objects.class);
+            writer.putContext("primitive", value.expectProperty(SymbolProperties.IS_PRIMITIVE));
+            writer.write(
+                """
+                    private ${shape:T}(Type type, ${value:T} value) {
+                        this.type = ${objects:T}.requireNonNull(type, "type cannot be null");
+                        this.value = ${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "value cannot be null")${/primitive};
+                    }
+                    """
+            );
+            writer.popState();
+        }
     }
 
     private static void writeGetters(JavaWriter writer) {
@@ -157,7 +166,7 @@ public class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationContext
             }
 
             public static ${shape:T} unknown(${value:T} value) {
-                    return new ${shape:T}(Type.$$$$UNKNOWN, value);
+                return new ${shape:T}(Type.$$$$UNKNOWN, value);
             }
             """);
     }
@@ -183,37 +192,39 @@ public class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationContext
         }
     }
 
-    private record EqualsGenerator(JavaWriter writer, Shape shape) implements Runnable {
+    private record EqualsGenerator(JavaWriter writer, Symbol value) implements Runnable {
         @Override
         public void run() {
             writer.pushState();
             writer.putContext("object", Object.class);
-            writer.putContext("int", shape.isIntEnumShape());
-            writer.write("""
-                @Override
-                public boolean equals(${object:T} other) {
-                    if (other == this) {
-                        return true;
-                    }
-                    if (other == null || getClass() != other.getClass()) {
-                        return false;
-                    }
-                    ${shape:T} that = (${shape:T}) other;
-                    return this.value${?int} == ${/int}${^int}.equals(${/int}that.value${^int})${/int};
-                }""");
+            writer.putContext("primitive", value.expectProperty(SymbolProperties.IS_PRIMITIVE));
+            writer.write(
+                """
+                    @Override
+                    public boolean equals(${object:T} other) {
+                        if (other == this) {
+                            return true;
+                        }
+                        if (other == null || getClass() != other.getClass()) {
+                            return false;
+                        }
+                        ${shape:T} that = (${shape:T}) other;
+                        return this.value${?primitive} == ${/primitive}${^primitive}.equals(${/primitive}that.value${^primitive})${/primitive};
+                    }"""
+            );
             writer.popState();
         }
     }
 
-    private record HashCodeGenerator(JavaWriter writer, Shape shape) implements Runnable {
+    private record HashCodeGenerator(JavaWriter writer, Symbol value) implements Runnable {
         @Override
         public void run() {
             writer.pushState();
-            writer.putContext("int", shape.isIntEnumShape());
+            writer.putContext("primitive", value.expectProperty(SymbolProperties.IS_PRIMITIVE));
             writer.write("""
                 @Override
                 public int hashCode() {
-                    return ${?int}value${/int}${^int}value.hashCode()${/int};
+                    return ${?primitive}value${/primitive}${^primitive}value.hashCode()${/primitive};
                 }
                 """);
             writer.popState();
@@ -257,12 +268,20 @@ public class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationContext
         protected void generateSetters(JavaWriter writer) {
             writer.pushState();
             writer.putContext("objects", Objects.class);
-            writer.write("""
-                private Builder value(${value:T} value) {
-                    this.value = ${objects:T}.requireNonNull(value, "Enum value cannot be null");
-                    return this;
-                }
-                """);
+            writer.putContext(
+                "primitive",
+                symbolProvider.toSymbol(shape)
+                    .expectProperty(SymbolProperties.ENUM_VALUE_TYPE)
+                    .expectProperty(SymbolProperties.IS_PRIMITIVE)
+            );
+            writer.write(
+                """
+                    private Builder value(${value:T} value) {
+                        this.value = ${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Enum value cannot be null")${/primitive};
+                        return this;
+                    }
+                    """
+            );
             writer.popState();
         }
 
