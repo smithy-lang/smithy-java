@@ -14,12 +14,10 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 
-/**
- * TODO: docs
- */
 record StructureDeserializerGenerator(
     JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model, ServiceShape service
 ) implements Runnable {
+
     @Override
     public void run() {
         writer.pushState();

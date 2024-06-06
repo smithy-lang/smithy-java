@@ -30,6 +30,7 @@ import software.amazon.smithy.model.traits.TraitService;
 record TraitInitializerGenerator(JavaWriter writer, Shape shape, Set<ShapeId> runtimeTraits) implements Runnable {
 
     private static final Map<ShapeId, Class<? extends TraitService>> serviceMap = new HashMap<>();
+
     static {
         // Add all trait services to a map, so they can be queried for a provider class
         ServiceLoader.load(TraitService.class, TraitInitializerGenerator.class.getClassLoader())

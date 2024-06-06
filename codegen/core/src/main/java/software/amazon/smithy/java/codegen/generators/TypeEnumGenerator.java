@@ -12,22 +12,16 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 
-/**
- * TODO: DOcs
- * @param writer
- * @param symbolProvider
- * @param shape
- */
 record TypeEnumGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements
     Runnable {
+
     @Override
     public void run() {
         List<String> enumList = new ArrayList<>();
         enumList.add("$$UNKNOWN");
-        shape.members()
-            .stream()
-            .map(member -> CodegenUtils.getEnumVariantName(symbolProvider, member))
-            .forEach(enumList::add);
+        for (var member : shape.members()) {
+            enumList.add(CodegenUtils.getEnumVariantName(symbolProvider, member));
+        }
         writer.pushState();
         writer.putContext("variants", enumList);
         writer.write("""

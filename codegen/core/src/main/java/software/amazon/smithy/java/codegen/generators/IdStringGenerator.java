@@ -17,6 +17,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  */
 @SmithyInternalApi
 public record IdStringGenerator(JavaWriter writer, Shape shape) implements Runnable {
+
     @Override
     public void run() {
         writer.pushState();

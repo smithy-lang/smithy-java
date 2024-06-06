@@ -286,12 +286,14 @@ public final class CodegenUtils {
     }
 
     /**
-     * TODO: Docs
-     * @param string
-     * @return
+     * Converts a string from camel-case or pascal-case to upper snake-case.
+     *
+     * <p>For example {@code MyString} would be converted to {@code MY_STRING}.
+     *
+     * @param string String to convert to upper snake case
+     * @return Upper snake-case string
      */
     public static String toUpperSnakeCase(String string) {
         return CaseUtils.toSnakeCase(string).toUpperCase(Locale.ENGLISH);
-
     }
 }

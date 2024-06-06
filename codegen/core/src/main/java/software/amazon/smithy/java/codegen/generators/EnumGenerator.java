@@ -28,11 +28,10 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
-// TODO: handle strings with enum trait
-// TODO: Equals and hashcode
 @SmithyInternalApi
-public class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationContext, JavaCodegenSettings>>
+public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationContext, JavaCodegenSettings>>
     implements Consumer<T> {
+
     @Override
     public void accept(T directive) {
         var shape = directive.shape();
