@@ -34,20 +34,8 @@ public interface SmithyHttpResponse extends SmithyHttpMessage {
         return (SmithyHttpResponse) SmithyHttpMessage.super.withAddedHeaders(fieldAndValues);
     }
 
-    /**
-     * Get the body of the response.
-     *
-     * @return Returns the response body.
-     */
-    ContentStream body();
-
-    /**
-     * Create a new response from this response with the given body.
-     *
-     * @param body Body to set.
-     * @return Returns the new response.
-     */
-    SmithyHttpMessage withBody(ContentStream body);
+    @Override
+    SmithyHttpResponse withBody(ContentStream body);
 
     static Builder builder() {
         return new Builder();

@@ -73,4 +73,8 @@ public interface SmithyHttpMessage {
         }
         return withHeaders(HttpHeaders.of(current, (k, v) -> true));
     }
+
+    ContentStream body();
+
+    SmithyHttpMessage withBody(ContentStream stream);
 }

@@ -18,10 +18,6 @@ public interface SmithyHttpRequest extends SmithyHttpMessage {
 
     SmithyHttpRequest withUri(URI uri);
 
-    ContentStream body();
-
-    SmithyHttpRequest withBody(ContentStream stream);
-
     @Override
     SmithyHttpRequest withHttpVersion(SmithyHttpVersion version);
 
@@ -37,6 +33,9 @@ public interface SmithyHttpRequest extends SmithyHttpMessage {
     default SmithyHttpRequest withAddedHeaders(String... fieldAndValues) {
         return (SmithyHttpRequest) SmithyHttpMessage.super.withAddedHeaders(fieldAndValues);
     }
+
+    @Override
+    SmithyHttpRequest withBody(ContentStream stream);
 
     @Override
     default String startLine() {
