@@ -49,14 +49,6 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      */
     Optional<String> contentType();
 
-    // TODO: Does rewind make sense?
-    /**
-     * Attempt to rewind the input stream to the beginning of the stream.
-     *
-     * @return Returns true if the stream could be rewound.
-     */
-    boolean rewind();
-
     // TODO: Does close make sense?
     /**
      * Close underlying resources, if necessary.
@@ -99,42 +91,42 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
 //    }
 
     /**
-     * Create an empty data stream.
+     * Create an empty DataStream.
      *
-     * @return the empty data stream.
+     * @return the empty DataStream.
      */
     static DataStream ofEmpty() {
         return ofHttpRequestPublisher(HttpRequest.BodyPublishers.noBody(), null);
     }
 
     /**
-     * Create a data stream from an InputStream.
+     * Create a DataStream from an InputStream.
      *
      * @param inputStream InputStream to wrap.
-     * @return the non-rewindable data stream.
+     * @return the created DataStream.
      */
     static DataStream ofInputStream(InputStream inputStream) {
         return ofInputStream(inputStream, null);
     }
 
     /**
-     * Create a data stream from an InputStream.
+     * Create a DataStream from an InputStream.
      *
      * @param inputStream InputStream to wrap.
-     * @param contentType Content-Type of the data stream if known, or null.
-     * @return the non-rewindable data stream.
+     * @param contentType Content-Type of the stream if known, or null.
+     * @return the created DataStream.
      */
     static DataStream ofInputStream(InputStream inputStream, String contentType) {
         return ofInputStream(inputStream, contentType, -1);
     }
 
     /**
-     * Create a data stream from an InputStream.
+     * Create a DataStream from an InputStream.
      *
      * @param inputStream   InputStream to wrap.
-     * @param contentType   Content-Type of the data stream if known, or null.
+     * @param contentType   Content-Type of the stream if known, or null.
      * @param contentLength Bytes in the stream if known, or -1.
-     * @return the non-rewindable data stream.
+     * @return the created DataStream.
      */
     static DataStream ofInputStream(InputStream inputStream, String contentType, long contentLength) {
         return ofPublisher(HttpRequest.BodyPublishers.ofInputStream(() -> inputStream), contentType, contentLength);
@@ -144,7 +136,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      * Create a DataStream from an in-memory UTF-8 string.
      *
      * @param data Data to stream.
-     * @return the rewindable data stream.
+     * @return the created DataStream.
      */
     static DataStream ofString(String data) {
         return ofString(data, null);
@@ -154,8 +146,8 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      * Create a DataStream from an in-memory UTF-8 string.
      *
      * @param data        Data to stream.
-     * @param contentType Content-Type of the data stream if known, or null.
-     * @return the rewindable data stream.
+     * @param contentType Content-Type of the data if known, or null.
+     * @return the created DataStream.
      */
     static DataStream ofString(String data, String contentType) {
         return ofBytes(data.getBytes(StandardCharsets.UTF_8), contentType);
@@ -165,7 +157,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      * Create a DataStream from an in-memory byte array.
      *
      * @param bytes Bytes to read.
-     * @return the rewindable data stream.
+     * @return the created DataStream.
      */
     static DataStream ofBytes(byte[] bytes) {
         return ofBytes(bytes, null);
@@ -175,8 +167,8 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      * Create a DataStream from an in-memory byte array.
      *
      * @param bytes       Bytes to read.
-     * @param contentType Content-Type of the data stream if known, or null.
-     * @return the rewindable data stream.
+     * @param contentType Content-Type of the data if known, or null.
+     * @return the created DataStream.
      */
     static DataStream ofBytes(byte[] bytes, String contentType) {
         return ofHttpRequestPublisher(HttpRequest.BodyPublishers.ofByteArray(bytes), contentType);
@@ -190,7 +182,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      * {@code contentType} argument.
      *
      * @param file File to read.
-     * @return the rewindable data stream.
+     * @return the created DataStream.
      */
     static DataStream ofFile(Path file) {
         String contentType;
@@ -206,8 +198,8 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      * Create a DataStream from a file on disk.
      *
      * @param file        File to read.
-     * @param contentType Content-Type of the data stream if known, or null.
-     * @return the rewindable data stream.
+     * @param contentType Content-Type of the data if known, or null.
+     * @return the created DataStream.
      */
     static DataStream ofFile(Path file, String contentType) {
         try {
@@ -222,19 +214,19 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      *
      * @param publisher   HTTP request body publisher to stream.
      * @param contentType Content-Type to associate with the stream. Can be set to null.
-     * @return The created DataStream.
+     * @return the created DataStream.
      */
     static DataStream ofHttpRequestPublisher(HttpRequest.BodyPublisher publisher, String contentType) {
         return ofPublisher(publisher, contentType, publisher.contentLength());
     }
 
     /**
-     * Creates a StreamPublisher that emits data from a {@link Flow.Publisher}.
+     * Creates a DataStream that emits data from a {@link Flow.Publisher}.
      *
      * @param publisher   Publisher to stream.
      * @param contentType Content-Type to associate with the stream. Can be null.
      * @param contentLength Content length of the stream. Use -1 for unknown, and 0 or greater for the byte length.
-     * @return the created StreamPublisher.
+     * @return the created DataStream.
      */
     static DataStream ofPublisher(Flow.Publisher<ByteBuffer> publisher, String contentType, long contentLength) {
         return new DataStream() {
@@ -251,11 +243,6 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
             @Override
             public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
                 publisher.subscribe(subscriber);
-            }
-
-            @Override
-            public boolean rewind() {
-                return false;
             }
         };
     }

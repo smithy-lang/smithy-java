@@ -13,7 +13,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
 /**
- * A rewindable stream of data for HTTP messages.
+ * A stream of data for HTTP messages.
  */
 public interface ContentStream {
     /**
@@ -25,11 +25,6 @@ public interface ContentStream {
             // TODO: Is this a valid "empty" publisher?
             return subscriber -> {};
         }
-
-        @Override
-        public boolean rewind() {
-            return false;
-        }
     };
 
     /**
@@ -38,16 +33,6 @@ public interface ContentStream {
      * @return the underlying Publisher.
      */
     Flow.Publisher<ByteBuffer> publisher();
-
-    // TODO: Not sure if this needs to be rewindable with Flow?
-    /**
-     * Attempt to rewind the input stream to the beginning of the stream.
-     *
-     * <p>This method must not throw if the stream is not rewindable.
-     *
-     * @return Returns true if the stream could be rewound.
-     */
-    boolean rewind();
 
     // TODO: Make this return CompletableFuture directly?
     default CompletionStage<String> asString() {
