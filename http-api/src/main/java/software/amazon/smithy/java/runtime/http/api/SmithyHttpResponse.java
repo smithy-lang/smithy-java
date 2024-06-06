@@ -7,7 +7,7 @@ package software.amazon.smithy.java.runtime.http.api;
 
 import java.net.http.HttpHeaders;
 
-public interface SmithyHttpResponse extends SmithyHttpMessage, AutoCloseable {
+public interface SmithyHttpResponse extends SmithyHttpMessage {
 
     @Override
     default String startLine() {
@@ -48,21 +48,6 @@ public interface SmithyHttpResponse extends SmithyHttpMessage, AutoCloseable {
      * @return Returns the new response.
      */
     SmithyHttpMessage withBody(ContentStream body);
-
-    /**
-     * Close underlying resources, if necessary.
-     *
-     * <p>If the resource is already closed, this method does nothing.
-     */
-    @Override
-    default void close() {
-        // TODO: should SmithyHttpMessage be AutoCloseable anymore?
-//        try {
-//            body().close();
-//        } catch (IOException e) {
-//            throw new UncheckedIOException(e);
-//        }
-    }
 
     static Builder builder() {
         return new Builder();

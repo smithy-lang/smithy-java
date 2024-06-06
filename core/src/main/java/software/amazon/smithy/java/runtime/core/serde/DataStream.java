@@ -23,7 +23,7 @@ import java.util.concurrent.Flow;
  */
 // TODO: Is it ok for the implementation to be dependent on java.net.http.HttpRequest.BodyPublishers?
 // TODO: Is it ok for core to have dependency on java.net.http? even after http-api module split
-public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
+public interface DataStream extends Flow.Publisher<ByteBuffer> {
     /**
      * Length of the data stream, if known.
      *
@@ -48,21 +48,6 @@ public interface DataStream extends Flow.Publisher<ByteBuffer>, AutoCloseable {
      * @return the optionally available content-type.
      */
     Optional<String> contentType();
-
-    // TODO: Does close make sense?
-    /**
-     * Close underlying resources, if necessary.
-     *
-     * <p>If the resource is already closed, this method does nothing.
-     */
-    @Override
-    default void close() {
-//        try {
-//            inputStream().close();
-//        } catch (IOException e) {
-//            throw new UncheckedIOException("Unable to close input stream in data stream", e);
-//        }
-    }
 
 //    /**
 //     * Read the contents of the stream to an in-memory byte array.
