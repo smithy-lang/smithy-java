@@ -40,7 +40,7 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
     public SmithyHttpRequest createRequest(ClientCall<?, ?> call, URI endpoint) {
         return HttpBinding.requestSerializer()
             .operation(call.operation().schema())
-            .payload(call.requestInputStream().orElse(null))
+            .payload(call.requestDataStream().orElse(null))
             .payloadCodec(codec)
             .shapeValue(call.input())
             .endpoint(endpoint)

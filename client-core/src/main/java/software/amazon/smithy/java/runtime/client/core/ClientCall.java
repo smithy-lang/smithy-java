@@ -41,7 +41,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
     private final Context context;
     private final BiFunction<Context, String, Optional<SdkShapeBuilder<ModeledSdkException>>> errorCreator;
     private final ClientInterceptor interceptor;
-    private final DataStream requestInputStream;
+    private final DataStream requestDataStream;
     private final AuthSchemeResolver authSchemeResolver;
     private final Map<String, AuthScheme<?, ?>> supportedAuthSchemes;
     private final IdentityResolvers identityResolvers;
@@ -59,7 +59,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         identityResolvers = Objects.requireNonNull(builder.identityResolvers, "identityResolvers is null");
         supportedAuthSchemes = builder.supportedAuthSchemes.stream()
             .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity()));
-        requestInputStream = builder.requestInputStream;
+        requestDataStream = builder.requestDataStream;
         requestEventStream = builder.requestEventStream;
         //TODO fix this to not use a cached thread pool.
         executor = builder.executor == null ? Executors.newCachedThreadPool() : builder.executor;
@@ -127,12 +127,12 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
     }
 
     /**
-     * Contains the optionally present input stream.
+     * Contains the optionally present data stream.
      *
-     * @return the optionally present input stream to send in a request.
+     * @return the optionally present data stream to send in a request.
      */
-    public Optional<DataStream> requestInputStream() {
-        return Optional.ofNullable(requestInputStream);
+    public Optional<DataStream> requestDataStream() {
+        return Optional.ofNullable(requestDataStream);
     }
 
     /**
@@ -221,7 +221,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         private Context context;
         private BiFunction<Context, String, Optional<SdkShapeBuilder<ModeledSdkException>>> errorCreator;
         private ClientInterceptor interceptor = ClientInterceptor.NOOP;
-        private DataStream requestInputStream;
+        private DataStream requestDataStream;
         private AuthSchemeResolver authSchemeResolver;
         private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
         private IdentityResolvers identityResolvers;
@@ -302,14 +302,14 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         }
 
         /**
-         * Set the request input stream of the call.
+         * Set the request data stream of the call.
          *
-         * @param requestInputStream Input stream to set.
+         * @param requestDataStream Data stream to set.
          * @return the builder.
          */
-        public Builder<I, O> requestInputStream(DataStream requestInputStream) {
-            if (requestInputStream != null) {
-                this.requestInputStream = requestInputStream;
+        public Builder<I, O> requestDataStream(DataStream requestDataStream) {
+            if (requestDataStream != null) {
+                this.requestDataStream = requestDataStream;
                 this.requestEventStream = null;
             }
             return this;
@@ -324,7 +324,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         public Builder<I, O> requestEventStream(Object requestEventStream) {
             if (requestEventStream != null) {
                 this.requestEventStream = requestEventStream;
-                this.requestInputStream = null;
+                this.requestDataStream = null;
             }
             return this;
         }

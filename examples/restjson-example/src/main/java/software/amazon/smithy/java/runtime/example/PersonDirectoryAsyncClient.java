@@ -124,7 +124,7 @@ public final class PersonDirectoryAsyncClient implements PersonDirectoryAsync {
                 .operation(operation)
                 .endpointResolver(endpointResolver)
                 .context(context)
-                .requestInputStream(inputStream)
+                .requestDataStream(inputStream)
                 .requestEventStream(eventStream)
                 .interceptor(interceptor)
                 .supportedAuthSchemes(supportedAuthSchemes)
