@@ -33,7 +33,13 @@ public class OperationInterfaceGenerator implements
                 .writerDelegator()
                 .useFileWriter(symbol.getDeclarationFile(), symbol.getNamespace(), writer -> {
                     writer.pushState(new ClassSection(shape));
-                    writer.write("@$T", FunctionalInterface.class);
+                    var template = """
+                        @${functionalInterface:T}
+                        public interface ${interface:T} {
+                            ${output:T} ${methodName:L}(${input:T} input, ${requestContext:T} context);
+                        }
+                        """;
+                    writer.putContext("functionalInterface", FunctionalInterface.class);
                     writer.putContext("interface", symbol);
                     writer.putContext("requestContext", RequestContext.class);
                     var outputSymbol = symbol == stubSymbol
@@ -45,11 +51,7 @@ public class OperationInterfaceGenerator implements
                     writer.putContext("output", outputSymbol);
                     writer.putContext("methodName", operationMethodName);
                     writer.putContext("input", input);
-                    writer.write("""
-                        public interface ${interface:T} {
-                            ${output:T} ${methodName:L}(${input:T} input, ${requestContext:T} context);
-                        }
-                        """);
+                    writer.write(template);
                     writer.popState();
                 });
         }

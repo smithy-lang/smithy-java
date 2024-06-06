@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
@@ -51,95 +52,107 @@ public final class SharedSchemasGenerator
                 getFilename(directive.settings()),
                 CodegenUtils.getModelNamespace(directive.settings()),
                 writer -> {
-                    var shapesToGenerate = getCommonShapes(directive.connectedShapes().values());
-                    writer.write(
-                        """
-                            /**
-                             * Defines shared shapes across the model package that are not part of another code-generated type.
-                             */
-                            final class SharedSchemas {
+                    var common = getCommonShapes(directive.connectedShapes().values());
+                    writer.pushState();
+                    var template = """
+                        /**
+                         * Defines shared shapes across the model package that are not part of another code-generated type.
+                         */
+                        final class SharedSchemas {
 
-                                ${C|}
+                            ${schemas:C|}
 
-                                private SharedSchemas() {}
-                            }
-                            """,
-                        writer.consumer(w -> this.generateSchemas(w, directive, shapesToGenerate))
+                            private SharedSchemas() {}
+                        }
+                        """;
+                    writer.putContext(
+                        "schemas",
+                        new SchemasGenerator(
+                            writer,
+                            common,
+                            directive.symbolProvider(),
+                            directive.model(),
+                            directive.context()
+                        )
                     );
+                    writer.write(template);
+                    writer.popState();
                 }
             );
     }
 
-    private void generateSchemas(
+    private record SchemasGenerator(
         JavaWriter writer,
-        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive,
-        Set<Shape> shapes
-    ) {
-        Set<Shape> deferred = deferredShapes(directive.model(), shapes);
-        writer.pushState();
-        writer.putContext("schemaClass", SdkSchema.class);
-        for (var shape : shapes) {
-            if (deferred.contains(shape)) {
-                writer.write("static final ${schemaClass:T} $L;", CodegenUtils.toSchemaName(shape));
-            } else {
+        Set<Shape> shapes,
+        SymbolProvider symbolProvider,
+        Model model,
+        CodeGenerationContext context
+    ) implements Runnable {
+
+        @Override
+        public void run() {
+            Set<Shape> deferred = deferredShapes(shapes);
+            writer.pushState();
+            writer.putContext("schemaClass", SdkSchema.class);
+            for (var shape : shapes) {
+                if (deferred.contains(shape)) {
+                    writer.write("static final ${schemaClass:T} $L;", CodegenUtils.toSchemaName(shape));
+                } else {
+                    writer.write(
+                        "static final ${schemaClass:T} $L = ${C}",
+                        CodegenUtils.toSchemaName(shape),
+                        new SchemaGenerator(
+                            writer,
+                            shape,
+                            symbolProvider,
+                            model,
+                            context
+                        )
+                    );
+                }
+            }
+            writer.openBlock("static {", "}", () -> writeDeferred(deferred));
+            writer.popState();
+        }
+
+        private void writeDeferred(Set<Shape> shapes) {
+            Set<Shape> deferred = deferredShapes(shapes);
+            for (var shape : shapes) {
+                if (deferred.contains(shape)) {
+                    continue;
+                }
                 writer.write(
-                    "static final ${schemaClass:T} $L = ${C}",
+                    "$L = ${C}",
                     CodegenUtils.toSchemaName(shape),
                     new SchemaGenerator(
                         writer,
                         shape,
-                        directive.symbolProvider(),
-                        directive.model(),
-                        directive.context()
+                        symbolProvider,
+                        model,
+                        context
                     )
                 );
             }
-        }
-        writer.openBlock("static {", "}", () -> writeDeferred(writer, directive, deferred));
-        writer.popState();
-    }
 
-    private void writeDeferred(
-        JavaWriter writer,
-        CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive,
-        Set<Shape> shapes
-    ) {
-        Set<Shape> deferred = deferredShapes(directive.model(), shapes);
-        for (var shape : shapes) {
-            if (deferred.contains(shape)) {
-                continue;
-            }
-            writer.write(
-                "$L = ${C}",
-                CodegenUtils.toSchemaName(shape),
-                new SchemaGenerator(
-                    writer,
-                    shape,
-                    directive.symbolProvider(),
-                    directive.model(),
-                    directive.context()
-                )
-            );
-        }
-
-        if (!deferred.isEmpty()) {
-            writeDeferred(writer, directive, deferred);
-        }
-    }
-
-    private Set<Shape> deferredShapes(Model model, Set<Shape> shapes) {
-        Set<Shape> deferred = new HashSet<>();
-        for (var shape : shapes) {
-            boolean isDeferred = shape.members()
-                .stream()
-                .map(MemberShape::getTarget)
-                .map(model::expectShape)
-                .anyMatch(shapes::contains);
-            if (isDeferred) {
-                deferred.add(shape);
+            if (!deferred.isEmpty()) {
+                writeDeferred(deferred);
             }
         }
-        return deferred;
+
+        private Set<Shape> deferredShapes(Set<Shape> shapes) {
+            Set<Shape> deferred = new HashSet<>();
+            for (var shape : shapes) {
+                boolean isDeferred = shape.members()
+                    .stream()
+                    .map(MemberShape::getTarget)
+                    .map(model::expectShape)
+                    .anyMatch(shapes::contains);
+                if (isDeferred) {
+                    deferred.add(shape);
+                }
+            }
+            return deferred;
+        }
     }
 
     /**

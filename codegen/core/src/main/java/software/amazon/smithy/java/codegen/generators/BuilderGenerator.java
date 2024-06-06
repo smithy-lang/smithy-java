@@ -39,6 +39,31 @@ abstract class BuilderGenerator implements Runnable {
     @Override
     public void run() {
         writer.pushState();
+        var template = """
+            ${?isStaged}
+            ${stageGen:C|}
+
+            ${/isStaged}
+            public static Builder builder() {
+                return new Builder();
+            }
+
+            /**
+             * Builder for {@link ${shape:T}}.
+             */
+            public static final class Builder implements ${sdkShapeBuilder:T}<${shape:T}>${?isStaged}, ${#stages}${value:L}${^key.last}, ${/key.last}${/stages}${/isStaged} {
+                ${builderProperties:C|}
+
+                private Builder() {}
+
+                ${builderSetters:C|}
+
+                ${buildMethod:C|}
+
+                ${errorCorrection:C|}
+
+                ${deserializer:C|}
+            }""";
         writer.putContext("sdkShapeBuilder", SdkShapeBuilder.class);
         writer.putContext("builderProperties", writer.consumer(this::generateProperties));
         writer.putContext("builderSetters", writer.consumer(this::generateSetters));
@@ -51,33 +76,7 @@ abstract class BuilderGenerator implements Runnable {
             writer.putContext("stages", this.stageInterfaces());
             writer.putContext("stageGen", writer.consumer(this::generateStages));
         }
-        writer.write(
-            """
-                ${?isStaged}
-                ${stageGen:C|}
-
-                ${/isStaged}
-                public static Builder builder() {
-                    return new Builder();
-                }
-
-                /**
-                 * Builder for {@link ${shape:T}}.
-                 */
-                public static final class Builder implements ${sdkShapeBuilder:T}<${shape:T}>${?isStaged}, ${#stages}${value:L}${^key.last}, ${/key.last}${/stages}${/isStaged} {
-                    ${builderProperties:C|}
-
-                    private Builder() {}
-
-                    ${builderSetters:C|}
-
-                    ${buildMethod:C|}
-
-                    ${errorCorrection:C|}
-
-                    ${deserializer:C|}
-                }"""
-        );
+        writer.write(template);
         writer.popState();
     }
 

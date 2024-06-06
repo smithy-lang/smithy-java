@@ -37,45 +37,7 @@ public final class UnionGenerator
         var shape = directive.shape();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
-            writer.putContext("shape", directive.symbol());
-            writer.putContext("serializableStruct", SerializableStruct.class);
-            writer.putContext("document", Document.class);
-            writer.putContext("id", new IdStringGenerator(writer, shape));
-            writer.putContext(
-                "schemas",
-                new SchemaGenerator(
-                    writer,
-                    directive.shape(),
-                    directive.symbolProvider(),
-                    directive.model(),
-                    directive.context()
-                )
-            );
-            writer.putContext("memberEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
-            writer.putContext("toString", new ToStringGenerator(writer));
-            writer.putContext("valueCasters", new ValueCasterGenerator(writer, directive.symbolProvider(), shape));
-            writer.putContext(
-                "valueClasses",
-                new ValueClassGenerator(
-                    writer,
-                    directive.symbolProvider(),
-                    directive.model(),
-                    directive.service(),
-                    shape
-                )
-            );
-            writer.putContext(
-                "builder",
-                new UnionBuilderGenerator(
-                    writer,
-                    shape,
-                    directive.symbolProvider(),
-                    directive.model(),
-                    directive.service()
-                )
-            );
-            // Register inner templates for builder generator
-            writer.write("""
+            var template = """
                 public abstract class ${shape:T} implements ${serializableStruct:T} {
                     ${id:C|}
 
@@ -101,14 +63,53 @@ public final class UnionGenerator
 
                     ${builder:C|}
                 }
-                """);
+                """;
+            writer.putContext("shape", directive.symbol());
+            writer.putContext("serializableStruct", SerializableStruct.class);
+            writer.putContext("document", Document.class);
+            writer.putContext("id", new IdStringGenerator(writer, shape));
+            writer.putContext(
+                "schemas",
+                new SchemaGenerator(
+                    writer,
+                    shape,
+                    directive.symbolProvider(),
+                    directive.model(),
+                    directive.context()
+                )
+            );
+            writer.putContext("memberEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
+            writer.putContext("toString", new ToStringGenerator(writer));
+            writer.putContext("valueCasters", new ValueCasterGenerator(writer, shape, directive.symbolProvider()));
+            writer.putContext(
+                "valueClasses",
+                new ValueClassGenerator(
+                    writer,
+                    shape,
+                    directive.symbolProvider(),
+                    directive.model(),
+                    directive.service()
+                )
+            );
+            writer.putContext(
+                "builder",
+                new UnionBuilderGenerator(
+                    writer,
+                    shape,
+                    directive.symbolProvider(),
+                    directive.model(),
+                    directive.service()
+                )
+            );
+            writer.write(template);
             writer.popState();
         });
     }
 
 
-    private record ValueCasterGenerator(JavaWriter writer, SymbolProvider symbolProvider, UnionShape shape) implements
+    private record ValueCasterGenerator(JavaWriter writer, UnionShape shape, SymbolProvider symbolProvider) implements
         Runnable {
+
         @Override
         public void run() {
             writer.pushState();
@@ -129,7 +130,7 @@ public final class UnionGenerator
     }
 
     private record ValueClassGenerator(
-        JavaWriter writer, SymbolProvider symbolProvider, Model model, ServiceShape service, UnionShape shape
+        JavaWriter writer, UnionShape shape, SymbolProvider symbolProvider, Model model, ServiceShape service
     ) implements Runnable {
 
         @Override
@@ -140,6 +141,35 @@ public final class UnionGenerator
             for (var member : shape.members()) {
                 writer.pushState();
                 writer.injectSection(new ClassSection(member));
+                var template = """
+                    public static final class ${memberName:U}Member extends ${shape:T} {
+                        private final transient ${member:T} value;
+
+                        public ${memberName:U}Member(${member:T} value) {
+                            super(Type.${enumValue:L});
+                            this.value = ${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Union value cannot be null")${/primitive};
+                        }
+
+                        @Override
+                        public void serialize(${shapeSerializer:T} serializer) {
+                            serializer.writeStruct(SCHEMA, this);
+                        }
+
+                        @Override
+                        public void serializeMembers(${shapeSerializer:T} serializer) {
+                            ${serializeMember:C};
+                        }
+
+                        @Override
+                        public ${member:B} ${memberName:L}() {
+                            return value;
+                        }
+
+                        ${equals:C|}
+
+                        ${hashCode:C|}
+                    }
+                    """;
                 var memberSymbol = symbolProvider.toSymbol(member);
                 writer.putContext("member", memberSymbol);
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
@@ -151,37 +181,7 @@ public final class UnionGenerator
                 writer.putContext("equals", new EqualsGenerator(writer, symbolProvider, member));
                 writer.putContext("hashCode", new HashCodeGenerator(writer, symbolProvider, member));
                 writer.putContext("primitive", memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE));
-                writer.write(
-                    """
-                        public static final class ${memberName:U}Member extends ${shape:T} {
-                            private final transient ${member:T} value;
-
-                            public ${memberName:U}Member(${member:T} value) {
-                                super(Type.${enumValue:L});
-                                this.value = ${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Union value cannot be null")${/primitive};
-                            }
-
-                            @Override
-                            public void serialize(${shapeSerializer:T} serializer) {
-                                serializer.writeStruct(SCHEMA, this);
-                            }
-
-                            @Override
-                            public void serializeMembers(${shapeSerializer:T} serializer) {
-                                ${serializeMember:C};
-                            }
-
-                            @Override
-                            public ${member:B} ${memberName:L}() {
-                                return value;
-                            }
-
-                            ${equals:C|}
-
-                            ${hashCode:C|}
-                        }
-                        """
-                );
+                writer.write(template);
                 writer.popState();
             }
             // TODO: Add in unknown variant
@@ -199,11 +199,11 @@ public final class UnionGenerator
                     public int hashCode() {
                         ${C|}
                     }""",
-                (Runnable) this::generate
+                writer.consumer(this::generate)
             );
         }
 
-        private void generate() {
+        private void generate(JavaWriter writer) {
             writer.pushState();
             if (CodegenUtils.isJavaArray(symbolProvider.toSymbol(shape))) {
                 writer.putContext("arrays", Arrays.class);
@@ -237,12 +237,12 @@ public final class UnionGenerator
                         ${memberName:U}Member that = (${memberName:U}Member) other;
                         return ${C};
                     }""",
-                (Runnable) this::writePropertyEqualityCheck
+                writer.consumer(this::writePropertyEqualityCheck)
             );
             writer.popState();
         }
 
-        private void writePropertyEqualityCheck() {
+        private void writePropertyEqualityCheck(JavaWriter writer) {
             var memberSymbol = symbolProvider.toSymbol(shape);
             if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE)) {
                 writer.writeInlineWithNoFormatting("value == that.value");

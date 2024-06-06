@@ -33,6 +33,44 @@ public class OperationGenerator
             var input = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getInputShape()));
             var output = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getOutputShape()));
             writer.pushState(new ClassSection(shape));
+            var template = """
+                public final class ${shape:T} implements ${sdkOperation:T}<${inputType:T}, ${outputType:T}> {
+
+                    static final ${sdkSchema:T} SCHEMA = ${schema:C}
+
+                    ${typeRegistrySection:C|}
+
+                    @Override
+                    public ${sdkShapeBuilder:T}<${inputType:T}> inputBuilder() {
+                        return ${inputType:T}.builder();
+                    }
+
+                    @Override
+                    public ${sdkShapeBuilder:T}<${outputType:T}> outputBuilder() {
+                        return ${outputType:T}.builder();
+                    }
+
+                    @Override
+                    public ${sdkSchema:T} schema() {
+                        return SCHEMA;
+                    }
+
+                    @Override
+                    public ${sdkSchema:T} inputSchema() {
+                        return ${inputType:T}.SCHEMA;
+                    }
+
+                    @Override
+                    public ${sdkSchema:T} outputSchema() {
+                        return ${outputType:T}.SCHEMA;
+                    }
+
+                    @Override
+                    public ${typeRegistry:T} typeRegistry() {
+                        return typeRegistry;
+                    }
+                }
+                """;
             writer.putContext("shape", directive.symbol());
             writer.putContext("sdkOperation", SdkOperation.class);
             writer.putContext("inputType", input);
@@ -54,46 +92,7 @@ public class OperationGenerator
                     directive.service()
                 )
             );
-            writer.write(
-                """
-                    public final class ${shape:T} implements ${sdkOperation:T}<${inputType:T}, ${outputType:T}> {
-
-                        static final ${sdkSchema:T} SCHEMA = ${schema:C}
-
-                        ${typeRegistrySection:C|}
-
-                        @Override
-                        public ${sdkShapeBuilder:T}<${inputType:T}> inputBuilder() {
-                            return ${inputType:T}.builder();
-                        }
-
-                        @Override
-                        public ${sdkShapeBuilder:T}<${outputType:T}> outputBuilder() {
-                            return ${outputType:T}.builder();
-                        }
-
-                        @Override
-                        public ${sdkSchema:T} schema() {
-                            return SCHEMA;
-                        }
-
-                        @Override
-                        public ${sdkSchema:T} inputSchema() {
-                            return ${inputType:T}.SCHEMA;
-                        }
-
-                        @Override
-                        public ${sdkSchema:T} outputSchema() {
-                            return ${outputType:T}.SCHEMA;
-                        }
-
-                        @Override
-                        public ${typeRegistry:T} typeRegistry() {
-                            return typeRegistry;
-                        }
-                    }
-                    """
-            );
+            writer.write(template);
             writer.popState();
         });
     }
@@ -106,6 +105,7 @@ public class OperationGenerator
         Model model,
         ServiceShape service
     ) implements Runnable {
+
         @Override
         public void run() {
             writer.write("private final ${typeRegistry:T} typeRegistry = ${typeRegistry:T}.builder()");

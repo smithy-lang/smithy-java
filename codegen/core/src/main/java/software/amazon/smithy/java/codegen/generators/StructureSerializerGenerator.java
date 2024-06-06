@@ -21,19 +21,16 @@ import software.amazon.smithy.model.traits.ErrorTrait;
  */
 record StructureSerializerGenerator(
     JavaWriter writer,
+    StructureShape shape,
     SymbolProvider symbolProvider,
     Model model,
-    StructureShape shape,
     ServiceShape service
 ) implements Runnable {
 
     @Override
     public void run() {
         writer.pushState();
-        writer.putContext("shapeSerializer", ShapeSerializer.class);
-        writer.putContext("writeMemberSerialization", writer.consumer(this::writeMemberSerialization));
-
-        writer.write("""
+        var template = """
             @Override
             public void serialize(${shapeSerializer:T} serializer) {
                 serializer.writeStruct(SCHEMA, this);
@@ -43,11 +40,14 @@ record StructureSerializerGenerator(
             public void serializeMembers(${shapeSerializer:T} serializer) {
                 ${writeMemberSerialization:C|}
             }
-            """);
+            """;
+        writer.putContext("shapeSerializer", ShapeSerializer.class);
+        writer.putContext("writeMemberSerialization", writer.consumer(this::writeMemberSerialization));
+        writer.write(template);
         writer.popState();
     }
 
-    private void writeMemberSerialization(JavaWriter w) {
+    private void writeMemberSerialization(JavaWriter writer) {
         boolean isError = shape.hasTrait(ErrorTrait.class);
 
         for (var member : shape.members()) {
@@ -60,15 +60,15 @@ record StructureSerializerGenerator(
             // if the shape is an error we need to use the `getMessage()` method for message field.
             var state = isError && memberName.equals("message") ? "getMessage()" : memberName;
 
-            w.pushState();
-            w.putContext("nullable", CodegenUtils.isNullableMember(member));
-            w.putContext("memberName", memberName);
-            w.write("""
+            writer.pushState();
+            writer.putContext("nullable", CodegenUtils.isNullableMember(member));
+            writer.putContext("memberName", memberName);
+            writer.write("""
                 ${?nullable}if (${memberName:L} != null) {
                     ${/nullable}${C|};${?nullable}
                 }${/nullable}
-                """, new SerializerMemberGenerator(w, symbolProvider, model, service, member, state));
-            w.popState();
+                """, new SerializerMemberGenerator(writer, symbolProvider, model, service, member, state));
+            writer.popState();
         }
     }
 }

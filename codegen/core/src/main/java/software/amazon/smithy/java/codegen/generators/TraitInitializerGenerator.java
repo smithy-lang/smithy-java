@@ -81,6 +81,11 @@ record TraitInitializerGenerator(JavaWriter writer, Shape shape, Set<ShapeId> ru
             throw new UnsupportedOperationException("Could not find trait provider for " + trait);
         }
         writer.pushState();
+        var template = """
+            new ${?enclosing}${enclosing:T}.${name:L}${/enclosing}${^enclosing}${type:T}${/enclosing}().createTrait(
+                ${shapeId:T}.from(${id:S}),
+                ${nodeInitializer:C|}
+            )""";
         writer.putContext("shapeId", ShapeId.class);
         writer.putContext("node", Node.class);
         writer.putContext("name", traitProviderClass.getSimpleName());
@@ -89,18 +94,17 @@ record TraitInitializerGenerator(JavaWriter writer, Shape shape, Set<ShapeId> ru
         if (traitProviderClass.isMemberClass()) {
             writer.putContext("enclosing", traitProviderClass.getEnclosingClass());
         }
-        writer.writeInline(
-            """
-                new ${?enclosing}${enclosing:T}.${name:L}${/enclosing}${^enclosing}${type:T}${/enclosing}().createTrait(
-                    ${shapeId:T}.from(${id:S}),
-                    ${C|}
-                )""",
-            writer.consumer(w -> trait.toNode().accept(new NodeWriter(writer)))
-        );
+        writer.putContext("nodeInitializer", new NodeWriter(writer, trait.toNode()));
+        writer.writeInline(template);
         writer.popState();
     }
 
-    private record NodeWriter(JavaWriter writer) implements NodeVisitor<Void> {
+    private record NodeWriter(JavaWriter writer, Node node) implements NodeVisitor<Void>, Runnable {
+
+        @Override
+        public void run() {
+            node.accept(this);
+        }
 
         @Override
         public Void booleanNode(BooleanNode booleanNode) {

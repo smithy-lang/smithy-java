@@ -21,34 +21,33 @@ record StructureDeserializerGenerator(
     @Override
     public void run() {
         writer.pushState();
+        var template = """
+            @Override
+            public Builder deserialize(${shapeDeserializer:T} decoder) {
+                decoder.readStruct(SCHEMA, this, InnerDeserializer.INSTANCE);
+                return this;
+            }
+
+            private static final class InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer<Builder> {
+                private static final InnerDeserializer INSTANCE = new InnerDeserializer();
+
+                @Override
+                public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {
+                    ${?hasMembers}switch (member.memberIndex()) {
+                        ${cases:C|}
+                    }${/hasMembers}
+                }
+            }
+            """;
         writer.putContext("shapeDeserializer", ShapeDeserializer.class);
         writer.putContext("sdkSchema", SdkSchema.class);
         writer.putContext("hasMembers", !shape.members().isEmpty());
-        writer.write(
-            """
-                @Override
-                public Builder deserialize(${shapeDeserializer:T} decoder) {
-                    decoder.readStruct(SCHEMA, this, InnerDeserializer.INSTANCE);
-                    return this;
-                }
-
-                private static final class InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer<Builder> {
-                    private static final InnerDeserializer INSTANCE = new InnerDeserializer();
-
-                    @Override
-                    public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {
-                        ${?hasMembers}switch (member.memberIndex()) {
-                            ${C|}
-                        }${/hasMembers}
-                    }
-                }
-                """,
-            (Runnable) this::generateMemberSwitchCases
-        );
+        writer.putContext("cases", writer.consumer(this::generateMemberSwitchCases));
+        writer.write(template);
         writer.popState();
     }
 
-    private void generateMemberSwitchCases() {
+    private void generateMemberSwitchCases(JavaWriter writer) {
         int idx = 0;
         for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {
             var member = iter.next();

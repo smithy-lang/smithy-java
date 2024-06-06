@@ -37,6 +37,32 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
         var shape = directive.shape();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
+            var template = """
+                public final class ${shape:T} implements ${serializableShape:T} {
+                    ${id:C|}
+                    ${staticImpls:C|}
+
+                    ${schema:C|}
+
+                    ${properties:C|}
+
+                    ${constructor:C|}
+
+                    ${innerEnum:C|}
+
+                    ${getters:C|}
+
+                    ${serializer:C|}
+
+                    ${toString:C|}
+
+                    ${equals:C|}
+
+                    ${hashCode:C|}
+
+                    ${builder:C|}
+                }
+                """;
             var shapeSymbol = directive.symbolProvider().toSymbol(shape);
             writer.putContext("shape", shapeSymbol);
             writer.putContext("serializableShape", SerializableShape.class);
@@ -76,35 +102,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                     directive.service()
                 )
             );
-
-            writer.write(
-                """
-                    public final class ${shape:T} implements ${serializableShape:T} {
-                        ${id:C|}
-                        ${staticImpls:C|}
-
-                        ${schema:C|}
-
-                        ${properties:C|}
-
-                        ${constructor:C|}
-
-                        ${innerEnum:C|}
-
-                        ${getters:C|}
-
-                        ${serializer:C|}
-
-                        ${toString:C|}
-
-                        ${equals:C|}
-
-                        ${hashCode:C|}
-
-                        ${builder:C|}
-                    }
-                    """
-            );
+            writer.write(template);
             writer.popState();
         });
     }

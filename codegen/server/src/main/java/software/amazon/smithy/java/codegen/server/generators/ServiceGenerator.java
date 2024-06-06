@@ -38,6 +38,22 @@ public class ServiceGenerator implements
             .toList();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
+            var template = """
+                public final class ${service:T} implements ${serviceType:T} {
+                    ${id:C|}
+
+                    ${properties:C|}
+
+                    ${constructor:C|}
+
+                    ${builder:C|}
+
+                    @Override
+                    public <I, O> ${operationHolder:T}<I, O> getOperation(String operationName) {
+                        ${getOperation:C|}
+                    }
+                }
+                """;
             writer.putContext("operationHolder", Operation.class);
             writer.putContext("serviceType", Service.class);
             writer.putContext("service", directive.symbol());
@@ -51,25 +67,11 @@ public class ServiceGenerator implements
                 new ConstructorGenerator(writer, shape, directive.symbolProvider(), operations)
             );
             writer.putContext("builder", new BuilderGenerator(writer, shape, directive.symbolProvider(), operations));
-            writer.write(
-                """
-                    public final class ${service:T} implements ${serviceType:T} {
-                        ${id:C|}
-
-                        ${properties:C|}
-
-                        ${constructor:C|}
-
-                        ${builder:C|}
-
-                        @Override
-                        public <I, O> ${operationHolder:T}<I, O> getOperation(String operationName) {
-                            ${C|}
-                        }
-                    }
-                    """,
+            writer.putContext(
+                "getOperation",
                 new GetOperationGenerator(writer, shape, directive.symbolProvider(), operations)
             );
+            writer.write(template);
             writer.popState();
         });
 
@@ -87,11 +89,7 @@ public class ServiceGenerator implements
                 var operationName = operation.getProperty(ServerSymbolProperties.OPERATION_FIELD_NAME);
                 writer.pushState();
                 writer.putContext("notFinal", notFinal);
-                writer.write(
-                    "private${^notFinal} final${/notFinal} $T $L;",
-                    Operation.class,
-                    operationName
-                );
+                writer.write("private${^notFinal} final${/notFinal} ${operationHolder:T} $L;", operationName);
                 writer.popState();
             }
         }
@@ -148,37 +146,37 @@ public class ServiceGenerator implements
                     """, syncOperation, asyncOperation);
                 writer.popState();
             }
-            writer.write("""
+            var template = """
                 public interface BuildStage {
                     ${service:T} build();
                 }
-                """);
-            writer.write("""
-                public static $L builder() {
+
+                public static ${lastStage:L} builder() {
                     return new Builder();
                 }
-                """, stages.get(0));
-            writer.write(
-                """
-                    private final static class Builder implements ${#stages}${value:L}${^key.last}, ${/key.last}${/stages} {
 
-                        ${C|}
+                private final static class Builder implements ${#stages}${value:L}${^key.last}, ${/key.last}${/stages} {
 
-                        ${C|}
+                    ${builderProperties:C|}
 
-                        public ${service:T} build() {
-                            return new ${service:T}(this);
-                        }
+                    ${builderStages:C|}
+
+                    public ${service:T} build() {
+                        return new ${service:T}(this);
                     }
-                    """,
-                new PropertyGenerator(writer, serviceShape, symbolProvider, operations, true),
-                (Runnable) () -> this.generateStages(stages)
+                }
+                """;
+            writer.putContext("lastStage", stages.get(0));
+            writer.putContext(
+                "builderProperties",
+                new PropertyGenerator(writer, serviceShape, symbolProvider, operations, true)
             );
+            writer.putContext("builderStages", writer.consumer(w -> this.generateStages(w, stages)));
+            writer.write(template);
             writer.popState();
-
         }
 
-        private void generateStages(List<String> stages) {
+        private void generateStages(JavaWriter writer, List<String> stages) {
             for (int i = 0; i < operations.size(); i++) {
                 Symbol operation = operations.get(i);
                 String operationFieldName = operation.expectProperty(
@@ -188,27 +186,26 @@ public class ServiceGenerator implements
                 Symbol syncOperation = operation.expectProperty(ServerSymbolProperties.STUB_OPERATION);
                 Symbol asyncOperation = operation.expectProperty(ServerSymbolProperties.ASYNC_STUB_OPERATION);
                 writer.pushState();
+                var template = """
+                    @Override
+                    public ${nextStage:L} add${operation:T}Operation(${asyncOperationType:T} operation) {
+                        this.${operationFieldName:L} = new ${operationClass:T}<>("${operation:T}", true, operation::${operationFieldName:L});
+                        return this;
+                    }
+
+                    @Override
+                    public ${nextStage:L} add${operation:T}Operation(${syncOperationType:T} operation) {
+                        this.${operationFieldName:L} = new ${operationClass:T}<>("${operation:T}", false, operation::${operationFieldName:L});
+                        return this;
+                    }
+                    """;
                 writer.putContext("operationFieldName", operationFieldName);
                 writer.putContext("nextStage", nextStage);
                 writer.putContext("operation", operation);
                 writer.putContext("asyncOperationType", asyncOperation);
                 writer.putContext("syncOperationType", syncOperation);
-                writer.write(
-                    """
-                        @Override
-                        public ${nextStage:L} add${operation:T}Operation(${asyncOperationType:T} operation) {
-                            this.${operationFieldName:L} = new $1T<>("${operation:T}", true, operation::${operationFieldName:L});
-                            return this;
-                        }
-
-                        @Override
-                        public ${nextStage:L} add${operation:T}Operation(${syncOperationType:T} operation) {
-                            this.${operationFieldName:L} = new $1T<>("${operation:T}", false, operation::${operationFieldName:L});
-                            return this;
-                        }
-                        """,
-                    Operation.class
-                );
+                writer.putContext("operationClass", Operation.class);
+                writer.write(template);
                 writer.popState();
             }
         }

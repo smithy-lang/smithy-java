@@ -67,6 +67,31 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         var shape = directive.shape();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
+            var template = """
+                public final class ${shape:T} ${^isError}implements ${serializableStruct:T}${/isError}${?isError}extends ${sdkException:T}${/isError} {
+                    ${id:C|}
+
+                    ${schemas:C|}
+
+                    ${properties:C|}
+
+                    ${constructor:C|}
+
+                    ${getters:C|}
+
+                    ${toString:C|}
+
+                    ${equals:C|}
+
+                    ${^isError}${hashCode:C|}${/isError}
+
+                    ${serializer:C|}
+
+                    ${builder:C|}
+
+                    ${^isError}${toBuilder:C|}${/isError}
+                }
+                """;
             writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
             writer.putContext("shape", directive.symbol());
             writer.putContext("serializableStruct", SerializableStruct.class);
@@ -76,7 +101,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 "schemas",
                 new SchemaGenerator(
                     writer,
-                    directive.shape(),
+                    shape,
                     directive.symbolProvider(),
                     directive.model(),
                     directive.context()
@@ -95,9 +120,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 "serializer",
                 new StructureSerializerGenerator(
                     writer,
+                    shape,
                     directive.symbolProvider(),
                     directive.model(),
-                    directive.shape(),
                     directive.service()
                 )
             );
@@ -112,33 +137,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 )
             );
             writer.putContext("toBuilder", new ToBuilderGenerator(writer, shape, directive.symbolProvider()));
-            writer.write(
-                """
-                    public final class ${shape:T} ${^isError}implements ${serializableStruct:T}${/isError}${?isError}extends ${sdkException:T}${/isError} {
-                        ${id:C|}
-
-                        ${schemas:C|}
-
-                        ${properties:C|}
-
-                        ${constructor:C|}
-
-                        ${getters:C|}
-
-                        ${toString:C|}
-
-                        ${equals:C|}
-
-                        ${^isError}${hashCode:C|}${/isError}
-
-                        ${serializer:C|}
-
-                        ${builder:C|}
-
-                        ${^isError}${toBuilder:C|}${/isError}
-                    }
-                    """
-            );
+            writer.write(template);
             writer.popState();
         });
     }
@@ -306,11 +305,11 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                     }
                     """,
                 Object.class,
-                (Runnable) this::writeMemberEquals
+                writer.consumer(this::writeMemberEquals)
             );
         }
 
-        private void writeMemberEquals() {
+        private void writeMemberEquals(JavaWriter writer) {
             // If there are no properties to compare, and they are the same non-null
             // type then classes should be considered equal, and we can simplify the return
             if (shape.members().isEmpty()) {
@@ -325,11 +324,11 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                     $1T that = ($1T) other;
                     return ${2C|};""",
                 symbolProvider.toSymbol(shape),
-                (Runnable) this::writePropertyEqualityChecks
+                writer.consumer(this::writePropertyEqualityChecks)
             );
         }
 
-        private void writePropertyEqualityChecks() {
+        private void writePropertyEqualityChecks(JavaWriter writer) {
             var iter = shape.members().iterator();
             while (iter.hasNext()) {
                 var member = iter.next();
@@ -370,11 +369,11 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                         ${C|}
                     }
                     """,
-                (Runnable) this::generate
+                writer.consumer(this::generate)
             );
         }
 
-        private void generate() {
+        private void generate(JavaWriter writer) {
             List<String> arrayMemberNames = shape.members()
                 .stream()
                 .filter(member -> CodegenUtils.isJavaArray(symbolProvider.toSymbol(member)))

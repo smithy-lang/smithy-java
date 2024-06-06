@@ -34,10 +34,38 @@ public final class ListGenerator
                 CodegenUtils.getSerdeFileName(directive.settings()),
                 CodegenUtils.getModelNamespace(directive.settings()),
                 writer -> writer.onSection("sharedSerde", t -> {
-
                     var name = CodegenUtils.getDefaultName(directive.shape(), directive.service());
                     var target = directive.model().expectShape(directive.shape().getMember().getTarget());
                     writer.pushState();
+                    var template = """
+                        static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:T}, ${shapeSerializer:T}> {
+                            static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
+
+                            @Override
+                            public void accept(${shape:T} values, ${shapeSerializer:T} serializer) {
+                                for (var value : values) {
+                                    ${memberSerializer:C|};
+                                }
+                            }
+                        }
+
+                        static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
+                            ${shape:T} result = new ${collectionImpl:T}<>();
+                            deserializer.readList(schema, result, ${name:U}MemberDeserializer.INSTANCE);
+                            return result;
+                        }
+
+                        private static final class ${name:U}MemberDeserializer implements ${shapeDeserializer:T}.ListMemberConsumer<${shape:T}> {
+                            static final ${name:U}MemberDeserializer INSTANCE = new ${name:U}MemberDeserializer();
+
+                            @Override
+                            public void accept(${shape:T} state, ${shapeDeserializer:T} deserializer) {
+                                ${?unique}if (${/unique}state.add($memberDeserializer:C)${^unique};${/unique}${?unique}) {
+                                    throw new ${serdeException:T}("Member must have unique values");
+                                }${/unique}
+                            }
+                        }
+                        """;
                     writer.putContext("shape", directive.symbol());
                     writer.putContext("name", name);
                     writer.putContext(
@@ -73,38 +101,10 @@ public final class ListGenerator
                             CodegenUtils.getSchemaType(writer, directive.symbolProvider(), target)
                         )
                     );
-                    writer.write(
-                        """
-                            static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:T}, ${shapeSerializer:T}> {
-                                static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
-
-                                @Override
-                                public void accept(${shape:T} values, ${shapeSerializer:T} serializer) {
-                                    for (var value : values) {
-                                        ${memberSerializer:C|};
-                                    }
-                                }
-                            }
-
-                            static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
-                                ${shape:T} result = new ${collectionImpl:T}<>();
-                                deserializer.readList(schema, result, ${name:U}MemberDeserializer.INSTANCE);
-                                return result;
-                            }
-
-                            private static final class ${name:U}MemberDeserializer implements ${shapeDeserializer:T}.ListMemberConsumer<${shape:T}> {
-                                static final ${name:U}MemberDeserializer INSTANCE = new ${name:U}MemberDeserializer();
-
-                                @Override
-                                public void accept(${shape:T} state, ${shapeDeserializer:T} deserializer) {
-                                    ${?unique}if (${/unique}state.add($memberDeserializer:C)${^unique};${/unique}${?unique}) {
-                                        throw new ${serdeException:T}("Member must have unique values");
-                                    }${/unique}
-                                }
-                            }
-                            """
-                    );
+                    writer.write(template);
                     writer.popState();
+
+                    // Writes any existing text
                     writer.writeInlineWithNoFormatting(t);
                 })
             );

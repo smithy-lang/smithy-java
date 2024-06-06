@@ -41,6 +41,47 @@ public class MapGenerator
                     var name = CodegenUtils.getDefaultName(directive.shape(), directive.service());
 
                     writer.pushState();
+                    var template = """
+                        static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:T}, ${mapSerializer:T}> {
+                            static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
+
+                            @Override
+                            public void accept(${shape:T} values, ${mapSerializer:T} serializer) {
+                                for (var valueEntry : values.entrySet()) {
+                                    serializer.writeEntry(
+                                        ${valueSchema:L},
+                                        valueEntry.getKey(),
+                                        valueEntry.getValue(),
+                                        ${name:U}ValueSerializer.INSTANCE
+                                    );
+                                }
+                            }
+                        }
+
+                        private static final class ${name:U}ValueSerializer implements ${biConsumer:T}<${value:T}, ${shapeSerializer:T}> {
+                            private static final ${name:U}ValueSerializer INSTANCE = new ${name:U}ValueSerializer();
+
+                            @Override
+                            public void accept(${value:T} values, ${shapeSerializer:T} serializer) {
+                                ${memberSerializer:C|};
+                            }
+                        }
+
+                        static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
+                            ${shape:T} result = new ${collectionImpl:T}<>();
+                            deserializer.readStringMap(schema, result, ${name:U}ValueDeserializer.INSTANCE);
+                            return result;
+                        }
+
+                        private static final class ${name:U}ValueDeserializer implements ${shapeDeserializer:T}.MapMemberConsumer<${key:T}, ${shape:T}> {
+                            static final ${name:U}ValueDeserializer INSTANCE = new ${name:U}ValueDeserializer();
+
+                            @Override
+                            public void accept(${shape:T} state, ${key:T} key, ${shapeDeserializer:T} deserializer) {
+                                state.put(key, $memberDeserializer:C);
+                            }
+                        }
+                        """;
                     writer.putContext("shape", directive.symbol());
                     writer.putContext("name", name);
                     writer.putContext("value", valueSymbol);
@@ -78,49 +119,7 @@ public class MapGenerator
                             valueSchema
                         )
                     );
-                    writer.write(
-                        """
-                            static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:T}, ${mapSerializer:T}> {
-                                static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
-
-                                @Override
-                                public void accept(${shape:T} values, ${mapSerializer:T} serializer) {
-                                    for (var valueEntry : values.entrySet()) {
-                                        serializer.writeEntry(
-                                            ${valueSchema:L},
-                                            valueEntry.getKey(),
-                                            valueEntry.getValue(),
-                                            ${name:U}ValueSerializer.INSTANCE
-                                        );
-                                    }
-                                }
-                            }
-
-                            private static final class ${name:U}ValueSerializer implements ${biConsumer:T}<${value:T}, ${shapeSerializer:T}> {
-                                private static final ${name:U}ValueSerializer INSTANCE = new ${name:U}ValueSerializer();
-
-                                @Override
-                                public void accept(${value:T} values, ${shapeSerializer:T} serializer) {
-                                    ${memberSerializer:C|};
-                                }
-                            }
-
-                            static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
-                                ${shape:T} result = new ${collectionImpl:T}<>();
-                                deserializer.readStringMap(schema, result, ${name:U}ValueDeserializer.INSTANCE);
-                                return result;
-                            }
-
-                            private static final class ${name:U}ValueDeserializer implements ${shapeDeserializer:T}.MapMemberConsumer<${key:T}, ${shape:T}> {
-                                static final ${name:U}ValueDeserializer INSTANCE = new ${name:U}ValueDeserializer();
-
-                                @Override
-                                public void accept(${shape:T} state, ${key:T} key, ${shapeDeserializer:T} deserializer) {
-                                    state.put(key, $memberDeserializer:C);
-                                }
-                            }
-                            """
-                    );
+                    writer.write(template);
                     writer.popState();
 
                     // Writes any existing text

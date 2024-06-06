@@ -129,7 +129,6 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
         return null;
     }
 
-    // TODO: handle string enums?
     @Override
     public Void enumShape(EnumShape shape) {
         writer.putContext("variants", shape.getEnumValues().keySet());
