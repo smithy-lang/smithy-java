@@ -216,8 +216,6 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
         return subscriber.result();
     }
 
-    // TODO: Make these return CompletableFuture directly?
-    // TODO: Have sync/async versions of these in DataStream directly. asBytesAsync/asBytesCf and asBytes with join()?
     /**
      * Read the contents of the stream into a byte array.
      *

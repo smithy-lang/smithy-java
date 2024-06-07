@@ -110,6 +110,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         if (!bodyMembers.isEmpty()) {
             validateMediaType();
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
+            // TODO: Should there be a configurable limit on the client/server for how much can be read in memory?
             bodyDeserializationCf = body.asBytes().thenAccept(bytes -> {
                 LOGGER.log(
                     System.Logger.Level.TRACE,
@@ -125,8 +126,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     CompletableFuture<Void> completeBodyDeserialization() {
-        // TODO: Should this return CompletableFuture.completedFuture(body) like in `flow` branch?
-        // return Objects.requireNonNullElseGet(bodyCf, () -> CompletableFuture.completedFuture(body));
         return Objects.requireNonNullElse(bodyDeserializationCf, CompletableFuture.completedFuture(null));
     }
 
