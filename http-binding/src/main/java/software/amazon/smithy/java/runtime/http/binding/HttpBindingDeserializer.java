@@ -86,7 +86,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                             System.Logger.Level.TRACE,
                             () -> "Reading " + schema + " body to bytes for structured payload"
                         );
-                        // TODO: validateMediaType here?
                         CompletionStage<byte[]> asBytes = body.asBytes();
                         bodyDeserializationCf = asBytes.thenAccept(bytes -> {
                             LOGGER.log(
