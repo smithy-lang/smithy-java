@@ -110,8 +110,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         if (!bodyMembers.isEmpty()) {
             validateMediaType();
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
-            CompletionStage<byte[]> asBytes = body.asBytes();
-            bodyDeserializationCf = asBytes.thenAccept(bytes -> {
+            bodyDeserializationCf = body.asBytes().thenAccept(bytes -> {
                 LOGGER.log(
                     System.Logger.Level.TRACE,
                     () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
@@ -121,16 +120,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                         body.structMemberConsumer.accept(body.state, m, de);
                     }
                 });
-                LOGGER.log(
-                    System.Logger.Level.TRACE,
-                    () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
-                );
             }).toCompletableFuture();
         }
     }
 
-    // TODO: rename to completeBodyDeserialization()?
-    public CompletableFuture<Void> finishParsingBody() {
+    CompletableFuture<Void> completeBodyDeserialization() {
         // TODO: Should this return CompletableFuture.completedFuture(body) like in `flow` branch?
         // return Objects.requireNonNullElseGet(bodyCf, () -> CompletableFuture.completedFuture(body));
         return Objects.requireNonNullElse(bodyDeserializationCf, CompletableFuture.completedFuture(null));

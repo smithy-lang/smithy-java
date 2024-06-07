@@ -27,7 +27,7 @@ import java.util.concurrent.Flow;
 // TODO: Should this be renamed? Should this be a public interface?
 // TODO: Is it ok for the implementation to be dependent on java.net.http.HttpRequest.BodySubscribers?
 // TODO: Is it ok for core to have dependency on java.net.http? even after http-api module split
-public interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
+interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
     /**
      * Returns a {@code CompletionStage} which when completed will return the created result. This method can be called
      * at any time relative to the other {@link Flow.Subscriber} methods.
@@ -122,7 +122,7 @@ public interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
      * @return the adapted StreamSubscriber.
      * @param <T> Value created by the BodySubscriber.
      */
-    static <T> StreamSubscriber<T> ofHttpResponseBodySubscriber(HttpResponse.BodySubscriber<T> subscriber) {
+    private static <T> StreamSubscriber<T> ofHttpResponseBodySubscriber(HttpResponse.BodySubscriber<T> subscriber) {
         return new StreamSubscriber<>() {
             @Override
             public CompletionStage<T> result() {

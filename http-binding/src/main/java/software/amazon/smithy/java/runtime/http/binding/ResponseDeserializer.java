@@ -95,6 +95,6 @@ public final class ResponseDeserializer {
             errorShapeBuilder.deserialize(deserializer);
         }
 
-        return deserializer.finishParsingBody();
+        return deserializer.completeBodyDeserialization();
     }
 }

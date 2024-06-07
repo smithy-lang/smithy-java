@@ -54,7 +54,6 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
         SmithyHttpResponse response
     ) {
         if (!isSuccess(response)) {
-            LOGGER.log(System.Logger.Level.TRACE, () -> "Deserializing error response with " + getClass().getName());
             return createError(call, response).thenApply(e -> {
                 throw e;
             });

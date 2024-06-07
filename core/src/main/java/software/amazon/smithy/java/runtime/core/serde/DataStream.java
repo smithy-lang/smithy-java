@@ -21,8 +21,6 @@ import java.util.concurrent.Flow;
 /**
  * Abstraction for reading streams of data.
  */
-// TODO: Is it ok for the implementation to be dependent on java.net.http.HttpRequest.BodyPublishers?
-// TODO: Is it ok for core to have dependency on java.net.http? even after http-api module split
 public interface DataStream extends Flow.Publisher<ByteBuffer> {
     /**
      * Length of the data stream, if known.
@@ -175,7 +173,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @param contentType Content-Type to associate with the stream. Can be set to null.
      * @return the created DataStream.
      */
-    static DataStream ofHttpRequestPublisher(HttpRequest.BodyPublisher publisher, String contentType) {
+    private static DataStream ofHttpRequestPublisher(HttpRequest.BodyPublisher publisher, String contentType) {
         return ofPublisher(publisher, contentType, publisher.contentLength());
     }
 
@@ -213,7 +211,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the eventually transformed result.
      * @param <T> Value to transform into.
      */
-    default <T> CompletionStage<T> transform(StreamSubscriber<T> subscriber) {
+    private <T> CompletionStage<T> transform(StreamSubscriber<T> subscriber) {
         subscribe(subscriber);
         return subscriber.result();
     }
@@ -223,6 +221,9 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     /**
      * Read the contents of the stream into a byte array.
      *
+     * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
+     * {@link #contentLength()} can be used to know if it is safe.
+     *
      * @return the CompletionStage that contains the read byte array.
      */
     default CompletionStage<byte[]> asBytes() {
@@ -231,6 +232,9 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
 
     /**
      * Attempts to read the contents of the stream into a UTF-8 string.
+     *
+     * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
+     * {@link #contentLength()} can be used to know if it is safe.
      *
      * @return the CompletionStage that contains the string.
      */
