@@ -86,8 +86,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                             System.Logger.Level.TRACE,
                             () -> "Reading " + schema + " body to bytes for structured payload"
                         );
-                        CompletionStage<byte[]> asBytes = body.asBytes();
-                        bodyDeserializationCf = asBytes.thenAccept(bytes -> {
+                        bodyDeserializationCf = bodyAsBytes().thenAccept(bytes -> {
                             LOGGER.log(
                                 System.Logger.Level.TRACE,
                                 () -> "Deserializing the payload of " + schema + " via " + payloadCodec.getMediaType()
@@ -109,8 +108,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         if (!bodyMembers.isEmpty()) {
             validateMediaType();
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
-            // TODO: Should there be a configurable limit on the client/server for how much can be read in memory?
-            bodyDeserializationCf = body.asBytes().thenAccept(bytes -> {
+            bodyDeserializationCf = bodyAsBytes().thenAccept(bytes -> {
                 LOGGER.log(
                     System.Logger.Level.TRACE,
                     () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
@@ -122,6 +120,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 });
             }).toCompletableFuture();
         }
+    }
+
+    // TODO: Should there be a configurable limit on the client/server for how much can be read in memory?
+    private CompletionStage<byte[]> bodyAsBytes() {
+        return body.asBytes();
     }
 
     CompletableFuture<Void> completeBodyDeserialization() {
