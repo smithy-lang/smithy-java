@@ -49,32 +49,6 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      */
     Optional<String> contentType();
 
-//    /**
-//     * Read the contents of the stream to an in-memory byte array.
-//     *
-//     * @param maxLength Maximum number of bytes to read.
-//     * @return Returns the in-memory byte array.
-//     */
-//    // TODO: seems blocking. do we need to remove?
-//    default byte[] readToBytes(int maxLength) {
-//        try (InputStream stream = inputStream()) {
-//            return stream.readNBytes(maxLength);
-//        } catch (IOException e) {
-//            throw new UncheckedIOException(e);
-//        }
-//    }
-//
-//    /**
-//     * Read the contents of the stream to an in-memory String.
-//     *
-//     * @param maxLength Maximum number of bytes to read.
-//     * @return Returns the in-memory string.
-//     */
-//    // TODO: seems blocking. do we need to remove?
-//    default String readToString(int maxLength) {
-//        return new String(readToBytes(maxLength), StandardCharsets.UTF_8);
-//    }
-
     /**
      * Create an empty DataStream.
      *
