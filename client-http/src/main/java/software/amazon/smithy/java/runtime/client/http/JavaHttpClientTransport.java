@@ -58,10 +58,6 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
     }
 
     private HttpRequest createJavaRequest(Context context, SmithyHttpRequest request) {
-        // TODO: Is there a need for knowing the contentLength and explicitly using noBody()?
-//        var bodyPublisher = request.body().contentLength() == 0
-//                ? HttpRequest.BodyPublishers.noBody()
-//                : HttpRequest.BodyPublishers.fromPublisher(request.body());
         var bodyPublisher = HttpRequest.BodyPublishers.fromPublisher(request.body());
 
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder()

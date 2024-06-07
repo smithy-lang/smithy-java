@@ -205,13 +205,13 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     }
 
     /**
-     * Transform the stream into another value using the given {@link StreamSubscriber}.
+     * Transform the stream into another value using the given {@link DataStreamSubscriber}.
      *
      * @param subscriber Subscriber used to transform the stream.
      * @return the eventually transformed result.
      * @param <T> Value to transform into.
      */
-    private <T> CompletionStage<T> transform(StreamSubscriber<T> subscriber) {
+    private <T> CompletionStage<T> transform(DataStreamSubscriber<T> subscriber) {
         subscribe(subscriber);
         return subscriber.result();
     }
@@ -227,7 +227,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the CompletionStage that contains the read byte array.
      */
     default CompletionStage<byte[]> asBytes() {
-        return transform(StreamSubscriber.ofByteArray());
+        return transform(DataStreamSubscriber.ofByteArray());
     }
 
     /**
@@ -239,7 +239,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the CompletionStage that contains the string.
      */
     default CompletionStage<String> asString() {
-        return transform(StreamSubscriber.ofString());
+        return transform(DataStreamSubscriber.ofString());
     }
 
     /**
@@ -253,6 +253,6 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return Returns the CompletionStage that contains the blocking {@code InputStream}.
      */
     default CompletionStage<InputStream> asInputStream() {
-        return transform(StreamSubscriber.ofInputStream());
+        return transform(DataStreamSubscriber.ofInputStream());
     }
 }

@@ -24,10 +24,7 @@ import java.util.concurrent.Flow;
  *
  * @param <T> Result to transform the published data into.
  */
-// TODO: Should this be renamed? Should this be a public interface?
-// TODO: Is it ok for the implementation to be dependent on java.net.http.HttpRequest.BodySubscribers?
-// TODO: Is it ok for core to have dependency on java.net.http? even after http-api module split
-interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
+interface DataStreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
     /**
      * Returns a {@code CompletionStage} which when completed will return the created result. This method can be called
      * at any time relative to the other {@link Flow.Subscriber} methods.
@@ -41,7 +38,7 @@ interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
      *
      * @return the StreamSubscriber that reads the stream into a String.
      */
-    static StreamSubscriber<String> ofString() {
+    static DataStreamSubscriber<String> ofString() {
         return ofHttpResponseBodySubscriber(HttpResponse.BodySubscribers.ofString(StandardCharsets.UTF_8));
     }
 
@@ -50,7 +47,7 @@ interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
      *
      * @return the StreamSubscriber that reads the stream into a byte array.
      */
-    static StreamSubscriber<byte[]> ofByteArray() {
+    static DataStreamSubscriber<byte[]> ofByteArray() {
         return ofHttpResponseBodySubscriber(HttpResponse.BodySubscribers.ofByteArray());
     }
 
@@ -62,7 +59,7 @@ interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
      * @param  file the file to store the body in
      * @return a body subscriber
      */
-    static StreamSubscriber<Path> ofFile(Path file) {
+    static DataStreamSubscriber<Path> ofFile(Path file) {
         return ofHttpResponseBodySubscriber(HttpResponse.BodySubscribers.ofFile(file));
     }
 
@@ -76,7 +73,7 @@ interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
      * @return a body subscriber
      * @throws IllegalArgumentException if an invalid set of open options are specified.
      */
-    static StreamSubscriber<Path> ofFile(Path file, OpenOption... openOptions) {
+    static DataStreamSubscriber<Path> ofFile(Path file, OpenOption... openOptions) {
         return ofHttpResponseBodySubscriber(HttpResponse.BodySubscribers.ofFile(file, openOptions));
     }
 
@@ -92,7 +89,7 @@ interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
      *
      * @return a subscriber that streams the response body as an {@link InputStream}.
      */
-    static StreamSubscriber<InputStream> ofInputStream() {
+    static DataStreamSubscriber<InputStream> ofInputStream() {
         return ofHttpResponseBodySubscriber(HttpResponse.BodySubscribers.ofInputStream());
     }
 
@@ -101,7 +98,7 @@ interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
      *
      * @return the discarding subscriber.
      */
-    static StreamSubscriber<Void> discarding() {
+    static DataStreamSubscriber<Void> discarding() {
         return ofHttpResponseBodySubscriber(HttpResponse.BodySubscribers.discarding());
     }
 
@@ -111,7 +108,7 @@ interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
      * @param value Value to replace the discarded result.
      * @return the replacing subscriber.
      */
-    static <U> StreamSubscriber<U> replacing(U value) {
+    static <U> DataStreamSubscriber<U> replacing(U value) {
         return ofHttpResponseBodySubscriber(HttpResponse.BodySubscribers.replacing(value));
     }
 
@@ -122,8 +119,8 @@ interface StreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
      * @return the adapted StreamSubscriber.
      * @param <T> Value created by the BodySubscriber.
      */
-    private static <T> StreamSubscriber<T> ofHttpResponseBodySubscriber(HttpResponse.BodySubscriber<T> subscriber) {
-        return new StreamSubscriber<>() {
+    private static <T> DataStreamSubscriber<T> ofHttpResponseBodySubscriber(HttpResponse.BodySubscriber<T> subscriber) {
+        return new DataStreamSubscriber<>() {
             @Override
             public CompletionStage<T> result() {
                 return subscriber.getBody();
