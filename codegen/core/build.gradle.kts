@@ -1,39 +1,27 @@
 plugins {
-    id("smithy-java.module-conventions")
-    id("smithy-java.integ-test-conventions")
+    id("smithy-java.codegen-plugin-conventions")
 }
 
 description = "This module provides the core codegen functionality for Smithy java"
-group = "software.amazon.smithy.java.codegen"
 
 extra["displayName"] = "Smithy :: Java :: Codegen :: Core"
-extra["moduleName"] = "software.amazon.smithy.java.codegen"
+extra["moduleName"] = "software.amazon.smithy.java.codegen.core"
 
 dependencies {
-    implementation(libs.smithy.codegen)
-    implementation(project(":core"))
     itImplementation(project(":json-codec"))
 }
 
 // Execute building of Java classes using an executable class
 // These classes will then be used by integration tests and benchmarks
-val generatedPojoDir = "${layout.buildDirectory.get()}/generated-pojos"
-tasks.register<JavaExec>("generatePojos") {
+val generatedSrcDir = layout.buildDirectory.dir("generated-src").get()
+tasks.register<JavaExec>("generateSources") {
+    delete(generatedSrcDir)
     dependsOn("test")
     classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.getSourceDirectories()
     mainClass = "software.amazon.smithy.java.codegen.utils.TestJavaCodegenRunner"
     environment("service", "smithy.java.codegen.test#TestService")
     environment("namespace", "io.smithy.codegen.test")
-    environment("output", generatedPojoDir)
-}
-
-// Add generated POJOs to integ tests and jmh benchmark
-sourceSets {
-    it {
-        java {
-            srcDir(generatedPojoDir)
-        }
-    }
+    environment("output", generatedSrcDir)
 }
 
 tasks {
@@ -41,19 +29,9 @@ tasks {
         finalizedBy("integ")
     }
     integ {
-        dependsOn("generatePojos")
+        dependsOn("generateSources")
     }
     compileItJava {
-        dependsOn("generatePojos")
-    }
-    spotbugsIt {
-        enabled = false
-    }
-}
-
-// Ignore generated generated code for formatter check
-spotless {
-    java {
-        targetExclude("**/build/**/*.*")
+        dependsOn("generateSources")
     }
 }

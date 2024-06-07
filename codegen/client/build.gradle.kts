@@ -6,3 +6,7 @@ description = "This module provides the codegen plugin for Smithy java client co
 
 extra["displayName"] = "Smithy :: Java :: Codegen :: Client"
 extra["moduleName"] = "software.amazon.smithy.java.codegen.client"
+
+dependencies {
+    implementation(project(":client-core"))
+}
