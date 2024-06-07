@@ -5,10 +5,14 @@
 
 package software.amazon.smithy.java.runtime.client.http;
 
+import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.core.Context;
@@ -117,11 +121,44 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
             return CompletableFuture.completedFuture(new SdkException(message.toString(), fault));
         }
 
-        CompletionStage<String> asString = response.body().asString();
-        return asString.thenApply(string -> {
+        return asString(response).thenApply(string -> {
             message.append(string);
             return new SdkException(message.toString(), fault);
-        }).toCompletableFuture();
+        });
+    }
+
+    // TODO: There is some duplication with DataStream.asString/StreamSubscriber.transform
+    private static CompletableFuture<String> asString(SmithyHttpResponse response) {
+        return transform(response.body(), HttpResponse.BodySubscribers.ofString(StandardCharsets.UTF_8));
+    }
+
+    private static <T> CompletableFuture<T> transform(
+        Flow.Publisher<ByteBuffer> publisher,
+        HttpResponse.BodySubscriber<T> subscriber
+    ) {
+        Flow.Subscriber<ByteBuffer> byteBufferSubscriber = new Flow.Subscriber<>() {
+            @Override
+            public void onSubscribe(Flow.Subscription subscription) {
+                subscriber.onSubscribe(subscription);
+            }
+
+            @Override
+            public void onNext(ByteBuffer item) {
+                subscriber.onNext(List.of(item));
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                subscriber.onError(throwable);
+            }
+
+            @Override
+            public void onComplete() {
+                subscriber.onComplete();
+            }
+        };
+        publisher.subscribe(byteBufferSubscriber);
+        return subscriber.getBody().toCompletableFuture();
     }
 
     private static boolean isText(String contentType) {

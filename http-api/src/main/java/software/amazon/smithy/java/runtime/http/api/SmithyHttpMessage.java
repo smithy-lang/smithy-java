@@ -6,8 +6,10 @@
 package software.amazon.smithy.java.runtime.http.api;
 
 import java.net.http.HttpHeaders;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.concurrent.Flow;
 
 public interface SmithyHttpMessage {
 
@@ -74,7 +76,7 @@ public interface SmithyHttpMessage {
         return withHeaders(HttpHeaders.of(current, (k, v) -> true));
     }
 
-    ContentStream body();
+    Flow.Publisher<ByteBuffer> body();
 
-    SmithyHttpMessage withBody(ContentStream stream);
+    SmithyHttpMessage withBody(Flow.Publisher<ByteBuffer> stream);
 }

@@ -10,7 +10,6 @@ import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
-import software.amazon.smithy.java.runtime.http.api.ContentStream;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 
 /**
@@ -51,16 +50,9 @@ public final class ResponseDeserializer {
     }
 
     private DataStream bodyDataStream(SmithyHttpResponse response) {
-        ContentStream contentStream = response.body();
-        // TODO: Is this unnecessary optimization?
-        if (contentStream instanceof ContentStreamAdapter contentStreamAdapter) {
-            return contentStreamAdapter.delegate();
-        }
-
-        var publisher = contentStream.publisher();
         var contentType = response.headers().firstValue("content-type").orElse(null);
         var contentLength = response.headers().firstValue("content-length").map(Long::valueOf).orElse(-1L);
-        return DataStream.ofPublisher(publisher, contentType, contentLength);
+        return DataStream.ofPublisher(response.body(), contentType, contentLength);
     }
 
     /**

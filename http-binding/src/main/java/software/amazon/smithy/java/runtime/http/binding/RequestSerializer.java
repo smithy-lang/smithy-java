@@ -120,7 +120,7 @@ public final class RequestSerializer {
             .method(httpTrait.getMethod())
             .uri(targetEndpoint)
             .headers(serializer.getHeaders())
-            .body(new ContentStreamAdapter(serializer.getBody()))
+            .body(serializer.getBody())
             .build();
     }
 }

@@ -6,20 +6,23 @@
 package software.amazon.smithy.java.runtime.http.api;
 
 import java.net.http.HttpHeaders;
+import java.net.http.HttpRequest;
+import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.Flow;
 
 public final class SmithyHttpResponseImpl implements SmithyHttpResponse {
 
     private final SmithyHttpVersion httpVersion;
     private final int statusCode;
-    private final ContentStream body;
+    private final Flow.Publisher<ByteBuffer> body;
     private final HttpHeaders headers;
 
     SmithyHttpResponseImpl(SmithyHttpResponse.Builder builder) {
         this.httpVersion = Objects.requireNonNull(builder.httpVersion);
         this.statusCode = builder.statusCode;
-        this.body = Objects.requireNonNullElse(builder.body, ContentStream.EMPTY);
+        this.body = Objects.requireNonNullElse(builder.body, HttpRequest.BodyPublishers.noBody());
         this.headers = Objects.requireNonNullElseGet(builder.headers, () -> HttpHeaders.of(Map.of(), (k, v) -> true));
     }
 
@@ -65,12 +68,12 @@ public final class SmithyHttpResponseImpl implements SmithyHttpResponse {
     }
 
     @Override
-    public ContentStream body() {
+    public Flow.Publisher<ByteBuffer> body() {
         return body;
     }
 
     @Override
-    public SmithyHttpResponse withBody(ContentStream body) {
+    public SmithyHttpResponse withBody(Flow.Publisher<ByteBuffer> body) {
         return SmithyHttpResponse.builder().with(this).body(body).build();
     }
 

@@ -19,11 +19,9 @@ import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.SraPipeline;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
-import software.amazon.smithy.java.runtime.http.binding.ContentStreamAdapter;
 
 /**
  * A client transport that uses Java's built-in {@link HttpClient} and protocols that use {@link SmithyHttpRequest}
@@ -64,7 +62,7 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
 //        var bodyPublisher = request.body().contentLength() == 0
 //                ? HttpRequest.BodyPublishers.noBody()
 //                : HttpRequest.BodyPublishers.fromPublisher(request.body());
-        var bodyPublisher = HttpRequest.BodyPublishers.fromPublisher(request.body().publisher());
+        var bodyPublisher = HttpRequest.BodyPublishers.fromPublisher(request.body());
 
         HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder()
             .version(smithyToHttpVersion(request.httpVersion()))
@@ -96,20 +94,11 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
             System.Logger.Level.TRACE,
             () -> "Got response: " + response + "; headers: " + response.headers().map()
         );
-        var responsePublisher = response.body();
-        var contentType = response.headers().firstValue("content-type").orElse(null);
-        var contentLength = response.headers().firstValue("content-length").map(Long::valueOf).orElse(-1L);
-
-        // Flatten the List<ByteBuffer> to ByteBuffer.
-        var flattenedByteBufferPublisher = new ListByteBufferToByteBuffer(responsePublisher);
-        var dataStream = DataStream.ofPublisher(flattenedByteBufferPublisher, contentType, contentLength);
-        var contentStream = new ContentStreamAdapter(dataStream);
-
         return SmithyHttpResponse.builder()
             .httpVersion(javaToSmithyVersion(response.version()))
             .statusCode(response.statusCode())
             .headers(response.headers())
-            .body(contentStream)
+            .body(new ListByteBufferToByteBuffer(response.body())) // Flatten the List<ByteBuffer> to ByteBuffer.
             .build();
     }
 
