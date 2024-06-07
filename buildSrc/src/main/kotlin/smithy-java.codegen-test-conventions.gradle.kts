@@ -11,7 +11,7 @@ dependencies {
 
 // Add generated Java sources to the main sourceset
 afterEvaluate {
-    var clientOutputPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-client-codegen")
+    val clientOutputPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-client-codegen")
     sourceSets {
         main {
             java {
@@ -20,14 +20,6 @@ afterEvaluate {
         }
     }
 }
-
-// Ignore generated generated code for formatter check
-spotless {
-    java {
-        targetExclude("**/build/**/*.*")
-    }
-}
-
 
 tasks.named("compileJava") {
     dependsOn("smithyBuild")

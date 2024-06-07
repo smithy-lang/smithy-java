@@ -1,7 +1,6 @@
 import com.github.spotbugs.snom.Effort
 import java.util.regex.Pattern
 import org.gradle.api.Project
-import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.the
 
 plugins {
@@ -76,6 +75,9 @@ spotless {
         // Static first, then everything else alphabetically
         removeUnusedImports()
         importOrder("\\#", "")
+
+        // Ignore generated generated code for formatter check
+        targetExclude("**/build/**/*.*")
     }
 }
 

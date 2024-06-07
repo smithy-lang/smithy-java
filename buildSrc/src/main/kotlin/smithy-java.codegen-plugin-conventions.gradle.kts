@@ -20,17 +20,18 @@ dependencies {
     }
 }
 
-// Ignore generated generated code for formatter check
-spotless {
-    java {
-        targetExclude("**/build/**/*.*")
-    }
+// Do not run spotbugs on integration tests
+tasks.named("spotbugsIt") {
+    enabled = false
 }
-
-// Do not run spotbugs on integ tests
-tasks["spotbugsIt"].enabled = false
 
 val generatedSrcDir = layout.buildDirectory.dir("generated-src").get()
 
-// Add generated sources to integ test sources
-project.the<SourceSetContainer>()["it"].java.srcDir(generatedSrcDir)
+// Add generated sources to integration test sources
+sourceSets {
+    named("it") {
+        java {
+            srcDir(generatedSrcDir)
+        }
+    }
+}

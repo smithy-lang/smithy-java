@@ -14,6 +14,3 @@ tasks.register<Test>("integ") {
     testClassesDirs = project.the<SourceSetContainer>()["it"].output.classesDirs
     classpath = project.the<SourceSetContainer>()["it"].runtimeClasspath
 }
-
-// Always run integ tests after base tests
-// tasks["test"].finalizedBy("integ")

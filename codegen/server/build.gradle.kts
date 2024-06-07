@@ -17,7 +17,7 @@ val generatedSrcDir = layout.buildDirectory.dir("generated-src").get()
 val generateSrcTask = tasks.register<JavaExec>("generateSources") {
     delete(generatedSrcDir)
     dependsOn("test")
-    classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.getSourceDirectories()
+    classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
     mainClass = "software.amazon.smithy.java.codegen.server.TestServerJavaCodegenRunner"
     environment("service", "smithy.java.codegen.server.test#TestService")
     environment("namespace", "smithy.java.codegen.server.test")

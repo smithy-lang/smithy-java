@@ -5,7 +5,7 @@ plugins {
 description = "This module provides the core codegen functionality for Smithy java"
 
 extra["displayName"] = "Smithy :: Java :: Codegen :: Core"
-extra["moduleName"] = "software.amazon.smithy.java.codegen.core"
+extra["moduleName"] = "software.amazon.smithy.java.codegen"
 
 dependencies {
     itImplementation(project(":json-codec"))
@@ -17,7 +17,7 @@ val generatedSrcDir = layout.buildDirectory.dir("generated-src").get()
 tasks.register<JavaExec>("generateSources") {
     delete(generatedSrcDir)
     dependsOn("test")
-    classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.getSourceDirectories()
+    classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
     mainClass = "software.amazon.smithy.java.codegen.utils.TestJavaCodegenRunner"
     environment("service", "smithy.java.codegen.test#TestService")
     environment("namespace", "io.smithy.codegen.test")
