@@ -37,7 +37,7 @@ public abstract class Client<T extends Client<T>> {
     private final AuthSchemeResolver authSchemeResolver;
     private final IdentityResolvers identityResolvers;
 
-    public Client(Builder<T> builder) {
+    protected Client(Builder<T> builder) {
         this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
         this.transport = new ApiCallTimeoutTransport(Objects.requireNonNull(builder.transport, "transport is null"));
         // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
@@ -105,12 +105,12 @@ public abstract class Client<T extends Client<T>> {
     }
 
     public static abstract class Builder<T extends Client<T>> {
-        ClientTransport transport;
-        EndpointResolver endpointResolver;
-        final List<ClientInterceptor> interceptors = new ArrayList<>();
-        AuthSchemeResolver authSchemeResolver;
-        final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
-        final List<IdentityResolver<?>> identityResolvers = new ArrayList<>();
+        private ClientTransport transport;
+        private EndpointResolver endpointResolver;
+        private final List<ClientInterceptor> interceptors = new ArrayList<>();
+        private AuthSchemeResolver authSchemeResolver;
+        private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
+        private final List<IdentityResolver<?>> identityResolvers = new ArrayList<>();
 
         /**
          * Set the protocol and transport to when calling the service.
