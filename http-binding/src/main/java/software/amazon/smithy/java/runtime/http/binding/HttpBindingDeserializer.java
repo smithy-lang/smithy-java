@@ -128,7 +128,10 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     CompletableFuture<Void> completeBodyDeserialization() {
-        return Objects.requireNonNullElse(bodyDeserializationCf, CompletableFuture.completedFuture(null));
+        if (bodyDeserializationCf == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return bodyDeserializationCf;
     }
 
     /**

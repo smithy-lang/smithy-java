@@ -126,6 +126,7 @@ public class JavaHttpClientTransport implements ClientTransport, ClientTransport
 
                 @Override
                 public void onNext(List<ByteBuffer> item) {
+                    // TODO: subscriber.onNext should only be called as many times as requested by the subscription
                     item.forEach(subscriber::onNext);
                 }
 
