@@ -11,7 +11,10 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.JavaSymbolProvider;
+import software.amazon.smithy.java.codegen.client.generators.ClientImplementationGenerator;
+import software.amazon.smithy.java.codegen.client.generators.ClientInterfaceGenerator;
 import software.amazon.smithy.java.codegen.client.generators.OperationGenerator;
+import software.amazon.smithy.java.codegen.generators.EnumGenerator;
 import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
@@ -23,6 +26,7 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 @SmithyUnstableApi
 public class DirectedJavaClientCodegen implements
     DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
+
     @Override
     public SymbolProvider createSymbolProvider(
         CreateSymbolProviderDirective<JavaCodegenSettings> directive
@@ -49,7 +53,8 @@ public class DirectedJavaClientCodegen implements
 
     @Override
     public void generateService(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        // TODO
+        new ClientInterfaceGenerator().accept(directive);
+        new ClientImplementationGenerator().accept(directive);
     }
 
     @Override
@@ -85,12 +90,12 @@ public class DirectedJavaClientCodegen implements
 
     @Override
     public void generateEnumShape(GenerateEnumDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        // TODO
+        new EnumGenerator<>().accept(directive);
     }
 
     @Override
     public void generateIntEnumShape(GenerateIntEnumDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        // TODO
+        new EnumGenerator<>().accept(directive);
     }
 
     @Override

@@ -74,7 +74,6 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
         Symbol symbol = shape.accept(this);
         LOGGER.log(System.Logger.Level.TRACE, () -> "Creating symbol from " + shape + ": " + symbol);
         return symbol;
-
     }
 
     @Override

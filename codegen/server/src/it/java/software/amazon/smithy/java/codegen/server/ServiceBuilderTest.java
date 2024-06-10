@@ -73,6 +73,4 @@ public class ServiceBuilderTest {
         assertThatThrownBy(() -> service.getOperation("UnknownOperation"))
             .isInstanceOf(UnknownOperationException.class);
     }
-
-
 }

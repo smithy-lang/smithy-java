@@ -7,10 +7,10 @@ package software.amazon.smithy.java.runtime.example;
 
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.core.Context;
+import software.amazon.smithy.java.runtime.example.client.PersonDirectory;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImage;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
-import software.amazon.smithy.java.runtime.example.model.PersonDirectory;
 import software.amazon.smithy.java.runtime.example.model.PutPerson;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImage;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImageInput;

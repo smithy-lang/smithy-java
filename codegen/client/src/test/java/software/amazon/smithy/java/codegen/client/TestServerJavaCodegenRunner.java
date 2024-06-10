@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.codegen.utils;
+package software.amazon.smithy.java.codegen.client;
+
 
 import java.nio.file.Paths;
 import software.amazon.smithy.build.FileManifest;
@@ -15,15 +16,15 @@ import software.amazon.smithy.model.node.ObjectNode;
 /**
  * Simple wrapper class used to execute the test Java codegen plugin for integration tests.
  */
-public final class TestJavaCodegenRunner {
-    private TestJavaCodegenRunner() {
+public final class TestServerJavaCodegenRunner {
+    private TestServerJavaCodegenRunner() {
         // Utility class does not have constructor
     }
 
     public static void main(String[] args) {
-        TestJavaCodegenPlugin plugin = new TestJavaCodegenPlugin();
-        Model model = Model.assembler(TestJavaCodegenRunner.class.getClassLoader())
-            .discoverModels(TestJavaCodegenRunner.class.getClassLoader())
+        JavaClientCodegenPlugin plugin = new JavaClientCodegenPlugin();
+        Model model = Model.assembler(TestServerJavaCodegenRunner.class.getClassLoader())
+            .discoverModels(TestServerJavaCodegenRunner.class.getClassLoader())
             .assemble()
             .unwrap();
         PluginContext context = PluginContext.builder()

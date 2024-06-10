@@ -26,7 +26,6 @@ public final class TestServerJavaCodegenRunner {
             .discoverModels(TestServerJavaCodegenRunner.class.getClassLoader())
             .assemble()
             .unwrap();
-        System.out.println("WRITING TO : " + System.getenv("output"));
         PluginContext context = PluginContext.builder()
             .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
             .settings(
