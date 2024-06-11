@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import javax.xml.validation.Schema;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
@@ -86,11 +87,11 @@ public interface Document extends SerializableShape {
      * Serializes the Document as a document value in the Smithy data model.
      *
      * <p>All implementations of a document type are expected to follow the same behavior as this method when writing
-     * to a {@link ShapeSerializer}; the document is always written with {@link ShapeSerializer#writeDocument(Document)}
+     * to a {@link ShapeSerializer}; the document is always written with {@link ShapeSerializer#writeDocument(SdkSchema, Document)}
      * and receivers are free to query the underlying contents of the document using
      * {@link #serializeContents(ShapeSerializer)}.
      *
-     * @param serializer Where to send the document to {@link ShapeSerializer#writeDocument(Document)}.
+     * @param serializer Where to send the document to {@link ShapeSerializer#writeDocument(SdkSchema, Document)}.
      */
     @Override
     default void serialize(ShapeSerializer serializer) {
@@ -101,7 +102,7 @@ public interface Document extends SerializableShape {
      * Serialize the contents of the document using the Smithy data model and an appropriate {@link Schema}.
      *
      * <p>While {@link #serialize(ShapeSerializer)} always emits document values as
-     * {@link ShapeSerializer#writeDocument(Document)}, this method emits the contents of the document itself.
+     * {@link ShapeSerializer#writeDocument(SdkSchema, Document)}, this method emits the contents of the document itself.
      * {@code ShapeSerializer} implementations that receive a {@link Document} via {@code writeDocument} can get the
      * inner contents of the document using this method.
      *
@@ -117,7 +118,7 @@ public interface Document extends SerializableShape {
      * (e.g., {@code smithy.api#Document$value}). In doing so, receivers of the document's data model do not need to
      * implement special-cased logic to account for synthetic document type members vs. actual modeled members
      *
-     * <p>Implementations must not write the contents of the document as {@link ShapeSerializer#writeDocument(Document)},
+     * <p>Implementations must not write the contents of the document as {@link ShapeSerializer#writeDocument(SdkSchema, Document)}
      * because that could result in infinite recursion for serializers that want access to the contents of a document.
      *
      * @param serializer Serializer to write the underlying data of the document to.
