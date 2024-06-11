@@ -219,6 +219,29 @@ public class JavadocIntegrationTest {
             """));
     }
 
+    @Test
+    void addsToEnumVariants() {
+        var fileContents = getFileStringForClass("EnumWithDocs");
+        assertThat(
+            fileContents,
+            containsString(
+                """
+                        public static final ShapeId ID = ShapeId.from("smithy.java.codegen.integrations.javadoc#EnumWithDocs");
+                        /**
+                         * @deprecated As of the past.
+                         */
+                        @Deprecated(since = "the past")
+                        public static final EnumWithDocs DOCUMENTED = new EnumWithDocs(Type.DOCUMENTED, "DOCUMENTED");
+                        /**
+                         * General Docs
+                         */
+                        @SmithyUnstableApi
+                        public static final EnumWithDocs ALSO_DOCUMENTED = new EnumWithDocs(Type.ALSO_DOCUMENTED, "ALSO_DOCUMENTED");
+                    """
+            )
+        );
+    }
+
     private String getFileStringForClass(String className) {
         var fileStringOptional = manifest.getFileString(
             Paths.get(String.format("/test/smithy/codegen/model/%s.java", className))
