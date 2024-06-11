@@ -18,7 +18,7 @@ import software.amazon.smithy.java.runtime.example.model.PutPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonOutput;
 
-public final class PersonDirectoryClient extends Client<PersonDirectoryClient> implements PersonDirectory {
+public final class PersonDirectoryClient extends Client implements PersonDirectory {
 
     private PersonDirectoryClient(Builder builder) {
         super(builder);
@@ -43,7 +43,7 @@ public final class PersonDirectoryClient extends Client<PersonDirectoryClient> i
         return new Builder();
     }
 
-    public static final class Builder extends Client.Builder<PersonDirectoryClient> {
+    public static final class Builder extends Client.Builder<Builder> {
 
         private Builder() {}
 

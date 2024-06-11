@@ -28,7 +28,7 @@ import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-public abstract class Client<T extends Client<T>> {
+public abstract class Client {
     private final EndpointResolver endpointResolver;
     private final ClientTransport transport;
     private final TypeRegistry typeRegistry;
@@ -37,7 +37,7 @@ public abstract class Client<T extends Client<T>> {
     private final AuthSchemeResolver authSchemeResolver;
     private final IdentityResolvers identityResolvers;
 
-    protected Client(Builder<T> builder) {
+    protected Client(Builder<?> builder) {
         this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
         this.transport = new ApiCallTimeoutTransport(Objects.requireNonNull(builder.transport, "transport is null"));
         // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
@@ -104,7 +104,7 @@ public abstract class Client<T extends Client<T>> {
         );
     }
 
-    public static abstract class Builder<T extends Client<T>> {
+    public static abstract class Builder<B extends Builder<B>> {
         private ClientTransport transport;
         private EndpointResolver endpointResolver;
         private final List<ClientInterceptor> interceptors = new ArrayList<>();
@@ -118,9 +118,10 @@ public abstract class Client<T extends Client<T>> {
          * @param transport Client transport used to send requests.
          * @return Returns the builder.
          */
-        public Builder<T> transport(ClientTransport transport) {
+        @SuppressWarnings("unchecked")
+        public B transport(ClientTransport transport) {
             this.transport = transport;
-            return this;
+            return (B) this;
         }
 
         /**
@@ -129,9 +130,10 @@ public abstract class Client<T extends Client<T>> {
          * @param endpointResolver Endpoint resolver to use to resolve endpoints.
          * @return Returns the endpoint resolver.
          */
-        public Builder<T> endpointResolver(EndpointResolver endpointResolver) {
+        @SuppressWarnings("unchecked")
+        public B endpointResolver(EndpointResolver endpointResolver) {
             this.endpointResolver = endpointResolver;
-            return this;
+            return (B) this;
         }
 
         /**
@@ -140,7 +142,7 @@ public abstract class Client<T extends Client<T>> {
          * @param endpoint Endpoint to connect to.
          * @return the builder.
          */
-        public Builder<T> endpoint(Endpoint endpoint) {
+        public B endpoint(Endpoint endpoint) {
             return endpointResolver(EndpointResolver.staticEndpoint(endpoint));
         }
 
@@ -150,7 +152,7 @@ public abstract class Client<T extends Client<T>> {
          * @param endpoint Endpoint to connect to.
          * @return the builder.
          */
-        public Builder<T> endpoint(URI endpoint) {
+        public B endpoint(URI endpoint) {
             return endpoint(Endpoint.builder().uri(endpoint).build());
         }
 
@@ -160,7 +162,7 @@ public abstract class Client<T extends Client<T>> {
          * @param endpoint Endpoint to connect to.
          * @return the builder.
          */
-        public Builder<T> endpoint(String endpoint) {
+        public B endpoint(String endpoint) {
             return endpoint(Endpoint.builder().uri(endpoint).build());
         }
 
@@ -170,9 +172,10 @@ public abstract class Client<T extends Client<T>> {
          * @param interceptor Interceptor to add.
          * @return the builder.
          */
-        public Builder<T> addInterceptor(ClientInterceptor interceptor) {
+        @SuppressWarnings("unchecked")
+        public B addInterceptor(ClientInterceptor interceptor) {
             interceptors.add(interceptor);
-            return this;
+            return (B) this;
         }
 
         /**
@@ -181,9 +184,10 @@ public abstract class Client<T extends Client<T>> {
          * @param authSchemeResolver Auth scheme resolver to use.
          * @return the builder.
          */
-        public Builder<T> authSchemeResolver(AuthSchemeResolver authSchemeResolver) {
+        @SuppressWarnings("unchecked")
+        public B authSchemeResolver(AuthSchemeResolver authSchemeResolver) {
             this.authSchemeResolver = authSchemeResolver;
-            return this;
+            return (B) this;
         }
 
         /**
@@ -194,9 +198,10 @@ public abstract class Client<T extends Client<T>> {
          * @param authSchemes Auth schemes to add.
          * @return the builder.
          */
-        public Builder<T> putSupportedAuthSchemes(AuthScheme<?, ?>... authSchemes) {
+        @SuppressWarnings("unchecked")
+        public B putSupportedAuthSchemes(AuthScheme<?, ?>... authSchemes) {
             supportedAuthSchemes.addAll(Arrays.asList(authSchemes));
-            return this;
+            return (B) this;
         }
 
         /**
@@ -205,9 +210,10 @@ public abstract class Client<T extends Client<T>> {
          * @param identityResolvers Identity resolvers to add.
          * @return the builder.
          */
-        public Builder<T> addIdentityResolver(IdentityResolver<?>... identityResolvers) {
+        @SuppressWarnings("unchecked")
+        public B addIdentityResolver(IdentityResolver<?>... identityResolvers) {
             this.identityResolvers.addAll(Arrays.asList(identityResolvers));
-            return this;
+            return (B) this;
         }
 
         /**
@@ -216,10 +222,11 @@ public abstract class Client<T extends Client<T>> {
          * @param identityResolvers Identity resolvers to set.
          * @return the builder.
          */
-        public Builder<T> identityResolvers(List<IdentityResolver<?>> identityResolvers) {
+        @SuppressWarnings("unchecked")
+        public B identityResolvers(List<IdentityResolver<?>> identityResolvers) {
             this.identityResolvers.clear();
             this.identityResolvers.addAll(identityResolvers);
-            return this;
+            return (B) this;
         }
 
         /**
@@ -227,6 +234,6 @@ public abstract class Client<T extends Client<T>> {
          *
          * @return the created client.
          */
-        public abstract T build();
+        public abstract Client build();
     }
 }
