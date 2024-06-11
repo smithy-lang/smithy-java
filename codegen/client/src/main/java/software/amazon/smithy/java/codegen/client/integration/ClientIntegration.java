@@ -20,9 +20,6 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
-/**
- * TODO: Docs
- */
 @SmithyInternalApi
 public final class ClientIntegration implements JavaCodegenIntegration {
 
