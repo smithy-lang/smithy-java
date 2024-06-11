@@ -6,6 +6,8 @@
 package software.amazon.smithy.java.runtime.core.schema;
 
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
+import software.amazon.smithy.java.runtime.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 
 /**
@@ -36,6 +38,37 @@ public interface SerializableStruct extends SerializableShape {
             @Override
             public void serializeMembers(ShapeSerializer serializer) {
                 memberWriter.accept(schema, serializer);
+            }
+        };
+    }
+
+    /**
+     * Create a serializable struct that only serializes members that pass the given predicate.
+     *
+     * @param schema Structure schema.
+     * @param struct Struct to serialize.
+     * @param memberPredicate Predicate that takes a member schema.
+     * @return the filtered struct.
+     */
+    static SerializableStruct filteredMembers(
+        SdkSchema schema,
+        SerializableStruct struct,
+        Predicate<SdkSchema> memberPredicate
+    ) {
+        return new SerializableStruct() {
+            @Override
+            public void serialize(ShapeSerializer encoder) {
+                encoder.writeStruct(schema, this);
+            }
+
+            @Override
+            public void serializeMembers(ShapeSerializer serializer) {
+                struct.serializeMembers(new InterceptingSerializer() {
+                    @Override
+                    protected ShapeSerializer before(SdkSchema schema) {
+                        return memberPredicate.test(schema) ? serializer : ShapeSerializer.nullSerializer();
+                    }
+                });
             }
         };
     }

@@ -90,11 +90,18 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         if (foundBody) {
             shapeBodyOutput = new ByteArrayOutputStream();
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
-            struct.serializeMembers(new BindingSerializer(this, shapeBodySerializer));
+            // Serialize only the body members to the codec.
+            SerializableStruct.filteredMembers(schema, struct, this::bodyBindingPredicate)
+                .serialize(shapeBodySerializer);
             headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
-        } else {
-            struct.serializeMembers(new BindingSerializer(this, null));
         }
+
+        // Serialize the bindings that aren't BODY (the derived body structure).
+        struct.serializeMembers(new BindingSerializer(this));
+    }
+
+    private boolean bodyBindingPredicate(SdkSchema member) {
+        return bindingMatcher.match(member) == BindingMatcher.Binding.BODY;
     }
 
     @Override
@@ -186,12 +193,10 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     private static final class BindingSerializer extends InterceptingSerializer {
         private final HttpBindingSerializer serializer;
-        private final ShapeSerializer bodyStructSerializer;
         private ByteArrayOutputStream structureBytes;
 
-        private BindingSerializer(HttpBindingSerializer serializer, ShapeSerializer bodyStructSerializer) {
+        private BindingSerializer(HttpBindingSerializer serializer) {
             this.serializer = serializer;
-            this.bodyStructSerializer = bodyStructSerializer;
         }
 
         @Override
@@ -200,21 +205,22 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                 case HEADER -> serializer.headerSerializer;
                 case QUERY -> serializer.querySerializer;
                 case LABEL -> serializer.labelSerializer;
-                case BODY -> bodyStructSerializer;
                 case STATUS -> new ResponseStatusSerializer(i -> serializer.responseStatus = i);
                 case PREFIX_HEADERS -> new HttpPrefixHeadersSerializer(
                     serializer.bindingMatcher.prefixHeaders(),
                     serializer.headerConsumer
                 );
                 case QUERY_PARAMS -> new HttpQueryParamsSerializer(serializer.queryStringParams::put);
+                case BODY -> ShapeSerializer.nullSerializer(); // handled in HttpBindingSerializer#writeStruct.
                 case PAYLOAD -> {
-                    if (schema.memberTarget().type() != ShapeType.STRUCTURE) {
-                        yield ShapeSerializer.nullSerializer();
-                    } else {
-                        // Deserialize a structure bound to the payload.
+                    if (schema.memberTarget().type() == ShapeType.STRUCTURE) {
+                        // Serialize a structure bound to the payload.
                         serializer.headers.put("Content-Type", List.of(serializer.payloadCodec.getMediaType()));
                         structureBytes = new ByteArrayOutputStream();
                         yield serializer.payloadCodec.createSerializer(structureBytes);
+                    } else {
+                        // httpPayload serialization is handled elsewhere.
+                        yield ShapeSerializer.nullSerializer();
                     }
                 }
             };

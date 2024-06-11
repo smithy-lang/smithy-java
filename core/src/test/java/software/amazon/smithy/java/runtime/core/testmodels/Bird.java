@@ -18,10 +18,10 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public final class Bird implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Bird");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
+    public static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
         .id(ID)
         .build();
-    static final SdkSchema SCHEMA = SdkSchema.builder()
+    public static final SdkSchema SCHEMA = SdkSchema.builder()
         .id(ID)
         .type(ShapeType.STRUCTURE)
         .members(SCHEMA_NAME)
