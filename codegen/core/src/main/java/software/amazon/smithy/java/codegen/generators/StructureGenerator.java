@@ -232,7 +232,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             writer.pushState(new GetterSection(member));
             writer.write(
                 """
-                    public ${?isNullable}${member:T}${/isNullable}${^isNullable}${member:B}${/isNullable} ${memberName:L}() {
+                    public ${?isNullable}${member:B}${/isNullable}${^isNullable}${member:T}${/isNullable} ${memberName:L}() {
                         return ${memberName:L};
                     }
                     """
