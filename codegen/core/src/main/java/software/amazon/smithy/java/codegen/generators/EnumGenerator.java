@@ -17,6 +17,7 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
+import software.amazon.smithy.java.codegen.sections.EnumVariantSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
@@ -113,10 +114,11 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
         public void run() {
             writer.pushState();
             writer.putContext("string", shape.isEnumShape());
-            for (var entry : getEnumValues(shape).entrySet()) {
-                writer.pushState();
-                writer.putContext("var", CodegenUtils.toUpperSnakeCase(entry.getKey()));
-                writer.putContext("val", entry.getValue());
+            var enumValues = getEnumValues(shape);
+            for (var member : shape.members()) {
+                writer.pushState(new EnumVariantSection(member));
+                writer.putContext("var", CodegenUtils.toUpperSnakeCase(member.getMemberName()));
+                writer.putContext("val", enumValues.get(member.getMemberName()));
                 writer.write(
                     "public static final ${shape:T} ${var:L} = new ${shape:T}(Type.${var:L}, ${?string}${val:S}${/string}${^string}${val:L}${/string});"
                 );

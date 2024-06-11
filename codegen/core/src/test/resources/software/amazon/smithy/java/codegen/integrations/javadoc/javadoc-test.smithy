@@ -12,6 +12,7 @@ service TestService {
         ExternalDocumentation
         Unstable
         Rollup
+        EnumVariants
     ]
 }
 
@@ -110,4 +111,21 @@ structure RollupInput {
     )
     @since("4.5")
     rollupMember: String
+}
+
+/// Checks that docs are correctly added to enum variants
+operation EnumVariants {
+    input := {
+        enum: EnumWithDocs
+    }
+}
+
+/// Generic Documentation
+@since("4.5")
+enum EnumWithDocs {
+    @deprecated(since: "the past")
+    DOCUMENTED
+    /// General Docs
+    @unstable
+    ALSO_DOCUMENTED
 }

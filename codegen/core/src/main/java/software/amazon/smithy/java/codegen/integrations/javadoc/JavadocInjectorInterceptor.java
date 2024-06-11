@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.integrations.javadoc;
 
 import software.amazon.smithy.java.codegen.sections.ClassSection;
+import software.amazon.smithy.java.codegen.sections.EnumVariantSection;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.sections.JavadocSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -31,8 +32,9 @@ final class JavadocInjectorInterceptor implements CodeInterceptor.Prepender<Code
     @Override
     public boolean isIntercepted(CodeSection section) {
         // Javadocs are generated for Classes, on member Getters, and on enum variants
-        // TODO: Add enum variant section
-        return section instanceof ClassSection || section instanceof GetterSection;
+        return section instanceof ClassSection
+            || section instanceof GetterSection
+            || section instanceof EnumVariantSection;
     }
 
     @Override
@@ -42,6 +44,8 @@ final class JavadocInjectorInterceptor implements CodeInterceptor.Prepender<Code
             shape = cs.shape();
         } else if (section instanceof GetterSection gs) {
             shape = gs.memberShape();
+        } else if (section instanceof EnumVariantSection es) {
+            shape = es.memberShape();
         } else {
             throw new IllegalArgumentException("Javadocs cannot be injected for section: " + section);
         }
