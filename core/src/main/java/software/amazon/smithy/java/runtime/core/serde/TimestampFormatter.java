@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 /**
@@ -29,14 +29,14 @@ public interface TimestampFormatter {
      *
      * @param trait Trait to create the format from.
      * @return Returns the created formatter.
-     * @throws SdkSerdeException for an unknown format.
+     * @throws SerializationException for an unknown format.
      */
     static TimestampFormatter of(TimestampFormatTrait trait) {
         return switch (trait.getFormat()) {
             case DATE_TIME -> Prelude.DATE_TIME;
             case EPOCH_SECONDS -> Prelude.EPOCH_SECONDS;
             case HTTP_DATE -> Prelude.HTTP_DATE;
-            default -> throw new SdkSerdeException("Unknown timestamp format: " + trait.getFormat());
+            default -> throw new SerializationException("Unknown timestamp format: " + trait.getFormat());
         };
     }
 
@@ -68,7 +68,7 @@ public interface TimestampFormatter {
      * @param value      Timestamp value to serialize.
      * @param serializer Where to serialize the data.
      */
-    void writeToSerializer(SdkSchema schema, Instant value, ShapeSerializer serializer);
+    void writeToSerializer(Schema schema, Instant value, ShapeSerializer serializer);
 
     /**
      * Parse a timestamp from a string.
@@ -140,7 +140,7 @@ public interface TimestampFormatter {
             }
 
             @Override
-            public void writeToSerializer(SdkSchema schema, Instant instant, ShapeSerializer serializer) {
+            public void writeToSerializer(Schema schema, Instant instant, ShapeSerializer serializer) {
                 double value = ((double) instant.toEpochMilli()) / 1000;
                 serializer.writeDouble(schema, value);
             }
@@ -191,7 +191,7 @@ public interface TimestampFormatter {
         }
 
         @Override
-        public void writeToSerializer(SdkSchema schema, Instant value, ShapeSerializer serializer) {
+        public void writeToSerializer(Schema schema, Instant value, ShapeSerializer serializer) {
             serializer.writeString(schema, writeString(value));
         }
 
@@ -214,7 +214,7 @@ public interface TimestampFormatter {
     /**
      * Thrown when a timestamp format cannot be parsed.
      */
-    final class TimestampSyntaxError extends SdkSerdeException {
+    final class TimestampSyntaxError extends SerializationException {
 
         private final TimestampFormatTrait.Format format;
         private final ExpectedType expectedType;

@@ -11,11 +11,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -39,7 +39,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private final Map<String, String> requestPathLabels;
     private final BindingMatcher bindingMatcher;
     private final DataStream body;
-    private final SdkShapeBuilder<?> shapeBuilder;
+    private final ShapeBuilder<?> shapeBuilder;
     private CompletableFuture<Void> bodyDeserializationCf;
 
     private HttpBindingDeserializer(Builder builder) {
@@ -59,16 +59,16 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     @Override
-    protected RuntimeException throwForInvalidState(SdkSchema schema) {
+    protected RuntimeException throwForInvalidState(Schema schema) {
         throw new IllegalStateException("Expected to parse a structure for HTTP bindings, but found " + schema);
     }
 
     @Override
-    public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
+    public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         BodyMembersList<T> bodyMembers = new BodyMembersList<>(state, structMemberConsumer);
 
         // First parse members in the framing.
-        for (SdkSchema member : schema.members()) {
+        for (Schema member : schema.members()) {
             switch (bindingMatcher.match(member)) {
                 case LABEL -> throw new UnsupportedOperationException("httpLabel binding not supported yet");
                 case QUERY -> throw new UnsupportedOperationException("httpQuery binding not supported yet");
@@ -152,7 +152,9 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         // Validate the media-type matches the codec.
         String contentType = headers.firstValue("content-type").orElse("");
         if (!contentType.equals(payloadCodec.getMediaType())) {
-            throw new SdkSerdeException("Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec);
+            throw new SerializationException(
+                "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec
+            );
         }
     }
 
@@ -165,7 +167,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         private DataStream body;
         private String requestPath;
         private int responseStatus;
-        private SdkShapeBuilder<?> shapeBuilder;
+        private ShapeBuilder<?> shapeBuilder;
 
         private Builder() {
         }
@@ -284,7 +286,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @param shapeBuilder Shape builder to create a shape.
          * @return the builder.
          */
-        Builder shapeBuilder(SdkShapeBuilder<?> shapeBuilder) {
+        Builder shapeBuilder(ShapeBuilder<?> shapeBuilder) {
             this.shapeBuilder = shapeBuilder;
             return this;
         }

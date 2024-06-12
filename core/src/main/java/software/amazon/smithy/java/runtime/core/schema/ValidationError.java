@@ -33,25 +33,25 @@ public interface ValidationError {
         }
     }
 
-    record UnionValidationFailure(String path, String message, SdkSchema schema) implements ValidationError {}
+    record UnionValidationFailure(String path, String message, Schema schema) implements ValidationError {}
 
-    record TypeValidationFailure(String path, String message, ShapeType actual, SdkSchema schema) implements
+    record TypeValidationFailure(String path, String message, ShapeType actual, Schema schema) implements
         ValidationError {
-        public TypeValidationFailure(String path, ShapeType actual, SdkSchema schema) {
+        public TypeValidationFailure(String path, ShapeType actual, Schema schema) {
             this(path, "Value must be " + schema.type() + ", but found " + actual, actual, schema);
         }
     }
 
-    record RequiredValidationFailure(String path, String message, String missingMember, SdkSchema schema) implements
+    record RequiredValidationFailure(String path, String message, String missingMember, Schema schema) implements
         ValidationError {
-        public RequiredValidationFailure(String path, String missingMember, SdkSchema schema) {
+        public RequiredValidationFailure(String path, String missingMember, Schema schema) {
             this(path, "Value missing required member: " + missingMember, missingMember, schema);
         }
     }
 
-    record PatternValidationFailure(String path, String message, String value, SdkSchema schema) implements
+    record PatternValidationFailure(String path, String message, String value, Schema schema) implements
         ValidationError {
-        public PatternValidationFailure(String path, String value, SdkSchema schema) {
+        public PatternValidationFailure(String path, String value, Schema schema) {
             this(
                 path,
                 "Value must satisfy regular expression pattern: "
@@ -62,33 +62,33 @@ public interface ValidationError {
         }
     }
 
-    record EnumValidationFailure(String path, String message, String value, SdkSchema schema) implements
+    record EnumValidationFailure(String path, String message, String value, Schema schema) implements
         ValidationError {
-        public EnumValidationFailure(String path, String value, SdkSchema schema) {
+        public EnumValidationFailure(String path, String value, Schema schema) {
             this(path, "Value is not an allowed enum string", value, schema);
         }
     }
 
-    record IntEnumValidationFailure(String path, String message, int value, SdkSchema schema) implements
+    record IntEnumValidationFailure(String path, String message, int value, Schema schema) implements
         ValidationError {
-        public IntEnumValidationFailure(String path, int value, SdkSchema schema) {
+        public IntEnumValidationFailure(String path, int value, Schema schema) {
             this(path, "Value is not an allowed integer enum number", value, schema);
         }
     }
 
-    record SparseValidationFailure(String path, String message, SdkSchema schema) implements ValidationError {
-        public SparseValidationFailure(String path, SdkSchema schema) {
+    record SparseValidationFailure(String path, String message, Schema schema) implements ValidationError {
+        public SparseValidationFailure(String path, Schema schema) {
             this(path, "Value is in a " + schema.type() + " that does not allow null values", schema);
         }
     }
 
-    record RangeValidationFailure(String path, String message, Number value, SdkSchema schema) implements
+    record RangeValidationFailure(String path, String message, Number value, Schema schema) implements
         ValidationError {
-        public RangeValidationFailure(String path, Number value, SdkSchema schema) {
+        public RangeValidationFailure(String path, Number value, Schema schema) {
             this(path, createMessage(schema), value, schema);
         }
 
-        private static String createMessage(SdkSchema schema) {
+        private static String createMessage(Schema schema) {
             if (schema.minRangeConstraint == null) {
                 return "Value must be less than or equal to " + formatDecimal(schema.maxRangeConstraint);
             } else if (schema.maxRangeConstraint == null) {
@@ -110,13 +110,13 @@ public interface ValidationError {
         }
     }
 
-    record LengthValidationFailure(String path, String message, long length, SdkSchema schema) implements
+    record LengthValidationFailure(String path, String message, long length, Schema schema) implements
         ValidationError {
-        public LengthValidationFailure(String path, long length, SdkSchema schema) {
+        public LengthValidationFailure(String path, long length, Schema schema) {
             this(path, createMessage(length, schema), length, schema);
         }
 
-        private static String createMessage(long length, SdkSchema schema) {
+        private static String createMessage(long length, Schema schema) {
             var prefix = "Value with length " + length;
             if (schema.minLengthConstraint == Long.MIN_VALUE) {
                 return prefix + " must have length less than or equal to " + schema.maxLengthConstraint;

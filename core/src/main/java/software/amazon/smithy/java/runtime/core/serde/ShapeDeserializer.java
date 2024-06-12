@@ -8,7 +8,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
@@ -25,7 +25,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the shape.
      * @return the read value.
      */
-    boolean readBoolean(SdkSchema schema);
+    boolean readBoolean(Schema schema);
 
     /**
      * Attempt to read a blob value.
@@ -33,7 +33,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the shape.
      * @return the read value.
      */
-    byte[] readBlob(SdkSchema schema);
+    byte[] readBlob(Schema schema);
 
     /**
      * Attempt to read a byte value.
@@ -41,7 +41,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the shape.
      * @return the read value.
      */
-    byte readByte(SdkSchema schema);
+    byte readByte(Schema schema);
 
     /**
      * Attempt to read a short value.
@@ -49,7 +49,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the shape.
      * @return the read value.
      */
-    short readShort(SdkSchema schema);
+    short readShort(Schema schema);
 
     /**
      * Attempt to read an integer or intEnum value.
@@ -57,7 +57,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the shape.
      * @return the read value.
      */
-    int readInteger(SdkSchema schema);
+    int readInteger(Schema schema);
 
     /**
      * Attempt to read a long value.
@@ -65,7 +65,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the shape.
      * @return the read value.
      */
-    long readLong(SdkSchema schema);
+    long readLong(Schema schema);
 
     /**
      * Attempt to read a float value.
@@ -73,7 +73,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the shape.
      * @return the read value.
      */
-    float readFloat(SdkSchema schema);
+    float readFloat(Schema schema);
 
     /**
      * Attempt to read a double value.
@@ -81,7 +81,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the shape.
      * @return the read value.
      */
-    double readDouble(SdkSchema schema);
+    double readDouble(Schema schema);
 
     /**
      * Attempt to read a bigInteger value.
@@ -89,7 +89,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the shape.
      * @return the read value.
      */
-    BigInteger readBigInteger(SdkSchema schema);
+    BigInteger readBigInteger(Schema schema);
 
     /**
      * Attempt to read a bigDecimal value.
@@ -97,7 +97,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the shape.
      * @return the read value.
      */
-    BigDecimal readBigDecimal(SdkSchema schema);
+    BigDecimal readBigDecimal(Schema schema);
 
     /**
      * Attempt to read a string or enum value.
@@ -105,7 +105,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the shape.
      * @return the read value.
      */
-    String readString(SdkSchema schema);
+    String readString(Schema schema);
 
     /**
      * Attempt to read a document value.
@@ -119,7 +119,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      *
      * @return the read value.
      */
-    Instant readTimestamp(SdkSchema schema);
+    Instant readTimestamp(Schema schema);
 
     /**
      * Attempt to read a structure or union value.
@@ -128,7 +128,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param state    State to pass to the consumer.
      * @param consumer Consumer that receives the state, member schema, and deserializer.
      */
-    <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> consumer);
+    <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> consumer);
 
     /**
      * Attempt to read a list value.
@@ -137,7 +137,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param state    State to pass to the consumer.
      * @param consumer Consumer that receives the state and deserializer.
      */
-    <T> void readList(SdkSchema schema, T state, ListMemberConsumer<T> consumer);
+    <T> void readList(Schema schema, T state, ListMemberConsumer<T> consumer);
 
     /**
      * Attempt to read a map value.
@@ -146,7 +146,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param state    State to pass to the consumer.
      * @param consumer Consumer that receives the state, map key, and deserializer.
      */
-    <T> void readStringMap(SdkSchema schema, T state, MapMemberConsumer<String, T> consumer);
+    <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer);
 
     /**
      * Consumer of a structure member.
@@ -155,7 +155,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      */
     @FunctionalInterface
     interface StructMemberConsumer<T> {
-        void accept(T state, SdkSchema memberSchema, ShapeDeserializer memberDeserializer);
+        void accept(T state, Schema memberSchema, ShapeDeserializer memberDeserializer);
     }
 
     /**

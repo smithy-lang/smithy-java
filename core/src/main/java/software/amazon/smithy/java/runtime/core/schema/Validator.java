@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -111,7 +111,7 @@ public final class Validator {
     /**
      * An error that short circuits further validation.
      */
-    static final class ValidationShortCircuitException extends SdkSerdeException {
+    static final class ValidationShortCircuitException extends SerializationException {
         ValidationShortCircuitException() {
             super("Stop further validation");
         }
@@ -139,7 +139,7 @@ public final class Validator {
          * sparse collections. Each time the currentSchema is changed, the previous {@link #elementCount} and schema must
          * be stored in a variable, the next shape is validated, and then the schema and count are restored.
          */
-        private SdkSchema currentSchema = null;
+        private Schema currentSchema = null;
 
         private ShapeValidator(int maxAllowedErrors, int maxDepth) {
             this.maxAllowedErrors = maxAllowedErrors;
@@ -213,7 +213,7 @@ public final class Validator {
         }
 
         @Override
-        public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+        public void writeStruct(Schema schema, SerializableStruct struct) {
             // Track the current schema and count.
             var previousSchema = currentSchema;
             var previousCount = elementCount;
@@ -229,7 +229,7 @@ public final class Validator {
         }
 
         @Override
-        public <T> void writeList(SdkSchema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
+        public <T> void writeList(Schema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
             checkType(schema, ShapeType.LIST);
 
             // Track the current schema and count.
@@ -251,7 +251,7 @@ public final class Validator {
             checkListLength(schema, count);
         }
 
-        private void checkListLength(SdkSchema schema, int count) {
+        private void checkListLength(Schema schema, int count) {
             // Ensure the list has an acceptable length.
             if (count < schema.minLengthConstraint) {
                 addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));
@@ -261,7 +261,7 @@ public final class Validator {
         }
 
         @Override
-        public <T> void writeMap(SdkSchema schema, T state, BiConsumer<T, MapSerializer> consumer) {
+        public <T> void writeMap(Schema schema, T state, BiConsumer<T, MapSerializer> consumer) {
             checkType(schema, ShapeType.MAP);
 
             // Track the current schema and count.
@@ -286,7 +286,7 @@ public final class Validator {
             checkMapLength(schema, count);
         }
 
-        private void checkMapLength(SdkSchema schema, int count) {
+        private void checkMapLength(Schema schema, int count) {
             // Ensure the map is properly sized.
             if (count < schema.minLengthConstraint) {
                 addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));
@@ -299,7 +299,7 @@ public final class Validator {
 
         @Override
         public <T> void writeEntry(
-            SdkSchema keySchema,
+            Schema keySchema,
             String key,
             T state,
             BiConsumer<T, ShapeSerializer> valueSerializer
@@ -313,24 +313,24 @@ public final class Validator {
         }
 
         @Override
-        public void writeBoolean(SdkSchema schema, boolean value) {
+        public void writeBoolean(Schema schema, boolean value) {
             checkType(schema, ShapeType.BOOLEAN);
         }
 
         @Override
-        public void writeByte(SdkSchema schema, byte value) {
+        public void writeByte(Schema schema, byte value) {
             checkType(schema, ShapeType.BYTE);
             validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
         }
 
         @Override
-        public void writeShort(SdkSchema schema, short value) {
+        public void writeShort(Schema schema, short value) {
             checkType(schema, ShapeType.SHORT);
             validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
         }
 
         @Override
-        public void writeInteger(SdkSchema schema, int value) {
+        public void writeInteger(Schema schema, int value) {
             // Validate range traits for normal integers, and validate intEnum for INT_ENUM values.
             switch (schema.type()) {
                 case INTEGER -> validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
@@ -344,25 +344,25 @@ public final class Validator {
         }
 
         @Override
-        public void writeLong(SdkSchema schema, long value) {
+        public void writeLong(Schema schema, long value) {
             checkType(schema, ShapeType.LONG);
             validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
         }
 
         @Override
-        public void writeFloat(SdkSchema schema, float value) {
+        public void writeFloat(Schema schema, float value) {
             checkType(schema, ShapeType.FLOAT);
             validateRange(schema, value, schema.minDoubleConstraint, schema.maxDoubleConstraint);
         }
 
         @Override
-        public void writeDouble(SdkSchema schema, double value) {
+        public void writeDouble(Schema schema, double value) {
             checkType(schema, ShapeType.DOUBLE);
             validateRange(schema, value, schema.minDoubleConstraint, schema.maxDoubleConstraint);
         }
 
         @Override
-        public void writeBigInteger(SdkSchema schema, BigInteger value) {
+        public void writeBigInteger(Schema schema, BigInteger value) {
             checkType(schema, ShapeType.BIG_INTEGER);
             if (schema.minRangeConstraint != null && value.compareTo(schema.minRangeConstraint.toBigInteger()) < 0) {
                 emitRangeError(schema, value);
@@ -374,7 +374,7 @@ public final class Validator {
         }
 
         @Override
-        public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+        public void writeBigDecimal(Schema schema, BigDecimal value) {
             checkType(schema, ShapeType.BIG_DECIMAL);
             if (schema.minRangeConstraint != null && value.compareTo(schema.minRangeConstraint) < 0) {
                 emitRangeError(schema, value);
@@ -384,7 +384,7 @@ public final class Validator {
         }
 
         @Override
-        public void writeString(SdkSchema schema, String value) {
+        public void writeString(Schema schema, String value) {
             switch (schema.type()) {
                 case STRING, ENUM -> schema.stringValidation.apply(schema, value, this);
                 default -> checkType(schema, ShapeType.STRING); // it's invalid, and calling this adds an error.
@@ -392,7 +392,7 @@ public final class Validator {
         }
 
         @Override
-        public void writeBlob(SdkSchema schema, byte[] value) {
+        public void writeBlob(Schema schema, byte[] value) {
             checkType(schema, ShapeType.BLOB);
             if (value.length < schema.minLengthConstraint || value.length > schema.maxLengthConstraint) {
                 addError(new ValidationError.LengthValidationFailure(createPath(), value.length, schema));
@@ -400,17 +400,17 @@ public final class Validator {
         }
 
         @Override
-        public void writeTimestamp(SdkSchema schema, Instant value) {
+        public void writeTimestamp(Schema schema, Instant value) {
             checkType(schema, ShapeType.TIMESTAMP);
         }
 
         @Override
-        public void writeDocument(SdkSchema schema, Document document) {
+        public void writeDocument(Schema schema, Document document) {
             checkType(schema, ShapeType.DOCUMENT);
         }
 
         @Override
-        public void writeNull(SdkSchema schema) {
+        public void writeNull(Schema schema) {
             // This class only needs to validate null values when the current shape under validation is a list or map.
             // If it's a list or map, and it doesn't have the sparse trait, then null isn't allowed.
             // Note that union and structure member validation is handled in other classes (e.g., ValidatorOfUnion).
@@ -423,23 +423,23 @@ public final class Validator {
             }
         }
 
-        private void validateRange(SdkSchema schema, long value, long min, long max) {
+        private void validateRange(Schema schema, long value, long min, long max) {
             if (value < min || value > max) {
                 emitRangeError(schema, value);
             }
         }
 
-        private void validateRange(SdkSchema schema, double value, double min, double max) {
+        private void validateRange(Schema schema, double value, double min, double max) {
             if (value < min || value > max) {
                 emitRangeError(schema, value);
             }
         }
 
-        private void emitRangeError(SdkSchema schema, Number value) {
+        private void emitRangeError(Schema schema, Number value) {
             addError(new ValidationError.RangeValidationFailure(createPath(), value, schema));
         }
 
-        private void checkType(SdkSchema schema, ShapeType type) {
+        private void checkType(Schema schema, ShapeType type) {
             if (schema.type() != type) {
                 addError(new ValidationError.TypeValidationFailure(createPath(), type, schema));
                 // Stop any further validation if an incorrect type is given. This should only be encountered when data

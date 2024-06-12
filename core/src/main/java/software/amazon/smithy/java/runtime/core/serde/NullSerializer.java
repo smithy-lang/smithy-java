@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.BiConsumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
@@ -23,53 +23,53 @@ final class NullSerializer implements ShapeSerializer {
     static final NullSerializer INSTANCE = new NullSerializer();
 
     @Override
-    public void writeStruct(SdkSchema schema, SerializableStruct struct) {}
+    public void writeStruct(Schema schema, SerializableStruct struct) {}
 
     @Override
-    public <T> void writeList(SdkSchema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {}
+    public <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {}
 
     @Override
-    public <T> void writeMap(SdkSchema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {}
+    public <T> void writeMap(Schema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {}
 
     @Override
-    public void writeBoolean(SdkSchema schema, boolean value) {}
+    public void writeBoolean(Schema schema, boolean value) {}
 
     @Override
-    public void writeByte(SdkSchema schema, byte value) {}
+    public void writeByte(Schema schema, byte value) {}
 
     @Override
-    public void writeShort(SdkSchema schema, short value) {}
+    public void writeShort(Schema schema, short value) {}
 
     @Override
-    public void writeInteger(SdkSchema schema, int value) {}
+    public void writeInteger(Schema schema, int value) {}
 
     @Override
-    public void writeLong(SdkSchema schema, long value) {}
+    public void writeLong(Schema schema, long value) {}
 
     @Override
-    public void writeFloat(SdkSchema schema, float value) {}
+    public void writeFloat(Schema schema, float value) {}
 
     @Override
-    public void writeDouble(SdkSchema schema, double value) {}
+    public void writeDouble(Schema schema, double value) {}
 
     @Override
-    public void writeBigInteger(SdkSchema schema, BigInteger value) {}
+    public void writeBigInteger(Schema schema, BigInteger value) {}
 
     @Override
-    public void writeBigDecimal(SdkSchema schema, BigDecimal value) {}
+    public void writeBigDecimal(Schema schema, BigDecimal value) {}
 
     @Override
-    public void writeString(SdkSchema schema, String value) {}
+    public void writeString(Schema schema, String value) {}
 
     @Override
-    public void writeBlob(SdkSchema schema, byte[] value) {}
+    public void writeBlob(Schema schema, byte[] value) {}
 
     @Override
-    public void writeTimestamp(SdkSchema schema, Instant value) {}
+    public void writeTimestamp(Schema schema, Instant value) {}
 
     @Override
-    public void writeDocument(SdkSchema schema, Document value) {}
+    public void writeDocument(Schema schema, Document value) {}
 
     @Override
-    public void writeNull(SdkSchema schema) {}
+    public void writeNull(Schema schema) {}
 }

@@ -8,7 +8,7 @@ package software.amazon.smithy.java.codegen.generators;
 import java.util.List;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.*;
 
@@ -64,7 +64,7 @@ abstract class BuilderGenerator implements Runnable {
 
                 ${deserializer:C|}
             }""";
-        writer.putContext("sdkShapeBuilder", SdkShapeBuilder.class);
+        writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
         writer.putContext("builderProperties", writer.consumer(this::generateProperties));
         writer.putContext("builderSetters", writer.consumer(this::generateSetters));
         writer.putContext("buildMethod", writer.consumer(this::generateBuild));

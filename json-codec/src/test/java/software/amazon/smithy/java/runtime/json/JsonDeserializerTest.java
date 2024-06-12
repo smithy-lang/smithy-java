@@ -30,8 +30,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
@@ -97,7 +97,7 @@ public class JsonDeserializerTest {
     public void deserializesBigIntegerOnlyFromRawNumbersByDefault() {
         try (var codec = JsonCodec.builder().build()) {
             var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
-            Assertions.assertThrows(SdkSerdeException.class, () -> de.readBigInteger(PreludeSchemas.BIG_INTEGER));
+            Assertions.assertThrows(SerializationException.class, () -> de.readBigInteger(PreludeSchemas.BIG_INTEGER));
         }
     }
 
@@ -113,7 +113,7 @@ public class JsonDeserializerTest {
     public void deserializesBigDecimalOnlyFromRawNumbersByDefault() {
         try (var codec = JsonCodec.builder().build()) {
             var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
-            Assertions.assertThrows(SdkSerdeException.class, () -> de.readBigDecimal(PreludeSchemas.BIG_DECIMAL));
+            Assertions.assertThrows(SerializationException.class, () -> de.readBigDecimal(PreludeSchemas.BIG_DECIMAL));
         }
     }
 
@@ -277,7 +277,7 @@ public class JsonDeserializerTest {
         TimestampFormatter defaultFormat,
         String json
     ) {
-        SdkSchema.Builder schemaBuilder = SdkSchema.builder()
+        Schema.Builder schemaBuilder = Schema.builder()
             .type(ShapeType.TIMESTAMP)
             .id("smithy.foo#Time");
 
@@ -340,14 +340,14 @@ public class JsonDeserializerTest {
 
     @Test
     public void throwsWhenTimestampIsWrongType() {
-        SdkSchema schema = SdkSchema.builder()
+        Schema schema = Schema.builder()
             .type(ShapeType.TIMESTAMP)
             .id("smithy.foo#Time")
             .build();
 
         try (var codec = JsonCodec.builder().build()) {
             var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
-            var e = Assertions.assertThrows(SdkSerdeException.class, () -> de.readTimestamp(schema));
+            var e = Assertions.assertThrows(SerializationException.class, () -> de.readTimestamp(schema));
             assertThat(e.getMessage(), equalTo("Expected a timestamp, but found boolean"));
         }
     }

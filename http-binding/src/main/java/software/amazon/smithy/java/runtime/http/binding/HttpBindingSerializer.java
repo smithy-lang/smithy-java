@@ -13,12 +13,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
 import java.util.function.BiConsumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.InterceptingSerializer;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.uri.QueryStringBuilder;
@@ -78,7 +78,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+    public void writeStruct(Schema schema, SerializableStruct struct) {
         boolean foundBody = false;
         for (var member : schema.members()) {
             if (bindingMatcher.match(member) == BindingMatcher.Binding.BODY) {
@@ -100,7 +100,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         struct.serializeMembers(new BindingSerializer(this));
     }
 
-    private boolean bodyBindingPredicate(SdkSchema member) {
+    private boolean bodyBindingPredicate(Schema member) {
         return bindingMatcher.match(member) == BindingMatcher.Binding.BODY;
     }
 
@@ -111,7 +111,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         }
     }
 
-    void setHttpPayload(SdkSchema schema, DataStream value) {
+    void setHttpPayload(Schema schema, DataStream value) {
         httpPayload = value;
         String contentType = value.contentType()
             .orElseGet(() -> {
@@ -172,7 +172,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                 joiner.add(content);
             } else if (!labels.containsKey(content)) {
                 // Labels are inherently required.
-                throw new SdkSerdeException("HTTP label not set for `" + content + "`");
+                throw new SerializationException("HTTP label not set for `" + content + "`");
             } else {
                 String labelValue = labels.get(segment.getContent());
                 if (segment.isGreedyLabel()) {
@@ -200,7 +200,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         }
 
         @Override
-        protected ShapeSerializer before(SdkSchema schema) {
+        protected ShapeSerializer before(Schema schema) {
             return switch (serializer.bindingMatcher.match(schema)) {
                 case HEADER -> serializer.headerSerializer;
                 case QUERY -> serializer.querySerializer;
@@ -227,7 +227,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         }
 
         @Override
-        protected void after(SdkSchema schema) {
+        protected void after(Schema schema) {
             if (structureBytes != null) {
                 serializer.setHttpPayload(
                     schema,

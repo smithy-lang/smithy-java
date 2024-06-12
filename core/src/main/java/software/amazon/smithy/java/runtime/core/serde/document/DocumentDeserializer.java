@@ -8,7 +8,7 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 
 /**
@@ -35,62 +35,62 @@ public class DocumentDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public String readString(SdkSchema schema) {
+    public String readString(Schema schema) {
         return value.asString();
     }
 
     @Override
-    public boolean readBoolean(SdkSchema schema) {
+    public boolean readBoolean(Schema schema) {
         return value.asBoolean();
     }
 
     @Override
-    public byte[] readBlob(SdkSchema schema) {
+    public byte[] readBlob(Schema schema) {
         return value.asBlob();
     }
 
     @Override
-    public byte readByte(SdkSchema schema) {
+    public byte readByte(Schema schema) {
         return value.asByte();
     }
 
     @Override
-    public short readShort(SdkSchema schema) {
+    public short readShort(Schema schema) {
         return value.asShort();
     }
 
     @Override
-    public int readInteger(SdkSchema schema) {
+    public int readInteger(Schema schema) {
         return value.asInteger();
     }
 
     @Override
-    public long readLong(SdkSchema schema) {
+    public long readLong(Schema schema) {
         return value.asLong();
     }
 
     @Override
-    public float readFloat(SdkSchema schema) {
+    public float readFloat(Schema schema) {
         return value.asFloat();
     }
 
     @Override
-    public double readDouble(SdkSchema schema) {
+    public double readDouble(Schema schema) {
         return value.asDouble();
     }
 
     @Override
-    public BigInteger readBigInteger(SdkSchema schema) {
+    public BigInteger readBigInteger(Schema schema) {
         return value.asBigInteger();
     }
 
     @Override
-    public BigDecimal readBigDecimal(SdkSchema schema) {
+    public BigDecimal readBigDecimal(Schema schema) {
         return value.asBigDecimal();
     }
 
     @Override
-    public Instant readTimestamp(SdkSchema schema) {
+    public Instant readTimestamp(Schema schema) {
         return value.asTimestamp();
     }
 
@@ -100,7 +100,7 @@ public class DocumentDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
+    public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         for (var memberSchema : schema.members()) {
             var memberValue = value.getMember(memberSchema.memberName());
             if (memberValue != null) {
@@ -110,14 +110,14 @@ public class DocumentDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readList(SdkSchema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
+    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
         for (var element : value.asList()) {
             listMemberConsumer.accept(state, deserializer(element));
         }
     }
 
     @Override
-    public <T> void readStringMap(SdkSchema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
+    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
         var map = value.asStringMap();
         for (var entry : map.entrySet()) {
             mapMemberConsumer.accept(state, entry.getKey(), deserializer(entry.getValue()));

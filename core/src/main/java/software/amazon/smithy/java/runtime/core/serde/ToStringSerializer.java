@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.BiConsumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -39,7 +39,7 @@ public final class ToStringSerializer implements ShapeSerializer {
         return builder.toString().trim();
     }
 
-    private void append(SdkSchema schema, Object value) {
+    private void append(Schema schema, Object value) {
         if (schema.hasTrait(SensitiveTrait.class)) {
             builder.append("*REDACTED*");
         } else {
@@ -48,7 +48,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+    public void writeStruct(Schema schema, SerializableStruct struct) {
         builder.append(schema.id().getName()).append('[');
         struct.serializeMembers(new StructureWriter(this));
         builder.append(']');
@@ -63,7 +63,7 @@ public final class ToStringSerializer implements ShapeSerializer {
         }
 
         @Override
-        protected ShapeSerializer before(SdkSchema schema) {
+        protected ShapeSerializer before(Schema schema) {
             if (!isFirst) {
                 toStringSerializer.builder.append(", ");
             } else {
@@ -75,7 +75,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(SdkSchema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T> void writeList(Schema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
         builder.append('[');
         consumer.accept(state, new ListSerializer(this, this::writeComma));
         builder.append(']');
@@ -88,7 +88,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeMap(SdkSchema schema, T state, BiConsumer<T, MapSerializer> consumer) {
+    public <T> void writeMap(Schema schema, T state, BiConsumer<T, MapSerializer> consumer) {
         builder.append('{');
         consumer.accept(state, new ToStringMapSerializer(this));
         builder.append('}');
@@ -104,7 +104,7 @@ public final class ToStringSerializer implements ShapeSerializer {
 
         @Override
         public <T> void writeEntry(
-            SdkSchema keySchema,
+            Schema keySchema,
             String key,
             T state,
             BiConsumer<T, ShapeSerializer> valueSerializer
@@ -121,57 +121,57 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeBoolean(SdkSchema schema, boolean value) {
+    public void writeBoolean(Schema schema, boolean value) {
         append(schema, value);
     }
 
     @Override
-    public void writeShort(SdkSchema schema, short value) {
+    public void writeShort(Schema schema, short value) {
         append(schema, value);
     }
 
     @Override
-    public void writeByte(SdkSchema schema, byte value) {
+    public void writeByte(Schema schema, byte value) {
         append(schema, value);
     }
 
     @Override
-    public void writeInteger(SdkSchema schema, int value) {
+    public void writeInteger(Schema schema, int value) {
         append(schema, value);
     }
 
     @Override
-    public void writeLong(SdkSchema schema, long value) {
+    public void writeLong(Schema schema, long value) {
         append(schema, value);
     }
 
     @Override
-    public void writeFloat(SdkSchema schema, float value) {
+    public void writeFloat(Schema schema, float value) {
         builder.append(value);
     }
 
     @Override
-    public void writeDouble(SdkSchema schema, double value) {
+    public void writeDouble(Schema schema, double value) {
         append(schema, value);
     }
 
     @Override
-    public void writeBigInteger(SdkSchema schema, BigInteger value) {
+    public void writeBigInteger(Schema schema, BigInteger value) {
         append(schema, value);
     }
 
     @Override
-    public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+    public void writeBigDecimal(Schema schema, BigDecimal value) {
         append(schema, value);
     }
 
     @Override
-    public void writeString(SdkSchema schema, String value) {
+    public void writeString(Schema schema, String value) {
         append(schema, value);
     }
 
     @Override
-    public void writeBlob(SdkSchema schema, byte[] value) {
+    public void writeBlob(Schema schema, byte[] value) {
         if (schema.hasTrait(SensitiveTrait.class)) {
             append(schema, value);
         } else {
@@ -182,19 +182,19 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeTimestamp(SdkSchema schema, Instant value) {
+    public void writeTimestamp(Schema schema, Instant value) {
         append(schema, value);
     }
 
     @Override
-    public void writeDocument(SdkSchema schema, Document value) {
+    public void writeDocument(Schema schema, Document value) {
         builder.append(value.type()).append('.').append("Document[");
         value.serializeContents(this);
         builder.append(']');
     }
 
     @Override
-    public void writeNull(SdkSchema schema) {
+    public void writeNull(Schema schema) {
         builder.append("null");
     }
 }

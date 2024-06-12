@@ -10,8 +10,8 @@ import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.core.schema.SdkException;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.ApiException;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
@@ -31,12 +31,12 @@ public final class CallContext {
     /**
      * Error encountered by the call that will be thrown.
      */
-    public static final Context.Key<SdkException> ERROR = Context.key("Error");
+    public static final Context.Key<ApiException> ERROR = Context.key("Error");
 
     /**
      * Contains the schema of the operation being sent.
      */
-    public static final Context.Key<SdkSchema> OPERATION_SCHEMA = Context.key("Operation schema");
+    public static final Context.Key<Schema> OPERATION_SCHEMA = Context.key("Operation schema");
 
     /**
      * The total amount of time to wait for an API call to complete, including retries, and serialization.

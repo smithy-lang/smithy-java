@@ -9,7 +9,7 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
@@ -23,7 +23,7 @@ public abstract sealed class PresenceTracker {
      *
      * @param memberSchema schema of member to set
      */
-    public abstract void setMember(SdkSchema memberSchema);
+    public abstract void setMember(Schema memberSchema);
 
     /**
      * Checks if a member is present.
@@ -31,7 +31,7 @@ public abstract sealed class PresenceTracker {
      * @param memberSchema schema of member to check.
      * @return true if member is present.
      */
-    public abstract boolean checkMember(SdkSchema memberSchema);
+    public abstract boolean checkMember(Schema memberSchema);
 
     /**
      * Checks if all required members are set.
@@ -50,11 +50,11 @@ public abstract sealed class PresenceTracker {
     /**
      * Checks if all required members are set and throws an exception if any are unset.
      *
-     * @throws SdkSerdeException if any required members are not set.
+     * @throws SerializationException if any required members are not set.
      */
     public void validate() {
         if (!allSet()) {
-            throw new SdkSerdeException("Missing required members: " + getMissingMembers());
+            throw new SerializationException("Missing required members: " + getMissingMembers());
         }
     }
 
@@ -64,7 +64,7 @@ public abstract sealed class PresenceTracker {
      *
      * @return StructureValidator to use for validating required members.
      */
-    public static PresenceTracker of(SdkSchema schema) {
+    public static PresenceTracker of(Schema schema) {
         if (schema.requiredMemberCount == 0) {
             return NoOpPresenceTracker.INSTANCE;
         } else if (schema.requiredMemberCount <= 64) {
@@ -83,12 +83,12 @@ public abstract sealed class PresenceTracker {
         private static final NoOpPresenceTracker INSTANCE = new NoOpPresenceTracker();
 
         @Override
-        public void setMember(SdkSchema memberSchema) {
+        public void setMember(Schema memberSchema) {
             // No required members to set.
         }
 
         @Override
-        public boolean checkMember(SdkSchema memberSchema) {
+        public boolean checkMember(Schema memberSchema) {
             return false;
         }
 
@@ -108,19 +108,19 @@ public abstract sealed class PresenceTracker {
      */
     static final class RequiredMemberPresenceTracker extends PresenceTracker {
         private long setBitfields = 0L;
-        private final SdkSchema schema;
+        private final Schema schema;
 
-        RequiredMemberPresenceTracker(SdkSchema schema) {
+        RequiredMemberPresenceTracker(Schema schema) {
             this.schema = schema;
         }
 
         @Override
-        public void setMember(SdkSchema memberSchema) {
+        public void setMember(Schema memberSchema) {
             setBitfields |= memberSchema.requiredByValidationBitmask;
         }
 
         @Override
-        public boolean checkMember(SdkSchema memberSchema) {
+        public boolean checkMember(Schema memberSchema) {
             return (setBitfields & memberSchema.requiredByValidationBitmask) != 0L;
         }
 
@@ -146,22 +146,22 @@ public abstract sealed class PresenceTracker {
      */
     static final class BigRequiredMemberPresenceTracker extends PresenceTracker {
         private final BitSet bitSet;
-        private final SdkSchema schema;
+        private final Schema schema;
 
-        BigRequiredMemberPresenceTracker(SdkSchema schema) {
+        BigRequiredMemberPresenceTracker(Schema schema) {
             this.schema = schema;
             this.bitSet = new BitSet(schema.members().size());
         }
 
         @Override
-        public void setMember(SdkSchema memberSchema) {
+        public void setMember(Schema memberSchema) {
             if (memberSchema.isRequiredByValidation()) {
                 bitSet.set(memberSchema.memberIndex());
             }
         }
 
         @Override
-        public boolean checkMember(SdkSchema memberSchema) {
+        public boolean checkMember(Schema memberSchema) {
             return bitSet.get(memberSchema.memberIndex());
         }
 

@@ -51,12 +51,12 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 
@@ -141,7 +141,7 @@ public class SerdeTest {
     @MethodSource("source")
     <T extends SerializableStruct> void pojoToDocumentRoundTrip(T pojo) {
         var document = Document.createTyped(pojo);
-        SdkShapeBuilder<T> builder = getBuilder(pojo);
+        ShapeBuilder<T> builder = getBuilder(pojo);
         document.deserializeInto(builder);
         var output = builder.build();
         assertEquals(pojo.hashCode(), output.hashCode());
@@ -157,9 +157,9 @@ public class SerdeTest {
 
     @ParameterizedTest
     @MethodSource("exceptions")
-    void simpleExceptionToDocument(ModeledSdkException exception) {
+    void simpleExceptionToDocument(ModeledApiException exception) {
         var document = Document.createTyped(exception);
-        SdkShapeBuilder<ModeledSdkException> builder = getBuilder(exception);
+        ShapeBuilder<ModeledApiException> builder = getBuilder(exception);
         document.deserializeInto(builder);
         var output = builder.build();
         assertEquals(exception.getMessage(), output.getMessage());
@@ -189,16 +189,16 @@ public class SerdeTest {
                 "{\"requiredList\":[\"a\",\"b\",\"b\",\"c\"]}".getBytes(StandardCharsets.UTF_8)
             );
 
-            var exc = assertThrows(SdkSerdeException.class, () -> SetsInput.builder().deserialize(de));
+            var exc = assertThrows(SerializationException.class, () -> SetsInput.builder().deserialize(de));
             assertTrue(exc.getMessage().contains("Member must have unique values"));
         }
     }
 
     @SuppressWarnings("unchecked")
-    private static <P extends SerializableShape> SdkShapeBuilder<P> getBuilder(P pojo) {
+    private static <P extends SerializableShape> ShapeBuilder<P> getBuilder(P pojo) {
         try {
             var method = pojo.getClass().getDeclaredMethod("builder");
-            return (SdkShapeBuilder<P>) method.invoke(pojo);
+            return (ShapeBuilder<P>) method.invoke(pojo);
         } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }

@@ -19,15 +19,15 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 final class ValidatorOfUnion implements ShapeSerializer {
 
     private final Validator.ShapeValidator validator;
-    private final SdkSchema schema;
+    private final Schema schema;
     private String setMember;
 
-    private ValidatorOfUnion(Validator.ShapeValidator validator, SdkSchema schema) {
+    private ValidatorOfUnion(Validator.ShapeValidator validator, Schema schema) {
         this.validator = validator;
         this.schema = schema;
     }
 
-    static void validate(Validator.ShapeValidator validator, SdkSchema schema, SerializableStruct struct) {
+    static void validate(Validator.ShapeValidator validator, Schema schema, SerializableStruct struct) {
         var unionValidator = new ValidatorOfUnion(validator, schema);
         struct.serializeMembers(unionValidator);
         unionValidator.checkResult();
@@ -44,12 +44,12 @@ final class ValidatorOfUnion implements ShapeSerializer {
         }
     }
 
-    private boolean validateSetValue(SdkSchema schema, Object value) {
+    private boolean validateSetValue(Schema schema, Object value) {
         // Don't further validate the value if it's null.
         return value != null && validateSetValue(schema);
     }
 
-    private boolean validateSetValue(SdkSchema schema) {
+    private boolean validateSetValue(Schema schema) {
         if (setMember != null) {
             String message = "Union member conflicts with '" + setMember + "'";
             validator.addError(new ValidationError.UnionValidationFailure(validator.createPath(), message, schema));
@@ -61,7 +61,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeBoolean(SdkSchema member, boolean value) {
+    public void writeBoolean(Schema member, boolean value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
             validator.writeBoolean(member, value);
@@ -70,7 +70,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeByte(SdkSchema member, byte value) {
+    public void writeByte(Schema member, byte value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
             validator.writeByte(member, value);
@@ -79,7 +79,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeShort(SdkSchema member, short value) {
+    public void writeShort(Schema member, short value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
             validator.writeShort(member, value);
@@ -88,7 +88,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeInteger(SdkSchema member, int value) {
+    public void writeInteger(Schema member, int value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
             validator.writeInteger(member, value);
@@ -97,7 +97,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeLong(SdkSchema member, long value) {
+    public void writeLong(Schema member, long value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
             validator.writeLong(member, value);
@@ -106,7 +106,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeFloat(SdkSchema member, float value) {
+    public void writeFloat(Schema member, float value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
             validator.writeFloat(member, value);
@@ -115,7 +115,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeDouble(SdkSchema member, double value) {
+    public void writeDouble(Schema member, double value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
             validator.writeDouble(member, value);
@@ -124,7 +124,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeBigInteger(SdkSchema member, BigInteger value) {
+    public void writeBigInteger(Schema member, BigInteger value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member, value)) {
             validator.writeBigInteger(member, value);
@@ -133,7 +133,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeBigDecimal(SdkSchema member, BigDecimal value) {
+    public void writeBigDecimal(Schema member, BigDecimal value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member, value)) {
             validator.writeBigDecimal(member, value);
@@ -142,7 +142,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeBlob(SdkSchema member, byte[] value) {
+    public void writeBlob(Schema member, byte[] value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member, value)) {
             validator.writeBlob(member, value);
@@ -151,7 +151,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeString(SdkSchema member, String value) {
+    public void writeString(Schema member, String value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member, value)) {
             validator.writeString(member, value);
@@ -160,7 +160,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeTimestamp(SdkSchema member, Instant value) {
+    public void writeTimestamp(Schema member, Instant value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member, value)) {
             validator.writeTimestamp(member, value);
@@ -169,7 +169,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeDocument(SdkSchema member, Document value) {
+    public void writeDocument(Schema member, Document value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member, value)) {
             validator.writeDocument(member, value);
@@ -178,7 +178,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(SdkSchema member, T state, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T> void writeList(Schema member, T state, BiConsumer<T, ShapeSerializer> consumer) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
             validator.writeList(member, state, consumer);
@@ -187,7 +187,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeMap(SdkSchema member, T state, BiConsumer<T, MapSerializer> consumer) {
+    public <T> void writeMap(Schema member, T state, BiConsumer<T, MapSerializer> consumer) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
             validator.writeMap(member, state, consumer);
@@ -196,7 +196,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema member, SerializableStruct struct) {
+    public void writeStruct(Schema member, SerializableStruct struct) {
         validator.pushPath(member);
         if (validateSetValue(member)) {
             validator.writeStruct(member, struct);
@@ -205,7 +205,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeNull(SdkSchema schema) {
+    public void writeNull(Schema schema) {
         // null values in unions are ignored.
     }
 }

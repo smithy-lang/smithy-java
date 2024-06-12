@@ -11,7 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.Either;
-import software.amazon.smithy.java.runtime.core.schema.SdkException;
+import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
@@ -452,7 +452,7 @@ public interface ClientInterceptor {
         I input,
         Value<RequestT> request,
         Value<ResponseT> response,
-        Either<SdkException, O> result
+        Either<ApiException, O> result
     ) {}
 
     /**
@@ -478,12 +478,12 @@ public interface ClientInterceptor {
      * @param <RequestT> Protocol-specific request type.
      * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<SdkException, O> modifyBeforeAttemptCompletion(
+    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<ApiException, O> modifyBeforeAttemptCompletion(
         Context context,
         I input,
         Value<RequestT> request,
         Value<ResponseT> response,
-        Either<SdkException, O> result
+        Either<ApiException, O> result
     ) {
         return result;
     }
@@ -517,7 +517,7 @@ public interface ClientInterceptor {
         I input,
         Value<RequestT> request,
         Value<ResponseT> responseIfAvailable,
-        Either<SdkException, O> result
+        Either<ApiException, O> result
     ) {}
 
     /**
@@ -544,12 +544,12 @@ public interface ClientInterceptor {
      * @param <RequestT>  Protocol-specific request type.
      * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<SdkException, O> modifyBeforeCompletion(
+    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<ApiException, O> modifyBeforeCompletion(
         Context context,
         I input,
         Value<RequestT> requestIfAvailable,
         Value<ResponseT> responseIfAvailable,
-        Either<SdkException, O> result
+        Either<ApiException, O> result
     ) {
         return result;
     }
@@ -583,6 +583,6 @@ public interface ClientInterceptor {
         I input,
         Value<RequestT> requestIfAvailable,
         Value<ResponseT> responseIfAvailable,
-        Either<SdkException, O> result
+        Either<ApiException, O> result
     ) {}
 }

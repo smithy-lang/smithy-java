@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.core.serde;
 
 import java.util.function.BiConsumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 
 /**
  * Serializes a map shape.
@@ -20,5 +20,5 @@ public interface MapSerializer {
      * @param state           State to pass to {@code valueSerializer}.
      * @param valueSerializer Serializer used to serialize the map value. A value must be serialized.
      */
-    <T> void writeEntry(SdkSchema keySchema, String key, T state, BiConsumer<T, ShapeSerializer> valueSerializer);
+    <T> void writeEntry(Schema keySchema, String key, T state, BiConsumer<T, ShapeSerializer> valueSerializer);
 }

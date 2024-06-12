@@ -5,9 +5,9 @@
 
 package software.amazon.smithy.java.server.core.exceptions;
 
-import software.amazon.smithy.java.runtime.core.schema.SdkException;
+import software.amazon.smithy.java.runtime.core.schema.ApiException;
 
-public final class UnknownOperationException extends SdkException {
+public final class UnknownOperationException extends ApiException {
     public UnknownOperationException(String s) {
         super(s);
     }

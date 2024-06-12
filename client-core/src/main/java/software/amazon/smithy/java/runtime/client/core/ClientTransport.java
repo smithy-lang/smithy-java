@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.runtime.client.core;
 
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
-import software.amazon.smithy.java.runtime.core.schema.SdkException;
+import software.amazon.smithy.java.runtime.core.schema.ApiException;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
@@ -21,8 +21,8 @@ public interface ClientTransport {
      * @return a CompletableFuture of the deserialized output.
      * @param <I> Input shape.
      * @param <O> Output shape.
-     * @throws ModeledSdkException if a modeled error occurs.
-     * @throws SdkException if an error occurs.
+     * @throws ModeledApiException if a modeled error occurs.
+     * @throws ApiException if an error occurs.
      */
     <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> send(ClientCall<I, O> call);
 

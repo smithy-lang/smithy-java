@@ -13,12 +13,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -32,7 +32,9 @@ final class DocumentParser implements ShapeSerializer {
 
     Document getResult() {
         if (!wroteSomething) {
-            throw new SdkSerdeException("Unable to create a document from ShapeSerializer that serialized nothing");
+            throw new SerializationException(
+                "Unable to create a document from ShapeSerializer that serialized nothing"
+            );
         }
         return result;
     }
@@ -43,7 +45,7 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+    public void writeStruct(Schema schema, SerializableStruct struct) {
         if (schema.type() == ShapeType.STRUCTURE) {
             setResult(new Documents.LazyStructure(schema, struct));
         } else {
@@ -61,12 +63,12 @@ final class DocumentParser implements ShapeSerializer {
         private final Map<String, Document> members = new LinkedHashMap<>();
 
         @Override
-        protected ShapeSerializer before(SdkSchema schema) {
+        protected ShapeSerializer before(Schema schema) {
             return parser;
         }
 
         @Override
-        protected void after(SdkSchema schema) {
+        protected void after(Schema schema) {
             members.put(schema.memberName(), parser.getResult());
         }
 
@@ -76,7 +78,7 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(SdkSchema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T> void writeList(Schema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
         List<Document> elements = new ArrayList<>();
         var elementParser = new DocumentParser();
         ListSerializer serializer = new ListSerializer(elementParser, position -> {
@@ -93,16 +95,18 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeMap(SdkSchema schema, T state, BiConsumer<T, MapSerializer> consumer) {
+    public <T> void writeMap(Schema schema, T state, BiConsumer<T, MapSerializer> consumer) {
         var keyMember = schema.member("key");
         if (keyMember == null) {
-            throw new SdkSerdeException("Cannot create a map from a schema that does not define a map key: " + schema);
+            throw new SerializationException(
+                "Cannot create a map from a schema that does not define a map key: " + schema
+            );
         } else if (keyMember.type() == ShapeType.STRING || keyMember.type() == ShapeType.ENUM) {
             var serializer = new DocumentMapSerializer();
             consumer.accept(state, serializer);
             setResult(new Documents.StringMapDocument(schema, serializer.entries));
         } else {
-            throw new SdkSerdeException("Unexpected map key schema: " + schema);
+            throw new SerializationException("Unexpected map key schema: " + schema);
         }
     }
 
@@ -111,7 +115,7 @@ final class DocumentParser implements ShapeSerializer {
 
         @Override
         public <U> void writeEntry(
-            SdkSchema keySchema,
+            Schema keySchema,
             String key,
             U keyState,
             BiConsumer<U, ShapeSerializer> valueSerializer
@@ -123,72 +127,72 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public void writeBoolean(SdkSchema schema, boolean value) {
+    public void writeBoolean(Schema schema, boolean value) {
         setResult(new Documents.BooleanDocument(schema, value));
     }
 
     @Override
-    public void writeByte(SdkSchema schema, byte value) {
+    public void writeByte(Schema schema, byte value) {
         setResult(new Documents.ByteDocument(schema, value));
     }
 
     @Override
-    public void writeShort(SdkSchema schema, short value) {
+    public void writeShort(Schema schema, short value) {
         setResult(new Documents.ShortDocument(schema, value));
     }
 
     @Override
-    public void writeInteger(SdkSchema schema, int value) {
+    public void writeInteger(Schema schema, int value) {
         setResult(new Documents.IntegerDocument(schema, value));
     }
 
     @Override
-    public void writeLong(SdkSchema schema, long value) {
+    public void writeLong(Schema schema, long value) {
         setResult(new Documents.LongDocument(schema, value));
     }
 
     @Override
-    public void writeFloat(SdkSchema schema, float value) {
+    public void writeFloat(Schema schema, float value) {
         setResult(new Documents.FloatDocument(schema, value));
     }
 
     @Override
-    public void writeDouble(SdkSchema schema, double value) {
+    public void writeDouble(Schema schema, double value) {
         setResult(new Documents.DoubleDocument(schema, value));
     }
 
     @Override
-    public void writeBigInteger(SdkSchema schema, BigInteger value) {
+    public void writeBigInteger(Schema schema, BigInteger value) {
         setResult(new Documents.BigIntegerDocument(schema, value));
     }
 
     @Override
-    public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+    public void writeBigDecimal(Schema schema, BigDecimal value) {
         setResult(new Documents.BigDecimalDocument(schema, value));
     }
 
     @Override
-    public void writeString(SdkSchema schema, String value) {
+    public void writeString(Schema schema, String value) {
         setResult(new Documents.StringDocument(schema, value));
     }
 
     @Override
-    public void writeBlob(SdkSchema schema, byte[] value) {
+    public void writeBlob(Schema schema, byte[] value) {
         setResult(new Documents.BlobDocument(schema, value));
     }
 
     @Override
-    public void writeTimestamp(SdkSchema schema, Instant value) {
+    public void writeTimestamp(Schema schema, Instant value) {
         setResult(new Documents.TimestampDocument(schema, value));
     }
 
     @Override
-    public void writeDocument(SdkSchema schema, Document value) {
+    public void writeDocument(Schema schema, Document value) {
         value.serializeContents(this);
     }
 
     @Override
-    public void writeNull(SdkSchema schema) {
+    public void writeNull(Schema schema) {
         setResult(null);
     }
 }

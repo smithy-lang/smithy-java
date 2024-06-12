@@ -6,9 +6,9 @@
 package software.amazon.smithy.java.runtime.core.testmodels;
 
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
@@ -18,10 +18,10 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public final class Bird implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Bird");
-    public static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
+    public static final Schema SCHEMA_NAME = Schema.memberBuilder("name", PreludeSchemas.STRING)
         .id(ID)
         .build();
-    public static final SdkSchema SCHEMA = SdkSchema.builder()
+    public static final Schema SCHEMA = Schema.builder()
         .id(ID)
         .type(ShapeType.STRUCTURE)
         .members(SCHEMA_NAME)
@@ -56,7 +56,7 @@ public final class Bird implements SerializableStruct {
         serializer.writeString(SCHEMA_NAME, name);
     }
 
-    public static final class Builder implements SdkShapeBuilder<Bird> {
+    public static final class Builder implements ShapeBuilder<Bird> {
 
         private String name;
 

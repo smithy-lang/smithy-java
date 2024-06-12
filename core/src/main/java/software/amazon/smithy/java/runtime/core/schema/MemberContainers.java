@@ -19,7 +19,7 @@ final class MemberContainers {
 
     private MemberContainers() {}
 
-    static Map<String, SdkSchema> of(ShapeType type, List<SdkSchema> members, Map<String, SdkSchema> targetMembers) {
+    static Map<String, Schema> of(ShapeType type, List<Schema> members, Map<String, Schema> targetMembers) {
         if (members == null || members.isEmpty()) {
             // Use the members of the target shape directly rather than needing to do a recursive resolution.
             return targetMembers != null ? targetMembers : Map.of();
@@ -32,8 +32,8 @@ final class MemberContainers {
             var member = members.get(0);
             return Map.of(member.memberName(), member);
         } else {
-            Map<String, SdkSchema> result = new LinkedHashMap<>(members.size());
-            for (SdkSchema member : members) {
+            Map<String, Schema> result = new LinkedHashMap<>(members.size());
+            for (Schema member : members) {
                 result.put(member.memberName(), member);
             }
             return result;
@@ -43,12 +43,12 @@ final class MemberContainers {
     /**
      * Validates and stores list members that always have a single "member" member.
      */
-    private static final class ListMembers extends AbstractMap<String, SdkSchema> {
+    private static final class ListMembers extends AbstractMap<String, Schema> {
 
-        private final SdkSchema member;
-        private final Set<Entry<String, SdkSchema>> entries;
+        private final Schema member;
+        private final Set<Entry<String, Schema>> entries;
 
-        ListMembers(List<SdkSchema> members) {
+        ListMembers(List<Schema> members) {
             if (members.size() != 1) {
                 throw new IllegalArgumentException("List shapes require exactly one member");
             }
@@ -67,12 +67,12 @@ final class MemberContainers {
         }
 
         @Override
-        public SdkSchema get(Object key) {
+        public Schema get(Object key) {
             return "member".equals(key) ? member : null;
         }
 
         @Override
-        public Set<Entry<String, SdkSchema>> entrySet() {
+        public Set<Entry<String, Schema>> entrySet() {
             return entries;
         }
     }
@@ -80,19 +80,19 @@ final class MemberContainers {
     /**
      * Validates and stores map members that always have a "key" and "value" member, in that order.
      */
-    private static final class MapMembers extends AbstractMap<String, SdkSchema> {
+    private static final class MapMembers extends AbstractMap<String, Schema> {
 
-        private final SdkSchema key;
-        private final SdkSchema value;
-        private final Set<Entry<String, SdkSchema>> entries;
+        private final Schema key;
+        private final Schema value;
+        private final Set<Entry<String, Schema>> entries;
 
-        private MapMembers(SdkSchema key, SdkSchema value) {
+        private MapMembers(Schema key, Schema value) {
             this.key = key;
             this.value = value;
             this.entries = Set.of(new SimpleImmutableEntry<>("key", key), new SimpleImmutableEntry<>("value", value));
         }
 
-        static MapMembers of(List<SdkSchema> members) {
+        static MapMembers of(List<Schema> members) {
             int size = members.size();
             if (size != 2) {
                 throw new IllegalArgumentException("Maps require exactly two members. Found: " + members);
@@ -111,7 +111,7 @@ final class MemberContainers {
         }
 
         @Override
-        public SdkSchema get(Object key) {
+        public Schema get(Object key) {
             if ("key".equals(key)) {
                 return this.key;
             } else if ("value".equals(key)) {
@@ -122,7 +122,7 @@ final class MemberContainers {
         }
 
         @Override
-        public Set<Entry<String, SdkSchema>> entrySet() {
+        public Set<Entry<String, Schema>> entrySet() {
             return entries;
         }
     }

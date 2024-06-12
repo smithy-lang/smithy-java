@@ -26,7 +26,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
         this.structValidator = structValidator;
     }
 
-    static void validate(Validator.ShapeValidator validator, SdkSchema schema, SerializableStruct struct) {
+    static void validate(Validator.ShapeValidator validator, Schema schema, SerializableStruct struct) {
         var tracker = PresenceTracker.of(schema);
         struct.serializeMembers(new ValidatorOfStruct(validator, tracker));
         if (!tracker.allSet()) {
@@ -39,7 +39,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeBoolean(SdkSchema member, boolean value) {
+    public void writeBoolean(Schema member, boolean value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeBoolean(member, value);
@@ -47,7 +47,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeByte(SdkSchema member, byte value) {
+    public void writeByte(Schema member, byte value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeByte(member, value);
@@ -55,7 +55,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeShort(SdkSchema member, short value) {
+    public void writeShort(Schema member, short value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeShort(member, value);
@@ -63,7 +63,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeInteger(SdkSchema member, int value) {
+    public void writeInteger(Schema member, int value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeInteger(member, value);
@@ -71,7 +71,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeLong(SdkSchema member, long value) {
+    public void writeLong(Schema member, long value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeLong(member, value);
@@ -79,7 +79,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeFloat(SdkSchema member, float value) {
+    public void writeFloat(Schema member, float value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeFloat(member, value);
@@ -87,7 +87,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeDouble(SdkSchema member, double value) {
+    public void writeDouble(Schema member, double value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeDouble(member, value);
@@ -95,7 +95,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeBigInteger(SdkSchema member, BigInteger value) {
+    public void writeBigInteger(Schema member, BigInteger value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeBigInteger(member, value);
@@ -103,7 +103,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeBigDecimal(SdkSchema member, BigDecimal value) {
+    public void writeBigDecimal(Schema member, BigDecimal value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeBigDecimal(member, value);
@@ -111,7 +111,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeBlob(SdkSchema member, byte[] value) {
+    public void writeBlob(Schema member, byte[] value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeBlob(member, value);
@@ -119,7 +119,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeString(SdkSchema member, String value) {
+    public void writeString(Schema member, String value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeString(member, value);
@@ -127,7 +127,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeTimestamp(SdkSchema member, Instant value) {
+    public void writeTimestamp(Schema member, Instant value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeTimestamp(member, value);
@@ -135,7 +135,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeDocument(SdkSchema member, Document value) {
+    public void writeDocument(Schema member, Document value) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeDocument(member, value);
@@ -143,7 +143,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(SdkSchema member, T state, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T> void writeList(Schema member, T state, BiConsumer<T, ShapeSerializer> consumer) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeList(member, state, consumer);
@@ -151,7 +151,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeMap(SdkSchema member, T state, BiConsumer<T, MapSerializer> consumer) {
+    public <T> void writeMap(Schema member, T state, BiConsumer<T, MapSerializer> consumer) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeMap(member, state, consumer);
@@ -159,7 +159,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeStruct(SdkSchema member, SerializableStruct struct) {
+    public void writeStruct(Schema member, SerializableStruct struct) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeStruct(member, struct);
@@ -167,7 +167,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public void writeNull(SdkSchema member) {
+    public void writeNull(Schema member) {
         // A null member does not count as present so don't set the bitfield.
         validator.pushPath(member.memberName());
         validator.writeNull(member);

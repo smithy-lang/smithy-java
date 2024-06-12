@@ -8,8 +8,8 @@ package software.amazon.smithy.java.runtime.core.serde;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 
 /**
  * Generic shape serialization and deserialization.
@@ -66,7 +66,7 @@ public interface Codec extends AutoCloseable {
      * @return Returns the built and error-corrected shape.
      * @param <T> Shape to build.
      */
-    default <T extends SerializableShape> T deserializeShape(byte[] source, SdkShapeBuilder<T> builder) {
+    default <T extends SerializableShape> T deserializeShape(byte[] source, ShapeBuilder<T> builder) {
         return builder.deserialize(createDeserializer(source)).errorCorrection().build();
     }
 
@@ -78,7 +78,7 @@ public interface Codec extends AutoCloseable {
      * @return Returns the built and error-corrected shape.
      * @param <T> Shape to build.
      */
-    default <T extends SerializableShape> T deserializeShape(String source, SdkShapeBuilder<T> builder) {
+    default <T extends SerializableShape> T deserializeShape(String source, ShapeBuilder<T> builder) {
         return deserializeShape(source.getBytes(StandardCharsets.UTF_8), builder);
     }
 }

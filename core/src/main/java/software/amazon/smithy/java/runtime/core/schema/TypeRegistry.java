@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyBuilder;
 
@@ -18,7 +18,7 @@ import software.amazon.smithy.utils.SmithyBuilder;
  */
 public final class TypeRegistry {
 
-    private record Entry<T extends SerializableShape>(Class<T> type, Supplier<SdkShapeBuilder<T>> supplier) {}
+    private record Entry<T extends SerializableShape>(Class<T> type, Supplier<ShapeBuilder<T>> supplier) {}
 
     private final Map<ShapeId, Entry<?>> supplierMap;
 
@@ -42,7 +42,7 @@ public final class TypeRegistry {
      * @param shapeId Shape ID to attempt to create.
      * @return the optionally created builder.
      */
-    public Optional<SdkShapeBuilder<?>> create(ShapeId shapeId) {
+    public Optional<ShapeBuilder<?>> create(ShapeId shapeId) {
         var mapping = supplierMap.get(shapeId);
         if (mapping == null) {
             return Optional.empty();
@@ -58,17 +58,17 @@ public final class TypeRegistry {
      * @param type    Shape class.
      * @return the optionally created builder.
      * @param <T> Shape type.
-     * @throws SdkSerdeException if the given type isn't compatible with the shape in the registry.
+     * @throws SerializationException if the given type isn't compatible with the shape in the registry.
      */
     @SuppressWarnings("unchecked")
-    public <T extends SerializableShape> Optional<SdkShapeBuilder<T>> create(ShapeId shapeId, Class<T> type) {
+    public <T extends SerializableShape> Optional<ShapeBuilder<T>> create(ShapeId shapeId, Class<T> type) {
         var mapping = supplierMap.get(shapeId);
         if (mapping == null) {
             return Optional.empty();
         } else if (type.isAssignableFrom(mapping.type)) {
-            return Optional.ofNullable((SdkShapeBuilder<T>) mapping.supplier.get());
+            return Optional.ofNullable((ShapeBuilder<T>) mapping.supplier.get());
         } else {
-            throw new SdkSerdeException("Polymorphic shape " + shapeId + " is not compatible with " + type);
+            throw new SerializationException("Polymorphic shape " + shapeId + " is not compatible with " + type);
         }
     }
 
@@ -98,7 +98,7 @@ public final class TypeRegistry {
         public <T extends SerializableShape> Builder putType(
             ShapeId shapeId,
             Class<T> type,
-            Supplier<SdkShapeBuilder<T>> supplier
+            Supplier<ShapeBuilder<T>> supplier
         ) {
             supplierMap.put(shapeId, new Entry<>(type, supplier));
             return this;

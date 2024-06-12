@@ -21,8 +21,8 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterc
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
-import software.amazon.smithy.java.runtime.core.schema.SdkOperation;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
@@ -76,7 +76,7 @@ public abstract class Client {
         I input,
         DataStream inputStream,
         Object eventStream,
-        SdkOperation<I, O> operation,
+        ApiOperation<I, O> operation,
         Context context
     ) {
         // Create a copy of the type registry that adds the errors this operation can encounter.
@@ -98,7 +98,7 @@ public abstract class Client {
                 .identityResolvers(identityResolvers)
                 .errorCreator((c, id) -> {
                     ShapeId shapeId = ShapeId.from(id);
-                    return operationRegistry.create(shapeId, ModeledSdkException.class);
+                    return operationRegistry.create(shapeId, ModeledApiException.class);
                 })
                 .build()
         );

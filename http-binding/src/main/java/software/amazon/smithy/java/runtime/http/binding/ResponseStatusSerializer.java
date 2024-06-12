@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.function.IntConsumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 
 final class ResponseStatusSerializer extends SpecificShapeSerializer {
@@ -18,7 +18,7 @@ final class ResponseStatusSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public void writeInteger(SdkSchema schema, int value) {
+    public void writeInteger(Schema schema, int value) {
         consumer.accept(value);
     }
 }

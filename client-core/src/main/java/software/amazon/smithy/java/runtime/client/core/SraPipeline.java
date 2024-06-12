@@ -20,7 +20,7 @@ import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolverParams;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.Either;
-import software.amazon.smithy.java.runtime.core.schema.SdkException;
+import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
@@ -149,7 +149,7 @@ public final class SraPipeline<I extends SerializableStruct, O extends Serializa
         }
 
         // TODO: Build more useful error message (to log also) indicating why some schemes were not used.
-        throw new SdkException("No auth scheme could be resolved for " + call.operation().schema().id());
+        throw new ApiException("No auth scheme could be resolved for " + call.operation().schema().id());
     }
 
     private <IdentityT extends Identity> Optional<ResolvedScheme<IdentityT, RequestT>> createResolvedSchema(
@@ -215,7 +215,7 @@ public final class SraPipeline<I extends SerializableStruct, O extends Serializa
         return protocol.deserializeResponse(call, request, modifiedResponse)
             .thenApply(shape -> {
                 context.put(CallContext.OUTPUT, shape);
-                Either<SdkException, O> result = Either.right(shape);
+                Either<ApiException, O> result = Either.right(shape);
 
                 interceptor.readAfterDeserialization(
                     context,

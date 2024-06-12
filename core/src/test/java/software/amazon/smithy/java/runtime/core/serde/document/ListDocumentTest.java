@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.function.BiConsumer;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -38,7 +38,7 @@ public class ListDocumentTest {
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(SdkSchema schema, Document value) {
+            public void writeDocument(Schema schema, Document value) {
                 assertThat(value, is(document));
             }
         });
@@ -53,21 +53,21 @@ public class ListDocumentTest {
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(SdkSchema schema, Document value) {
+            public void writeDocument(Schema schema, Document value) {
                 value.serializeContents(this);
             }
 
             @Override
-            public <T> void writeList(SdkSchema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
+            public <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
                 assertThat(schema.type(), equalTo(ShapeType.LIST));
                 consumer.accept(listState, new SpecificShapeSerializer() {
                     @Override
-                    public void writeDocument(SdkSchema schema, Document value) {
+                    public void writeDocument(Schema schema, Document value) {
                         value.serializeContents(this);
                     }
 
                     @Override
-                    public void writeString(SdkSchema schema, String value) {
+                    public void writeString(Schema schema, String value) {
                         assertThat(schema, equalTo(PreludeSchemas.STRING));
                         writtenStrings.add(value);
                     }

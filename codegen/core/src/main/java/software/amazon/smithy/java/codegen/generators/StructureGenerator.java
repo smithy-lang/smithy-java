@@ -23,7 +23,7 @@ import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.PresenceTracker;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
@@ -95,7 +95,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
             writer.putContext("shape", directive.symbol());
             writer.putContext("serializableStruct", SerializableStruct.class);
-            writer.putContext("sdkException", ModeledSdkException.class);
+            writer.putContext("sdkException", ModeledApiException.class);
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(
                 "schemas",

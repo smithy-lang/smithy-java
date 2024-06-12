@@ -14,11 +14,11 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -48,7 +48,7 @@ final class JsonSerializer implements ShapeSerializer {
         try {
             stream.flush();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
@@ -59,133 +59,133 @@ final class JsonSerializer implements ShapeSerializer {
             returnHandle.accept(stream);
             stream = null;
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeBoolean(SdkSchema schema, boolean value) {
+    public void writeBoolean(Schema schema, boolean value) {
         try {
             stream.writeVal(value);
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeByte(SdkSchema schema, byte value) {
+    public void writeByte(Schema schema, byte value) {
         try {
             stream.writeVal(value);
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeShort(SdkSchema schema, short value) {
+    public void writeShort(Schema schema, short value) {
         try {
             stream.writeVal(value);
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeBlob(SdkSchema schema, byte[] value) {
+    public void writeBlob(Schema schema, byte[] value) {
         try {
             stream.writeVal(Base64.getEncoder().encodeToString(value));
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeInteger(SdkSchema schema, int value) {
+    public void writeInteger(Schema schema, int value) {
         try {
             stream.writeVal(value);
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeLong(SdkSchema schema, long value) {
+    public void writeLong(Schema schema, long value) {
         try {
             stream.writeVal(value);
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeFloat(SdkSchema schema, float value) {
+    public void writeFloat(Schema schema, float value) {
         try {
             stream.writeVal(value);
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeDouble(SdkSchema schema, double value) {
+    public void writeDouble(Schema schema, double value) {
         try {
             stream.writeVal(value);
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeBigInteger(SdkSchema schema, BigInteger value) {
+    public void writeBigInteger(Schema schema, BigInteger value) {
         try {
             stream.writeVal(value);
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeBigDecimal(SdkSchema schema, BigDecimal value) {
+    public void writeBigDecimal(Schema schema, BigDecimal value) {
         try {
             stream.writeVal(value);
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeString(SdkSchema schema, String value) {
+    public void writeString(Schema schema, String value) {
         try {
             stream.writeVal(value);
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeTimestamp(SdkSchema schema, Instant value) {
+    public void writeTimestamp(Schema schema, Instant value) {
         timestampResolver.resolve(schema).writeToSerializer(schema, value, this);
     }
 
     @Override
-    public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+    public void writeStruct(Schema schema, SerializableStruct struct) {
         try {
             stream.writeObjectStart();
             struct.serializeMembers(new JsonStructSerializer(this, true));
             stream.writeObjectEnd();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public <T> void writeList(SdkSchema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
         try {
             stream.writeArrayStart();
             consumer.accept(listState, new ListSerializer(this, this::writeComma));
             stream.writeArrayEnd();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
@@ -200,25 +200,25 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeMap(SdkSchema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {
+    public <T> void writeMap(Schema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {
         try {
             stream.writeObjectStart();
             consumer.accept(mapState, new JsonMapSerializer(this, stream));
             stream.writeObjectEnd();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public void writeDocument(SdkSchema schema, Document value) {
+    public void writeDocument(Schema schema, Document value) {
         // Document values in JSON are serialized inline by receiving the data model contents of the document.
         if (value.type() != ShapeType.STRUCTURE) {
             value.serializeContents(this);
         } else {
             value.serializeContents(new SpecificShapeSerializer() {
                 @Override
-                public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+                public void writeStruct(Schema schema, SerializableStruct struct) {
                     try {
                         stream.writeObjectStart();
                         stream.writeObjectField("__type");
@@ -226,7 +226,7 @@ final class JsonSerializer implements ShapeSerializer {
                         struct.serializeMembers(new JsonStructSerializer(JsonSerializer.this, false));
                         stream.writeObjectEnd();
                     } catch (IOException | JsonException e) {
-                        throw new SdkSerdeException(e);
+                        throw new SerializationException(e);
                     }
                 }
             });
@@ -234,11 +234,11 @@ final class JsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeNull(SdkSchema schema) {
+    public void writeNull(Schema schema) {
         try {
             stream.writeNull();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 }

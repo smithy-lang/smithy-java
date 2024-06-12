@@ -12,31 +12,31 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class Documents {
 
-    static final SdkSchema LIST_SCHEMA = SdkSchema.builder()
+    static final Schema LIST_SCHEMA = Schema.builder()
         .id(PreludeSchemas.DOCUMENT.id())
         .type(ShapeType.LIST)
-        .members(SdkSchema.memberBuilder("member", PreludeSchemas.DOCUMENT))
+        .members(Schema.memberBuilder("member", PreludeSchemas.DOCUMENT))
         .build();
 
-    static final SdkSchema STR_MAP_SCHEMA = SdkSchema.builder()
+    static final Schema STR_MAP_SCHEMA = Schema.builder()
         .id(PreludeSchemas.DOCUMENT.id())
         .type(ShapeType.MAP)
         .members(
-            SdkSchema.memberBuilder("key", PreludeSchemas.STRING).id(PreludeSchemas.DOCUMENT.id()).build(),
-            SdkSchema.memberBuilder("value", PreludeSchemas.DOCUMENT).id(PreludeSchemas.DOCUMENT.id()).build()
+            Schema.memberBuilder("key", PreludeSchemas.STRING).id(PreludeSchemas.DOCUMENT.id()).build(),
+            Schema.memberBuilder("value", PreludeSchemas.DOCUMENT).id(PreludeSchemas.DOCUMENT.id()).build()
         )
         .build();
 
     private Documents() {}
 
-    record BooleanDocument(SdkSchema schema, boolean value) implements Document {
+    record BooleanDocument(Schema schema, boolean value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.BOOLEAN;
@@ -82,7 +82,7 @@ final class Documents {
         return converted;
     }
 
-    record ByteDocument(SdkSchema schema, byte value) implements Document {
+    record ByteDocument(Schema schema, byte value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.BYTE;
@@ -139,7 +139,7 @@ final class Documents {
         }
     }
 
-    record ShortDocument(SdkSchema schema, short value) implements Document {
+    record ShortDocument(Schema schema, short value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.SHORT;
@@ -196,7 +196,7 @@ final class Documents {
         }
     }
 
-    record IntegerDocument(SdkSchema schema, int value) implements Document {
+    record IntegerDocument(Schema schema, int value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.INTEGER;
@@ -253,7 +253,7 @@ final class Documents {
         }
     }
 
-    record LongDocument(SdkSchema schema, long value) implements Document {
+    record LongDocument(Schema schema, long value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.LONG;
@@ -310,7 +310,7 @@ final class Documents {
         }
     }
 
-    record FloatDocument(SdkSchema schema, float value) implements Document {
+    record FloatDocument(Schema schema, float value) implements Document {
 
         private static long convertFloatToLong(ShapeType dest, float value) {
             if (!Float.isFinite(value)) {
@@ -375,7 +375,7 @@ final class Documents {
         }
     }
 
-    record DoubleDocument(SdkSchema schema, double value) implements Document {
+    record DoubleDocument(Schema schema, double value) implements Document {
 
         private static long convertDoubleToLong(ShapeType dest, double value) {
             if (!Double.isFinite(value)) {
@@ -452,7 +452,7 @@ final class Documents {
         }
     }
 
-    record BigIntegerDocument(SdkSchema schema, BigInteger value) implements Document {
+    record BigIntegerDocument(Schema schema, BigInteger value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.BIG_INTEGER;
@@ -509,7 +509,7 @@ final class Documents {
         }
     }
 
-    record BigDecimalDocument(SdkSchema schema, BigDecimal value) implements Document {
+    record BigDecimalDocument(Schema schema, BigDecimal value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.BIG_DECIMAL;
@@ -566,7 +566,7 @@ final class Documents {
         }
     }
 
-    record StringDocument(SdkSchema schema, String value) implements Document {
+    record StringDocument(Schema schema, String value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.STRING;
@@ -588,7 +588,7 @@ final class Documents {
         }
     }
 
-    record BlobDocument(SdkSchema schema, byte[] value) implements Document {
+    record BlobDocument(Schema schema, byte[] value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.BLOB;
@@ -628,7 +628,7 @@ final class Documents {
         }
     }
 
-    record TimestampDocument(SdkSchema schema, Instant value) implements Document {
+    record TimestampDocument(Schema schema, Instant value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.TIMESTAMP;
@@ -650,7 +650,7 @@ final class Documents {
         }
     }
 
-    record ListDocument(SdkSchema schema, List<Document> values) implements Document {
+    record ListDocument(Schema schema, List<Document> values) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.LIST;
@@ -671,7 +671,7 @@ final class Documents {
         }
     }
 
-    record StringMapDocument(SdkSchema schema, Map<String, Document> members) implements Document {
+    record StringMapDocument(Schema schema, Map<String, Document> members) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.MAP;
@@ -698,7 +698,7 @@ final class Documents {
         }
     }
 
-    record StructureDocument(SdkSchema schema, Map<String, Document> members) implements Document, SerializableStruct {
+    record StructureDocument(Schema schema, Map<String, Document> members) implements Document, SerializableStruct {
         @Override
         public ShapeType type() {
             return ShapeType.STRUCTURE;
@@ -739,11 +739,11 @@ final class Documents {
      */
     static final class LazyStructure implements Document {
 
-        private final SdkSchema schema;
+        private final Schema schema;
         private final SerializableStruct struct;
         private volatile transient Document createdDocument;
 
-        LazyStructure(SdkSchema schema, SerializableStruct struct) {
+        LazyStructure(Schema schema, SerializableStruct struct) {
             this.schema = schema;
             this.struct = struct;
         }

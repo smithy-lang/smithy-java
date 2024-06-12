@@ -5,18 +5,18 @@
 
 package software.amazon.smithy.java.runtime.core.serde;
 
-import software.amazon.smithy.java.runtime.core.schema.SdkException;
+import software.amazon.smithy.java.runtime.core.schema.ApiException;
 
-public class SdkSerdeException extends SdkException {
-    public SdkSerdeException(String message) {
+public class SerializationException extends ApiException {
+    public SerializationException(String message) {
         super(message, Fault.OTHER);
     }
 
-    public SdkSerdeException(Throwable cause) {
+    public SerializationException(Throwable cause) {
         this(cause.getMessage(), cause);
     }
 
-    public SdkSerdeException(String message, Throwable cause) {
+    public SerializationException(String message, Throwable cause) {
         super(message, cause, Fault.OTHER);
     }
 }

@@ -17,7 +17,7 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.Prelude;
 import software.amazon.smithy.model.shapes.MemberShape;
@@ -93,7 +93,7 @@ public final class SharedSchemasGenerator
         public void run() {
             Set<Shape> deferred = deferredShapes(shapes);
             writer.pushState();
-            writer.putContext("schemaClass", SdkSchema.class);
+            writer.putContext("schemaClass", Schema.class);
             for (var shape : shapes) {
                 if (deferred.contains(shape)) {
                     writer.write("static final ${schemaClass:T} $L;", CodegenUtils.toSchemaName(shape));

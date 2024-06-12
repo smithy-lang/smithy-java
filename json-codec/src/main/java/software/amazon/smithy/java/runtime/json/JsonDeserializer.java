@@ -14,8 +14,8 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 
 final class JsonDeserializer implements ShapeDeserializer {
@@ -44,102 +44,102 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public byte[] readBlob(SdkSchema schema) {
+    public byte[] readBlob(Schema schema) {
         try {
             String content = iter.readString();
             return Base64.getDecoder().decode(content);
         } catch (JsonException | IOException | IllegalArgumentException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public byte readByte(SdkSchema schema) {
+    public byte readByte(Schema schema) {
         try {
             return (byte) iter.readShort();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public short readShort(SdkSchema schema) {
+    public short readShort(Schema schema) {
         try {
             return iter.readShort();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public int readInteger(SdkSchema schema) {
+    public int readInteger(Schema schema) {
         try {
             return iter.readInt();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public long readLong(SdkSchema schema) {
+    public long readLong(Schema schema) {
         try {
             return iter.readLong();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public float readFloat(SdkSchema schema) {
+    public float readFloat(Schema schema) {
         try {
             return iter.readFloat();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public double readDouble(SdkSchema schema) {
+    public double readDouble(Schema schema) {
         try {
             return iter.readDouble();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public BigInteger readBigInteger(SdkSchema schema) {
+    public BigInteger readBigInteger(Schema schema) {
         try {
             return iter.readBigInteger();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public BigDecimal readBigDecimal(SdkSchema schema) {
+    public BigDecimal readBigDecimal(Schema schema) {
         try {
             return iter.readBigDecimal();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public String readString(SdkSchema schema) {
+    public String readString(Schema schema) {
         try {
             return iter.readString();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public boolean readBoolean(SdkSchema schema) {
+    public boolean readBoolean(Schema schema) {
         try {
             return iter.readBoolean();
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
@@ -154,22 +154,22 @@ final class JsonDeserializer implements ShapeDeserializer {
                 return new JsonDocument(any, fieldMapper, timestampResolver);
             }
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public Instant readTimestamp(SdkSchema schema) {
+    public Instant readTimestamp(Schema schema) {
         try {
             var format = timestampResolver.resolve(schema);
             return TimestampResolver.readTimestamp(iter.readAny(), format);
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
+    public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         try {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
                 var member = fieldMapper.fieldToMember(schema, field);
@@ -180,29 +180,29 @@ final class JsonDeserializer implements ShapeDeserializer {
                 }
             }
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public <T> void readList(SdkSchema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
+    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
         try {
             while (iter.readArray()) {
                 listMemberConsumer.accept(state, this);
             }
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
     @Override
-    public <T> void readStringMap(SdkSchema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
+    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
         try {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
                 mapMemberConsumer.accept(state, field, this);
             }
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 }

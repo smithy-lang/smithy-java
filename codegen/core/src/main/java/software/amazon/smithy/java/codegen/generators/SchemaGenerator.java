@@ -9,7 +9,7 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.EnumShape;
 import software.amazon.smithy.model.shapes.IntEnumShape;
@@ -55,7 +55,7 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
     @Override
     public void run() {
         writer.pushState();
-        writer.putContext("schemaClass", SdkSchema.class);
+        writer.putContext("schemaClass", Schema.class);
         writer.putContext("shapeTypeClass", ShapeType.class);
         writer.putContext("shapeId", shape.toShapeId());
         writer.putContext("shapeType", shape.getType().name());

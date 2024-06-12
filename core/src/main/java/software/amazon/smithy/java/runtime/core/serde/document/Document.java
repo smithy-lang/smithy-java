@@ -13,12 +13,11 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import javax.xml.validation.Schema;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -87,11 +86,11 @@ public interface Document extends SerializableShape {
      * Serializes the Document as a document value in the Smithy data model.
      *
      * <p>All implementations of a document type are expected to follow the same behavior as this method when writing
-     * to a {@link ShapeSerializer}; the document is always written with {@link ShapeSerializer#writeDocument(SdkSchema, Document)}
+     * to a {@link ShapeSerializer}; the document is always written with {@link ShapeSerializer#writeDocument(Schema, Document)}
      * and receivers are free to query the underlying contents of the document using
      * {@link #serializeContents(ShapeSerializer)}.
      *
-     * @param serializer Where to send the document to {@link ShapeSerializer#writeDocument(SdkSchema, Document)}.
+     * @param serializer Where to send the document to {@link ShapeSerializer#writeDocument(Schema, Document)}.
      */
     @Override
     default void serialize(ShapeSerializer serializer) {
@@ -99,10 +98,10 @@ public interface Document extends SerializableShape {
     }
 
     /**
-     * Serialize the contents of the document using the Smithy data model and an appropriate {@link Schema}.
+     * Serialize the contents of the document using the Smithy data model and an appropriate {@link javax.xml.validation.Schema}.
      *
      * <p>While {@link #serialize(ShapeSerializer)} always emits document values as
-     * {@link ShapeSerializer#writeDocument(SdkSchema, Document)}, this method emits the contents of the document itself.
+     * {@link ShapeSerializer#writeDocument(Schema, Document)}, this method emits the contents of the document itself.
      * {@code ShapeSerializer} implementations that receive a {@link Document} via {@code writeDocument} can get the
      * inner contents of the document using this method.
      *
@@ -118,7 +117,7 @@ public interface Document extends SerializableShape {
      * (e.g., {@code smithy.api#Document$value}). In doing so, receivers of the document's data model do not need to
      * implement special-cased logic to account for synthetic document type members vs. actual modeled members
      *
-     * <p>Implementations must not write the contents of the document as {@link ShapeSerializer#writeDocument(SdkSchema, Document)}
+     * <p>Implementations must not write the contents of the document as {@link ShapeSerializer#writeDocument(Schema, Document)}
      * because that could result in infinite recursion for serializers that want access to the contents of a document.
      *
      * @param serializer Serializer to write the underlying data of the document to.
@@ -129,10 +128,10 @@ public interface Document extends SerializableShape {
      * Get the boolean value of the Document if it is a boolean.
      *
      * @return the boolean value.
-     * @throws SdkSerdeException if the Document is not a boolean.
+     * @throws SerializationException if the Document is not a boolean.
      */
     default boolean asBoolean() {
-        throw new SdkSerdeException("Expected a boolean document, but found " + type());
+        throw new SerializationException("Expected a boolean document, but found " + type());
     }
 
     /**
@@ -141,11 +140,11 @@ public interface Document extends SerializableShape {
      * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
      *
      * @return the byte value.
-     * @throws SdkSerdeException if the Document is not a number.
+     * @throws SerializationException if the Document is not a number.
      * @throws ArithmeticException if the value is out of range for this type.
      */
     default byte asByte() {
-        throw new SdkSerdeException("Expected a byte document, but found " + type());
+        throw new SerializationException("Expected a byte document, but found " + type());
     }
 
     /**
@@ -154,11 +153,11 @@ public interface Document extends SerializableShape {
      * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
      *
      * @return the short value.
-     * @throws SdkSerdeException if the Document is not a number.
+     * @throws SerializationException if the Document is not a number.
      * @throws ArithmeticException if the value is out of range for this type.
      */
     default short asShort() {
-        throw new SdkSerdeException("Expected a short document, but found " + type());
+        throw new SerializationException("Expected a short document, but found " + type());
     }
 
     /**
@@ -167,11 +166,11 @@ public interface Document extends SerializableShape {
      * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
      *
      * @return the integer value.
-     * @throws SdkSerdeException if the Document is not a number.
+     * @throws SerializationException if the Document is not a number.
      * @throws ArithmeticException if the value is out of range for this type.
      */
     default int asInteger() {
-        throw new SdkSerdeException("Expected an integer document, but found " + type());
+        throw new SerializationException("Expected an integer document, but found " + type());
     }
 
     /**
@@ -180,11 +179,11 @@ public interface Document extends SerializableShape {
      * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
      *
      * @return the long value.
-     * @throws SdkSerdeException if the Document is not a number.
+     * @throws SerializationException if the Document is not a number.
      * @throws ArithmeticException if the value is out of range for this type.
      */
     default long asLong() {
-        throw new SdkSerdeException("Expected a long document, but found " + type());
+        throw new SerializationException("Expected a long document, but found " + type());
     }
 
     /**
@@ -193,11 +192,11 @@ public interface Document extends SerializableShape {
      * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
      *
      * @return the float value.
-     * @throws SdkSerdeException if the Document is not a number.
+     * @throws SerializationException if the Document is not a number.
      * @throws ArithmeticException if the value is out of range for this type.
      */
     default float asFloat() {
-        throw new SdkSerdeException("Expected a float document, but found " + type());
+        throw new SerializationException("Expected a float document, but found " + type());
     }
 
     /**
@@ -206,11 +205,11 @@ public interface Document extends SerializableShape {
      * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
      *
      * @return the double value.
-     * @throws SdkSerdeException if the Document is not a number.
+     * @throws SerializationException if the Document is not a number.
      * @throws ArithmeticException if the value is out of range for this type.
      */
     default double asDouble() {
-        throw new SdkSerdeException("Expected a double document, but found " + type());
+        throw new SerializationException("Expected a double document, but found " + type());
     }
 
     /**
@@ -219,10 +218,10 @@ public interface Document extends SerializableShape {
      * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
      *
      * @return the BigInteger value.
-     * @throws SdkSerdeException if the Document is not a number.
+     * @throws SerializationException if the Document is not a number.
      */
     default BigInteger asBigInteger() {
-        throw new SdkSerdeException("Expected a bigInteger document, but found " + type());
+        throw new SerializationException("Expected a bigInteger document, but found " + type());
     }
 
     /**
@@ -231,17 +230,17 @@ public interface Document extends SerializableShape {
      * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
      *
      * @return the BigDecimal value.
-     * @throws SdkSerdeException if the Document is not a number.
+     * @throws SerializationException if the Document is not a number.
      */
     default BigDecimal asBigDecimal() {
-        throw new SdkSerdeException("Expected a bigDecimal document, but found " + type());
+        throw new SerializationException("Expected a bigDecimal document, but found " + type());
     }
 
     /**
      * Get the value of the builder as a Number.
      *
      * @return the Number value.
-     * @throws SdkSerdeException if the Document is not a numeric type.
+     * @throws SerializationException if the Document is not a numeric type.
      */
     default Number asNumber() {
         return switch (type()) {
@@ -253,7 +252,7 @@ public interface Document extends SerializableShape {
             case DOUBLE -> asDouble();
             case BIG_INTEGER -> asBigInteger();
             case BIG_DECIMAL -> asBigDecimal();
-            default -> throw new SdkSerdeException("Expected a number document, but found " + type());
+            default -> throw new SerializationException("Expected a number document, but found " + type());
         };
     }
 
@@ -261,40 +260,40 @@ public interface Document extends SerializableShape {
      * Get the string value of the Document if it is a string.
      *
      * @return the string value.
-     * @throws SdkSerdeException if the Document is not a string.
+     * @throws SerializationException if the Document is not a string.
      */
     default String asString() {
-        throw new SdkSerdeException("Expected a string document, but found " + type());
+        throw new SerializationException("Expected a string document, but found " + type());
     }
 
     /**
      * Get the Document as a blob if the Document is a blob.
      *
      * @return the bytes of the blob.
-     * @throws SdkSerdeException if the Document is not a blob.
+     * @throws SerializationException if the Document is not a blob.
      */
     default byte[] asBlob() {
-        throw new SdkSerdeException("Expected a blob document, but found " + type());
+        throw new SerializationException("Expected a blob document, but found " + type());
     }
 
     /**
      * Get the Document as an Instant if the Document is a timestamp.
      *
      * @return the Instant value of the timestamp.
-     * @throws SdkSerdeException if the Document is not a timestamp.
+     * @throws SerializationException if the Document is not a timestamp.
      */
     default Instant asTimestamp() {
-        throw new SdkSerdeException("Expected a timestamp document, but found " + type());
+        throw new SerializationException("Expected a timestamp document, but found " + type());
     }
 
     /**
      * Get the list contents of the Document if it is a list.
      *
      * @return the list contents.
-     * @throws SdkSerdeException if the Document is not a list.
+     * @throws SerializationException if the Document is not a list.
      */
     default List<Document> asList() {
-        throw new SdkSerdeException("Expected a list document, but found " + type());
+        throw new SerializationException("Expected a list document, but found " + type());
     }
 
     /**
@@ -305,10 +304,10 @@ public interface Document extends SerializableShape {
      * member names of each present member.
      *
      * @return the map contents.
-     * @throws SdkSerdeException if the Document is not a map, structure, or union or the keys are numbers.
+     * @throws SerializationException if the Document is not a map, structure, or union or the keys are numbers.
      */
     default Map<String, Document> asStringMap() {
-        throw new SdkSerdeException("Expected a map of strings to documents, but found " + type());
+        throw new SerializationException("Expected a map of strings to documents, but found " + type());
     }
 
     /**
@@ -320,7 +319,7 @@ public interface Document extends SerializableShape {
      * @throws IllegalStateException if the Document is not a string map, structure, or union shape.
      */
     default Document getMember(String memberName) {
-        throw new SdkSerdeException("Expected a map, structure, or union document, but found " + type());
+        throw new SerializationException("Expected a map, structure, or union document, but found " + type());
     }
 
     /**
@@ -372,7 +371,7 @@ public interface Document extends SerializableShape {
      * @param builder Builder to populate from the Document.
      * @param <T> Shape type to build.
      */
-    default <T extends SerializableShape> void deserializeInto(SdkShapeBuilder<T> builder) {
+    default <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
         builder.deserialize(new DocumentDeserializer(this));
     }
 
@@ -383,7 +382,7 @@ public interface Document extends SerializableShape {
      * @return the built and error-corrected shape.
      * @param <T> Shape type to build.
      */
-    default <T extends SerializableShape> T asShape(SdkShapeBuilder<T> builder) {
+    default <T extends SerializableShape> T asShape(ShapeBuilder<T> builder) {
         deserializeInto(builder);
         return builder.errorCorrection().build();
     }

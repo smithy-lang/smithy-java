@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
@@ -18,8 +18,8 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 public final class ResponseDeserializer {
 
     private final HttpBindingDeserializer.Builder deserBuilder = HttpBindingDeserializer.builder();
-    private SdkShapeBuilder<?> outputShapeBuilder;
-    private SdkShapeBuilder<? extends ModeledSdkException> errorShapeBuilder;
+    private ShapeBuilder<?> outputShapeBuilder;
+    private ShapeBuilder<? extends ModeledApiException> errorShapeBuilder;
 
     ResponseDeserializer() {}
 
@@ -61,7 +61,7 @@ public final class ResponseDeserializer {
      * @param outputShapeBuilder Output shape builder.
      * @return Returns the deserializer.
      */
-    public ResponseDeserializer outputShapeBuilder(SdkShapeBuilder<?> outputShapeBuilder) {
+    public ResponseDeserializer outputShapeBuilder(ShapeBuilder<?> outputShapeBuilder) {
         this.outputShapeBuilder = outputShapeBuilder;
         errorShapeBuilder = null;
         return this;
@@ -73,7 +73,7 @@ public final class ResponseDeserializer {
      * @param errorShapeBuilder Error shape builder.
      * @return Returns the deserializer.
      */
-    public ResponseDeserializer errorShapeBuilder(SdkShapeBuilder<? extends ModeledSdkException> errorShapeBuilder) {
+    public ResponseDeserializer errorShapeBuilder(ShapeBuilder<? extends ModeledApiException> errorShapeBuilder) {
         this.errorShapeBuilder = errorShapeBuilder;
         outputShapeBuilder = null;
         return this;

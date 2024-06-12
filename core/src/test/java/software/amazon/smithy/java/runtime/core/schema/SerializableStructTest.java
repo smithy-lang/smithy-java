@@ -23,7 +23,7 @@ public class SerializableStructTest {
             private boolean wroteStruct;
 
             @Override
-            public void writeStruct(SdkSchema schema, SerializableStruct struct) {
+            public void writeStruct(Schema schema, SerializableStruct struct) {
                 wroteStruct = true;
                 struct.serializeMembers(this);
             }

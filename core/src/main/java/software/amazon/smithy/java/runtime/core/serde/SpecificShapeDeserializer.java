@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
@@ -20,61 +20,61 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
      * @param schema Unexpected encountered schema.
      * @return Returns an exception to throw.
      */
-    protected abstract RuntimeException throwForInvalidState(SdkSchema schema);
+    protected abstract RuntimeException throwForInvalidState(Schema schema);
 
     @Override
-    public byte[] readBlob(SdkSchema schema) {
+    public byte[] readBlob(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
 
-    public byte readByte(SdkSchema schema) {
+    public byte readByte(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public short readShort(SdkSchema schema) {
+    public short readShort(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public int readInteger(SdkSchema schema) {
+    public int readInteger(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public long readLong(SdkSchema schema) {
+    public long readLong(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public float readFloat(SdkSchema schema) {
+    public float readFloat(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public double readDouble(SdkSchema schema) {
+    public double readDouble(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public BigInteger readBigInteger(SdkSchema schema) {
+    public BigInteger readBigInteger(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public BigDecimal readBigDecimal(SdkSchema schema) {
+    public BigDecimal readBigDecimal(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public String readString(SdkSchema schema) {
+    public String readString(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public boolean readBoolean(SdkSchema schema) {
+    public boolean readBoolean(Schema schema) {
         return false;
     }
 
@@ -84,22 +84,22 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public Instant readTimestamp(SdkSchema schema) {
+    public Instant readTimestamp(Schema schema) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> consumer) {
+    public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> consumer) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public <T> void readList(SdkSchema schema, T state, ListMemberConsumer<T> consumer) {
+    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public <T> void readStringMap(SdkSchema schema, T state, MapMemberConsumer<String, T> consumer) {
+    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer) {
         throw throwForInvalidState(schema);
     }
 }

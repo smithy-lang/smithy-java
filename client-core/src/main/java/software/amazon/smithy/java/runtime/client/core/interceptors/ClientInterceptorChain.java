@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.Either;
-import software.amazon.smithy.java.runtime.core.schema.SdkException;
+import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 final class ClientInterceptorChain implements ClientInterceptor {
@@ -194,7 +194,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
         I input,
         Value<RequestT> request,
         Value<ResponseT> response,
-        Either<SdkException, O> result
+        Either<ApiException, O> result
     ) {
         for (var interceptor : interceptors) {
             interceptor.readAfterDeserialization(context, input, request, response, result);
@@ -202,12 +202,12 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<SdkException, O> modifyBeforeAttemptCompletion(
+    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<ApiException, O> modifyBeforeAttemptCompletion(
         Context context,
         I input,
         Value<RequestT> request,
         Value<ResponseT> response,
-        Either<SdkException, O> result
+        Either<ApiException, O> result
     ) {
         for (var interceptor : interceptors) {
             result = interceptor.modifyBeforeAttemptCompletion(context, input, request, response, result);
@@ -221,7 +221,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
         I input,
         Value<RequestT> request,
         Value<ResponseT> responseIfAvailable,
-        Either<SdkException, O> result
+        Either<ApiException, O> result
     ) {
         applyToEachThrowLastError(
             interceptor -> interceptor.readAfterAttempt(context, input, request, responseIfAvailable, result)
@@ -229,12 +229,12 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<SdkException, O> modifyBeforeCompletion(
+    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<ApiException, O> modifyBeforeCompletion(
         Context context,
         I input,
         Value<RequestT> requestIfAvailable,
         Value<ResponseT> responseIfAvailable,
-        Either<SdkException, O> result
+        Either<ApiException, O> result
     ) {
         for (var interceptor : interceptors) {
             result = interceptor.modifyBeforeCompletion(
@@ -254,7 +254,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
         I input,
         Value<RequestT> requestIfAvailable,
         Value<ResponseT> responseIfAvailable,
-        Either<SdkException, O> result
+        Either<ApiException, O> result
     ) {
         applyToEachThrowLastError(
             interceptor -> interceptor.readAfterExecution(

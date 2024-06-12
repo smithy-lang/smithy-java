@@ -14,7 +14,7 @@ import static org.hamcrest.Matchers.sameInstance;
 
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
@@ -23,12 +23,12 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public class TypedDocumentTest {
 
     private SerializableShape createSerializableShape() {
-        var structSchema = SdkSchema.builder()
+        var structSchema = Schema.builder()
             .id("smithy.example#Struct")
             .type(ShapeType.STRUCTURE)
             .members(
-                SdkSchema.memberBuilder("a", PreludeSchemas.STRING),
-                SdkSchema.memberBuilder("b", PreludeSchemas.STRING)
+                Schema.memberBuilder("a", PreludeSchemas.STRING),
+                Schema.memberBuilder("b", PreludeSchemas.STRING)
             )
             .build();
 
@@ -71,7 +71,7 @@ public class TypedDocumentTest {
         // Writes as document unless getting contents.
         result.serialize(new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(SdkSchema schema, Document value) {
+            public void writeDocument(Schema schema, Document value) {
                 assertThat(value, is(result));
             }
         });

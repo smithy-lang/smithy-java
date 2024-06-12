@@ -27,10 +27,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
@@ -109,7 +109,7 @@ public class JsonDocumentTest {
         var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
-        var e = Assertions.assertThrows(SdkSerdeException.class, document::asTimestamp);
+        var e = Assertions.assertThrows(SerializationException.class, document::asTimestamp);
         assertThat(e.getMessage(), containsString("Expected a timestamp, but found boolean"));
     }
 
@@ -177,7 +177,7 @@ public class JsonDocumentTest {
         var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
-        Assertions.assertThrows(SdkSerdeException.class, () -> consumer.accept(document));
+        Assertions.assertThrows(SerializationException.class, () -> consumer.accept(document));
     }
 
     public static List<Arguments> failToConvertSource() {
@@ -283,31 +283,31 @@ public class JsonDocumentTest {
 
         private static final ShapeId ID = ShapeId.from("smithy.example#Foo");
 
-        private static final SdkSchema NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
+        private static final Schema NAME = Schema.memberBuilder("name", PreludeSchemas.STRING)
             .id(ID)
             .build();
 
-        private static final SdkSchema BINARY = SdkSchema.memberBuilder("binary", PreludeSchemas.BLOB)
+        private static final Schema BINARY = Schema.memberBuilder("binary", PreludeSchemas.BLOB)
             .id(ID)
             .traits(new JsonNameTrait("BINARY"))
             .build();
 
-        private static final SdkSchema DATE = SdkSchema.memberBuilder("date", PreludeSchemas.TIMESTAMP)
+        private static final Schema DATE = Schema.memberBuilder("date", PreludeSchemas.TIMESTAMP)
             .id(ID)
             .traits(new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
             .build();
 
-        private static final SdkSchema NUMBERS_LIST = SdkSchema.builder()
+        private static final Schema NUMBERS_LIST = Schema.builder()
             .type(ShapeType.LIST)
             .id("smithy.example#Numbers")
-            .members(SdkSchema.memberBuilder("member", PreludeSchemas.INTEGER))
+            .members(Schema.memberBuilder("member", PreludeSchemas.INTEGER))
             .build();
 
-        private static final SdkSchema NUMBERS = SdkSchema.memberBuilder("numbers", NUMBERS_LIST)
+        private static final Schema NUMBERS = Schema.memberBuilder("numbers", NUMBERS_LIST)
             .id(ID)
             .build();
 
-        private static final SdkSchema SCHEMA = SdkSchema.builder()
+        private static final Schema SCHEMA = Schema.builder()
             .id(ID)
             .type(ShapeType.STRUCTURE)
             .members(NAME, BINARY, DATE, NUMBERS)
@@ -330,7 +330,7 @@ public class JsonDocumentTest {
             throw new UnsupportedOperationException();
         }
 
-        private static final class Builder implements SdkShapeBuilder<TestPojo> {
+        private static final class Builder implements ShapeBuilder<TestPojo> {
 
             private String name;
             private byte[] binary;

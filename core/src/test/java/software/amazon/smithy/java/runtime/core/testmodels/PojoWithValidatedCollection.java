@@ -10,9 +10,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -26,32 +26,32 @@ public final class PojoWithValidatedCollection implements SerializableStruct {
     public static final ShapeId ID = ShapeId.from("smithy.example#PojoWithValidatedCollection");
 
     private static final ShapeId MAP_OF_VALIDATED_POJO_ID = ShapeId.from("smithy.example#MapOfValidatedPojo");
-    private static final SdkSchema MAP_OF_VALIDATED_POJO_KEY = SdkSchema.memberBuilder("key", PreludeSchemas.STRING)
+    private static final Schema MAP_OF_VALIDATED_POJO_KEY = Schema.memberBuilder("key", PreludeSchemas.STRING)
         .id(MAP_OF_VALIDATED_POJO_ID)
         .build();
-    private static final SdkSchema MAP_OF_VALIDATED_POJO_VALUE = SdkSchema.memberBuilder("value", ValidatedPojo.SCHEMA)
+    private static final Schema MAP_OF_VALIDATED_POJO_VALUE = Schema.memberBuilder("value", ValidatedPojo.SCHEMA)
         .id(MAP_OF_VALIDATED_POJO_ID)
         .build();
-    private static final SdkSchema MAP_OF_VALIDATED_POJO = SdkSchema.builder()
+    private static final Schema MAP_OF_VALIDATED_POJO = Schema.builder()
         .type(ShapeType.MAP)
         .id(MAP_OF_VALIDATED_POJO_ID)
         .members(MAP_OF_VALIDATED_POJO_KEY, MAP_OF_VALIDATED_POJO_VALUE)
         .build();
-    private static final SdkSchema LIST_OF_VALIDATED_POJO = SdkSchema.builder()
+    private static final Schema LIST_OF_VALIDATED_POJO = Schema.builder()
         .type(ShapeType.LIST)
         .id("smithy.example#ListOfValidatedPojo")
-        .members(SdkSchema.memberBuilder("member", ValidatedPojo.SCHEMA))
+        .members(Schema.memberBuilder("member", ValidatedPojo.SCHEMA))
         .build();
-    private static final SdkSchema SCHEMA_MAP = SdkSchema.memberBuilder("map", MAP_OF_VALIDATED_POJO)
+    private static final Schema SCHEMA_MAP = Schema.memberBuilder("map", MAP_OF_VALIDATED_POJO)
         .id(ID)
         .traits(new RequiredTrait())
         .build();
-    private static final SdkSchema SCHEMA_LIST = SdkSchema
+    private static final Schema SCHEMA_LIST = Schema
         .memberBuilder("list", LIST_OF_VALIDATED_POJO)
         .id(ID)
         .traits(new RequiredTrait())
         .build();
-    static final SdkSchema SCHEMA = SdkSchema.builder()
+    static final Schema SCHEMA = Schema.builder()
         .id(ID)
         .type(ShapeType.STRUCTURE)
         .members(SCHEMA_MAP, SCHEMA_LIST)
@@ -115,7 +115,7 @@ public final class PojoWithValidatedCollection implements SerializableStruct {
         }
     }
 
-    public static final class Builder implements SdkShapeBuilder<PojoWithValidatedCollection> {
+    public static final class Builder implements ShapeBuilder<PojoWithValidatedCollection> {
 
         private Map<String, ValidatedPojo> map = Collections.emptyMap();
         private List<ValidatedPojo> list = Collections.emptyList();

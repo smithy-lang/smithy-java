@@ -21,10 +21,10 @@ import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
-import software.amazon.smithy.java.runtime.core.schema.SdkOperation;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 
 /**
@@ -37,9 +37,9 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
 
     private final I input;
     private final EndpointResolver endpointResolver;
-    private final SdkOperation<I, O> operation;
+    private final ApiOperation<I, O> operation;
     private final Context context;
-    private final BiFunction<Context, String, Optional<SdkShapeBuilder<ModeledSdkException>>> errorCreator;
+    private final BiFunction<Context, String, Optional<ShapeBuilder<ModeledApiException>>> errorCreator;
     private final ClientInterceptor interceptor;
     private final DataStream requestDataStream;
     private final AuthSchemeResolver authSchemeResolver;
@@ -95,7 +95,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
      *
      * @return Returns the operation definition.
      */
-    public SdkOperation<I, O> operation() {
+    public ApiOperation<I, O> operation() {
         return operation;
     }
 
@@ -152,7 +152,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
      * @param shapeId Nullable ID of the error shape to create, if known.
      * @return Returns the created output builder.
      */
-    public SdkShapeBuilder<O> createOutputBuilder(Context context, String shapeId) {
+    public ShapeBuilder<O> createOutputBuilder(Context context, String shapeId) {
         // TODO: Allow customizing this if needed.
         return operation().outputBuilder();
     }
@@ -167,7 +167,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
      *                only information we have is just a name.
      * @return Returns the error deserializer if present.
      */
-    public Optional<SdkShapeBuilder<ModeledSdkException>> createExceptionBuilder(Context context, String shapeId) {
+    public Optional<ShapeBuilder<ModeledApiException>> createExceptionBuilder(Context context, String shapeId) {
         return errorCreator.apply(context, shapeId);
     }
 
@@ -217,9 +217,9 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
 
         private I input;
         private EndpointResolver endpointResolver;
-        private SdkOperation<I, O> operation;
+        private ApiOperation<I, O> operation;
         private Context context;
-        private BiFunction<Context, String, Optional<SdkShapeBuilder<ModeledSdkException>>> errorCreator;
+        private BiFunction<Context, String, Optional<ShapeBuilder<ModeledApiException>>> errorCreator;
         private ClientInterceptor interceptor = ClientInterceptor.NOOP;
         private DataStream requestDataStream;
         private AuthSchemeResolver authSchemeResolver;
@@ -247,7 +247,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
          * @param operation Operation to call.
          * @return Returns the builder.
          */
-        public Builder<I, O> operation(SdkOperation<I, O> operation) {
+        public Builder<I, O> operation(ApiOperation<I, O> operation) {
             this.operation = operation;
             return this;
         }
@@ -273,7 +273,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
          * @return Returns the builder.
          */
         public Builder<I, O> errorCreator(
-            BiFunction<Context, String, Optional<SdkShapeBuilder<ModeledSdkException>>> errorCreator
+            BiFunction<Context, String, Optional<ShapeBuilder<ModeledApiException>>> errorCreator
         ) {
             this.errorCreator = errorCreator;
             return this;

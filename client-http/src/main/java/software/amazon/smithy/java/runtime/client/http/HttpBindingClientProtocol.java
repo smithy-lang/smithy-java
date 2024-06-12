@@ -10,10 +10,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.client.core.ClientCall;
-import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
-import software.amazon.smithy.java.runtime.core.schema.SdkException;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.ApiException;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
@@ -92,7 +92,7 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
      * @param response HTTP response to deserialize.
      * @return Returns the deserialized error.
      */
-    protected CompletableFuture<? extends SdkException> createError(
+    protected CompletableFuture<? extends ApiException> createError(
         ClientCall<?, ?> call,
         SmithyHttpResponse response
     ) {
@@ -107,7 +107,7 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
             // Attempt to match the extracted error ID to a modeled error type.
             .flatMap(
                 errorId -> call.createExceptionBuilder(call.context(), errorId)
-                    .<CompletableFuture<? extends SdkException>>map(
+                    .<CompletableFuture<? extends ApiException>>map(
                         error -> createModeledException(codec, response, error)
                     )
             )
@@ -118,10 +118,10 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
             });
     }
 
-    private CompletableFuture<ModeledSdkException> createModeledException(
+    private CompletableFuture<ModeledApiException> createModeledException(
         Codec codec,
         SmithyHttpResponse response,
-        SdkShapeBuilder<ModeledSdkException> error
+        ShapeBuilder<ModeledApiException> error
     ) {
         return HttpBinding.responseDeserializer()
             .payloadCodec(codec)

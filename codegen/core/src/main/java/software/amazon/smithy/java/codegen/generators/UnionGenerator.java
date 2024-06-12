@@ -18,7 +18,7 @@ import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.Model;
@@ -287,7 +287,7 @@ public final class UnionGenerator
             }
 
             writer.pushState();
-            writer.putContext("serdeException", SdkSerdeException.class);
+            writer.putContext("serdeException", SerializationException.class);
             writer.write("""
                 private void checkForExistingValue() {
                     if (this.value != null) {

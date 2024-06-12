@@ -28,7 +28,7 @@ public interface SerializableStruct extends SerializableShape {
      * @param memberWriter BiConsumer that writes members to the given serializer.
      * @return the created SerializableStruct.
      */
-    static SerializableStruct create(SdkSchema schema, BiConsumer<SdkSchema, ShapeSerializer> memberWriter) {
+    static SerializableStruct create(Schema schema, BiConsumer<Schema, ShapeSerializer> memberWriter) {
         return new SerializableStruct() {
             @Override
             public void serialize(ShapeSerializer encoder) {
@@ -51,9 +51,9 @@ public interface SerializableStruct extends SerializableShape {
      * @return the filtered struct.
      */
     static SerializableStruct filteredMembers(
-        SdkSchema schema,
+        Schema schema,
         SerializableStruct struct,
-        Predicate<SdkSchema> memberPredicate
+        Predicate<Schema> memberPredicate
     ) {
         return new SerializableStruct() {
             @Override
@@ -65,7 +65,7 @@ public interface SerializableStruct extends SerializableShape {
             public void serializeMembers(ShapeSerializer serializer) {
                 struct.serializeMembers(new InterceptingSerializer() {
                     @Override
-                    protected ShapeSerializer before(SdkSchema schema) {
+                    protected ShapeSerializer before(Schema schema) {
                         return memberPredicate.test(schema) ? serializer : ShapeSerializer.nullSerializer();
                     }
                 });

@@ -16,7 +16,7 @@ import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.core.schema.SdkException;
+import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.uri.URIBuilder;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
@@ -88,11 +88,11 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
      * @param response    HTTP response that was received.
      * @return the created exception.
      */
-    public static CompletableFuture<SdkException> createErrorFromHints(
+    public static CompletableFuture<ApiException> createErrorFromHints(
         String operationId,
         SmithyHttpResponse response
     ) {
-        SdkException.Fault fault = SdkException.Fault.ofHttpStatusCode(response.statusCode());
+        ApiException.Fault fault = ApiException.Fault.ofHttpStatusCode(response.statusCode());
         StringBuilder message = new StringBuilder();
         message.append(switch (fault) {
             case CLIENT -> "Client error ";
@@ -118,12 +118,12 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
             .toLowerCase(Locale.ENGLISH);
 
         if (!isText(contentType)) {
-            return CompletableFuture.completedFuture(new SdkException(message.toString(), fault));
+            return CompletableFuture.completedFuture(new ApiException(message.toString(), fault));
         }
 
         return asString(response).thenApply(string -> {
             message.append(string);
-            return new SdkException(message.toString(), fault);
+            return new ApiException(message.toString(), fault);
         });
     }
 

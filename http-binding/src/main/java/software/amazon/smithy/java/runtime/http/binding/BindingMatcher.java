@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.Objects;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.traits.HttpHeaderTrait;
 import software.amazon.smithy.model.traits.HttpLabelTrait;
 import software.amazon.smithy.model.traits.HttpPayloadTrait;
@@ -49,7 +49,7 @@ final class BindingMatcher {
         return new BindingMatcher(false);
     }
 
-    Binding match(SdkSchema member) {
+    Binding match(Schema member) {
         if (isRequest) {
             label = member.getTrait(HttpLabelTrait.class);
             if (label != null) {

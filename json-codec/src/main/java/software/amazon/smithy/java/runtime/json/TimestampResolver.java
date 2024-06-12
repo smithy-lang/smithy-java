@@ -11,8 +11,8 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
@@ -26,7 +26,7 @@ sealed interface TimestampResolver {
      * @param schema Shape to resolve.
      * @return resolved formatter.
      */
-    TimestampFormatter resolve(SdkSchema schema);
+    TimestampFormatter resolve(Schema schema);
 
     /**
      * Get the default formatter.
@@ -41,7 +41,7 @@ sealed interface TimestampResolver {
      * @param any    JSON any type to read from.
      * @param format Formatter used to parse the timestamp.
      * @return the parsed Instant.
-     * @throws SdkSerdeException if the timestamp format or type is invalid.
+     * @throws SerializationException if the timestamp format or type is invalid.
      */
     static Instant readTimestamp(Any any, TimestampFormatter format) {
         try {
@@ -49,13 +49,13 @@ sealed interface TimestampResolver {
                 case NUMBER -> format.readFromNumber(any.toDouble());
                 case STRING -> format.readFromString(any.toString(), true);
                 default -> {
-                    throw new SdkSerdeException(
+                    throw new SerializationException(
                         "Expected a timestamp, but found " + any.valueType().toString().toLowerCase(Locale.ENGLISH)
                     );
                 }
             };
         } catch (JsonException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 
@@ -64,7 +64,7 @@ sealed interface TimestampResolver {
      */
     record StaticFormat(TimestampFormatter defaultFormat) implements TimestampResolver {
         @Override
-        public TimestampFormatter resolve(SdkSchema schema) {
+        public TimestampFormatter resolve(Schema schema) {
             return defaultFormat;
         }
 
@@ -83,7 +83,7 @@ sealed interface TimestampResolver {
      * Uses the timestampFormat trait if present, otherwise uses a configurable default format.
      */
     final class UseTimestampFormatTrait implements TimestampResolver {
-        private final ConcurrentHashMap<SdkSchema, TimestampFormatter> cache = new ConcurrentHashMap<>();
+        private final ConcurrentHashMap<Schema, TimestampFormatter> cache = new ConcurrentHashMap<>();
         private final TimestampFormatter defaultFormat;
 
         UseTimestampFormatTrait(TimestampFormatter defaultFormat) {
@@ -96,7 +96,7 @@ sealed interface TimestampResolver {
         }
 
         @Override
-        public TimestampFormatter resolve(SdkSchema schema) {
+        public TimestampFormatter resolve(Schema schema) {
             return cache.computeIfAbsent(schema, s -> {
                 var trait = schema.getTrait(TimestampFormatTrait.class);
                 return trait != null ? TimestampFormatter.of(trait) : defaultFormat;

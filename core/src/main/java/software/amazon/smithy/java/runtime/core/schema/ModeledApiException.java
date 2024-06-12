@@ -10,26 +10,26 @@ import software.amazon.smithy.model.shapes.ShapeId;
 /**
  * The top-level exception that should be used to throw modeled errors from clients and servers.
  */
-public abstract class ModeledSdkException extends SdkException implements SerializableStruct {
+public abstract class ModeledApiException extends ApiException implements SerializableStruct {
 
     private final ShapeId shapeId;
 
-    public ModeledSdkException(ShapeId shapeId, String message) {
+    public ModeledApiException(ShapeId shapeId, String message) {
         super(message);
         this.shapeId = shapeId;
     }
 
-    public ModeledSdkException(ShapeId shapeId, String message, Fault errorType) {
+    public ModeledApiException(ShapeId shapeId, String message, Fault errorType) {
         super(message, errorType);
         this.shapeId = shapeId;
     }
 
-    public ModeledSdkException(ShapeId shapeId, String message, Throwable cause) {
+    public ModeledApiException(ShapeId shapeId, String message, Throwable cause) {
         super(message, cause);
         this.shapeId = shapeId;
     }
 
-    public ModeledSdkException(ShapeId shapeId, String message, Throwable cause, Fault errorType) {
+    public ModeledApiException(ShapeId shapeId, String message, Throwable cause, Fault errorType) {
         super(message, cause, errorType);
         this.shapeId = shapeId;
     }

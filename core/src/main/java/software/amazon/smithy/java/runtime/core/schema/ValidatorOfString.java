@@ -14,7 +14,7 @@ abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValida
     ValidatorOfString.PatternStringValidator,
     ValidatorOfString.CompositeStringValidator {
 
-    abstract void apply(SdkSchema schema, String value, Validator.ShapeValidator validator);
+    abstract void apply(Schema schema, String value, Validator.ShapeValidator validator);
 
     static ValidatorOfString of(List<ValidatorOfString> validators) {
         if (validators == null || validators.isEmpty()) {
@@ -30,7 +30,7 @@ abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValida
         static final NoStringValidation INSTANCE = new NoStringValidation();
 
         @Override
-        public void apply(SdkSchema schema, String value, Validator.ShapeValidator validator) {}
+        public void apply(Schema schema, String value, Validator.ShapeValidator validator) {}
     }
 
     static final class CompositeStringValidator extends ValidatorOfString {
@@ -41,7 +41,7 @@ abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValida
         }
 
         @Override
-        public void apply(SdkSchema schema, String value, Validator.ShapeValidator validator) {
+        public void apply(Schema schema, String value, Validator.ShapeValidator validator) {
             for (var v : validators) {
                 v.apply(schema, value, validator);
             }
@@ -59,7 +59,7 @@ abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValida
         }
 
         @Override
-        public void apply(SdkSchema schema, String value, Validator.ShapeValidator validator) {
+        public void apply(Schema schema, String value, Validator.ShapeValidator validator) {
             var length = value.codePointCount(0, value.length());
             if (length < min || length > max) {
                 validator.addError(new ValidationError.LengthValidationFailure(validator.createPath(), length, schema));
@@ -76,7 +76,7 @@ abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValida
         }
 
         @Override
-        public void apply(SdkSchema schema, String value, Validator.ShapeValidator validator) {
+        public void apply(Schema schema, String value, Validator.ShapeValidator validator) {
             try {
                 // Note: using Matcher#find() here and not Matcher#match() because Smithy expects patterns to be rooted
                 // with ^ and $ to get the same behavior as #match().
@@ -101,7 +101,7 @@ abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValida
         static final EnumStringValidator INSTANCE = new EnumStringValidator();
 
         @Override
-        public void apply(SdkSchema schema, String value, Validator.ShapeValidator validator) {
+        public void apply(Schema schema, String value, Validator.ShapeValidator validator) {
             if (!schema.stringEnumValues().contains(value)) {
                 validator.addError(new ValidationError.EnumValidationFailure(validator.createPath(), value, schema));
             }

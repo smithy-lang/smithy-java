@@ -6,9 +6,9 @@
 package software.amazon.smithy.java.runtime.core.testmodels;
 
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
@@ -21,17 +21,17 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public final class UnvalidatedPojo implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#UnvalidatedPojo");
-    private static final SdkSchema SCHEMA_STRING = SdkSchema.memberBuilder("string", PreludeSchemas.STRING)
+    private static final Schema SCHEMA_STRING = Schema.memberBuilder("string", PreludeSchemas.STRING)
         .id(ID)
         .build();
-    private static final SdkSchema SCHEMA_BOXED_INTEGER = SdkSchema
+    private static final Schema SCHEMA_BOXED_INTEGER = Schema
         .memberBuilder("boxedInteger", PreludeSchemas.INTEGER)
         .id(ID)
         .build();
-    private static final SdkSchema SCHEMA_INTEGER = SdkSchema.memberBuilder("integer", PreludeSchemas.PRIMITIVE_INTEGER)
+    private static final Schema SCHEMA_INTEGER = Schema.memberBuilder("integer", PreludeSchemas.PRIMITIVE_INTEGER)
         .id(ID)
         .build();
-    static final SdkSchema SCHEMA = SdkSchema.builder()
+    static final Schema SCHEMA = Schema.builder()
         .id(ID)
         .type(ShapeType.STRUCTURE)
         .members(SCHEMA_STRING, SCHEMA_BOXED_INTEGER, SCHEMA_INTEGER)
@@ -81,7 +81,7 @@ public final class UnvalidatedPojo implements SerializableStruct {
         serializer.writeInteger(SCHEMA_INTEGER, integer);
     }
 
-    public static final class Builder implements SdkShapeBuilder<UnvalidatedPojo> {
+    public static final class Builder implements ShapeBuilder<UnvalidatedPojo> {
 
         private String string;
         private int integer;

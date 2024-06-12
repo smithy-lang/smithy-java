@@ -8,7 +8,7 @@ package software.amazon.smithy.java.codegen.generators;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
@@ -40,7 +40,7 @@ record StructureDeserializerGenerator(
             }
             """;
         writer.putContext("shapeDeserializer", ShapeDeserializer.class);
-        writer.putContext("sdkSchema", SdkSchema.class);
+        writer.putContext("sdkSchema", Schema.class);
         writer.putContext("hasMembers", !shape.members().isEmpty());
         writer.putContext("cases", writer.consumer(this::generateMemberSwitchCases));
         writer.write(template);

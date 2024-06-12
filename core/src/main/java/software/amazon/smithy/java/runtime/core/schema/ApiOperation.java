@@ -11,41 +11,41 @@ package software.amazon.smithy.java.runtime.core.schema;
  * @param <I> Operation input shape type.
  * @param <O> Operation output shape type.
  */
-public interface SdkOperation<I extends SerializableStruct, O extends SerializableStruct> {
+public interface ApiOperation<I extends SerializableStruct, O extends SerializableStruct> {
     /**
      * Create a builder used to create the input of the operation.
      *
      * @return Returns the input builder.
      */
-    SdkShapeBuilder<I> inputBuilder();
+    ShapeBuilder<I> inputBuilder();
 
     /**
      * Create a builder used to create the output of the operation.
      *
      * @return Returns the operation output builder.
      */
-    SdkShapeBuilder<O> outputBuilder();
+    ShapeBuilder<O> outputBuilder();
 
     /**
      * Get the schema of the operation.
      *
      * @return Returns the operation schema, including relevant traits.
      */
-    SdkSchema schema();
+    Schema schema();
 
     /**
      * Get the input structure schema.
      *
      * @return Returns the input schema.
      */
-    SdkSchema inputSchema();
+    Schema inputSchema();
 
     /**
      * Get the output structure schema.
      *
      * @return Returns the output schema.
      */
-    SdkSchema outputSchema();
+    Schema outputSchema();
 
     /**
      * Get a type registry for the operation used to create errors and output types.

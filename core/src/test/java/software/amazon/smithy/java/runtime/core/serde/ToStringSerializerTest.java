@@ -14,7 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.testmodels.Bird;
 import software.amazon.smithy.java.runtime.core.testmodels.Person;
@@ -52,23 +52,23 @@ public class ToStringSerializerTest {
 
     @Test
     public void redactsSensitiveKeys() {
-        var mapMemberSchema = SdkSchema.builder()
+        var mapMemberSchema = Schema.builder()
             .type(ShapeType.STRING)
             .id("smithy.example#Str")
             .traits(new SensitiveTrait())
             .build();
-        var mapSchema = SdkSchema.builder()
+        var mapSchema = Schema.builder()
             .type(ShapeType.MAP)
             .id("smithy.example#Map")
             .members(
-                SdkSchema.memberBuilder("key", mapMemberSchema),
-                SdkSchema.memberBuilder("value", mapMemberSchema)
+                Schema.memberBuilder("key", mapMemberSchema),
+                Schema.memberBuilder("value", mapMemberSchema)
             )
             .build();
-        var schema = SdkSchema.builder()
+        var schema = Schema.builder()
             .id("smithy.example#Struct")
             .type(ShapeType.STRUCTURE)
-            .members(SdkSchema.memberBuilder("foo", mapSchema))
+            .members(Schema.memberBuilder("foo", mapSchema))
             .build();
 
         var str = ToStringSerializer.serialize(e -> {
@@ -89,15 +89,15 @@ public class ToStringSerializerTest {
 
     @Test
     public void redactsSensitiveBlobs() {
-        var blobSchema = SdkSchema.builder()
+        var blobSchema = Schema.builder()
             .type(ShapeType.BLOB)
             .id("smithy.example#Blob")
             .traits(new SensitiveTrait())
             .build();
-        var schema = SdkSchema.builder()
+        var schema = Schema.builder()
             .id("smithy.example#Struct")
             .type(ShapeType.STRUCTURE)
-            .members(SdkSchema.memberBuilder("foo", blobSchema))
+            .members(Schema.memberBuilder("foo", blobSchema))
             .build();
 
         var str = ToStringSerializer.serialize(e -> {

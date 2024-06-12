@@ -12,7 +12,7 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -91,7 +91,7 @@ public class MapGenerator
                         "collectionImpl",
                         directive.symbol().expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
                     );
-                    writer.putContext("schema", SdkSchema.class);
+                    writer.putContext("schema", Schema.class);
                     writer.putContext("biConsumer", BiConsumer.class);
                     writer.putContext("mapSerializer", MapSerializer.class);
                     writer.putContext("shapeSerializer", ShapeSerializer.class);

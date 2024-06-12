@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.json;
 
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.JsonNameTrait;
@@ -14,25 +14,25 @@ import software.amazon.smithy.model.traits.JsonNameTrait;
 public final class JsonTestData {
 
     static final ShapeId BIRD_ID = ShapeId.from("smithy.example#Bird");
-    static final SdkSchema BIRD_NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
+    static final Schema BIRD_NAME = Schema.memberBuilder("name", PreludeSchemas.STRING)
         .id(BIRD_ID)
         .build();
-    static final SdkSchema BIRD_COLOR = SdkSchema.memberBuilder("color", PreludeSchemas.STRING)
+    static final Schema BIRD_COLOR = Schema.memberBuilder("color", PreludeSchemas.STRING)
         .id(BIRD_ID)
         .traits(new JsonNameTrait("Color"))
         .build();
-    static final SdkSchema BIRD_NESTED = SdkSchema.memberBuilder("nested", PreludeSchemas.STRING).id(BIRD_ID).build();
-    static final SdkSchema BIRD = SdkSchema.builder()
+    static final Schema BIRD_NESTED = Schema.memberBuilder("nested", PreludeSchemas.STRING).id(BIRD_ID).build();
+    static final Schema BIRD = Schema.builder()
         .id(BIRD_ID)
         .type(ShapeType.STRUCTURE)
         .members(BIRD_NAME, BIRD_COLOR, BIRD_NESTED)
         .build();
 
     static final ShapeId NESTED_ID = ShapeId.from("smithy.example#Nested");
-    static final SdkSchema NESTED_NUMBER = SdkSchema.memberBuilder("number", PreludeSchemas.INTEGER)
+    static final Schema NESTED_NUMBER = Schema.memberBuilder("number", PreludeSchemas.INTEGER)
         .id(NESTED_ID)
         .build();
-    static final SdkSchema NESTED = SdkSchema.builder()
+    static final Schema NESTED = Schema.builder()
         .id(NESTED_ID)
         .type(ShapeType.STRUCTURE)
         .members(NESTED_NUMBER)

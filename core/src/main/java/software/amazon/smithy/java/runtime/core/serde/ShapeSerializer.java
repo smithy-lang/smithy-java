@@ -11,14 +11,14 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
  * Serializes a shape by receiving the Smithy data model and writing output to a receiver owned by the serializer.
  *
- * <p>Note: null values should only ever be written using {@link #writeNull(SdkSchema)}. Every other method expects
+ * <p>Note: null values should only ever be written using {@link #writeNull(Schema)}. Every other method expects
  * a non-null value or a value type.
  */
 public interface ShapeSerializer extends Flushable, AutoCloseable {
@@ -44,7 +44,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema A member schema that targets the given struct.
      * @param struct Structure to serialize.
      */
-    void writeStruct(SdkSchema schema, SerializableStruct struct);
+    void writeStruct(Schema schema, SerializableStruct struct);
 
     /**
      * Begin a list and write zero or more values into it using the provided serializer.
@@ -53,7 +53,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param listState State to pass into the consumer.
      * @param consumer  Received in the context of the list and writes zero or more values.
      */
-    <T> void writeList(SdkSchema schema, T listState, BiConsumer<T, ShapeSerializer> consumer);
+    <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer);
 
     /**
      * Begin a map and write zero or more entries into it using the provided serializer.
@@ -62,7 +62,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param mapState State to pass into the consumer.
      * @param consumer Received in the context of the map and writes zero or more entries.
      */
-    <T> void writeMap(SdkSchema schema, T mapState, BiConsumer<T, MapSerializer> consumer);
+    <T> void writeMap(Schema schema, T mapState, BiConsumer<T, MapSerializer> consumer);
 
     /**
      * Serialize a boolean.
@@ -70,7 +70,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeBoolean(SdkSchema schema, boolean value);
+    void writeBoolean(Schema schema, boolean value);
 
     /**
      * Serialize a byte.
@@ -78,7 +78,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeByte(SdkSchema schema, byte value);
+    void writeByte(Schema schema, byte value);
 
     /**
      * Serialize a short.
@@ -86,7 +86,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeShort(SdkSchema schema, short value);
+    void writeShort(Schema schema, short value);
 
     /**
      * Serialize an integer.
@@ -94,7 +94,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeInteger(SdkSchema schema, int value);
+    void writeInteger(Schema schema, int value);
 
     /**
      * Serialize a long.
@@ -102,7 +102,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeLong(SdkSchema schema, long value);
+    void writeLong(Schema schema, long value);
 
     /**
      * Serialize a float.
@@ -110,7 +110,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeFloat(SdkSchema schema, float value);
+    void writeFloat(Schema schema, float value);
 
     /**
      * Serialize a double.
@@ -118,7 +118,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeDouble(SdkSchema schema, double value);
+    void writeDouble(Schema schema, double value);
 
     /**
      * Serialize a big integer.
@@ -126,7 +126,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeBigInteger(SdkSchema schema, BigInteger value);
+    void writeBigInteger(Schema schema, BigInteger value);
 
     /**
      * Serialize a big decimal.
@@ -134,7 +134,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Value to serialize.
      */
-    void writeBigDecimal(SdkSchema schema, BigDecimal value);
+    void writeBigDecimal(Schema schema, BigDecimal value);
 
     /**
      * Serialize a string.
@@ -142,7 +142,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  String value.
      */
-    void writeString(SdkSchema schema, String value);
+    void writeString(Schema schema, String value);
 
     /**
      * Serialize a blob.
@@ -150,7 +150,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Blob value.
      */
-    void writeBlob(SdkSchema schema, byte[] value);
+    void writeBlob(Schema schema, byte[] value);
 
     /**
      * Serialize a timestamp.
@@ -158,7 +158,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Timestamp value.
      */
-    void writeTimestamp(SdkSchema schema, Instant value);
+    void writeTimestamp(Schema schema, Instant value);
 
     /**
      * Serialize a document shape.
@@ -169,12 +169,12 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      *               document wraps a modeled shape.
      * @param value  Value to serialize.
      */
-    void writeDocument(SdkSchema schema, Document value);
+    void writeDocument(Schema schema, Document value);
 
     /**
      * Writes a null value.
      *
      * @param schema Schema of the null value.
      */
-    void writeNull(SdkSchema schema);
+    void writeNull(Schema schema);
 }

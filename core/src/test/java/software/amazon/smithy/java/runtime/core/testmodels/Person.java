@@ -13,9 +13,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -30,29 +30,29 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class Person implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Person");
-    private static final SdkSchema SCHEMA_NAME = SdkSchema.memberBuilder("name", PreludeSchemas.STRING)
+    private static final Schema SCHEMA_NAME = Schema.memberBuilder("name", PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpLabelTrait(), new RequiredTrait(), LengthTrait.builder().max(7L).build())
         .build();
-    private static final SdkSchema SCHEMA_FAVORITE_COLOR = SdkSchema
+    private static final Schema SCHEMA_FAVORITE_COLOR = Schema
         .memberBuilder("favoriteColor", PreludeSchemas.STRING)
         .id(ID)
         .build();
-    private static final SdkSchema SCHEMA_AGE = SdkSchema.memberBuilder("age", PreludeSchemas.INTEGER)
+    private static final Schema SCHEMA_AGE = Schema.memberBuilder("age", PreludeSchemas.INTEGER)
         .id(ID)
         .traits(RangeTrait.builder().max(BigDecimal.valueOf(150)).build())
         .build();
-    private static final SdkSchema SCHEMA_BIRTHDAY = SdkSchema.memberBuilder("birthday", SharedSchemas.BIRTHDAY)
+    private static final Schema SCHEMA_BIRTHDAY = Schema.memberBuilder("birthday", SharedSchemas.BIRTHDAY)
         .id(ID)
         .build();
-    private static final SdkSchema SCHEMA_BINARY = SdkSchema.memberBuilder("binary", PreludeSchemas.BLOB)
+    private static final Schema SCHEMA_BINARY = Schema.memberBuilder("binary", PreludeSchemas.BLOB)
         .id(ID)
         .build();
-    private static final SdkSchema SCHEMA_QUERY_PARAMS = SdkSchema
+    private static final Schema SCHEMA_QUERY_PARAMS = Schema
         .memberBuilder("queryParams", SharedSchemas.MAP_LIST_STRING)
         .id(ID)
         .build();
-    static final SdkSchema SCHEMA = SdkSchema.builder()
+    static final Schema SCHEMA = Schema.builder()
         .id(ID)
         .type(ShapeType.STRUCTURE)
         .members(
@@ -64,9 +64,9 @@ public final class Person implements SerializableStruct {
             SCHEMA_QUERY_PARAMS
         )
         .build();
-    private static final SdkSchema SCHEMA_QUERY_PARAMS_KEY = SharedSchemas.MAP_LIST_STRING.member("key");
-    private static final SdkSchema SCHEMA_QUERY_PARAMS_VALUE = SharedSchemas.MAP_LIST_STRING.member("value");
-    private static final SdkSchema LIST_OF_STRING_MEMBER = SharedSchemas.LIST_OF_STRING.member("member");
+    private static final Schema SCHEMA_QUERY_PARAMS_KEY = SharedSchemas.MAP_LIST_STRING.member("key");
+    private static final Schema SCHEMA_QUERY_PARAMS_VALUE = SharedSchemas.MAP_LIST_STRING.member("value");
+    private static final Schema LIST_OF_STRING_MEMBER = SharedSchemas.LIST_OF_STRING.member("member");
 
     private final String name;
     private final int age;
@@ -157,7 +157,7 @@ public final class Person implements SerializableStruct {
         }
     }
 
-    public static final class Builder implements SdkShapeBuilder<Person> {
+    public static final class Builder implements ShapeBuilder<Person> {
 
         private String name;
         private int age = 0;

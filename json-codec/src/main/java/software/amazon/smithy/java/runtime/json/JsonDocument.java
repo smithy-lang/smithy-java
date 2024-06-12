@@ -17,10 +17,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.core.serde.document.DocumentDeserializer;
@@ -28,7 +28,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JsonDocument implements Document {
 
-    private static final SdkSchema STRING_MAP_KEY = SdkSchema.memberBuilder("key", PreludeSchemas.STRING)
+    private static final Schema STRING_MAP_KEY = Schema.memberBuilder("key", PreludeSchemas.STRING)
         .id(PreludeSchemas.DOCUMENT.id())
         .build();
 
@@ -36,7 +36,7 @@ final class JsonDocument implements Document {
     private final JsonFieldMapper fieldMapper;
     private final TimestampResolver timestampResolver;
     private final ShapeType type;
-    private final SdkSchema schema;
+    private final Schema schema;
 
     JsonDocument(
         com.jsoniter.any.Any any,
@@ -62,7 +62,7 @@ final class JsonDocument implements Document {
             case STRING -> ShapeType.STRING;
             case BOOLEAN -> ShapeType.BOOLEAN;
             // The default case should never be reached.
-            default -> throw new SdkSerdeException("Expected JSON document: " + any.mustBeValid());
+            default -> throw new SerializationException("Expected JSON document: " + any.mustBeValid());
         };
         this.schema = PreludeSchemas.getSchemaForType(type);
     }
@@ -131,7 +131,7 @@ final class JsonDocument implements Document {
                 // Base64 decode JSON blobs.
                 return Base64.getDecoder().decode(any.toString());
             } catch (IllegalArgumentException e) {
-                throw new SdkSerdeException("Expected a base64 encoded blob value", e);
+                throw new SerializationException("Expected a base64 encoded blob value", e);
             }
         }
     }
@@ -206,12 +206,12 @@ final class JsonDocument implements Document {
                 }
             });
             // When type is set in the ctor, it only allows the above types; the default switch should never happen.
-            default -> throw new SdkSerdeException("Cannot serialize unexpected JSON value: " + any);
+            default -> throw new SerializationException("Cannot serialize unexpected JSON value: " + any);
         }
     }
 
     @Override
-    public <T extends SerializableShape> void deserializeInto(SdkShapeBuilder<T> builder) {
+    public <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
         builder.deserialize(new JsonDocumentDeserializer(this));
     }
 
@@ -259,7 +259,7 @@ final class JsonDocument implements Document {
         }
 
         @Override
-        public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
+        public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
             for (var member : schema.members()) {
                 var nextValue = jsonDocument.getMember(jsonDocument.fieldMapper.memberToField(member));
                 if (nextValue != null) {
@@ -269,7 +269,7 @@ final class JsonDocument implements Document {
         }
 
         @Override
-        public Instant readTimestamp(SdkSchema schema) {
+        public Instant readTimestamp(Schema schema) {
             var format = jsonDocument.timestampResolver.resolve(schema);
             return TimestampResolver.readTimestamp(jsonDocument.any, format);
         }

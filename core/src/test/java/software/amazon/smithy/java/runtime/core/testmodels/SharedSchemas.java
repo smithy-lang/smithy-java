@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.core.testmodels;
 
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 
@@ -15,24 +15,24 @@ import software.amazon.smithy.model.traits.SensitiveTrait;
  */
 public final class SharedSchemas {
 
-    public static final SdkSchema BIRTHDAY = SdkSchema.builder()
+    public static final Schema BIRTHDAY = Schema.builder()
         .type(ShapeType.TIMESTAMP)
         .id("smithy.example#Birthday")
         .traits(new SensitiveTrait())
         .build();
 
-    public static final SdkSchema LIST_OF_STRING = SdkSchema.builder()
+    public static final Schema LIST_OF_STRING = Schema.builder()
         .type(ShapeType.LIST)
         .id("smithy.example#ListOfString")
-        .members(SdkSchema.memberBuilder("member", PreludeSchemas.STRING))
+        .members(Schema.memberBuilder("member", PreludeSchemas.STRING))
         .build();
 
-    public static final SdkSchema MAP_LIST_STRING = SdkSchema.builder()
+    public static final Schema MAP_LIST_STRING = Schema.builder()
         .type(ShapeType.MAP)
         .id("smithy.example#StringsMap")
         .members(
-            SdkSchema.memberBuilder("key", PreludeSchemas.STRING),
-            SdkSchema.memberBuilder("value", SharedSchemas.LIST_OF_STRING)
+            Schema.memberBuilder("key", PreludeSchemas.STRING),
+            Schema.memberBuilder("value", SharedSchemas.LIST_OF_STRING)
         )
         .build();
 

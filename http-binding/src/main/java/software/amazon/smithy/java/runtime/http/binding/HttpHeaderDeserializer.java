@@ -10,7 +10,7 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -25,7 +25,7 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public boolean readBoolean(SdkSchema schema) {
+    public boolean readBoolean(Schema schema) {
         return switch (value) {
             case "true" -> true;
             case "false" -> false;
@@ -34,7 +34,7 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public byte[] readBlob(SdkSchema schema) {
+    public byte[] readBlob(Schema schema) {
         try {
             return Base64.getDecoder().decode(value.getBytes(StandardCharsets.UTF_8));
         } catch (IllegalArgumentException e) {
@@ -46,47 +46,47 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public byte readByte(SdkSchema schema) {
+    public byte readByte(Schema schema) {
         return Byte.parseByte(value);
     }
 
     @Override
-    public short readShort(SdkSchema schema) {
+    public short readShort(Schema schema) {
         return Short.parseShort(value);
     }
 
     @Override
-    public int readInteger(SdkSchema schema) {
+    public int readInteger(Schema schema) {
         return Integer.parseInt(value);
     }
 
     @Override
-    public long readLong(SdkSchema schema) {
+    public long readLong(Schema schema) {
         return Long.parseLong(value);
     }
 
     @Override
-    public float readFloat(SdkSchema schema) {
+    public float readFloat(Schema schema) {
         return Float.parseFloat(value);
     }
 
     @Override
-    public double readDouble(SdkSchema schema) {
+    public double readDouble(Schema schema) {
         return Double.parseDouble(value);
     }
 
     @Override
-    public BigInteger readBigInteger(SdkSchema schema) {
+    public BigInteger readBigInteger(Schema schema) {
         return new BigInteger(value);
     }
 
     @Override
-    public BigDecimal readBigDecimal(SdkSchema schema) {
+    public BigDecimal readBigDecimal(Schema schema) {
         return new BigDecimal(value);
     }
 
     @Override
-    public String readString(SdkSchema schema) {
+    public String readString(Schema schema) {
         return value;
     }
 
@@ -96,7 +96,7 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public Instant readTimestamp(SdkSchema schema) {
+    public Instant readTimestamp(Schema schema) {
         var trait = schema.getTrait(TimestampFormatTrait.class);
         TimestampFormatter formatter = trait != null
             ? TimestampFormatter.of(trait)
@@ -105,17 +105,17 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readStruct(SdkSchema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
+    public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         throw new UnsupportedOperationException("Structures are not supported in HTTP header bindings");
     }
 
     @Override
-    public <T> void readList(SdkSchema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
+    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
         throw new UnsupportedOperationException("List header support not yet implemented");
     }
 
     @Override
-    public <T> void readStringMap(SdkSchema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
+    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
         throw new UnsupportedOperationException("List map support not yet implemented");
     }
 }

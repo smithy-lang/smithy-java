@@ -12,8 +12,8 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
@@ -72,12 +72,12 @@ public final class ListGenerator
                         "collectionImpl",
                         directive.symbol().expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
                     );
-                    writer.putContext("schema", SdkSchema.class);
+                    writer.putContext("schema", Schema.class);
                     writer.putContext("biConsumer", BiConsumer.class);
                     writer.putContext("shapeSerializer", ShapeSerializer.class);
                     writer.putContext("shapeDeserializer", ShapeDeserializer.class);
                     writer.putContext("unique", directive.shape().hasTrait(UniqueItemsTrait.class));
-                    writer.putContext("serdeException", SdkSerdeException.class);
+                    writer.putContext("serdeException", SerializationException.class);
                     writer.putContext(
                         "memberSerializer",
                         new SerializerMemberGenerator(

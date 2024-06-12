@@ -16,7 +16,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -38,7 +38,7 @@ public class DoubleDocumentTest {
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
-            public void writeDocument(SdkSchema schema, Document value) {
+            public void writeDocument(Schema schema, Document value) {
                 assertThat(value, is(document));
             }
         });
@@ -50,7 +50,7 @@ public class DoubleDocumentTest {
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
-            public void writeDouble(SdkSchema schema, double value) {
+            public void writeDouble(Schema schema, double value) {
                 assertThat(schema, equalTo(PreludeSchemas.DOUBLE));
                 assertThat(value, equalTo(1.0));
             }

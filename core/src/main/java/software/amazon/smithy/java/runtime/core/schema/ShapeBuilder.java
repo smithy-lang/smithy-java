@@ -14,7 +14,7 @@ import software.amazon.smithy.utils.SmithyBuilder;
  *
  * @param <T> Shape to build.
  */
-public interface SdkShapeBuilder<T extends SerializableShape> extends SmithyBuilder<T> {
+public interface ShapeBuilder<T extends SerializableShape> extends SmithyBuilder<T> {
     /**
      * Set a stream of data on the shape, if allowed.
      *
@@ -42,7 +42,7 @@ public interface SdkShapeBuilder<T extends SerializableShape> extends SmithyBuil
      *
      * @param decoder Decoder used to deserialize the shape.
      */
-    SdkShapeBuilder<T> deserialize(ShapeDeserializer decoder);
+    ShapeBuilder<T> deserialize(ShapeDeserializer decoder);
 
     /**
      * Performs any necessary error correction before the shape can be built.
@@ -52,7 +52,7 @@ public interface SdkShapeBuilder<T extends SerializableShape> extends SmithyBuil
      *
      * @return Returns the builder.
      */
-    default SdkShapeBuilder<T> errorCorrection() {
+    default ShapeBuilder<T> errorCorrection() {
         return this;
     }
 }

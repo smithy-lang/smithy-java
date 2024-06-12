@@ -9,9 +9,9 @@ import com.jsoniter.output.JsonStream;
 import com.jsoniter.spi.JsonException;
 import java.io.IOException;
 import java.util.function.BiConsumer;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
-import software.amazon.smithy.java.runtime.core.serde.SdkSerdeException;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 
 final class JsonMapSerializer implements MapSerializer {
@@ -27,7 +27,7 @@ final class JsonMapSerializer implements MapSerializer {
 
     @Override
     public <T> void writeEntry(
-        SdkSchema keySchema,
+        Schema keySchema,
         String key,
         T state,
         BiConsumer<T, ShapeSerializer> valueSerializer
@@ -37,7 +37,7 @@ final class JsonMapSerializer implements MapSerializer {
             stream.writeObjectField(key);
             valueSerializer.accept(state, parent);
         } catch (JsonException | IOException e) {
-            throw new SdkSerdeException(e);
+            throw new SerializationException(e);
         }
     }
 

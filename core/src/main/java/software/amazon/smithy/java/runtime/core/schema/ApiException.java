@@ -14,7 +14,7 @@ import java.util.Objects;
  * errors, and shape validation errors. It should not be used for illegal arguments, null argument validation,
  * or other kinds of logic errors sufficiently covered by the Java standard library.
  */
-public class SdkException extends RuntimeException {
+public class ApiException extends RuntimeException {
 
     /**
      * The party that is at fault for the error, if any.
@@ -47,31 +47,31 @@ public class SdkException extends RuntimeException {
          */
         public static Fault ofHttpStatusCode(int statusCode) {
             if (statusCode >= 400 && statusCode <= 499) {
-                return SdkException.Fault.CLIENT;
+                return ApiException.Fault.CLIENT;
             } else if (statusCode >= 500 && statusCode <= 599) {
-                return SdkException.Fault.SERVER;
+                return ApiException.Fault.SERVER;
             } else {
-                return SdkException.Fault.OTHER;
+                return ApiException.Fault.OTHER;
             }
         }
     }
 
     private final Fault errorType;
 
-    public SdkException(String message) {
+    public ApiException(String message) {
         this(message, Fault.OTHER);
     }
 
-    public SdkException(String message, Fault errorType) {
+    public ApiException(String message, Fault errorType) {
         super(message);
         this.errorType = Objects.requireNonNull(errorType);
     }
 
-    public SdkException(String message, Throwable cause) {
+    public ApiException(String message, Throwable cause) {
         this(message, cause, Fault.OTHER);
     }
 
-    public SdkException(String message, Throwable cause, Fault errorType) {
+    public ApiException(String message, Throwable cause, Fault errorType) {
         super(message, cause);
         this.errorType = Objects.requireNonNull(errorType);
     }

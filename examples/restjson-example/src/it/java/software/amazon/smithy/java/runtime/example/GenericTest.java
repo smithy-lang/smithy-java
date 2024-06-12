@@ -15,9 +15,9 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterc
 import software.amazon.smithy.java.runtime.client.http.HttpContext;
 import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.core.schema.ModeledSdkException;
-import software.amazon.smithy.java.runtime.core.schema.SdkShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
@@ -114,8 +114,8 @@ public class GenericTest {
             .putType(ValidationError.ID, ValidationError.class, ValidationError::builder)
             .build();
 
-        registry.create(ValidationError.ID, ModeledSdkException.class)
-            .map(SdkShapeBuilder::build)
+        registry.create(ValidationError.ID, ModeledApiException.class)
+            .map(ShapeBuilder::build)
             .ifPresent(System.out::println);
     }
 

@@ -21,7 +21,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -112,7 +112,7 @@ public class JsonSerializerTest {
     @ParameterizedTest
     @MethodSource("configurableTimestampFormatProvider")
     public void configurableTimestampFormat(boolean useTimestampFormat, String json) throws Exception {
-        SdkSchema schema = SdkSchema.builder()
+        Schema schema = Schema.builder()
             .type(ShapeType.TIMESTAMP)
             .id("smithy.example#foo")
             .traits(new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))

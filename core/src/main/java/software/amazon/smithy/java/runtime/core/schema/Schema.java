@@ -34,17 +34,17 @@ import software.amazon.smithy.utils.SmithyBuilder;
  *
  * <p>Note: when creating a structure schema, all required members must come before optional members.
  */
-public final class SdkSchema {
+public final class Schema {
 
     private final ShapeId id;
     private final ShapeType type;
     private final Map<Class<? extends Trait>, Trait> traits;
-    private final Map<String, SdkSchema> members;
-    private final List<SdkSchema> memberList;
+    private final Map<String, Schema> members;
+    private final List<Schema> memberList;
     private volatile int hashCode;
 
     private final String memberName;
-    private final SdkSchema memberTarget;
+    private final Schema memberTarget;
 
     /**
      * The position of the member in a containing shape's {@link #members()} return value.
@@ -79,7 +79,7 @@ public final class SdkSchema {
      */
     final long requiredStructureMemberBitfield;
 
-    private SdkSchema(Builder builder) {
+    private Schema(Builder builder) {
         this.id = Objects.requireNonNull(builder.id, "id is null");
         this.type = Objects.requireNonNull(builder.type, "type is null");
         this.traits = createTraitMap(builder.traits);
@@ -196,7 +196,7 @@ public final class SdkSchema {
         }
     }
 
-    private static ValidatorOfString createStringValidator(SdkSchema schema, LengthTrait lengthTrait) {
+    private static ValidatorOfString createStringValidator(Schema schema, LengthTrait lengthTrait) {
         List<ValidatorOfString> stringValidators = null;
 
         if (schema.type == ShapeType.STRING || schema.type == ShapeType.ENUM) {
@@ -224,7 +224,7 @@ public final class SdkSchema {
         return ValidatorOfString.of(stringValidators);
     }
 
-    private static int computeRequiredMemberCount(ShapeType type, SdkSchema memberTarget, List<SdkSchema> members) {
+    private static int computeRequiredMemberCount(ShapeType type, Schema memberTarget, List<Schema> members) {
         if (memberTarget != null) {
             return memberTarget.requiredMemberCount;
         } else if (type != ShapeType.STRUCTURE) {
@@ -240,9 +240,9 @@ public final class SdkSchema {
         }
     }
 
-    private static long computeRequiredBitField(Collection<SdkSchema> members) {
+    private static long computeRequiredBitField(Collection<Schema> members) {
         long setFields = 0L;
-        for (SdkSchema member : members) {
+        for (Schema member : members) {
             setFields |= member.requiredByValidationBitmask;
         }
         return setFields;
@@ -278,7 +278,7 @@ public final class SdkSchema {
      * @return Returns the member builder.
      * @throws IllegalArgumentException if {@code memberIndex} is less than 1.
      */
-    public static Builder memberBuilder(String memberName, SdkSchema memberTarget) {
+    public static Builder memberBuilder(String memberName, Schema memberTarget) {
         Builder builder = builder();
         builder.memberTarget = Objects.requireNonNull(memberTarget, "memberTarget is null");
         builder.memberName = Objects.requireNonNull(memberName, "memberName is null");
@@ -347,7 +347,7 @@ public final class SdkSchema {
      *
      * @return Member target.
      */
-    public SdkSchema memberTarget() {
+    public Schema memberTarget() {
         return memberTarget;
     }
 
@@ -399,7 +399,7 @@ public final class SdkSchema {
      *
      * @return Returns the members.
      */
-    public List<SdkSchema> members() {
+    public List<Schema> members() {
         return memberList;
     }
 
@@ -409,7 +409,7 @@ public final class SdkSchema {
      * @param memberName Member by name to get.
      * @return Returns the found member or null if not found.
      */
-    public SdkSchema member(String memberName) {
+    public Schema member(String memberName) {
         return members.get(memberName);
     }
 
@@ -448,7 +448,7 @@ public final class SdkSchema {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        SdkSchema sdkSchema = (SdkSchema) o;
+        Schema sdkSchema = (Schema) o;
         return memberIndex == sdkSchema.memberIndex && Objects.equals(id, sdkSchema.id)
             && type == sdkSchema.type
             && Objects.equals(traits, sdkSchema.traits)
@@ -479,21 +479,21 @@ public final class SdkSchema {
         return code;
     }
 
-    public static final class Builder implements SmithyBuilder<SdkSchema> {
+    public static final class Builder implements SmithyBuilder<Schema> {
 
         private ShapeId id;
         private ShapeType type;
         private Trait[] traits;
-        private List<SdkSchema> members;
+        private List<Schema> members;
         private String memberName;
-        private SdkSchema memberTarget;
+        private Schema memberTarget;
 
         private Set<String> stringEnumValues = Collections.emptySet();
         private Set<Integer> intEnumValues = Collections.emptySet();
 
         @Override
-        public SdkSchema build() {
-            return new SdkSchema(this);
+        public Schema build() {
+            return new Schema(this);
         }
 
         /**
@@ -557,8 +557,8 @@ public final class SdkSchema {
          * @return Returns the builder.
          * @throws IllegalStateException if the schema is for a member.
          */
-        public Builder members(SdkSchema... members) {
-            List<SdkSchema> result = new ArrayList<>(members.length);
+        public Builder members(Schema... members) {
+            List<Schema> result = new ArrayList<>(members.length);
             Collections.addAll(result, members);
             return membersWithOwnedList(result);
         }
@@ -571,7 +571,7 @@ public final class SdkSchema {
          * @throws IllegalStateException if the schema is for a member.
          */
         public Builder members(Builder... members) {
-            List<SdkSchema> built = new ArrayList<>(members.length);
+            List<Schema> built = new ArrayList<>(members.length);
             for (Builder member : members) {
                 built.add(member.id(id).build());
             }
@@ -585,12 +585,12 @@ public final class SdkSchema {
          * @return Returns the builder.
          * @throws IllegalStateException if the schema is for a member, or if the member is owned by another shape.
          */
-        public Builder members(List<SdkSchema> members) {
+        public Builder members(List<Schema> members) {
             return membersWithOwnedList(new ArrayList<>(members));
         }
 
         // Given a list that the builder owns and is free to mutate and keep, sort the members and store them.
-        private Builder membersWithOwnedList(List<SdkSchema> members) {
+        private Builder membersWithOwnedList(List<Schema> members) {
             if (memberTarget != null) {
                 throw new IllegalStateException("Cannot add members to a member");
             }
@@ -626,11 +626,11 @@ public final class SdkSchema {
          *
          * @param stringEnumValues Allowed string values.
          * @return the builder.
-         * @throws SdkException if type has not been set or is not equal to ENUM or STRING.
+         * @throws ApiException if type has not been set or is not equal to ENUM or STRING.
          */
         public Builder stringEnumValues(Set<String> stringEnumValues) {
             if (type != ShapeType.STRING && type != ShapeType.ENUM) {
-                throw new SdkException("Can only set enum values for STRING or ENUM types");
+                throw new ApiException("Can only set enum values for STRING or ENUM types");
             }
             this.stringEnumValues = Objects.requireNonNull(stringEnumValues);
             return this;
@@ -641,7 +641,7 @@ public final class SdkSchema {
          *
          * @param stringEnumValues Allowed string values.
          * @return the builder.
-         * @throws SdkException if type has not been set or is not equal to ENUM or STRING.
+         * @throws ApiException if type has not been set or is not equal to ENUM or STRING.
          */
         public Builder stringEnumValues(String... stringEnumValues) {
             Set<String> values = new LinkedHashSet<>(stringEnumValues.length);
@@ -659,11 +659,11 @@ public final class SdkSchema {
          *
          * @param intEnumValues Allowed int values.
          * @return the builder.
-         * @throws SdkException if type has not been set or is not equal to INT_ENUM.
+         * @throws ApiException if type has not been set or is not equal to INT_ENUM.
          */
         public Builder intEnumValues(Set<Integer> intEnumValues) {
             if (type != ShapeType.INT_ENUM) {
-                throw new SdkException("Can only set intEnum values for INT_ENUM types");
+                throw new ApiException("Can only set intEnum values for INT_ENUM types");
             }
             this.intEnumValues = Objects.requireNonNull(intEnumValues);
             return this;
@@ -674,7 +674,7 @@ public final class SdkSchema {
          *
          * @param intEnumValues Allowed int values.
          * @return the builder.
-         * @throws SdkException if type has not been set or is not equal to INT_ENUM.
+         * @throws ApiException if type has not been set or is not equal to INT_ENUM.
          */
         public Builder intEnumValues(Integer... intEnumValues) {
             Set<Integer> values = new LinkedHashSet<>(intEnumValues.length);
