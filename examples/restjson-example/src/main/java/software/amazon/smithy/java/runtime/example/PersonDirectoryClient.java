@@ -31,7 +31,7 @@ public final class PersonDirectoryClient extends Client implements PersonDirecto
 
     @Override
     public PutPersonImageOutput putPersonImage(PutPersonImageInput input, Context context) {
-        return call(input, null, null, new PutPersonImage(), context).join();
+        return call(input, input.image(), null, new PutPersonImage(), context).join();
     }
 
     @Override
