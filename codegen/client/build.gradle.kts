@@ -21,7 +21,7 @@ val generateSrcTask = tasks.register<JavaExec>("generateSources") {
     delete(files(generatedSrcDir))
     dependsOn("test")
     classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
-    mainClass = "software.amazon.smithy.java.codegen.client.TestServerJavaCodegenRunner"
+    mainClass = "software.amazon.smithy.java.codegen.client.TestServerJavaClientCodegenRunner"
     environment("service", "smithy.java.codegen.server.test#TestService")
     environment("namespace", "smithy.java.codegen.server.test")
     environment("output", generatedSrcDir)

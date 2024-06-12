@@ -60,19 +60,21 @@ public final class ClientIntegration implements JavaCodegenIntegration {
 
     private static Symbol getSymbolFromName(JavaCodegenSettings settings, String name, boolean async) {
         var symbol = Symbol.builder()
-            .name(name)
+            .name(name + "Client")
             .putProperty(SymbolProperties.IS_PRIMITIVE, false)
             .putProperty(ClientSymbolProperties.ASYNC, async)
             .namespace(format("%s.client", settings.packageNamespace()), ".")
-            .declarationFile(format("./%s/client/%s.java", settings.packageNamespace().replace(".", "/"), name))
+            .definitionFile(format("./%s/client/%sClient.java", settings.packageNamespace().replace(".", "/"), name))
             .build();
 
         return symbol.toBuilder()
             .putProperty(
                 ClientSymbolProperties.CLIENT_IMPL,
                 symbol.toBuilder()
-                    .name(name + "Client")
-                    .declarationFile(symbol.getDefinitionFile().replace(name, name + "Client"))
+                    .name(name + "ClientImpl")
+                    .definitionFile(
+                        format("./%s/client/%sClientImpl.java", settings.packageNamespace().replace(".", "/"), name)
+                    )
                     .build()
             )
             .build();

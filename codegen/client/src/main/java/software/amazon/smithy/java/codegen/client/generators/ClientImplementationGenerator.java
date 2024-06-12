@@ -42,35 +42,21 @@ public final class ClientImplementationGenerator
         GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive
     ) {
         var impl = symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL);
-        directive.context().writerDelegator().useFileWriter(impl.getDeclarationFile(), impl.getNamespace(), writer -> {
+        directive.context().writerDelegator().useFileWriter(impl.getDefinitionFile(), impl.getNamespace(), writer -> {
             writer.pushState(new ClassSection(directive.shape()));
             var template = """
-                public final class ${clientImpl:T} extends ${client:T} implements ${interface:T} {
+                final class ${impl:T} extends ${client:T} implements ${interface:T} {
 
-                    private ${clientImpl:T}(Builder builder) {
+                    ${impl:T}(${interface:T}.Builder builder) {
                         super(builder);
                     }
 
                     ${operations:C|}
-
-                    public static Builder builder() {
-                        return new Builder();
-                    }
-
-                    public static final class Builder extends ${client:T}.Builder<Builder> {
-
-                        private Builder() {}
-
-                        @Override
-                        public ${clientImpl:T} build() {
-                            return new ${clientImpl:T}(this);
-                        }
-                    }
                 }
                 """;
             writer.putContext("client", Client.class);
             writer.putContext("interface", symbol);
-            writer.putContext("clientImpl", impl);
+            writer.putContext("impl", impl);
             writer.putContext("future", CompletableFuture.class);
             writer.putContext(
                 "operations",

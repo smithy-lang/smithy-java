@@ -16,6 +16,7 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
@@ -42,15 +43,31 @@ public final class ClientInterfaceGenerator
     ) {
         directive.context()
             .writerDelegator()
-            .useFileWriter(symbol.getDeclarationFile(), symbol.getNamespace(), writer -> {
+            .useFileWriter(symbol.getDefinitionFile(), symbol.getNamespace(), writer -> {
                 writer.pushState(new ClassSection(directive.shape()));
                 var template = """
                     public interface ${interface:T} {
 
                         ${operations:C|}
+
+                        static Builder builder() {
+                            return new Builder();
+                        }
+
+                        final class Builder extends ${client:T}.Builder<${interface:T}, Builder> {
+
+                            private Builder() {}
+
+                            @Override
+                            public ${interface:T} build() {
+                                return new ${impl:T}(this);
+                            }
+                        }
                     }
                     """;
+                writer.putContext("client", Client.class);
                 writer.putContext("interface", symbol);
+                writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
                 writer.putContext(
                     "operations",
                     new OperationMethodGenerator(

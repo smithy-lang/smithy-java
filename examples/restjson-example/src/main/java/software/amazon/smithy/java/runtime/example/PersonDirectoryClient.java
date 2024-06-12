@@ -7,49 +7,44 @@ package software.amazon.smithy.java.runtime.example;
 
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.example.client.PersonDirectory;
-import software.amazon.smithy.java.runtime.example.model.GetPersonImage;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
-import software.amazon.smithy.java.runtime.example.model.PutPerson;
-import software.amazon.smithy.java.runtime.example.model.PutPersonImage;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonOutput;
 
-public final class PersonDirectoryClient extends Client implements PersonDirectory {
+public interface PersonDirectoryClient {
 
-    private PersonDirectoryClient(Builder builder) {
-        super(builder);
+    default GetPersonImageOutput getPersonImage(GetPersonImageInput input) {
+        return getPersonImage(input, Context.create());
     }
 
-    @Override
-    public PutPersonOutput putPerson(PutPersonInput input, Context context) {
-        return call(input, null, null, new PutPerson(), context).join();
+    GetPersonImageOutput getPersonImage(GetPersonImageInput input, Context context);
+
+    default PutPersonOutput putPerson(PutPersonInput input) {
+        return putPerson(input, Context.create());
     }
 
-    @Override
-    public PutPersonImageOutput putPersonImage(PutPersonImageInput input, Context context) {
-        return call(input, input.image(), null, new PutPersonImage(), context).join();
+    PutPersonOutput putPerson(PutPersonInput input, Context context);
+
+    default PutPersonImageOutput putPersonImage(PutPersonImageInput input) {
+        return putPersonImage(input, Context.create());
     }
 
-    @Override
-    public GetPersonImageOutput getPersonImage(GetPersonImageInput input, Context context) {
-        return call(input, null, null, new GetPersonImage(), context).join();
-    }
+    PutPersonImageOutput putPersonImage(PutPersonImageInput input, Context context);
 
-    public static Builder builder() {
+    static Builder builder() {
         return new Builder();
     }
 
-    public static final class Builder extends Client.Builder<Builder> {
+    final class Builder extends Client.Builder<PersonDirectoryClient, Builder> {
 
         private Builder() {}
 
         @Override
         public PersonDirectoryClient build() {
-            return new PersonDirectoryClient(this);
+            return new PersonDirectoryClientImpl(this);
         }
     }
 }

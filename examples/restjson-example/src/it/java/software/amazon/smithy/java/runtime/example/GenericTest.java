@@ -22,7 +22,6 @@ import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.java.runtime.example.client.PersonDirectory;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImageInput;
@@ -37,7 +36,7 @@ public class GenericTest {
     @Test
     public void putPerson() {
         // Create a generated client using rest-json and a fixed endpoint.
-        PersonDirectory client = PersonDirectoryClient.builder()
+        PersonDirectoryClient client = PersonDirectoryClient.builder()
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
             .endpoint("http://httpbin.org/anything")
             .build();
@@ -54,7 +53,7 @@ public class GenericTest {
 
     @Test
     public void getPersonImage() {
-        PersonDirectory client = PersonDirectoryClient.builder()
+        PersonDirectoryClient client = PersonDirectoryClient.builder()
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
             .endpoint("http://httpbin.org")
             .build();
@@ -67,7 +66,7 @@ public class GenericTest {
 
     @Test
     public void streamingRequestPayload() {
-        PersonDirectory client = PersonDirectoryClient.builder()
+        PersonDirectoryClient client = PersonDirectoryClient.builder()
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
             .endpoint("http://httpbin.org")
             .build();
@@ -162,7 +161,7 @@ public class GenericTest {
             }
         };
 
-        PersonDirectory client = PersonDirectoryClient.builder()
+        PersonDirectoryClient client = PersonDirectoryClient.builder()
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
             .endpoint("http://httpbin.org")
             .addInterceptor(interceptor)

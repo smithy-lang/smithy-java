@@ -37,7 +37,7 @@ public abstract class Client {
     private final AuthSchemeResolver authSchemeResolver;
     private final IdentityResolvers identityResolvers;
 
-    protected Client(Builder<?> builder) {
+    protected Client(Builder<?, ?> builder) {
         this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
         this.transport = new ApiCallTimeoutTransport(Objects.requireNonNull(builder.transport, "transport is null"));
         // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
@@ -104,7 +104,13 @@ public abstract class Client {
         );
     }
 
-    public static abstract class Builder<B extends Builder<B>> {
+    /**
+     * Static builder for Clients.
+     *
+     * @param <I> Client interface created by builder
+     * @param <B> Implementing builder class
+     */
+    public static abstract class Builder<I, B extends Builder<I, B>> {
         private ClientTransport transport;
         private EndpointResolver endpointResolver;
         private final List<ClientInterceptor> interceptors = new ArrayList<>();
@@ -234,6 +240,6 @@ public abstract class Client {
          *
          * @return the created client.
          */
-        public abstract Client build();
+        public abstract I build();
     }
 }

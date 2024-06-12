@@ -8,7 +8,6 @@ package software.amazon.smithy.java.codegen.client;
 
 import java.net.http.HttpClient;
 import org.junit.jupiter.api.Test;
-import smithy.java.codegen.server.test.client.TestService;
 import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
 import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
@@ -20,7 +19,6 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 
 public class GenericClientTest {
-    // TODO: Update tests once issue with body not serializing is resolved.
     @Test
     public void echoTest() {
         var client = TestServiceClient.builder()
@@ -31,6 +29,7 @@ public class GenericClientTest {
         var value = "hello world";
         var input = EchoInput.builder().string(value).build();
         var output = client.echo(input);
+        System.out.println(output);
     }
 
     @Test
@@ -65,7 +64,7 @@ public class GenericClientTest {
             }
         };
 
-        TestService client = TestServiceClient.builder()
+        var client = TestServiceClient.builder()
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
             .endpoint("https://httpbin.org")
             .addInterceptor(interceptor)
