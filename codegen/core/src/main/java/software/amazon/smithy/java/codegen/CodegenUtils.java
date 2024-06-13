@@ -22,6 +22,7 @@ import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.traits.StreamingTrait;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.CaseUtils;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
@@ -177,7 +178,8 @@ public final class CodegenUtils {
      */
     public static String getSchemaType(JavaWriter writer, SymbolProvider provider, Shape shape) {
         if (Prelude.isPreludeShape(shape)) {
-            return writer.format("$T.$L", PreludeSchemas.class, shape.getType().name());
+            var shapeName = shape.hasTrait(UnitTypeTrait.class) ? "UNIT" : shape.getType().name();
+            return writer.format("$T.$L", PreludeSchemas.class, shapeName);
         } else if (shape.isStructureShape() || shape.isUnionShape() || shape.isIntEnumShape() || shape.isEnumShape()) {
             // Shapes that generate a class have their schemas as static properties on that class
             return writer.format("$T.SCHEMA", provider.toSymbol(shape));

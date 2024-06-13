@@ -42,7 +42,7 @@ public class MapGenerator
 
                     writer.pushState();
                     var template = """
-                        static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:T}, ${mapSerializer:T}> {
+                        static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${mapSerializer:T}> {
                             static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
 
                             @Override
@@ -58,11 +58,11 @@ public class MapGenerator
                             }
                         }
 
-                        private static final class ${name:U}ValueSerializer implements ${biConsumer:T}<${value:T}, ${shapeSerializer:T}> {
+                        private static final class ${name:U}ValueSerializer implements ${biConsumer:T}<${value:B}, ${shapeSerializer:T}> {
                             private static final ${name:U}ValueSerializer INSTANCE = new ${name:U}ValueSerializer();
 
                             @Override
-                            public void accept(${value:T} values, ${shapeSerializer:T} serializer) {
+                            public void accept(${value:B} values, ${shapeSerializer:T} serializer) {
                                 ${memberSerializer:C|};
                             }
                         }
@@ -73,11 +73,11 @@ public class MapGenerator
                             return result;
                         }
 
-                        private static final class ${name:U}ValueDeserializer implements ${shapeDeserializer:T}.MapMemberConsumer<${key:T}, ${shape:T}> {
+                        private static final class ${name:U}ValueDeserializer implements ${shapeDeserializer:T}.MapMemberConsumer<${key:T}, ${shape:B}> {
                             static final ${name:U}ValueDeserializer INSTANCE = new ${name:U}ValueDeserializer();
 
                             @Override
-                            public void accept(${shape:T} state, ${key:T} key, ${shapeDeserializer:T} deserializer) {
+                            public void accept(${shape:B} state, ${key:T} key, ${shapeDeserializer:T} deserializer) {
                                 state.put(key, $memberDeserializer:C);
                             }
                         }

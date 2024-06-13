@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -173,7 +174,11 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 "}",
                 () -> {
                     if (shape.hasTrait(ErrorTrait.class)) {
-                        writer.write("super(ID, builder.message);");
+                        if (shape.getMember("message").isPresent()) {
+                            writer.write("super(ID, builder.message);");
+                        } else {
+                            writer.write("super(ID, null);");
+                        }
                     }
 
                     for (var member : shape.members()) {
@@ -722,7 +727,30 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
 
             @Override
             public Void blobShape(BlobShape blobShape) {
-                throw new UnsupportedOperationException("Blob default value cannot be set.");
+                var strValue = defaultValue.expectStringNode().getValue();
+                if (blobShape.hasTrait(StreamingTrait.class)) {
+                    if (strValue.isEmpty()) {
+                        writer.write("$T.ofEmpty()", DataStream.class);
+                    } else {
+                        writer.write(
+                            "$T.ofBytes($T.getDecoder().decode($S))",
+                            DataStream.class,
+                            Base64.class,
+                            strValue
+                        );
+                    }
+                } else {
+                    if (strValue.isEmpty()) {
+                        writer.write("new byte[0]");
+                    } else {
+                        writer.write(
+                            "$T.getDecoder().decode($S)",
+                            Base64.class,
+                            strValue
+                        );
+                    }
+                }
+                return null;
             }
 
             @Override
