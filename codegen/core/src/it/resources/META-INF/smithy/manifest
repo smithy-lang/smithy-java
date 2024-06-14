@@ -2,6 +2,8 @@ main.smithy
 structures/structures.smithy
 structures/blob-members/blobs.smithy
 structures/boolean-members/booleans.smithy
+structures/document-members/documents.smithy
+structures/default-values/defaults.smithy
 structures/list-members/list-of-structs.smithy
 structures/list-members/lists.smithy
 structures/list-members/nested-lists.smithy

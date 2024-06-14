@@ -3,12 +3,14 @@ $version: "2"
 namespace smithy.java.codegen.test.structures
 
 use smithy.java.codegen.test.exceptions#ExceptionOperation
+use smithy.java.codegen.test.structures.defaults#Defaults
 use smithy.java.codegen.test.structures.members#BigDecimals
 use smithy.java.codegen.test.structures.members#BigIntegers
 use smithy.java.codegen.test.structures.members#Blobs
 use smithy.java.codegen.test.structures.members#Booleans
 use smithy.java.codegen.test.structures.members#Bytes
 use smithy.java.codegen.test.structures.members#ClientErrorCorrection
+use smithy.java.codegen.test.structures.members#Documents
 use smithy.java.codegen.test.structures.members#Doubles
 use smithy.java.codegen.test.structures.members#Enums
 use smithy.java.codegen.test.structures.members#Floats
@@ -36,6 +38,8 @@ resource StructureShapes {
         Blobs,
         // Boolean members
         Booleans,
+        // Document Members
+        Documents,
         // List members
         Lists,
         Sets,
@@ -72,5 +76,7 @@ resource StructureShapes {
         ExceptionOperation,
         // Error correction
         ClientErrorCorrection
+        // Default values
+        Defaults
     ]
 }

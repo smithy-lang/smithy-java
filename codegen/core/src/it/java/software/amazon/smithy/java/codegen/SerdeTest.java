@@ -15,6 +15,7 @@ import io.smithy.codegen.test.model.BigIntegersInput;
 import io.smithy.codegen.test.model.BlobsInput;
 import io.smithy.codegen.test.model.BooleansInput;
 import io.smithy.codegen.test.model.BytesInput;
+import io.smithy.codegen.test.model.DocumentsInput;
 import io.smithy.codegen.test.model.DoublesInput;
 import io.smithy.codegen.test.model.EnumType;
 import io.smithy.codegen.test.model.EnumsInput;
@@ -68,6 +69,8 @@ public class SerdeTest {
         return Stream.of(
             // Booleans
             BooleansInput.builder().requiredBoolean(true).build(),
+            // Documents
+            DocumentsInput.builder().requiredDoc(Document.createString("str")).build(),
             // Lists
             ListsInput.builder().requiredList(List.of("a", "b", "c")).build(),
             NestedListsInput.builder()

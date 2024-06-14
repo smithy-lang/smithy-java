@@ -38,11 +38,11 @@ public final class ListGenerator
                     var target = directive.model().expectShape(directive.shape().getMember().getTarget());
                     writer.pushState();
                     var template = """
-                        static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:T}, ${shapeSerializer:T}> {
+                        static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${shapeSerializer:T}> {
                             static final ${name:U}Serializer INSTANCE = new ${name:U}Serializer();
 
                             @Override
-                            public void accept(${shape:T} values, ${shapeSerializer:T} serializer) {
+                            public void accept(${shape:B} values, ${shapeSerializer:T} serializer) {
                                 for (var value : values) {
                                     ${memberSerializer:C|};
                                 }
@@ -55,11 +55,11 @@ public final class ListGenerator
                             return result;
                         }
 
-                        private static final class ${name:U}MemberDeserializer implements ${shapeDeserializer:T}.ListMemberConsumer<${shape:T}> {
+                        private static final class ${name:U}MemberDeserializer implements ${shapeDeserializer:T}.ListMemberConsumer<${shape:B}> {
                             static final ${name:U}MemberDeserializer INSTANCE = new ${name:U}MemberDeserializer();
 
                             @Override
-                            public void accept(${shape:T} state, ${shapeDeserializer:T} deserializer) {
+                            public void accept(${shape:B} state, ${shapeDeserializer:T} deserializer) {
                                 ${?unique}if (${/unique}state.add($memberDeserializer:C)${^unique};${/unique}${?unique}) {
                                     throw new ${serdeException:T}("Member must have unique values");
                                 }${/unique}

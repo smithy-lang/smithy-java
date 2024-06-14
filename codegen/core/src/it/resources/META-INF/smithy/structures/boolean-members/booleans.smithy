@@ -6,6 +6,10 @@ operation Booleans {
     input := {
         @required
         requiredBoolean: Boolean
+
+        @default(true)
+        defaultBoolean: Boolean
+
         optionalBoolean: Boolean
     }
 }

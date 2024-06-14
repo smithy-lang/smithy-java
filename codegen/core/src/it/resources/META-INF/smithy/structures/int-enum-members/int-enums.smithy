@@ -2,16 +2,18 @@ $version: "2"
 
 namespace smithy.java.codegen.test.structures.members
 
-operation Enums {
-    input := {
+operation IntEnums {
+input := {
         @required
-        requiredEnum: EnumType
-        optionalEnum: EnumType
+        requiredEnum: IntEnumType
+        @default(1)
+        defaultEnum: IntEnumType
+        optionalEnum: IntEnumType
     }
 }
 
 @private
-enum EnumType {
-    OPTION_ONE = "option-one"
-    OPTION_TWO = "option-two"
+intEnum IntEnumType {
+    OPTION_ONE = 1
+    OPTION_TWO = 10
 }

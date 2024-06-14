@@ -28,8 +28,16 @@ import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.PresenceTracker;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.node.ArrayNode;
+import software.amazon.smithy.model.node.BooleanNode;
 import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.model.node.NodeVisitor;
+import software.amazon.smithy.model.node.NullNode;
+import software.amazon.smithy.model.node.NumberNode;
+import software.amazon.smithy.model.node.ObjectNode;
+import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.BigDecimalShape;
 import software.amazon.smithy.model.shapes.BigIntegerShape;
 import software.amazon.smithy.model.shapes.BlobShape;
@@ -806,6 +814,22 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             }
 
             @Override
+            public Void intEnumShape(IntEnumShape shape) {
+                var value = defaultValue.expectNumberNode().getValue().intValue();
+                for (var entry : shape.getEnumValues().entrySet()) {
+                    if (entry.getValue() == value) {
+                        writer.write(
+                            "$T.$L",
+                            symbolProvider.toSymbol(member),
+                            CodegenUtils.toUpperSnakeCase(entry.getKey())
+                        );
+                        break;
+                    }
+                }
+                return null;
+            }
+
+            @Override
             public Void longShape(LongShape longShape) {
                 writer.write("$LL", defaultValue.expectNumberNode().getValue().longValue());
                 return null;
@@ -819,7 +843,11 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
 
             @Override
             public Void documentShape(DocumentShape documentShape) {
-                throw new UnsupportedOperationException("Document shape defaults cannot be set.");
+                writer.pushState();
+                writer.putContext("document", Document.class);
+                defaultValue.accept(new DocumentDefaultNodeVisitor(writer));
+                writer.popState();
+                return null;
             }
 
             @Override
@@ -847,6 +875,22 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             @Override
             public Void stringShape(StringShape stringShape) {
                 writer.write("$S", defaultValue.expectStringNode().getValue());
+                return null;
+            }
+
+            @Override
+            public Void enumShape(EnumShape shape) {
+                var value = defaultValue.expectStringNode().getValue();
+                for (var entry : shape.getEnumValues().entrySet()) {
+                    if (entry.getValue().equals(value)) {
+                        writer.write(
+                            "$T.$L",
+                            symbolProvider.toSymbol(member),
+                            CodegenUtils.toUpperSnakeCase(entry.getKey())
+                        );
+                        break;
+                    }
+                }
                 return null;
             }
 
@@ -895,6 +939,50 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 throw new IllegalArgumentException(
                     "Invalid timestamp value node: " + defaultValue + "Expected string or number"
                 );
+            }
+        }
+
+        private record DocumentDefaultNodeVisitor(JavaWriter writer) implements NodeVisitor<Void> {
+
+            @Override
+            public Void arrayNode(ArrayNode node) {
+                // List defaults must always be empty
+                writer.write("${document:T}.createList($T.emptyList())", Collections.class);
+                return null;
+            }
+
+            @Override
+            public Void booleanNode(BooleanNode node) {
+                writer.write("${document:T}.createBoolean($L)", node.getValue());
+                return null;
+            }
+
+            @Override
+            public Void nullNode(NullNode node) {
+                throw new UnsupportedOperationException("Null default should not generate default value.");
+            }
+
+            @Override
+            public Void numberNode(NumberNode node) {
+                if (node.isFloatingPointNumber()) {
+                    writer.write("${document:T}.createDouble($L)", node.getValue().doubleValue());
+                } else {
+                    writer.write("${document:T}.createInteger($L)", node.getValue().intValue());
+                }
+                return null;
+            }
+
+            @Override
+            public Void objectNode(ObjectNode node) {
+                // Map defaults must always be empty
+                writer.write("${document:T}.createStringMap($T.emptyMap())", Collections.class);
+                return null;
+            }
+
+            @Override
+            public Void stringNode(StringNode node) {
+                writer.write("${document:T}.createString($S)", node.getValue());
+                return null;
             }
         }
     }

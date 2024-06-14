@@ -11,6 +11,6 @@ import software.amazon.smithy.utils.CodeSection;
 /**
  * Used to add documentation to an Enum Variant member shape.
  *
- * @param shape Member shape for enum variant
+ * @param memberShape Member shape for enum variant
  */
 public record EnumVariantSection(MemberShape memberShape) implements CodeSection {}
