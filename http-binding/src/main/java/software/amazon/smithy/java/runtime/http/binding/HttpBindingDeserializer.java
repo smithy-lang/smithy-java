@@ -78,7 +78,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                         structMemberConsumer.accept(state, member, new HttpHeaderDeserializer(headerValue));
                     }
                 }
-                case BODY -> bodyMembers.add(member.id().getName());
+                case BODY -> bodyMembers.add(member.memberName());
                 case PAYLOAD -> {
                     if (member.memberTarget().type() == ShapeType.STRUCTURE) {
                         // Read the payload into a byte buffer to deserialize a shape in the body.
@@ -114,7 +114,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                     () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
                 );
                 payloadCodec.createDeserializer(bytes).readStruct(schema, bodyMembers, (body, m, de) -> {
-                    if (!body.contains(m.id().getName())) {
+                    if (body.contains(m.memberName())) {
                         body.structMemberConsumer.accept(body.state, m, de);
                     }
                 });

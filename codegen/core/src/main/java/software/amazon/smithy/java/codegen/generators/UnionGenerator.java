@@ -244,7 +244,8 @@ public final class UnionGenerator
 
         private void writePropertyEqualityCheck(JavaWriter writer) {
             var memberSymbol = symbolProvider.toSymbol(shape);
-            if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE)) {
+            if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE)
+                && !memberSymbol.getProperty(SymbolProperties.IS_JAVA_ARRAY).orElse(false)) {
                 writer.writeInlineWithNoFormatting("value == that.value");
             } else {
                 Class<?> comparator = CodegenUtils.isJavaArray(memberSymbol) ? Arrays.class : Objects.class;
