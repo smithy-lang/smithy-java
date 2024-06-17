@@ -29,7 +29,13 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
 
     @Override
     public <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
-        consumer.accept(listState, new ListSerializer(this, position -> {}));
+        // Consumer is generally going to be something generic - like a shared serializer for iterating
+        // lists of strings and writing them back out to the delegate serializer (this). However, this
+        // means writeHeader, below, will receive something like the schema for smithy.api#String
+        // which does not have a httpHeader trait. So we wrap this in SpecificHttpHeaderSerializer,
+        // which will use the header member's schema, and not the schema of the type we're writing
+        // to call writeHeader
+        consumer.accept(listState, new ListSerializer(new SpecificHttpHeaderSerializer(schema, this), position -> {}));
     }
 
     void writeHeader(Schema schema, Supplier<String> supplier) {
