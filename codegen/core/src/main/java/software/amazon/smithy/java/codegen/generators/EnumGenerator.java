@@ -57,6 +57,8 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
 
                     ${toString:C|}
 
+                    ${from:C|}
+
                     ${equals:C|}
 
                     ${hashCode:C|}
@@ -91,6 +93,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                 )
             );
             writer.putContext("toString", new ToStringGenerator(writer));
+            writer.putContext("from", new FromValueGenerator(writer, shape));
             writer.putContext("equals", new EqualsGenerator(writer, valueSymbol));
             writer.putContext("hashCode", new HashCodeGenerator(writer, valueSymbol));
             writer.putContext(
@@ -187,6 +190,23 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                     ${serializerBody:C|};
                 }
                 """);
+            writer.popState();
+        }
+    }
+
+    private record FromValueGenerator(JavaWriter writer, Shape shape) implements Runnable {
+        @Override
+        public void run() {
+            writer.pushState();
+            writer.putContext("illegalArg", IllegalArgumentException.class);
+            writer.write("""
+                public static ${shape:T} from(${value:T} value) {
+                    return switch (value) {
+                        ${C|}
+                        default -> throw new ${illegalArg:T}("Unknown value: " + value);
+                    };
+                }
+                """, writer.consumer(w -> generateSwitchCases(w, shape)));
             writer.popState();
         }
     }
@@ -294,21 +314,21 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                         default -> new ${shape:T}(Type.$$$$UNKNOWN, value);
                     };
                 }
-                """, writer.consumer(this::generateSwitchCases));
+                """, writer.consumer(w -> generateSwitchCases(w, shape)));
         }
+    }
 
-        private void generateSwitchCases(JavaWriter writer) {
-            writer.pushState();
-            writer.putContext("string", shape.isEnumShape());
-            for (var entry : getEnumValues(shape).entrySet()) {
-                writer.write(
-                    "case ${?string}$1S${/string}${^string}$1L${/string} -> $2L;",
-                    entry.getValue(),
-                    CodegenUtils.toUpperSnakeCase(entry.getKey())
-                );
-            }
-            writer.popState();
+    private static void generateSwitchCases(JavaWriter writer, Shape shape) {
+        writer.pushState();
+        writer.putContext("string", shape.isEnumShape());
+        for (var entry : getEnumValues(shape).entrySet()) {
+            writer.write(
+                "case ${?string}$1S${/string}${^string}$1L${/string} -> $2L;",
+                entry.getValue(),
+                CodegenUtils.toUpperSnakeCase(entry.getKey())
+            );
         }
+        writer.popState();
     }
 
     private static Map<String, String> getEnumValues(Shape shape) {
