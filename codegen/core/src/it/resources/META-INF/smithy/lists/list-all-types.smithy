@@ -26,6 +26,7 @@ operation ListAllTypes {
         listOfEnum: Enums
         listOfIntEnum: IntEnums
         listOfStruct: Structs
+        listOfDocuments: Docs
     }
 }
 
@@ -102,4 +103,9 @@ list IntEnums {
 @private
 list Structs {
     member: NestedStruct
+}
+
+@private
+list Docs {
+    member: Document
 }

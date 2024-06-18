@@ -120,6 +120,11 @@ public class ListsTest {
                 .listOfStruct(
                     List.of(NestedStruct.builder().build(), NestedStruct.builder().build())
                 )
+                .build(),
+            ListAllTypesInput.builder()
+                .listOfDocuments(
+                    List.of(Document.createDouble(2.0), Document.createString("string"))
+                )
                 .build()
         );
     }
