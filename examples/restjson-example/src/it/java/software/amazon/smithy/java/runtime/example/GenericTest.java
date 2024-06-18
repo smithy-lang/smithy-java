@@ -73,7 +73,7 @@ public class GenericTest {
 
         PutPersonImageInput input = PutPersonImageInput.builder()
             .name("Michael")
-            //.tags(List.of("Foo", "Bar")) // TODO: temporarily commenting as this serialization is broken right now
+            .tags(List.of("Foo", "Bar"))
             .moreTags(List.of("Abc", "one two"))
             .image(DataStream.ofString("image..."))
             .build();
