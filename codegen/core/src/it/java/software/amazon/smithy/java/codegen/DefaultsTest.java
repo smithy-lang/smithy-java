@@ -10,9 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.smithy.codegen.test.model.DefaultsInput;
-import io.smithy.codegen.test.model.FishOrBird;
-import io.smithy.codegen.test.model.OneOrTwo;
-import java.io.IOException;
+import io.smithy.codegen.test.model.NestedEnum;
+import io.smithy.codegen.test.model.NestedIntEnum;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
@@ -25,7 +24,7 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 public class DefaultsTest {
     @Test
-    void setsCorrectDefault() throws IOException {
+    void setsCorrectDefault() {
         var defaults = DefaultsInput.builder().build();
 
         assertTrue(defaults.booleanMember());
@@ -50,7 +49,7 @@ public class DefaultsTest {
         assertEquals(defaults.list(), List.of());
         assertEquals(defaults.map(), Map.of());
         assertEquals(defaults.timestamp(), Instant.parse("1985-04-12T23:20:50.52Z"));
-        assertEquals(defaults.enumMember(), FishOrBird.FISH);
-        assertEquals(defaults.intEnum(), OneOrTwo.ONE);
+        assertEquals(defaults.enumMember(), NestedEnum.A);
+        assertEquals(defaults.intEnum(), NestedIntEnum.A);
     }
 }

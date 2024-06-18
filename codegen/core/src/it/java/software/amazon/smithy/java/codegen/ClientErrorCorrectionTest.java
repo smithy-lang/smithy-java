@@ -11,9 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import io.smithy.codegen.test.model.ClientErrorCorrectionInput;
-import io.smithy.codegen.test.model.IntYesOrNo;
-import io.smithy.codegen.test.model.YesOrNo;
-import java.io.IOException;
+import io.smithy.codegen.test.model.NestedEnum;
+import io.smithy.codegen.test.model.NestedIntEnum;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
@@ -23,7 +22,7 @@ import org.junit.jupiter.api.Test;
 
 public class ClientErrorCorrectionTest {
     @Test
-    void correctsErrors() throws IOException {
+    void correctsErrors() {
         var corrected = ClientErrorCorrectionInput.builder()
             .errorCorrection()
             .build();
@@ -44,10 +43,9 @@ public class ClientErrorCorrectionTest {
         assertEquals(corrected.list(), List.of());
         assertEquals(corrected.map(), Map.of());
         assertEquals(corrected.timestamp(), Instant.EPOCH);
-        assertEquals(corrected.enumMember().type(), YesOrNo.Type.$UNKNOWN);
+        assertEquals(corrected.enumMember().type(), NestedEnum.Type.$UNKNOWN);
         assertEquals(corrected.enumMember().value(), "");
-        assertEquals(corrected.intEnum().type(), IntYesOrNo.Type.$UNKNOWN);
+        assertEquals(corrected.intEnum().type(), NestedIntEnum.Type.$UNKNOWN);
         assertEquals(corrected.intEnum().value(), 0);
-
     }
 }

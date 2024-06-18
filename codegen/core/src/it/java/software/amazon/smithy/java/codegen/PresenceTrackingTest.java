@@ -8,9 +8,9 @@ package software.amazon.smithy.java.codegen;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.smithy.codegen.test.model.BooleansInput;
-import io.smithy.codegen.test.model.Nested;
-import io.smithy.codegen.test.model.StructuresInput;
+import io.smithy.codegen.test.model.BooleanMembersInput;
+import io.smithy.codegen.test.model.NestedStruct;
+import io.smithy.codegen.test.model.StructureMembersInput;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 
@@ -19,7 +19,7 @@ public class PresenceTrackingTest {
     void throwsSerdeExceptionOnMissingRequiredForPrimitiveField() {
         var exc = assertThrows(SerializationException.class, () -> {
             // Missing requiredBooleanField
-            BooleansInput.builder().optionalBoolean(true).build();
+            BooleanMembersInput.builder().optionalBoolean(true).build();
         });
         assertTrue(exc.getMessage().contains("requiredBoolean"));
     }
@@ -28,7 +28,7 @@ public class PresenceTrackingTest {
     void throwsSerdeExceptionOnMissingRequiredForNonPrimitiveField() {
         var exc = assertThrows(SerializationException.class, () -> {
             // Missing requiredBooleanField
-            StructuresInput.builder().optionalStruct(Nested.builder().build()).build();
+            StructureMembersInput.builder().optionalStruct(NestedStruct.builder().build()).build();
         });
         assertTrue(exc.getMessage().contains("requiredStruct"));
     }
