@@ -189,7 +189,7 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
     @Override
     public Void memberShape(MemberShape shape) {
         var target = model.expectShape(shape.getTarget());
-        writer.putContext("member", symbolProvider.toMemberName(shape));
+        writer.putContext("member", shape.getMemberName());
         writer.putContext("schema", CodegenUtils.getSchemaType(writer, symbolProvider, target));
         writer.write("${schemaClass:T}.memberBuilder(${member:S}, ${schema:L})${traitInitializer:C}");
 
@@ -197,13 +197,12 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
     }
 
     private void writeNestedMemberSchema(MemberShape member) {
-        var memberName = symbolProvider.toMemberName(member);
         var target = model.expectShape(member.getTarget());
 
         writer.pushState();
         writer.putContext("schema", CodegenUtils.getSchemaType(writer, symbolProvider, target));
-        writer.putContext("memberName", memberName);
-        writer.putContext("name", CodegenUtils.toMemberSchemaName(memberName));
+        writer.putContext("memberName", member.getMemberName());
+        writer.putContext("name", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
         writer.write(
             """
                 private static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.memberBuilder(${memberName:S}, ${schema:L})
