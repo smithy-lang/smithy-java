@@ -11,6 +11,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -32,6 +33,7 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
+import software.amazon.smithy.java.runtime.core.testmodels.Bird;
 import software.amazon.smithy.java.runtime.core.testmodels.Person;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -490,5 +492,57 @@ public class DocumentTest {
         public int hashCode() {
             return getDocument().hashCode();
         }
+    }
+
+    @ParameterizedTest
+    @MethodSource("documentToObjectProvider")
+    public void convertsDocumentToObject(Object value, ShapeType type) {
+        var document = Document.createFromObject(value);
+
+        assertThat(document.type(), is(type));
+
+        // Convert it back to an Object.
+        assertThat(document.asObject(), equalTo(value));
+    }
+
+    public static List<Arguments> documentToObjectProvider() {
+        return List.of(
+            Arguments.of("hi", ShapeType.STRING),
+            Arguments.of("hi".getBytes(StandardCharsets.UTF_8), ShapeType.BLOB),
+            Arguments.of(true, ShapeType.BOOLEAN),
+            Arguments.of(Instant.EPOCH, ShapeType.TIMESTAMP),
+            Arguments.of((byte) 1, ShapeType.BYTE),
+            Arguments.of((short) 1, ShapeType.SHORT),
+            Arguments.of(1, ShapeType.INTEGER),
+            Arguments.of(1L, ShapeType.LONG),
+            Arguments.of(1.0f, ShapeType.FLOAT),
+            Arguments.of(1.0d, ShapeType.DOUBLE),
+            Arguments.of(BigInteger.ONE, ShapeType.BIG_INTEGER),
+            Arguments.of(BigDecimal.ONE, ShapeType.BIG_DECIMAL),
+            Arguments.of(Map.of("a", true), ShapeType.MAP),
+            Arguments.of(Map.of("a", true, "b", 100), ShapeType.MAP),
+            Arguments.of(List.of("a", true, "b", 100), ShapeType.LIST)
+        );
+    }
+
+    @Test
+    public void returnsDocumentsAsIs() {
+        var document = Document.createString("hi");
+        var created = Document.createFromObject(document);
+
+        assertThat(document, is(created));
+    }
+
+    @Test
+    public void convertsNullObjectToNullDocumentValue() {
+        assertThat(Document.createFromObject(null), nullValue());
+    }
+
+    @Test
+    public void createsDocumentFromSerializableShape() {
+        Bird bird = Bird.builder().name("Iago").build();
+        var document = Document.createFromObject(bird);
+
+        assertThat(document.type(), is(ShapeType.STRUCTURE));
     }
 }

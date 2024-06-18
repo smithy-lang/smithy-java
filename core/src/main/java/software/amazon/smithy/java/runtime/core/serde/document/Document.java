@@ -311,6 +311,45 @@ public interface Document extends SerializableShape {
     }
 
     /**
+     * Unwrap the document and convert to a standard library type compatible with {@link #createFromObject(Object)}.
+     *
+     * @return the unwrapped document value.
+     */
+    default Object asObject() {
+        return switch (type()) {
+            case BLOB -> asBlob();
+            case BOOLEAN -> asBoolean();
+            case STRING, ENUM -> asString();
+            case TIMESTAMP -> asTimestamp();
+            case BYTE -> asByte();
+            case SHORT -> asShort();
+            case INTEGER, INT_ENUM -> asInteger();
+            case LONG -> asLong();
+            case FLOAT -> asFloat();
+            case DOUBLE -> asDouble();
+            case BIG_DECIMAL -> asBigDecimal();
+            case BIG_INTEGER -> asBigInteger();
+            case LIST, SET -> {
+                var elements = asList();
+                List<Object> result = new ArrayList<>(elements.size());
+                for (var e : elements) {
+                    result.add(e.asObject());
+                }
+                yield result;
+            }
+            case MAP, STRUCTURE, UNION -> {
+                var elements = asStringMap();
+                Map<String, Object> result = new LinkedHashMap<>(elements.size());
+                for (var e : elements.entrySet()) {
+                    result.put(e.getKey(), e.getValue().asObject());
+                }
+                yield result;
+            }
+            default -> throw new UnsupportedOperationException("Unable to convert document to object: " + this);
+        };
+    }
+
+    /**
      * Get a map, struct, or union member from the Document by name.
      *
      * @param memberName Member to access from the Document. For Document types with a schema, this name is the name
@@ -525,6 +564,83 @@ public interface Document extends SerializableShape {
      */
     static Document createStringMap(Map<String, Document> members) {
         return new Documents.StringMapDocument(Documents.STR_MAP_SCHEMA, members);
+    }
+
+    /**
+     * Create a document from an object that can be one of a number of standard library Java types.
+     *
+     * <p>This method supports the following conversions only. Reflection-based creation is not supported.
+     *
+     * <ul>
+     *     <li>{@link Document}</li>
+     *     <li>{@link SerializableShape}</li>
+     *     <li>{@link String}</li>
+     *     <li>{@code byte[]} to blob</li>
+     *     <li>{@link Instant} to timestamp</li>
+     *     <li>{@link Boolean}</li>
+     *     <li>{@link Byte}</li>
+     *     <li>{@link Short}</li>
+     *     <li>{@link Integer}</li>
+     *     <li>{@link Long}</li>
+     *     <li>{@link Float}</li>
+     *     <li>{@link Double}</li>
+     *     <li>{@link BigInteger}</li>
+     *     <li>{@link BigDecimal}</li>
+     *     <li>{@link List} of convertable objects</li>
+     *     <li>{@link Map} of string to convertable objects</li>
+     * </ul>
+     *
+     * @param o Object to convert to a document.
+     * @return the created document.
+     * @throws UnsupportedOperationException if the given object {@code o} cannot be converted to a document.
+     */
+    static Document createFromObject(Object o) {
+        if (o instanceof Document d) {
+            return d;
+        } else if (o instanceof SerializableShape s) {
+            return createTyped(s);
+        } else if (o instanceof String s) {
+            return createString(s);
+        } else if (o instanceof Boolean b) {
+            return createBoolean(b);
+        } else if (o instanceof Byte b) {
+            return createByte(b);
+        } else if (o instanceof Short s) {
+            return createShort(s);
+        } else if (o instanceof Integer i) {
+            return createInteger(i);
+        } else if (o instanceof Long l) {
+            return createLong(l);
+        } else if (o instanceof Float f) {
+            return createFloat(f);
+        } else if (o instanceof Double d) {
+            return createDouble(d);
+        } else if (o instanceof BigInteger b) {
+            return createBigInteger(b);
+        } else if (o instanceof BigDecimal b) {
+            return createBigDecimal(b);
+        } else if (o instanceof byte[] b) {
+            return createBlob(b);
+        } else if (o instanceof Instant i) {
+            return createTimestamp(i);
+        } else if (o instanceof List<?> l) {
+            List<Document> values = new ArrayList<>(l.size());
+            for (var v : l) {
+                values.add(createFromObject(v));
+            }
+            return createList(values);
+        } else if (o instanceof Map<?, ?> m) {
+            Map<String, Document> values = new LinkedHashMap<>(m.size());
+            for (var entry : m.entrySet()) {
+                var key = createFromObject(entry.getKey());
+                values.put(key.asString(), createFromObject(entry.getValue()));
+            }
+            return createStringMap(values);
+        } else if (o == null) {
+            return null;
+        } else {
+            throw new UnsupportedOperationException("Cannot convert " + o + " to a document");
+        }
     }
 
     /**
