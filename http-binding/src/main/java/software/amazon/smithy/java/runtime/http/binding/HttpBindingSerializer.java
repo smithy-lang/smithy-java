@@ -80,14 +80,20 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         boolean foundBody = false;
+        boolean foundPayload = false;
         for (var member : schema.members()) {
-            if (bindingMatcher.match(member) == BindingMatcher.Binding.BODY) {
+            BindingMatcher.Binding bindingLoc = bindingMatcher.match(member);
+            if (bindingLoc == BindingMatcher.Binding.BODY) {
                 foundBody = true;
+                break;
+            }
+            if (bindingLoc == BindingMatcher.Binding.PAYLOAD) {
+                foundPayload = true;
                 break;
             }
         }
 
-        if (foundBody) {
+        if (foundBody || !foundPayload) {
             shapeBodyOutput = new ByteArrayOutputStream();
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
             // Serialize only the body members to the codec.
@@ -194,6 +200,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private static final class BindingSerializer extends InterceptingSerializer {
         private final HttpBindingSerializer serializer;
         private ByteArrayOutputStream structureBytes;
+        private ShapeSerializer structureSerializer;
 
         private BindingSerializer(HttpBindingSerializer serializer) {
             this.serializer = serializer;
@@ -217,7 +224,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                         // Serialize a structure bound to the payload.
                         serializer.headers.put("Content-Type", List.of(serializer.payloadCodec.getMediaType()));
                         structureBytes = new ByteArrayOutputStream();
-                        yield serializer.payloadCodec.createSerializer(structureBytes);
+                        structureSerializer = serializer.payloadCodec.createSerializer(structureBytes);
+                        yield structureSerializer;
                     } else {
                         // httpPayload serialization is handled elsewhere.
                         yield ShapeSerializer.nullSerializer();
@@ -229,6 +237,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         @Override
         protected void after(Schema schema) {
             if (structureBytes != null) {
+                structureSerializer.flush();
                 serializer.setHttpPayload(
                     schema,
                     DataStream.ofBytes(
