@@ -6,5 +6,6 @@ resource MapTests {
     operations: [
         MapAllTypes
         NestedMaps
+        SparseMaps
     ]
 }

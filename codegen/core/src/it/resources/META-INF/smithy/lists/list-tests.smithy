@@ -7,5 +7,6 @@ resource ListTests {
         ListAllTypes
         NestedLists
         SetsAllTypes
+        SparseLists
     ]
 }

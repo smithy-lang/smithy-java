@@ -6,9 +6,11 @@ lists/list-all-types.smithy
 lists/list-tests.smithy
 lists/nested-lists.smithy
 lists/unique-items.smithy
+lists/sparse-lists.smithy
 maps/map-all-types.smithy
 maps/map-tests.smithy
 maps/nested-maps.smithy
+maps/sparse-maps.smithy
 recursion/mutual-recursion-list.smithy
 recursion/mutual-recursion-map.smithy
 recursion/recursion-tests.smithy

@@ -20,6 +20,7 @@ import io.smithy.codegen.test.model.NestedListsInput;
 import io.smithy.codegen.test.model.NestedStruct;
 import io.smithy.codegen.test.model.NestedUnion;
 import io.smithy.codegen.test.model.SetsAllTypesInput;
+import io.smithy.codegen.test.model.SparseListsInput;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
@@ -36,6 +37,7 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
+import software.amazon.smithy.utils.ListUtils;
 
 public class ListsTest {
 
@@ -149,8 +151,98 @@ public class ListsTest {
         );
     }
 
+    static Stream<SerializableShape> sparseLists() {
+        return Stream.of(
+            SparseListsInput.builder()
+                .listOfBooleans(
+                    ListUtils.of(true, true, null, false)
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfBigDecimal(
+                    ListUtils.of(BigDecimal.TEN, null, BigDecimal.ZERO)
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfBigInteger(
+                    ListUtils.of(BigInteger.TEN, null, BigInteger.ZERO)
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfByte(
+                    ListUtils.of((byte) 1, null, (byte) 2)
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfDouble(
+                    ListUtils.of(2.0, null, 3.0)
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfFloat(
+                    ListUtils.of(2f, null, 3f)
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfInteger(
+                    ListUtils.of(1, null, 2)
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfLong(
+                    ListUtils.of(1L, null, 2L)
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfShort(
+                    ListUtils.of((short) 1, null, (short) 2)
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfString(
+                    ListUtils.of("a", null, "b")
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfBlobs(
+                    ListUtils.of(Base64.getDecoder().decode("YmxvYg=="), null, Base64.getDecoder().decode("YmlyZHM="))
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfTimestamps(
+                    ListUtils.of(Instant.EPOCH, null, Instant.MIN)
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfUnion(
+                    ListUtils.of(new NestedUnion.AMember("string"), null, new NestedUnion.BMember(2))
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfEnum(
+                    ListUtils.of(NestedEnum.A, null, NestedEnum.B)
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfIntEnum(
+                    ListUtils.of(NestedIntEnum.A, null, NestedIntEnum.B)
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfStruct(
+                    ListUtils.of(NestedStruct.builder().build(), null, NestedStruct.builder().build())
+                )
+                .build(),
+            SparseListsInput.builder()
+                .listOfDocuments(
+                    ListUtils.of(Document.createDouble(2.0), null, Document.createString("string"))
+                )
+                .build()
+        );
+    }
+
     @ParameterizedTest
-    @MethodSource({"listTypes", "nestedLists"})
+    @MethodSource({"listTypes", "nestedLists", "sparseLists"})
     void pojoToDocumentRoundTrip(SerializableStruct pojo) {
         var output = Utils.pojoToDocumentRoundTrip(pojo);
         assertEquals(pojo.hashCode(), output.hashCode());
