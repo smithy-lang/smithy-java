@@ -205,4 +205,25 @@ final class JsonDeserializer implements ShapeDeserializer {
             throw new SerializationException(e);
         }
     }
+
+    @Override
+    public boolean isNull() {
+        try {
+            return iter.whatIsNext() == ValueType.NULL;
+        } catch (IOException e) {
+            throw new SerializationException(e);
+        }
+    }
+
+    @Override
+    public <T> T readNull() {
+        try {
+            if (!iter.readNull()) {
+                throw new SerializationException("Attempted to read non-null value as null");
+            }
+        } catch (IOException e) {
+            throw new SerializationException(e);
+        }
+        return null;
+    }
 }

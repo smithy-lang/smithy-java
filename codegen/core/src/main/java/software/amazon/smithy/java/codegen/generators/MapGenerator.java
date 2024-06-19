@@ -16,6 +16,7 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
@@ -63,6 +64,10 @@ public class MapGenerator
 
                             @Override
                             public void accept(${value:B} values, ${shapeSerializer:T} serializer) {
+                                ${?sparse}if (values == null) {
+                                    serializer.writeNull(${valueSchema:L});
+                                    return;
+                                }${/sparse}
                                 ${memberSerializer:C|};
                             }
                         }
@@ -78,6 +83,10 @@ public class MapGenerator
 
                             @Override
                             public void accept(${shape:B} state, ${key:T} key, ${shapeDeserializer:T} deserializer) {
+                                ${?sparse}if (deserializer.isNull()) {
+                                    state.put(key, deserializer.readNull());
+                                    return;
+                                }${/sparse}
                                 state.put(key, $memberDeserializer:C);
                             }
                         }
@@ -119,6 +128,7 @@ public class MapGenerator
                             valueSchema
                         )
                     );
+                    writer.putContext("sparse", directive.shape().hasTrait(SparseTrait.class));
                     writer.write(template);
                     writer.popState();
 

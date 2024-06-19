@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 
 /**
@@ -122,5 +123,18 @@ public class DocumentDeserializer implements ShapeDeserializer {
         for (var entry : map.entrySet()) {
             mapMemberConsumer.accept(state, entry.getKey(), deserializer(entry.getValue()));
         }
+    }
+
+    @Override
+    public boolean isNull() {
+        return value == null;
+    }
+
+    @Override
+    public <T> T readNull() {
+        if (value != null) {
+            throw new SerializationException("Attempted to read non-null value as null");
+        }
+        return null;
     }
 }

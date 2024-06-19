@@ -149,6 +149,23 @@ public interface ShapeDeserializer extends AutoCloseable {
     <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer);
 
     /**
+     *
+     * Attempt to see if this value is null. Useful for sparse collections.
+     *
+     * @return true if null
+     */
+    boolean isNull();
+
+    /**
+     * Read (skip) the null value. Only makes sense after {@link #isNull()}.
+     *
+     * @return null
+     */
+    default <T> T readNull() {
+        return null;
+    }
+
+    /**
      * Consumer of a structure member.
      *
      * @param <T> Passed in state value to avoid capturing external state.

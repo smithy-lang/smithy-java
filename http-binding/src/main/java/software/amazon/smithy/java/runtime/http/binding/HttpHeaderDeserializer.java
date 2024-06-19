@@ -118,4 +118,9 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
     public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
         throw new UnsupportedOperationException("List map support not yet implemented");
     }
+
+    @Override
+    public boolean isNull() {
+        return value == null;
+    }
 }

@@ -16,6 +16,7 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
@@ -36,6 +37,7 @@ public final class ListGenerator
                 writer -> writer.onSection("sharedSerde", t -> {
                     var name = CodegenUtils.getDefaultName(directive.shape(), directive.service());
                     var target = directive.model().expectShape(directive.shape().getMember().getTarget());
+                    var valueSchema = CodegenUtils.getSchemaType(writer, directive.symbolProvider(), target);
                     writer.pushState();
                     var template = """
                         static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${shapeSerializer:T}> {
@@ -44,6 +46,10 @@ public final class ListGenerator
                             @Override
                             public void accept(${shape:B} values, ${shapeSerializer:T} serializer) {
                                 for (var value : values) {
+                                    ${?sparse}if (value == null) {
+                                        serializer.writeNull(${valueSchema:L});
+                                        continue;
+                                    }${/sparse}
                                     ${memberSerializer:C|};
                                 }
                             }
@@ -60,6 +66,12 @@ public final class ListGenerator
 
                             @Override
                             public void accept(${shape:B} state, ${shapeDeserializer:T} deserializer) {
+                                ${?sparse}if (deserializer.isNull()) {
+                                    ${?unique}if (!${/unique}state.add(deserializer.readNull())${^unique};${/unique}${?unique}) {
+                                        throw new ${serdeException:T}("Member must have unique values");
+                                    }${/unique}
+                                    return;
+                                }${/sparse}
                                 ${?unique}if (!${/unique}state.add($memberDeserializer:C)${^unique};${/unique}${?unique}) {
                                     throw new ${serdeException:T}("Member must have unique values");
                                 }${/unique}
@@ -78,6 +90,8 @@ public final class ListGenerator
                     writer.putContext("shapeDeserializer", ShapeDeserializer.class);
                     writer.putContext("unique", directive.shape().hasTrait(UniqueItemsTrait.class));
                     writer.putContext("serdeException", SerializationException.class);
+                    writer.putContext("sparse", directive.shape().hasTrait(SparseTrait.class));
+                    writer.putContext("valueSchema", valueSchema);
                     writer.putContext(
                         "memberSerializer",
                         new SerializerMemberGenerator(
@@ -98,7 +112,7 @@ public final class ListGenerator
                             directive.model(),
                             directive.service(),
                             "deserializer",
-                            CodegenUtils.getSchemaType(writer, directive.symbolProvider(), target)
+                            valueSchema
                         )
                     );
                     writer.write(template);

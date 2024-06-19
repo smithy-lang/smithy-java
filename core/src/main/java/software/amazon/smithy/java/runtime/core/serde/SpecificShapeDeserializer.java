@@ -102,4 +102,9 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
     public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer) {
         throw throwForInvalidState(schema);
     }
+
+    @Override
+    public boolean isNull() {
+        throw new UnsupportedOperationException("cannot look ahead for null values");
+    }
 }
