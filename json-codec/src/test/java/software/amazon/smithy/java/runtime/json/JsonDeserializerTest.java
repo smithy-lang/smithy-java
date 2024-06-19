@@ -11,6 +11,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
@@ -74,6 +75,12 @@ public class JsonDeserializerTest {
         try (var codec = JsonCodec.builder().build()) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readFloat(PreludeSchemas.FLOAT), is(1.0f));
+            de = codec.createDeserializer("\"NaN\"".getBytes(StandardCharsets.UTF_8));
+            assertTrue(Float.isNaN(de.readFloat(PreludeSchemas.FLOAT)));
+            de = codec.createDeserializer("\"Infinity\"".getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readFloat(PreludeSchemas.FLOAT), is(Float.POSITIVE_INFINITY));
+            de = codec.createDeserializer("\"-Infinity\"".getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readFloat(PreludeSchemas.FLOAT), is(Float.NEGATIVE_INFINITY));
         }
     }
 
@@ -82,6 +89,12 @@ public class JsonDeserializerTest {
         try (var codec = JsonCodec.builder().build()) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readDouble(PreludeSchemas.DOUBLE), is(1.0));
+            de = codec.createDeserializer("\"NaN\"".getBytes(StandardCharsets.UTF_8));
+            assertTrue(Double.isNaN(de.readDouble(PreludeSchemas.DOUBLE)));
+            de = codec.createDeserializer("\"Infinity\"".getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readDouble(PreludeSchemas.DOUBLE), is(Double.POSITIVE_INFINITY));
+            de = codec.createDeserializer("\"-Infinity\"".getBytes(StandardCharsets.UTF_8));
+            assertThat(de.readDouble(PreludeSchemas.DOUBLE), is(Double.NEGATIVE_INFINITY));
         }
     }
 

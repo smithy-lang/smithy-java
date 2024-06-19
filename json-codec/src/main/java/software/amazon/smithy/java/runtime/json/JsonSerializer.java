@@ -120,7 +120,17 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeFloat(Schema schema, float value) {
         try {
-            stream.writeVal(value);
+            if (Float.isNaN(value)) {
+                stream.writeVal("NaN");
+            } else if (Float.isInfinite(value)) {
+                if (Float.POSITIVE_INFINITY == value) {
+                    stream.writeVal("Infinity");
+                } else {
+                    stream.writeVal("-Infinity");
+                }
+            } else {
+                stream.writeVal(value);
+            }
         } catch (JsonException | IOException e) {
             throw new SerializationException(e);
         }
@@ -129,7 +139,17 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeDouble(Schema schema, double value) {
         try {
-            stream.writeVal(value);
+            if (Double.isNaN(value)) {
+                stream.writeVal("NaN");
+            } else if (Double.isInfinite(value)) {
+                if (Double.POSITIVE_INFINITY == value) {
+                    stream.writeVal("Infinity");
+                } else {
+                    stream.writeVal("-Infinity");
+                }
+            } else {
+                stream.writeVal(value);
+            }
         } catch (JsonException | IOException e) {
             throw new SerializationException(e);
         }

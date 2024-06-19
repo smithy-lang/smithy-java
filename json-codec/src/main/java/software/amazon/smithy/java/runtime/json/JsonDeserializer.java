@@ -92,6 +92,14 @@ final class JsonDeserializer implements ShapeDeserializer {
     @Override
     public float readFloat(Schema schema) {
         try {
+            if (iter.whatIsNext() == ValueType.STRING) {
+                return switch (iter.readString()) {
+                    case "NaN" -> Float.NaN;
+                    case "-Infinity" -> Float.NEGATIVE_INFINITY;
+                    case "Infinity" -> Float.POSITIVE_INFINITY;
+                    default -> throw new SerializationException("Expected float, received unrecognized string");
+                };
+            }
             return iter.readFloat();
         } catch (JsonException | IOException e) {
             throw new SerializationException(e);
@@ -101,6 +109,14 @@ final class JsonDeserializer implements ShapeDeserializer {
     @Override
     public double readDouble(Schema schema) {
         try {
+            if (iter.whatIsNext() == ValueType.STRING) {
+                return switch (iter.readString()) {
+                    case "NaN" -> Double.NaN;
+                    case "-Infinity" -> Double.NEGATIVE_INFINITY;
+                    case "Infinity" -> Double.POSITIVE_INFINITY;
+                    default -> throw new SerializationException("Expected double, received unrecognized string");
+                };
+            }
             return iter.readDouble();
         } catch (JsonException | IOException e) {
             throw new SerializationException(e);
