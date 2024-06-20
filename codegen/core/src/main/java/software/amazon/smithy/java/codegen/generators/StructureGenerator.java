@@ -352,10 +352,10 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE) && !CodegenUtils.isNullableMember(
                     member
                 )) {
-                    writer.writeInline("${memberName:L} == that.${memberName:L}");
+                    writer.writeInline("this.${memberName:L} == that.${memberName:L}");
                 } else {
                     Class<?> comparator = CodegenUtils.isJavaArray(memberSymbol) ? Arrays.class : Objects.class;
-                    writer.writeInline("$T.equals(${memberName:L}, that.${memberName:L})", comparator);
+                    writer.writeInline("$T.equals(this.${memberName:L}, that.${memberName:L})", comparator);
                 }
                 if (iter.hasNext()) {
                     writer.writeInlineWithNoFormatting(writer.getNewline() + "&& ");

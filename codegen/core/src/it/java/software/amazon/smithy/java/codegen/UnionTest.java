@@ -22,7 +22,6 @@ import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 public class UnionTest {
@@ -53,7 +52,7 @@ public class UnionTest {
 
     @ParameterizedTest
     @MethodSource("unionTypes")
-    void pojoToDocumentRoundTrip(SerializableStruct pojo) {
+    void pojoToDocumentRoundTrip(UnionType pojo) {
         var document = Document.createTyped(pojo);
         var builder = UnionType.builder();
         document.deserializeInto(builder);

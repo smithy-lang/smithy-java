@@ -36,13 +36,14 @@ public final class CodegenUtils {
         CodegenUtils.class.getResource("reserved-words.txt")
     );
 
-    private static final String SCHEMA_STATIC_NAME = "SCHEMA";
     public static final ReservedWords SHAPE_ESCAPER = new ReservedWordsBuilder()
         .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Shape")
         .build();
     public static final ReservedWords MEMBER_ESCAPER = new ReservedWordsBuilder()
         .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Member")
         .build();
+
+    private static final String SCHEMA_STATIC_NAME = "SCHEMA";
 
     private CodegenUtils() {
         // Utility class should not be instantiated
