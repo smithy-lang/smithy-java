@@ -10,9 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.build.MockManifest;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.build.SmithyBuildPlugin;
@@ -100,6 +104,59 @@ public class NamingTest {
         var fileStr = getFileStringForClass("BuilderShape");
         var expected = "public final class BuilderShape";
         assertTrue(fileStr.contains(expected));
+    }
+
+    @Test
+    void snakeCaseMember() {
+        var fileStr = getFileStringForClass("CasingInput");
+        // Member schema still uses the raw member name
+        assertTrue(fileStr.contains(".memberBuilder(\"snake_case_member\", PreludeSchemas.STRING)"));
+        // Member property is renamed to java-friendly string
+        assertTrue(fileStr.contains("private transient final String snakeCaseMember;"));
+    }
+
+    @Test
+    void snakeCaseShape() {
+        var fileStr = getFileStringForClass("SnakeCaseShape");
+        assertTrue(fileStr.contains("public final class SnakeCaseShape implements SerializableStruct"));
+    }
+
+    @Test
+    void upperSnakeCaseShape() {
+        var fileStr = getFileStringForClass("UpperSnakeCaseShape");
+        assertTrue(fileStr.contains("public final class UpperSnakeCaseShape implements SerializableStruct"));
+    }
+
+    @Test
+    void acronymInsideMember() {
+        var fileStr = getFileStringForClass("CasingInput");
+        // Member schema still uses the raw member name
+        assertTrue(fileStr.contains("memberBuilder(\"ACRONYM_Inside_Member\", PreludeSchemas.STRING)"));
+        // Member property is renamed to java-friendly string
+        assertTrue(fileStr.contains("private transient final String acronymInsideMember;"));
+    }
+
+    @Test
+    void acronymInsideStruct() {
+        var fileStr = getFileStringForClass("ACRONYMInsideStruct");
+        assertTrue(fileStr.contains("public final class ACRONYMInsideStruct implements SerializableStruct"));
+    }
+
+    static List<Arguments> enumCaseArgs() {
+        return List.of(
+            Arguments.of("CAMEL_CASE", "camelCase"),
+            Arguments.of("SNAKE_CASE", "snake_case"),
+            Arguments.of("PASCAL_CASE", "PascalCase"),
+            Arguments.of("WITH_1_NUMBER", "with_1_number")
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("enumCaseArgs")
+    void enumCasing(String updated, String original) {
+        var fileStr = getFileStringForClass("EnumCasing");
+        // All variants should maintain the raw value for the value, but convert the type to expected string
+        assertTrue(fileStr.contains(String.format("new EnumCasing(Type.%s, \"%s\")", updated, original)));
     }
 
     private String getFileStringForClass(String className) {

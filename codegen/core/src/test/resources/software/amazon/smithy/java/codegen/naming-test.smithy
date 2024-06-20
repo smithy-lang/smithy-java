@@ -8,6 +8,7 @@ service TestService {
         NamingConflicts
         ReservedWordMembers
         ReservedWordShape
+        Casing
     ]
 }
 
@@ -67,4 +68,35 @@ operation ReservedWordShape {
 @private
 structure Builder {
     field: String
+}
+
+operation Casing {
+    input:= {
+        snake_case_member: String
+        snakeCaseShape: Snake_Case_Shape
+        upperSnakeCaseShape: UPPER_SNAKE_CASE_SHAPE
+        ACRONYM_Inside_Member: String
+        acronymInsideStruct: ACRONYMInsideStruct
+        enums: EnumCasing
+    }
+}
+
+@private
+structure Snake_Case_Shape {
+}
+
+@private
+structure UPPER_SNAKE_CASE_SHAPE {
+}
+
+@private
+structure ACRONYMInsideStruct {
+}
+
+@private
+enum EnumCasing {
+    camelCase
+    snake_case
+    PascalCase
+    with_1_number
 }
