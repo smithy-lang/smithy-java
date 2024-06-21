@@ -362,49 +362,6 @@ public interface Document extends SerializableShape {
     }
 
     /**
-     * Create a normalized version of the document using normalized document types that aren't tied to any specific
-     * protocol or schema.
-     *
-     * <p>A structure and union document are converted to a map of string to normalized documents. An intEnum is
-     * converted to an integer. An enum is converted to a string.
-     *
-     * @return the normalized document.
-     */
-    default Document normalize() {
-        return switch (type()) {
-            case BOOLEAN -> createBoolean(asBoolean());
-            case BYTE -> createByte(asByte());
-            case SHORT -> createShort(asShort());
-            case INTEGER, INT_ENUM -> createInteger(asInteger());
-            case LONG -> createLong(asLong());
-            case FLOAT -> createFloat(asFloat());
-            case DOUBLE -> createDouble(asDouble());
-            case BIG_INTEGER -> createBigInteger(asBigInteger());
-            case BIG_DECIMAL -> createBigDecimal(asBigDecimal());
-            case STRING, ENUM -> createString(asString());
-            case BLOB -> createBlob(asBlob());
-            case TIMESTAMP -> createTimestamp(asTimestamp());
-            case STRUCTURE, UNION, MAP -> {
-                var map = asStringMap();
-                Map<String, Document> result = new LinkedHashMap<>(map.size());
-                for (var entry : map.entrySet()) {
-                    result.put(entry.getKey(), entry.getValue().normalize());
-                }
-                yield createStringMap(result);
-            }
-            case LIST -> {
-                var list = asList();
-                List<Document> result = new ArrayList<>(list.size());
-                for (var element : list) {
-                    result.add(element.normalize());
-                }
-                yield createList(result);
-            }
-            default -> throw new UnsupportedOperationException("Unable to normalize document: " + this);
-        };
-    }
-
-    /**
      * Attempt to deserialize the Document into a builder.
      *
      * @param builder Builder to populate from the Document.
