@@ -10,7 +10,6 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
-import static org.hamcrest.Matchers.sameInstance;
 
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
@@ -87,13 +86,5 @@ public class TypedDocumentTest {
         var copy1 = result.asStringMap();
         assertThat(copy1.get("a").asString(), equalTo("1"));
         assertThat(copy1.get("b").asString(), equalTo("2"));
-    }
-
-    @Test
-    public void normalizesWithoutSchema() {
-        var serializableShape = createSerializableShape();
-        var result = Document.createTyped(serializableShape);
-
-        assertThat(result.normalize(), not(sameInstance(result)));
     }
 }

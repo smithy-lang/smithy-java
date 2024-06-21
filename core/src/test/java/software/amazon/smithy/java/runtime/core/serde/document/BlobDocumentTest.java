@@ -56,9 +56,10 @@ public class BlobDocumentTest {
     }
 
     @Test
-    public void normalizeReturnsSelf() {
-        var doc = Document.createBlob("a".getBytes(StandardCharsets.UTF_8));
+    public void toObjectReturnsSelf() {
+        var bytes = "a".getBytes(StandardCharsets.UTF_8);
+        var doc = Document.createBlob(bytes);
 
-        assertThat(doc.normalize(), is(doc));
+        assertThat(doc.asObject(), is(bytes));
     }
 }
