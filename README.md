@@ -1,11 +1,15 @@
-## My Project
+# <img alt="Smithy" src="https://github.com/smithy-lang/smithy/blob/main/docs/_static/favicon.png?raw=true" width="28"> Smithy Java
 
-TODO: Fill this README out!
+[Smithy](https://smithy.io/2.0/index.html) code generators for [Java](https://java.com/).
 
-Be sure to:
+## Development
 
-* Change the title in this README
-* Edit your repository description on GitHub
+### Pre-commit hooks
+Provided pre-commit hooks make it easier to pass automated linting when opening a pull request.
+To set up these hooks run:
+```shell 
+ln -s -f ../../git-hooks/pre-commit .git/hooks/pre-commit
+```
 
 ## Security
 

@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Execute formatter if any java files are staged
+changedJavaFiles=$(git diff --staged --name-only | grep .java | xargs -I {} basename {} | tr '\n' '.*' | paste -sd ',' -) 
+if [ -n "$changedJavaFiles" ]; then
+  echo "[git hook] Executing spotless formatter on staged files before commit" 
+  ./gradlew spotlessApply -DspotlessFiles=$changedJavaFiles
+  # Stage updates
+  git add -u
+fi 
+
