@@ -59,7 +59,7 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
         writer.putContext("shapeTypeClass", ShapeType.class);
         writer.putContext("shapeId", shape.toShapeId());
         writer.putContext("shapeType", shape.getType().name());
-        writer.putContext("traitInitializer", new TraitInitializerGenerator(writer, shape, context.runtimeTraits()));
+        writer.putContext("traitInitializer", new TraitInitializerGenerator(writer, shape, context));
         shape.accept(this);
         writer.popState();
     }
@@ -209,7 +209,7 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
                     .id(ID)${C}
                     .build();
                 """,
-            new TraitInitializerGenerator(writer, member, context.runtimeTraits())
+            new TraitInitializerGenerator(writer, member, context)
         );
         writer.popState();
     }

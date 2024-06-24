@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -88,6 +89,7 @@ public class CodeGenerationContext
     private final List<JavaCodegenIntegration> integrations;
     private final WriterDelegator<JavaWriter> writerDelegator;
     private final Set<ShapeId> runtimeTraits;
+    private final List<TraitInitializer<?>> traitInitializers;
 
     public CodeGenerationContext(
         Model model,
@@ -103,6 +105,7 @@ public class CodeGenerationContext
         this.integrations = integrations;
         this.writerDelegator = new WriterDelegator<>(fileManifest, symbolProvider, new JavaWriter.Factory(settings));
         this.runtimeTraits = collectRuntimeTraits();
+        this.traitInitializers = collectTraitInitializers();
     }
 
     @Override
@@ -137,6 +140,10 @@ public class CodeGenerationContext
 
     public Set<ShapeId> runtimeTraits() {
         return runtimeTraits;
+    }
+
+    public List<TraitInitializer<?>> traitInitializers() {
+        return traitInitializers;
     }
 
     /**
@@ -181,5 +188,13 @@ public class CodeGenerationContext
         }
 
         return Collections.unmodifiableSet(traits);
+    }
+
+    private List<TraitInitializer<?>> collectTraitInitializers() {
+        List<TraitInitializer<?>> initializers = new ArrayList<>();
+        for (var integration : integrations) {
+            initializers.addAll(integration.traitInitializers());
+        }
+        return initializers;
     }
 }

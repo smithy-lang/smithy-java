@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.codegen;
+package software.amazon.smithy.java.codegen.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -12,13 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.smithy.codegen.test.model.MapAllTypesInput;
-import io.smithy.codegen.test.model.NestedEnum;
-import io.smithy.codegen.test.model.NestedIntEnum;
-import io.smithy.codegen.test.model.NestedMapsInput;
-import io.smithy.codegen.test.model.NestedStruct;
-import io.smithy.codegen.test.model.NestedUnion;
-import io.smithy.codegen.test.model.SparseMapsInput;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
@@ -30,6 +23,13 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.codegen.test.model.MapAllTypesInput;
+import software.amazon.smithy.java.codegen.test.model.NestedEnum;
+import software.amazon.smithy.java.codegen.test.model.NestedIntEnum;
+import software.amazon.smithy.java.codegen.test.model.NestedMapsInput;
+import software.amazon.smithy.java.codegen.test.model.NestedStruct;
+import software.amazon.smithy.java.codegen.test.model.NestedUnion;
+import software.amazon.smithy.java.codegen.test.model.SparseMapsInput;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;

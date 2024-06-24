@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.codegen;
+package software.amazon.smithy.java.codegen.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.smithy.codegen.test.model.EnumType;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.codegen.test.model.EnumType;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 
 public class EnumTest {

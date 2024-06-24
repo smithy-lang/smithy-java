@@ -8,6 +8,7 @@ use smithy.java.codegen.test.lists#ListTests
 use smithy.java.codegen.test.maps#MapTests
 use smithy.java.codegen.test.naming#Naming
 use smithy.java.codegen.test.structures#StructureTests
+use smithy.java.codegen.test.traits#Traits
 use smithy.java.codegen.test.unions#UnionTests
 
 service TestService {
@@ -23,5 +24,6 @@ service TestService {
     ]
     operations: [
         Naming
+        Traits
     ]
 }

@@ -3,22 +3,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.codegen;
+package software.amazon.smithy.java.codegen.test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import io.smithy.codegen.test.model.ClientErrorCorrectionInput;
-import io.smithy.codegen.test.model.NestedEnum;
-import io.smithy.codegen.test.model.NestedIntEnum;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.codegen.test.model.ClientErrorCorrectionInput;
+import software.amazon.smithy.java.codegen.test.model.NestedEnum;
+import software.amazon.smithy.java.codegen.test.model.NestedIntEnum;
 
 public class ClientErrorCorrectionTest {
     @Test

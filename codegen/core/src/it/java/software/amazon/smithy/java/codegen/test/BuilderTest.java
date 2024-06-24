@@ -3,15 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.codegen;
+package software.amazon.smithy.java.codegen.test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.smithy.codegen.test.model.ListMembersInput;
-import io.smithy.codegen.test.model.MapMembersInput;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.codegen.test.model.ListMembersInput;
+import software.amazon.smithy.java.codegen.test.model.MapMembersInput;
 
 
 public class BuilderTest {

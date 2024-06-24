@@ -3,15 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.codegen;
+package software.amazon.smithy.java.codegen.test;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.smithy.codegen.test.model.BooleanMembersInput;
-import io.smithy.codegen.test.model.NestedStruct;
-import io.smithy.codegen.test.model.StructureMembersInput;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.codegen.test.model.BooleanMembersInput;
+import software.amazon.smithy.java.codegen.test.model.NestedStruct;
+import software.amazon.smithy.java.codegen.test.model.StructureMembersInput;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 
 public class PresenceTrackingTest {
