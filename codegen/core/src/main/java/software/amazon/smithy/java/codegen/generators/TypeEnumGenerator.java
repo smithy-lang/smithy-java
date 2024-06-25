@@ -18,7 +18,7 @@ record TypeEnumGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolPr
     @Override
     public void run() {
         List<String> enumList = new ArrayList<>();
-        enumList.add("$$UNKNOWN");
+        enumList.add("$UNKNOWN");
         for (var member : shape.members()) {
             enumList.add(CodegenUtils.getEnumVariantName(symbolProvider, member));
         }
