@@ -9,6 +9,7 @@ import java.io.File;
 import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.codegen.core.CodegenException;
+import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.IoUtils;
@@ -24,15 +25,26 @@ public final class JavaCodegenSettings {
     private static final String SERVICE = "service";
     private static final String NAMESPACE = "namespace";
     private static final String HEADER_FILE = "headerFile";
+    private static final String NULL_ANNOTATION = "nullAnnotation";
+
 
     private final ShapeId service;
     private final String packageNamespace;
     private final String header;
 
-    JavaCodegenSettings(ShapeId service, String packageNamespace, String headerFile, String sourceLocation) {
+    private final String nullAnnotation;
+
+    JavaCodegenSettings(
+        ShapeId service,
+        String packageNamespace,
+        String headerFile,
+        String sourceLocation,
+        String nullAnnotation
+    ) {
         this.service = Objects.requireNonNull(service);
         this.packageNamespace = Objects.requireNonNull(packageNamespace);
         this.header = getHeader(headerFile, Objects.requireNonNull(sourceLocation));
+        this.nullAnnotation = nullAnnotation;
     }
 
     /**
@@ -47,7 +59,8 @@ public final class JavaCodegenSettings {
             settingsNode.expectStringMember(SERVICE).expectShapeId(),
             settingsNode.expectStringMember(NAMESPACE).getValue(),
             settingsNode.getStringMemberOrDefault(HEADER_FILE, null),
-            settingsNode.getSourceLocation().getFilename()
+            settingsNode.getSourceLocation().getFilename(),
+            settingsNode.getStringMemberOrDefault(NULL_ANNOTATION, "")
         );
     }
 
@@ -61,6 +74,19 @@ public final class JavaCodegenSettings {
 
     public String header() {
         return header;
+    }
+
+    public Symbol getNullAnnotationSymbol() {
+
+        Class nullAnnotationClass;
+        try {
+            nullAnnotationClass = Class.forName(this.nullAnnotation);
+            return CodegenUtils.fromClass(nullAnnotationClass);
+        } catch (ClassNotFoundException e) {
+            LOGGER.log(System.Logger.Level.DEBUG, () -> "Null Annotation class " + this.nullAnnotation + " not found");
+            return null;
+        }
+
     }
 
     private static String getHeader(String headerFile, String sourceLocation) {

@@ -60,7 +60,7 @@ public class CodegenContextTest {
     void getsCorrectRuntimeTraitsForProtocolsAndAuth() {
         var context = new CodeGenerationContext(
             model,
-            new JavaCodegenSettings(SERVICE_ID, "ns.foo", null, ""),
+            new JavaCodegenSettings(SERVICE_ID, "ns.foo", null, "", ""),
             new JavaSymbolProvider(model, model.expectShape(SERVICE_ID).asServiceShape().get(), "ns.foo"),
             new MockManifest(),
             List.of()
@@ -108,7 +108,7 @@ public class CodegenContextTest {
     void getsCorrectTraitsWithNoProtocolOrAuth() {
         var context = new CodeGenerationContext(
             model,
-            new JavaCodegenSettings(NO_PROTOCOL_SERVICE_ID, "ns.foo", null, ""),
+            new JavaCodegenSettings(NO_PROTOCOL_SERVICE_ID, "ns.foo", null, "", ""),
             new JavaSymbolProvider(model, model.expectShape(NO_PROTOCOL_SERVICE_ID).asServiceShape().get(), "ns.foo"),
             new MockManifest(),
             List.of()

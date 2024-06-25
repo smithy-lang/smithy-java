@@ -163,8 +163,10 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 }
                 writer.pushState();
                 writer.putContext("isNullable", CodegenUtils.isNullableMember(member));
+
+
                 writer.write(
-                    "private transient final ${?isNullable}$1B${/isNullable}${^isNullable}$1T${/isNullable} $2L;",
+                    "private transient final ${?isNullable}$1B${/isNullable}${^isNullable}$1N${/isNullable} $2L;",
                     symbolProvider.toSymbol(member),
                     memberName
                 );
@@ -243,9 +245,10 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         protected Void getDefault(Shape shape) {
             // If the member is not required then prefer the boxed type
             writer.pushState(new GetterSection(member));
+
             writer.write(
                 """
-                    public ${?isNullable}${member:B}${/isNullable}${^isNullable}${member:T}${/isNullable} ${memberName:L}() {
+                    public ${?isNullable}${member:B}${/isNullable}${^isNullable}${member:N}${/isNullable} ${memberName:L}() {
                         return ${memberName:L};
                     }
                     """

@@ -9,6 +9,7 @@ service TestService {
         ReservedWordMembers
         ReservedWordShape
         Casing
+        RequiredOperation
     ]
 }
 
@@ -26,6 +27,8 @@ operation NamingConflicts {
         javaList: StringList
     }
 }
+
+
 
 @private
 structure Map {
@@ -99,4 +102,17 @@ enum EnumCasing {
     snake_case
     PascalCase
     with_1_number
+}
+
+operation RequiredOperation {
+    input := {
+        @required
+        requiredStruct: RequiredStruct
+    }
+}
+
+@private
+structure RequiredStruct {
+    @required
+    member: String
 }
