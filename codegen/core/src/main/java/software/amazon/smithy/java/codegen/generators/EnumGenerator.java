@@ -168,7 +168,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             }
 
             public static ${shape:T} unknown(${value:T} value) {
-                return new ${shape:T}(Type.$$$$UNKNOWN, value);
+                return new ${shape:T}(Type.$$UNKNOWN, value);
             }
             """);
     }
@@ -311,7 +311,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                 public ${shape:T} build() {
                     return switch (value) {
                         ${C|}
-                        default -> new ${shape:T}(Type.$$$$UNKNOWN, value);
+                        default -> new ${shape:T}(Type.$$UNKNOWN, value);
                     };
                 }
                 """, writer.consumer(w -> generateSwitchCases(w, shape)));

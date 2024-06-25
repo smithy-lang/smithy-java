@@ -23,6 +23,7 @@ import software.amazon.smithy.utils.StringUtils;
  */
 @SmithyUnstableApi
 public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportContainer> {
+    private static final char PLACEHOLDER_FORMAT_CHAR = '£';
     private final String packageNamespace;
     private final JavaCodegenSettings settings;
 
@@ -50,14 +51,15 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
     @Override
     public String toString() {
         putNameContext();
+        setExpressionStart(PLACEHOLDER_FORMAT_CHAR);
         return format(
             """
-                $L
+                £L
 
-                package $L;
+                package £L;
 
-                $L
-                $L
+                £L
+                £L
                 """,
             settings.header(),
             packageNamespace,
@@ -119,19 +121,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
     private final class JavaTypeFormatter implements BiFunction<Object, String, String> {
         @Override
         public String apply(Object type, String indent) {
-            Symbol typeSymbol;
-            if (type instanceof Symbol s) {
-                typeSymbol = s;
-            } else if (type instanceof Class<?> c) {
-                typeSymbol = CodegenUtils.fromClass(c);
-            } else if (type instanceof SymbolReference r) {
-                typeSymbol = r.getSymbol();
-            } else {
-                throw new IllegalArgumentException(
-                    "Invalid type provided for $T. Expected a Symbol or Class"
-                        + " but found: `" + type + "`."
-                );
-            }
+            Symbol typeSymbol = getTypeSymbol(type, 'T');
 
             if (typeSymbol.getReferences().isEmpty()) {
                 return getPlaceholder(typeSymbol);
@@ -155,7 +145,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
 
             // Return a placeholder value that will be filled when toString is called
             // [] is replaced with "Array" to ensure array types don't break formatter.
-            return format("$${$L:L}", symbol.getFullName().replace("[]", "Array"));
+            return format("$L{$L:L}", PLACEHOLDER_FORMAT_CHAR, symbol.getFullName().replace("[]", "Array"));
         }
     }
 
@@ -167,25 +157,28 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
 
         @Override
         public String apply(Object type, String indent) {
-            Symbol typeSymbol;
-            if (type instanceof Symbol s) {
-                typeSymbol = s;
-            } else if (type instanceof Class<?> c) {
-                typeSymbol = CodegenUtils.fromClass(c);
-            } else if (type instanceof SymbolReference r) {
-                typeSymbol = r.getSymbol();
-            } else {
-                throw new IllegalArgumentException(
-                    "Invalid type provided for $B. Expected a Symbol or Class"
-                        + " but found: `" + type + "`."
-                );
-            }
+            Symbol typeSymbol = getTypeSymbol(type, 'B');
 
             if (typeSymbol.getProperty(SymbolProperties.BOXED_TYPE).isPresent()) {
                 typeSymbol = typeSymbol.expectProperty(SymbolProperties.BOXED_TYPE);
             }
 
             return javaTypeFormatter.apply(typeSymbol, indent);
+        }
+    }
+
+    private static Symbol getTypeSymbol(Object type, char formatChar) {
+        if (type instanceof Symbol s) {
+            return s;
+        } else if (type instanceof Class<?> c) {
+            return CodegenUtils.fromClass(c);
+        } else if (type instanceof SymbolReference r) {
+            return r.getSymbol();
+        } else {
+            throw new IllegalArgumentException(
+                "Invalid type provided for " + formatChar + ". Expected a Symbol or Class"
+                    + " but found: `" + type + "`."
+            );
         }
     }
 
