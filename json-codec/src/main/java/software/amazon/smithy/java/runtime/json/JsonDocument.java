@@ -12,10 +12,13 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
@@ -33,19 +36,16 @@ final class JsonDocument implements Document {
         .build();
 
     private final Any any;
-    private final JsonFieldMapper fieldMapper;
-    private final TimestampResolver timestampResolver;
+    private final JsonCodec.Settings settings;
     private final ShapeType type;
     private final Schema schema;
 
     JsonDocument(
         com.jsoniter.any.Any any,
-        JsonFieldMapper fieldMapper,
-        TimestampResolver timestampResolver
+        JsonCodec.Settings settings
     ) {
         this.any = any;
-        this.fieldMapper = fieldMapper;
-        this.timestampResolver = timestampResolver;
+        this.settings = settings;
 
         // Determine the type from the underlying JSON value.
         this.type = switch (any.valueType()) {
@@ -139,7 +139,7 @@ final class JsonDocument implements Document {
     @Override
     public Instant asTimestamp() {
         // Always use the default JSON timestamp format with untyped documents.
-        return TimestampResolver.readTimestamp(any, timestampResolver.defaultFormat());
+        return TimestampResolver.readTimestamp(any, settings.timestampResolver().defaultFormat());
     }
 
     @Override
@@ -150,7 +150,7 @@ final class JsonDocument implements Document {
 
         List<Document> result = new ArrayList<>();
         for (var value : any) {
-            result.add(new JsonDocument(value, fieldMapper, timestampResolver));
+            result.add(new JsonDocument(value, settings));
         }
 
         return result;
@@ -165,7 +165,7 @@ final class JsonDocument implements Document {
             for (var entry : any.asMap().entrySet()) {
                 result.put(
                     entry.getKey(),
-                    new JsonDocument(entry.getValue(), fieldMapper, timestampResolver)
+                    new JsonDocument(entry.getValue(), settings)
                 );
             }
             return result;
@@ -177,10 +177,22 @@ final class JsonDocument implements Document {
         if (any.valueType() == ValueType.OBJECT) {
             var memberDocument = any.get(memberName);
             if (memberDocument.valueType() != ValueType.NULL && memberDocument.valueType() != ValueType.INVALID) {
-                return new JsonDocument(memberDocument, fieldMapper, timestampResolver);
+                return new JsonDocument(memberDocument, settings);
             }
         }
         return null;
+    }
+
+    @Override
+    public Set<String> getMemberNames() {
+        if (any.valueType() == ValueType.OBJECT) {
+            var result = new HashSet<String>();
+            for (var key : any.keys()) {
+                result.add(key.toString());
+            }
+            return result;
+        }
+        return Collections.emptySet();
     }
 
     @Override
@@ -225,20 +237,20 @@ final class JsonDocument implements Document {
         }
         JsonDocument that = (JsonDocument) o;
         return type == that.type
-            && fieldMapper.getClass() == that.fieldMapper.getClass()
-            && timestampResolver.equals(that.timestampResolver)
+            && settings.fieldMapper().getClass() == that.settings.fieldMapper().getClass()
+            && settings.timestampResolver().equals(that.settings.timestampResolver())
             && any.equals(that.any);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, any, timestampResolver);
+        return Objects.hash(type, any, settings.timestampResolver());
     }
 
     @Override
     public String toString() {
-        return "JsonDocument{any=" + any + ", timestampResolver=" + timestampResolver
-            + ", memberToField=" + fieldMapper + '}';
+        return "JsonDocument{any=" + any + ", settings.timestampResolver()=" + settings.timestampResolver()
+            + ", memberToField=" + settings.fieldMapper() + '}';
     }
 
     /**
@@ -261,7 +273,7 @@ final class JsonDocument implements Document {
         @Override
         public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
             for (var member : schema.members()) {
-                var nextValue = jsonDocument.getMember(jsonDocument.fieldMapper.memberToField(member));
+                var nextValue = jsonDocument.getMember(jsonDocument.settings.fieldMapper().memberToField(member));
                 if (nextValue != null) {
                     structMemberConsumer.accept(state, member, deserializer(nextValue));
                 }
@@ -270,7 +282,7 @@ final class JsonDocument implements Document {
 
         @Override
         public Instant readTimestamp(Schema schema) {
-            var format = jsonDocument.timestampResolver.resolve(schema);
+            var format = jsonDocument.settings.timestampResolver().resolve(schema);
             return TimestampResolver.readTimestamp(jsonDocument.any, format);
         }
     }

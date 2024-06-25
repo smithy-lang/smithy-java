@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
@@ -358,6 +359,13 @@ public interface Document extends SerializableShape {
      * @throws IllegalStateException if the Document is not a string map, structure, or union shape.
      */
     default Document getMember(String memberName) {
+        throw new SerializationException("Expected a map, structure, or union document, but found " + type());
+    }
+
+    /**
+     * List all the available members.
+     */
+    default Set<String> getMemberNames() {
         throw new SerializationException("Expected a map, structure, or union document, but found " + type());
     }
 

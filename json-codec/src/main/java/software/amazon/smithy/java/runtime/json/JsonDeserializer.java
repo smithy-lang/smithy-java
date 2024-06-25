@@ -17,23 +17,21 @@ import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JsonDeserializer implements ShapeDeserializer {
 
     private JsonIterator iter;
-    private final TimestampResolver timestampResolver;
-    private final JsonFieldMapper fieldMapper;
+    private final JsonCodec.Settings settings;
     private final Consumer<JsonIterator> returnHandle;
 
     JsonDeserializer(
         JsonIterator iter,
-        TimestampResolver timestampResolver,
-        JsonFieldMapper fieldMapper,
+        JsonCodec.Settings settings,
         Consumer<JsonIterator> returnHandle
     ) {
         this.iter = iter;
-        this.timestampResolver = timestampResolver;
-        this.fieldMapper = fieldMapper;
+        this.settings = settings;
         this.returnHandle = returnHandle;
     }
 
@@ -167,7 +165,7 @@ final class JsonDeserializer implements ShapeDeserializer {
             if (any.valueType() == ValueType.NULL) {
                 return null;
             } else {
-                return new JsonDocument(any, fieldMapper, timestampResolver);
+                return new JsonDocument(any, settings);
             }
         } catch (JsonException | IOException e) {
             throw new SerializationException(e);
@@ -177,7 +175,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     @Override
     public Instant readTimestamp(Schema schema) {
         try {
-            var format = timestampResolver.resolve(schema);
+            var format = settings.timestampResolver().resolve(schema);
             return TimestampResolver.readTimestamp(iter.readAny(), format);
         } catch (JsonException | IOException e) {
             throw new SerializationException(e);
@@ -188,11 +186,16 @@ final class JsonDeserializer implements ShapeDeserializer {
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         try {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
-                var member = fieldMapper.fieldToMember(schema, field);
-                if (member == null) {
-                    iter.skip();
-                } else {
+                var member = settings.fieldMapper().fieldToMember(schema, field);
+                if (member != null) {
                     structMemberConsumer.accept(state, member, this);
+                } else {
+                    if (schema.type() != ShapeType.UNION || !settings.forbidUnknownUnionMembers()) {
+                        structMemberConsumer.unknownMember(state, field);
+                    } else {
+                        throw new SerializationException("Unknown member " + field + " encountered");
+                    }
+                    iter.skip();
                 }
             }
         } catch (JsonException | IOException e) {

@@ -29,16 +29,16 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
  */
 public final class JsonCodec implements Codec {
 
-    private final TimestampResolver timestampResolver;
-    private final JsonFieldMapper fieldMapper;
+    private final Settings settings;
 
     private JsonCodec(Builder builder) {
-        timestampResolver = builder.useTimestampFormat
+        var timestampResolver = builder.useTimestampFormat
             ? new TimestampResolver.UseTimestampFormatTrait(builder.defaultTimestampFormat)
             : new TimestampResolver.StaticFormat(builder.defaultTimestampFormat);
-        fieldMapper = builder.useJsonName
+        var fieldMapper = builder.useJsonName
             ? new JsonFieldMapper.UseJsonNameTrait()
             : JsonFieldMapper.UseMemberName.INSTANCE;
+        settings = new Settings(timestampResolver, fieldMapper, builder.forbidUnknownUnionMembers);
     }
 
     public static Builder builder() {
@@ -53,12 +53,12 @@ public final class JsonCodec implements Codec {
     @Override
     public ShapeSerializer createSerializer(OutputStream sink) {
         var stream = createStream(sink);
-        return new JsonSerializer(stream, fieldMapper, timestampResolver, this::returnStream);
+        return new JsonSerializer(stream, settings, this::returnStream);
     }
 
     @Override
     public ShapeDeserializer createDeserializer(byte[] source) {
-        return new JsonDeserializer(createIterator(source), timestampResolver, fieldMapper, this::returnIterator);
+        return new JsonDeserializer(createIterator(source), settings, this::returnIterator);
     }
 
     // TODO: Implement virtual thread friendly pooling (JsonIter's pooling is done using ThreadLocals).
@@ -82,6 +82,7 @@ public final class JsonCodec implements Codec {
         private boolean useJsonName;
         private boolean useTimestampFormat = false;
         private TimestampFormatter defaultTimestampFormat = TimestampFormatter.Prelude.EPOCH_SECONDS;
+        private boolean forbidUnknownUnionMembers;
 
         private Builder() {}
 
@@ -103,5 +104,16 @@ public final class JsonCodec implements Codec {
             this.defaultTimestampFormat = Objects.requireNonNull(defaultTimestampFormat);
             return this;
         }
+
+        public Builder forbidUnknownUnionMembers(boolean forbid) {
+            this.forbidUnknownUnionMembers = forbid;
+            return this;
+        }
     }
+
+    public record Settings(
+        TimestampResolver timestampResolver,
+        JsonFieldMapper fieldMapper,
+        boolean forbidUnknownUnionMembers
+    ) {}
 }

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.junit.jupiter.api.Assertions;
@@ -475,6 +476,11 @@ public class DocumentTest {
         @Override
         public Document getMember(String memberName) {
             return getDocument().getMember(memberName);
+        }
+
+        @Override
+        public Set<String> getMemberNames() {
+            return getDocument().getMemberNames();
         }
 
         @Override

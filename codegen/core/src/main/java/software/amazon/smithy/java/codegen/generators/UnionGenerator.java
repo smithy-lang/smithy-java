@@ -113,11 +113,11 @@ public final class UnionGenerator
         @Override
         public void run() {
             writer.pushState();
+            writer.putContext("unsupported", UnsupportedOperationException.class);
             for (var member : shape.members()) {
                 writer.pushState();
                 writer.putContext("member", symbolProvider.toSymbol(member));
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
-                writer.putContext("unsupported", UnsupportedOperationException.class);
                 writer.write("""
                     public ${member:B} ${memberName:L}() {
                         throw new ${unsupported:T}("Member ${memberName:L} not supported for union of type: " + type);
@@ -125,7 +125,11 @@ public final class UnionGenerator
                     """);
                 writer.popState();
             }
-            // TODO: Add in unknown variant
+            writer.write("""
+                public String $$unknownMember() {
+                    throw new ${unsupported:T}("Union of type: " + type + " is not unknown.");
+                }
+                """);
             writer.popState();
         }
     }
@@ -185,7 +189,54 @@ public final class UnionGenerator
                 writer.write(template);
                 writer.popState();
             }
-            // TODO: Add in unknown variant
+            generateUnknownVariant();
+            writer.popState();
+        }
+
+        private void generateUnknownVariant() {
+            writer.pushState();
+            var template = """
+                public static final class $$UnknownMember extends ${shape:T} {
+                    private final String memberName;
+
+                    public $$UnknownMember(String memberName) {
+                        super(Type.$$UNKNOWN);
+                        this.memberName = memberName;
+                    }
+
+                    @Override
+                    public String $$unknownMember() {
+                        return memberName;
+                    }
+
+                    @Override
+                    public void serialize(${shapeSerializer:T} serializer) {
+                        throw new ${serdeException:T}("Cannot serialize union with unknown member " + this.memberName);
+                    }
+
+                    @Override
+                    public void serializeMembers(${shapeSerializer:T} serializer) {}
+
+                    @Override
+                    public boolean equals(${object:T} other) {
+                        if (other == this) {
+                            return true;
+                        }
+                        if (other == null || getClass() != other.getClass()) {
+                            return false;
+                        }
+                        return memberName.equals((($$UnknownMember) other).memberName);
+                    }
+
+                    @Override
+                    public int hashCode() {
+                        return memberName.hashCode();
+                    }
+                }
+                """;
+            writer.putContext("serdeException", SerializationException.class);
+            writer.putContext("object", Object.class);
+            writer.write(template);
             writer.popState();
         }
     }
@@ -288,16 +339,27 @@ public final class UnionGenerator
                 writer.popState();
             }
 
+            writer.write("""
+                public BuildStage $$unknownMember(String memberName) {
+                    checkForExistingValue();
+                    this.value = new $$UnknownMember(memberName);
+                    return this;
+                }
+                """);
+
             writer.pushState();
             writer.putContext("serdeException", SerializationException.class);
             writer.write("""
                 private void checkForExistingValue() {
                     if (this.value != null) {
+                        if (this.value.type() == Type.$$UNKNOWN) {
+                            throw new ${serdeException:T}("Cannot change union from unknown to known variant");
+                        }
                         throw new ${serdeException:T}("Only one value may be set for unions");
                     }
                 }
                 """);
-            // TODO: Add unknown setter
+
             writer.popState();
         }
 

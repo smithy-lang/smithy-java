@@ -9,8 +9,10 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
@@ -628,6 +630,11 @@ final class Documents {
         }
 
         @Override
+        public Set<String> getMemberNames() {
+            return Set.copyOf(members.keySet());
+        }
+
+        @Override
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeMap(schema, members, (members, s) -> {
                 var key = schema.member("key");
@@ -647,6 +654,11 @@ final class Documents {
         @Override
         public Document getMember(String memberName) {
             return members.get(memberName);
+        }
+
+        @Override
+        public Set<String> getMemberNames() {
+            return Set.copyOf(members.keySet());
         }
 
         @Override
@@ -716,6 +728,13 @@ final class Documents {
             } else {
                 return getDocument().getMember(memberName);
             }
+        }
+
+        @Override
+        public Set<String> getMemberNames() {
+            var result = new HashSet<>(getDocument().getMemberNames());
+            result.add("__type");
+            return result;
         }
 
         @Override
