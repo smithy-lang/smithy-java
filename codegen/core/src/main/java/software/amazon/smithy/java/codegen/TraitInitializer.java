@@ -12,17 +12,19 @@ import software.amazon.smithy.model.traits.Trait;
 /**
  * Writes an initializer for a trait when adding that trait to a {@link software.amazon.smithy.java.runtime.core.schema.Schema}.
  *
- * <p>TraitInitializer implementations can be added to a {@link JavaCodegenIntegration} to customize the way in which
- * traits are initialized in a Schema definition. Initializers for:
+ * <p>{@code TraitInitializer} implementations can be added to a {@link JavaCodegenIntegration} to customize the way
+ * in which traits are initialized in a Schema definition. Custom initializers are useful to improve the performance of
+ * initializing complex traits in generated code. The following initializers are provided by default by the "core"
+ * integration:
  * <ul>
  *     <li>{@link  software.amazon.smithy.model.traits.AnnotationTrait}</li>
  *     <li>{@link software.amazon.smithy.model.traits.StringTrait}</li>
  *     <li>{@link software.amazon.smithy.model.traits.StringListTrait}</li>
  *     <li>Catch-all for {@link Trait}</li>
  * </ul>
- * are provided by the "core" integration. Custom traits are automatically supported by the catch-all initializer.
- * Custom initializers are useful to improve the performance of initializing complex traits.
- * generated code.
+ * Custom traits are automatically supported by the catch-all initializer. The catch-all initializer uses the
+ * {@code TraitService} service provider interface to identify the correct trait provider class for a given trait ID.
+ * The trait is then initialized using the trait provider and a {@code Node}.
  */
 public interface TraitInitializer<T extends Trait> extends BiConsumer<JavaWriter, T> {
     Class<T> traitClass();
