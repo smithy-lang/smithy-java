@@ -7,14 +7,14 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 
-final class HttpHeaderDeserializer extends BasicStringValueDeserializer {
+final class HttpPathLabelDeserializer extends BasicStringValueDeserializer {
 
-    HttpHeaderDeserializer(String value) {
-        super(value, "HTTP header bindings");
+    HttpPathLabelDeserializer(String value) {
+        super(value, "HTTP path bindings");
     }
 
     @Override
     TimestampFormatter defaultTimestampFormatter() {
-        return TimestampFormatter.Prelude.HTTP_DATE;
+        return TimestampFormatter.Prelude.DATE_TIME;
     }
 }

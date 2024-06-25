@@ -35,8 +35,8 @@ public final class HttpBinding {
      *
      * @return Returns the request deserializer.
      */
-    public static Object requestDeserializer() {
-        throw new UnsupportedOperationException("Not yet implemented");
+    public static RequestDeserializer requestDeserializer() {
+        return new RequestDeserializer();
     }
 
     /**

@@ -153,6 +153,16 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
     void writeBlob(Schema schema, byte[] value);
 
     /**
+     * Serialize a data stream.
+     *
+     * @param schema Schema of the shape.
+     * @param value  Streaming value.
+     */
+    default void writeDataStream(Schema schema, DataStream value) {
+        // by default, do nothing
+    }
+
+    /**
      * Serialize a timestamp.
      *
      * @param schema Schema of the shape.
