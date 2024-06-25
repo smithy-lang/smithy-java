@@ -28,6 +28,7 @@ public class OperationInterfaceGenerator implements
         var operationMethodName = directive.symbol().getProperty(ServerSymbolProperties.OPERATION_FIELD_NAME);
         Symbol stubSymbol = directive.symbol().expectProperty(ServerSymbolProperties.STUB_OPERATION);
         Symbol asyncStubSymbol = directive.symbol().expectProperty(ServerSymbolProperties.ASYNC_STUB_OPERATION);
+
         for (Symbol symbol : List.of(stubSymbol, asyncStubSymbol)) {
             directive.context()
                 .writerDelegator()
@@ -56,4 +57,5 @@ public class OperationInterfaceGenerator implements
                 });
         }
     }
+
 }
