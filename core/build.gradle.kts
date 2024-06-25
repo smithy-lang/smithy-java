@@ -17,3 +17,14 @@ jmh {
     fork = 1
     //profilers = ['async:output=flamegraph', 'gc']
 }
+
+//Run all tests with a different locale to ensure we are not doing anything locale specific.
+val localeTest = tasks.register<Test>("localeTest") {
+    useJUnitPlatform()
+    systemProperty("user.country", "DE")
+    systemProperty("user.language", "de")
+}
+
+tasks.build {
+    dependsOn(localeTest)
+}
