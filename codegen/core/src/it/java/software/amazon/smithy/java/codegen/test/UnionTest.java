@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -13,7 +14,9 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.codegen.test.model.NestedEnum;
@@ -22,7 +25,10 @@ import software.amazon.smithy.java.codegen.test.model.NestedStruct;
 import software.amazon.smithy.java.codegen.test.model.NestedUnion;
 import software.amazon.smithy.java.codegen.test.model.UnionType;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 public class UnionTest {
 
@@ -59,5 +65,52 @@ public class UnionTest {
         var output = builder.build();
         assertEquals(pojo.hashCode(), output.hashCode());
         assertEquals(pojo, output);
+        assertThrows(UnsupportedOperationException.class, output::$unknownMember);
+    }
+
+    record UnknownDocument() implements Document {
+
+        private static final Map<String, Document> members = Map.of("UNKNOWN!!!", Document.createDouble(3.14));
+
+        @Override
+        public ShapeType type() {
+            return ShapeType.UNION;
+        }
+
+        @Override
+        public void serializeContents(ShapeSerializer serializer) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Document getMember(String memberName) {
+            return members.get(memberName);
+        }
+
+        @Override
+        public Set<String> getMemberNames() {
+            return members.keySet();
+        }
+
+        @Override
+        public Map<String, Document> asStringMap() {
+            return members;
+        }
+    }
+
+    @Test
+    void unknownUnionDeser() {
+        var document = new UnknownDocument();
+        var builder = UnionType.builder();
+        document.deserializeInto(builder);
+        var output = builder.build();
+
+        assertEquals("UNKNOWN!!!", output.$unknownMember());
+    }
+
+    @Test
+    void unknownUnionSerFails() {
+        var union = UnionType.builder().$unknownMember("foo").build();
+        assertThrows(SerializationException.class, () -> Document.createTyped(union));
     }
 }

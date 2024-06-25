@@ -37,12 +37,20 @@ record StructureDeserializerGenerator(
                         ${cases:C|}
                     }${/hasMembers}
                 }
+
+                ${?union}
+                @Override
+                public void unknownMember(Builder builder, String memberName) {
+                    builder.$$unknownMember(memberName);
+                }
+                ${/union}
             }
             """;
         writer.putContext("shapeDeserializer", ShapeDeserializer.class);
         writer.putContext("sdkSchema", Schema.class);
         writer.putContext("hasMembers", !shape.members().isEmpty());
         writer.putContext("cases", writer.consumer(this::generateMemberSwitchCases));
+        writer.putContext("union", shape.isUnionShape());
         writer.write(template);
         writer.popState();
     }

@@ -37,4 +37,18 @@ public final class JsonTestData {
         .type(ShapeType.STRUCTURE)
         .members(NESTED_NUMBER)
         .build();
+
+    static final ShapeId UNION_ID = ShapeId.from("smithy.example#Union");
+    static final Schema UNION_BOOLEAN_VALUE = Schema.memberBuilder("booleanValue", PreludeSchemas.BOOLEAN)
+        .id(UNION_ID)
+        .build();
+    static final Schema UNION_INTEGER_VALUE = Schema.memberBuilder("intValue", PreludeSchemas.INTEGER)
+        .id(UNION_ID)
+        .build();
+    static final Schema UNION = Schema.builder()
+        .id(UNION_ID)
+        .type(ShapeType.UNION)
+        .members(UNION_BOOLEAN_VALUE, UNION_INTEGER_VALUE)
+        .build();
+
 }

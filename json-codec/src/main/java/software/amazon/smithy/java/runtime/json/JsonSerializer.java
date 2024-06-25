@@ -27,19 +27,16 @@ import software.amazon.smithy.model.shapes.ShapeType;
 final class JsonSerializer implements ShapeSerializer {
 
     JsonStream stream;
-    final JsonFieldMapper fieldMapper;
-    final TimestampResolver timestampResolver;
+    final JsonCodec.Settings settings;
     private final Consumer<JsonStream> returnHandle;
 
     JsonSerializer(
         JsonStream stream,
-        JsonFieldMapper fieldMapper,
-        TimestampResolver timestampResolver,
+        JsonCodec.Settings settings,
         Consumer<JsonStream> returnHandle
     ) {
         this.stream = stream;
-        this.timestampResolver = timestampResolver;
-        this.fieldMapper = fieldMapper;
+        this.settings = settings;
         this.returnHandle = returnHandle;
     }
 
@@ -184,7 +181,7 @@ final class JsonSerializer implements ShapeSerializer {
 
     @Override
     public void writeTimestamp(Schema schema, Instant value) {
-        timestampResolver.resolve(schema).writeToSerializer(schema, value, this);
+        settings.timestampResolver().resolve(schema).writeToSerializer(schema, value, this);
     }
 
     @Override

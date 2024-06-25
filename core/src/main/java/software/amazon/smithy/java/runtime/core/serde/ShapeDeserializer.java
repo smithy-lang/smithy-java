@@ -173,6 +173,8 @@ public interface ShapeDeserializer extends AutoCloseable {
     @FunctionalInterface
     interface StructMemberConsumer<T> {
         void accept(T state, Schema memberSchema, ShapeDeserializer memberDeserializer);
+
+        default void unknownMember(T state, String memberName) {}
     }
 
     /**

@@ -36,7 +36,7 @@ class JsonStructSerializer implements ShapeSerializer {
             } else {
                 firstValue = false;
             }
-            parent.stream.writeObjectField(parent.fieldMapper.memberToField(member));
+            parent.stream.writeObjectField(parent.settings.fieldMapper().memberToField(member));
         } catch (JsonException | IOException e) {
             throw new SerializationException(e);
         }

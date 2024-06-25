@@ -25,6 +25,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,6 +34,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
+import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
@@ -217,6 +219,56 @@ public class JsonDeserializerTest {
             });
 
             assertThat(members, contains("name", "color"));
+        }
+    }
+
+    @Test
+    public void deserializesUnion() {
+        try (var codec = JsonCodec.builder().useJsonName(true).build()) {
+            var de = codec.createDeserializer("{\"booleanValue\":true}".getBytes(StandardCharsets.UTF_8));
+            Set<String> members = new LinkedHashSet<>();
+
+            de.readStruct(JsonTestData.UNION, members, new ShapeDeserializer.StructMemberConsumer<>() {
+                @Override
+                public void accept(Set<String> memberResult, Schema member, ShapeDeserializer deser) {
+                    memberResult.add(member.memberName());
+                    if (member.memberName().equals("booleanValue")) {
+                        assertThat(deser.readBoolean(JsonTestData.UNION.member("booleanValue")), equalTo(true));
+                    } else {
+                        throw new IllegalStateException("Unexpected member: " + member);
+                    }
+                }
+
+                @Override
+                public void unknownMember(Set<String> state, String memberName) {
+                    Assertions.fail("Should not have detected an unknown member: " + memberName);
+                }
+            });
+
+            assertThat(members, contains("booleanValue"));
+        }
+    }
+
+    @Test
+    public void deserializesUnknownUnion() {
+        try (var codec = JsonCodec.builder().useJsonName(true).build()) {
+            var de = codec.createDeserializer("{\"totallyUnknown!\":3.14}".getBytes(StandardCharsets.UTF_8));
+            Set<String> members = new LinkedHashSet<>();
+
+            AtomicReference<String> unknownSet = new AtomicReference<>();
+            de.readStruct(JsonTestData.UNION, members, new ShapeDeserializer.StructMemberConsumer<>() {
+                @Override
+                public void accept(Set<String> state, Schema memberSchema, ShapeDeserializer memberDeserializer) {
+                    Assertions.fail("Unexpected member: " + memberSchema);
+                }
+
+                @Override
+                public void unknownMember(Set<String> state, String memberName) {
+                    unknownSet.set(memberName);
+                }
+            });
+
+            assertThat(unknownSet.get(), equalTo("totallyUnknown!"));
         }
     }
 
