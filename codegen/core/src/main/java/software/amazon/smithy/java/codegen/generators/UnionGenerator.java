@@ -308,7 +308,7 @@ public final class UnionGenerator
         @Override
         protected void generateStages(JavaWriter writer) {
             writer.write("""
-                public static interface BuildStage {
+                public interface BuildStage {
                     ${shape:T} build();
                 }
                 """);
