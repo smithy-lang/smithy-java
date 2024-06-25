@@ -41,6 +41,8 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         putFormatter('T', new JavaTypeFormatter());
         putFormatter('B', new BoxedTypeFormatter());
         putFormatter('U', new CapitalizingFormatter());
+        putFormatter('N', new NullAnnotationFormatter());
+
     }
 
     // Java does not support aliases, so just import normally
@@ -195,6 +197,31 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
                 "Invalid type provided for $U. Expected a String but found: `"
                     + type + "`."
             );
+        }
+    }
+
+    /**
+     * Implements a formatter for {@code $N} that adds null annotation
+     */
+    private final class NullAnnotationFormatter implements BiFunction<Object, String, String> {
+        private final JavaTypeFormatter javaTypeFormatter = new JavaTypeFormatter();
+
+        @Override
+        public String apply(Object type, String indent) {
+
+            Symbol nullAnnotationSymbol = settings.getNullAnnotationSymbol();
+
+            if (nullAnnotationSymbol == null) {
+                return javaTypeFormatter.apply(type, indent);
+            }
+
+            Symbol typeSymbol = getTypeSymbol(type, 'N');
+
+            if (typeSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE)) {
+                return javaTypeFormatter.apply(typeSymbol, indent);
+            }
+
+            return format("@$T $T", nullAnnotationSymbol, typeSymbol);
         }
     }
 }

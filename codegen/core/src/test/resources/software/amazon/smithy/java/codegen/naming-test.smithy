@@ -9,6 +9,7 @@ service TestService {
         ReservedWordMembers
         ReservedWordShape
         Casing
+        NonNullAnnotation
     ]
 }
 
@@ -99,4 +100,17 @@ enum EnumCasing {
     snake_case
     PascalCase
     with_1_number
+}
+
+operation NonNullAnnotation {
+    input := {
+        @required
+        requiredStruct: RequiredStruct
+    }
+}
+
+@private
+structure RequiredStruct {
+    @required
+    member: String
 }

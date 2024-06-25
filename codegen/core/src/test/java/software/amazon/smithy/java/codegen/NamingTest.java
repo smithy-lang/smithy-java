@@ -42,6 +42,7 @@ public class NamingTest {
                 ObjectNode.builder()
                     .withMember("service", "smithy.java.codegen#TestService")
                     .withMember("namespace", "test.smithy.codegen")
+                    .withMember("nullAnnotation", "software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation")
                     .build()
             )
             .model(model)
@@ -50,6 +51,20 @@ public class NamingTest {
         plugin.execute(context);
 
         assertFalse(manifest.getFiles().isEmpty());
+    }
+
+    @Test
+    void nullAnnotationsOnFieldsAndGetter() {
+        var fileStr = getFileStringForClass("NonNullAnnotationInput");
+        var expectedField = "private transient final @TestNonNullAnnotation" +
+            " RequiredStruct requiredStruct;";
+        var expectedGetter = "public @TestNonNullAnnotation " +
+            "RequiredStruct requiredStruct()";
+        var expectedImport = "import software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation;";
+
+        assertTrue(fileStr.contains(expectedField));
+        assertTrue(fileStr.contains(expectedGetter));
+        assertTrue(fileStr.contains(expectedImport));
     }
 
     @Test
