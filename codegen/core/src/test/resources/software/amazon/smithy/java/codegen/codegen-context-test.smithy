@@ -3,13 +3,7 @@ $version: "2"
 namespace smithy.java.codegen
 
 @protocolDefinition(
-    traits: [
-        timestampFormat
-        cors
-        endpoint
-        hostLabel
-        http
-    ]
+    traits: [timestampFormat, cors, endpoint, hostLabel, http]
 )
 @trait(selector: "service")
 structure testProtocol {}
@@ -29,10 +23,6 @@ structure authScheme2 {}
 @testProtocol
 @authScheme1
 @authScheme2
-service TestService {
-    version: "today"
-}
+service TestService { version: "today" }
 
-service NoProtocolService {
-    version: "today"
-}
+service NoProtocolService { version: "today" }

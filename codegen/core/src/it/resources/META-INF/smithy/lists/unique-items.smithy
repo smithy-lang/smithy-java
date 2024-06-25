@@ -74,7 +74,6 @@ list SetOfStructs {
     member: NestedStruct
 }
 
-
 @private
 @uniqueItems
 list SetOfStringList {

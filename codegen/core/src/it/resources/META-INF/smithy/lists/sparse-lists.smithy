@@ -130,4 +130,3 @@ list SparseStructs {
 list SparseDocs {
     member: Document
 }
-

@@ -19,10 +19,13 @@ operation NamingConflicts {
     input := {
         // Structure named map that will conflict with java Map
         map: Map
+
         // Field that will pull in java map
         javaMap: StringStringMap
+
         // Structure named list
         list: List
+
         // Field that will pull in java list
         javaList: StringList
     }
@@ -74,7 +77,7 @@ structure Builder {
 }
 
 operation Casing {
-    input:= {
+    input := {
         snake_case_member: String
         snakeCaseShape: Snake_Case_Shape
         upperSnakeCaseShape: UPPER_SNAKE_CASE_SHAPE
@@ -85,16 +88,13 @@ operation Casing {
 }
 
 @private
-structure Snake_Case_Shape {
-}
+structure Snake_Case_Shape {}
 
 @private
-structure UPPER_SNAKE_CASE_SHAPE {
-}
+structure UPPER_SNAKE_CASE_SHAPE {}
 
 @private
-structure ACRONYMInsideStruct {
-}
+structure ACRONYMInsideStruct {}
 
 @private
 enum EnumCasing {

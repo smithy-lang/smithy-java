@@ -70,19 +70,14 @@ operation ExternalDocumentation {
     input: ExternalDocumentationInput
 }
 
-@externalDocumentation(
-    "Auks are cool birds": "https://en.wikipedia.org/wiki/Auk"
-    "Example": "https://example.com"
-)
+@externalDocumentation("Auks are cool birds": "https://en.wikipedia.org/wiki/Auk", Example: "https://example.com")
 structure ExternalDocumentationInput {
-    @externalDocumentation(
-        "Puffins are also neat": "https://en.wikipedia.org/wiki/Puffin"
-    )
+    @externalDocumentation("Puffins are also neat": "https://en.wikipedia.org/wiki/Puffin")
     memberWithExternalDocumentation: String
 }
 
 operation Unstable {
-    input : UnstableInput
+    input: UnstableInput
 }
 
 @unstable
@@ -98,17 +93,13 @@ operation Rollup {
 /// This structure applies all documentation traits
 @unstable
 @deprecated(since: "sometime")
-@externalDocumentation(
-    "Puffins are still cool": "https://en.wikipedia.org/wiki/Puffin"
-)
+@externalDocumentation("Puffins are still cool": "https://en.wikipedia.org/wiki/Puffin")
 @since("4.5")
 structure RollupInput {
     /// This member applies all documentation traits
     @unstable
     @deprecated(since: "sometime")
-    @externalDocumentation(
-        "Puffins are still cool": "https://en.wikipedia.org/wiki/Puffin"
-    )
+    @externalDocumentation("Puffins are still cool": "https://en.wikipedia.org/wiki/Puffin")
     @since("4.5")
     rollupMember: String
 }
@@ -125,6 +116,7 @@ operation EnumVariants {
 enum EnumWithDocs {
     @deprecated(since: "the past")
     DOCUMENTED
+
     /// General Docs
     @unstable
     ALSO_DOCUMENTED
