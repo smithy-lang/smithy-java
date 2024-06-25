@@ -120,7 +120,7 @@ public final class UnionGenerator
                 writer.putContext("unsupported", UnsupportedOperationException.class);
                 writer.write("""
                     public ${member:B} ${memberName:L}() {
-                        throw new ${unsupported:T}("Member ${memberName:L} not supported.");
+                        throw new ${unsupported:T}("Member ${memberName:L} not supported for union of type: " + type);
                     }
                     """);
                 writer.popState();
