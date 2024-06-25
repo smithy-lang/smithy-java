@@ -107,9 +107,9 @@ public interface TimestampFormatter {
                 double v = ((double) value.toEpochMilli()) / 1000;
                 // only write fractional seconds if we wouldn't write ".000"
                 if (v - (long) v >= 0.001d) {
-                    return String.format("%.3f", v);
+                    return String.format(Locale.ROOT, "%.3f", v);
                 }
-                return String.format("%d", (long) v);
+                return Long.toString((long) v);
             }
 
             @Override
