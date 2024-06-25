@@ -53,7 +53,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private ShapeSerializer shapeBodySerializer;
     private ByteArrayOutputStream shapeBodyOutput;
     private DataStream httpPayload;
-    private int responseStatus;
+    private int responseStatus = 200;
 
     private final BindingMatcher bindingMatcher;
     private final UriPattern uriPattern;
@@ -82,7 +82,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         boolean foundBody = false;
         boolean foundPayload = false;
         for (var member : schema.members()) {
-            BindingMatcher.Binding bindingLoc = bindingMatcher.match(member);
+            var bindingLoc = bindingMatcher.match(member);
             if (bindingLoc == BindingMatcher.Binding.BODY) {
                 foundBody = true;
                 break;
@@ -102,7 +102,6 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
         }
 
-        // Serialize the bindings that aren't BODY (the derived body structure).
         struct.serializeMembers(new BindingSerializer(this));
     }
 
@@ -119,17 +118,24 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     void setHttpPayload(Schema schema, DataStream value) {
         httpPayload = value;
-        String contentType = value.contentType()
-            .orElseGet(() -> {
-                var mediaType = schema.getTrait(MediaTypeTrait.class);
-                if (mediaType != null) {
-                    return mediaType.getValue();
-                } else if (schema.type() == ShapeType.BLOB) {
-                    return DEFAULT_BLOB_CONTENT_TYPE;
-                } else {
-                    return DEFAULT_STRING_CONTENT_TYPE;
-                }
-            });
+        if (headers.containsKey("Content-Type")) {
+            return;
+        }
+
+        String contentType;
+        var mediaType = schema.getTrait(MediaTypeTrait.class);
+        if (mediaType != null) {
+            contentType = mediaType.getValue();
+        } else {
+            contentType = value.contentType()
+                .orElseGet(() -> {
+                    if (schema.type() == ShapeType.BLOB) {
+                        return DEFAULT_BLOB_CONTENT_TYPE;
+                    } else {
+                        return DEFAULT_STRING_CONTENT_TYPE;
+                    }
+                });
+        }
         headers.put("Content-Type", List.of(contentType));
     }
 
@@ -193,14 +199,17 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         return joiner.toString();
     }
 
-    public int getResponseStatus() {
+    int getResponseStatus() {
         return responseStatus;
+    }
+
+    void writePayloadContentType() {
+        headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
     }
 
     private static final class BindingSerializer extends InterceptingSerializer {
         private final HttpBindingSerializer serializer;
-        private ByteArrayOutputStream structureBytes;
-        private ShapeSerializer structureSerializer;
+        private PayloadSerializer payloadSerializer;
 
         private BindingSerializer(HttpBindingSerializer serializer) {
             this.serializer = serializer;
@@ -220,30 +229,20 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                 case QUERY_PARAMS -> new HttpQueryParamsSerializer(serializer.queryStringParams::put);
                 case BODY -> ShapeSerializer.nullSerializer(); // handled in HttpBindingSerializer#writeStruct.
                 case PAYLOAD -> {
-                    if (schema.memberTarget().type() == ShapeType.STRUCTURE) {
-                        // Serialize a structure bound to the payload.
-                        serializer.headers.put("Content-Type", List.of(serializer.payloadCodec.getMediaType()));
-                        structureBytes = new ByteArrayOutputStream();
-                        structureSerializer = serializer.payloadCodec.createSerializer(structureBytes);
-                        yield structureSerializer;
-                    } else {
-                        // httpPayload serialization is handled elsewhere.
-                        yield ShapeSerializer.nullSerializer();
-                    }
+                    payloadSerializer = new PayloadSerializer(serializer, serializer.payloadCodec);
+                    yield payloadSerializer;
                 }
             };
         }
 
         @Override
         protected void after(Schema schema) {
-            if (structureBytes != null) {
-                structureSerializer.flush();
+            flush();
+            if (payloadSerializer != null && !payloadSerializer.isPayloadWritten()) {
+                payloadSerializer.flush();
                 serializer.setHttpPayload(
                     schema,
-                    DataStream.ofBytes(
-                        structureBytes.toByteArray(),
-                        serializer.payloadCodec.getMediaType()
-                    )
+                    DataStream.ofBytes(payloadSerializer.toByteArray())
                 );
             }
         }

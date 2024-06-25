@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.net.http.HttpHeaders;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -18,7 +19,10 @@ import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
+import software.amazon.smithy.java.runtime.core.uri.QueryStringParser;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.HttpQueryTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.utils.SmithyBuilder;
 
 /**
@@ -33,7 +37,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private static final System.Logger LOGGER = System.getLogger(HttpBindingDeserializer.class.getName());
     private final Codec payloadCodec;
     private final HttpHeaders headers;
-    private final String requestRawQueryString;
+    private final Map<String, List<String>> queryStringParameters;
     private final int responseStatus;
     private final String requestPath;
     private final Map<String, String> requestPathLabels;
@@ -49,7 +53,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         this.bindingMatcher = builder.isRequest ? BindingMatcher.requestMatcher() : BindingMatcher.responseMatcher();
         this.body = builder.body == null ? DataStream.ofEmpty() : builder.body;
         this.requestPath = builder.requestPath;
-        this.requestRawQueryString = builder.requestRawQueryString;
+        this.queryStringParameters = QueryStringParser.parse(builder.requestRawQueryString);
         this.responseStatus = builder.responseStatus;
         this.requestPathLabels = builder.requestPathLabels;
     }
@@ -69,15 +73,45 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
 
         // First parse members in the framing.
         for (Schema member : schema.members()) {
-            switch (bindingMatcher.match(member)) {
-                case LABEL -> throw new UnsupportedOperationException("httpLabel binding not supported yet");
-                case QUERY -> throw new UnsupportedOperationException("httpQuery binding not supported yet");
-                case HEADER -> {
-                    var headerValue = headers.firstValue(bindingMatcher.header()).orElse(null);
-                    if (headerValue != null) {
-                        structMemberConsumer.accept(state, member, new HttpHeaderDeserializer(headerValue));
+            BindingMatcher.Binding bindingLoc = bindingMatcher.match(member);
+            switch (bindingLoc) {
+                case LABEL -> {
+                    var labelValue = requestPathLabels.get(member.memberName());
+                    if (labelValue == null) {
+                        throw new IllegalStateException(
+                            "Expected a label value for " + member.memberName()
+                                + " but it was null."
+                        );
+                    }
+                    structMemberConsumer.accept(
+                        state,
+                        member,
+                        new HttpPathLabelDeserializer(labelValue)
+                    );
+                }
+                case QUERY -> {
+                    var paramValue = queryStringParameters.get(member.expectTrait(HttpQueryTrait.class).getValue());
+                    if (paramValue != null) {
+                        structMemberConsumer.accept(state, member, new HttpQueryStringDeserializer(paramValue));
                     }
                 }
+                case QUERY_PARAMS ->
+                    structMemberConsumer.accept(state, member, new HttpQueryParamsDeserializer(queryStringParameters));
+                case HEADER -> {
+                    if (member.type() == ShapeType.LIST) {
+                        var allValues = headers.allValues(bindingMatcher.header());
+                        if (!allValues.isEmpty()) {
+                            structMemberConsumer.accept(state, member, new HttpHeaderListDeserializer(allValues));
+                        }
+                    } else {
+                        var headerValue = headers.firstValue(bindingMatcher.header()).orElse(null);
+                        if (headerValue != null) {
+                            structMemberConsumer.accept(state, member, new HttpHeaderDeserializer(headerValue));
+                        }
+                    }
+                }
+                case PREFIX_HEADERS ->
+                    structMemberConsumer.accept(state, member, new HttpPrefixHeadersDeserializer(headers));
                 case BODY -> bodyMembers.add(member.memberName());
                 case PAYLOAD -> {
                     if (member.memberTarget().type() == ShapeType.STRUCTURE) {
@@ -93,14 +127,17 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                             );
                             structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bytes));
                         }).toCompletableFuture();
-                    } else if (member.memberTarget().type() == ShapeType.BLOB) {
-                        // Set the payload on shape builder directly. This will fail for misconfigured shapes.
-                        shapeBuilder.setDataStream(body);
-                    } else {
-                        // TODO: shapeBuilder.setEventStream(EventStream.of(body));
-                        throw new UnsupportedOperationException("Not yet supported");
-                    }
+                    } else if (isEventStream(member)) {
+                        throw new UnsupportedOperationException("Event streaming not yet supported");
+                    } else if (member.memberTarget().type() == ShapeType.BLOB
+                        && member.memberTarget().hasTrait(StreamingTrait.class)) {
+                            // Set the payload on shape builder directly. This will fail for misconfigured shapes.
+                            shapeBuilder.setDataStream(body);
+                        } else if (body != null && !(body.hasKnownLength() && body.contentLength() == 0)) {
+                            structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
+                        }
                 }
+                default -> throw new UnsupportedOperationException(bindingLoc + "not supported yet");
             }
         }
 
@@ -120,6 +157,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 });
             }).toCompletableFuture();
         }
+    }
+
+    private static boolean isEventStream(Schema member) {
+        return member.memberTarget().type() == ShapeType.UNION
+            && member.memberTarget().hasTrait(StreamingTrait.class);
     }
 
     // TODO: Should there be a configurable limit on the client/server for how much can be read in memory?
@@ -180,7 +222,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         /**
          * Set the captured, already percent-decoded, labels for the operation.
          *
-         * <p>This builder assumes an operation has already been matched by a framework, which means HTTP label
+         * <p>This builder assumes an operation has already been matched by the framework, which means HTTP label
          * bindings have already been extracted.
          *
          * @param requestPathLabels Captured request labels.
