@@ -21,7 +21,7 @@ import software.amazon.smithy.model.traits.Trait;
  *     <li>Catch-all for {@link Trait}</li>
  * </ul>
  * are provided by the "core" integration. Custom traits are automatically supported by the catch-all initializer.
- * Custom initializers can be used instead of the catch-all implementation in order to simplify and clean up
+ * Custom initializers are useful to improve the performance of initializing complex traits.
  * generated code.
  */
 public interface TraitInitializer<T extends Trait> extends BiConsumer<JavaWriter, T> {
