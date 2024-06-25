@@ -4,7 +4,10 @@ namespace smithy.java.codegen.server.test
 
 service TestService {
     version: "today"
-    operations: [GetBeer, Echo]
+    operations: [
+        GetBeer
+        Echo
+    ]
 }
 
 operation GetBeer {
@@ -27,6 +30,7 @@ structure EchoOutput {
 
 structure EchoPayload {
     string: String
+
     @required
     @default(0)
     echoCount: Integer
@@ -50,5 +54,3 @@ structure GetBeerOutput {
     @required
     value: BeerList
 }
-
-

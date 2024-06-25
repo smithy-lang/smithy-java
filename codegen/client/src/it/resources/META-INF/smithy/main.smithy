@@ -7,7 +7,9 @@ use aws.protocols#restJson1
 @restJson1
 service TestService {
     version: "today"
-    operations: [Echo]
+    operations: [
+        Echo
+    ]
 }
 
 @http(method: "PUT", uri: "/anything")
@@ -15,7 +17,6 @@ operation Echo {
     input := {
         string: String
     }
-
     output := {
         string: String
     }
