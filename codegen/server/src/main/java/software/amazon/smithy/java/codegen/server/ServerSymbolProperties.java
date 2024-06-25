@@ -31,4 +31,9 @@ public final class ServerSymbolProperties {
      * TODO: DOCS
      */
     public static final Property<String> OPERATION_FIELD_NAME = Property.named("operation-field-name");
+
+    /**
+     *  Symbol for the generated @{@link software.amazon.smithy.java.runtime.core.schema.ApiOperation}
+     */
+    public static final Property<Symbol> API_OPERATION_SYMBOL = Property.named("api-operation");
 }

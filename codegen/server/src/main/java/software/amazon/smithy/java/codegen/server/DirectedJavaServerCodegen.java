@@ -30,6 +30,7 @@ import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.java.codegen.generators.UnionGenerator;
 import software.amazon.smithy.java.codegen.server.generators.OperationInterfaceGenerator;
+import software.amazon.smithy.java.codegen.server.generators.ServerApiOperationGenerator;
 import software.amazon.smithy.java.codegen.server.generators.ServiceGenerator;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
@@ -74,6 +75,7 @@ public class DirectedJavaServerCodegen implements
     @Override
     public void generateOperation(GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         new OperationInterfaceGenerator().accept(directive);
+        new ServerApiOperationGenerator().accept(directive);
     }
 
     @Override
