@@ -2,6 +2,7 @@
 
 package software.amazon.smithy.java.codegen.test.model;
 
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -88,7 +89,7 @@ public final class SetsAllTypesInput implements SerializableStruct {
     private transient final Set<Boolean> setOfBoolean;
     private transient final Set<Integer> setOfNumber;
     private transient final Set<String> setOfString;
-    private transient final Set<byte[]> setOfBlobs;
+    private transient final Set<ByteBuffer> setOfBlobs;
     private transient final Set<Instant> setOfTimestamps;
     private transient final Set<NestedUnion> setOfUnion;
     private transient final Set<NestedEnum> setOfEnum;
@@ -144,7 +145,7 @@ public final class SetsAllTypesInput implements SerializableStruct {
         return setOfString != null;
     }
 
-    public Set<byte[]> setOfBlobs() {
+    public Set<ByteBuffer> setOfBlobs() {
         if (setOfBlobs == null) {
             return Collections.emptySet();
         }
@@ -329,7 +330,7 @@ public final class SetsAllTypesInput implements SerializableStruct {
         private Set<Boolean> setOfBoolean;
         private Set<Integer> setOfNumber;
         private Set<String> setOfString;
-        private Set<byte[]> setOfBlobs;
+        private Set<ByteBuffer> setOfBlobs;
         private Set<Instant> setOfTimestamps;
         private Set<NestedUnion> setOfUnion;
         private Set<NestedEnum> setOfEnum;
@@ -355,7 +356,7 @@ public final class SetsAllTypesInput implements SerializableStruct {
             return this;
         }
 
-        public Builder setOfBlobs(Set<byte[]> setOfBlobs) {
+        public Builder setOfBlobs(Set<ByteBuffer> setOfBlobs) {
             this.setOfBlobs = setOfBlobs;
             return this;
         }

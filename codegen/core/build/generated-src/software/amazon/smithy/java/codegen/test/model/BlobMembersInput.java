@@ -2,7 +2,7 @@
 
 package software.amazon.smithy.java.codegen.test.model;
 
-import java.util.Arrays;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.PresenceTracker;
@@ -50,21 +50,21 @@ public final class BlobMembersInput implements SerializableStruct {
         )
         .build();
 
-    private transient final byte[] requiredBlob;
-    private transient final byte[] optionalBlob;
+    private transient final ByteBuffer requiredBlob;
+    private transient final ByteBuffer optionalBlob;
     private transient final DataStream streamingBlob;
 
     private BlobMembersInput(Builder builder) {
-        this.requiredBlob = builder.requiredBlob;
-        this.optionalBlob = builder.optionalBlob;
+        this.requiredBlob = builder.requiredBlob.asReadOnlyBuffer();
+        this.optionalBlob = builder.optionalBlob == null ? null : builder.optionalBlob.asReadOnlyBuffer();
         this.streamingBlob = builder.streamingBlob;
     }
 
-    public byte[] requiredBlob() {
+    public ByteBuffer requiredBlob() {
         return requiredBlob;
     }
 
-    public byte[] optionalBlob() {
+    public ByteBuffer optionalBlob() {
         return optionalBlob;
     }
 
@@ -86,17 +86,14 @@ public final class BlobMembersInput implements SerializableStruct {
             return false;
         }
         BlobMembersInput that = (BlobMembersInput) other;
-        return this.requiredBlob == that.requiredBlob
-               && Arrays.equals(this.optionalBlob, that.optionalBlob)
+        return Objects.equals(this.requiredBlob, that.requiredBlob)
+               && Objects.equals(this.optionalBlob, that.optionalBlob)
                && Objects.equals(this.streamingBlob, that.streamingBlob);
     }
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(streamingBlob);
-        result = 31 * result + Arrays.hashCode(requiredBlob) + Arrays.hashCode(optionalBlob);
-        return result;
-
+        return Objects.hash(requiredBlob, optionalBlob, streamingBlob);
     }
 
     @Override
@@ -123,19 +120,19 @@ public final class BlobMembersInput implements SerializableStruct {
      */
     public static final class Builder implements ShapeBuilder<BlobMembersInput> {
         private final PresenceTracker tracker = PresenceTracker.of(SCHEMA);
-        private byte[] requiredBlob;
-        private byte[] optionalBlob;
+        private ByteBuffer requiredBlob;
+        private ByteBuffer optionalBlob;
         private DataStream streamingBlob = DataStream.ofEmpty();
 
         private Builder() {}
 
-        public Builder requiredBlob(byte[] requiredBlob) {
-            this.requiredBlob = requiredBlob;
+        public Builder requiredBlob(ByteBuffer requiredBlob) {
+            this.requiredBlob = Objects.requireNonNull(requiredBlob, "requiredBlob cannot be null");
             tracker.setMember(SCHEMA_REQUIRED_BLOB);
             return this;
         }
 
-        public Builder optionalBlob(byte[] optionalBlob) {
+        public Builder optionalBlob(ByteBuffer optionalBlob) {
             this.optionalBlob = optionalBlob;
             return this;
         }
@@ -163,7 +160,7 @@ public final class BlobMembersInput implements SerializableStruct {
                 return this;
             }
             if (!tracker.checkMember(SCHEMA_REQUIRED_BLOB)) {
-                requiredBlob(new byte[0]);
+                requiredBlob(ByteBuffer.allocate(0));
             }
             if (!tracker.checkMember(SCHEMA_STREAMING_BLOB)) {
                 streamingBlob(DataStream.ofEmpty());

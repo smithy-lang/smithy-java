@@ -4,6 +4,7 @@ package software.amazon.smithy.java.codegen.test.model;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -126,7 +127,7 @@ public final class SparseListsInput implements SerializableStruct {
     private transient final List<Long> listOfLong;
     private transient final List<Short> listOfShort;
     private transient final List<String> listOfString;
-    private transient final List<byte[]> listOfBlobs;
+    private transient final List<ByteBuffer> listOfBlobs;
     private transient final List<Instant> listOfTimestamps;
     private transient final List<NestedUnion> listOfUnion;
     private transient final List<NestedEnum> listOfEnum;
@@ -264,7 +265,7 @@ public final class SparseListsInput implements SerializableStruct {
         return listOfString != null;
     }
 
-    public List<byte[]> listOfBlobs() {
+    public List<ByteBuffer> listOfBlobs() {
         if (listOfBlobs == null) {
             return Collections.emptyList();
         }
@@ -475,7 +476,7 @@ public final class SparseListsInput implements SerializableStruct {
         private List<Long> listOfLong;
         private List<Short> listOfShort;
         private List<String> listOfString;
-        private List<byte[]> listOfBlobs;
+        private List<ByteBuffer> listOfBlobs;
         private List<Instant> listOfTimestamps;
         private List<NestedUnion> listOfUnion;
         private List<NestedEnum> listOfEnum;
@@ -535,7 +536,7 @@ public final class SparseListsInput implements SerializableStruct {
             return this;
         }
 
-        public Builder listOfBlobs(List<byte[]> listOfBlobs) {
+        public Builder listOfBlobs(List<ByteBuffer> listOfBlobs) {
             this.listOfBlobs = listOfBlobs;
             return this;
         }

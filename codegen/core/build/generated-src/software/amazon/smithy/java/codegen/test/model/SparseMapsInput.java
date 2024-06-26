@@ -4,6 +4,7 @@ package software.amazon.smithy.java.codegen.test.model;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
@@ -120,7 +121,7 @@ public final class SparseMapsInput implements SerializableStruct {
     private transient final Map<String, Long> stringLongMap;
     private transient final Map<String, Short> stringShortMap;
     private transient final Map<String, String> stringStringMap;
-    private transient final Map<String, byte[]> stringBlobMap;
+    private transient final Map<String, ByteBuffer> stringBlobMap;
     private transient final Map<String, Instant> stringTimestampMap;
     private transient final Map<String, NestedUnion> stringUnionMap;
     private transient final Map<String, NestedEnum> stringEnumMap;
@@ -256,7 +257,7 @@ public final class SparseMapsInput implements SerializableStruct {
         return stringStringMap != null;
     }
 
-    public Map<String, byte[]> stringBlobMap() {
+    public Map<String, ByteBuffer> stringBlobMap() {
         if (stringBlobMap == null) {
             return Collections.emptyMap();
         }
@@ -451,7 +452,7 @@ public final class SparseMapsInput implements SerializableStruct {
         private Map<String, Long> stringLongMap;
         private Map<String, Short> stringShortMap;
         private Map<String, String> stringStringMap;
-        private Map<String, byte[]> stringBlobMap;
+        private Map<String, ByteBuffer> stringBlobMap;
         private Map<String, Instant> stringTimestampMap;
         private Map<String, NestedUnion> stringUnionMap;
         private Map<String, NestedEnum> stringEnumMap;
@@ -510,7 +511,7 @@ public final class SparseMapsInput implements SerializableStruct {
             return this;
         }
 
-        public Builder stringBlobMap(Map<String, byte[]> stringBlobMap) {
+        public Builder stringBlobMap(Map<String, ByteBuffer> stringBlobMap) {
             this.stringBlobMap = stringBlobMap;
             return this;
         }

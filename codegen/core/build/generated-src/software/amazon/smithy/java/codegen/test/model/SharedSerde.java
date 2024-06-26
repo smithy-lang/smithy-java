@@ -4,6 +4,7 @@ package software.amazon.smithy.java.codegen.test.model;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -46,9 +47,9 @@ final class SharedSerde {
         private static final MapStringStringValueSerializer INSTANCE = new MapStringStringValueSerializer();
 
         @Override
-        public void accept(String values, ShapeSerializer serializer) {
+        public void accept(String value, ShapeSerializer serializer) {
 
-            serializer.writeString(PreludeSchemas.STRING, values);
+            serializer.writeString(PreludeSchemas.STRING, value);
         }
     }
 
@@ -116,12 +117,12 @@ final class SharedSerde {
         private static final SparseStringUnionMapValueSerializer INSTANCE = new SparseStringUnionMapValueSerializer();
 
         @Override
-        public void accept(NestedUnion values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(NestedUnion value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(NestedUnion.SCHEMA);
                 return;
             }
-            serializer.writeStruct(NestedUnion.SCHEMA, values);
+            serializer.writeStruct(NestedUnion.SCHEMA, value);
         }
     }
 
@@ -164,12 +165,12 @@ final class SharedSerde {
         private static final SparseStringTimestampMapValueSerializer INSTANCE = new SparseStringTimestampMapValueSerializer();
 
         @Override
-        public void accept(Instant values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(Instant value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(PreludeSchemas.TIMESTAMP);
                 return;
             }
-            serializer.writeTimestamp(PreludeSchemas.TIMESTAMP, values);
+            serializer.writeTimestamp(PreludeSchemas.TIMESTAMP, value);
         }
     }
 
@@ -212,12 +213,12 @@ final class SharedSerde {
         private static final SparseStringStructMapValueSerializer INSTANCE = new SparseStringStructMapValueSerializer();
 
         @Override
-        public void accept(NestedStruct values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(NestedStruct value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(NestedStruct.SCHEMA);
                 return;
             }
-            serializer.writeStruct(NestedStruct.SCHEMA, values);
+            serializer.writeStruct(NestedStruct.SCHEMA, value);
         }
     }
 
@@ -260,12 +261,12 @@ final class SharedSerde {
         private static final SparseStringStringMapValueSerializer INSTANCE = new SparseStringStringMapValueSerializer();
 
         @Override
-        public void accept(String values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(String value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(PreludeSchemas.STRING);
                 return;
             }
-            serializer.writeString(PreludeSchemas.STRING, values);
+            serializer.writeString(PreludeSchemas.STRING, value);
         }
     }
 
@@ -308,12 +309,12 @@ final class SharedSerde {
         private static final SparseStringShortMapValueSerializer INSTANCE = new SparseStringShortMapValueSerializer();
 
         @Override
-        public void accept(Short values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(Short value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(PreludeSchemas.SHORT);
                 return;
             }
-            serializer.writeShort(PreludeSchemas.SHORT, values);
+            serializer.writeShort(PreludeSchemas.SHORT, value);
         }
     }
 
@@ -356,12 +357,12 @@ final class SharedSerde {
         private static final SparseStringLongMapValueSerializer INSTANCE = new SparseStringLongMapValueSerializer();
 
         @Override
-        public void accept(Long values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(Long value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(PreludeSchemas.LONG);
                 return;
             }
-            serializer.writeLong(PreludeSchemas.LONG, values);
+            serializer.writeLong(PreludeSchemas.LONG, value);
         }
     }
 
@@ -404,12 +405,12 @@ final class SharedSerde {
         private static final SparseStringIntEnumMapValueSerializer INSTANCE = new SparseStringIntEnumMapValueSerializer();
 
         @Override
-        public void accept(NestedIntEnum values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(NestedIntEnum value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(NestedIntEnum.SCHEMA);
                 return;
             }
-            serializer.writeInteger(NestedIntEnum.SCHEMA, values.value());
+            serializer.writeInteger(NestedIntEnum.SCHEMA, value.value());
         }
     }
 
@@ -452,12 +453,12 @@ final class SharedSerde {
         private static final SparseStringIntegerMapValueSerializer INSTANCE = new SparseStringIntegerMapValueSerializer();
 
         @Override
-        public void accept(Integer values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(Integer value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(PreludeSchemas.INTEGER);
                 return;
             }
-            serializer.writeInteger(PreludeSchemas.INTEGER, values);
+            serializer.writeInteger(PreludeSchemas.INTEGER, value);
         }
     }
 
@@ -500,12 +501,12 @@ final class SharedSerde {
         private static final SparseStringFloatMapValueSerializer INSTANCE = new SparseStringFloatMapValueSerializer();
 
         @Override
-        public void accept(Float values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(Float value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(PreludeSchemas.FLOAT);
                 return;
             }
-            serializer.writeFloat(PreludeSchemas.FLOAT, values);
+            serializer.writeFloat(PreludeSchemas.FLOAT, value);
         }
     }
 
@@ -548,12 +549,12 @@ final class SharedSerde {
         private static final SparseStringEnumMapValueSerializer INSTANCE = new SparseStringEnumMapValueSerializer();
 
         @Override
-        public void accept(NestedEnum values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(NestedEnum value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(NestedEnum.SCHEMA);
                 return;
             }
-            serializer.writeString(NestedEnum.SCHEMA, values.value());
+            serializer.writeString(NestedEnum.SCHEMA, value.value());
         }
     }
 
@@ -596,12 +597,12 @@ final class SharedSerde {
         private static final SparseStringDoubleMapValueSerializer INSTANCE = new SparseStringDoubleMapValueSerializer();
 
         @Override
-        public void accept(Double values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(Double value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(PreludeSchemas.DOUBLE);
                 return;
             }
-            serializer.writeDouble(PreludeSchemas.DOUBLE, values);
+            serializer.writeDouble(PreludeSchemas.DOUBLE, value);
         }
     }
 
@@ -644,12 +645,12 @@ final class SharedSerde {
         private static final SparseStringByteMapValueSerializer INSTANCE = new SparseStringByteMapValueSerializer();
 
         @Override
-        public void accept(Byte values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(Byte value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(PreludeSchemas.BYTE);
                 return;
             }
-            serializer.writeByte(PreludeSchemas.BYTE, values);
+            serializer.writeByte(PreludeSchemas.BYTE, value);
         }
     }
 
@@ -692,12 +693,12 @@ final class SharedSerde {
         private static final SparseStringBooleanMapValueSerializer INSTANCE = new SparseStringBooleanMapValueSerializer();
 
         @Override
-        public void accept(Boolean values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(Boolean value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(PreludeSchemas.BOOLEAN);
                 return;
             }
-            serializer.writeBoolean(PreludeSchemas.BOOLEAN, values);
+            serializer.writeBoolean(PreludeSchemas.BOOLEAN, value);
         }
     }
 
@@ -720,11 +721,11 @@ final class SharedSerde {
         }
     }
 
-    static final class SparseStringBlobMapSerializer implements BiConsumer<Map<String, byte[]>, MapSerializer> {
+    static final class SparseStringBlobMapSerializer implements BiConsumer<Map<String, ByteBuffer>, MapSerializer> {
         static final SparseStringBlobMapSerializer INSTANCE = new SparseStringBlobMapSerializer();
 
         @Override
-        public void accept(Map<String, byte[]> values, MapSerializer serializer) {
+        public void accept(Map<String, ByteBuffer> values, MapSerializer serializer) {
             for (var valueEntry : values.entrySet()) {
                 serializer.writeEntry(
                     PreludeSchemas.BLOB,
@@ -736,30 +737,30 @@ final class SharedSerde {
         }
     }
 
-    private static final class SparseStringBlobMapValueSerializer implements BiConsumer<byte[], ShapeSerializer> {
+    private static final class SparseStringBlobMapValueSerializer implements BiConsumer<ByteBuffer, ShapeSerializer> {
         private static final SparseStringBlobMapValueSerializer INSTANCE = new SparseStringBlobMapValueSerializer();
 
         @Override
-        public void accept(byte[] values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(ByteBuffer value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(PreludeSchemas.BLOB);
                 return;
             }
-            serializer.writeBlob(PreludeSchemas.BLOB, values);
+            serializer.writeBlob(PreludeSchemas.BLOB, value.asReadOnlyBuffer());
         }
     }
 
-    static Map<String, byte[]> deserializeSparseStringBlobMap(Schema schema, ShapeDeserializer deserializer) {
-        Map<String, byte[]> result = new LinkedHashMap<>();
+    static Map<String, ByteBuffer> deserializeSparseStringBlobMap(Schema schema, ShapeDeserializer deserializer) {
+        Map<String, ByteBuffer> result = new LinkedHashMap<>();
         deserializer.readStringMap(schema, result, SparseStringBlobMapValueDeserializer.INSTANCE);
         return result;
     }
 
-    private static final class SparseStringBlobMapValueDeserializer implements ShapeDeserializer.MapMemberConsumer<String, Map<String, byte[]>> {
+    private static final class SparseStringBlobMapValueDeserializer implements ShapeDeserializer.MapMemberConsumer<String, Map<String, ByteBuffer>> {
         static final SparseStringBlobMapValueDeserializer INSTANCE = new SparseStringBlobMapValueDeserializer();
 
         @Override
-        public void accept(Map<String, byte[]> state, String key, ShapeDeserializer deserializer) {
+        public void accept(Map<String, ByteBuffer> state, String key, ShapeDeserializer deserializer) {
             if (deserializer.isNull()) {
                 state.put(key, deserializer.readNull());
                 return;
@@ -788,12 +789,12 @@ final class SharedSerde {
         private static final SparseStringBigIntegerMapValueSerializer INSTANCE = new SparseStringBigIntegerMapValueSerializer();
 
         @Override
-        public void accept(BigInteger values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(BigInteger value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(PreludeSchemas.BIG_INTEGER);
                 return;
             }
-            serializer.writeBigInteger(PreludeSchemas.BIG_INTEGER, values);
+            serializer.writeBigInteger(PreludeSchemas.BIG_INTEGER, value);
         }
     }
 
@@ -836,12 +837,12 @@ final class SharedSerde {
         private static final SparseStringBigDecimalMapValueSerializer INSTANCE = new SparseStringBigDecimalMapValueSerializer();
 
         @Override
-        public void accept(BigDecimal values, ShapeSerializer serializer) {
-            if (values == null) {
+        public void accept(BigDecimal value, ShapeSerializer serializer) {
+            if (value == null) {
                 serializer.writeNull(PreludeSchemas.BIG_DECIMAL);
                 return;
             }
-            serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, values);
+            serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, value);
         }
     }
 
@@ -884,9 +885,9 @@ final class SharedSerde {
         private static final MapOfStringListValueSerializer INSTANCE = new MapOfStringListValueSerializer();
 
         @Override
-        public void accept(List<String> values, ShapeSerializer serializer) {
+        public void accept(List<String> value, ShapeSerializer serializer) {
 
-            serializer.writeList(SharedSchemas.STRING_LIST, values, SharedSerde.StringListSerializer.INSTANCE);
+            serializer.writeList(SharedSchemas.STRING_LIST, value, SharedSerde.StringListSerializer.INSTANCE);
         }
     }
 
@@ -954,9 +955,9 @@ final class SharedSerde {
         private static final MapOfMapOfStringMapValueSerializer INSTANCE = new MapOfMapOfStringMapValueSerializer();
 
         @Override
-        public void accept(Map<String, Map<String, String>> values, ShapeSerializer serializer) {
+        public void accept(Map<String, Map<String, String>> value, ShapeSerializer serializer) {
 
-            serializer.writeMap(SharedSchemas.MAP_OF_STRING_MAP, values, SharedSerde.MapOfStringMapSerializer.INSTANCE);
+            serializer.writeMap(SharedSchemas.MAP_OF_STRING_MAP, value, SharedSerde.MapOfStringMapSerializer.INSTANCE);
         }
     }
 
@@ -996,9 +997,9 @@ final class SharedSerde {
         private static final MapOfStringMapValueSerializer INSTANCE = new MapOfStringMapValueSerializer();
 
         @Override
-        public void accept(Map<String, String> values, ShapeSerializer serializer) {
+        public void accept(Map<String, String> value, ShapeSerializer serializer) {
 
-            serializer.writeMap(SharedSchemas.STRING_MAP, values, SharedSerde.StringMapSerializer.INSTANCE);
+            serializer.writeMap(SharedSchemas.STRING_MAP, value, SharedSerde.StringMapSerializer.INSTANCE);
         }
     }
 
@@ -1038,9 +1039,9 @@ final class SharedSerde {
         private static final MapOfMapListValueSerializer INSTANCE = new MapOfMapListValueSerializer();
 
         @Override
-        public void accept(List<Map<String, String>> values, ShapeSerializer serializer) {
+        public void accept(List<Map<String, String>> value, ShapeSerializer serializer) {
 
-            serializer.writeList(SharedSchemas.MAP_LIST, values, SharedSerde.MapListSerializer.INSTANCE);
+            serializer.writeList(SharedSchemas.MAP_LIST, value, SharedSerde.MapListSerializer.INSTANCE);
         }
     }
 
@@ -1108,9 +1109,9 @@ final class SharedSerde {
         private static final StringMapValueSerializer INSTANCE = new StringMapValueSerializer();
 
         @Override
-        public void accept(String values, ShapeSerializer serializer) {
+        public void accept(String value, ShapeSerializer serializer) {
 
-            serializer.writeString(PreludeSchemas.STRING, values);
+            serializer.writeString(PreludeSchemas.STRING, value);
         }
     }
 
@@ -1150,9 +1151,9 @@ final class SharedSerde {
         private static final StringUnionMapValueSerializer INSTANCE = new StringUnionMapValueSerializer();
 
         @Override
-        public void accept(NestedUnion values, ShapeSerializer serializer) {
+        public void accept(NestedUnion value, ShapeSerializer serializer) {
 
-            serializer.writeStruct(NestedUnion.SCHEMA, values);
+            serializer.writeStruct(NestedUnion.SCHEMA, value);
         }
     }
 
@@ -1192,9 +1193,9 @@ final class SharedSerde {
         private static final StringTimestampMapValueSerializer INSTANCE = new StringTimestampMapValueSerializer();
 
         @Override
-        public void accept(Instant values, ShapeSerializer serializer) {
+        public void accept(Instant value, ShapeSerializer serializer) {
 
-            serializer.writeTimestamp(PreludeSchemas.TIMESTAMP, values);
+            serializer.writeTimestamp(PreludeSchemas.TIMESTAMP, value);
         }
     }
 
@@ -1234,9 +1235,9 @@ final class SharedSerde {
         private static final StringStructMapValueSerializer INSTANCE = new StringStructMapValueSerializer();
 
         @Override
-        public void accept(NestedStruct values, ShapeSerializer serializer) {
+        public void accept(NestedStruct value, ShapeSerializer serializer) {
 
-            serializer.writeStruct(NestedStruct.SCHEMA, values);
+            serializer.writeStruct(NestedStruct.SCHEMA, value);
         }
     }
 
@@ -1276,9 +1277,9 @@ final class SharedSerde {
         private static final StringShortMapValueSerializer INSTANCE = new StringShortMapValueSerializer();
 
         @Override
-        public void accept(Short values, ShapeSerializer serializer) {
+        public void accept(Short value, ShapeSerializer serializer) {
 
-            serializer.writeShort(PreludeSchemas.SHORT, values);
+            serializer.writeShort(PreludeSchemas.SHORT, value);
         }
     }
 
@@ -1318,9 +1319,9 @@ final class SharedSerde {
         private static final StringLongMapValueSerializer INSTANCE = new StringLongMapValueSerializer();
 
         @Override
-        public void accept(Long values, ShapeSerializer serializer) {
+        public void accept(Long value, ShapeSerializer serializer) {
 
-            serializer.writeLong(PreludeSchemas.LONG, values);
+            serializer.writeLong(PreludeSchemas.LONG, value);
         }
     }
 
@@ -1360,9 +1361,9 @@ final class SharedSerde {
         private static final StringIntEnumMapValueSerializer INSTANCE = new StringIntEnumMapValueSerializer();
 
         @Override
-        public void accept(NestedIntEnum values, ShapeSerializer serializer) {
+        public void accept(NestedIntEnum value, ShapeSerializer serializer) {
 
-            serializer.writeInteger(NestedIntEnum.SCHEMA, values.value());
+            serializer.writeInteger(NestedIntEnum.SCHEMA, value.value());
         }
     }
 
@@ -1402,9 +1403,9 @@ final class SharedSerde {
         private static final StringIntegerMapValueSerializer INSTANCE = new StringIntegerMapValueSerializer();
 
         @Override
-        public void accept(Integer values, ShapeSerializer serializer) {
+        public void accept(Integer value, ShapeSerializer serializer) {
 
-            serializer.writeInteger(PreludeSchemas.INTEGER, values);
+            serializer.writeInteger(PreludeSchemas.INTEGER, value);
         }
     }
 
@@ -1444,9 +1445,9 @@ final class SharedSerde {
         private static final StringFloatMapValueSerializer INSTANCE = new StringFloatMapValueSerializer();
 
         @Override
-        public void accept(Float values, ShapeSerializer serializer) {
+        public void accept(Float value, ShapeSerializer serializer) {
 
-            serializer.writeFloat(PreludeSchemas.FLOAT, values);
+            serializer.writeFloat(PreludeSchemas.FLOAT, value);
         }
     }
 
@@ -1486,9 +1487,9 @@ final class SharedSerde {
         private static final StringEnumMapValueSerializer INSTANCE = new StringEnumMapValueSerializer();
 
         @Override
-        public void accept(NestedEnum values, ShapeSerializer serializer) {
+        public void accept(NestedEnum value, ShapeSerializer serializer) {
 
-            serializer.writeString(NestedEnum.SCHEMA, values.value());
+            serializer.writeString(NestedEnum.SCHEMA, value.value());
         }
     }
 
@@ -1528,9 +1529,9 @@ final class SharedSerde {
         private static final StringDoubleMapValueSerializer INSTANCE = new StringDoubleMapValueSerializer();
 
         @Override
-        public void accept(Double values, ShapeSerializer serializer) {
+        public void accept(Double value, ShapeSerializer serializer) {
 
-            serializer.writeDouble(PreludeSchemas.DOUBLE, values);
+            serializer.writeDouble(PreludeSchemas.DOUBLE, value);
         }
     }
 
@@ -1570,9 +1571,9 @@ final class SharedSerde {
         private static final StringByteMapValueSerializer INSTANCE = new StringByteMapValueSerializer();
 
         @Override
-        public void accept(Byte values, ShapeSerializer serializer) {
+        public void accept(Byte value, ShapeSerializer serializer) {
 
-            serializer.writeByte(PreludeSchemas.BYTE, values);
+            serializer.writeByte(PreludeSchemas.BYTE, value);
         }
     }
 
@@ -1612,9 +1613,9 @@ final class SharedSerde {
         private static final StringBooleanMapValueSerializer INSTANCE = new StringBooleanMapValueSerializer();
 
         @Override
-        public void accept(Boolean values, ShapeSerializer serializer) {
+        public void accept(Boolean value, ShapeSerializer serializer) {
 
-            serializer.writeBoolean(PreludeSchemas.BOOLEAN, values);
+            serializer.writeBoolean(PreludeSchemas.BOOLEAN, value);
         }
     }
 
@@ -1634,11 +1635,11 @@ final class SharedSerde {
         }
     }
 
-    static final class StringBlobMapSerializer implements BiConsumer<Map<String, byte[]>, MapSerializer> {
+    static final class StringBlobMapSerializer implements BiConsumer<Map<String, ByteBuffer>, MapSerializer> {
         static final StringBlobMapSerializer INSTANCE = new StringBlobMapSerializer();
 
         @Override
-        public void accept(Map<String, byte[]> values, MapSerializer serializer) {
+        public void accept(Map<String, ByteBuffer> values, MapSerializer serializer) {
             for (var valueEntry : values.entrySet()) {
                 serializer.writeEntry(
                     PreludeSchemas.BLOB,
@@ -1650,27 +1651,27 @@ final class SharedSerde {
         }
     }
 
-    private static final class StringBlobMapValueSerializer implements BiConsumer<byte[], ShapeSerializer> {
+    private static final class StringBlobMapValueSerializer implements BiConsumer<ByteBuffer, ShapeSerializer> {
         private static final StringBlobMapValueSerializer INSTANCE = new StringBlobMapValueSerializer();
 
         @Override
-        public void accept(byte[] values, ShapeSerializer serializer) {
+        public void accept(ByteBuffer value, ShapeSerializer serializer) {
 
-            serializer.writeBlob(PreludeSchemas.BLOB, values);
+            serializer.writeBlob(PreludeSchemas.BLOB, value.asReadOnlyBuffer());
         }
     }
 
-    static Map<String, byte[]> deserializeStringBlobMap(Schema schema, ShapeDeserializer deserializer) {
-        Map<String, byte[]> result = new LinkedHashMap<>();
+    static Map<String, ByteBuffer> deserializeStringBlobMap(Schema schema, ShapeDeserializer deserializer) {
+        Map<String, ByteBuffer> result = new LinkedHashMap<>();
         deserializer.readStringMap(schema, result, StringBlobMapValueDeserializer.INSTANCE);
         return result;
     }
 
-    private static final class StringBlobMapValueDeserializer implements ShapeDeserializer.MapMemberConsumer<String, Map<String, byte[]>> {
+    private static final class StringBlobMapValueDeserializer implements ShapeDeserializer.MapMemberConsumer<String, Map<String, ByteBuffer>> {
         static final StringBlobMapValueDeserializer INSTANCE = new StringBlobMapValueDeserializer();
 
         @Override
-        public void accept(Map<String, byte[]> state, String key, ShapeDeserializer deserializer) {
+        public void accept(Map<String, ByteBuffer> state, String key, ShapeDeserializer deserializer) {
 
             state.put(key, deserializer.readBlob(PreludeSchemas.BLOB));
         }
@@ -1696,9 +1697,9 @@ final class SharedSerde {
         private static final StringBigIntegerMapValueSerializer INSTANCE = new StringBigIntegerMapValueSerializer();
 
         @Override
-        public void accept(BigInteger values, ShapeSerializer serializer) {
+        public void accept(BigInteger value, ShapeSerializer serializer) {
 
-            serializer.writeBigInteger(PreludeSchemas.BIG_INTEGER, values);
+            serializer.writeBigInteger(PreludeSchemas.BIG_INTEGER, value);
         }
     }
 
@@ -1738,9 +1739,9 @@ final class SharedSerde {
         private static final StringBigDecimalMapValueSerializer INSTANCE = new StringBigDecimalMapValueSerializer();
 
         @Override
-        public void accept(BigDecimal values, ShapeSerializer serializer) {
+        public void accept(BigDecimal value, ShapeSerializer serializer) {
 
-            serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, values);
+            serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, value);
         }
     }
 
@@ -2236,32 +2237,32 @@ final class SharedSerde {
         }
     }
 
-    static final class SparseBlobsSerializer implements BiConsumer<List<byte[]>, ShapeSerializer> {
+    static final class SparseBlobsSerializer implements BiConsumer<List<ByteBuffer>, ShapeSerializer> {
         static final SparseBlobsSerializer INSTANCE = new SparseBlobsSerializer();
 
         @Override
-        public void accept(List<byte[]> values, ShapeSerializer serializer) {
+        public void accept(List<ByteBuffer> values, ShapeSerializer serializer) {
             for (var value : values) {
                 if (value == null) {
                     serializer.writeNull(PreludeSchemas.BLOB);
                     continue;
                 }
-                serializer.writeBlob(PreludeSchemas.BLOB, value);
+                serializer.writeBlob(PreludeSchemas.BLOB, value.asReadOnlyBuffer());
             }
         }
     }
 
-    static List<byte[]> deserializeSparseBlobs(Schema schema, ShapeDeserializer deserializer) {
-        List<byte[]> result = new ArrayList<>();
+    static List<ByteBuffer> deserializeSparseBlobs(Schema schema, ShapeDeserializer deserializer) {
+        List<ByteBuffer> result = new ArrayList<>();
         deserializer.readList(schema, result, SparseBlobsMemberDeserializer.INSTANCE);
         return result;
     }
 
-    private static final class SparseBlobsMemberDeserializer implements ShapeDeserializer.ListMemberConsumer<List<byte[]>> {
+    private static final class SparseBlobsMemberDeserializer implements ShapeDeserializer.ListMemberConsumer<List<ByteBuffer>> {
         static final SparseBlobsMemberDeserializer INSTANCE = new SparseBlobsMemberDeserializer();
 
         @Override
-        public void accept(List<byte[]> state, ShapeDeserializer deserializer) {
+        public void accept(List<ByteBuffer> state, ShapeDeserializer deserializer) {
             if (deserializer.isNull()) {
                 state.add(deserializer.readNull());
                 return;
@@ -2638,29 +2639,29 @@ final class SharedSerde {
         }
     }
 
-    static final class SetOfBlobsSerializer implements BiConsumer<Set<byte[]>, ShapeSerializer> {
+    static final class SetOfBlobsSerializer implements BiConsumer<Set<ByteBuffer>, ShapeSerializer> {
         static final SetOfBlobsSerializer INSTANCE = new SetOfBlobsSerializer();
 
         @Override
-        public void accept(Set<byte[]> values, ShapeSerializer serializer) {
+        public void accept(Set<ByteBuffer> values, ShapeSerializer serializer) {
             for (var value : values) {
 
-                serializer.writeBlob(PreludeSchemas.BLOB, value);
+                serializer.writeBlob(PreludeSchemas.BLOB, value.asReadOnlyBuffer());
             }
         }
     }
 
-    static Set<byte[]> deserializeSetOfBlobs(Schema schema, ShapeDeserializer deserializer) {
-        Set<byte[]> result = new LinkedHashSet<>();
+    static Set<ByteBuffer> deserializeSetOfBlobs(Schema schema, ShapeDeserializer deserializer) {
+        Set<ByteBuffer> result = new LinkedHashSet<>();
         deserializer.readList(schema, result, SetOfBlobsMemberDeserializer.INSTANCE);
         return result;
     }
 
-    private static final class SetOfBlobsMemberDeserializer implements ShapeDeserializer.ListMemberConsumer<Set<byte[]>> {
+    private static final class SetOfBlobsMemberDeserializer implements ShapeDeserializer.ListMemberConsumer<Set<ByteBuffer>> {
         static final SetOfBlobsMemberDeserializer INSTANCE = new SetOfBlobsMemberDeserializer();
 
         @Override
-        public void accept(Set<byte[]> state, ShapeDeserializer deserializer) {
+        public void accept(Set<ByteBuffer> state, ShapeDeserializer deserializer) {
 
             if (!state.add(deserializer.readBlob(PreludeSchemas.BLOB))) {
                 throw new SerializationException("Member must have unique values");
@@ -2716,9 +2717,9 @@ final class SharedSerde {
         private static final StringStringMapValueSerializer INSTANCE = new StringStringMapValueSerializer();
 
         @Override
-        public void accept(String values, ShapeSerializer serializer) {
+        public void accept(String value, ShapeSerializer serializer) {
 
-            serializer.writeString(PreludeSchemas.STRING, values);
+            serializer.writeString(PreludeSchemas.STRING, value);
         }
     }
 
@@ -3186,29 +3187,29 @@ final class SharedSerde {
         }
     }
 
-    static final class BlobsSerializer implements BiConsumer<List<byte[]>, ShapeSerializer> {
+    static final class BlobsSerializer implements BiConsumer<List<ByteBuffer>, ShapeSerializer> {
         static final BlobsSerializer INSTANCE = new BlobsSerializer();
 
         @Override
-        public void accept(List<byte[]> values, ShapeSerializer serializer) {
+        public void accept(List<ByteBuffer> values, ShapeSerializer serializer) {
             for (var value : values) {
 
-                serializer.writeBlob(PreludeSchemas.BLOB, value);
+                serializer.writeBlob(PreludeSchemas.BLOB, value.asReadOnlyBuffer());
             }
         }
     }
 
-    static List<byte[]> deserializeBlobs(Schema schema, ShapeDeserializer deserializer) {
-        List<byte[]> result = new ArrayList<>();
+    static List<ByteBuffer> deserializeBlobs(Schema schema, ShapeDeserializer deserializer) {
+        List<ByteBuffer> result = new ArrayList<>();
         deserializer.readList(schema, result, BlobsMemberDeserializer.INSTANCE);
         return result;
     }
 
-    private static final class BlobsMemberDeserializer implements ShapeDeserializer.ListMemberConsumer<List<byte[]>> {
+    private static final class BlobsMemberDeserializer implements ShapeDeserializer.ListMemberConsumer<List<ByteBuffer>> {
         static final BlobsMemberDeserializer INSTANCE = new BlobsMemberDeserializer();
 
         @Override
-        public void accept(List<byte[]> state, ShapeDeserializer deserializer) {
+        public void accept(List<ByteBuffer> state, ShapeDeserializer deserializer) {
 
             state.add(deserializer.readBlob(PreludeSchemas.BLOB));
         }

@@ -4,8 +4,8 @@ package software.amazon.smithy.java.codegen.test.model;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -160,7 +160,7 @@ public abstract class UnionType implements SerializableStruct {
         return ToStringSerializer.serialize(this);
     }
 
-    public byte[] blobValue() {
+    public ByteBuffer blobValue() {
         throw new UnsupportedOperationException("Member blobValue not supported for union of type: " + type);
     }
 
@@ -238,11 +238,11 @@ public abstract class UnionType implements SerializableStruct {
 
     @SmithyGenerated
     public static final class BlobValueMember extends UnionType {
-        private final transient byte[] value;
+        private final transient ByteBuffer value;
 
-        public BlobValueMember(byte[] value) {
+        public BlobValueMember(ByteBuffer value) {
             super(Type.BLOB_VALUE);
-            this.value = value;
+            this.value = Objects.requireNonNull(value, "Union value cannot be null");
         }
 
         @Override
@@ -256,7 +256,7 @@ public abstract class UnionType implements SerializableStruct {
         }
 
         @Override
-        public byte[] blobValue() {
+        public ByteBuffer blobValue() {
             return value;
         }
 
@@ -269,12 +269,12 @@ public abstract class UnionType implements SerializableStruct {
                 return false;
             }
             BlobValueMember that = (BlobValueMember) other;
-            return Arrays.equals(value, that.value);
+            return Objects.equals(value, that.value);
         }
 
         @Override
         public int hashCode() {
-            return Arrays.hashCode(value);
+            return Objects.hash(value);
         }
     }
 
@@ -1046,7 +1046,7 @@ public abstract class UnionType implements SerializableStruct {
 
         private Builder() {}
 
-        public BuildStage blobValue(byte[] value) {
+        public BuildStage blobValue(ByteBuffer value) {
             checkForExistingValue();
             this.value = new BlobValueMember(value);
             return this;

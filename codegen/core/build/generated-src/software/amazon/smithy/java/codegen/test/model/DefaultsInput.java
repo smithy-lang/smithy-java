@@ -4,8 +4,8 @@ package software.amazon.smithy.java.codegen.test.model;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
@@ -237,7 +237,7 @@ public final class DefaultsInput implements SerializableStruct {
     private transient final long longMember;
     private transient final short shortMember;
     private transient final String string;
-    private transient final byte[] blob;
+    private transient final ByteBuffer blob;
     private transient final DataStream streamingBlob;
     private transient final Document boolDoc;
     private transient final Document stringDoc;
@@ -262,7 +262,7 @@ public final class DefaultsInput implements SerializableStruct {
         this.longMember = builder.longMember;
         this.shortMember = builder.shortMember;
         this.string = builder.string;
-        this.blob = builder.blob;
+        this.blob = builder.blob.asReadOnlyBuffer();
         this.streamingBlob = builder.streamingBlob;
         this.boolDoc = builder.boolDoc;
         this.stringDoc = builder.stringDoc;
@@ -317,7 +317,7 @@ public final class DefaultsInput implements SerializableStruct {
         return string;
     }
 
-    public byte[] blob() {
+    public ByteBuffer blob() {
         return blob;
     }
 
@@ -401,7 +401,7 @@ public final class DefaultsInput implements SerializableStruct {
                && this.longMember == that.longMember
                && this.shortMember == that.shortMember
                && Objects.equals(this.string, that.string)
-               && this.blob == that.blob
+               && Objects.equals(this.blob, that.blob)
                && Objects.equals(this.streamingBlob, that.streamingBlob)
                && Objects.equals(this.boolDoc, that.boolDoc)
                && Objects.equals(this.stringDoc, that.stringDoc)
@@ -418,10 +418,7 @@ public final class DefaultsInput implements SerializableStruct {
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(booleanMember, bigDecimal, bigInteger, byteMember, doubleMember, floatMember, integer, longMember, shortMember, string, streamingBlob, boolDoc, stringDoc, numberDoc, floatingPointnumberDoc, listDoc, mapDoc, list, map, timestamp, enumMember, intEnum);
-        result = 31 * result + Arrays.hashCode(blob);
-        return result;
-
+        return Objects.hash(booleanMember, bigDecimal, bigInteger, byteMember, doubleMember, floatMember, integer, longMember, shortMember, string, blob, streamingBlob, boolDoc, stringDoc, numberDoc, floatingPointnumberDoc, listDoc, mapDoc, list, map, timestamp, enumMember, intEnum);
     }
 
     @Override
@@ -507,7 +504,7 @@ public final class DefaultsInput implements SerializableStruct {
         private long longMember = 1L;
         private short shortMember = 1;
         private String string = STRING_DEFAULT;
-        private byte[] blob = Base64.getDecoder().decode("YmxvYg==");
+        private ByteBuffer blob = ByteBuffer.wrap(Base64.getDecoder().decode("YmxvYg==")).asReadOnlyBuffer();
         private DataStream streamingBlob = DataStream.ofEmpty();
         private Document boolDoc = BOOL_DOC_DEFAULT;
         private Document stringDoc = STRING_DOC_DEFAULT;
@@ -573,8 +570,8 @@ public final class DefaultsInput implements SerializableStruct {
             return this;
         }
 
-        public Builder blob(byte[] blob) {
-            this.blob = blob;
+        public Builder blob(ByteBuffer blob) {
+            this.blob = Objects.requireNonNull(blob, "blob cannot be null");
             return this;
         }
 

@@ -4,8 +4,8 @@ package software.amazon.smithy.java.codegen.test.model;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -190,7 +190,7 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
     private transient final long longMember;
     private transient final short shortMember;
     private transient final String string;
-    private transient final byte[] blob;
+    private transient final ByteBuffer blob;
     private transient final DataStream streamingBlob;
     private transient final Document document;
     private transient final List<String> list;
@@ -210,7 +210,7 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
         this.longMember = builder.longMember;
         this.shortMember = builder.shortMember;
         this.string = builder.string;
-        this.blob = builder.blob;
+        this.blob = builder.blob.asReadOnlyBuffer();
         this.streamingBlob = builder.streamingBlob;
         this.document = builder.document;
         this.list = Collections.unmodifiableList(builder.list);
@@ -260,7 +260,7 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
         return string;
     }
 
-    public byte[] blob() {
+    public ByteBuffer blob() {
         return blob;
     }
 
@@ -324,7 +324,7 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
                && this.longMember == that.longMember
                && this.shortMember == that.shortMember
                && Objects.equals(this.string, that.string)
-               && this.blob == that.blob
+               && Objects.equals(this.blob, that.blob)
                && Objects.equals(this.streamingBlob, that.streamingBlob)
                && Objects.equals(this.document, that.document)
                && Objects.equals(this.list, that.list)
@@ -336,10 +336,7 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(booleanMember, bigDecimal, bigInteger, byteMember, doubleMember, floatMember, integer, longMember, shortMember, string, streamingBlob, document, list, map, timestamp, enumMember, intEnum);
-        result = 31 * result + Arrays.hashCode(blob);
-        return result;
-
+        return Objects.hash(booleanMember, bigDecimal, bigInteger, byteMember, doubleMember, floatMember, integer, longMember, shortMember, string, blob, streamingBlob, document, list, map, timestamp, enumMember, intEnum);
     }
 
     @Override
@@ -404,7 +401,7 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
         private long longMember;
         private short shortMember;
         private String string;
-        private byte[] blob;
+        private ByteBuffer blob;
         private DataStream streamingBlob = DataStream.ofEmpty();
         private Document document;
         private List<String> list;
@@ -475,8 +472,8 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
             return this;
         }
 
-        public Builder blob(byte[] blob) {
-            this.blob = blob;
+        public Builder blob(ByteBuffer blob) {
+            this.blob = Objects.requireNonNull(blob, "blob cannot be null");
             tracker.setMember(SCHEMA_BLOB);
             return this;
         }
@@ -570,7 +567,7 @@ public final class ClientErrorCorrectionInput implements SerializableStruct {
                 string("");
             }
             if (!tracker.checkMember(SCHEMA_BLOB)) {
-                blob(new byte[0]);
+                blob(ByteBuffer.allocate(0));
             }
             if (!tracker.checkMember(SCHEMA_STREAMING_BLOB)) {
                 streamingBlob(DataStream.ofEmpty());
