@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateOperationDirective;
@@ -14,10 +15,13 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.knowledge.EventStreamIndex;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 
@@ -41,9 +45,10 @@ public class OperationGenerator
             .useFileWriter(symbol.getDeclarationFile(), symbol.getNamespace(), writer -> {
                 var input = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getInputShape()));
                 var output = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getOutputShape()));
+                var eventStreamIndex = EventStreamIndex.of(directive.model());
                 writer.pushState(new ClassSection(shape));
                 var template = """
-                    public final class ${shape:T} implements ${sdkOperation:T}<${inputType:T}, ${outputType:T}> {
+                    public final class ${shape:T} implements ${operationType:C} {
 
                         ${schema:C|}
 
@@ -53,6 +58,13 @@ public class OperationGenerator
                         public ${sdkShapeBuilder:T}<${inputType:T}> inputBuilder() {
                             return ${inputType:T}.builder();
                         }
+
+                        ${?hasInputEventStream}
+                        @Override
+                        public ${supplier:T}<${sdkShapeBuilder:T}<${inputType:T}>> inputEventBuilderSupplier() {
+                            return () -> ${inputEventType:T}.builder();
+                        }
+                        ${/hasInputEventStream}
 
                         @Override
                         public ${sdkShapeBuilder:T}<${outputType:T}> outputBuilder() {
@@ -69,6 +81,20 @@ public class OperationGenerator
                             return ${inputType:T}.SCHEMA;
                         }
 
+                        ${?hasInputEventStream}
+                        @Override
+                        public ${sdkSchema:T} inputEventSchema() {
+                            return ${inputEventType:T}.SCHEMA;
+                        }
+                        ${/hasInputEventStream}
+
+                        ${?hasOutputEventStream}
+                        @Override
+                        public ${sdkSchema:T} outputEventSchema() {
+                            return ${outputEventType:T}.SCHEMA;
+                        }
+                        ${/hasOutputEventStream}
+
                         @Override
                         public ${sdkSchema:T} outputSchema() {
                             return ${outputType:T}.SCHEMA;
@@ -81,11 +107,24 @@ public class OperationGenerator
                     }
                     """;
                 writer.putContext("shape", symbol);
-                writer.putContext("sdkOperation", ApiOperation.class);
                 writer.putContext("inputType", input);
                 writer.putContext("outputType", output);
                 writer.putContext("sdkSchema", Schema.class);
                 writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
+
+
+                writer.putContext(
+                    "operationType",
+                    new OperationTypeGenerator(
+                        writer,
+                        shape,
+                        directive.symbolProvider(),
+                        directive.model(),
+                        eventStreamIndex,
+                        directive.context()
+                    )
+                );
+
                 writer.putContext("typeRegistry", TypeRegistry.class);
                 writer.putContext(
                     "schema",
@@ -107,6 +146,21 @@ public class OperationGenerator
                         directive.service()
                     )
                 );
+                eventStreamIndex.getInputInfo(shape).ifPresent(info -> {
+                    writer.putContext("supplier", Supplier.class);
+                    writer.putContext("hasInputEventStream", true);
+                    writer.putContext(
+                        "inputEventType",
+                        directive.symbolProvider().toSymbol(info.getEventStreamTarget())
+                    );
+                });
+                eventStreamIndex.getOutputInfo(shape).ifPresent(info -> {
+                    writer.putContext("hasOutputEventStream", true);
+                    writer.putContext(
+                        "outputEventType",
+                        directive.symbolProvider().toSymbol(info.getEventStreamTarget())
+                    );
+                });
                 writer.write(template);
                 writer.popState();
             });
@@ -133,6 +187,47 @@ public class OperationGenerator
             }
             writer.writeWithNoFormatting(".build();");
             writer.dedent();
+        }
+    }
+
+    private record OperationTypeGenerator(
+        JavaWriter writer, OperationShape shape, SymbolProvider symbolProvider,
+        Model model, EventStreamIndex index, CodeGenerationContext context
+    ) implements Runnable {
+        @Override
+        public void run() {
+            var inputShape = model.expectShape(shape.getInputShape());
+            var input = symbolProvider.toSymbol(inputShape);
+            var outputShape = model.expectShape(shape.getOutputShape());
+            var output = symbolProvider.toSymbol(outputShape);
+
+            var inputInfo = index.getInputInfo(shape);
+            var outputInfo = index.getOutputInfo(shape);
+            inputInfo.ifPresent(info -> {
+                writer.writeInline(
+                    "$1T<$2T, $3T, $4T>",
+                    InputEventStreamingApiOperation.class,
+                    input,
+                    output,
+                    symbolProvider.toSymbol(info.getEventStreamTarget())
+                );
+            });
+            outputInfo.ifPresent(info -> {
+                if (inputInfo.isPresent()) {
+                    writer.writeInline(", ");
+                }
+                writer.writeInline(
+                    "$1T<$2T, $3T, $4T>",
+                    OutputEventStreamingApiOperation.class,
+                    input,
+                    output,
+                    symbolProvider.toSymbol(info.getEventStreamTarget())
+                );
+            });
+
+            if (inputInfo.isEmpty() && outputInfo.isEmpty()) {
+                writer.writeInline("$1T<$2T, $3T>", ApiOperation.class, input, output);
+            }
         }
     }
 }

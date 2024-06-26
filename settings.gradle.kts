@@ -12,6 +12,7 @@ include("tracing-api")
 
 include(":http-api")
 include(":http-binding")
+include(":aws-event-streams")
 
 include(":json-codec")
 

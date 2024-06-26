@@ -11,4 +11,5 @@ dependencies {
     api(project(":client-http"))
     api(project(":http-binding"))
     api(project(":json-codec"))
+    api(project(":aws-event-streams"))
 }

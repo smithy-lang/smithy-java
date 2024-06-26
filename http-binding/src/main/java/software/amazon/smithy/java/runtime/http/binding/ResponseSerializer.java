@@ -6,11 +6,13 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.Objects;
-import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
+import software.amazon.smithy.java.runtime.core.serde.event.EventEncoderFactory;
+import software.amazon.smithy.java.runtime.core.serde.event.EventStreamFrameEncodingProcessor;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
-import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.HttpTrait;
 
 /**
@@ -18,8 +20,9 @@ import software.amazon.smithy.model.traits.HttpTrait;
  */
 public final class ResponseSerializer {
     private Codec payloadCodec;
-    private Schema operation;
+    private ApiOperation<?, ?> operation;
     private SerializableShape shapeValue;
+    private EventEncoderFactory<?> eventEncoderFactory;
     private final BindingMatcher bindingMatcher = BindingMatcher.responseMatcher();
 
     ResponseSerializer() {}
@@ -30,10 +33,7 @@ public final class ResponseSerializer {
      * @param operation Operation schema.
      * @return Returns the serializer.
      */
-    public ResponseSerializer operation(Schema operation) {
-        if (operation.type() != ShapeType.OPERATION) {
-            throw new IllegalArgumentException("operation must be an operation, but found " + operation);
-        }
+    public ResponseSerializer operation(ApiOperation<?, ?> operation) {
         this.operation = operation;
         return this;
     }
@@ -61,6 +61,19 @@ public final class ResponseSerializer {
     }
 
     /**
+     * Enables event streaming support.
+     *
+     * @param encoderFactory the encoder factory for the protocol
+     * @return Returns the serializer.
+     */
+    public ResponseSerializer eventEncoderFactory(
+        EventEncoderFactory<?> encoderFactory
+    ) {
+        this.eventEncoderFactory = encoderFactory;
+        return this;
+    }
+
+    /**
      * Finishes setting up the serializer and creates an HTTP response.
      *
      * @return Returns the created response.
@@ -69,18 +82,25 @@ public final class ResponseSerializer {
         Objects.requireNonNull(shapeValue, "shapeValue is not set");
         Objects.requireNonNull(operation, "operation is not set");
         Objects.requireNonNull(payloadCodec, "payloadCodec is not set");
-        Objects.requireNonNull(payloadCodec, "endpoint is not set");
-        Objects.requireNonNull(payloadCodec, "value is not set");
 
-        var httpTrait = operation.expectTrait(HttpTrait.class);
+        var httpTrait = operation.schema().expectTrait(HttpTrait.class);
         var serializer = new HttpBindingSerializer(httpTrait, payloadCodec, bindingMatcher);
         shapeValue.serialize(serializer);
         serializer.flush();
 
-        return SmithyHttpResponse.builder()
-            .statusCode(serializer.getResponseStatus())
-            .headers(serializer.getHeaders())
-            .body(serializer.getBody())
-            .build();
+        var builder = SmithyHttpResponse.builder()
+            .statusCode(serializer.getResponseStatus());
+
+        var eventStream = serializer.getEventStream();
+        if (eventStream != null && operation instanceof OutputEventStreamingApiOperation<?, ?, ?>) {
+            builder.body(
+                EventStreamFrameEncodingProcessor.create(eventStream, eventEncoderFactory)
+            );
+            serializer.setContentType(eventEncoderFactory.contentType());
+        } else if (serializer.hasBody()) {
+            builder.body(serializer.getBody());
+        }
+
+        return builder.headers(serializer.getHeaders()).build();
     }
 }

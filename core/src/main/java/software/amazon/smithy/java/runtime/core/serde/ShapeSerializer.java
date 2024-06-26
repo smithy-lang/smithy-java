@@ -9,6 +9,7 @@ import java.io.Flushable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
+import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
@@ -159,6 +160,16 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param value  Streaming value.
      */
     default void writeDataStream(Schema schema, DataStream value) {
+        // by default, do nothing
+    }
+
+    /**
+     * Serialize an event stream.
+     *
+     * @param schema Schema of the shape.
+     * @param value  Event Stream value.
+     */
+    default void writeEventStream(Schema schema, Flow.Publisher<? extends SerializableStruct> value) {
         // by default, do nothing
     }
 

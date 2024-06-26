@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
@@ -26,6 +27,8 @@ import software.amazon.smithy.java.runtime.core.uri.URLEncoding;
 import software.amazon.smithy.model.pattern.SmithyPattern;
 import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.ErrorTrait;
+import software.amazon.smithy.model.traits.HttpErrorTrait;
 import software.amazon.smithy.model.traits.HttpTrait;
 import software.amazon.smithy.model.traits.MediaTypeTrait;
 
@@ -53,13 +56,15 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private ShapeSerializer shapeBodySerializer;
     private ByteArrayOutputStream shapeBodyOutput;
     private DataStream httpPayload;
-    private int responseStatus = 200;
+    private Flow.Publisher<? extends SerializableStruct> eventStream;
+    private int responseStatus;
 
     private final BindingMatcher bindingMatcher;
     private final UriPattern uriPattern;
-    private final BiConsumer<String, String> headerConsumer = (field, value) -> {
-        headers.computeIfAbsent(field, f -> new ArrayList<>()).add(value);
-    };
+    private final BiConsumer<String, String> headerConsumer = (field, value) -> headers.computeIfAbsent(
+        field,
+        f -> new ArrayList<>()
+    ).add(value);
 
     HttpBindingSerializer(HttpTrait httpTrait, Codec payloadCodec, BindingMatcher bindingMatcher) {
         uriPattern = httpTrait.getUri();
@@ -73,6 +78,12 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
+        if (schema.hasTrait(HttpErrorTrait.class)) {
+            responseStatus = schema.expectTrait(HttpErrorTrait.class).getCode();
+        } else if (schema.hasTrait(ErrorTrait.class)) {
+            responseStatus = schema.expectTrait(ErrorTrait.class).getDefaultHttpStatusCode();
+        }
+
         boolean foundBody = false;
         boolean foundPayload = false;
         for (var member : schema.members()) {
@@ -197,8 +208,20 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         return responseStatus;
     }
 
+    public Flow.Publisher<? extends SerializableStruct> getEventStream() {
+        return eventStream;
+    }
+
+    void setEventStream(Flow.Publisher<? extends SerializableStruct> stream) {
+        this.eventStream = stream;
+    }
+
     void writePayloadContentType() {
-        headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
+        setContentType(payloadCodec.getMediaType());
+    }
+
+    public void setContentType(String contentType) {
+        headers.put("Content-Type", List.of(contentType));
     }
 
     private static final class BindingSerializer extends InterceptingSerializer {

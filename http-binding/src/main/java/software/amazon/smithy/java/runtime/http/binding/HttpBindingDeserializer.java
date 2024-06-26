@@ -19,6 +19,8 @@ import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
+import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
+import software.amazon.smithy.java.runtime.core.serde.event.EventStreamFrameDecodingProcessor;
 import software.amazon.smithy.java.runtime.core.uri.QueryStringParser;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.HttpQueryTrait;
@@ -44,6 +46,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private final BindingMatcher bindingMatcher;
     private final DataStream body;
     private final ShapeBuilder<?> shapeBuilder;
+    private final EventDecoderFactory<?> eventDecoderFactory;
     private CompletableFuture<Void> bodyDeserializationCf;
 
     private HttpBindingDeserializer(Builder builder) {
@@ -51,6 +54,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         this.payloadCodec = Objects.requireNonNull(builder.payloadCodec, "payloadSerializer not set");
         this.headers = Objects.requireNonNull(builder.headers, "headers not set");
         this.bindingMatcher = builder.isRequest ? BindingMatcher.requestMatcher() : BindingMatcher.responseMatcher();
+        this.eventDecoderFactory = builder.eventDecoderFactory;
         this.body = builder.body == null ? DataStream.ofEmpty() : builder.body;
         this.requestPath = builder.requestPath;
         this.queryStringParameters = QueryStringParser.parse(builder.requestRawQueryString);
@@ -104,10 +108,14 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                             structMemberConsumer.accept(state, member, new HttpHeaderListDeserializer(allValues));
                         }
                     } else {
-                        var headerValue = headers.firstValue(bindingMatcher.header()).orElse(null);
-                        if (headerValue != null) {
-                            structMemberConsumer.accept(state, member, new HttpHeaderDeserializer(headerValue));
-                        }
+                        headers.firstValue(bindingMatcher.header())
+                            .ifPresent(
+                                headerValue -> structMemberConsumer.accept(
+                                    state,
+                                    member,
+                                    new HttpHeaderDeserializer(headerValue)
+                                )
+                            );
                     }
                 }
                 case PREFIX_HEADERS ->
@@ -128,7 +136,9 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                             structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bytes));
                         }).toCompletableFuture();
                     } else if (isEventStream(member)) {
-                        throw new UnsupportedOperationException("Event streaming not yet supported");
+                        shapeBuilder.setEventStream(
+                            EventStreamFrameDecodingProcessor.create(body, eventDecoderFactory)
+                        );
                     } else if (member.memberTarget().type() == ShapeType.BLOB
                         && member.memberTarget().hasTrait(StreamingTrait.class)) {
                             // Set the payload on shape builder directly. This will fail for misconfigured shapes.
@@ -210,6 +220,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         private String requestPath;
         private int responseStatus;
         private ShapeBuilder<?> shapeBuilder;
+        private EventDecoderFactory<?> eventDecoderFactory;
 
         private Builder() {
         }
@@ -330,6 +341,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          */
         Builder shapeBuilder(ShapeBuilder<?> shapeBuilder) {
             this.shapeBuilder = shapeBuilder;
+            return this;
+        }
+
+        Builder eventDecoderFactory(EventDecoderFactory<?> eventDecoderFactory) {
+            this.eventDecoderFactory = eventDecoderFactory;
             return this;
         }
     }

@@ -7,12 +7,15 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.net.URI;
 import java.util.Objects;
-import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
+import software.amazon.smithy.java.runtime.core.serde.event.EventEncoderFactory;
+import software.amazon.smithy.java.runtime.core.serde.event.EventStreamFrameEncodingProcessor;
+import software.amazon.smithy.java.runtime.core.serde.event.Frame;
 import software.amazon.smithy.java.runtime.core.uri.URIBuilder;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.HttpTrait;
 
 /**
@@ -21,9 +24,10 @@ import software.amazon.smithy.model.traits.HttpTrait;
 public final class RequestSerializer {
 
     private Codec payloadCodec;
-    private Schema operation;
+    private ApiOperation<?, ?> operation;
     private URI endpoint;
     private SerializableShape shapeValue;
+    private EventEncoderFactory<?> eventStreamEncodingFactory;
     private final BindingMatcher bindingMatcher = BindingMatcher.requestMatcher();
 
     RequestSerializer() {}
@@ -31,13 +35,10 @@ public final class RequestSerializer {
     /**
      * Schema of the operation to serialize.
      *
-     * @param operation Operation schema.
+     * @param operation the operation
      * @return Returns the serializer.
      */
-    public RequestSerializer operation(Schema operation) {
-        if (operation.type() != ShapeType.OPERATION) {
-            throw new IllegalArgumentException("operation must be an operation, but found " + operation);
-        }
+    public RequestSerializer operation(ApiOperation<?, ?> operation) {
         this.operation = operation;
         return this;
     }
@@ -76,6 +77,19 @@ public final class RequestSerializer {
     }
 
     /**
+     * Enables event streaming support.
+     *
+     * @param eventStreamEncodingFactory a factory for event stream encoding.
+     * @return Returns the serializer.
+     */
+    public <F extends Frame<?>> RequestSerializer eventEncoderFactory(
+        EventEncoderFactory<F> eventStreamEncodingFactory
+    ) {
+        this.eventStreamEncodingFactory = eventStreamEncodingFactory;
+        return this;
+    }
+
+    /**
      * Finishes setting up the serializer and creates an HTTP request.
      *
      * @return Returns the created request.
@@ -87,7 +101,7 @@ public final class RequestSerializer {
         Objects.requireNonNull(payloadCodec, "endpoint is not set");
         Objects.requireNonNull(payloadCodec, "value is not set");
 
-        var httpTrait = operation.expectTrait(HttpTrait.class);
+        var httpTrait = operation.schema().expectTrait(HttpTrait.class);
         var serializer = new HttpBindingSerializer(httpTrait, payloadCodec, bindingMatcher);
         shapeValue.serialize(serializer);
         serializer.flush();
@@ -103,11 +117,18 @@ public final class RequestSerializer {
 
         var targetEndpoint = uriBuilder.build();
 
-        return SmithyHttpRequest.builder()
+        SmithyHttpRequest.Builder builder = SmithyHttpRequest.builder()
             .method(httpTrait.getMethod())
-            .uri(targetEndpoint)
-            .headers(serializer.getHeaders())
-            .body(serializer.getBody())
-            .build();
+            .uri(targetEndpoint);
+
+        var eventStream = serializer.getEventStream();
+        if (eventStream != null && operation instanceof InputEventStreamingApiOperation<?, ?, ?>) {
+            builder.body(EventStreamFrameEncodingProcessor.create(eventStream, eventStreamEncodingFactory));
+            serializer.setContentType(eventStreamEncodingFactory.contentType());
+        } else if (serializer.hasBody()) {
+            builder.body(serializer.getBody());
+        }
+
+        return builder.headers(serializer.getHeaders()).build();
     }
 }

@@ -11,6 +11,8 @@ import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
+import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
+import software.amazon.smithy.java.runtime.core.serde.event.Frame;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 
 /**
@@ -70,6 +72,18 @@ public final class RequestDeserializer {
         errorShapeBuilder = null;
         return this;
     }
+
+    /**
+     * Enables input event decoding.
+     *
+     * @param eventDecoderFactory event decoding support
+     * @return Returns the deserializer.
+     */
+    public <F extends Frame<?>> RequestDeserializer eventDecoderFactory(EventDecoderFactory<F> eventDecoderFactory) {
+        deserBuilder.eventDecoderFactory(eventDecoderFactory);
+        return this;
+    }
+
 
     public RequestDeserializer pathLabelValues(Map<String, String> labelValues) {
         deserBuilder.requestPathLabels(labelValues);
