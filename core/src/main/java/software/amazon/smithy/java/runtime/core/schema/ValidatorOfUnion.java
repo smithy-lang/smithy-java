@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.schema;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
@@ -142,7 +143,7 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public void writeBlob(Schema member, byte[] value) {
+    public void writeBlob(Schema member, ByteBuffer value) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member, value)) {
             validator.writeBlob(member, value);

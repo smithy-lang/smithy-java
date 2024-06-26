@@ -9,6 +9,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.function.BiConsumer;
@@ -144,6 +145,12 @@ final class PayloadSerializer implements ShapeSerializer {
     public void writeBlob(Schema schema, byte[] value) {
         payloadWritten = true;
         serializer.setHttpPayload(schema, DataStream.ofBytes(value));
+    }
+
+    @Override
+    public void writeBlob(Schema schema, ByteBuffer value) {
+        payloadWritten = true;
+        serializer.setHttpPayload(schema, DataStream.ofByteBuffer(value));
     }
 
     @Override

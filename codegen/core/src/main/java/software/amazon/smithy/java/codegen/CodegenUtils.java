@@ -118,7 +118,7 @@ public final class CodegenUtils {
      * @return true if symbol resolves to a Java Array
      */
     public static boolean isJavaArray(Symbol symbol) {
-        return symbol.getProperty(SymbolProperties.IS_JAVA_ARRAY).isPresent();
+        return symbol.getProperty(SymbolProperties.IS_JAVA_ARRAY).orElse(false);
     }
 
     /**

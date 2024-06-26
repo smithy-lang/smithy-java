@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Collections;
@@ -36,7 +37,7 @@ public class DefaultsTest {
         assertEquals(defaults.integer(), 1);
         assertEquals(defaults.longMember(), 1);
         assertEquals(defaults.shortMember(), (short) 1);
-        assertArrayEquals(defaults.blob(), Base64.getDecoder().decode("YmxvYg=="));
+        assertEquals(defaults.blob(), ByteBuffer.wrap(Base64.getDecoder().decode("YmxvYg==")));
         defaults.streamingBlob()
             .asBytes()
             .thenAccept(b -> assertArrayEquals(b, Base64.getDecoder().decode("c3RyZWFtaW5n")));

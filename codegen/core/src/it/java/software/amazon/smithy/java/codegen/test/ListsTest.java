@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.test;
 
+import static java.nio.ByteBuffer.wrap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -15,11 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -95,7 +94,9 @@ public class ListsTest {
                 .build(),
             ListAllTypesInput.builder()
                 .listOfBlobs(
-                    List.of(Base64.getDecoder().decode("YmxvYg=="), Base64.getDecoder().decode("YmlyZHM="))
+                    Stream.of(Base64.getDecoder().decode("YmxvYg=="), Base64.getDecoder().decode("YmlyZHM="))
+                        .map(ByteBuffer::wrap)
+                        .toList()
                 )
                 .build(),
             ListAllTypesInput.builder()
@@ -205,7 +206,11 @@ public class ListsTest {
                 .build(),
             SparseListsInput.builder()
                 .listOfBlobs(
-                    ListUtils.of(Base64.getDecoder().decode("YmxvYg=="), null, Base64.getDecoder().decode("YmlyZHM="))
+                    ListUtils.of(
+                        wrap(Base64.getDecoder().decode("YmxvYg==")),
+                        null,
+                        wrap(Base64.getDecoder().decode("YmlyZHM="))
+                    )
                 )
                 .build(),
             SparseListsInput.builder()

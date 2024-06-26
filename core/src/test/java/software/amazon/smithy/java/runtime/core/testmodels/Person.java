@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.core.testmodels;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -72,7 +73,7 @@ public final class Person implements SerializableStruct {
     private final int age;
     private final Instant birthday;
     private final String favoriteColor;
-    private final byte[] binary;
+    private final ByteBuffer binary;
     private final Map<String, List<String>> queryParams;
 
     private Person(Builder builder) {
@@ -100,7 +101,7 @@ public final class Person implements SerializableStruct {
         return birthday;
     }
 
-    public byte[] binary() {
+    public ByteBuffer binary() {
         return binary;
     }
 
@@ -163,7 +164,7 @@ public final class Person implements SerializableStruct {
         private int age = 0;
         private Instant birthday;
         private String favoriteColor;
-        private byte[] binary;
+        private ByteBuffer binary;
         private Map<String, List<String>> queryParams = Collections.emptyMap();
 
         private Builder() {}
@@ -193,7 +194,7 @@ public final class Person implements SerializableStruct {
             return this;
         }
 
-        public Builder binary(byte[] binary) {
+        public Builder binary(ByteBuffer binary) {
             this.binary = binary;
             return this;
         }

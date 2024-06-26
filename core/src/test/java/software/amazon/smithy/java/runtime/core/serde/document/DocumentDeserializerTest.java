@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.core.serde.document;
 
+import static java.nio.ByteBuffer.wrap;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
@@ -28,7 +29,7 @@ public class DocumentDeserializerTest {
                 "birthday",
                 Document.createTimestamp(Instant.EPOCH),
                 "binary",
-                Document.createBlob("hi".getBytes(StandardCharsets.UTF_8))
+                Document.createBlob(wrap("hi".getBytes(StandardCharsets.UTF_8)))
             )
         );
 
@@ -37,7 +38,7 @@ public class DocumentDeserializerTest {
         assertThat(person.name(), is("Savage Bob"));
         assertThat(person.age(), is(100));
         assertThat(person.birthday(), is(Instant.EPOCH));
-        assertThat(person.binary(), is("hi".getBytes(StandardCharsets.UTF_8)));
+        assertThat(person.binary(), is(wrap("hi".getBytes(StandardCharsets.UTF_8))));
     }
 
     @Test
@@ -46,7 +47,7 @@ public class DocumentDeserializerTest {
             .name("Savage Bob")
             .age(100)
             .birthday(Instant.EPOCH)
-            .binary("hi".getBytes(StandardCharsets.UTF_8))
+            .binary(wrap("hi".getBytes(StandardCharsets.UTF_8)))
             .build();
 
         var bobDocument = Document.createTyped(person);
@@ -55,6 +56,6 @@ public class DocumentDeserializerTest {
         assertThat(personCopy.name(), is("Savage Bob"));
         assertThat(personCopy.age(), is(100));
         assertThat(personCopy.birthday(), is(Instant.EPOCH));
-        assertThat(personCopy.binary(), is("hi".getBytes(StandardCharsets.UTF_8)));
+        assertThat(personCopy.binary(), is(wrap("hi".getBytes(StandardCharsets.UTF_8))));
     }
 }

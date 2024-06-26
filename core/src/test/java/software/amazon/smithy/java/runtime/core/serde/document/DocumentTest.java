@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.core.serde.document;
 
+import static java.nio.ByteBuffer.wrap;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
@@ -15,6 +16,7 @@ import static org.hamcrest.Matchers.nullValue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -162,7 +164,7 @@ public class DocumentTest {
             Arguments.of(Document.createBoolean(true), true, (Function<Document, Object>) Document::asBoolean),
             Arguments.of(
                 Document.createBlob("a".getBytes(StandardCharsets.UTF_8)),
-                "a".getBytes(StandardCharsets.UTF_8),
+                wrap("a".getBytes(StandardCharsets.UTF_8)),
                 (Function<Document, Object>) Document::asBlob
             ),
             Arguments.of(
@@ -188,7 +190,7 @@ public class DocumentTest {
         var person = Person.builder()
             .name("A")
             .age(1)
-            .binary("hi".getBytes(StandardCharsets.UTF_8))
+            .binary(wrap("hi".getBytes(StandardCharsets.UTF_8)))
             .birthday(Instant.EPOCH)
             .build();
         var doc = Document.createTyped(person);
@@ -196,7 +198,7 @@ public class DocumentTest {
         assertThat(doc.getMember("__type").asString(), equalTo(Person.ID.toString()));
         assertThat(doc.getMember("name").asString(), equalTo("A"));
         assertThat(doc.getMember("age").asInteger(), equalTo(1));
-        assertThat(doc.getMember("binary").asBlob(), equalTo("hi".getBytes(StandardCharsets.UTF_8)));
+        assertThat(doc.getMember("binary").asBlob(), equalTo(wrap("hi".getBytes(StandardCharsets.UTF_8))));
         assertThat(doc.getMember("birthday").asTimestamp(), equalTo(Instant.EPOCH));
     }
 
@@ -220,7 +222,7 @@ public class DocumentTest {
             ),
             Arguments.of(
                 Document.createBlob("a".getBytes(StandardCharsets.UTF_8)),
-                "a".getBytes(StandardCharsets.UTF_8),
+                wrap("a".getBytes(StandardCharsets.UTF_8)),
                 (Function<ShapeDeserializer, Object>) s -> s.readBlob(PreludeSchemas.BLOB)
             ),
             Arguments.of(
@@ -454,7 +456,7 @@ public class DocumentTest {
         }
 
         @Override
-        public byte[] asBlob() {
+        public ByteBuffer asBlob() {
             return getDocument().asBlob();
         }
 
@@ -514,7 +516,7 @@ public class DocumentTest {
     public static List<Arguments> documentToObjectProvider() {
         return List.of(
             Arguments.of("hi", ShapeType.STRING),
-            Arguments.of("hi".getBytes(StandardCharsets.UTF_8), ShapeType.BLOB),
+            Arguments.of(wrap("hi".getBytes(StandardCharsets.UTF_8)), ShapeType.BLOB),
             Arguments.of(true, ShapeType.BOOLEAN),
             Arguments.of(Instant.EPOCH, ShapeType.TIMESTAMP),
             Arguments.of((byte) 1, ShapeType.BYTE),

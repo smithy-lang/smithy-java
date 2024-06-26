@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
@@ -23,7 +24,7 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
     protected abstract RuntimeException throwForInvalidState(Schema schema);
 
     @Override
-    public byte[] readBlob(Schema schema) {
+    public ByteBuffer readBlob(Schema schema) {
         throw throwForInvalidState(schema);
     }
 

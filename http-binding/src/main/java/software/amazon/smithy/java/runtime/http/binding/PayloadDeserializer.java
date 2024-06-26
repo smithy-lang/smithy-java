@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.concurrent.ExecutionException;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
@@ -25,9 +26,9 @@ final class PayloadDeserializer implements ShapeDeserializer {
         this.body = body;
     }
 
-    private byte[] resolveBodyBytes() {
+    private ByteBuffer resolveBodyBytes() {
         try {
-            return body.asBytes().toCompletableFuture().get();
+            return body.asByteBuffer().toCompletableFuture().get();
         } catch (InterruptedException | ExecutionException e) {
             throw new SerializationException("Failed to get payload bytes", e);
         }
@@ -45,7 +46,7 @@ final class PayloadDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public byte[] readBlob(Schema schema) {
+    public ByteBuffer readBlob(Schema schema) {
         if (isNull()) {
             return null;
         }

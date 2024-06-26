@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.function.Function;
 
 /**
  * Subscribes to a {@link DataStream} to transform it into a result.
@@ -49,6 +50,15 @@ interface DataStreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
      */
     static DataStreamSubscriber<byte[]> ofByteArray() {
         return ofHttpResponseBodySubscriber(HttpResponse.BodySubscribers.ofByteArray());
+    }
+
+    /**
+     * Reads a stream and stores the result into a ByteBuffer.
+     *
+     * @return the StreamSubscriber that reads the stream into a ByteBuffer.
+     */
+    static DataStreamSubscriber<ByteBuffer> ofByteBuffer() {
+        return ofHttpResponseBodySubscriber(HttpResponse.BodySubscribers.ofByteArray(), ByteBuffer::wrap);
     }
 
     /**
@@ -120,10 +130,17 @@ interface DataStreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
      * @param <T> Value created by the BodySubscriber.
      */
     private static <T> DataStreamSubscriber<T> ofHttpResponseBodySubscriber(HttpResponse.BodySubscriber<T> subscriber) {
+        return ofHttpResponseBodySubscriber(subscriber, Function.identity());
+    }
+
+    private static <I, O> DataStreamSubscriber<O> ofHttpResponseBodySubscriber(
+        HttpResponse.BodySubscriber<I> subscriber,
+        Function<I, O> function
+    ) {
         return new DataStreamSubscriber<>() {
             @Override
-            public CompletionStage<T> result() {
-                return subscriber.getBody();
+            public CompletionStage<O> result() {
+                return subscriber.getBody().thenApply(function);
             }
 
             @Override

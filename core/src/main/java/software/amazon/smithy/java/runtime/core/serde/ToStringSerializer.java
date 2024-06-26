@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
@@ -171,13 +172,15 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeBlob(Schema schema, byte[] value) {
+    public void writeBlob(Schema schema, ByteBuffer value) {
         if (schema.hasTrait(SensitiveTrait.class)) {
             append(schema, value);
         } else {
-            for (var b : value) {
-                builder.append(Integer.toHexString(b));
+            value.mark();
+            while (value.hasRemaining()) {
+                builder.append(Integer.toHexString(value.get()));
             }
+            value.reset();
         }
     }
 

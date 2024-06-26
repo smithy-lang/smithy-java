@@ -9,6 +9,7 @@ import static java.lang.String.format;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -100,10 +101,9 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
         if (blobShape.hasTrait(StreamingTrait.class)) {
             return CodegenUtils.fromClass(DataStream.class);
         }
-        return CodegenUtils.fromClass(byte[].class)
+        return CodegenUtils.fromClass(ByteBuffer.class)
             .toBuilder()
-            .putProperty(SymbolProperties.IS_JAVA_ARRAY, true)
-            .putProperty(SymbolProperties.IS_PRIMITIVE, true)
+            .putProperty(SymbolProperties.IS_PRIMITIVE, false)
             .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
             .build();
     }

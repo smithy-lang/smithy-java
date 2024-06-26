@@ -5,10 +5,12 @@
 
 package software.amazon.smithy.java.runtime.http.binding;
 
+import static software.amazon.smithy.java.runtime.core.ByteBufferUtils.base64Encode;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
@@ -90,8 +92,8 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public void writeBlob(Schema schema, byte[] value) {
-        writeQuery(schema, () -> Base64.getEncoder().encodeToString(value));
+    public void writeBlob(Schema schema, ByteBuffer value) {
+        writeQuery(schema, () -> base64Encode(value));
     }
 
     @Override

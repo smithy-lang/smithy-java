@@ -7,6 +7,7 @@ package software.amazon.smithy.java.codegen.generators;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -209,11 +210,11 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                         }
                         writer.pushState();
                         writer.putContext("memberName", memberName);
+                        writer.putContext("nullable", CodegenUtils.isNullableMember(member));
                         var target = model.expectShape(member.getTarget());
                         // Wrap maps and lists with immutable collection
                         if (target.isMapShape() || target.isListShape()) {
                             var memberSymbol = symbolProvider.toSymbol(member);
-                            writer.putContext("nullable", CodegenUtils.isNullableMember(member));
                             writer.putContext(
                                 "wrapper",
                                 memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER)
@@ -221,6 +222,10 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                             writer.putContext("collections", Collections.class);
                             writer.write(
                                 "this.${memberName:L} = ${?nullable}builder.${memberName:L} == null ? null : ${/nullable}${collections:T}.${wrapper:L}(builder.${memberName:L});"
+                            );
+                        } else if (target.isBlobShape() && !CodegenUtils.isStreamingBlob(target)) {
+                            writer.write(
+                                "this.${memberName:L} = ${?nullable}builder.${memberName:L} == null ? null : ${/nullable}builder.${memberName:L}.asReadOnlyBuffer();"
                             );
                         } else {
                             writer.write("this.${memberName:L} = builder.${memberName:L};");
@@ -551,7 +556,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 if (blobShape.hasTrait(StreamingTrait.class)) {
                     writer.writeInline("$T.ofEmpty()", DataStream.class);
                 } else {
-                    writer.writeInlineWithNoFormatting("new byte[0]");
+                    writer.writeInline("$T.allocate(0)", ByteBuffer.class);
                 }
                 return null;
             }
@@ -766,28 +771,30 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             @Override
             public Void blobShape(BlobShape blobShape) {
                 var strValue = defaultValue.expectStringNode().getValue();
+                writer.pushState();
+                writer.putContext("dataStream", DataStream.class);
+                writer.putContext("b64", Base64.class);
+                writer.putContext("byteBuf", ByteBuffer.class);
                 if (blobShape.hasTrait(StreamingTrait.class)) {
                     if (strValue.isEmpty()) {
-                        writer.write("$T.ofEmpty()", DataStream.class);
+                        writer.write("${dataStream:T}.ofEmpty()");
                     } else {
                         writer.write(
-                            "$T.ofBytes($T.getDecoder().decode($S))",
-                            DataStream.class,
-                            Base64.class,
+                            "${dataStream:T}.ofBytes(${b64:T}.getDecoder().decode($S))",
                             strValue
                         );
                     }
                 } else {
                     if (strValue.isEmpty()) {
-                        writer.write("new byte[0]");
+                        writer.write("${byteBuf:T}.allocate(0);");
                     } else {
                         writer.write(
-                            "$T.getDecoder().decode($S)",
-                            Base64.class,
+                            "${byteBuf:T}.wrap(${b64:T}.getDecoder().decode($S)).asReadOnlyBuffer()",
                             strValue
                         );
                     }
                 }
+                writer.popState();
                 return null;
             }
 

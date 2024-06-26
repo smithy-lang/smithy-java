@@ -7,9 +7,9 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -273,7 +273,7 @@ public interface Document extends SerializableShape {
      * @return the bytes of the blob.
      * @throws SerializationException if the Document is not a blob.
      */
-    default byte[] asBlob() {
+    default ByteBuffer asBlob() {
         throw new SerializationException("Expected a blob document, but found " + type());
     }
 
@@ -497,8 +497,12 @@ public interface Document extends SerializableShape {
      * @param value Value to wrap.
      * @return the Document type.
      */
-    static Document createBlob(byte[] value) {
+    static Document createBlob(ByteBuffer value) {
         return new Documents.BlobDocument(PreludeSchemas.BLOB, value);
+    }
+
+    static Document createBlob(byte[] value) {
+        return createBlob(ByteBuffer.wrap(value));
     }
 
     /**
@@ -584,6 +588,8 @@ public interface Document extends SerializableShape {
             return createBigInteger(b);
         } else if (o instanceof BigDecimal b) {
             return createBigDecimal(b);
+        } else if (o instanceof ByteBuffer b) {
+            return createBlob(b);
         } else if (o instanceof byte[] b) {
             return createBlob(b);
         } else if (o instanceof Instant i) {
@@ -640,7 +646,7 @@ public interface Document extends SerializableShape {
                     return false;
                 }
                 return switch (l.type()) {
-                    case BLOB -> Arrays.equals(l.asBlob(), r.asBlob());
+                    case BLOB -> l.asBlob().equals(r.asBlob());
                     case BOOLEAN -> l.asBoolean() == r.asBoolean();
                     case STRING, ENUM -> l.asString().equals(r.asString());
                     case TIMESTAMP -> l.asTimestamp().equals(r.asTimestamp());

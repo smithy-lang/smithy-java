@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -126,10 +127,10 @@ final class JacksonDocument implements Document {
     }
 
     @Override
-    public byte[] asBlob() {
+    public ByteBuffer asBlob() {
         if (root.isBinary()) {
             try {
-                return root.binaryValue();
+                return ByteBuffer.wrap(root.binaryValue());
             } catch (IOException e) {
                 throw new SerializationException(e);
             }
@@ -137,7 +138,7 @@ final class JacksonDocument implements Document {
         if (root.isTextual()) {
             // Base64 decode JSON blobs.
             try {
-                return Base64.getDecoder().decode(root.textValue());
+                return ByteBuffer.wrap(Base64.getDecoder().decode(root.textValue()));
             } catch (IllegalArgumentException e) {
                 throw new SerializationException("Invalid base64", e);
             }

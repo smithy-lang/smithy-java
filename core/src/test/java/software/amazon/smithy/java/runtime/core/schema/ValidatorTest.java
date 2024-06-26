@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.core.schema;
 
+import static java.nio.ByteBuffer.wrap;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.empty;
@@ -702,7 +703,7 @@ public class ValidatorTest {
                 ShapeType.BLOB,
                 (Consumer<ShapeSerializer>) serializer -> serializer.writeBlob(
                     PreludeSchemas.INTEGER,
-                    "a".getBytes(StandardCharsets.UTF_8)
+                    wrap("a".getBytes(StandardCharsets.UTF_8))
                 )
             ),
             Arguments.of(
@@ -983,7 +984,7 @@ public class ValidatorTest {
                 ShapeType.BLOB,
                 (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBlob(
                     schema,
-                    "a".getBytes(StandardCharsets.UTF_8)
+                    wrap("a".getBytes(StandardCharsets.UTF_8))
                 )
             ),
             Arguments.of(
@@ -1022,7 +1023,7 @@ public class ValidatorTest {
                 ShapeType.BLOB,
                 (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBlob(
                     schema,
-                    "".getBytes(StandardCharsets.UTF_8)
+                    wrap("".getBytes(StandardCharsets.UTF_8))
                 )
             ),
             Arguments.of(
@@ -1052,7 +1053,7 @@ public class ValidatorTest {
                 ShapeType.BLOB,
                 (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBlob(
                     schema,
-                    "abcdefghijklmnop".getBytes(StandardCharsets.UTF_8)
+                    wrap("abcdefghijklmnop".getBytes(StandardCharsets.UTF_8))
                 )
             ),
             Arguments.of(

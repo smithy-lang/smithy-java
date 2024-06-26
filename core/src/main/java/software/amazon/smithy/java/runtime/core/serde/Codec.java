@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
@@ -41,6 +42,14 @@ public interface Codec extends AutoCloseable {
      * @return Returns the created deserializer.
      */
     ShapeDeserializer createDeserializer(byte[] source);
+
+    /**
+     * Create a deserializer from this Codec that deserializes a shape from the source.
+     *
+     * @param source Source to parse.
+     * @return Returns the created deserializer.
+     */
+    ShapeDeserializer createDeserializer(ByteBuffer source);
 
     /**
      * Helper method to serialize a shape a string.

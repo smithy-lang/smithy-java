@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import software.amazon.smithy.java.runtime.core.ByteBufferUtils;
 
 /**
  * Abstraction for reading streams of data.
@@ -120,6 +121,17 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
         return ofBytes(bytes, null);
     }
 
+
+    /**
+     * Create a DataStream from an ByteBuffer.
+     *
+     * @param buffer Bytes to read.
+     * @return the created DataStream.
+     */
+    static DataStream ofByteBuffer(ByteBuffer buffer) {
+        return ofByteBuffer(buffer, null);
+    }
+
     /**
      * Create a DataStream from an in-memory byte array.
      *
@@ -129,6 +141,14 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      */
     static DataStream ofBytes(byte[] bytes, String contentType) {
         return ofHttpRequestPublisher(HttpRequest.BodyPublishers.ofByteArray(bytes), contentType);
+    }
+
+    static DataStream ofByteBuffer(ByteBuffer buffer, String contentType) {
+        //TODO avoid having to copy here.
+        return ofHttpRequestPublisher(
+            HttpRequest.BodyPublishers.ofByteArray(ByteBufferUtils.getBytes(buffer)),
+            contentType
+        );
     }
 
     /**
@@ -226,6 +246,18 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      */
     default CompletionStage<byte[]> asBytes() {
         return transform(DataStreamSubscriber.ofByteArray());
+    }
+
+    /**
+     * Read the contents of the stream into a ByteBuffer.
+     *
+     * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
+     * {@link #contentLength()} can be used to know if it is safe.
+     *
+     * @return the CompletionStage that contains the read ByteBuffer.
+     */
+    default CompletionStage<ByteBuffer> asByteBuffer() {
+        return transform(DataStreamSubscriber.ofByteBuffer());
     }
 
     /**

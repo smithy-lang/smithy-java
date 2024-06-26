@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.function.BiConsumer;
@@ -127,7 +128,7 @@ public final class ListSerializer implements ShapeSerializer {
     }
 
     @Override
-    public void writeBlob(Schema schema, byte[] value) {
+    public void writeBlob(Schema schema, ByteBuffer value) {
         beforeWrite();
         delegate.writeBlob(schema, value);
     }

@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -177,7 +178,7 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public void writeBlob(Schema schema, byte[] value) {
+    public void writeBlob(Schema schema, ByteBuffer value) {
         setResult(new Documents.BlobDocument(schema, value));
     }
 

@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.json;
 
+import static java.nio.ByteBuffer.wrap;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.comparesEqualTo;
 import static org.hamcrest.Matchers.containsString;
@@ -17,6 +18,7 @@ import static org.hamcrest.Matchers.nullValue;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -123,7 +125,7 @@ public class JsonDocumentTest {
         assertThat(document.type(), is(ShapeType.STRING));
 
         // Reading here as a blob will base64 decode the value.
-        assertThat(document.asBlob(), equalTo("foo".getBytes(StandardCharsets.UTF_8)));
+        assertThat(document.asBlob(), equalTo(wrap("foo".getBytes(StandardCharsets.UTF_8))));
     }
 
     @Test
@@ -258,7 +260,7 @@ public class JsonDocumentTest {
         var pojo = builder.build();
 
         assertThat(pojo.name, equalTo("Hank"));
-        assertThat(pojo.binary, equalTo("foo".getBytes(StandardCharsets.UTF_8)));
+        assertThat(pojo.binary, equalTo(wrap("foo".getBytes(StandardCharsets.UTF_8))));
         assertThat(pojo.date, equalTo(Instant.EPOCH));
         assertThat(pojo.numbers, equalTo(List.of(1, 2, 3)));
     }
@@ -275,7 +277,7 @@ public class JsonDocumentTest {
         var pojo = builder.build();
 
         assertThat(pojo.name, equalTo("Hank"));
-        assertThat(pojo.binary, equalTo("foo".getBytes(StandardCharsets.UTF_8)));
+        assertThat(pojo.binary, equalTo(wrap("foo".getBytes(StandardCharsets.UTF_8))));
         assertThat(pojo.date, equalTo(Instant.EPOCH));
         assertThat(pojo.numbers, equalTo(List.of(1, 2, 3)));
     }
@@ -315,7 +317,7 @@ public class JsonDocumentTest {
             .build();
 
         private final String name;
-        private final byte[] binary;
+        private final ByteBuffer binary;
         private final Instant date;
         private final List<Integer> numbers;
 
@@ -334,7 +336,7 @@ public class JsonDocumentTest {
         private static final class Builder implements ShapeBuilder<TestPojo> {
 
             private String name;
-            private byte[] binary;
+            private ByteBuffer binary;
             private Instant date;
             private final List<Integer> numbers = new ArrayList<>();
 

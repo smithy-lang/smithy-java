@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -33,7 +34,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param schema Schema of the shape.
      * @return the read value.
      */
-    byte[] readBlob(Schema schema);
+    ByteBuffer readBlob(Schema schema);
 
     /**
      * Attempt to read a byte value.

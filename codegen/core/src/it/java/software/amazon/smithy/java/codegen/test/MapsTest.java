@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.test;
 
+import static java.nio.ByteBuffer.wrap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -91,7 +92,12 @@ public class MapsTest {
                 .build(),
             MapAllTypesInput.builder()
                 .stringBlobMap(
-                    Map.of("a", Base64.getDecoder().decode("YmxvYg=="), "b", Base64.getDecoder().decode("YmlyZHM="))
+                    Map.of(
+                        "a",
+                        wrap(Base64.getDecoder().decode("YmxvYg==")),
+                        "b",
+                        wrap(Base64.getDecoder().decode("YmlyZHM="))
+                    )
                 )
                 .build(),
             MapAllTypesInput.builder()
@@ -203,11 +209,11 @@ public class MapsTest {
                 .stringBlobMap(
                     MapUtils.of(
                         "a",
-                        Base64.getDecoder().decode("YmxvYg=="),
+                        wrap(Base64.getDecoder().decode("YmxvYg==")),
                         "null",
                         null,
                         "b",
-                        Base64.getDecoder().decode("YmlyZHM=")
+                        wrap(Base64.getDecoder().decode("YmlyZHM="))
                     )
                 )
                 .build(),

@@ -5,10 +5,12 @@
 
 package software.amazon.smithy.java.runtime.core.serde.document;
 
+import static java.nio.ByteBuffer.wrap;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
@@ -21,16 +23,16 @@ public class BlobDocumentTest {
 
     @Test
     public void createsDocument() {
-        var document = Document.createBlob("hi".getBytes(StandardCharsets.UTF_8));
+        var document = Document.createBlob(wrap("hi".getBytes(StandardCharsets.UTF_8)));
 
         assertThat(document.type(), equalTo(ShapeType.BLOB));
-        assertThat(document.asBlob(), equalTo("hi".getBytes(StandardCharsets.UTF_8)));
-        assertThat(document, equalTo(Document.createBlob("hi".getBytes(StandardCharsets.UTF_8))));
+        assertThat(document.asBlob(), equalTo(wrap("hi".getBytes(StandardCharsets.UTF_8))));
+        assertThat(document, equalTo(Document.createBlob(wrap("hi".getBytes(StandardCharsets.UTF_8)))));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.createBlob("hi".getBytes(StandardCharsets.UTF_8));
+        var document = Document.createBlob(wrap("hi".getBytes(StandardCharsets.UTF_8)));
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -46,9 +48,9 @@ public class BlobDocumentTest {
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
-            public void writeBlob(Schema schema, byte[] value) {
+            public void writeBlob(Schema schema, ByteBuffer value) {
                 assertThat(schema, equalTo(PreludeSchemas.BLOB));
-                assertThat(value, equalTo("hi".getBytes(StandardCharsets.UTF_8)));
+                assertThat(value, equalTo(wrap("hi".getBytes(StandardCharsets.UTF_8))));
             }
         };
 
@@ -60,6 +62,6 @@ public class BlobDocumentTest {
         var bytes = "a".getBytes(StandardCharsets.UTF_8);
         var doc = Document.createBlob(bytes);
 
-        assertThat(doc.asObject(), is(bytes));
+        assertThat(doc.asObject(), is(wrap(bytes)));
     }
 }

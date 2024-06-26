@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 import java.io.Flushable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
@@ -150,7 +151,11 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param schema Schema of the shape.
      * @param value  Blob value.
      */
-    void writeBlob(Schema schema, byte[] value);
+    void writeBlob(Schema schema, ByteBuffer value);
+
+    default void writeBlob(Schema schema, byte[] value) {
+        writeBlob(schema, ByteBuffer.wrap(value));
+    }
 
     /**
      * Serialize a data stream.

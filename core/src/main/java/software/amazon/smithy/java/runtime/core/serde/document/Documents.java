@@ -7,8 +7,8 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -540,14 +540,14 @@ final class Documents {
         }
     }
 
-    record BlobDocument(Schema schema, byte[] value) implements Document {
+    record BlobDocument(Schema schema, ByteBuffer value) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.BLOB;
         }
 
         @Override
-        public byte[] asBlob() {
+        public ByteBuffer asBlob() {
             return value;
         }
 
@@ -565,13 +565,13 @@ final class Documents {
                 return false;
             } else {
                 BlobDocument that = (BlobDocument) o;
-                return Arrays.equals(value, that.value);
+                return value.equals(that.value);
             }
         }
 
         @Override
         public int hashCode() {
-            return Arrays.hashCode(value);
+            return value.hashCode();
         }
     }
 

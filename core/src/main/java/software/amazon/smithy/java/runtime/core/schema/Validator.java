@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.schema;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -392,10 +393,11 @@ public final class Validator {
         }
 
         @Override
-        public void writeBlob(Schema schema, byte[] value) {
+        public void writeBlob(Schema schema, ByteBuffer value) {
             checkType(schema, ShapeType.BLOB);
-            if (value.length < schema.minLengthConstraint || value.length > schema.maxLengthConstraint) {
-                addError(new ValidationError.LengthValidationFailure(createPath(), value.length, schema));
+            int length = value.remaining();
+            if (length < schema.minLengthConstraint || length > schema.maxLengthConstraint) {
+                addError(new ValidationError.LengthValidationFailure(createPath(), length, schema));
             }
         }
 

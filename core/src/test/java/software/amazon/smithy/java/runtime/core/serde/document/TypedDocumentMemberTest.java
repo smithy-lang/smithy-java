@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.core.serde.document;
 
+import static java.nio.ByteBuffer.wrap;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
@@ -140,7 +141,7 @@ public class TypedDocumentMemberTest {
             ),
             Arguments.of(
                 ShapeType.BLOB,
-                "a".getBytes(StandardCharsets.UTF_8),
+                wrap("a".getBytes(StandardCharsets.UTF_8)),
                 (BiConsumer<Schema, ShapeSerializer>) (schema, s) -> s.writeBlob(
                     schema,
                     "a".getBytes(StandardCharsets.UTF_8)

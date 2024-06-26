@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
@@ -62,7 +63,7 @@ final class NullSerializer implements ShapeSerializer {
     public void writeString(Schema schema, String value) {}
 
     @Override
-    public void writeBlob(Schema schema, byte[] value) {}
+    public void writeBlob(Schema schema, ByteBuffer value) {}
 
     @Override
     public void writeTimestamp(Schema schema, Instant value) {}

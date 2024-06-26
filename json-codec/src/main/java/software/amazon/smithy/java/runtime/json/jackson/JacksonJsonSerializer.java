@@ -6,8 +6,10 @@
 package software.amazon.smithy.java.runtime.json.jackson;
 
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.function.BiConsumer;
@@ -85,6 +87,15 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     public void writeBlob(Schema schema, byte[] value) {
         try {
             generator.writeString(Base64.getEncoder().encodeToString(value));
+        } catch (Exception e) {
+            throw new SerializationException(e);
+        }
+    }
+
+    @Override
+    public void writeBlob(Schema schema, ByteBuffer value) {
+        try {
+            generator.writeBinary(new ByteBufferBackedInputStream(value), value.remaining());
         } catch (Exception e) {
             throw new SerializationException(e);
         }

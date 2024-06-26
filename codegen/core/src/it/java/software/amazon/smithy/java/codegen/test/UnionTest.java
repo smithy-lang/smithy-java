@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -46,7 +47,7 @@ public class UnionTest {
             new UnionType.LongValueMember(1L),
             new UnionType.ShortValueMember((short) 1),
             new UnionType.StringValueMember("string"),
-            new UnionType.BlobValueMember(Base64.getDecoder().decode("c3RyZWFtaW5n")),
+            new UnionType.BlobValueMember(ByteBuffer.wrap(Base64.getDecoder().decode("c3RyZWFtaW5n"))),
             new UnionType.StructureValueMember(NestedStruct.builder().build()),
             new UnionType.TimestampValueMember(Instant.EPOCH),
             new UnionType.UnionValueMember(new NestedUnion.BMember(1)),

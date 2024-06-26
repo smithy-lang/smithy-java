@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.json;
 
+import static java.nio.ByteBuffer.wrap;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
@@ -151,7 +152,7 @@ public class JsonDeserializerTest {
             var str = "foo";
             var expected = Base64.getEncoder().encodeToString(str.getBytes());
             var de = codec.createDeserializer(("\"" + expected + "\"").getBytes(StandardCharsets.UTF_8));
-            assertThat(de.readBlob(PreludeSchemas.BLOB), equalTo(str.getBytes(StandardCharsets.UTF_8)));
+            assertThat(de.readBlob(PreludeSchemas.BLOB), equalTo(wrap(str.getBytes(StandardCharsets.UTF_8))));
         }
     }
 

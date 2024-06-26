@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.test;
 
+import static java.nio.ByteBuffer.wrap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.math.BigDecimal;
@@ -81,7 +82,7 @@ public class StructuresTest {
     @Test
     void blobSerialization() {
         var datastream = DataStream.ofBytes("data streeeeeeeeeeam".getBytes());
-        var builder = BlobMembersInput.builder().requiredBlob("data".getBytes());
+        var builder = BlobMembersInput.builder().requiredBlob(wrap("data".getBytes()));
         builder.setDataStream(datastream);
         var input = builder.build();
         var document = Document.createTyped(builder.build());

@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -38,9 +39,9 @@ abstract class BasicStringValueDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public byte[] readBlob(Schema schema) {
+    public ByteBuffer readBlob(Schema schema) {
         try {
-            return Base64.getDecoder().decode(value.getBytes(StandardCharsets.UTF_8));
+            return ByteBuffer.wrap(Base64.getDecoder().decode(value.getBytes(StandardCharsets.UTF_8)));
         } catch (IllegalArgumentException e) {
             throw new SerializationException("invalid base64", e);
         }

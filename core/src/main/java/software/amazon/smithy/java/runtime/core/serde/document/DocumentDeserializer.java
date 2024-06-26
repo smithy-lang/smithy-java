@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
@@ -46,7 +47,7 @@ public class DocumentDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public byte[] readBlob(Schema schema) {
+    public ByteBuffer readBlob(Schema schema) {
         return value.asBlob();
     }
 

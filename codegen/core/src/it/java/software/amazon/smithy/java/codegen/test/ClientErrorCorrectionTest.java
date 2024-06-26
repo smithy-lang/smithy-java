@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,7 @@ public class ClientErrorCorrectionTest {
         assertEquals(corrected.integer(), 0);
         assertEquals(corrected.longMember(), 0);
         assertEquals(corrected.shortMember(), (short) 0);
-        assertArrayEquals(corrected.blob(), new byte[0]);
+        assertEquals(corrected.blob(), ByteBuffer.allocate(0));
         assertEquals(corrected.streamingBlob().contentLength(), 0);
         corrected.streamingBlob().asBytes().thenAccept(bytes -> assertArrayEquals(bytes, new byte[0]));
         assertNull(corrected.document());

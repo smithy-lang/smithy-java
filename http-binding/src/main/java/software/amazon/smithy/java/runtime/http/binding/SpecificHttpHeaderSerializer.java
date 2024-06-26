@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
@@ -72,7 +73,7 @@ final class SpecificHttpHeaderSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public void writeBlob(Schema schema, byte[] value) {
+    public void writeBlob(Schema schema, ByteBuffer value) {
         delegate.writeBlob(headerSchema, value);
     }
 

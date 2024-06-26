@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.json;
 
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.ServiceLoader;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
@@ -81,6 +82,11 @@ public final class JsonCodec implements Codec {
 
     @Override
     public ShapeDeserializer createDeserializer(byte[] source) {
+        return provider.newDeserializer(source, settings);
+    }
+
+    @Override
+    public ShapeDeserializer createDeserializer(ByteBuffer source) {
         return provider.newDeserializer(source, settings);
     }
 

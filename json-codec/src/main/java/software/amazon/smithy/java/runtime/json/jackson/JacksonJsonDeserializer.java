@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Locale;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
@@ -55,9 +56,9 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public byte[] readBlob(Schema schema) {
+    public ByteBuffer readBlob(Schema schema) {
         try {
-            return parser.getBinaryValue(Base64Variants.MIME_NO_LINEFEEDS);
+            return ByteBuffer.wrap(parser.getBinaryValue(Base64Variants.MIME_NO_LINEFEEDS));
         } catch (Exception e) {
             throw new SerializationException(e);
         }

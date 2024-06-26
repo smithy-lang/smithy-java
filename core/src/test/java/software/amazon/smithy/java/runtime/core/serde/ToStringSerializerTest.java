@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.core.serde;
 
+import static java.nio.ByteBuffer.wrap;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
@@ -40,7 +41,7 @@ public class ToStringSerializerTest {
             .name("Mike")
             .age(102)
             .birthday(Instant.EPOCH)
-            .binary("hello".getBytes(StandardCharsets.UTF_8))
+            .binary(wrap("hello".getBytes(StandardCharsets.UTF_8)))
             .queryParams(Map.of("a", List.of("1", "2")))
             .build();
 
@@ -102,7 +103,7 @@ public class ToStringSerializerTest {
 
         var str = ToStringSerializer.serialize(e -> {
             e.writeStruct(schema, SerializableStruct.create(schema, (s, ser) -> {
-                ser.writeBlob(s.member("foo"), "abc".getBytes(StandardCharsets.UTF_8));
+                ser.writeBlob(s.member("foo"), wrap("abc".getBytes(StandardCharsets.UTF_8)));
             }));
         });
 
