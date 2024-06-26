@@ -16,8 +16,10 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
 import software.amazon.smithy.java.server.core.RequestContext;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
-public class OperationInterfaceGenerator implements
+@SmithyInternalApi
+public final class OperationInterfaceGenerator implements
     Consumer<GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     @Override

@@ -22,8 +22,10 @@ import software.amazon.smithy.java.server.core.Service;
 import software.amazon.smithy.java.server.core.exceptions.UnknownOperationException;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
-public class ServiceGenerator implements
+@SmithyInternalApi
+public final class ServiceGenerator implements
     Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     @Override

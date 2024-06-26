@@ -25,10 +25,10 @@ public class ServiceJavaSymbolProvider extends JavaSymbolProvider {
 
     @Override
     public Symbol operationShape(OperationShape operationShape) {
-        String name = CodegenUtils.getDefaultName(operationShape, getService());
-        String stubName = name + "Operation";
+        var baseSymbol = super.operationShape(operationShape);
+        String stubName = baseSymbol.getName() + "Operation";
         String asyncStubName = stubName + "Async";
-        String operationFieldName = StringUtils.uncapitalize(name);
+        String operationFieldName = StringUtils.uncapitalize(baseSymbol.getName());
         var stubSymbol = Symbol.builder()
             .name(stubName)
             .putProperty(SymbolProperties.IS_PRIMITIVE, false)
@@ -41,15 +41,12 @@ public class ServiceJavaSymbolProvider extends JavaSymbolProvider {
             .namespace(format("%s.service", getPackageNamespace()), ".")
             .declarationFile(format("./%s/service/%s.java", getPackageNamespace().replace(".", "/"), asyncStubName))
             .build();
-        var apiOperationSymbol = super.operationShape(operationShape);
-        return Symbol.builder()
-            .name(name)
+
+        return baseSymbol.toBuilder()
             .putProperty(SymbolProperties.IS_PRIMITIVE, false)
             .putProperty(ServerSymbolProperties.OPERATION_FIELD_NAME, operationFieldName)
             .putProperty(ServerSymbolProperties.ASYNC_STUB_OPERATION, asyncStubSymbol)
             .putProperty(ServerSymbolProperties.STUB_OPERATION, stubSymbol)
-            .putProperty(ServerSymbolProperties.API_OPERATION_SYMBOL, apiOperationSymbol)
-            .namespace(format("%s.service", getPackageNamespace()), ".")
             .build();
     }
 
