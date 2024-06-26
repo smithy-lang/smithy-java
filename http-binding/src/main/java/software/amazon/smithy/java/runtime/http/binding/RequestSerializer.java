@@ -10,7 +10,6 @@ import java.util.Objects;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
-import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.uri.URIBuilder;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -25,7 +24,6 @@ public final class RequestSerializer {
     private Schema operation;
     private URI endpoint;
     private SerializableShape shapeValue;
-    private DataStream payload;
     private final BindingMatcher bindingMatcher = BindingMatcher.requestMatcher();
 
     RequestSerializer() {}
@@ -78,17 +76,6 @@ public final class RequestSerializer {
     }
 
     /**
-     * Set the streaming payload of the request, if any.
-     *
-     * @param payload Payload to associate to the request.
-     * @return Returns the serializer.
-     */
-    public RequestSerializer payload(DataStream payload) {
-        this.payload = payload;
-        return this;
-    }
-
-    /**
      * Finishes setting up the serializer and creates an HTTP request.
      *
      * @return Returns the created request.
@@ -101,7 +88,7 @@ public final class RequestSerializer {
         Objects.requireNonNull(payloadCodec, "value is not set");
 
         var httpTrait = operation.expectTrait(HttpTrait.class);
-        var serializer = new HttpBindingSerializer(httpTrait, payloadCodec, bindingMatcher, payload);
+        var serializer = new HttpBindingSerializer(httpTrait, payloadCodec, bindingMatcher);
         shapeValue.serialize(serializer);
         serializer.flush();
 

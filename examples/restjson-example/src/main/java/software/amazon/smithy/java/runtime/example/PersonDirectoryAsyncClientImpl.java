@@ -26,16 +26,16 @@ final class PersonDirectoryAsyncClientImpl extends Client implements PersonDirec
 
     @Override
     public CompletableFuture<PutPersonOutput> putPerson(PutPersonInput input, Context context) {
-        return call(input, null, null, new PutPerson(), context);
+        return call(input, new PutPerson(), context);
     }
 
     @Override
     public CompletableFuture<PutPersonImageOutput> putPersonImage(PutPersonImageInput input, Context context) {
-        return call(input, input.image(), null, new PutPersonImage(), context);
+        return call(input, new PutPersonImage(), context);
     }
 
     @Override
     public CompletableFuture<GetPersonImageOutput> getPersonImage(GetPersonImageInput input, Context context) {
-        return call(input, null, null, new GetPersonImage(), context);
+        return call(input, new GetPersonImage(), context);
     }
 }

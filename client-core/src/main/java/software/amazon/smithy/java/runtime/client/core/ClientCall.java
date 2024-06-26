@@ -25,7 +25,6 @@ import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
-import software.amazon.smithy.java.runtime.core.serde.DataStream;
 
 /**
  * Contains the information needed to send a request from a client using a protocol.
@@ -41,11 +40,9 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
     private final Context context;
     private final BiFunction<Context, String, Optional<ShapeBuilder<ModeledApiException>>> errorCreator;
     private final ClientInterceptor interceptor;
-    private final DataStream requestDataStream;
     private final AuthSchemeResolver authSchemeResolver;
     private final Map<String, AuthScheme<?, ?>> supportedAuthSchemes;
     private final IdentityResolvers identityResolvers;
-    private final Object requestEventStream;
     private final ExecutorService executor;
 
     private ClientCall(Builder<I, O> builder) {
@@ -59,8 +56,6 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         identityResolvers = Objects.requireNonNull(builder.identityResolvers, "identityResolvers is null");
         supportedAuthSchemes = builder.supportedAuthSchemes.stream()
             .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity()));
-        requestDataStream = builder.requestDataStream;
-        requestEventStream = builder.requestEventStream;
         //TODO fix this to not use a cached thread pool.
         executor = builder.executor == null ? Executors.newCachedThreadPool() : builder.executor;
 
@@ -124,25 +119,6 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
      */
     public Context context() {
         return context;
-    }
-
-    /**
-     * Contains the optionally present data stream.
-     *
-     * @return the optionally present data stream to send in a request.
-     */
-    public Optional<DataStream> requestDataStream() {
-        return Optional.ofNullable(requestDataStream);
-    }
-
-    /**
-     * Contains the optionally present event stream of the input shape.
-     *
-     * <p>TODO: Implement event streams.
-     * @return the optionally present input event stream.
-     */
-    public Optional<Object> requestEventStream() {
-        return Optional.empty();
     }
 
     /**
@@ -221,11 +197,9 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         private Context context;
         private BiFunction<Context, String, Optional<ShapeBuilder<ModeledApiException>>> errorCreator;
         private ClientInterceptor interceptor = ClientInterceptor.NOOP;
-        private DataStream requestDataStream;
         private AuthSchemeResolver authSchemeResolver;
         private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
         private IdentityResolvers identityResolvers;
-        private Object requestEventStream;
         private ExecutorService executor;
 
         private Builder() {}
@@ -298,34 +272,6 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
          */
         public Builder<I, O> interceptor(ClientInterceptor interceptor) {
             this.interceptor = Objects.requireNonNullElse(interceptor, ClientInterceptor.NOOP);
-            return this;
-        }
-
-        /**
-         * Set the request data stream of the call.
-         *
-         * @param requestDataStream Data stream to set.
-         * @return the builder.
-         */
-        public Builder<I, O> requestDataStream(DataStream requestDataStream) {
-            if (requestDataStream != null) {
-                this.requestDataStream = requestDataStream;
-                this.requestEventStream = null;
-            }
-            return this;
-        }
-
-        /**
-         * Set the request event stream of the call.
-         *
-         * @param requestEventStream Event stream to set.
-         * @return the builder.
-         */
-        public Builder<I, O> requestEventStream(Object requestEventStream) {
-            if (requestEventStream != null) {
-                this.requestEventStream = requestEventStream;
-                this.requestDataStream = null;
-            }
             return this;
         }
 

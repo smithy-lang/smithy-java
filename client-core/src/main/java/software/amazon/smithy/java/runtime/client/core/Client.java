@@ -25,7 +25,6 @@ import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
-import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public abstract class Client {
@@ -64,8 +63,6 @@ public abstract class Client {
      * Performs the actual RPC call.
      *
      * @param input       Input to send.
-     * @param inputStream Any kind of data stream extracted from the input, or null.
-     * @param eventStream The event stream extracted from the input, or null. TODO: Implement.
      * @param operation   The operation shape.
      * @param context     Context of the call.
      * @param <I>         Input shape.
@@ -74,8 +71,6 @@ public abstract class Client {
      */
     protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
         I input,
-        DataStream inputStream,
-        Object eventStream,
         ApiOperation<I, O> operation,
         Context context
     ) {
@@ -90,8 +85,6 @@ public abstract class Client {
                 .operation(operation)
                 .endpointResolver(endpointResolver)
                 .context(context)
-                .requestDataStream(inputStream)
-                .requestEventStream(eventStream)
                 .interceptor(interceptor)
                 .supportedAuthSchemes(supportedAuthSchemes)
                 .authSchemeResolver(authSchemeResolver)

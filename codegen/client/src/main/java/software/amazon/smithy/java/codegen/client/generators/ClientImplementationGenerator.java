@@ -79,7 +79,6 @@ public final class ClientImplementationGenerator
 
         @Override
         public void run() {
-            // TODO: support event streams and streaming blobs
             writer.pushState();
             writer.putContext("async", async);
             writer.putContext("context", Context.class);
@@ -94,7 +93,7 @@ public final class ClientImplementationGenerator
                     """
                         @Override
                         public ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${context:T} context) {
-                            return call(input, null, null, new ${operation:T}(), context)${^async}.join()${/async};
+                            return call(input, new ${operation:T}(), context)${^async}.join()${/async};
                         }
                         """
                 );

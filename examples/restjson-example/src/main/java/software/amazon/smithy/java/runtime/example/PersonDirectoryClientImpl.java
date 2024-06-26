@@ -25,16 +25,16 @@ final class PersonDirectoryClientImpl extends Client implements PersonDirectoryC
 
     @Override
     public PutPersonOutput putPerson(PutPersonInput input, Context context) {
-        return call(input, null, null, new PutPerson(), context).join();
+        return call(input, new PutPerson(), context).join();
     }
 
     @Override
     public PutPersonImageOutput putPersonImage(PutPersonImageInput input, Context context) {
-        return call(input, input.image(), null, new PutPersonImage(), context).join();
+        return call(input, new PutPersonImage(), context).join();
     }
 
     @Override
     public GetPersonImageOutput getPersonImage(GetPersonImageInput input, Context context) {
-        return call(input, null, null, new GetPersonImage(), context).join();
+        return call(input, new GetPersonImage(), context).join();
     }
 }
