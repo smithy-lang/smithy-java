@@ -117,7 +117,10 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 )
             );
             writer.putContext("properties", new PropertyGenerator(writer, shape, directive.symbolProvider()));
-            writer.putContext("constructor", new ConstructorGenerator(writer, shape, directive.symbolProvider()));
+            writer.putContext(
+                "constructor",
+                new ConstructorGenerator(writer, shape, directive.symbolProvider(), directive.model())
+            );
             writer.putContext(
                 "getters",
                 new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model())
@@ -173,8 +176,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         }
     }
 
-    private record ConstructorGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements
-        Runnable {
+    private record ConstructorGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model)
+        implements Runnable {
+
         @Override
         public void run() {
             writer.openBlock(
@@ -196,7 +200,25 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                         if (shape.hasTrait(ErrorTrait.class) && memberName.equals("message")) {
                             continue;
                         }
-                        writer.write("this.$1L = builder.$1L;", memberName);
+                        writer.pushState();
+                        writer.putContext("memberName", memberName);
+                        var target = model.expectShape(member.getTarget());
+                        // Wrap maps and lists with immutable collection
+                        if (target.isMapShape() || target.isListShape()) {
+                            var memberSymbol = symbolProvider.toSymbol(member);
+                            writer.putContext("nullable", CodegenUtils.isNullableMember(member));
+                            writer.putContext(
+                                "wrapper",
+                                memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER)
+                            );
+                            writer.putContext("collections", Collections.class);
+                            writer.write(
+                                "this.${memberName:L} = ${?nullable}builder.${memberName:L} == null ? null : ${/nullable}${collections:T}.${wrapper:L}(builder.${memberName:L});"
+                            );
+                        } else {
+                            writer.write("this.${memberName:L} = builder.${memberName:L};");
+                        }
+                        writer.popState();
                     }
                 }
             );
@@ -270,7 +292,6 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             writer.pushState(new GetterSection(member));
             var shapeSymbol = symbolProvider.toSymbol(shape);
             writer.putContext("empty", shapeSymbol.expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD));
-            writer.putContext("wrapper", shapeSymbol.expectProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER));
             writer.putContext("collections", Collections.class);
             writer.write(
                 """
@@ -278,7 +299,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                         if (${memberName:L} == null) {
                             return ${collections:T}.${empty:L};
                         }${/isNullable}
-                        return ${collections:T}.${wrapper:L}(${memberName:L});
+                        return ${memberName:L};
                     }
                     """
             );
@@ -666,12 +687,13 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 // If streaming blob then a setter must be added to allow
                 // operation to set on builder.
                 if (CodegenUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {
+                    writer.putContext("dataStream", DataStream.class);
                     writer.write("""
                         @Override
-                        public void setDataStream($T stream) {
+                        public void setDataStream(${dataStream:T} stream) {
                             ${memberName:L}(stream);
                         }
-                        """, DataStream.class);
+                        """);
                 }
                 writer.write(
                     """

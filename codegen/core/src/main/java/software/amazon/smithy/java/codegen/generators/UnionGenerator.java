@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -143,6 +144,7 @@ public final class UnionGenerator
             writer.pushState();
             writer.putContext("shapeSerializer", ShapeSerializer.class);
             writer.putContext("objects", Objects.class);
+            writer.putContext("collections", Collections.class);
             for (var member : shape.members()) {
                 writer.pushState();
                 writer.injectSection(new ClassSection(member));
@@ -152,7 +154,7 @@ public final class UnionGenerator
 
                         public ${memberName:U}Member(${member:T} value) {
                             super(Type.${enumValue:L});
-                            this.value = ${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Union value cannot be null")${/primitive};
+                            this.value = ${?col}${collections:T}.${wrap:L}(${/col}${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Union value cannot be null")${/primitive}${?col})${/col};
                         }
 
                         @Override
@@ -186,6 +188,12 @@ public final class UnionGenerator
                 writer.putContext("equals", new EqualsGenerator(writer, symbolProvider, member));
                 writer.putContext("hashCode", new HashCodeGenerator(writer, symbolProvider, member));
                 writer.putContext("primitive", memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE));
+                writer.putContext(
+                    "wrap",
+                    memberSymbol.getProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER).orElse(null)
+                );
+                var target = model.expectShape(member.getTarget());
+                writer.putContext("col", target.isMapShape() || target.isListShape());
                 writer.write(template);
                 writer.popState();
             }
