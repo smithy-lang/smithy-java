@@ -117,9 +117,10 @@ public final class UnionGenerator
                 writer.pushState();
                 writer.putContext("member", symbolProvider.toSymbol(member));
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
+                writer.putContext("unsupported", UnsupportedOperationException.class);
                 writer.write("""
                     public ${member:B} ${memberName:L}() {
-                        return null;
+                        throw new ${unsupported:T}("Member ${memberName:L} not supported for union of type: " + type);
                     }
                     """);
                 writer.popState();
