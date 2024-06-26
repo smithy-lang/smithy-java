@@ -20,7 +20,7 @@ tasks.register<JavaExec>("generateSources") {
     classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
     mainClass = "software.amazon.smithy.java.codegen.utils.TestJavaCodegenRunner"
     environment("service", "smithy.java.codegen.test#TestService")
-    environment("namespace", "io.smithy.codegen.test")
+    environment("namespace", "software.amazon.smithy.java.codegen.test")
     environment("output", generatedSrcDir)
 }
 

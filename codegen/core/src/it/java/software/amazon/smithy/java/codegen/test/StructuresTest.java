@@ -3,33 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.codegen;
+package software.amazon.smithy.java.codegen.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.smithy.codegen.test.model.BigDecimalMembersInput;
-import io.smithy.codegen.test.model.BigIntegerMembersInput;
-import io.smithy.codegen.test.model.BlobMembersInput;
-import io.smithy.codegen.test.model.BooleanMembersInput;
-import io.smithy.codegen.test.model.ByteMembersInput;
-import io.smithy.codegen.test.model.DocumentMembersInput;
-import io.smithy.codegen.test.model.DoubleMembersInput;
-import io.smithy.codegen.test.model.EnumMembersInput;
-import io.smithy.codegen.test.model.EnumType;
-import io.smithy.codegen.test.model.FloatMembersInput;
-import io.smithy.codegen.test.model.IntEnumMembersInput;
-import io.smithy.codegen.test.model.IntEnumType;
-import io.smithy.codegen.test.model.IntegerMembersInput;
-import io.smithy.codegen.test.model.ListMembersInput;
-import io.smithy.codegen.test.model.LongMembersInput;
-import io.smithy.codegen.test.model.MapMembersInput;
-import io.smithy.codegen.test.model.NestedStruct;
-import io.smithy.codegen.test.model.NestedUnion;
-import io.smithy.codegen.test.model.ShortMembersInput;
-import io.smithy.codegen.test.model.StringMembersInput;
-import io.smithy.codegen.test.model.StructureMembersInput;
-import io.smithy.codegen.test.model.TimestampMembersInput;
-import io.smithy.codegen.test.model.UnionMembersInput;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
@@ -39,6 +16,29 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.codegen.test.model.BigDecimalMembersInput;
+import software.amazon.smithy.java.codegen.test.model.BigIntegerMembersInput;
+import software.amazon.smithy.java.codegen.test.model.BlobMembersInput;
+import software.amazon.smithy.java.codegen.test.model.BooleanMembersInput;
+import software.amazon.smithy.java.codegen.test.model.ByteMembersInput;
+import software.amazon.smithy.java.codegen.test.model.DocumentMembersInput;
+import software.amazon.smithy.java.codegen.test.model.DoubleMembersInput;
+import software.amazon.smithy.java.codegen.test.model.EnumMembersInput;
+import software.amazon.smithy.java.codegen.test.model.EnumType;
+import software.amazon.smithy.java.codegen.test.model.FloatMembersInput;
+import software.amazon.smithy.java.codegen.test.model.IntEnumMembersInput;
+import software.amazon.smithy.java.codegen.test.model.IntEnumType;
+import software.amazon.smithy.java.codegen.test.model.IntegerMembersInput;
+import software.amazon.smithy.java.codegen.test.model.ListMembersInput;
+import software.amazon.smithy.java.codegen.test.model.LongMembersInput;
+import software.amazon.smithy.java.codegen.test.model.MapMembersInput;
+import software.amazon.smithy.java.codegen.test.model.NestedStruct;
+import software.amazon.smithy.java.codegen.test.model.NestedUnion;
+import software.amazon.smithy.java.codegen.test.model.ShortMembersInput;
+import software.amazon.smithy.java.codegen.test.model.StringMembersInput;
+import software.amazon.smithy.java.codegen.test.model.StructureMembersInput;
+import software.amazon.smithy.java.codegen.test.model.TimestampMembersInput;
+import software.amazon.smithy.java.codegen.test.model.UnionMembersInput;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;

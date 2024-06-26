@@ -39,6 +39,7 @@ structures/structure-members.smithy
 structures/structure-tests.smithy
 structures/timestamp-members.smithy
 structures/union-members.smithy
+traits/traits.smithy
 unions/union-tests.smithy
 unions/unions-all-types.smithy
 common.smithy
