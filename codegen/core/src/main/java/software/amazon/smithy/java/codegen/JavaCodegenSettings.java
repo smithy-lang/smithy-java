@@ -26,25 +26,31 @@ public final class JavaCodegenSettings {
     private static final String NAMESPACE = "namespace";
     private static final String HEADER_FILE = "headerFile";
     private static final String NULL_ANNOTATION = "nullAnnotation";
+    private static final String DEFAULT_NULL_ANNOTATION = "edu.umd.cs.findbugs.annotations.NonNull";
 
 
     private final ShapeId service;
     private final String packageNamespace;
     private final String header;
 
-    private final String nullAnnotation;
+    private final Symbol nullAnnotationSymbol;
 
     JavaCodegenSettings(
         ShapeId service,
         String packageNamespace,
         String headerFile,
         String sourceLocation,
-        String nullAnnotation
+        String nullAnnotationFullyQualifiedName
     ) {
         this.service = Objects.requireNonNull(service);
         this.packageNamespace = Objects.requireNonNull(packageNamespace);
         this.header = getHeader(headerFile, Objects.requireNonNull(sourceLocation));
-        this.nullAnnotation = nullAnnotation;
+
+        if (nullAnnotationFullyQualifiedName != null && !nullAnnotationFullyQualifiedName.equals("")) {
+            nullAnnotationSymbol = buildSymbolFromFullyQualifiedName(nullAnnotationFullyQualifiedName);
+        } else {
+            nullAnnotationSymbol = null;
+        }
     }
 
     /**
@@ -77,16 +83,19 @@ public final class JavaCodegenSettings {
     }
 
     public Symbol getNullAnnotationSymbol() {
+        return this.nullAnnotationSymbol;
 
-        Class nullAnnotationClass;
-        try {
-            nullAnnotationClass = Class.forName(this.nullAnnotation);
-            return CodegenUtils.fromClass(nullAnnotationClass);
-        } catch (ClassNotFoundException e) {
-            LOGGER.log(System.Logger.Level.DEBUG, () -> "Null Annotation class " + this.nullAnnotation + " not found");
-            return null;
-        }
+    }
 
+    private Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {
+        String[] parts = fullyQualifiedName.split("\\.");
+        String name = parts[parts.length - 1];
+        String namespace = fullyQualifiedName.substring(0, fullyQualifiedName.length() - name.length() - 1);
+        return Symbol.builder()
+            .name(name)
+            .namespace(namespace, ".")
+            .putProperty(SymbolProperties.IS_PRIMITIVE, false)
+            .build();
     }
 
     private static String getHeader(String headerFile, String sourceLocation) {

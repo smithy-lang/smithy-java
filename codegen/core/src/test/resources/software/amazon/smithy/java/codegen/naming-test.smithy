@@ -9,7 +9,7 @@ service TestService {
         ReservedWordMembers
         ReservedWordShape
         Casing
-        RequiredOperation
+        NonNullAnnotation
     ]
 }
 
@@ -30,8 +30,6 @@ operation NamingConflicts {
         javaList: StringList
     }
 }
-
-
 
 @private
 structure Map {
@@ -104,7 +102,7 @@ enum EnumCasing {
     with_1_number
 }
 
-operation RequiredOperation {
+operation NonNullAnnotation {
     input := {
         @required
         requiredStruct: RequiredStruct

@@ -42,7 +42,7 @@ public class NamingTest {
                 ObjectNode.builder()
                     .withMember("service", "smithy.java.codegen#TestService")
                     .withMember("namespace", "test.smithy.codegen")
-                    .withMember("nullAnnotation", "software.amazon.smithy.java.codegen.utils.PlaceholderNonNull")
+                    .withMember("nullAnnotation", "software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation")
                     .build()
             )
             .model(model)
@@ -55,10 +55,12 @@ public class NamingTest {
 
     @Test
     void nullAnnotationsOnFieldsAndGetter() {
-        var fileStr = getFileStringForClass("RequiredOperationInput");
-        var expectedField = "private transient final @PlaceholderNonNull RequiredStruct requiredStruct;";
-        var expectedGetter = "public @PlaceholderNonNull RequiredStruct requiredStruct()";
-        var expectedImport = "import software.amazon.smithy.java.codegen.utils.PlaceholderNonNull;";
+        var fileStr = getFileStringForClass("NonNullAnnotationInput");
+        var expectedField = "private transient final @TestNonNullAnnotation" +
+            " RequiredStruct requiredStruct;";
+        var expectedGetter = "public @TestNonNullAnnotation " +
+            "RequiredStruct requiredStruct()";
+        var expectedImport = "import software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation;";
 
         assertTrue(fileStr.contains(expectedField));
         assertTrue(fileStr.contains(expectedGetter));

@@ -5,5 +5,5 @@
 
 package software.amazon.smithy.java.codegen.utils;
 
-public class PlaceholderNonNull {
+public class TestNonNullAnnotation {
 }

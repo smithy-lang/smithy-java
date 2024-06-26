@@ -207,30 +207,18 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         private final JavaTypeFormatter javaTypeFormatter = new JavaTypeFormatter();
 
         @Override
-        public String apply(Object type, String temp) {
+        public String apply(Object type, String indent) {
 
             Symbol nullAnnotationSymbol = settings.getNullAnnotationSymbol();
 
             if (nullAnnotationSymbol == null) {
-                return javaTypeFormatter.apply(type, temp);
+                return javaTypeFormatter.apply(type, indent);
             }
 
-            Symbol typeSymbol;
-            if (type instanceof Symbol s) {
-                typeSymbol = s;
-            } else if (type instanceof Class<?> c) {
-                typeSymbol = CodegenUtils.fromClass(c);
-            } else if (type instanceof SymbolReference r) {
-                typeSymbol = r.getSymbol();
-            } else {
-                throw new IllegalArgumentException(
-                    "Invalid type provided for $N. Expected a Symbol or Class"
-                        + " but found: `" + type + "`."
-                );
-            }
+            Symbol typeSymbol = getTypeSymbol(type, 'N');
 
             if (typeSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE)) {
-                return javaTypeFormatter.apply(typeSymbol, temp);
+                return javaTypeFormatter.apply(typeSymbol, indent);
             }
 
             return format("@$T $T", nullAnnotationSymbol, typeSymbol);
