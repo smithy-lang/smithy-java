@@ -108,7 +108,10 @@ public class JsonSerializerTest {
                     this.put("a", Document.createString("av"));
                     this.put("b", Document.createString("bv"));
                     this.put("c", Document.createInteger(1));
-                    this.put("d", Document.createList(List.of(Document.createInteger(1), Document.createInteger(2))));
+                    this.put(
+                        "d",
+                        Document.createList(List.of(Document.createInteger(1), Document.createInteger(2)))
+                    );
                     this.put("e", Document.createStringMap(Map.of("ek", Document.createString("ek1"))));
                 }
             }), "{\"a\":\"av\",\"b\":\"bv\",\"c\":1,\"d\":[1,2],\"e\":{\"ek\":\"ek1\"}}")
@@ -117,7 +120,10 @@ public class JsonSerializerTest {
 
     @ParameterizedTest
     @MethodSource("configurableTimestampFormatProvider")
-    public void configurableTimestampFormat(boolean useTimestampFormat, String json) throws Exception {
+    public void configurableTimestampFormat(
+        boolean useTimestampFormat,
+        String json
+    ) throws Exception {
         Schema schema = Schema.builder()
             .type(ShapeType.TIMESTAMP)
             .id("smithy.example#foo")

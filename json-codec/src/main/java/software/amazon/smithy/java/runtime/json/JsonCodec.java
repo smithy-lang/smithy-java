@@ -5,10 +5,9 @@
 
 package software.amazon.smithy.java.runtime.json;
 
-import com.jsoniter.JsonIterator;
-import com.jsoniter.output.JsonStream;
 import java.io.OutputStream;
 import java.util.Objects;
+import java.util.ServiceLoader;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -28,8 +27,32 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
  * <p>Blobs are base64 encoded as strings.
  */
 public final class JsonCodec implements Codec {
+    private static final JsonSerdeProvider PROVIDER;
+
+    static {
+        final String preferredName = System.getProperty("smithy-java.json-provider");
+        JsonSerdeProvider selected = null;
+        for (JsonSerdeProvider provider : ServiceLoader.load(JsonSerdeProvider.class)) {
+            if (preferredName != null) {
+                if (provider.getName().equals(preferredName)) {
+                    selected = provider;
+                    break;
+                }
+            }
+            if (selected == null) {
+                selected = provider;
+            } else if (provider.getPriority() > selected.getPriority()) {
+                selected = provider;
+            }
+        }
+        if (selected == null) {
+            throw new IllegalStateException("At least one JSON provider should be registered.");
+        }
+        PROVIDER = selected;
+    }
 
     private final Settings settings;
+    private final JsonSerdeProvider provider;
 
     private JsonCodec(Builder builder) {
         var timestampResolver = builder.useTimestampFormat
@@ -39,6 +62,7 @@ public final class JsonCodec implements Codec {
             ? new JsonFieldMapper.UseJsonNameTrait()
             : JsonFieldMapper.UseMemberName.INSTANCE;
         settings = new Settings(timestampResolver, fieldMapper, builder.forbidUnknownUnionMembers);
+        provider = builder.provider == null ? PROVIDER : builder.provider;
     }
 
     public static Builder builder() {
@@ -52,36 +76,19 @@ public final class JsonCodec implements Codec {
 
     @Override
     public ShapeSerializer createSerializer(OutputStream sink) {
-        var stream = createStream(sink);
-        return new JsonSerializer(stream, settings, this::returnStream);
+        return provider.newSerializer(sink, settings);
     }
 
     @Override
     public ShapeDeserializer createDeserializer(byte[] source) {
-        return new JsonDeserializer(createIterator(source), settings, this::returnIterator);
-    }
-
-    // TODO: Implement virtual thread friendly pooling (JsonIter's pooling is done using ThreadLocals).
-    private JsonStream createStream(OutputStream sink) {
-        return new JsonStream(sink, 1024);
-    }
-
-    private JsonIterator createIterator(byte[] source) {
-        return JsonIterator.parse(source);
-    }
-
-    private void returnStream(JsonStream stream) {
-        // TODO: Implement pooling.
-    }
-
-    private void returnIterator(JsonIterator iterator) {
-        // TODO: Implement pooling.
+        return provider.newDeserializer(source, settings);
     }
 
     public static final class Builder {
         private boolean useJsonName;
         private boolean useTimestampFormat = false;
         private TimestampFormatter defaultTimestampFormat = TimestampFormatter.Prelude.EPOCH_SECONDS;
+        private JsonSerdeProvider provider;
         private boolean forbidUnknownUnionMembers;
 
         private Builder() {}
@@ -108,6 +115,21 @@ public final class JsonCodec implements Codec {
         public Builder forbidUnknownUnionMembers(boolean forbid) {
             this.forbidUnknownUnionMembers = forbid;
             return this;
+        }
+
+        Builder overrideSerdeProvider(JsonSerdeProvider provider) {
+            this.provider = Objects.requireNonNull(provider);
+            return this;
+        }
+
+        @Override
+        public String toString() {
+            return "JsonCodec.Builder{" +
+                "useJsonName=" + useJsonName +
+                ", useTimestampFormat=" + useTimestampFormat +
+                ", defaultTimestampFormat=" + defaultTimestampFormat +
+                ", provider=" + provider.getName() +
+                '}';
         }
     }
 

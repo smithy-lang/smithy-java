@@ -3,22 +3,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.json;
+package software.amazon.smithy.java.runtime.json.jackson;
 
-import com.jsoniter.ValueType;
-import com.jsoniter.any.Any;
+import static com.fasterxml.jackson.databind.node.JsonNodeType.MISSING;
+import static com.fasterxml.jackson.databind.node.JsonNodeType.NULL;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.Collections;
-import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
@@ -27,42 +28,44 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.core.serde.document.DocumentDeserializer;
+import software.amazon.smithy.java.runtime.json.JsonCodec;
+import software.amazon.smithy.java.runtime.json.TimestampResolver;
 import software.amazon.smithy.model.shapes.ShapeType;
 
-final class JsonDocument implements Document {
+final class JacksonDocument implements Document {
 
     private static final Schema STRING_MAP_KEY = Schema.memberBuilder("key", PreludeSchemas.STRING)
         .id(PreludeSchemas.DOCUMENT.id())
         .build();
 
-    private final Any any;
+    private final JsonNode root;
     private final JsonCodec.Settings settings;
     private final ShapeType type;
     private final Schema schema;
 
-    JsonDocument(
-        com.jsoniter.any.Any any,
+    JacksonDocument(
+        JsonNode root,
         JsonCodec.Settings settings
     ) {
-        this.any = any;
+        this.root = root;
         this.settings = settings;
 
         // Determine the type from the underlying JSON value.
-        this.type = switch (any.valueType()) {
-            case NUMBER -> {
-                String val = any.toString();
-                if (val.contains(".")) {
-                    yield ShapeType.DOUBLE;
-                } else {
-                    yield ShapeType.INTEGER;
-                }
-            }
+        this.type = switch (root.getNodeType()) {
             case ARRAY -> ShapeType.LIST;
+            case BINARY -> ShapeType.BLOB;
+            case BOOLEAN -> ShapeType.BOOLEAN;
+            case NUMBER -> switch (root.numberType()) {
+                case INT -> ShapeType.INTEGER;
+                case LONG -> ShapeType.LONG;
+                case BIG_INTEGER -> ShapeType.BIG_INTEGER;
+                case FLOAT -> ShapeType.FLOAT;
+                case DOUBLE -> ShapeType.DOUBLE;
+                case BIG_DECIMAL -> ShapeType.BIG_DECIMAL;
+            };
             case OBJECT -> ShapeType.MAP;
             case STRING -> ShapeType.STRING;
-            case BOOLEAN -> ShapeType.BOOLEAN;
-            // The default case should never be reached.
-            default -> throw new SerializationException("Expected JSON document: " + any.mustBeValid());
+            default -> throw new SerializationException("Expected JSON document: " + root.asToken());
         };
         this.schema = PreludeSchemas.getSchemaForType(type);
     }
@@ -74,83 +77,97 @@ final class JsonDocument implements Document {
 
     @Override
     public boolean asBoolean() {
-        return any.valueType() == ValueType.BOOLEAN ? any.toBoolean() : Document.super.asBoolean();
+        return root.isBoolean() ? root.asBoolean() : Document.super.asBoolean();
     }
 
     @Override
     public byte asByte() {
-        return any.valueType() == ValueType.NUMBER ? (byte) any.toInt() : Document.super.asByte();
+        return root.isNumber() ? (byte) root.asInt() : Document.super.asByte();
     }
 
     @Override
     public short asShort() {
-        return any.valueType() == ValueType.NUMBER ? (short) any.toInt() : Document.super.asShort();
+        return root.isNumber() ? (short) root.asInt() : Document.super.asShort();
     }
 
     @Override
     public int asInteger() {
-        return any.valueType() == ValueType.NUMBER ? any.toInt() : Document.super.asInteger();
+        return root.isNumber() ? root.asInt() : Document.super.asInteger();
     }
 
     @Override
     public long asLong() {
-        return any.valueType() == ValueType.NUMBER ? any.toLong() : Document.super.asLong();
+        return root.isNumber() ? root.asLong() : Document.super.asLong();
     }
 
     @Override
     public float asFloat() {
-        return any.valueType() == ValueType.NUMBER ? any.toFloat() : Document.super.asFloat();
+        return root.isNumber() ? (float) root.asDouble() : Document.super.asFloat();
     }
 
     @Override
     public double asDouble() {
-        return any.valueType() == ValueType.NUMBER ? any.toDouble() : Document.super.asDouble();
+        return root.isNumber() ? root.asDouble() : Document.super.asDouble();
     }
 
     @Override
     public BigInteger asBigInteger() {
-        return any.valueType() == ValueType.NUMBER ? BigInteger.valueOf(any.toLong()) : Document.super.asBigInteger();
+        return root.isNumber() ? root.bigIntegerValue() : Document.super.asBigInteger();
     }
 
     @Override
     public BigDecimal asBigDecimal() {
-        return any.valueType() == ValueType.NUMBER ? BigDecimal.valueOf(any.toDouble()) : Document.super.asBigDecimal();
+        return root.isNumber() ? root.decimalValue() : Document.super.asBigDecimal();
     }
 
     @Override
     public String asString() {
-        return any.valueType() == ValueType.STRING ? any.toString() : Document.super.asString();
+        return root.isTextual() ? root.asText() : Document.super.asString();
     }
 
     @Override
     public byte[] asBlob() {
-        if (any.valueType() != ValueType.STRING) {
-            return Document.super.asBlob(); // this always fails
-        } else {
+        if (root.isBinary()) {
             try {
-                // Base64 decode JSON blobs.
-                return Base64.getDecoder().decode(any.toString());
-            } catch (IllegalArgumentException e) {
-                throw new SerializationException("Expected a base64 encoded blob value", e);
+                return root.binaryValue();
+            } catch (IOException e) {
+                throw new SerializationException(e);
             }
         }
+        if (root.isTextual()) {
+            // Base64 decode JSON blobs.
+            try {
+                return Base64.getDecoder().decode(root.textValue());
+            } catch (IllegalArgumentException e) {
+                throw new SerializationException("Invalid base64", e);
+            }
+        }
+        return Document.super.asBlob(); // this always fails
     }
 
     @Override
     public Instant asTimestamp() {
+        Object val;
+        if (root.isTextual()) {
+            val = root.textValue();
+        } else if (root.isNumber()) {
+            val = root.numberValue();
+        } else {
+            throw new SerializationException("Expected a timestamp, but found " + type());
+        }
         // Always use the default JSON timestamp format with untyped documents.
-        return TimestampResolver.readTimestamp(any, settings.timestampResolver().defaultFormat());
+        return TimestampResolver.readTimestamp(val, settings.timestampResolver().defaultFormat());
     }
 
     @Override
     public List<Document> asList() {
-        if (any.valueType() != ValueType.ARRAY) {
+        if (!root.isArray()) {
             return Document.super.asList();
         }
 
         List<Document> result = new ArrayList<>();
-        for (var value : any) {
-            result.add(new JsonDocument(value, settings));
+        for (int i = 0; i < root.size(); i++) {
+            result.add(new JacksonDocument(root.get(i), settings));
         }
 
         return result;
@@ -158,15 +175,13 @@ final class JsonDocument implements Document {
 
     @Override
     public Map<String, Document> asStringMap() {
-        if (any.valueType() != ValueType.OBJECT) {
+        if (!root.isObject()) {
             return Document.super.asStringMap();
         } else {
             Map<String, Document> result = new LinkedHashMap<>();
-            for (var entry : any.asMap().entrySet()) {
-                result.put(
-                    entry.getKey(),
-                    new JsonDocument(entry.getValue(), settings)
-                );
+            for (Iterator<String> iter = root.fieldNames(); iter.hasNext();) {
+                var key = iter.next();
+                result.put(key, new JacksonDocument(root.get(key), settings));
             }
             return result;
         }
@@ -174,25 +189,15 @@ final class JsonDocument implements Document {
 
     @Override
     public Document getMember(String memberName) {
-        if (any.valueType() == ValueType.OBJECT) {
-            var memberDocument = any.get(memberName);
-            if (memberDocument.valueType() != ValueType.NULL && memberDocument.valueType() != ValueType.INVALID) {
-                return new JsonDocument(memberDocument, settings);
+        if (root.isObject()) {
+            var memberDocument = root.get(memberName);
+            if (memberDocument != null &&
+                memberDocument.getNodeType() != NULL
+                && memberDocument.getNodeType() != MISSING) {
+                return new JacksonDocument(memberDocument, settings);
             }
         }
         return null;
-    }
-
-    @Override
-    public Set<String> getMemberNames() {
-        if (any.valueType() == ValueType.OBJECT) {
-            var result = new HashSet<String>();
-            for (var key : any.keys()) {
-                result.add(key.toString());
-            }
-            return result;
-        }
-        return Collections.emptySet();
     }
 
     @Override
@@ -218,7 +223,7 @@ final class JsonDocument implements Document {
                 }
             });
             // When type is set in the ctor, it only allows the above types; the default switch should never happen.
-            default -> throw new SerializationException("Cannot serialize unexpected JSON value: " + any);
+            default -> throw new SerializationException("Cannot serialize unexpected JSON value: " + root);
         }
     }
 
@@ -235,21 +240,21 @@ final class JsonDocument implements Document {
         } else if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        JsonDocument that = (JsonDocument) o;
+        JacksonDocument that = (JacksonDocument) o;
         return type == that.type
             && settings.fieldMapper().getClass() == that.settings.fieldMapper().getClass()
             && settings.timestampResolver().equals(that.settings.timestampResolver())
-            && any.equals(that.any);
+            && root.equals(that.root);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, any, settings.timestampResolver());
+        return Objects.hash(type, root, settings.timestampResolver());
     }
 
     @Override
     public String toString() {
-        return "JsonDocument{any=" + any + ", settings.timestampResolver()=" + settings.timestampResolver()
+        return "JsonDocument{root=" + root + ", settings.timestampResolver()=" + settings.timestampResolver()
             + ", memberToField=" + settings.fieldMapper() + '}';
     }
 
@@ -258,16 +263,16 @@ final class JsonDocument implements Document {
      */
     private static final class JsonDocumentDeserializer extends DocumentDeserializer {
 
-        private final JsonDocument jsonDocument;
+        private final JacksonDocument jsonDocument;
 
-        JsonDocumentDeserializer(JsonDocument value) {
+        JsonDocumentDeserializer(JacksonDocument value) {
             super(value);
             this.jsonDocument = value;
         }
 
         @Override
         protected DocumentDeserializer deserializer(Document nextValue) {
-            return new JsonDocumentDeserializer((JsonDocument) nextValue);
+            return new JsonDocumentDeserializer((JacksonDocument) nextValue);
         }
 
         @Override
@@ -283,7 +288,12 @@ final class JsonDocument implements Document {
         @Override
         public Instant readTimestamp(Schema schema) {
             var format = jsonDocument.settings.timestampResolver().resolve(schema);
-            return TimestampResolver.readTimestamp(jsonDocument.any, format);
+            return TimestampResolver.readTimestamp(
+                jsonDocument.root.isNumber()
+                    ? jsonDocument.root.numberValue()
+                    : jsonDocument.root.textValue(),
+                format
+            );
         }
     }
 }

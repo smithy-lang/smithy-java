@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.json;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.comparesEqualTo;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -58,7 +59,7 @@ public class JsonDocumentTest {
         assertThat(document.asFloat(), is(120f));
         assertThat(document.asDouble(), is(120.0));
         assertThat(document.asBigInteger(), equalTo(BigInteger.valueOf(120)));
-        assertThat(document.asBigDecimal(), equalTo(BigDecimal.valueOf(120.0)));
+        assertThat(document.asBigDecimal(), comparesEqualTo(BigDecimal.valueOf(120.0)));
     }
 
     @Test

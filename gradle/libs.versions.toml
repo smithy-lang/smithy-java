@@ -3,19 +3,20 @@ junit5 = "5.10.2"
 hamcrest = "2.1"
 smithy = "1.50.0"
 jmh = "0.7.2"
-jsoniter = "0.9.23"
 test-logger-plugin = "4.0.0"
 spotbugs = "6.0.9"
 spotless = "6.25.0"
 smithy-gradle = "1.0.0"
 assertj = "3.25.1"
+jackson = "2.17.1"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
 smithy-codegen = { module = "software.amazon.smithy:smithy-codegen-core", version.ref = "smithy" }
 smithy-aws-traits = { module = "software.amazon.smithy:smithy-aws-traits", version.ref = "smithy" }
 
-jsoniter = { module = "com.jsoniter:jsoniter", version.ref = "jsoniter"}
+jackson-core = {module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson"}
+jackson-databind = {module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson"}
 
 # Test dependencies
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit5" }

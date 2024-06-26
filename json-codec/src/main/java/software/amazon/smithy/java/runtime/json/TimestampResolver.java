@@ -5,10 +5,7 @@
 
 package software.amazon.smithy.java.runtime.json;
 
-import com.jsoniter.any.Any;
-import com.jsoniter.spi.JsonException;
 import java.time.Instant;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
@@ -19,7 +16,7 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
 /**
  * Resolves the timestamp format to use for a shape.
  */
-sealed interface TimestampResolver {
+public sealed interface TimestampResolver {
     /**
      * Determine the formatter of a shape.
      *
@@ -43,20 +40,16 @@ sealed interface TimestampResolver {
      * @return the parsed Instant.
      * @throws SerializationException if the timestamp format or type is invalid.
      */
-    static Instant readTimestamp(Any any, TimestampFormatter format) {
-        try {
-            return switch (any.valueType()) {
-                case NUMBER -> format.readFromNumber(any.toDouble());
-                case STRING -> format.readFromString(any.toString(), true);
-                default -> {
-                    throw new SerializationException(
-                        "Expected a timestamp, but found " + any.valueType().toString().toLowerCase(Locale.ENGLISH)
-                    );
-                }
-            };
-        } catch (JsonException e) {
-            throw new SerializationException(e);
+    static Instant readTimestamp(Object any, TimestampFormatter format) {
+        if (any instanceof Number n) {
+            return format.readFromNumber(n.doubleValue());
         }
+        if (any instanceof String s) {
+            return format.readFromString(s, true);
+        }
+        throw new SerializationException(
+            "Expected a timestamp, but found " + any.getClass().getSimpleName()
+        );
     }
 
     /**

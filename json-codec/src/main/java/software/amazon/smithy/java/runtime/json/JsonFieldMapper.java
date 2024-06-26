@@ -14,7 +14,7 @@ import software.amazon.smithy.model.traits.JsonNameTrait;
 /**
  * Provides a mapping to and from members and JSON field names.
  */
-sealed interface JsonFieldMapper {
+public sealed interface JsonFieldMapper {
     /**
      * Determines the schema of a member inside a container based on a JSON field name.
      *

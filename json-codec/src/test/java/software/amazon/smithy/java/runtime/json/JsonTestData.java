@@ -50,5 +50,4 @@ public final class JsonTestData {
         .type(ShapeType.UNION)
         .members(UNION_BOOLEAN_VALUE, UNION_INTEGER_VALUE)
         .build();
-
 }
