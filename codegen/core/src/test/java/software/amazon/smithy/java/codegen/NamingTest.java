@@ -56,10 +56,8 @@ public class NamingTest {
     @Test
     void nullAnnotationsOnFieldsAndGetter() {
         var fileStr = getFileStringForClass("NonNullAnnotationInput");
-        var expectedField = "private transient final @TestNonNullAnnotation" +
-            " RequiredStruct requiredStruct;";
-        var expectedGetter = "public @TestNonNullAnnotation " +
-            "RequiredStruct requiredStruct()";
+        var expectedField = "private transient final @TestNonNullAnnotation RequiredStruct requiredStruct;";
+        var expectedGetter = "public @TestNonNullAnnotation RequiredStruct requiredStruct()";
         var expectedImport = "import software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation;";
 
         assertTrue(fileStr.contains(expectedField));

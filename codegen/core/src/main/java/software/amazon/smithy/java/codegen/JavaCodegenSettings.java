@@ -14,6 +14,7 @@ import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.IoUtils;
 import software.amazon.smithy.utils.SmithyUnstableApi;
+import software.amazon.smithy.utils.StringUtils;
 
 /**
  * Settings for {@code JavaCodegenPlugin}.
@@ -26,8 +27,6 @@ public final class JavaCodegenSettings {
     private static final String NAMESPACE = "namespace";
     private static final String HEADER_FILE = "headerFile";
     private static final String NULL_ANNOTATION = "nullAnnotation";
-    private static final String DEFAULT_NULL_ANNOTATION = "edu.umd.cs.findbugs.annotations.NonNull";
-
 
     private final ShapeId service;
     private final String packageNamespace;
@@ -46,7 +45,7 @@ public final class JavaCodegenSettings {
         this.packageNamespace = Objects.requireNonNull(packageNamespace);
         this.header = getHeader(headerFile, Objects.requireNonNull(sourceLocation));
 
-        if (nullAnnotationFullyQualifiedName != null && !nullAnnotationFullyQualifiedName.equals("")) {
+        if (!StringUtils.isEmpty(nullAnnotationFullyQualifiedName)) {
             nullAnnotationSymbol = buildSymbolFromFullyQualifiedName(nullAnnotationFullyQualifiedName);
         } else {
             nullAnnotationSymbol = null;
@@ -83,11 +82,10 @@ public final class JavaCodegenSettings {
     }
 
     public Symbol getNullAnnotationSymbol() {
-        return this.nullAnnotationSymbol;
-
+        return nullAnnotationSymbol;
     }
 
-    private Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {
+    private static Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {
         String[] parts = fullyQualifiedName.split("\\.");
         String name = parts[parts.length - 1];
         String namespace = fullyQualifiedName.substring(0, fullyQualifiedName.length() - name.length() - 1);
