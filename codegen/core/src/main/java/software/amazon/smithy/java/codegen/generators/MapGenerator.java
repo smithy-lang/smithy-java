@@ -36,9 +36,11 @@ public class MapGenerator
                 writer -> writer.onSection("sharedSerde", t -> {
 
                     var value = directive.model().expectShape(directive.shape().getValue().getTarget());
+                    var key = directive.model().expectShape(directive.shape().getKey().getTarget());
                     var valueSymbol = directive.symbolProvider().toSymbol(value);
                     var valueSchema = CodegenUtils.getSchemaType(writer, directive.symbolProvider(), value);
                     var keySymbol = directive.symbolProvider().toSymbol(directive.shape().getKey());
+                    var keySchema = CodegenUtils.getSchemaType(writer, directive.symbolProvider(), key);
                     var name = CodegenUtils.getDefaultName(directive.shape(), directive.service());
 
                     writer.pushState();
@@ -50,7 +52,7 @@ public class MapGenerator
                             public void accept(${shape:T} values, ${mapSerializer:T} serializer) {
                                 for (var valueEntry : values.entrySet()) {
                                     serializer.writeEntry(
-                                        ${valueSchema:L},
+                                        ${keySchema:L},
                                         valueEntry.getKey(),
                                         valueEntry.getValue(),
                                         ${name:U}ValueSerializer.INSTANCE
@@ -93,9 +95,10 @@ public class MapGenerator
                         """;
                     writer.putContext("shape", directive.symbol());
                     writer.putContext("name", name);
-                    writer.putContext("value", valueSymbol);
-                    writer.putContext("valueSchema", valueSchema);
                     writer.putContext("key", keySymbol);
+                    writer.putContext("value", valueSymbol);
+                    writer.putContext("keySchema", keySchema);
+                    writer.putContext("valueSchema", valueSchema);
                     writer.putContext(
                         "collectionImpl",
                         directive.symbol().expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)
