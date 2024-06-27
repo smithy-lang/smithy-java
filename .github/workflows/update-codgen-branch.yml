@@ -11,9 +11,6 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: main-codegen
-
       - uses: gradle/wrapper-validation-action@v2
 
       - name: Set up JDK 17
@@ -22,21 +19,23 @@ jobs:
           java-version: 17
           distribution: 'corretto'
 
-      - name: Rebase on main and setup
-        run: |
-          git config --global user.email "github-aws-smithy-automation@amazon.com"
-          git config --global user.name "Smithy Automation"
-          git pull -r origin main
-        env:
-          GITHUB_TOKEN: ${{ secrets.PR_TOKEN }}
-
       - name: Rebuild project
         run: ./gradlew clean build --stacktrace
 
-      # TODO: Add server and client generation
+      - name: Set up git configuration
+        run: |
+          git config --global user.email "github-aws-smithy-automation@amazon.com"
+          git config --global user.name "Smithy Automation"
+
+      - name: Delete local main-codegen branch
+        run: git branch --delete main-codegen
+
       - name: Add generated files
         run: |
-          git add -f codegen/core/build/generated-pojos/
+          git checkout -b main-codegen
+          git add -f codegen/core/build/generated-src/
+          git add -f codegen/client/build/generated-src/
+          git add -f codegen/server/build/generated-src/
 
       - name: Create and push update
         run: |
