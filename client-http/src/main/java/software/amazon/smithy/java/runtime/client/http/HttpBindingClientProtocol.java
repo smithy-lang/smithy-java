@@ -127,8 +127,6 @@ public class HttpBindingClientProtocol extends HttpClientProtocol {
             .errorShapeBuilder(error)
             .response(response)
             .deserialize()
-            .thenApply(ignore -> {
-                return error.errorCorrection().build();
-            });
+            .thenApply(ignore -> error.errorCorrection().build());
     }
 }

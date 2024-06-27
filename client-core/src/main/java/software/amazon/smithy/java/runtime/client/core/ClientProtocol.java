@@ -12,8 +12,13 @@ import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
+/**
+ * Handles request and response serialization.
+ *
+ * @param <RequestT> Request type to create.
+ * @param <ResponseT> Response type to create.
+ */
 public interface ClientProtocol<RequestT, ResponseT> {
-
     /**
      * Get the ID of the protocol (e.g., aws.protocols#restJson1).
      *

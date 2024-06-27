@@ -14,9 +14,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.client.core.ClientCall;
-import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
-import software.amazon.smithy.java.runtime.client.core.SraPipeline;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
@@ -24,36 +22,40 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
 
 /**
- * A client transport that uses Java's built-in {@link HttpClient} and protocols that use {@link SmithyHttpRequest}
- * and {@link SmithyHttpResponse}.
+ * A client transport that uses Java's built-in {@link HttpClient} to send {@link SmithyHttpRequest} and return
+ * {@link SmithyHttpResponse}.
  */
-public class JavaHttpClientTransport implements ClientTransport, ClientTransport.SraCompliant {
+public class JavaHttpClientTransport implements ClientTransport {
 
     private static final System.Logger LOGGER = System.getLogger(JavaHttpClientTransport.class.getName());
-
     private final HttpClient client;
-    private final ClientProtocol<SmithyHttpRequest, SmithyHttpResponse> protocol;
 
     /**
      * @param client   Java client to use.
-     * @param protocol Underlying protocol to handle serialization.
      */
-    public JavaHttpClientTransport(HttpClient client, ClientProtocol<SmithyHttpRequest, SmithyHttpResponse> protocol) {
+    public JavaHttpClientTransport(HttpClient client) {
         this.client = client;
-        this.protocol = protocol;
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> send(
+    public Context.Key<SmithyHttpRequest> requestKey() {
+        return HttpContext.HTTP_REQUEST;
+    }
+
+    @Override
+    public Context.Key<SmithyHttpResponse> responseKey() {
+        return HttpContext.HTTP_RESPONSE;
+    }
+
+    @Override
+    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<Void> send(
         ClientCall<I, O> call
     ) {
-        return SraPipeline.send(call, protocol, request -> {
-            LOGGER.log(System.Logger.Level.TRACE, () -> "Sending HTTP request: " + request.startLine());
-            var javaRequest = createJavaRequest(call.context(), request);
-            return sendRequest(javaRequest).thenApply(response -> {
-                LOGGER.log(System.Logger.Level.TRACE, () -> "Got HTTP response: " + response.startLine());
-                return response;
-            });
+        var request = call.context().expect(requestKey());
+        var javaRequest = createJavaRequest(call.context(), request);
+        return sendRequest(javaRequest).thenApply(response -> {
+            call.context().put(responseKey(), response);
+            return null;
         });
     }
 

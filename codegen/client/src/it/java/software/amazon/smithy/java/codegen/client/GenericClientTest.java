@@ -22,7 +22,8 @@ public class GenericClientTest {
     @Test
     public void echoTest() {
         var client = TestServiceClient.builder()
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
+            .protocol(new RestJsonClientProtocol())
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .endpoint("https://httpbin.org")
             .build();
 
@@ -65,7 +66,8 @@ public class GenericClientTest {
         };
 
         var client = TestServiceClient.builder()
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
+            .protocol(new RestJsonClientProtocol())
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .endpoint("https://httpbin.org")
             .addInterceptor(interceptor)
             .build();

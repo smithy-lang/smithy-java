@@ -37,7 +37,8 @@ public class GenericTest {
     public void putPerson() {
         // Create a generated client using rest-json and a fixed endpoint.
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
+            .protocol(new RestJsonClientProtocol())
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .endpoint("http://httpbin.org/anything")
             .build();
 
@@ -54,8 +55,9 @@ public class GenericTest {
     @Test
     public void getPersonImage() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
-            .endpoint("http://httpbin.org")
+            .protocol(new RestJsonClientProtocol())
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
+            .endpoint("http://httpbin.org/anything")
             .build();
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
@@ -67,8 +69,9 @@ public class GenericTest {
     @Test
     public void streamingRequestPayload() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
-            .endpoint("http://httpbin.org")
+            .protocol(new RestJsonClientProtocol())
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
+            .endpoint("http://httpbin.org/anything")
             .build();
 
         PutPersonImageInput input = PutPersonImageInput.builder()
@@ -162,8 +165,9 @@ public class GenericTest {
         };
 
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient(), new RestJsonClientProtocol()))
-            .endpoint("http://httpbin.org")
+            .protocol(new RestJsonClientProtocol())
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
+            .endpoint("http://httpbin.org/anything")
             .addInterceptor(interceptor)
             .build();
 

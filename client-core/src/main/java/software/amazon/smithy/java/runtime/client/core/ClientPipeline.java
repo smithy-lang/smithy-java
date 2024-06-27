@@ -7,9 +7,9 @@ package software.amazon.smithy.java.runtime.client.core;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
@@ -24,21 +24,16 @@ import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
- * Handles the requests/response pipeline to turn an input into a request, emit the appropriate SRA interceptors,
- * auth resolution, send requests using a wire transport, deserialize responses, and error handling.
+ * Handles sending a {@link ClientCall} using a {@link ClientProtocol} and {@link ClientTransport}.
  *
- * <p>This class is typically used by SRA-compliant {@link ClientTransport}s to implement a transport.
+ * <p>This class manages calling interceptors registered with the call.
  *
- * @param <I> Input to send.
- * @param <O> Output to deserialize.
- * @param <RequestT> Request type to send.
- * @param <ResponseT> Response type to receive.
+ * @param <RequestT>
+ * @param <ResponseT>
  */
-// TODO: Should more of this class be separated out into pieces (like resolving auth)?
-// TODO: Implement the real SRA interceptors workflow and error handling.
-public final class SraPipeline<I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> {
+public final class ClientPipeline<RequestT, ResponseT> {
 
-    private static final System.Logger LOGGER = System.getLogger(SraPipeline.class.getName());
+    private static final System.Logger LOGGER = System.getLogger(ClientPipeline.class.getName());
     private static final URI UNRESOLVED;
 
     static {
@@ -49,33 +44,47 @@ public final class SraPipeline<I extends SerializableStruct, O extends Serializa
         }
     }
 
-    private final ClientCall<I, O> call;
     private final ClientProtocol<RequestT, ResponseT> protocol;
+    private final ClientTransport transport;
     private final Context.Key<RequestT> requestKey;
     private final Context.Key<ResponseT> responseKey;
-    private final Function<RequestT, CompletableFuture<ResponseT>> wireTransport;
 
-    private SraPipeline(
-        ClientCall<I, O> call,
+    private ClientPipeline(
         ClientProtocol<RequestT, ResponseT> protocol,
-        Function<RequestT, CompletableFuture<ResponseT>> wireTransport
+        ClientTransport transport
     ) {
-        this.call = call;
-        this.protocol = protocol;
-        this.wireTransport = wireTransport;
+        this.protocol = Objects.requireNonNull(protocol);
+        this.transport = Objects.requireNonNull(transport);
         this.requestKey = protocol.requestKey();
         this.responseKey = protocol.responseKey();
     }
 
-    public static <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> CompletableFuture<O> send(
-        ClientCall<I, O> call,
+    public static <RequestT, ResponseT> ClientPipeline<RequestT, ResponseT> of(
         ClientProtocol<RequestT, ResponseT> protocol,
-        Function<RequestT, CompletableFuture<ResponseT>> wireTransport
+        ClientTransport transport
     ) {
-        return new SraPipeline<>(call, protocol, wireTransport).send();
+        validateProtocolAndTransport(protocol, transport);
+        return new ClientPipeline<>(protocol, transport);
     }
 
-    private CompletableFuture<O> send() {
+    /**
+     * Ensures that the given protocol and transport are compatible by comparing their request and response types.
+     *
+     * @param protocol Protocol to check.
+     * @param transport Transport to check.
+     * @throws IllegalStateException if the protocol and transport use different request or response types.
+     */
+    public static void validateProtocolAndTransport(ClientProtocol<?, ?> protocol, ClientTransport transport) {
+        if (protocol.requestKey() != transport.requestKey()) {
+            throw new IllegalStateException("Protocol request key != transport: " + protocol + " vs " + transport);
+        } else if (protocol.responseKey() != transport.responseKey()) {
+            throw new IllegalStateException("Protocol response key != transport: " + protocol + " vs " + transport);
+        }
+    }
+
+    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> send(
+        ClientCall<I, O> call
+    ) {
         var context = call.context();
         var input = call.input();
         var interceptor = call.interceptor();
@@ -114,13 +123,13 @@ public final class SraPipeline<I extends SerializableStruct, O extends Serializa
 
                 req = interceptor.modifyBeforeTransmit(context, input, Context.value(requestKey, req)).value();
                 interceptor.readBeforeTransmit(context, input, Context.value(requestKey, req));
-
+                call.context().put(requestKey, req);
                 return req;
             })
-            .thenCompose(
-                finalRequest -> wireTransport.apply(finalRequest)
-                    .thenCompose(response -> deserialize(call, finalRequest, response, interceptor))
-            );
+            .thenCompose(finalRequest -> transport.send(call).thenCompose(ignore -> {
+                var response = call.context().expect(responseKey);
+                return deserialize(call, call.context().expect(requestKey), response, call.interceptor());
+            }));
     }
 
     @SuppressWarnings("unchecked")
@@ -204,6 +213,7 @@ public final class SraPipeline<I extends SerializableStruct, O extends Serializa
                 Context.value(responseKey, response)
             )
             .value();
+        context.put(responseKey, modifiedResponse);
 
         interceptor.readBeforeDeserialization(
             context,

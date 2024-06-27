@@ -26,7 +26,6 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
  */
 public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpRequest, SmithyHttpResponse> {
 
-    private static final System.Logger LOGGER = System.getLogger(HttpClientProtocol.class.getName());
     private static final Set<String> TEXT_CONTENT_TYPES = Set.of("application/json", "application/xml");
 
     private final String id;

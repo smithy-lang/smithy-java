@@ -28,8 +28,10 @@ import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public abstract class Client {
+
     private final EndpointResolver endpointResolver;
     private final ClientTransport transport;
+    private final ClientProtocol<?, ?> protocol;
     private final TypeRegistry typeRegistry;
     private final ClientInterceptor interceptor;
     private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
@@ -38,7 +40,12 @@ public abstract class Client {
 
     protected Client(Builder<?, ?> builder) {
         this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
-        this.transport = new ApiCallTimeoutTransport(Objects.requireNonNull(builder.transport, "transport is null"));
+
+        // Set the protocol and transport and ensure they are compatible.
+        this.protocol = Objects.requireNonNull(builder.protocol, "protocol is null");
+        this.transport = Objects.requireNonNull(builder.transport, "transport is null");
+        ClientPipeline.validateProtocolAndTransport(protocol, transport);
+
         // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
         this.interceptor = ClientInterceptor.chain(builder.interceptors);
 
@@ -54,8 +61,6 @@ public abstract class Client {
         this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, defaultAuthSchemeResolver);
         this.identityResolvers = IdentityResolvers.of(builder.identityResolvers);
 
-        // Here is where you would register errors bound to the service on the registry.
-        // ...
         this.typeRegistry = TypeRegistry.builder().build();
     }
 
@@ -79,22 +84,22 @@ public abstract class Client {
             .putAllTypes(typeRegistry, operation.typeRegistry())
             .build();
 
-        return transport.send(
-            ClientCall.<I, O>builder()
-                .input(input)
-                .operation(operation)
-                .endpointResolver(endpointResolver)
-                .context(context)
-                .interceptor(interceptor)
-                .supportedAuthSchemes(supportedAuthSchemes)
-                .authSchemeResolver(authSchemeResolver)
-                .identityResolvers(identityResolvers)
-                .errorCreator((c, id) -> {
-                    ShapeId shapeId = ShapeId.from(id);
-                    return operationRegistry.create(shapeId, ModeledApiException.class);
-                })
-                .build()
-        );
+        var call = ClientCall.<I, O>builder()
+            .input(input)
+            .operation(operation)
+            .endpointResolver(endpointResolver)
+            .context(context)
+            .interceptor(interceptor)
+            .supportedAuthSchemes(supportedAuthSchemes)
+            .authSchemeResolver(authSchemeResolver)
+            .identityResolvers(identityResolvers)
+            .errorCreator((c, id) -> {
+                ShapeId shapeId = ShapeId.from(id);
+                return operationRegistry.create(shapeId, ModeledApiException.class);
+            })
+            .build();
+
+        return ClientPipeline.of(protocol, transport).send(call);
     }
 
     /**
@@ -105,6 +110,7 @@ public abstract class Client {
      */
     public static abstract class Builder<I, B extends Builder<I, B>> {
         private ClientTransport transport;
+        private ClientProtocol<?, ?> protocol;
         private EndpointResolver endpointResolver;
         private final List<ClientInterceptor> interceptors = new ArrayList<>();
         private AuthSchemeResolver authSchemeResolver;
@@ -112,7 +118,7 @@ public abstract class Client {
         private final List<IdentityResolver<?>> identityResolvers = new ArrayList<>();
 
         /**
-         * Set the protocol and transport to when calling the service.
+         * Set the transport used to send requests.
          *
          * @param transport Client transport used to send requests.
          * @return Returns the builder.
@@ -120,6 +126,18 @@ public abstract class Client {
         @SuppressWarnings("unchecked")
         public B transport(ClientTransport transport) {
             this.transport = transport;
+            return (B) this;
+        }
+
+        /**
+         * Set the protocol to use when sending requests.
+         *
+         * @param protocol Client protocol used to send requests.
+         * @return Returns the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B protocol(ClientProtocol<?, ?> protocol) {
+            this.protocol = protocol;
             return (B) this;
         }
 
