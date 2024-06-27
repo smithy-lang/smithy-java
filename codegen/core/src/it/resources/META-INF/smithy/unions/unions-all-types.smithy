@@ -34,4 +34,5 @@ union UnionType {
     unionValue: NestedUnion
     enumValue: NestedEnum
     intEnumValue: NestedIntEnum
+    unitValue: Unit
 }

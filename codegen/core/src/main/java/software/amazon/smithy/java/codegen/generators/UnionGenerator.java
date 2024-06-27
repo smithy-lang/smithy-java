@@ -27,6 +27,7 @@ import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.UnionShape;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -82,7 +83,10 @@ public final class UnionGenerator
             );
             writer.putContext("memberEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext("toString", new ToStringGenerator(writer));
-            writer.putContext("valueCasters", new ValueCasterGenerator(writer, shape, directive.symbolProvider()));
+            writer.putContext(
+                "valueCasters",
+                new ValueCasterGenerator(writer, shape, directive.symbolProvider(), directive.model())
+            );
             writer.putContext(
                 "valueClasses",
                 new ValueClassGenerator(
@@ -109,8 +113,9 @@ public final class UnionGenerator
     }
 
 
-    private record ValueCasterGenerator(JavaWriter writer, UnionShape shape, SymbolProvider symbolProvider) implements
-        Runnable {
+    private record ValueCasterGenerator(
+        JavaWriter writer, UnionShape shape, SymbolProvider symbolProvider, Model model
+    ) implements Runnable {
 
         @Override
         public void run() {
@@ -151,11 +156,11 @@ public final class UnionGenerator
                 writer.injectSection(new ClassSection(member));
                 var template = """
                     public static final class ${memberName:U}Member extends ${shape:T} {
-                        private final transient ${member:T} value;
+                        ${^unit}private final transient ${member:T} value;${/unit}
 
-                        public ${memberName:U}Member(${member:T} value) {
-                            super(Type.${enumValue:L});
-                            this.value = ${?col}${collections:T}.${wrap:L}(${/col}${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Union value cannot be null")${/primitive}${?col})${/col};
+                        public ${memberName:U}Member(${^unit}${member:T} value${/unit}) {
+                            super(Type.${enumValue:L});${^unit}
+                            this.value = ${?col}${collections:T}.${wrap:L}(${/col}${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Union value cannot be null")${/primitive}${?col})${/col};${/unit}
                         }
 
                         @Override
@@ -166,12 +171,12 @@ public final class UnionGenerator
                         @Override
                         public void serializeMembers(${shapeSerializer:T} serializer) {
                             ${serializeMember:C};
-                        }
+                        }${^unit}
 
                         @Override
                         public ${member:N} ${memberName:L}() {
                             return value;
-                        }
+                        }${/unit}
 
                         ${equals:C|}
 
@@ -194,6 +199,7 @@ public final class UnionGenerator
                     memberSymbol.getProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER).orElse(null)
                 );
                 var target = model.expectShape(member.getTarget());
+                writer.putContext("unit", target.hasTrait(UnitTypeTrait.class));
                 writer.putContext("col", target.isMapShape() || target.isListShape());
                 writer.write(template);
                 writer.popState();
@@ -259,7 +265,7 @@ public final class UnionGenerator
                 """
                     @Override
                     public int hashCode() {
-                        ${C|}
+                        return ${^unit}${C|}${/unit}${?unit}${memberName:U}Member.class.hashCode();${/unit}
                     }""",
                 writer.consumer(this::generate)
             );
@@ -269,10 +275,10 @@ public final class UnionGenerator
             writer.pushState();
             if (CodegenUtils.isJavaArray(symbolProvider.toSymbol(shape))) {
                 writer.putContext("arrays", Arrays.class);
-                writer.write("return ${arrays:T}.hashCode(value);");
+                writer.write("${arrays:T}.hashCode(value);");
             } else {
                 writer.putContext("objects", Objects.class);
-                writer.write("return ${objects:T}.hash(value);");
+                writer.write("${objects:T}.hash(value);");
             }
             writer.popState();
         }
@@ -296,8 +302,8 @@ public final class UnionGenerator
                         if (other == null || getClass() != other.getClass()) {
                             return false;
                         }
-                        ${memberName:U}Member that = (${memberName:U}Member) other;
-                        return ${C};
+                        ${^unit}${memberName:U}Member that = (${memberName:U}Member) other;${/unit}
+                        return ${^unit}${C}${/unit}${?unit}true${/unit};
                     }""",
                 writer.consumer(this::writePropertyEqualityCheck)
             );
@@ -339,10 +345,12 @@ public final class UnionGenerator
                 writer.pushState();
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
                 writer.putContext("member", symbolProvider.toSymbol(member));
+                var target = model.expectShape(member.getTarget());
+                writer.putContext("unit", target.hasTrait(UnitTypeTrait.class));
                 writer.write("""
                     public BuildStage ${memberName:L}(${member:T} value) {
                         checkForExistingValue();
-                        this.value = new ${memberName:U}Member(value);
+                        this.value = new ${memberName:U}Member(${^unit}value${/unit});
                         return this;
                     }
                     """);

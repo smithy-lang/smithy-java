@@ -20,6 +20,7 @@ import java.util.Set;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.runtime.core.schema.Unit;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.Model;
@@ -50,6 +51,7 @@ import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.CaseUtils;
 
 /**
@@ -58,6 +60,7 @@ import software.amazon.smithy.utils.CaseUtils;
 public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider {
 
     private static final System.Logger LOGGER = System.getLogger(JavaSymbolProvider.class.getName());
+    private static final Symbol UNIT_SYMBOL = CodegenUtils.fromClass(Unit.class);
 
     private final Model model;
     private final ServiceShape service;
@@ -249,6 +252,9 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
 
     @Override
     public Symbol structureShape(StructureShape structureShape) {
+        if (structureShape.hasTrait(UnitTypeTrait.class)) {
+            return UNIT_SYMBOL;
+        }
         return getJavaClassSymbol(structureShape);
     }
 

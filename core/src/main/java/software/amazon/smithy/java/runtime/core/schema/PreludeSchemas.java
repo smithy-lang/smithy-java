@@ -8,7 +8,6 @@ package software.amazon.smithy.java.runtime.core.schema;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.DefaultTrait;
-import software.amazon.smithy.model.traits.UnitTypeTrait;
 
 /**
  * {@link Schema} definitions for the Smithy prelude
@@ -81,11 +80,6 @@ public final class PreludeSchemas {
         .type(ShapeType.DOUBLE)
         .id("smithy.api#PrimitiveDouble")
         .traits(new DefaultTrait(Node.from(0)))
-        .build();
-    public static final Schema UNIT = Schema.builder()
-        .type(ShapeType.STRUCTURE)
-        .id("smithy.api#Unit")
-        .traits(new UnitTypeTrait())
         .build();
 
     private PreludeSchemas() {
