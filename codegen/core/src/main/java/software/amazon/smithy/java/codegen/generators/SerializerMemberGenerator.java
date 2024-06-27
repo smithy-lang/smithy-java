@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.generators;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.core.schema.Unit;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.BigDecimalShape;
 import software.amazon.smithy.model.shapes.BigIntegerShape;
@@ -33,6 +34,7 @@ import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.ErrorTrait;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
 
 final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void> implements
     Runnable {
@@ -176,7 +178,11 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void structureShape(StructureShape structureShape) {
-        writer.write("serializer.writeStruct(${schema:L}, ${state:L})");
+        if (structureShape.hasTrait(UnitTypeTrait.class)) {
+            writer.write("serializer.writeStruct(${schema:L}, $T.INSTANCE)", Unit.class);
+        } else {
+            writer.write("serializer.writeStruct(${schema:L}, ${state:L})");
+        }
         return null;
     }
 

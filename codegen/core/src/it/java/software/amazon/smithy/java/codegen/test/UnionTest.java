@@ -51,7 +51,8 @@ public class UnionTest {
             new UnionType.TimestampValueMember(Instant.EPOCH),
             new UnionType.UnionValueMember(new NestedUnion.BMember(1)),
             new UnionType.EnumValueMember(NestedEnum.A),
-            new UnionType.IntEnumValueMember(NestedIntEnum.A)
+            new UnionType.IntEnumValueMember(NestedIntEnum.A),
+            new UnionType.UnitValueMember()
         );
     }
 

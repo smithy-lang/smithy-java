@@ -178,9 +178,8 @@ public final class CodegenUtils {
      * @param shape shape to write Schema type for.
      */
     public static String getSchemaType(JavaWriter writer, SymbolProvider provider, Shape shape) {
-        if (Prelude.isPreludeShape(shape)) {
-            var shapeName = shape.hasTrait(UnitTypeTrait.class) ? "UNIT" : shape.getType().name();
-            return writer.format("$T.$L", PreludeSchemas.class, shapeName);
+        if (Prelude.isPreludeShape(shape) && !shape.hasTrait(UnitTypeTrait.class)) {
+            return writer.format("$T.$L", PreludeSchemas.class, shape.getType().name());
         } else if (shape.isStructureShape() || shape.isUnionShape() || shape.isIntEnumShape() || shape.isEnumShape()) {
             // Shapes that generate a class have their schemas as static properties on that class
             return writer.format("$T.SCHEMA", provider.toSymbol(shape));

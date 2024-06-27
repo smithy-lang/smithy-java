@@ -65,6 +65,7 @@ import software.amazon.smithy.model.traits.DefaultTrait;
 import software.amazon.smithy.model.traits.ErrorTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -74,6 +75,10 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
     @Override
     public void accept(T directive) {
         var shape = directive.shape();
+        if (shape.hasTrait(UnitTypeTrait.class)) {
+            // Do not generate Unit structures
+            return;
+        }
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
             var template = """
