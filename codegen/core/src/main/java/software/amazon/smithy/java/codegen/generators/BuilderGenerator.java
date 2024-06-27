@@ -90,7 +90,7 @@ abstract class BuilderGenerator implements Runnable {
     }
 
     protected void generateDeserialization(JavaWriter writer) {
-        writer.write("${C|}", new StructureDeserializerGenerator(writer, shape, symbolProvider, model, service));
+        writer.writeInline("${C|}", new StructureDeserializerGenerator(writer, shape, symbolProvider, model, service));
     }
 
     protected abstract void generateProperties(JavaWriter writer);

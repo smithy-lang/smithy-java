@@ -36,16 +36,13 @@ record StructureDeserializerGenerator(
                     ${?hasMembers}switch (member.memberIndex()) {
                         ${cases:C|}
                     }${/hasMembers}
-                }
+                }${?union}
 
-                ${?union}
                 @Override
                 public void unknownMember(Builder builder, String memberName) {
                     builder.$$unknownMember(memberName);
-                }
-                ${/union}
-            }
-            """;
+                }${/union}
+            }""";
         writer.putContext("shapeDeserializer", ShapeDeserializer.class);
         writer.putContext("sdkSchema", Schema.class);
         writer.putContext("hasMembers", !shape.members().isEmpty());

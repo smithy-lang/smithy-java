@@ -45,7 +45,7 @@ public class OperationGenerator
                 var template = """
                     public final class ${shape:T} implements ${sdkOperation:T}<${inputType:T}, ${outputType:T}> {
 
-                        static final ${sdkSchema:T} SCHEMA = ${schema:C}
+                        ${schema:C|}
 
                         ${typeRegistrySection:C|}
 

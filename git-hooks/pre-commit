@@ -14,7 +14,7 @@ if [ -n "$changedJavaFiles" ]; then
 fi 
 
 # Execute smithy formatter on any updated smithy files 
-changedSmithyFiles=$(git diff --staged --name-only | grep .smithy)
+changedSmithyFiles=$(git diff --staged --name-only | grep '\.smithy')
 if [ -n "$changedSmithyFiles" ]; then
   echo "[git hook] Formatting staged smithy files before commit"
 fi

@@ -16,6 +16,7 @@ import software.amazon.smithy.model.shapes.IntEnumShape;
 import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
+import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.shapes.ShapeVisitor;
@@ -212,5 +213,19 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
             new TraitInitializerGenerator(writer, member, context)
         );
         writer.popState();
+    }
+
+
+    @Override
+    public Void operationShape(OperationShape shape) {
+        writer.write(
+            """
+                static final ${schemaClass:T} SCHEMA = ${schemaClass:T}.builder()
+                    .type(${shapeTypeClass:T}.${shapeType:L})
+                    .id(${shapeId:S})${traitInitializer:C}
+                    .build();
+                """
+        );
+        return null;
     }
 }

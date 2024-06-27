@@ -66,7 +66,7 @@ public class TestJavaCodegen implements
 
     @Override
     public void generateService(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        // TODO
+        // No service generated for tests.
     }
 
     @Override
