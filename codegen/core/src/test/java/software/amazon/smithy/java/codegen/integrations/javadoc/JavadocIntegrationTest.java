@@ -7,47 +7,20 @@ package software.amazon.smithy.java.codegen.integrations.javadoc;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URL;
-import java.nio.file.Paths;
 import java.util.Objects;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.build.MockManifest;
-import software.amazon.smithy.build.PluginContext;
-import software.amazon.smithy.build.SmithyBuildPlugin;
-import software.amazon.smithy.java.codegen.utils.TestJavaCodegenPlugin;
-import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.node.ObjectNode;
+import software.amazon.smithy.java.codegen.utils.AbstractCodegenFileTest;
 
-public class JavadocIntegrationTest {
+public class JavadocIntegrationTest extends AbstractCodegenFileTest {
     private static final URL TEST_FILE = Objects.requireNonNull(
         JavadocIntegrationTest.class.getResource("javadoc-test.smithy")
     );
-    private final MockManifest manifest = new MockManifest();
 
-    @BeforeEach
-    public void setup() {
-        var model = Model.assembler()
-            .addImport(TEST_FILE)
-            .assemble()
-            .unwrap();
-        var context = PluginContext.builder()
-            .fileManifest(manifest)
-            .settings(
-                ObjectNode.builder()
-                    .withMember("service", "smithy.java.codegen.integrations.javadoc#TestService")
-                    .withMember("namespace", "test.smithy.codegen")
-                    .build()
-            )
-            .model(model)
-            .build();
-        SmithyBuildPlugin plugin = new TestJavaCodegenPlugin();
-        plugin.execute(context);
-
-        assertFalse(manifest.getFiles().isEmpty());
+    @Override
+    protected URL testFile() {
+        return TEST_FILE;
     }
 
     @Test
@@ -226,7 +199,7 @@ public class JavadocIntegrationTest {
             fileContents,
             containsString(
                 """
-                        public static final ShapeId ID = ShapeId.from("smithy.java.codegen.integrations.javadoc#EnumWithDocs");
+                        public static final ShapeId ID = ShapeId.from("smithy.java.codegen#EnumWithDocs");
                         /**
                          * @deprecated As of the past.
                          */
@@ -240,13 +213,5 @@ public class JavadocIntegrationTest {
                     """
             )
         );
-    }
-
-    private String getFileStringForClass(String className) {
-        var fileStringOptional = manifest.getFileString(
-            Paths.get(String.format("/test/smithy/codegen/model/%s.java", className))
-        );
-        assertTrue(fileStringOptional.isPresent());
-        return fileStringOptional.get();
     }
 }

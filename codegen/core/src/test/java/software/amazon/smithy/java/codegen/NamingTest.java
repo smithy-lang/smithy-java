@@ -5,64 +5,25 @@
 
 package software.amazon.smithy.java.codegen;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URL;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Objects;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import software.amazon.smithy.build.MockManifest;
-import software.amazon.smithy.build.PluginContext;
-import software.amazon.smithy.build.SmithyBuildPlugin;
-import software.amazon.smithy.java.codegen.utils.TestJavaCodegenPlugin;
-import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.node.ObjectNode;
+import software.amazon.smithy.java.codegen.utils.AbstractCodegenFileTest;
 
-public class NamingTest {
+public class NamingTest extends AbstractCodegenFileTest {
     private static final URL TEST_FILE = Objects.requireNonNull(
         NamingTest.class.getResource("naming-test.smithy")
     );
-    private final MockManifest manifest = new MockManifest();
 
-    @BeforeEach
-    public void setup() {
-        var model = Model.assembler()
-            .addImport(TEST_FILE)
-            .assemble()
-            .unwrap();
-        var context = PluginContext.builder()
-            .fileManifest(manifest)
-            .settings(
-                ObjectNode.builder()
-                    .withMember("service", "smithy.java.codegen#TestService")
-                    .withMember("namespace", "test.smithy.codegen")
-                    .withMember("nullAnnotation", "software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation")
-                    .build()
-            )
-            .model(model)
-            .build();
-        SmithyBuildPlugin plugin = new TestJavaCodegenPlugin();
-        plugin.execute(context);
-
-        assertFalse(manifest.getFiles().isEmpty());
-    }
-
-    @Test
-    void nullAnnotationsOnFieldsAndGetter() {
-        var fileStr = getFileStringForClass("NonNullAnnotationInput");
-        var expectedField = "private transient final @TestNonNullAnnotation RequiredStruct requiredStruct;";
-        var expectedGetter = "public @TestNonNullAnnotation RequiredStruct requiredStruct()";
-        var expectedImport = "import software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation;";
-
-        assertTrue(fileStr.contains(expectedField));
-        assertTrue(fileStr.contains(expectedGetter));
-        assertTrue(fileStr.contains(expectedImport));
+    @Override
+    protected URL testFile() {
+        return TEST_FILE;
     }
 
     @Test
@@ -170,13 +131,5 @@ public class NamingTest {
         var fileStr = getFileStringForClass("EnumCasing");
         // All variants should maintain the raw value for the value, but convert the type to expected string
         assertTrue(fileStr.contains(String.format("new EnumCasing(Type.%s, \"%s\")", updated, original)));
-    }
-
-    private String getFileStringForClass(String className) {
-        var fileStringOptional = manifest.getFileString(
-            Paths.get(String.format("/test/smithy/codegen/model/%s.java", className))
-        );
-        assertTrue(fileStringOptional.isPresent());
-        return fileStringOptional.get();
     }
 }

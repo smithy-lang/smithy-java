@@ -5,50 +5,24 @@
 
 package software.amazon.smithy.java.codegen.integrations.core;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URL;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Objects;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import software.amazon.smithy.build.MockManifest;
-import software.amazon.smithy.build.PluginContext;
-import software.amazon.smithy.build.SmithyBuildPlugin;
-import software.amazon.smithy.java.codegen.utils.TestJavaCodegenPlugin;
-import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.node.ObjectNode;
+import software.amazon.smithy.java.codegen.utils.AbstractCodegenFileTest;
 
-public class PreludeTraitInitializerTest {
+public class PreludeTraitInitializerTest extends AbstractCodegenFileTest {
     private static final URL TEST_FILE = Objects.requireNonNull(
         PreludeTraitInitializerTest.class.getResource("prelude-trait-initializer-test.smithy")
     );
-    private final MockManifest manifest = new MockManifest();
 
-    @BeforeEach
-    public void setup() {
-        var model = Model.assembler()
-            .addImport(TEST_FILE)
-            .assemble()
-            .unwrap();
-        var context = PluginContext.builder()
-            .fileManifest(manifest)
-            .settings(
-                ObjectNode.builder()
-                    .withMember("service", "smithy.java.codegen.integrations.javadoc#TestService")
-                    .withMember("namespace", "test.smithy.codegen")
-                    .build()
-            )
-            .model(model)
-            .build();
-        SmithyBuildPlugin plugin = new TestJavaCodegenPlugin();
-        plugin.execute(context);
-
-        assertFalse(manifest.getFiles().isEmpty());
+    @Override
+    protected URL testFile() {
+        return TEST_FILE;
     }
 
     static List<String> customInitializersInput() {
@@ -71,13 +45,5 @@ public class PreludeTraitInitializerTest {
     void customInitializerForRetryableCorrect() {
         var fileContents = getFileStringForClass("RetryableError");
         assertTrue(fileContents.contains("RetryableTrait.builder().throttling(false).build()"));
-    }
-
-    private String getFileStringForClass(String className) {
-        var fileStringOptional = manifest.getFileString(
-            Paths.get(String.format("/test/smithy/codegen/model/%s.java", className))
-        );
-        assertTrue(fileStringOptional.isPresent());
-        return fileStringOptional.get();
     }
 }

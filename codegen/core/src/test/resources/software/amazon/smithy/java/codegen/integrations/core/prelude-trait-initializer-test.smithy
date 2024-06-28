@@ -1,6 +1,6 @@
 $version: "2"
 
-namespace smithy.java.codegen.integrations.javadoc
+namespace smithy.java.codegen
 
 service TestService {
     version: "today"
@@ -15,10 +15,13 @@ service TestService {
 operation SpecialCased {
     input := {
         stringDefault: String = "string"
+
         @length(min: 10)
         stringWithLength: String
+
         @range(max: 100)
         numberWithRange: Integer
+
         @xmlNamespace(uri: "http://foo.com")
         xmlNamespaced: String
     }

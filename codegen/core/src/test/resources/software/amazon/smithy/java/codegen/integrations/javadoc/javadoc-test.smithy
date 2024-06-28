@@ -1,6 +1,6 @@
 $version: "2"
 
-namespace smithy.java.codegen.integrations.javadoc
+namespace smithy.java.codegen
 
 service TestService {
     version: "today"
