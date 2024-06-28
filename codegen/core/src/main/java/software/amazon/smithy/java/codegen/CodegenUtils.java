@@ -299,4 +299,15 @@ public final class CodegenUtils {
     public static String toUpperSnakeCase(String string) {
         return CaseUtils.toSnakeCase(string).toUpperCase(Locale.ENGLISH);
     }
+
+    /**
+     * Gets a symbol representing a nested {@code Type} enum for the given root symbol.
+     *
+     * @return Symbol representing a nested {@code Type} enum
+     */
+    public static Symbol getInnerTypeEnumSymbol(Symbol symbol) {
+        return symbol.toBuilder()
+            .name("Type")
+            .build();
+    }
 }

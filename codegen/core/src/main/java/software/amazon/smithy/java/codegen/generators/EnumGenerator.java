@@ -81,7 +81,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.putContext("properties", writer.consumer(EnumGenerator::writeProperties));
             writer.putContext("constructor", new ConstructorGenerator(writer, valueSymbol));
             writer.putContext("innerEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
-            writer.putContext("getters", writer.consumer(EnumGenerator::writeGetters));
+            writer.putContext("getters", new GetterGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext(
                 "serializer",
                 new SerializerGenerator(
@@ -133,7 +133,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
 
     private static void writeProperties(JavaWriter writer) {
         writer.write("""
-            private final ${value:T} value;
+            private final ${value:N} value;
             private final Type type;
             """);
     }
@@ -157,20 +157,28 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
         }
     }
 
-    private static void writeGetters(JavaWriter writer) {
-        writer.write("""
-            public ${value:T} value() {
-                return value;
-            }
+    private record GetterGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements Runnable {
 
-            public Type type() {
-                return type;
-            }
+        @Override
+        public void run() {
+            writer.pushState();
+            var template = """
+                public ${value:N} value() {
+                    return value;
+                }
 
-            public static ${shape:T} unknown(${value:T} value) {
-                return new ${shape:T}(Type.$$UNKNOWN, value);
-            }
-            """);
+                public ${type:N} type() {
+                    return type;
+                }
+
+                public static ${shape:T} unknown(${value:T} value) {
+                    return new ${shape:T}(Type.$$UNKNOWN, value);
+                }
+                """;
+            writer.putContext("type", CodegenUtils.getInnerTypeEnumSymbol(symbolProvider.toSymbol(shape)));
+            writer.write(template);
+            writer.popState();
+        }
     }
 
     private record SerializerGenerator(

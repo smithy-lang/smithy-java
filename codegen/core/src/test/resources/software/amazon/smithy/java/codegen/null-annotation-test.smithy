@@ -5,14 +5,18 @@ namespace smithy.java.codegen
 service TestService {
     version: "today"
     operations: [
-        NonNullAnnotation
+        NonNullAnnotationStruct
+        AdditionalNullAnnotationTests
     ]
 }
 
-operation NonNullAnnotation {
+operation NonNullAnnotationStruct {
     input := {
         @required
         requiredStruct: RequiredStruct
+
+        @required
+        requiredPrimitive: Boolean
     }
 }
 
@@ -20,4 +24,23 @@ operation NonNullAnnotation {
 structure RequiredStruct {
     @required
     member: String
+}
+
+operation AdditionalNullAnnotationTests {
+    input := {
+        union: TestUnion
+        enum: TestEnum
+    }
+}
+
+@private
+union TestUnion {
+    boxedVariant: String
+    primitiveVariant: String
+}
+
+@private
+enum TestEnum {
+    A
+    B
 }

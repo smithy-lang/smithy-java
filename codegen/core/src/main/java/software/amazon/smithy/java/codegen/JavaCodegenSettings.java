@@ -59,7 +59,7 @@ public final class JavaCodegenSettings {
      * @return Parsed settings
      */
     public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
-        settingsNode.warnIfAdditionalProperties(List.of(SERVICE, NAMESPACE, HEADER_FILE));
+        settingsNode.warnIfAdditionalProperties(List.of(SERVICE, NAMESPACE, HEADER_FILE, NULL_ANNOTATION));
         return new JavaCodegenSettings(
             settingsNode.expectStringMember(SERVICE).expectShapeId(),
             settingsNode.expectStringMember(NAMESPACE).getValue(),

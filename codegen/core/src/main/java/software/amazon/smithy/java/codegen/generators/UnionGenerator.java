@@ -44,13 +44,13 @@ public final class UnionGenerator
 
                     ${schemas:C|}
 
-                    private final Type type;
+                    private final ${type:N} type;
 
-                    private ${shape:T}(Type type) {
+                    private ${shape:T}(${type:T} type) {
                         this.type = type;
                     }
 
-                    public Type type() {
+                    public ${type:N} type() {
                         return type;
                     }
 
@@ -66,6 +66,7 @@ public final class UnionGenerator
                 }
                 """;
             writer.putContext("shape", directive.symbol());
+            writer.putContext("type", CodegenUtils.getInnerTypeEnumSymbol(directive.symbol()));
             writer.putContext("serializableStruct", SerializableStruct.class);
             writer.putContext("document", Document.class);
             writer.putContext("id", new IdStringGenerator(writer, shape));
@@ -120,7 +121,7 @@ public final class UnionGenerator
                 writer.putContext("member", symbolProvider.toSymbol(member));
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
                 writer.write("""
-                    public ${member:B} ${memberName:L}() {
+                    public ${member:T} ${memberName:L}() {
                         throw new ${unsupported:T}("Member ${memberName:L} not supported for union of type: " + type);
                     }
                     """);
@@ -168,7 +169,7 @@ public final class UnionGenerator
                         }
 
                         @Override
-                        public ${member:B} ${memberName:L}() {
+                        public ${member:N} ${memberName:L}() {
                             return value;
                         }
 
@@ -205,15 +206,15 @@ public final class UnionGenerator
             writer.pushState();
             var template = """
                 public static final class $$UnknownMember extends ${shape:T} {
-                    private final String memberName;
+                    private final ${string:T} memberName;
 
-                    public $$UnknownMember(String memberName) {
+                    public $$UnknownMember(${string:T} memberName) {
                         super(Type.$$UNKNOWN);
                         this.memberName = memberName;
                     }
 
                     @Override
-                    public String $$unknownMember() {
+                    public ${string:T} $$unknownMember() {
                         return memberName;
                     }
 
@@ -244,6 +245,7 @@ public final class UnionGenerator
                 """;
             writer.putContext("serdeException", SerializationException.class);
             writer.putContext("object", Object.class);
+            writer.putContext("string", String.class);
             writer.write(template);
             writer.popState();
         }
