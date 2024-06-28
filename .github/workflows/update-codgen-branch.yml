@@ -1,5 +1,6 @@
 name: Updates the main-codegen branch if any codegen updates are merged.
 on:
+  workflow_dispatch: # on button click
   pull_request:
     branches: ["main"]
     types: [closed]
@@ -10,7 +11,12 @@ jobs:
     if: ${{ github.event.pull_request.merged }}
     runs-on: 'ubuntu-latest'
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          ref: 'main'
+          token: "${{ secrets.PR_TOKEN }}"
+
       - uses: gradle/wrapper-validation-action@v2
 
       - name: Set up JDK 17
@@ -24,8 +30,8 @@ jobs:
 
       - name: Set up git configuration
         run: |
-          git config --global user.email "github-aws-smithy-automation@amazon.com"
-          git config --global user.name "Smithy Automation"
+          git config --global user.email "github-smithy-automation@amazon.com"
+          git config --global user.name "smithy-automation"
 
       - name: Add generated files
         run: |
@@ -38,5 +44,3 @@ jobs:
         run: |
           git commit -m "Update generated code for PR: ${{ github.event.pull_request.number }}"
           git push -f -u origin main-codegen
-        env:
-          GITHUB_TOKEN: ${{ secrets.PR_TOKEN }}
