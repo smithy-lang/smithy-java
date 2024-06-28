@@ -98,10 +98,8 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
 
     @Override
     public Symbol blobShape(BlobShape blobShape) {
-        if (blobShape.hasTrait(StreamingTrait.class)) {
-            return CodegenUtils.fromClass(DataStream.class);
-        }
-        return CodegenUtils.fromClass(ByteBuffer.class)
+        var type = blobShape.hasTrait(StreamingTrait.class) ? DataStream.class : ByteBuffer.class;
+        return CodegenUtils.fromClass(type)
             .toBuilder()
             .putProperty(SymbolProperties.IS_PRIMITIVE, false)
             .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
