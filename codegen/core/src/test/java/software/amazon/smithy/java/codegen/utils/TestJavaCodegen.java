@@ -15,6 +15,7 @@ import software.amazon.smithy.codegen.core.directed.GenerateErrorDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateIntEnumDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateListDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateMapDirective;
+import software.amazon.smithy.codegen.core.directed.GenerateOperationDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateStructureDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateUnionDirective;
@@ -25,6 +26,7 @@ import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.generators.EnumGenerator;
 import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;
+import software.amazon.smithy.java.codegen.generators.OperationGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
@@ -67,6 +69,11 @@ public class TestJavaCodegen implements
     @Override
     public void generateService(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // No service generated for tests.
+    }
+
+    @Override
+    public void generateOperation(GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        new OperationGenerator().accept(directive);
     }
 
     @Override

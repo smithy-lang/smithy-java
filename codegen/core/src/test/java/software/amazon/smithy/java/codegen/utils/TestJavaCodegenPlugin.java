@@ -31,6 +31,7 @@ public class TestJavaCodegenPlugin implements SmithyBuildPlugin {
         runner.model(context.getModel());
         runner.integrationClass(JavaCodegenIntegration.class);
         runner.performDefaultCodegenTransforms();
+        runner.createDedicatedInputsAndOutputs();
         runner.run();
     }
 }
