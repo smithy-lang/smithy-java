@@ -11,12 +11,7 @@ jobs:
     if: ${{ github.event.pull_request.merged }}
     runs-on: 'ubuntu-latest'
     steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v4
-        with:
-          ref: 'main'
-          token: "${{ secrets.PR_TOKEN }}"
-
+      - uses: actions/checkout@v4
       - uses: gradle/wrapper-validation-action@v2
 
       - name: Set up JDK 17
@@ -32,6 +27,7 @@ jobs:
         run: |
           git config --global user.email "github-smithy-automation@amazon.com"
           git config --global user.name "smithy-automation"
+          git remote set-url origin https://x-access-token/:${{ secrets.PR_TOKEN }}@github.com/${{ github.repository }}
 
       - name: Add generated files
         run: |
