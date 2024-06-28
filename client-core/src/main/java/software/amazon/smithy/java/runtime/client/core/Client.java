@@ -30,8 +30,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public abstract class Client {
 
     private final EndpointResolver endpointResolver;
-    private final ClientTransport transport;
-    private final ClientProtocol<?, ?> protocol;
+    private final ClientPipeline<?, ?> pipeline;
     private final TypeRegistry typeRegistry;
     private final ClientInterceptor interceptor;
     private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
@@ -41,10 +40,10 @@ public abstract class Client {
     protected Client(Builder<?, ?> builder) {
         this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
 
-        // Set the protocol and transport and ensure they are compatible.
-        this.protocol = Objects.requireNonNull(builder.protocol, "protocol is null");
-        this.transport = Objects.requireNonNull(builder.transport, "transport is null");
-        ClientPipeline.validateProtocolAndTransport(protocol, transport);
+        this.pipeline = ClientPipeline.of(
+            Objects.requireNonNull(builder.protocol, "protocol is null"),
+            Objects.requireNonNull(builder.transport, "transport is null")
+        );
 
         // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
         this.interceptor = ClientInterceptor.chain(builder.interceptors);
@@ -99,7 +98,7 @@ public abstract class Client {
             })
             .build();
 
-        return ClientPipeline.of(protocol, transport).send(call);
+        return pipeline.send(call);
     }
 
     /**
@@ -109,7 +108,7 @@ public abstract class Client {
      * @param <B> Implementing builder class
      */
     public static abstract class Builder<I, B extends Builder<I, B>> {
-        private ClientTransport transport;
+        private ClientTransport<?, ?> transport;
         private ClientProtocol<?, ?> protocol;
         private EndpointResolver endpointResolver;
         private final List<ClientInterceptor> interceptors = new ArrayList<>();
@@ -124,7 +123,7 @@ public abstract class Client {
          * @return Returns the builder.
          */
         @SuppressWarnings("unchecked")
-        public B transport(ClientTransport transport) {
+        public B transport(ClientTransport<?, ?> transport) {
             this.transport = transport;
             return (B) this;
         }

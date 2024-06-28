@@ -20,7 +20,7 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
  *     <li>Output: The modeled output of an operation.</li>
  *     <li>Request: A protocol specific request to send.</li>
  *     <li>Response: A protocol specific response from a service.</li>
- *     <li>Error: Modeled or unmodeled errors that can be returned by a client.</li>
+ *     <li>Error: An error encountered while sending or receiving data.</li>
  *     <li>Result: Either a successful output or error.</li>
  *     <li>Execution: is one end-to-end invocation against a client.</li>
  *     <li>Attempt: attempt at performing an execution. By default, executions are retried multiple times based on the
@@ -157,7 +157,7 @@ public interface ClientInterceptor {
      * {@code #readBeforeAttempt} invoked. Other hooks will then be skipped, and execution will jump to
      * {@link #modifyBeforeAttemptCompletion} with the raised error as the result. If multiple {@code beforeAttempt}
      * methods raise errors, the latest is used, and earlier errors are logged and dropped.
-     * 
+     *
      * @param hook Hook data.
      */
     default void readBeforeAttempt(RequestHook<?, ?> hook) {}

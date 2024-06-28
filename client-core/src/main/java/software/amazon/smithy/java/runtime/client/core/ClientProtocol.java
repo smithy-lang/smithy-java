@@ -8,7 +8,6 @@ package software.amazon.smithy.java.runtime.client.core;
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
-import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
@@ -27,18 +26,18 @@ public interface ClientProtocol<RequestT, ResponseT> {
     String id();
 
     /**
-     * The request type and context key used by the client protocol.
+     * The request class used by protocol.
      *
-     * @return the context key.
+     * @return the request class.
      */
-    Context.Key<RequestT> requestKey();
+    Class<RequestT> requestClass();
 
     /**
-     * The response type and context key used by the client protocol.
+     * The response class used by the protocol.
      *
-     * @return the context key.
+     * @return the response class.
      */
-    Context.Key<ResponseT> responseKey();
+    Class<ResponseT> responseClass();
 
     /**
      * Creates the underlying transport request.

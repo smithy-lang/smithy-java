@@ -13,10 +13,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
-import software.amazon.smithy.java.runtime.client.core.ClientCall;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
@@ -25,38 +23,35 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
  * A client transport that uses Java's built-in {@link HttpClient} to send {@link SmithyHttpRequest} and return
  * {@link SmithyHttpResponse}.
  */
-public class JavaHttpClientTransport implements ClientTransport {
+public class JavaHttpClientTransport implements ClientTransport<SmithyHttpRequest, SmithyHttpResponse> {
 
     private static final System.Logger LOGGER = System.getLogger(JavaHttpClientTransport.class.getName());
     private final HttpClient client;
 
+    public JavaHttpClientTransport() {
+        this(HttpClient.newHttpClient());
+    }
+
     /**
-     * @param client   Java client to use.
+     * @param client Java client to use.
      */
     public JavaHttpClientTransport(HttpClient client) {
         this.client = client;
     }
 
     @Override
-    public Context.Key<SmithyHttpRequest> requestKey() {
-        return HttpContext.HTTP_REQUEST;
+    public Class<SmithyHttpRequest> requestClass() {
+        return SmithyHttpRequest.class;
     }
 
     @Override
-    public Context.Key<SmithyHttpResponse> responseKey() {
-        return HttpContext.HTTP_RESPONSE;
+    public Class<SmithyHttpResponse> responseClass() {
+        return SmithyHttpResponse.class;
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<Void> send(
-        ClientCall<I, O> call
-    ) {
-        var request = call.context().expect(requestKey());
-        var javaRequest = createJavaRequest(call.context(), request);
-        return sendRequest(javaRequest).thenApply(response -> {
-            call.context().put(responseKey(), response);
-            return null;
-        });
+    public CompletableFuture<SmithyHttpResponse> send(Context context, SmithyHttpRequest request) {
+        return sendRequest(createJavaRequest(context, request));
     }
 
     private HttpRequest createJavaRequest(Context context, SmithyHttpRequest request) {

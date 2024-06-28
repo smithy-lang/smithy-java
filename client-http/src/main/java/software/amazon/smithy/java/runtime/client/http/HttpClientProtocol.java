@@ -15,7 +15,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
-import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.uri.URIBuilder;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
@@ -40,13 +39,13 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
     }
 
     @Override
-    public final Context.Key<SmithyHttpRequest> requestKey() {
-        return HttpContext.HTTP_REQUEST;
+    public final Class<SmithyHttpRequest> requestClass() {
+        return SmithyHttpRequest.class;
     }
 
     @Override
-    public final Context.Key<SmithyHttpResponse> responseKey() {
-        return HttpContext.HTTP_RESPONSE;
+    public final Class<SmithyHttpResponse> responseClass() {
+        return SmithyHttpResponse.class;
     }
 
     @Override

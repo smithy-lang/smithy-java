@@ -48,40 +48,48 @@ public final class ClientPipeline<RequestT, ResponseT> {
     }
 
     private final ClientProtocol<RequestT, ResponseT> protocol;
-    private final ClientTransport transport;
-    private final Context.Key<RequestT> requestKey;
-    private final Context.Key<ResponseT> responseKey;
+    private final ClientTransport<RequestT, ResponseT> transport;
 
-    private ClientPipeline(
+    /**
+     * @param protocol Protocol used to serialize requests and deserialize responses.
+     * @param transport Transport used to send requests and return responses.
+     */
+    public ClientPipeline(
         ClientProtocol<RequestT, ResponseT> protocol,
-        ClientTransport transport
+        ClientTransport<RequestT, ResponseT> transport
     ) {
         this.protocol = Objects.requireNonNull(protocol);
         this.transport = Objects.requireNonNull(transport);
-        this.requestKey = protocol.requestKey();
-        this.responseKey = protocol.responseKey();
-    }
-
-    public static <RequestT, ResponseT> ClientPipeline<RequestT, ResponseT> of(
-        ClientProtocol<RequestT, ResponseT> protocol,
-        ClientTransport transport
-    ) {
-        validateProtocolAndTransport(protocol, transport);
-        return new ClientPipeline<>(protocol, transport);
     }
 
     /**
-     * Ensures that the given protocol and transport are compatible by comparing their request and response types.
+     * Attempt to create a ClientTransport from the given protocol and transport.
+     *
+     * @param protocol Protocol used to serialize requests and deserialize responses.
+     * @param transport Transport used to send requests and return responses.
+     * @throws IllegalStateException if the protocol and transport are incompatible.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public static <RequestT, ResponseT> ClientPipeline<RequestT, ResponseT> of(
+        ClientProtocol<?, ?> protocol,
+        ClientTransport<?, ?> transport
+    ) {
+        validateProtocolAndTransport(protocol, transport);
+        return new ClientPipeline(protocol, transport);
+    }
+
+    /**
+     * Ensures that the given protocol and transport are compatible by comparing their request and response classes.
      *
      * @param protocol Protocol to check.
      * @param transport Transport to check.
-     * @throws IllegalStateException if the protocol and transport use different request or response types.
+     * @throws IllegalStateException if the protocol and transport use different request or response classes.
      */
-    public static void validateProtocolAndTransport(ClientProtocol<?, ?> protocol, ClientTransport transport) {
-        if (protocol.requestKey() != transport.requestKey()) {
-            throw new IllegalStateException("Protocol request key != transport: " + protocol + " vs " + transport);
-        } else if (protocol.responseKey() != transport.responseKey()) {
-            throw new IllegalStateException("Protocol response key != transport: " + protocol + " vs " + transport);
+    public static void validateProtocolAndTransport(ClientProtocol<?, ?> protocol, ClientTransport<?, ?> transport) {
+        if (protocol.requestClass() != transport.requestClass()) {
+            throw new IllegalStateException("Protocol request != transport: " + protocol + " vs " + transport);
+        } else if (protocol.responseClass() != transport.responseClass()) {
+            throw new IllegalStateException("Protocol response != transport: " + protocol + " vs " + transport);
         }
     }
 
@@ -132,12 +140,10 @@ public final class ClientPipeline<RequestT, ResponseT> {
                 interceptor.readAfterSigning(finalRequestHook);
                 req = interceptor.modifyBeforeTransmit(finalRequestHook);
                 interceptor.readBeforeTransmit(finalRequestHook.withRequest(req));
-                call.context().put(requestKey, req);
                 return req;
             })
-            .thenCompose(finalRequest -> transport.send(call).thenCompose(ignore -> {
-                var response = call.context().expect(responseKey);
-                return deserialize(call, call.context().expect(requestKey), response, call.interceptor());
+            .thenCompose(finalRequest -> transport.send(context, finalRequest).thenCompose(response -> {
+                return deserialize(call, finalRequest, response, call.interceptor());
             }));
     }
 
@@ -212,7 +218,6 @@ public final class ClientPipeline<RequestT, ResponseT> {
 
         ResponseT modifiedResponse = interceptor.modifyBeforeDeserialization(responseHook);
         responseHook = responseHook.withResponse(modifiedResponse);
-        context.put(responseKey, modifiedResponse);
 
         interceptor.readBeforeDeserialization(responseHook);
 
