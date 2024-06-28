@@ -5,13 +5,9 @@
 
 package software.amazon.smithy.java.runtime.client.core.interceptors;
 
-import static software.amazon.smithy.java.runtime.core.Context.Value;
-
-import java.util.Arrays;
 import java.util.List;
-import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.core.Either;
-import software.amazon.smithy.java.runtime.core.schema.ApiException;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
@@ -53,16 +49,6 @@ public interface ClientInterceptor {
     }
 
     /**
-     * Combines multiple interceptors into a single interceptor.
-     *
-     * @param interceptors Interceptors to combine.
-     * @return the combined interceptors.
-     */
-    static ClientInterceptor chain(ClientInterceptor... interceptors) {
-        return chain(Arrays.asList(interceptors));
-    }
-
-    /**
      * A hook called at the start of an execution, before the client does anything else.
      *
      * <p>When: This will ALWAYS be called once per execution. The duration between invocation of this hook and
@@ -73,16 +59,14 @@ public interface ClientInterceptor {
      * with the raised error as the result value. If multiple {@code readBeforeExecution} methods raise errors,
      * the latest will be used, and earlier errors will be logged and dropped.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param <I> Input type.
+     * @param hook Hook data.
      */
-    default <I extends SerializableStruct> void readBeforeExecution(Context context, I input) {}
+    default void readBeforeExecution(InputHook<?> hook) {}
 
     /**
      * A hook called before the input message is serialized into a transport message.
      *
-     * <p>This method can modify and return a new request message of the same type.
+     * <p>This method can modify and return a new request message.
      *
      * <p>When: This will ALWAYS be called once per execution, except when a failure occurs earlier in the request
      * pipeline.
@@ -94,16 +78,15 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If a hook raises an error, execution will jump to {@link #modifyBeforeCompletion} with the
      * raised error as the {@code result}.
      *
-     * <p>Return Constraints: The input message returned by this hook MUST be the same type of input message passed
-     * into this hook. If not, an error will immediately be raised.
+     * <p>If attempting to modify a specific kind of input, it can be modified using
+     * {@link InputHook#mapInput(Class, Function)} or {@link InputHook#mapInput(Class, Object, BiFunction)}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
+     * @param hook Hook data.
      * @return the updated input.
      * @param <I> Input type.
      */
-    default <I extends SerializableStruct> I modifyBeforeSerialization(Context context, I input) {
-        return input;
+    default <I extends SerializableStruct> I modifyBeforeSerialization(InputHook<I> hook) {
+        return hook.input();
     }
 
     /**
@@ -118,11 +101,9 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If a hook raises an error, execution will jump to {@link #modifyBeforeCompletion} with the
      * raised error as the {@code result}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param <I> Input type.
+     * @param hook Hook data.
      */
-    default <I extends SerializableStruct> void readBeforeSerialization(Context context, I input) {}
+    default void readBeforeSerialization(InputHook<?> hook) {}
 
     /**
      * A hook called after the input message is marshalled into a protocol-specific request.
@@ -137,17 +118,9 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If a hook raises an error, execution will jump to {@link #modifyBeforeCompletion} with the
      * raised error as the {@code result}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request to send.
-     * @param <I> Input type.
-     * @param <RequestT> Protocol-specific request type.
+     * @param hook Hook data.
      */
-    default <I extends SerializableStruct, RequestT> void readAfterSerialization(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {}
+    default void readAfterSerialization(RequestHook<?, ?> hook) {}
 
     /**
      * A hook called before the retry loop is entered that can be used to modify and return a new request.
@@ -160,19 +133,15 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeCompletion} with
      * the raised error as the {@code result}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request to send.
-     * @return the updated protocol-specific, type-safe request entry to send.
-     * @param <I> Input type.
+     * <p>If attempting to modify a specific kind of request, it can be modified using
+     * {@link RequestHook#mapRequest(Class, Function)} or {@link RequestHook#mapRequest(Class, Object, BiFunction)}.
+     *
+     * @param hook Hook data.
+     * @return the updated protocol-specific request entry to send.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <I extends SerializableStruct, RequestT> Value<RequestT> modifyBeforeRetryLoop(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {
-        return request;
+    default <RequestT> RequestT modifyBeforeRetryLoop(RequestHook<?, RequestT> hook) {
+        return hook.request();
     }
 
     /**
@@ -189,20 +158,12 @@ public interface ClientInterceptor {
      * {@link #modifyBeforeAttemptCompletion} with the raised error as the result. If multiple {@code beforeAttempt}
      * methods raise errors, the latest is used, and earlier errors are logged and dropped.
      * 
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request to send.
-     * @param <I> Input type.
-     * @param <RequestT> Protocol-specific request type.
+     * @param hook Hook data.
      */
-    default <I extends SerializableStruct, RequestT> void readBeforeAttempt(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {}
+    default void readBeforeAttempt(RequestHook<?, ?> hook) {}
 
     /**
-     * A hook called before the request is signed; this method can modify and return a new request of the same type.
+     * A hook called before the request is signed; this method can modify and return a new request.
      *
      * <p>When: This is ALWAYS called once per attempt, except when a failure occurs earlier in the request pipeline.
      * This method may be called multiple times if retries occur.
@@ -214,19 +175,15 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeAttemptCompletion}
      * with the raised error as the {@code result}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request to send.
-     * @return the type-safe, protocol-specific request.
-     * @param <I> Input type.
+     * <p>If attempting to modify a specific kind of request, it can be modified using
+     * {@link RequestHook#mapRequest(Class, Function)} or {@link RequestHook#mapRequest(Class, Object, BiFunction)}.
+     *
+     * @param hook Hook data.
+     * @return the protocol-specific request.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <I extends SerializableStruct, RequestT> Value<RequestT> modifyBeforeSigning(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {
-        return request;
+    default <RequestT> RequestT modifyBeforeSigning(RequestHook<?, RequestT> hook) {
+        return hook.request();
     }
 
     /**
@@ -241,17 +198,9 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeAttemptCompletion}
      * with the raised error as the {@code result}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request to send.
-     * @param <I>Input type.
-     * @param <RequestT> Protocol-specific request type.
+     * @param hook Hook data.
      */
-    default <I extends SerializableStruct, RequestT> void readBeforeSigning(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {}
+    default void readBeforeSigning(RequestHook<?, ?> hook) {}
 
     /**
      * A hook called after the transport request message is signed.
@@ -265,22 +214,14 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeAttemptCompletion}
      * with the raised error as the {@code result}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request to send.
-     * @param <I> Input type.
-     * @param <RequestT> Protocol-specific request type.
+     * @param hook Hook data.
      */
-    default <I extends SerializableStruct, RequestT> void readAfterSigning(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {}
+    default void readAfterSigning(RequestHook<?, ?> hook) {}
 
     /**
      * A hook called before the transport request message is sent to the service.
      *
-     * <p>This method can modify and return a new protocol-specific request of the same type.
+     * <p>This method can modify and return a new protocol-specific request.
      *
      * <p>When: This is ALWAYS called at least once per attempt, except when a failure occurs earlier in the request
      * pipeline. This method may be called multiple times when retries occur.
@@ -292,19 +233,15 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeAttemptCompletion}
      * with the raised error as the {@code result}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request to send.
-     * @return the type-safe, protocol-specific request.
-     * @param <I> Input type.
+     * <p>If attempting to modify a specific kind of request, it can be modified using
+     * {@link RequestHook#mapRequest(Class, Function)} or {@link RequestHook#mapRequest(Class, Object, BiFunction)}.
+     *
+     * @param hook Hook data.
+     * @return the protocol-specific request.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <I extends SerializableStruct, RequestT> Value<RequestT> modifyBeforeTransmit(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {
-        return request;
+    default <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, RequestT> hook) {
+        return hook.request();
     }
 
     /**
@@ -320,17 +257,9 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeAttemptCompletion}
      * with the raised error as the {@code result}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request to send.
-     * @param <I> Input type.
-     * @param <RequestT> Protocol-specific request type.
+     * @param hook Hook data.
      */
-    default <I extends SerializableStruct, RequestT> void readBeforeTransmit(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {}
+    default void readBeforeTransmit(RequestHook<?, ?> hook) {}
 
     /**
      * A hook called after the transport request message is sent to the service and a transport response message is
@@ -347,25 +276,14 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeAttemptCompletion}
      * with the raised error as the {@code result}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request that was sent.
-     * @param response Protocol-specific, type-safe response that was received.
-     * @param <I> Input type.
-     * @param <RequestT> Protocol-specific request type.
-     * @param <ResponseT> Protocol-specific response type.
+     * @param hook Hook data.
      */
-    default <I extends SerializableStruct, RequestT, ResponseT> void readAfterTransmit(
-        Context context,
-        I input,
-        Value<RequestT> request,
-        Value<ResponseT> response
-    ) {}
+    default void readAfterTransmit(ResponseHook<?, ?, ?> hook) {}
 
     /**
      * A hook called before the response is deserialized.
      *
-     * <p>This method can modify and return a new response of the same type.
+     * <p>This method can modify and return a new response.
      *
      * <p>When: This is ALWAYS called once per attempt, except when a failure occurs earlier in the request pipeline.
      * This method may be called multiple times when retries occur.
@@ -377,22 +295,15 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeAttemptCompletion}
      * with the raised error as the {@code result}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request that was sent.
-     * @param response Protocol-specific, type-safe response that was received.
-     * @return the type-safe, protocol-specific response.
-     * @param <I> Input type.
-     * @param <RequestT> Protocol-specific request type.
+     * <p>If attempting to modify a specific kind of response, it can be modified using
+     * {@link ResponseHook#mapResponse(Class, Function)} or {@link ResponseHook#mapResponse(Class, Object, BiFunction)}.
+     *
+     * @param hook Hook data.
+     * @return the protocol-specific response.
      * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableStruct, RequestT, ResponseT> Value<ResponseT> modifyBeforeDeserialization(
-        Context context,
-        I input,
-        Value<RequestT> request,
-        Value<ResponseT> response
-    ) {
-        return response;
+    default <ResponseT> ResponseT modifyBeforeDeserialization(ResponseHook<?, ?, ResponseT> hook) {
+        return hook.response();
     }
 
     /**
@@ -409,20 +320,9 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises an error, execution will jump to {@link #modifyBeforeAttemptCompletion}
      * with the raised error as the {@code result}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request that was sent.
-     * @param response Protocol-specific, type-safe response that was received.
-     * @param <I> Input type.
-     * @param <RequestT> Protocol-specific request type.
-     * @param <ResponseT> Protocol-specific response type.
+     * @param hook Hook data.
      */
-    default <I extends SerializableStruct, RequestT, ResponseT> void readBeforeDeserialization(
-        Context context,
-        I input,
-        Value<RequestT> request,
-        Value<ResponseT> response
-    ) {}
+    default void readBeforeDeserialization(ResponseHook<?, ?, ?> hook) {}
 
     /**
      * A hook called after the transport response message is deserialized.
@@ -437,23 +337,13 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises or returns an error, execution will jump to
      * {@link #modifyBeforeAttemptCompletion} with the raised error as the result.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request that was sent.
-     * @param response Protocol-specific, type-safe response that was received.
-     * @param result The result that contains either the modeled output, or an error.
-     * @param <I> Input type.
-     * @param <O> Output type.
-     * @param <RequestT> Protocol-specific request type.
-     * @param <ResponseT> Protocol-specific response type.
+     * @param hook Hook data.
+     * @param error Error to be thrown, present.
+     * @throws RuntimeException on error or to forward the given {@code error}.
      */
-    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> void readAfterDeserialization(
-        Context context,
-        I input,
-        Value<RequestT> request,
-        Value<ResponseT> response,
-        Either<ApiException, O> result
-    ) {}
+    default void readAfterDeserialization(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {
+        hook.forward(error);
+    }
 
     /**
      * A hook called when an attempt is completed. This method can modify and return a new output or error matching
@@ -467,25 +357,20 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises or returns an exception, execution will jump to {@link #readAfterAttempt}
      * with the error as the result.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request that was sent.
-     * @param response Protocol-specific, type-safe response that was received.
-     * @param result The result that contains either the modeled output, or an error.
-     * @return either the modeled output or an error to associate with the call.
-     * @param <I> Input type.
+     * <p>If attempting to modify a specific kind of output, it can be modified using
+     * {@link OutputHook#mapOutput(Class, Function)} or {@link OutputHook#mapOutput(Class, Object, BiFunction)}.
+     *
+     * @param hook Hook data.
+     * @param error Error to be thrown, present.
+     * @return Updated or forwarded output.
+     * @throws RuntimeException on error or to forward the given {@code error}.
      * @param <O> Output type.
-     * @param <RequestT> Protocol-specific request type.
-     * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<ApiException, O> modifyBeforeAttemptCompletion(
-        Context context,
-        I input,
-        Value<RequestT> request,
-        Value<ResponseT> response,
-        Either<ApiException, O> result
+    default <O extends SerializableStruct> O modifyBeforeAttemptCompletion(
+        OutputHook<?, ?, ?, O> hook,
+        RuntimeException error
     ) {
-        return result;
+        return hook.forward(error);
     }
 
     /**
@@ -502,23 +387,13 @@ public interface ClientInterceptor {
      * retryable, execution will then jump to {@link #readBeforeAttempt}. Otherwise, execution will jump to
      * {@link #modifyBeforeCompletion}.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param request Protocol-specific request that was sent.
-     * @param responseIfAvailable Protocol-specific, type-safe response that was received.
-     * @param result The result that contains either the modeled output, or an error.
-     * @param <I> Input type.
-     * @param <O> Output type.
-     * @param <RequestT>  Protocol-specific request type.
-     * @param <ResponseT> Protocol-specific response type.
+     * @param hook Hook data.
+     * @param error Error to be thrown, present.
+     * @throws RuntimeException on error or to forward the given {@code error}.
      */
-    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> void readAfterAttempt(
-        Context context,
-        I input,
-        Value<RequestT> request,
-        Value<ResponseT> responseIfAvailable,
-        Either<ApiException, O> result
-    ) {}
+    default void readAfterAttempt(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {
+        hook.forward(error);
+    }
 
     /**
      * A hook called when an execution is completed.
@@ -533,25 +408,20 @@ public interface ClientInterceptor {
      * <p>Error Behavior: If this hook raises or returns an error, execution will jump to {@link #readAfterExecution}
      * with the raised error as the result.
      *
-     * @param context             Mutable, thread-safe execution context data.
-     * @param input               The modeled input of the call.
-     * @param requestIfAvailable Protocol-specific request that was sent, or null if not available.
-     * @param responseIfAvailable Protocol-specific, type-safe response that was received, or null if not available.
-     * @param result              The result that contains either the modeled output, or an error.
-     * @return either the modeled output or an error to associate with the call.
-     * @param <I> Input type.
+     * <p>If attempting to modify a specific kind of output, it can be modified using
+     * {@link OutputHook#mapOutput(Class, Function)} or {@link OutputHook#mapOutput(Class, Object, BiFunction)}.
+     *
+     * @param hook Hook data.
+     * @param error Error to be thrown, present.
+     * @return Updated or forwarded output.
+     * @throws RuntimeException on error or to forward the given {@code error}.
      * @param <O> Output type.
-     * @param <RequestT>  Protocol-specific request type.
-     * @param <ResponseT> Protocol-specific response type.
      */
-    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<ApiException, O> modifyBeforeCompletion(
-        Context context,
-        I input,
-        Value<RequestT> requestIfAvailable,
-        Value<ResponseT> responseIfAvailable,
-        Either<ApiException, O> result
+    default <O extends SerializableStruct> O modifyBeforeCompletion(
+        OutputHook<?, ?, ?, O> hook,
+        RuntimeException error
     ) {
-        return result;
+        return hook.forward(error);
     }
 
     /**
@@ -568,21 +438,11 @@ public interface ClientInterceptor {
      * If multiple {@code readAfterExecution} methods raise an error, the latest is used, and earlier errors are logged
      * and dropped.
      *
-     * @param context Mutable, thread-safe execution context data.
-     * @param input The modeled input of the call.
-     * @param requestIfAvailable Protocol-specific request that was sent, or null if not available.
-     * @param responseIfAvailable Protocol-specific, type-safe response that was received, or null if not available.
-     * @param result The result that contains either the modeled output, or an error.
-     * @param <I> Input type.
-     * @param <O> Output type.
-     * @param <RequestT>  Protocol-specific request type.
-     * @param <ResponseT> Protocol-specific response type.
+     * @param hook Hook data.
+     * @param error Error to be thrown, present.
+     * @throws RuntimeException on error or to forward the given {@code error}.
      */
-    default <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> void readAfterExecution(
-        Context context,
-        I input,
-        Value<RequestT> requestIfAvailable,
-        Value<ResponseT> responseIfAvailable,
-        Either<ApiException, O> result
-    ) {}
+    default void readAfterExecution(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {
+        hook.forward(error);
+    }
 }

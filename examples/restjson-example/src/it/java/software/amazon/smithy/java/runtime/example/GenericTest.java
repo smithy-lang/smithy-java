@@ -12,11 +12,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.runtime.client.http.HttpContext;
+import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
-import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
@@ -29,6 +27,7 @@ import software.amazon.smithy.java.runtime.example.model.PutPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonOutput;
 import software.amazon.smithy.java.runtime.example.model.ValidationError;
+import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 
 public class GenericTest {
@@ -146,21 +145,15 @@ public class GenericTest {
     public void supportsInterceptors() throws Exception {
         var interceptor = new ClientInterceptor() {
             @Override
-            public <I extends SerializableStruct, RequestT> void readBeforeTransmit(
-                Context context,
-                I input,
-                Context.Value<RequestT> request
-            ) {
-                System.out.println("Sending request: " + input);
+            public void readBeforeTransmit(RequestHook<?, ?> hook) {
+                System.out.println("Sending request: " + hook.input());
             }
 
             @Override
-            public <I extends SerializableStruct, RequestT> Context.Value<RequestT> modifyBeforeTransmit(
-                Context context,
-                I input,
-                Context.Value<RequestT> request
-            ) {
-                return request.mapIf(HttpContext.HTTP_REQUEST, r -> r.withAddedHeaders("X-Foo", "Bar"));
+            public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, RequestT> hook) {
+                return hook.mapRequest(SmithyHttpRequest.class, request -> {
+                    return request.withAddedHeaders("X-Foo", "Bar");
+                });
             }
         };
 

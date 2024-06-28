@@ -16,10 +16,13 @@ import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.runtime.client.core.interceptors.InputHook;
+import software.amazon.smithy.java.runtime.client.core.interceptors.OutputHook;
+import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.runtime.client.core.interceptors.ResponseHook;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolverParams;
 import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.core.Either;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
@@ -89,22 +92,29 @@ public final class ClientPipeline<RequestT, ResponseT> {
         var input = call.input();
         var interceptor = call.interceptor();
 
-        interceptor.readBeforeExecution(context, input);
-        context.put(CallContext.INPUT, interceptor.modifyBeforeSerialization(context, input));
+        var inputHook = new InputHook<>(context, input);
+        interceptor.readBeforeExecution(inputHook);
+        input = interceptor.modifyBeforeSerialization(inputHook);
+        context.put(CallContext.INPUT, input);
+        inputHook = inputHook.withInput(input);
 
-        interceptor.readBeforeSerialization(context, input);
+        interceptor.readBeforeSerialization(inputHook);
         // Use the UNRESOLVED URI of "/" for now, and resolve the actual endpoint later.
         RequestT request = protocol.createRequest(call, UNRESOLVED);
-        interceptor.readAfterSerialization(context, input, Context.value(requestKey, request));
+        var requestHook = new RequestHook<>(context, input, request);
+        interceptor.readAfterSerialization(requestHook);
 
-        request = interceptor.modifyBeforeRetryLoop(context, input, Context.value(requestKey, request)).value();
+        request = interceptor.modifyBeforeRetryLoop(requestHook);
+        requestHook = requestHook.withRequest(request);
 
         // Retry loop
-        interceptor.readBeforeAttempt(context, input, Context.value(requestKey, request));
+        interceptor.readBeforeAttempt(requestHook);
 
         // 8.b. Resolve auth scheme, sign, etc.
-        request = interceptor.modifyBeforeSigning(context, input, Context.value(requestKey, request)).value();
-        interceptor.readBeforeSigning(context, input, Context.value(requestKey, request));
+        request = interceptor.modifyBeforeSigning(requestHook);
+        var finalRequestHook = requestHook.withRequest(request);
+
+        interceptor.readBeforeSigning(finalRequestHook);
 
         var resolvedAuthScheme = resolveAuthScheme(call, request);
 
@@ -119,10 +129,9 @@ public final class ClientPipeline<RequestT, ResponseT> {
             .thenApply(endpoint -> protocol.setServiceEndpoint(reqBeforeEndpointResolution, endpoint))
             .thenCompose(resolvedAuthScheme::sign)
             .thenApply(req -> {
-                interceptor.readAfterSigning(context, input, Context.value(requestKey, req));
-
-                req = interceptor.modifyBeforeTransmit(context, input, Context.value(requestKey, req)).value();
-                interceptor.readBeforeTransmit(context, input, Context.value(requestKey, req));
+                interceptor.readAfterSigning(finalRequestHook);
+                req = interceptor.modifyBeforeTransmit(finalRequestHook);
+                interceptor.readBeforeTransmit(finalRequestHook.withRequest(req));
                 call.context().put(requestKey, req);
                 return req;
             })
@@ -197,82 +206,55 @@ public final class ClientPipeline<RequestT, ResponseT> {
         );
 
         Context context = call.context();
+        var responseHook = new ResponseHook<>(context, input, request, response);
 
-        interceptor.readAfterTransmit(
-            context,
-            input,
-            Context.value(requestKey, request),
-            Context.value(responseKey, response)
-        );
+        interceptor.readAfterTransmit(responseHook);
 
-        ResponseT modifiedResponse = interceptor
-            .modifyBeforeDeserialization(
-                context,
-                input,
-                Context.value(requestKey, request),
-                Context.value(responseKey, response)
-            )
-            .value();
+        ResponseT modifiedResponse = interceptor.modifyBeforeDeserialization(responseHook);
+        responseHook = responseHook.withResponse(modifiedResponse);
         context.put(responseKey, modifiedResponse);
 
-        interceptor.readBeforeDeserialization(
-            context,
-            input,
-            Context.value(requestKey, request),
-            Context.value(responseKey, response)
-        );
+        interceptor.readBeforeDeserialization(responseHook);
 
         return protocol.deserializeResponse(call, request, modifiedResponse)
             .thenApply(shape -> {
                 context.put(CallContext.OUTPUT, shape);
-                Either<ApiException, O> result = Either.right(shape);
+                var outputHook = new OutputHook<>(context, input, request, response, shape);
+                RuntimeException error = null;
 
-                interceptor.readAfterDeserialization(
-                    context,
-                    input,
-                    Context.value(requestKey, request),
-                    Context.value(responseKey, response),
-                    result
-                );
+                try {
+                    interceptor.readAfterDeserialization(outputHook, null);
+                } catch (RuntimeException e) {
+                    error = e;
+                }
 
-                result = interceptor.modifyBeforeAttemptCompletion(
-                    context,
-                    input,
-                    Context.value(requestKey, request),
-                    Context.value(responseKey, response),
-                    result
-                );
+                try {
+                    shape = interceptor.modifyBeforeAttemptCompletion(outputHook, error);
+                    outputHook = outputHook.withOutput(shape);
+                    context.put(CallContext.OUTPUT, shape);
+                } catch (RuntimeException e) {
+                    error = e;
+                }
 
-                interceptor.readAfterAttempt(
-                    context,
-                    input,
-                    Context.value(requestKey, request),
-                    Context.value(responseKey, response),
-                    result
-                );
+                try {
+                    interceptor.readAfterAttempt(outputHook, error);
+                } catch (RuntimeException e) {
+                    // TODO: If retryable, goto readBeforeAttempt, if not goto modifyBeforeCompletion.
+                    error = e;
+                }
 
                 // End of retry loop
-                result = interceptor.modifyBeforeCompletion(
-                    context,
-                    input,
-                    Context.value(requestKey, request),
-                    Context.value(responseKey, response),
-                    result
-                );
-
-                interceptor.readAfterExecution(
-                    context,
-                    input,
-                    Context.value(requestKey, request),
-                    Context.value(responseKey, response),
-                    result
-                );
-
-                if (result.isRight()) {
-                    return result.right();
-                } else {
-                    throw result.left();
+                try {
+                    shape = interceptor.modifyBeforeCompletion(outputHook, error);
+                    outputHook = outputHook.withOutput(shape);
+                    context.put(CallContext.OUTPUT, shape);
+                } catch (RuntimeException e) {
+                    error = e;
                 }
+
+                interceptor.readAfterExecution(outputHook, error);
+
+                return outputHook.output();
             });
     }
 

@@ -62,7 +62,6 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         // Initialize the context.
         context.put(CallContext.INPUT, input());
         context.put(CallContext.OPERATION_SCHEMA, operation().schema());
-        context.put(CallContext.CLIENT_INTERCEPTOR, interceptor());
     }
 
     /**

@@ -5,14 +5,11 @@
 
 package software.amazon.smithy.java.runtime.client.core.interceptors;
 
-import static software.amazon.smithy.java.runtime.core.Context.Value;
-
 import java.util.List;
-import java.util.function.Consumer;
-import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.core.Either;
-import software.amazon.smithy.java.runtime.core.schema.ApiException;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.utils.TriConsumer;
 
 final class ClientInterceptorChain implements ClientInterceptor {
 
@@ -24,16 +21,16 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableStruct> void readBeforeExecution(Context context, I input) {
-        applyToEachThrowLastError(interceptor -> interceptor.readBeforeExecution(context, input));
+    public void readBeforeExecution(InputHook<?> hook) {
+        applyToEachThrowLastError(ClientInterceptor::readBeforeExecution, hook);
     }
 
-    // Many interceptors require running each hook, logging errors if multiple are encountered, and throwing the last.
-    private void applyToEachThrowLastError(Consumer<ClientInterceptor> consumer) {
+    // Many interceptors require running each hook, logging errors, and throwing the last.
+    private <T> void applyToEachThrowLastError(BiConsumer<ClientInterceptor, T> consumer, T hook) {
         RuntimeException error = null;
         for (var interceptor : interceptors) {
             try {
-                consumer.accept(interceptor);
+                consumer.accept(interceptor, hook);
             } catch (RuntimeException e) {
                 if (error != null) {
                     LOGGER.log(System.Logger.Level.ERROR, e);
@@ -48,222 +45,162 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableStruct> I modifyBeforeSerialization(Context context, I input) {
+    public <I extends SerializableStruct> I modifyBeforeSerialization(InputHook<I> hook) {
+        var input = hook.input();
         for (var interceptor : interceptors) {
-            input = interceptor.modifyBeforeSerialization(context, input);
+            input = interceptor.modifyBeforeSerialization(hook.withInput(input));
         }
         return input;
     }
 
     @Override
-    public <I extends SerializableStruct> void readBeforeSerialization(Context context, I input) {
+    public void readBeforeSerialization(InputHook<?> hook) {
         for (var interceptor : interceptors) {
-            interceptor.readBeforeSerialization(context, input);
+            interceptor.readBeforeSerialization(hook);
         }
     }
 
     @Override
-    public <I extends SerializableStruct, RequestT> void readAfterSerialization(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {
+    public void readAfterSerialization(RequestHook<?, ?> hook) {
         for (var interceptor : interceptors) {
-            interceptor.readAfterSerialization(context, input, request);
+            interceptor.readAfterSerialization(hook);
         }
     }
 
     @Override
-    public <I extends SerializableStruct, RequestT> Value<RequestT> modifyBeforeRetryLoop(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {
-        for (var interceptor : interceptors) {
-            request = interceptor.modifyBeforeRetryLoop(context, input, request);
-        }
-        return request;
+    public <RequestT> RequestT modifyBeforeRetryLoop(RequestHook<?, RequestT> hook) {
+        return modifyRequestHook(ClientInterceptor::modifyBeforeRetryLoop, hook);
     }
 
-    @Override
-    public <I extends SerializableStruct, RequestT> void readBeforeAttempt(
-        Context context,
-        I input,
-        Value<RequestT> request
+    private <I extends SerializableStruct, RequestT> RequestT modifyRequestHook(
+        BiFunction<ClientInterceptor, RequestHook<I, RequestT>, RequestT> mapper,
+        RequestHook<I, RequestT> hook
     ) {
-        applyToEachThrowLastError(interceptor -> interceptor.readBeforeAttempt(context, input, request));
-    }
-
-    @Override
-    public <I extends SerializableStruct, RequestT> Value<RequestT> modifyBeforeSigning(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {
+        var request = hook.request();
         for (var interceptor : interceptors) {
-            request = interceptor.modifyBeforeSigning(context, input, request);
+            request = mapper.apply(interceptor, hook.withRequest(request));
         }
         return request;
     }
 
     @Override
-    public <I extends SerializableStruct, RequestT> void readBeforeSigning(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {
+    public void readBeforeAttempt(RequestHook<?, ?> hook) {
+        applyToEachThrowLastError(ClientInterceptor::readBeforeAttempt, hook);
+    }
+
+    @Override
+    public <RequestT> RequestT modifyBeforeSigning(RequestHook<?, RequestT> hook) {
+        return modifyRequestHook(ClientInterceptor::modifyBeforeSigning, hook);
+    }
+
+    @Override
+    public void readBeforeSigning(RequestHook<?, ?> hook) {
         for (var interceptor : interceptors) {
-            interceptor.readBeforeSigning(context, input, request);
+            interceptor.readBeforeSigning(hook);
         }
     }
 
     @Override
-    public <I extends SerializableStruct, RequestT> void readAfterSigning(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {
+    public void readAfterSigning(RequestHook<?, ?> hook) {
         for (var interceptor : interceptors) {
-            interceptor.readAfterSigning(context, input, request);
+            interceptor.readAfterSigning(hook);
         }
     }
 
     @Override
-    public <I extends SerializableStruct, RequestT> Value<RequestT> modifyBeforeTransmit(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {
-        for (var interceptor : interceptors) {
-            request = interceptor.modifyBeforeTransmit(context, input, request);
-        }
-        return request;
+    public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, RequestT> hook) {
+        return modifyRequestHook(ClientInterceptor::modifyBeforeTransmit, hook);
     }
 
     @Override
-    public <I extends SerializableStruct, RequestT> void readBeforeTransmit(
-        Context context,
-        I input,
-        Value<RequestT> request
-    ) {
+    public void readBeforeTransmit(RequestHook<?, ?> hook) {
         for (var interceptor : interceptors) {
-            interceptor.readBeforeTransmit(context, input, request);
+            interceptor.readBeforeTransmit(hook);
         }
     }
 
     @Override
-    public <I extends SerializableStruct, RequestT, ResponseT> void readAfterTransmit(
-        Context context,
-        I input,
-        Value<RequestT> request,
-        Value<ResponseT> response
-    ) {
+    public void readAfterTransmit(ResponseHook<?, ?, ?> hook) {
         for (var interceptor : interceptors) {
-            interceptor.readAfterTransmit(context, input, request, response);
+            interceptor.readAfterTransmit(hook);
         }
     }
 
     @Override
-    public <I extends SerializableStruct, RequestT, ResponseT> Value<ResponseT> modifyBeforeDeserialization(
-        Context context,
-        I input,
-        Value<RequestT> request,
-        Value<ResponseT> response
-    ) {
+    public <ResponseT> ResponseT modifyBeforeDeserialization(ResponseHook<?, ?, ResponseT> hook) {
+        var response = hook.response();
         for (var interceptor : interceptors) {
-            response = interceptor.modifyBeforeDeserialization(context, input, request, response);
+            response = interceptor.modifyBeforeDeserialization(hook.withResponse(response));
         }
         return response;
     }
 
     @Override
-    public <I extends SerializableStruct, RequestT, ResponseT> void readBeforeDeserialization(
-        Context context,
-        I input,
-        Value<RequestT> request,
-        Value<ResponseT> response
-    ) {
+    public void readBeforeDeserialization(ResponseHook<?, ?, ?> hook) {
         for (var interceptor : interceptors) {
-            interceptor.readBeforeDeserialization(context, input, request, response);
+            interceptor.readBeforeDeserialization(hook);
         }
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> void readAfterDeserialization(
-        Context context,
-        I input,
-        Value<RequestT> request,
-        Value<ResponseT> response,
-        Either<ApiException, O> result
-    ) {
+    public void readAfterDeserialization(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {
         for (var interceptor : interceptors) {
-            interceptor.readAfterDeserialization(context, input, request, response, result);
+            interceptor.readAfterDeserialization(hook, error);
         }
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<ApiException, O> modifyBeforeAttemptCompletion(
-        Context context,
-        I input,
-        Value<RequestT> request,
-        Value<ResponseT> response,
-        Either<ApiException, O> result
+    public <O extends SerializableStruct> O modifyBeforeAttemptCompletion(
+        OutputHook<?, ?, ?, O> hook,
+        RuntimeException error
+    ) {
+        var output = hook.output();
+        for (var interceptor : interceptors) {
+            output = interceptor.modifyBeforeAttemptCompletion(hook.withOutput(output), error);
+        }
+        return output;
+    }
+
+    @Override
+    public void readAfterAttempt(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {
+        applyToEachThrowLastError(ClientInterceptor::readAfterAttempt, hook, error);
+    }
+
+    private <T> void applyToEachThrowLastError(
+        TriConsumer<ClientInterceptor, T, RuntimeException> consumer,
+        T hook,
+        RuntimeException error
     ) {
         for (var interceptor : interceptors) {
-            result = interceptor.modifyBeforeAttemptCompletion(context, input, request, response, result);
+            try {
+                consumer.accept(interceptor, hook, error);
+            } catch (RuntimeException e) {
+                if (error != null) {
+                    LOGGER.log(System.Logger.Level.ERROR, error);
+                }
+                error = e;
+            }
         }
-        return result;
+
+        if (error != null) {
+            throw error;
+        }
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> void readAfterAttempt(
-        Context context,
-        I input,
-        Value<RequestT> request,
-        Value<ResponseT> responseIfAvailable,
-        Either<ApiException, O> result
+    public <O extends SerializableStruct> O modifyBeforeCompletion(
+        OutputHook<?, ?, ?, O> hook,
+        RuntimeException error
     ) {
-        applyToEachThrowLastError(
-            interceptor -> interceptor.readAfterAttempt(context, input, request, responseIfAvailable, result)
-        );
-    }
-
-    @Override
-    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> Either<ApiException, O> modifyBeforeCompletion(
-        Context context,
-        I input,
-        Value<RequestT> requestIfAvailable,
-        Value<ResponseT> responseIfAvailable,
-        Either<ApiException, O> result
-    ) {
+        var output = hook.output();
         for (var interceptor : interceptors) {
-            result = interceptor.modifyBeforeCompletion(
-                context,
-                input,
-                requestIfAvailable,
-                responseIfAvailable,
-                result
-            );
+            output = interceptor.modifyBeforeCompletion(hook.withOutput(output), error);
         }
-        return result;
+        return output;
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> void readAfterExecution(
-        Context context,
-        I input,
-        Value<RequestT> requestIfAvailable,
-        Value<ResponseT> responseIfAvailable,
-        Either<ApiException, O> result
-    ) {
-        applyToEachThrowLastError(
-            interceptor -> interceptor.readAfterExecution(
-                context,
-                input,
-                requestIfAvailable,
-                responseIfAvailable,
-                result
-            )
-        );
+    public void readAfterExecution(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {
+        applyToEachThrowLastError(ClientInterceptor::readAfterExecution, hook, error);
     }
 }

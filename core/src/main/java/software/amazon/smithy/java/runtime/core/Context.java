@@ -9,7 +9,6 @@ import java.util.Iterator;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -38,50 +37,6 @@ public interface Context {
     }
 
     /**
-     * A binding of a key to a value.
-     *
-     * @param key   Key of the binding.
-     * @param value Value bound to the key.
-     * @param <T>   Value type.
-     */
-    record Value<T>(Key<T> key, T value) {
-        /**
-         * Checks if the value uses the same key as {@code key}, ensuring that {@code T} and {@code U} are the same,
-         * and if so, supplies the given mapper with a type {@code U} and returns an updated {@code U}. If the entry
-         * does not use the same key, the original value is returned as-is.
-         *
-         * @param key Key to check for identity equality.
-         * @param mapper Mapper that accepts the value and returns an updated value. It is only invoked if compatible.
-         * @return the mapped result, or the original result if the entry does not use the given {@code key}.
-         * @param <U> Value type to supply to the mapper.
-         */
-        @SuppressWarnings("unchecked")
-        public <U> Value<T> mapIf(Key<U> key, Function<U, U> mapper) {
-            if (key == this.key) {
-                var mapped = (U) value;
-                return (Value<T>) new Value<>(key, mapper.apply(mapped));
-            } else {
-                return this;
-            }
-        }
-
-        /**
-         * Get the value from the entry as {@code U} if it uses the given key, ensuring that {@code U} and {@code T}
-         * are the same.
-         *
-         * @param key Key to check for identity equality.
-         * @param consumer Consumer that accepts the value of the entry as a {@code U}.
-         * @param <U> Value type to supply to the consumer.
-         */
-        @SuppressWarnings("unchecked")
-        public <U> void getIf(Key<U> key, Consumer<U> consumer) {
-            if (key == this.key) {
-                consumer.accept((U) value);
-            }
-        }
-    }
-
-    /**
      * Create a new identity-based key to store in the context.
      *
      * @param name Name of the key.
@@ -90,18 +45,6 @@ public interface Context {
      */
     static <T> Key<T> key(String name) {
         return new Key<>(name);
-    }
-
-    /**
-     * Create a new typed entry that combines a key and value.
-     *
-     * @param key   Key to set.
-     * @param value Value to set.
-     * @return the created entry.
-     * @param <T> Value type.
-     */
-    static <T> Value<T> value(Key<T> key, T value) {
-        return new Value<>(key, value);
     }
 
     /**

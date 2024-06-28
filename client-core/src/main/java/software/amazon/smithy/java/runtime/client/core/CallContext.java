@@ -7,7 +7,6 @@ package software.amazon.smithy.java.runtime.client.core;
 
 import java.time.Duration;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
-import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
@@ -52,11 +51,6 @@ public final class CallContext {
      * The endpoint resolver used to resolve the destination endpoint for a request.
      */
     public static final Context.Key<EndpointResolver> ENDPOINT_RESOLVER = Context.key("EndpointResolver");
-
-    /**
-     * The SRA client interceptor.
-     */
-    public static final Context.Key<ClientInterceptor> CLIENT_INTERCEPTOR = Context.key("Client interceptor");
 
     /**
      * The identity resolved for the request.
