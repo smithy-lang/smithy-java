@@ -5,14 +5,9 @@
 ## Development
 
 ### Pre-commit hooks
-Provided pre-commit hooks make it easier to pass automated linting when opening a pull request.
-To set up these hooks run:
-```shell 
-ln -s -f ../../git-hooks/pre-commit .git/hooks/pre-commit
-```
+Pre-commit hooks are automatically added for unix users via the `addPreCommitHooks` gradle task.
 **Note**: In order to successfully execute the pre-defined hooks you must have the `smithy` CLI installed. 
-See [installation instructions](https://smithy.io/2.0/guides/smithy-cli/cli_installation.html) if you do not already 
-have the CLI installed.
+See [installation instructions](https://smithy.io/2.0/guides/smithy-cli/cli_installation.html) if you do not already have the CLI installed.
 
 ## Security
 
