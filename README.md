@@ -12,7 +12,7 @@ ln -s -f ../../git-hooks/pre-commit .git/hooks/pre-commit
 ```
 **Note**: In order to successfully execute the pre-defined hooks you must have the `smithy` CLI installed. 
 See [installation instructions](https://smithy.io/2.0/guides/smithy-cli/cli_installation.html) if you do not already 
-have the CLI installe.
+have the CLI installed.
 
 ## Security
 
