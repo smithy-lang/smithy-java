@@ -645,8 +645,10 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             }
 
             // Add presence tracker
-            writer.putContext("tracker", PresenceTracker.class);
-            writer.write("private final ${tracker:T} tracker = ${tracker:T}.of(SCHEMA);");
+            if (shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault)) {
+                writer.putContext("tracker", PresenceTracker.class);
+                writer.write("private final ${tracker:T} tracker = ${tracker:T}.of(SCHEMA);");
+            }
 
             // Add non-static builder properties
             for (var member : shape.members()) {
