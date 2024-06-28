@@ -12,7 +12,10 @@ import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
 
 /**
- * TODO: Docs
+ * Structure representing the {@code smithy.api#Unit} shape.
+ * <p>This structure is used to represent union members or operation inputs or outputs
+ * that have no meaningful value.
+ * @see <a href="https://smithy.io/2.0/spec/model.html#unit-type">Smithy Unit type</a>
  */
 public final class Unit implements SerializableStruct {
     public static final ShapeId ID = ShapeId.from("smithy.api#Unit");
@@ -23,9 +26,13 @@ public final class Unit implements SerializableStruct {
         .traits(new UnitTypeTrait())
         .build();
 
-    public static final Unit INSTANCE = new Unit();
+    private static final Unit INSTANCE = new Unit();
 
     private Unit() {}
+
+    public static Unit getInstance() {
+        return INSTANCE;
+    }
 
     @Override
     public void serialize(ShapeSerializer encoder) {

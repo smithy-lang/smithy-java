@@ -179,7 +179,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     @Override
     public Void structureShape(StructureShape structureShape) {
         if (structureShape.hasTrait(UnitTypeTrait.class)) {
-            writer.write("serializer.writeStruct(${schema:L}, $T.INSTANCE)", Unit.class);
+            writer.write("serializer.writeStruct(${schema:L}, $T.getInstance())", Unit.class);
         } else {
             writer.write("serializer.writeStruct(${schema:L}, ${state:L})");
         }
