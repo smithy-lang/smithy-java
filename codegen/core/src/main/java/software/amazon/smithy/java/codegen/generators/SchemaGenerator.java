@@ -192,7 +192,7 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
         var target = model.expectShape(shape.getTarget());
         writer.putContext("member", shape.getMemberName());
         writer.putContext("schema", CodegenUtils.getSchemaType(writer, symbolProvider, target));
-        writer.write("${schemaClass:T}.memberBuilder(${member:S}, ${schema:L})${traitInitializer:C}");
+        writer.write("${schemaClass:T}.memberBuilder(${member:S}, () -> ${schema:L})${traitInitializer:C}");
 
         return null;
     }
@@ -206,7 +206,7 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
         writer.putContext("name", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
         writer.write(
             """
-                private static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.memberBuilder(${memberName:S}, ${schema:L})
+                private static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.memberBuilder(${memberName:S}, () -> ${schema:L})
                     .id(ID)${C}
                     .build();
                 """,

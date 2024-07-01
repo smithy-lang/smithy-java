@@ -24,15 +24,15 @@ final class Documents {
     static final Schema LIST_SCHEMA = Schema.builder()
         .id(PreludeSchemas.DOCUMENT.id())
         .type(ShapeType.LIST)
-        .members(Schema.memberBuilder("member", PreludeSchemas.DOCUMENT))
+        .members(Schema.memberBuilder("member", () -> PreludeSchemas.DOCUMENT))
         .build();
 
     static final Schema STR_MAP_SCHEMA = Schema.builder()
         .id(PreludeSchemas.DOCUMENT.id())
         .type(ShapeType.MAP)
         .members(
-            Schema.memberBuilder("key", PreludeSchemas.STRING).id(PreludeSchemas.DOCUMENT.id()).build(),
-            Schema.memberBuilder("value", PreludeSchemas.DOCUMENT).id(PreludeSchemas.DOCUMENT.id()).build()
+            Schema.memberBuilder("key", () -> PreludeSchemas.STRING).id(PreludeSchemas.DOCUMENT.id()).build(),
+            Schema.memberBuilder("value", () -> PreludeSchemas.DOCUMENT).id(PreludeSchemas.DOCUMENT.id()).build()
         )
         .build();
 

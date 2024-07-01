@@ -6,12 +6,16 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.TopologicalIndex;
 import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
@@ -20,7 +24,6 @@ import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.Prelude;
-import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -52,7 +55,7 @@ public final class SharedSchemasGenerator
                 getFilename(directive.settings()),
                 CodegenUtils.getModelNamespace(directive.settings()),
                 writer -> {
-                    var common = getCommonShapes(directive.connectedShapes().values());
+                    var common = getCommonShapes(directive.connectedShapes().values(), directive.model());
                     writer.pushState();
                     var template = """
                         /**
@@ -91,38 +94,11 @@ public final class SharedSchemasGenerator
 
         @Override
         public void run() {
-            Set<Shape> deferred = deferredShapes(shapes);
             writer.pushState();
             writer.putContext("schemaClass", Schema.class);
             for (var shape : shapes) {
-                if (deferred.contains(shape)) {
-                    writer.write("static final ${schemaClass:T} $L;", CodegenUtils.toSchemaName(shape));
-                } else {
-                    writer.write(
-                        "static final ${schemaClass:T} $L = ${C}",
-                        CodegenUtils.toSchemaName(shape),
-                        new SchemaGenerator(
-                            writer,
-                            shape,
-                            symbolProvider,
-                            model,
-                            context
-                        )
-                    );
-                }
-            }
-            writer.openBlock("static {", "}", () -> writeDeferred(deferred));
-            writer.popState();
-        }
-
-        private void writeDeferred(Set<Shape> shapes) {
-            Set<Shape> deferred = deferredShapes(shapes);
-            for (var shape : shapes) {
-                if (deferred.contains(shape)) {
-                    continue;
-                }
                 writer.write(
-                    "$L = ${C}",
+                    "static final ${schemaClass:T} $L = ${C}",
                     CodegenUtils.toSchemaName(shape),
                     new SchemaGenerator(
                         writer,
@@ -133,25 +109,7 @@ public final class SharedSchemasGenerator
                     )
                 );
             }
-
-            if (!deferred.isEmpty()) {
-                writeDeferred(deferred);
-            }
-        }
-
-        private Set<Shape> deferredShapes(Set<Shape> shapes) {
-            Set<Shape> deferred = new HashSet<>();
-            for (var shape : shapes) {
-                boolean isDeferred = shape.members()
-                    .stream()
-                    .map(MemberShape::getTarget)
-                    .map(model::expectShape)
-                    .anyMatch(shapes::contains);
-                if (isDeferred) {
-                    deferred.add(shape);
-                }
-            }
-            return deferred;
+            writer.popState();
         }
     }
 
@@ -160,11 +118,24 @@ public final class SharedSchemasGenerator
      *
      * @return shapes that need a shared schema definition
      */
-    private static Set<Shape> getCommonShapes(Collection<Shape> connectedShapes) {
+    private static Set<Shape> getCommonShapes(Collection<Shape> connectedShapes, Model model) {
+        Map<Shape, Integer> totalOrdering = new HashMap<>();
+
+        int count = 0;
+        for (Shape s : TopologicalIndex.of(model).getOrderedShapes()) {
+            totalOrdering.put(s, count++);
+        }
+
+        // Add all recursive shapes last
+        for (Shape s : TopologicalIndex.of(model).getRecursiveShapes()) {
+            totalOrdering.put(s, count++);
+        }
+
         return connectedShapes.stream()
             .filter(s -> !EXCLUDED_TYPES.contains(s.getType()))
             .filter(s -> !Prelude.isPreludeShape(s))
-            .collect(Collectors.toSet());
+            .sorted(Comparator.comparing(totalOrdering::get))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private static String getFilename(JavaCodegenSettings settings) {

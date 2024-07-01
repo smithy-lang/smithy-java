@@ -24,8 +24,8 @@ public class MemberContainersTest {
     @Test
     public void listShapesRequireOneMember() {
         var members = List.of(
-            Schema.memberBuilder("member", PreludeSchemas.STRING).id(id).build(),
-            Schema.memberBuilder("foo", PreludeSchemas.STRING).id(id).build()
+            Schema.memberBuilder("member", () -> PreludeSchemas.STRING).id(id).build(),
+            Schema.memberBuilder("foo", () -> PreludeSchemas.STRING).id(id).build()
         );
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> {
@@ -35,7 +35,7 @@ public class MemberContainersTest {
 
     @Test
     public void listShapesRequireOneMemberNamedMember() {
-        var members = List.of(Schema.memberBuilder("foo", PreludeSchemas.STRING).id(id).build());
+        var members = List.of(Schema.memberBuilder("foo", () -> PreludeSchemas.STRING).id(id).build());
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> {
             MemberContainers.of(ShapeType.LIST, members, Map.of());
@@ -44,7 +44,7 @@ public class MemberContainersTest {
 
     @Test
     public void listContainerReturnsValues() {
-        var members = List.of(Schema.memberBuilder("member", PreludeSchemas.STRING).id(id).build());
+        var members = List.of(Schema.memberBuilder("member", () -> PreludeSchemas.STRING).id(id).build());
         var listMembers = MemberContainers.of(ShapeType.LIST, members, Map.of());
 
         assertThat(listMembers.values(), hasSize(1));
@@ -56,7 +56,7 @@ public class MemberContainersTest {
 
     @Test
     public void mapShapesRequireTwoMembers() {
-        var members = List.of(Schema.memberBuilder("key", PreludeSchemas.STRING).id(id).build());
+        var members = List.of(Schema.memberBuilder("key", () -> PreludeSchemas.STRING).id(id).build());
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> {
             MemberContainers.of(ShapeType.MAP, members, Map.of());
@@ -66,8 +66,8 @@ public class MemberContainersTest {
     @Test
     public void mapShapesRequireKeyAndValue() {
         var members = List.of(
-            Schema.memberBuilder("key", PreludeSchemas.STRING).id(id).build(),
-            Schema.memberBuilder("foo", PreludeSchemas.STRING).id(id).build()
+            Schema.memberBuilder("key", () -> PreludeSchemas.STRING).id(id).build(),
+            Schema.memberBuilder("foo", () -> PreludeSchemas.STRING).id(id).build()
         );
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> {
@@ -78,8 +78,8 @@ public class MemberContainersTest {
     @Test
     public void mapShapesRequireKeyAndValueOtherOrder() {
         var members = List.of(
-            Schema.memberBuilder("value", PreludeSchemas.STRING).id(id).build(),
-            Schema.memberBuilder("foo", PreludeSchemas.STRING).id(id).build()
+            Schema.memberBuilder("value", () -> PreludeSchemas.STRING).id(id).build(),
+            Schema.memberBuilder("foo", () -> PreludeSchemas.STRING).id(id).build()
         );
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> {
@@ -90,8 +90,8 @@ public class MemberContainersTest {
     @Test
     public void mapShapesRequireKeyAndValueBothWrong() {
         var members = List.of(
-            Schema.memberBuilder("foo", PreludeSchemas.STRING).id(id).build(),
-            Schema.memberBuilder("bar", PreludeSchemas.STRING).id(id).build()
+            Schema.memberBuilder("foo", () -> PreludeSchemas.STRING).id(id).build(),
+            Schema.memberBuilder("bar", () -> PreludeSchemas.STRING).id(id).build()
         );
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> {
@@ -102,8 +102,8 @@ public class MemberContainersTest {
     @Test
     public void mapContainerReturnsKeysAndValues() {
         var members = List.of(
-            Schema.memberBuilder("key", PreludeSchemas.STRING).id(id).build(),
-            Schema.memberBuilder("value", PreludeSchemas.STRING).id(id).build()
+            Schema.memberBuilder("key", () -> PreludeSchemas.STRING).id(id).build(),
+            Schema.memberBuilder("value", () -> PreludeSchemas.STRING).id(id).build()
         );
 
         var mapMembers = MemberContainers.of(ShapeType.MAP, members, Map.of());
@@ -119,7 +119,7 @@ public class MemberContainersTest {
 
     @Test
     public void returnsSingleItemContainer() {
-        var members = List.of(Schema.memberBuilder("foo", PreludeSchemas.STRING).id(id).build());
+        var members = List.of(Schema.memberBuilder("foo", () -> PreludeSchemas.STRING).id(id).build());
 
         var memberMap = MemberContainers.of(ShapeType.STRUCTURE, members, Map.of());
 
@@ -130,8 +130,8 @@ public class MemberContainersTest {
     @Test
     public void createsOtherKindsOfMemberMaps() {
         var members = List.of(
-            Schema.memberBuilder("foo", PreludeSchemas.STRING).id(id).build(),
-            Schema.memberBuilder("bar", PreludeSchemas.STRING).id(id).build()
+            Schema.memberBuilder("foo", () -> PreludeSchemas.STRING).id(id).build(),
+            Schema.memberBuilder("bar", () -> PreludeSchemas.STRING).id(id).build()
         );
 
         var memberMap = MemberContainers.of(ShapeType.STRUCTURE, members, Map.of());

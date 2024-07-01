@@ -147,7 +147,7 @@ public class ValidatorTest {
                     Schema.builder()
                         .type(ShapeType.LIST)
                         .id("s#L" + depth)
-                        .members(Schema.memberBuilder("member", PreludeSchemas.STRING))
+                        .members(Schema.memberBuilder("member", () -> PreludeSchemas.STRING))
                         .build()
                 );
             } else {
@@ -155,7 +155,7 @@ public class ValidatorTest {
                     Schema.builder()
                         .type(ShapeType.LIST)
                         .id("s#L3")
-                        .members(Schema.memberBuilder("member", schemas.get(schemas.size() - 1)))
+                        .members(Schema.memberBuilder("member", () -> schemas.get(schemas.size() - 1)))
                         .build()
                 );
             }
@@ -226,16 +226,16 @@ public class ValidatorTest {
             .type(ShapeType.STRUCTURE)
             .id("smithy.example#Foo")
             .members(
-                Schema.memberBuilder("a", string).traits(new RequiredTrait()),
-                Schema.memberBuilder("b", string).traits(new RequiredTrait()),
-                Schema.memberBuilder("c", string).traits(new RequiredTrait()),
-                Schema.memberBuilder("d", string)
+                Schema.memberBuilder("a", () -> string).traits(new RequiredTrait()),
+                Schema.memberBuilder("b", () -> string).traits(new RequiredTrait()),
+                Schema.memberBuilder("c", () -> string).traits(new RequiredTrait()),
+                Schema.memberBuilder("d", () -> string)
                     .traits(
                         new RequiredTrait(),
                         new DefaultTrait(Node.from("default"))
                     ),
-                Schema.memberBuilder("e", string).traits(new DefaultTrait(Node.from("default"))),
-                Schema.memberBuilder("f", string)
+                Schema.memberBuilder("e", () -> string).traits(new DefaultTrait(Node.from("default"))),
+                Schema.memberBuilder("f", () -> string)
             )
             .build();
 
@@ -261,7 +261,7 @@ public class ValidatorTest {
         Schema struct = Schema.builder()
             .type(ShapeType.STRUCTURE)
             .id("smithy.example#Foo")
-            .members(Schema.memberBuilder("a", string).traits(new RequiredTrait()))
+            .members(Schema.memberBuilder("a", () -> string).traits(new RequiredTrait()))
             .build();
 
         Validator validator = Validator.builder().build();
@@ -336,7 +336,7 @@ public class ValidatorTest {
         var list = Schema.builder()
             .id("s#L")
             .type(ShapeType.LIST)
-            .members(Schema.memberBuilder("member", memberTarget))
+            .members(Schema.memberBuilder("member", () -> memberTarget))
             .build();
 
         var errors = validator.validate(s -> {
@@ -373,8 +373,8 @@ public class ValidatorTest {
             .type(ShapeType.MAP)
             .id("s#M")
             .members(
-                Schema.memberBuilder("key", keySchema),
-                Schema.memberBuilder("value", PreludeSchemas.STRING).traits(LengthTrait.builder().min(2L).build())
+                Schema.memberBuilder("key", () -> keySchema),
+                Schema.memberBuilder("value", () -> PreludeSchemas.STRING).traits(LengthTrait.builder().min(2L).build())
             )
             .build();
 
@@ -484,9 +484,9 @@ public class ValidatorTest {
             .type(ShapeType.UNION)
             .id("s#U")
             .members(
-                Schema.memberBuilder("a", PreludeSchemas.STRING).traits(LengthTrait.builder().max(3L).build()),
-                Schema.memberBuilder("b", PreludeSchemas.STRING),
-                Schema.memberBuilder("c", PreludeSchemas.STRING)
+                Schema.memberBuilder("a", () -> PreludeSchemas.STRING).traits(LengthTrait.builder().max(3L).build()),
+                Schema.memberBuilder("b", () -> PreludeSchemas.STRING),
+                Schema.memberBuilder("c", () -> PreludeSchemas.STRING)
             )
             .build();
     }
@@ -590,7 +590,7 @@ public class ValidatorTest {
             .type(ShapeType.LIST)
             .id("smithy.api#Test")
             .traits(new SparseTrait())
-            .members(Schema.memberBuilder("member", PreludeSchemas.STRING))
+            .members(Schema.memberBuilder("member", () -> PreludeSchemas.STRING))
             .build();
 
         var errors = validator.validate(s -> {
@@ -610,7 +610,7 @@ public class ValidatorTest {
         var schema = Schema.builder()
             .type(ShapeType.STRUCTURE)
             .id("smithy.api#Test")
-            .members(Schema.memberBuilder("foo", PreludeSchemas.STRING))
+            .members(Schema.memberBuilder("foo", () -> PreludeSchemas.STRING))
             .build();
 
         var errors = validator.validate(s -> {
@@ -629,7 +629,7 @@ public class ValidatorTest {
         var listSchema = Schema.builder()
             .type(ShapeType.LIST)
             .id("smithy.api#Test")
-            .members(Schema.memberBuilder("member", PreludeSchemas.STRING))
+            .members(Schema.memberBuilder("member", () -> PreludeSchemas.STRING))
             .build();
 
         var errors = validator.validate(s -> {
@@ -655,8 +655,8 @@ public class ValidatorTest {
             .type(ShapeType.MAP)
             .id("smithy.api#Test")
             .members(
-                Schema.memberBuilder("key", PreludeSchemas.STRING),
-                Schema.memberBuilder("value", PreludeSchemas.STRING)
+                Schema.memberBuilder("key", () -> PreludeSchemas.STRING),
+                Schema.memberBuilder("value", () -> PreludeSchemas.STRING)
             )
             .build();
 
@@ -1156,7 +1156,7 @@ public class ValidatorTest {
             .type(ShapeType.LIST)
             .id("smithy.api#Test")
             .traits(LengthTrait.builder().min(2L).build())
-            .members(Schema.memberBuilder("member", PreludeSchemas.STRING))
+            .members(Schema.memberBuilder("member", () -> PreludeSchemas.STRING))
             .build();
         var validator = Validator.builder().build();
         var errors = validator.validate(e -> e.writeList(schema, null, (v, ser) -> {}));
@@ -1175,7 +1175,7 @@ public class ValidatorTest {
             .type(ShapeType.LIST)
             .id("smithy.api#Test")
             .traits(LengthTrait.builder().max(1L).build())
-            .members(Schema.memberBuilder("member", PreludeSchemas.STRING))
+            .members(Schema.memberBuilder("member", () -> PreludeSchemas.STRING))
             .build();
         var validator = Validator.builder().build();
         var errors = validator.validate(e -> e.writeList(schema, schema.member("member"), (member, ser) -> {
@@ -1197,7 +1197,7 @@ public class ValidatorTest {
             .type(ShapeType.LIST)
             .id("smithy.api#Test")
             .traits(LengthTrait.builder().min(1L).max(2L).build())
-            .members(Schema.memberBuilder("member", PreludeSchemas.STRING))
+            .members(Schema.memberBuilder("member", () -> PreludeSchemas.STRING))
             .build();
         var validator = Validator.builder().build();
         var errors = validator.validate(e -> e.writeList(schema, schema.member("member"), (member, ser) -> {
@@ -1283,11 +1283,9 @@ public class ValidatorTest {
     }
 
     static Schema createBigRequiredSchema(int totalMembers, int requiredCount, int defaultedCount) {
-        var string = PreludeSchemas.STRING;
-
         Schema.Builder[] members = new Schema.Builder[totalMembers];
         for (var i = 0; i < totalMembers; i++) {
-            Schema.Builder member = Schema.memberBuilder("member" + i, string);
+            Schema.Builder member = Schema.memberBuilder("member" + i, () -> PreludeSchemas.STRING);
             if (i < requiredCount) {
                 member.traits(new RequiredTrait());
             }

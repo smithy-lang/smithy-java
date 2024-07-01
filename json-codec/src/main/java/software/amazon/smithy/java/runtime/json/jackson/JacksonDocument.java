@@ -35,7 +35,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JacksonDocument implements Document {
 
-    private static final Schema STRING_MAP_KEY = Schema.memberBuilder("key", PreludeSchemas.STRING)
+    private static final Schema STRING_MAP_KEY = Schema.memberBuilder("key", () -> PreludeSchemas.STRING)
         .id(PreludeSchemas.DOCUMENT.id())
         .build();
 

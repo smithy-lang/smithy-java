@@ -7,6 +7,7 @@ use smithy.java.codegen.test.exceptions#ExceptionTests
 use smithy.java.codegen.test.lists#ListTests
 use smithy.java.codegen.test.maps#MapTests
 use smithy.java.codegen.test.naming#Naming
+use smithy.java.codegen.test.recursion#RecursionTests
 use smithy.java.codegen.test.structures#StructureTests
 use smithy.java.codegen.test.traits#Traits
 use smithy.java.codegen.test.unions#UnionTests
@@ -18,9 +19,9 @@ service TestService {
         ExceptionTests
         ListTests
         MapTests
-        // TODO: Add recursion tests
         StructureTests
         UnionTests
+        RecursionTests
     ]
     operations: [
         Naming

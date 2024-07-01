@@ -286,16 +286,16 @@ public class JsonDocumentTest {
 
         private static final ShapeId ID = ShapeId.from("smithy.example#Foo");
 
-        private static final Schema NAME = Schema.memberBuilder("name", PreludeSchemas.STRING)
+        private static final Schema NAME = Schema.memberBuilder("name", () -> PreludeSchemas.STRING)
             .id(ID)
             .build();
 
-        private static final Schema BINARY = Schema.memberBuilder("binary", PreludeSchemas.BLOB)
+        private static final Schema BINARY = Schema.memberBuilder("binary", () -> PreludeSchemas.BLOB)
             .id(ID)
             .traits(new JsonNameTrait("BINARY"))
             .build();
 
-        private static final Schema DATE = Schema.memberBuilder("date", PreludeSchemas.TIMESTAMP)
+        private static final Schema DATE = Schema.memberBuilder("date", () -> PreludeSchemas.TIMESTAMP)
             .id(ID)
             .traits(new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
             .build();
@@ -303,10 +303,10 @@ public class JsonDocumentTest {
         private static final Schema NUMBERS_LIST = Schema.builder()
             .type(ShapeType.LIST)
             .id("smithy.example#Numbers")
-            .members(Schema.memberBuilder("member", PreludeSchemas.INTEGER))
+            .members(Schema.memberBuilder("member", () -> PreludeSchemas.INTEGER))
             .build();
 
-        private static final Schema NUMBERS = Schema.memberBuilder("numbers", NUMBERS_LIST)
+        private static final Schema NUMBERS = Schema.memberBuilder("numbers", () -> NUMBERS_LIST)
             .id(ID)
             .build();
 

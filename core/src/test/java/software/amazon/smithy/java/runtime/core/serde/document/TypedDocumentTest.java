@@ -26,8 +26,8 @@ public class TypedDocumentTest {
             .id("smithy.example#Struct")
             .type(ShapeType.STRUCTURE)
             .members(
-                Schema.memberBuilder("a", PreludeSchemas.STRING),
-                Schema.memberBuilder("b", PreludeSchemas.STRING)
+                Schema.memberBuilder("a", () -> PreludeSchemas.STRING),
+                Schema.memberBuilder("b", () -> PreludeSchemas.STRING)
             )
             .build();
 

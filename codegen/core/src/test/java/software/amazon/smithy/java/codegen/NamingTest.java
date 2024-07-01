@@ -84,7 +84,7 @@ public class NamingTest extends AbstractCodegenFileTest {
     void snakeCaseMember() {
         var fileStr = getFileStringForClass("CasingInput");
         // Member schema still uses the raw member name
-        assertTrue(fileStr.contains(".memberBuilder(\"snake_case_member\", PreludeSchemas.STRING)"));
+        assertTrue(fileStr.contains(".memberBuilder(\"snake_case_member\", () -> PreludeSchemas.STRING)"));
         // Member property is renamed to java-friendly string
         assertTrue(fileStr.contains("private transient final String snakeCaseMember;"));
     }
@@ -105,7 +105,7 @@ public class NamingTest extends AbstractCodegenFileTest {
     void acronymInsideMember() {
         var fileStr = getFileStringForClass("CasingInput");
         // Member schema still uses the raw member name
-        assertTrue(fileStr.contains("memberBuilder(\"ACRONYM_Inside_Member\", PreludeSchemas.STRING)"));
+        assertTrue(fileStr.contains("memberBuilder(\"ACRONYM_Inside_Member\", () -> PreludeSchemas.STRING)"));
         // Member property is renamed to java-friendly string
         assertTrue(fileStr.contains("private transient final String acronymInsideMember;"));
     }

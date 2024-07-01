@@ -62,14 +62,14 @@ public class ToStringSerializerTest {
             .type(ShapeType.MAP)
             .id("smithy.example#Map")
             .members(
-                Schema.memberBuilder("key", mapMemberSchema),
-                Schema.memberBuilder("value", mapMemberSchema)
+                Schema.memberBuilder("key", () -> mapMemberSchema),
+                Schema.memberBuilder("value", () -> mapMemberSchema)
             )
             .build();
         var schema = Schema.builder()
             .id("smithy.example#Struct")
             .type(ShapeType.STRUCTURE)
-            .members(Schema.memberBuilder("foo", mapSchema))
+            .members(Schema.memberBuilder("foo", () -> mapSchema))
             .build();
 
         var str = ToStringSerializer.serialize(e -> {
@@ -98,7 +98,7 @@ public class ToStringSerializerTest {
         var schema = Schema.builder()
             .id("smithy.example#Struct")
             .type(ShapeType.STRUCTURE)
-            .members(Schema.memberBuilder("foo", blobSchema))
+            .members(Schema.memberBuilder("foo", () -> blobSchema))
             .build();
 
         var str = ToStringSerializer.serialize(e -> {

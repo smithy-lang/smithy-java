@@ -14,14 +14,14 @@ import software.amazon.smithy.model.traits.JsonNameTrait;
 public final class JsonTestData {
 
     static final ShapeId BIRD_ID = ShapeId.from("smithy.example#Bird");
-    static final Schema BIRD_NAME = Schema.memberBuilder("name", PreludeSchemas.STRING)
+    static final Schema BIRD_NAME = Schema.memberBuilder("name", () -> PreludeSchemas.STRING)
         .id(BIRD_ID)
         .build();
-    static final Schema BIRD_COLOR = Schema.memberBuilder("color", PreludeSchemas.STRING)
+    static final Schema BIRD_COLOR = Schema.memberBuilder("color", () -> PreludeSchemas.STRING)
         .id(BIRD_ID)
         .traits(new JsonNameTrait("Color"))
         .build();
-    static final Schema BIRD_NESTED = Schema.memberBuilder("nested", PreludeSchemas.STRING).id(BIRD_ID).build();
+    static final Schema BIRD_NESTED = Schema.memberBuilder("nested", () -> PreludeSchemas.STRING).id(BIRD_ID).build();
     static final Schema BIRD = Schema.builder()
         .id(BIRD_ID)
         .type(ShapeType.STRUCTURE)
@@ -29,7 +29,7 @@ public final class JsonTestData {
         .build();
 
     static final ShapeId NESTED_ID = ShapeId.from("smithy.example#Nested");
-    static final Schema NESTED_NUMBER = Schema.memberBuilder("number", PreludeSchemas.INTEGER)
+    static final Schema NESTED_NUMBER = Schema.memberBuilder("number", () -> PreludeSchemas.INTEGER)
         .id(NESTED_ID)
         .build();
     static final Schema NESTED = Schema.builder()
@@ -39,10 +39,10 @@ public final class JsonTestData {
         .build();
 
     static final ShapeId UNION_ID = ShapeId.from("smithy.example#Union");
-    static final Schema UNION_BOOLEAN_VALUE = Schema.memberBuilder("booleanValue", PreludeSchemas.BOOLEAN)
+    static final Schema UNION_BOOLEAN_VALUE = Schema.memberBuilder("booleanValue", () -> PreludeSchemas.BOOLEAN)
         .id(UNION_ID)
         .build();
-    static final Schema UNION_INTEGER_VALUE = Schema.memberBuilder("intValue", PreludeSchemas.INTEGER)
+    static final Schema UNION_INTEGER_VALUE = Schema.memberBuilder("intValue", () -> PreludeSchemas.INTEGER)
         .id(UNION_ID)
         .build();
     static final Schema UNION = Schema.builder()

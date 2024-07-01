@@ -89,13 +89,13 @@ public interface ValidationError {
         }
 
         private static String createMessage(Schema schema) {
-            if (schema.minRangeConstraint == null) {
-                return "Value must be less than or equal to " + formatDecimal(schema.maxRangeConstraint);
-            } else if (schema.maxRangeConstraint == null) {
-                return "Value must be greater than or equal to " + formatDecimal(schema.minRangeConstraint);
+            if (schema.minRangeConstraint() == null) {
+                return "Value must be less than or equal to " + formatDecimal(schema.maxRangeConstraint());
+            } else if (schema.maxRangeConstraint() == null) {
+                return "Value must be greater than or equal to " + formatDecimal(schema.minRangeConstraint());
             } else {
-                return "Value must be between " + formatDecimal(schema.minRangeConstraint) + " and " + formatDecimal(
-                    schema.maxRangeConstraint
+                return "Value must be between " + formatDecimal(schema.minRangeConstraint()) + " and " + formatDecimal(
+                    schema.maxRangeConstraint()
                 ) + ", inclusive";
             }
         }
@@ -118,13 +118,13 @@ public interface ValidationError {
 
         private static String createMessage(long length, Schema schema) {
             var prefix = "Value with length " + length;
-            if (schema.minLengthConstraint == Long.MIN_VALUE) {
-                return prefix + " must have length less than or equal to " + schema.maxLengthConstraint;
-            } else if (schema.maxLengthConstraint == Long.MAX_VALUE) {
-                return prefix + " must have length greater than or equal to " + schema.minLengthConstraint;
+            if (schema.minLengthConstraint() == Long.MIN_VALUE) {
+                return prefix + " must have length less than or equal to " + schema.maxLengthConstraint();
+            } else if (schema.maxLengthConstraint() == Long.MAX_VALUE) {
+                return prefix + " must have length greater than or equal to " + schema.minLengthConstraint();
             } else {
-                return prefix + " must have length between " + schema.minLengthConstraint
-                    + " and " + schema.maxLengthConstraint + ", inclusive";
+                return prefix + " must have length between " + schema.minLengthConstraint()
+                    + " and " + schema.maxLengthConstraint() + ", inclusive";
             }
         }
     }

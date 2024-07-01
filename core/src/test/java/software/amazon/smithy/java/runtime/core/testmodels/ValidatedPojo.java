@@ -22,16 +22,16 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class ValidatedPojo implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#ValidatedPojo");
-    private static final Schema SCHEMA_STRING = Schema.memberBuilder("string", PreludeSchemas.STRING)
+    private static final Schema SCHEMA_STRING = Schema.memberBuilder("string", () -> PreludeSchemas.STRING)
         .id(ID)
         .traits(new RequiredTrait(), LengthTrait.builder().min(1L).max(100L).build())
         .build();
     private static final Schema SCHEMA_BOXED_INTEGER = Schema
-        .memberBuilder("boxedInteger", PreludeSchemas.INTEGER)
+        .memberBuilder("boxedInteger", () -> PreludeSchemas.INTEGER)
         .id(ID)
         .traits(new RequiredTrait())
         .build();
-    private static final Schema SCHEMA_INTEGER = Schema.memberBuilder("integer", PreludeSchemas.PRIMITIVE_INTEGER)
+    private static final Schema SCHEMA_INTEGER = Schema.memberBuilder("integer", () -> PreludeSchemas.PRIMITIVE_INTEGER)
         .id(ID)
         .traits(new RequiredTrait(), RangeTrait.builder().min(BigDecimal.valueOf(0)).build())
         .build();

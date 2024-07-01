@@ -31,26 +31,26 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class Person implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Person");
-    private static final Schema SCHEMA_NAME = Schema.memberBuilder("name", PreludeSchemas.STRING)
+    private static final Schema SCHEMA_NAME = Schema.memberBuilder("name", () -> PreludeSchemas.STRING)
         .id(ID)
         .traits(new HttpLabelTrait(), new RequiredTrait(), LengthTrait.builder().max(7L).build())
         .build();
     private static final Schema SCHEMA_FAVORITE_COLOR = Schema
-        .memberBuilder("favoriteColor", PreludeSchemas.STRING)
+        .memberBuilder("favoriteColor", () -> PreludeSchemas.STRING)
         .id(ID)
         .build();
-    private static final Schema SCHEMA_AGE = Schema.memberBuilder("age", PreludeSchemas.INTEGER)
+    private static final Schema SCHEMA_AGE = Schema.memberBuilder("age", () -> PreludeSchemas.INTEGER)
         .id(ID)
         .traits(RangeTrait.builder().max(BigDecimal.valueOf(150)).build())
         .build();
-    private static final Schema SCHEMA_BIRTHDAY = Schema.memberBuilder("birthday", SharedSchemas.BIRTHDAY)
+    private static final Schema SCHEMA_BIRTHDAY = Schema.memberBuilder("birthday", () -> SharedSchemas.BIRTHDAY)
         .id(ID)
         .build();
-    private static final Schema SCHEMA_BINARY = Schema.memberBuilder("binary", PreludeSchemas.BLOB)
+    private static final Schema SCHEMA_BINARY = Schema.memberBuilder("binary", () -> PreludeSchemas.BLOB)
         .id(ID)
         .build();
     private static final Schema SCHEMA_QUERY_PARAMS = Schema
-        .memberBuilder("queryParams", SharedSchemas.MAP_LIST_STRING)
+        .memberBuilder("queryParams", () -> SharedSchemas.MAP_LIST_STRING)
         .id(ID)
         .build();
     static final Schema SCHEMA = Schema.builder()
