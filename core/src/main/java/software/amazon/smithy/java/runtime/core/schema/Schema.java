@@ -53,7 +53,7 @@ public final class Schema {
 
     private final Set<String> stringEnumValues;
     private final Set<Integer> intEnumValues;
-    private final Supplier<Schema> memberTargetSupplier;
+    private final SchemaRef memberTargetRef;
 
     private Schema memberTarget;
 
@@ -97,7 +97,7 @@ public final class Schema {
 
         // Member settings
         this.memberName = builder.memberName;
-        this.memberTargetSupplier = builder.memberTargetSupplier;
+        this.memberTargetRef = builder.memberTargetRef;
         this.memberList = builder.members;
 
         // Validation requires the member is present if it's required and has no default value.
@@ -126,7 +126,7 @@ public final class Schema {
                 member.resolve();
             }
         } else if (isMember()) {
-            this.memberTarget = memberTargetSupplier.get();
+            this.memberTarget = memberTargetRef.get();
             this.memberTarget.resolve();
             // Member schemas inherit their target's type
             this.type = memberTarget.type();
@@ -404,10 +404,28 @@ public final class Schema {
      */
     public static Builder memberBuilder(String memberName, Supplier<Schema> memberTargetSupplier) {
         Builder builder = builder();
-        builder.memberTargetSupplier = Objects.requireNonNull(memberTargetSupplier, "memberTargetSupplier is null");
+        builder.memberTargetRef = SchemaRef.from(
+            Objects.requireNonNull(memberTargetSupplier, "memberTargetSupplier is null")
+        );
         builder.memberName = Objects.requireNonNull(memberName, "memberName is null");
         return builder;
     }
+
+    /**
+     * Create a builder for a member.
+     *
+     * @param memberName   Name of the member.
+     * @param memberTarget Target of the member.
+     * @return Returns the member builder.
+     * @throws IllegalArgumentException if {@code memberIndex} is less than 1.
+     */
+    public static Builder memberBuilder(String memberName, Schema memberTarget) {
+        Builder builder = builder();
+        builder.memberTargetRef = SchemaRef.from(Objects.requireNonNull(memberTarget, "memberTarget is null"));
+        builder.memberName = Objects.requireNonNull(memberName, "memberName is null");
+        return builder;
+    }
+
 
     @Override
     public String toString() {
@@ -488,7 +506,7 @@ public final class Schema {
     public <T extends Trait> T getTrait(Class<T> trait) {
         var t = (T) traits.get(trait);
         if (t == null && isMember()) {
-            return memberTargetSupplier.get().getTrait(trait);
+            return memberTargetRef.get().getTrait(trait);
         }
         return t;
     }
@@ -501,7 +519,7 @@ public final class Schema {
      * @param <T> Trait type.
      */
     public <T extends Trait> boolean hasTrait(Class<T> trait) {
-        return traits.containsKey(trait) || (isMember() && memberTargetSupplier.get().hasTrait(trait));
+        return traits.containsKey(trait) || (isMember() && memberTargetRef.get().hasTrait(trait));
     }
 
     /**
@@ -588,7 +606,7 @@ public final class Schema {
             && Objects.equals(stringEnumValues, sdkSchema.stringEnumValues)
             && Objects.equals(intEnumValues, sdkSchema.intEnumValues)
             && Objects.equals(memberName, sdkSchema.memberName)
-            && Objects.equals(memberTargetSupplier, sdkSchema.memberTargetSupplier);
+            && Objects.equals(memberTargetRef, sdkSchema.memberTargetRef);
     }
 
     @Override
@@ -603,7 +621,7 @@ public final class Schema {
                 stringEnumValues,
                 intEnumValues,
                 memberName,
-                memberTargetSupplier,
+                memberTargetRef,
                 memberIndex
             );
             hashCode = code;
@@ -618,7 +636,7 @@ public final class Schema {
         private Trait[] traits;
         private List<Schema> members;
         private String memberName;
-        private Supplier<Schema> memberTargetSupplier;
+        private SchemaRef memberTargetRef;
 
         private Set<String> stringEnumValues = Collections.emptySet();
         private Set<Integer> intEnumValues = Collections.emptySet();
@@ -812,6 +830,28 @@ public final class Schema {
             Set<Integer> values = new LinkedHashSet<>(intEnumValues.length);
             Collections.addAll(values, intEnumValues);
             return intEnumValues(values);
+        }
+    }
+
+    private static final class SchemaRef {
+        private Schema value;
+        private final Supplier<Schema> supplier;
+
+        SchemaRef(Schema value, Supplier<Schema> supplier) {
+            this.value = value;
+            this.supplier = supplier;
+        }
+
+        static SchemaRef from(Supplier<Schema> supplier) {
+            return new SchemaRef(null, supplier);
+        }
+
+        static SchemaRef from(Schema value) {
+            return new SchemaRef(value, null);
+        }
+
+        public Schema get() {
+            return value != null ? value : (value = supplier.get());
         }
     }
 }

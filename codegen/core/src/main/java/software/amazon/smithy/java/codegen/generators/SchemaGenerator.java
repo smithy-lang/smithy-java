@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.TopologicalIndex;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -192,7 +193,11 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
         var target = model.expectShape(shape.getTarget());
         writer.putContext("member", shape.getMemberName());
         writer.putContext("schema", CodegenUtils.getSchemaType(writer, symbolProvider, target));
-        writer.write("${schemaClass:T}.memberBuilder(${member:S}, () -> ${schema:L})${traitInitializer:C}");
+        writer.putContext("recursive", TopologicalIndex.of(model).getRecursiveShapes().contains(target));
+
+        writer.write(
+            "${schemaClass:T}.memberBuilder(${member:S}, ${?recursive}() -> ${/recursive}${schema:L})${traitInitializer:C}"
+        );
 
         return null;
     }
@@ -204,9 +209,10 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
         writer.putContext("schema", CodegenUtils.getSchemaType(writer, symbolProvider, target));
         writer.putContext("memberName", member.getMemberName());
         writer.putContext("name", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
+        writer.putContext("recursive", TopologicalIndex.of(model).getRecursiveShapes().contains(target));
         writer.write(
             """
-                private static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.memberBuilder(${memberName:S}, () -> ${schema:L})
+                private static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.memberBuilder(${memberName:S}, ${?recursive}() -> ${/recursive}${schema:L})
                     .id(ID)${C}
                     .build();
                 """,

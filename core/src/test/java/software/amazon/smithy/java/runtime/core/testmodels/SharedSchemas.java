@@ -24,15 +24,15 @@ public final class SharedSchemas {
     public static final Schema LIST_OF_STRING = Schema.builder()
         .type(ShapeType.LIST)
         .id("smithy.example#ListOfString")
-        .members(Schema.memberBuilder("member", () -> PreludeSchemas.STRING))
+        .members(Schema.memberBuilder("member", PreludeSchemas.STRING))
         .build();
 
     public static final Schema MAP_LIST_STRING = Schema.builder()
         .type(ShapeType.MAP)
         .id("smithy.example#StringsMap")
         .members(
-            Schema.memberBuilder("key", () -> PreludeSchemas.STRING),
-            Schema.memberBuilder("value", () -> SharedSchemas.LIST_OF_STRING)
+            Schema.memberBuilder("key", PreludeSchemas.STRING),
+            Schema.memberBuilder("value", SharedSchemas.LIST_OF_STRING)
         )
         .build();
 

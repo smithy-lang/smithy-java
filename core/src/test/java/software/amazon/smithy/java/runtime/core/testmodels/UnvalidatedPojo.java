@@ -21,14 +21,14 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public final class UnvalidatedPojo implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#UnvalidatedPojo");
-    private static final Schema SCHEMA_STRING = Schema.memberBuilder("string", () -> PreludeSchemas.STRING)
+    private static final Schema SCHEMA_STRING = Schema.memberBuilder("string", PreludeSchemas.STRING)
         .id(ID)
         .build();
     private static final Schema SCHEMA_BOXED_INTEGER = Schema
-        .memberBuilder("boxedInteger", () -> PreludeSchemas.INTEGER)
+        .memberBuilder("boxedInteger", PreludeSchemas.INTEGER)
         .id(ID)
         .build();
-    private static final Schema SCHEMA_INTEGER = Schema.memberBuilder("integer", () -> PreludeSchemas.PRIMITIVE_INTEGER)
+    private static final Schema SCHEMA_INTEGER = Schema.memberBuilder("integer", PreludeSchemas.PRIMITIVE_INTEGER)
         .id(ID)
         .build();
     static final Schema SCHEMA = Schema.builder()

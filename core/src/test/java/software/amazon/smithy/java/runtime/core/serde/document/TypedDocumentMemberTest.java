@@ -36,7 +36,7 @@ public class TypedDocumentMemberTest {
         var structSchema = Schema.builder()
             .id("smithy.example#Struct1")
             .type(ShapeType.STRUCTURE)
-            .members(Schema.memberBuilder("foo", () -> PreludeSchemas.STRING))
+            .members(Schema.memberBuilder("foo", PreludeSchemas.STRING))
             .build();
 
         SerializableShape serializableShape = encoder -> {
@@ -64,12 +64,12 @@ public class TypedDocumentMemberTest {
         var structSchema1 = Schema.builder()
             .id("smithy.example#Struct1")
             .type(ShapeType.STRUCTURE)
-            .members(Schema.memberBuilder("foo", () -> PreludeSchemas.STRING))
+            .members(Schema.memberBuilder("foo", PreludeSchemas.STRING))
             .build();
         var structSchema2 = Schema.builder()
             .id("smithy.example#Struct2")
             .type(ShapeType.STRUCTURE)
-            .members(Schema.memberBuilder("foo", () -> PreludeSchemas.INTEGER))
+            .members(Schema.memberBuilder("foo", PreludeSchemas.INTEGER))
             .build();
 
         var document1 = Document.createTyped(encoder -> {
@@ -114,7 +114,7 @@ public class TypedDocumentMemberTest {
         Schema structSchema = Schema.builder()
             .type(ShapeType.STRUCTURE)
             .id("smithy.example#Foo")
-            .members(Schema.memberBuilder("a", () -> targetSchema))
+            .members(Schema.memberBuilder("a", targetSchema))
             .build();
         var document = Document.createTyped(encoder -> {
             encoder.writeStruct(structSchema, SerializableStruct.create(structSchema, (schema, serializer) -> {
@@ -600,8 +600,8 @@ public class TypedDocumentMemberTest {
                     .type(ShapeType.STRUCTURE)
                     .id("smithy.example#Foo")
                     .members(
-                        Schema.memberBuilder("foo", () -> PreludeSchemas.STRING),
-                        Schema.memberBuilder("bar", () -> PreludeSchemas.STRING)
+                        Schema.memberBuilder("foo", PreludeSchemas.STRING),
+                        Schema.memberBuilder("bar", PreludeSchemas.STRING)
                     )
                     .build(),
                 "b",
