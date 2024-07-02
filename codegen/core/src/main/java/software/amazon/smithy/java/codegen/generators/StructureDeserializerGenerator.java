@@ -23,7 +23,7 @@ record StructureDeserializerGenerator(
         writer.pushState();
         var template = """
             @Override
-            public Builder deserialize(${shapeDeserializer:T} decoder) {
+            public Builder deserialize(${shapeDeserializer:N} decoder) {
                 decoder.readStruct(SCHEMA, this, InnerDeserializer.INSTANCE);
                 return this;
             }
@@ -39,12 +39,13 @@ record StructureDeserializerGenerator(
                 }${?union}
 
                 @Override
-                public void unknownMember(Builder builder, String memberName) {
+                public void unknownMember(Builder builder, ${string:T} memberName) {
                     builder.$$unknownMember(memberName);
                 }${/union}
             }""";
         writer.putContext("shapeDeserializer", ShapeDeserializer.class);
         writer.putContext("sdkSchema", Schema.class);
+        writer.putContext("string", String.class);
         writer.putContext("hasMembers", !shape.members().isEmpty());
         writer.putContext("cases", writer.consumer(this::generateMemberSwitchCases));
         writer.putContext("union", shape.isUnionShape());

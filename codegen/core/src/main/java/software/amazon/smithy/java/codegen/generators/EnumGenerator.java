@@ -194,7 +194,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             );
             writer.write("""
                 @Override
-                public void serialize(${shapeSerializer:T} serializer) {
+                public void serialize(${shapeSerializer:N} serializer) {
                     ${serializerBody:C|};
                 }
                 """);
@@ -278,7 +278,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.write(
                 """
                     @Override
-                    public Builder deserialize(${shapeDeserializer:T} de) {
+                    public Builder deserialize(${shapeDeserializer:N} de) {
                         return value(de.${?string}readString${/string}${^string}readInteger${/string}(SCHEMA));
                     }
                     """

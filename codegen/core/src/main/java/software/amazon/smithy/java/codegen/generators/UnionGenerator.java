@@ -158,18 +158,18 @@ public final class UnionGenerator
                     public static final class ${memberName:U}Member extends ${shape:T} {
                         ${^unit}private final transient ${member:T} value;${/unit}
 
-                        public ${memberName:U}Member(${^unit}${member:T} value${/unit}) {
+                        public ${memberName:U}Member(${^unit}${member:N} value${/unit}) {
                             super(Type.${enumValue:L});${^unit}
                             this.value = ${?col}${collections:T}.${wrap:L}(${/col}${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Union value cannot be null")${/primitive}${?col})${/col};${/unit}
                         }
 
                         @Override
-                        public void serialize(${shapeSerializer:T} serializer) {
+                        public void serialize(${shapeSerializer:N} serializer) {
                             serializer.writeStruct(SCHEMA, this);
                         }
 
                         @Override
-                        public void serializeMembers(${shapeSerializer:T} serializer) {
+                        public void serializeMembers(${shapeSerializer:N} serializer) {
                             ${serializeMember:C};
                         }${^unit}
 
@@ -401,7 +401,7 @@ public final class UnionGenerator
             writer.putContext("objects", Objects.class);
             writer.write("""
                 @Override
-                public ${shape:T} build() {
+                public ${shape:N} build() {
                     return ${objects:T}.requireNonNull(value, "no union value set");
                 }
                 """);

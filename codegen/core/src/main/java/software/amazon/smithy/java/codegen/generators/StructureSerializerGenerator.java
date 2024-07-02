@@ -32,12 +32,12 @@ record StructureSerializerGenerator(
         writer.pushState();
         var template = """
             @Override
-            public void serialize(${shapeSerializer:T} serializer) {
+            public void serialize(${shapeSerializer:N} serializer) {
                 serializer.writeStruct(SCHEMA, this);
             }
 
             @Override
-            public void serializeMembers(${shapeSerializer:T} serializer) {
+            public void serializeMembers(${shapeSerializer:N} serializer) {
                 ${writeMemberSerialization:C|}
             }
             """;

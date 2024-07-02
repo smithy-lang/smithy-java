@@ -733,7 +733,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             );
             writer.write("""
                 @Override
-                public ${shape:T} build() {${?hasRequiredMembers}
+                public ${shape:N} build() {${?hasRequiredMembers}
                     tracker.validate();${/hasRequiredMembers}
                     return new ${shape:T}(this);
                 }
