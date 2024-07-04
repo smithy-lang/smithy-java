@@ -13,19 +13,14 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.ShapeType;
 
 public final class Bird implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Bird");
-    public static final Schema SCHEMA_NAME = Schema.memberBuilder("name", PreludeSchemas.STRING)
-        .id(ID)
+    public static final Schema SCHEMA = Schema.structureBuilder(ID)
+        .putMember("name", PreludeSchemas.STRING)
         .build();
-    public static final Schema SCHEMA = Schema.builder()
-        .id(ID)
-        .type(ShapeType.STRUCTURE)
-        .members(SCHEMA_NAME)
-        .build();
+    public static final Schema SCHEMA_NAME = SCHEMA.member("name");
 
     private final String name;
 

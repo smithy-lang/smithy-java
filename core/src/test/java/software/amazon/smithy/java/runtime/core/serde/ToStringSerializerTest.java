@@ -19,7 +19,7 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.testmodels.Bird;
 import software.amazon.smithy.java.runtime.core.testmodels.Person;
-import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 
 public class ToStringSerializerTest {
@@ -53,23 +53,13 @@ public class ToStringSerializerTest {
 
     @Test
     public void redactsSensitiveKeys() {
-        var mapMemberSchema = Schema.builder()
-            .type(ShapeType.STRING)
-            .id("smithy.example#Str")
-            .traits(new SensitiveTrait())
+        var mapMemberSchema = Schema.createString(ShapeId.from("smithy.example#Str"), new SensitiveTrait());
+        var mapSchema = Schema.mapBuilder(ShapeId.from("smithy.example#Map"))
+            .putMember("key", mapMemberSchema)
+            .putMember("value", mapMemberSchema)
             .build();
-        var mapSchema = Schema.builder()
-            .type(ShapeType.MAP)
-            .id("smithy.example#Map")
-            .members(
-                Schema.memberBuilder("key", mapMemberSchema),
-                Schema.memberBuilder("value", mapMemberSchema)
-            )
-            .build();
-        var schema = Schema.builder()
-            .id("smithy.example#Struct")
-            .type(ShapeType.STRUCTURE)
-            .members(Schema.memberBuilder("foo", mapSchema))
+        var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
+            .putMember("foo", mapSchema)
             .build();
 
         var str = ToStringSerializer.serialize(e -> {
@@ -90,15 +80,9 @@ public class ToStringSerializerTest {
 
     @Test
     public void redactsSensitiveBlobs() {
-        var blobSchema = Schema.builder()
-            .type(ShapeType.BLOB)
-            .id("smithy.example#Blob")
-            .traits(new SensitiveTrait())
-            .build();
-        var schema = Schema.builder()
-            .id("smithy.example#Struct")
-            .type(ShapeType.STRUCTURE)
-            .members(Schema.memberBuilder("foo", blobSchema))
+        var blobSchema = Schema.createBlob(ShapeId.from("smithy.example#Blob"), new SensitiveTrait());
+        var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
+            .putMember("foo", blobSchema)
             .build();
 
         var str = ToStringSerializer.serialize(e -> {

@@ -122,7 +122,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                     structMemberConsumer.accept(state, member, new HttpPrefixHeadersDeserializer(headers));
                 case BODY -> bodyMembers.add(member.memberName());
                 case PAYLOAD -> {
-                    if (member.memberTarget().type() == ShapeType.STRUCTURE) {
+                    if (member.type() == ShapeType.STRUCTURE) {
                         // Read the payload into a byte buffer to deserialize a shape in the body.
                         LOGGER.log(
                             System.Logger.Level.TRACE,
@@ -139,8 +139,8 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                         shapeBuilder.setEventStream(
                             EventStreamFrameDecodingProcessor.create(body, eventDecoderFactory)
                         );
-                    } else if (member.memberTarget().type() == ShapeType.BLOB
-                        && member.memberTarget().hasTrait(StreamingTrait.class)) {
+                    } else if (member.type() == ShapeType.BLOB
+                        && member.hasTrait(StreamingTrait.class)) {
                             // Set the payload on shape builder directly. This will fail for misconfigured shapes.
                             shapeBuilder.setDataStream(body);
                         } else if (body != null && !(body.hasKnownLength() && body.contentLength() == 0)) {
@@ -170,8 +170,8 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     private static boolean isEventStream(Schema member) {
-        return member.memberTarget().type() == ShapeType.UNION
-            && member.memberTarget().hasTrait(StreamingTrait.class);
+        return member.type() == ShapeType.UNION
+            && member.hasTrait(StreamingTrait.class);
     }
 
     // TODO: Should there be a configurable limit on the client/server for how much can be read in memory?

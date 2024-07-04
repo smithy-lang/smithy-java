@@ -25,7 +25,7 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 public class JsonSerializerTest {
@@ -124,11 +124,10 @@ public class JsonSerializerTest {
         boolean useTimestampFormat,
         String json
     ) throws Exception {
-        Schema schema = Schema.builder()
-            .type(ShapeType.TIMESTAMP)
-            .id("smithy.example#foo")
-            .traits(new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
-            .build();
+        Schema schema = Schema.createTimestamp(
+            ShapeId.from("smithy.example#foo"),
+            new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME)
+        );
         try (
             var codec = JsonCodec.builder()
                 .useTimestampFormat(useTimestampFormat)

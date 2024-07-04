@@ -14,7 +14,6 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.LengthTrait;
 import software.amazon.smithy.model.traits.RangeTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
@@ -22,24 +21,24 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class ValidatedPojo implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#ValidatedPojo");
-    private static final Schema SCHEMA_STRING = Schema.memberBuilder("string", PreludeSchemas.STRING)
-        .id(ID)
-        .traits(new RequiredTrait(), LengthTrait.builder().min(1L).max(100L).build())
+    static final Schema SCHEMA = Schema.structureBuilder(ID)
+        .putMember(
+            "string",
+            PreludeSchemas.STRING,
+            new RequiredTrait(),
+            LengthTrait.builder().min(1L).max(100L).build()
+        )
+        .putMember("boxedInteger", PreludeSchemas.INTEGER, new RequiredTrait())
+        .putMember(
+            "integer",
+            PreludeSchemas.PRIMITIVE_INTEGER,
+            new RequiredTrait(),
+            RangeTrait.builder().min(BigDecimal.valueOf(0)).build()
+        )
         .build();
-    private static final Schema SCHEMA_BOXED_INTEGER = Schema
-        .memberBuilder("boxedInteger", PreludeSchemas.INTEGER)
-        .id(ID)
-        .traits(new RequiredTrait())
-        .build();
-    private static final Schema SCHEMA_INTEGER = Schema.memberBuilder("integer", PreludeSchemas.PRIMITIVE_INTEGER)
-        .id(ID)
-        .traits(new RequiredTrait(), RangeTrait.builder().min(BigDecimal.valueOf(0)).build())
-        .build();
-    static final Schema SCHEMA = Schema.builder()
-        .id(ID)
-        .type(ShapeType.STRUCTURE)
-        .members(SCHEMA_STRING, SCHEMA_BOXED_INTEGER, SCHEMA_INTEGER)
-        .build();
+    private static final Schema SCHEMA_STRING = SCHEMA.member("string");
+    private static final Schema SCHEMA_BOXED_INTEGER = SCHEMA.member("boxedInteger");
+    private static final Schema SCHEMA_INTEGER = SCHEMA.member("integer");
 
     private final String string;
     private final int integer;

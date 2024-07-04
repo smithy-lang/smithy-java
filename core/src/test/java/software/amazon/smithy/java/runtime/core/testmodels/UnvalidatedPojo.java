@@ -13,7 +13,6 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
  * A POJO with no validation constraints.
@@ -21,21 +20,14 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public final class UnvalidatedPojo implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#UnvalidatedPojo");
-    private static final Schema SCHEMA_STRING = Schema.memberBuilder("string", PreludeSchemas.STRING)
-        .id(ID)
+    static final Schema SCHEMA = Schema.structureBuilder(ID)
+        .putMember("string", PreludeSchemas.STRING)
+        .putMember("boxedInteger", PreludeSchemas.INTEGER)
+        .putMember("integer", PreludeSchemas.PRIMITIVE_INTEGER)
         .build();
-    private static final Schema SCHEMA_BOXED_INTEGER = Schema
-        .memberBuilder("boxedInteger", PreludeSchemas.INTEGER)
-        .id(ID)
-        .build();
-    private static final Schema SCHEMA_INTEGER = Schema.memberBuilder("integer", PreludeSchemas.PRIMITIVE_INTEGER)
-        .id(ID)
-        .build();
-    static final Schema SCHEMA = Schema.builder()
-        .id(ID)
-        .type(ShapeType.STRUCTURE)
-        .members(SCHEMA_STRING, SCHEMA_BOXED_INTEGER, SCHEMA_INTEGER)
-        .build();
+    private static final Schema SCHEMA_STRING = SCHEMA.member("string");
+    private static final Schema SCHEMA_BOXED_INTEGER = SCHEMA.member("boxedInteger");
+    private static final Schema SCHEMA_INTEGER = SCHEMA.member("integer");
 
     private final String string;
     private final int integer;
@@ -75,6 +67,9 @@ public final class UnvalidatedPojo implements SerializableStruct {
 
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
+        if (string != null) {
+            serializer.writeString(SCHEMA_STRING, string);
+        }
         if (boxedInteger != null) {
             serializer.writeInteger(SCHEMA_BOXED_INTEGER, boxedInteger);
         }

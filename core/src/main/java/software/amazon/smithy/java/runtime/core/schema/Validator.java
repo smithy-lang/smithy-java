@@ -254,9 +254,9 @@ public final class Validator {
 
         private void checkListLength(Schema schema, int count) {
             // Ensure the list has an acceptable length.
-            if (count < schema.minLengthConstraint()) {
+            if (count < schema.minLengthConstraint) {
                 addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));
-            } else if (count > schema.maxLengthConstraint()) {
+            } else if (count > schema.maxLengthConstraint) {
                 addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));
             }
         }
@@ -289,9 +289,9 @@ public final class Validator {
 
         private void checkMapLength(Schema schema, int count) {
             // Ensure the map is properly sized.
-            if (count < schema.minLengthConstraint()) {
+            if (count < schema.minLengthConstraint) {
                 addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));
-            } else if (count > schema.maxLengthConstraint()) {
+            } else if (count > schema.maxLengthConstraint) {
                 addError(new ValidationError.LengthValidationFailure(createPath(), count, schema));
             }
         }
@@ -321,20 +321,25 @@ public final class Validator {
         @Override
         public void writeByte(Schema schema, byte value) {
             checkType(schema, ShapeType.BYTE);
-            validateRange(schema, value, schema.minLongConstraint(), schema.maxLongConstraint());
+            validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
         }
 
         @Override
         public void writeShort(Schema schema, short value) {
             checkType(schema, ShapeType.SHORT);
-            validateRange(schema, value, schema.minLongConstraint(), schema.maxLongConstraint());
+            validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
         }
 
         @Override
         public void writeInteger(Schema schema, int value) {
             // Validate range traits for normal integers, and validate intEnum for INT_ENUM values.
             switch (schema.type()) {
-                case INTEGER -> validateRange(schema, value, schema.minLongConstraint(), schema.maxLongConstraint());
+                case INTEGER -> validateRange(
+                    schema,
+                    value,
+                    schema.minLongConstraint,
+                    schema.maxLongConstraint
+                );
                 case INT_ENUM -> {
                     if (!schema.intEnumValues().isEmpty() && !schema.intEnumValues().contains(value)) {
                         addError(new ValidationError.IntEnumValidationFailure(createPath(), value, schema));
@@ -347,30 +352,30 @@ public final class Validator {
         @Override
         public void writeLong(Schema schema, long value) {
             checkType(schema, ShapeType.LONG);
-            validateRange(schema, value, schema.minLongConstraint(), schema.maxLongConstraint());
+            validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
         }
 
         @Override
         public void writeFloat(Schema schema, float value) {
             checkType(schema, ShapeType.FLOAT);
-            validateRange(schema, value, schema.minDoubleConstraint(), schema.maxDoubleConstraint());
+            validateRange(schema, value, schema.minDoubleConstraint, schema.maxDoubleConstraint);
         }
 
         @Override
         public void writeDouble(Schema schema, double value) {
             checkType(schema, ShapeType.DOUBLE);
-            validateRange(schema, value, schema.minDoubleConstraint(), schema.maxDoubleConstraint());
+            validateRange(schema, value, schema.minDoubleConstraint, schema.maxDoubleConstraint);
         }
 
         @Override
         public void writeBigInteger(Schema schema, BigInteger value) {
             checkType(schema, ShapeType.BIG_INTEGER);
-            if (schema.minRangeConstraint() != null && value.compareTo(
-                schema.minRangeConstraint().toBigInteger()
+            if (schema.minRangeConstraint != null && value.compareTo(
+                schema.minRangeConstraint.toBigInteger()
             ) < 0) {
                 emitRangeError(schema, value);
-            } else if (schema.maxRangeConstraint() != null && value.compareTo(
-                schema.maxRangeConstraint().toBigInteger()
+            } else if (schema.maxRangeConstraint != null && value.compareTo(
+                schema.maxRangeConstraint.toBigInteger()
             ) > 0) {
                 emitRangeError(schema, value);
             }
@@ -379,9 +384,11 @@ public final class Validator {
         @Override
         public void writeBigDecimal(Schema schema, BigDecimal value) {
             checkType(schema, ShapeType.BIG_DECIMAL);
-            if (schema.minRangeConstraint() != null && value.compareTo(schema.minRangeConstraint()) < 0) {
+            if (schema.minRangeConstraint != null && value.compareTo(schema.minRangeConstraint) < 0) {
                 emitRangeError(schema, value);
-            } else if (schema.maxRangeConstraint() != null && value.compareTo(schema.maxRangeConstraint()) > 0) {
+            } else if (schema.maxRangeConstraint != null && value.compareTo(
+                schema.maxRangeConstraint
+            ) > 0) {
                 emitRangeError(schema, value);
             }
         }
@@ -389,7 +396,7 @@ public final class Validator {
         @Override
         public void writeString(Schema schema, String value) {
             switch (schema.type()) {
-                case STRING, ENUM -> schema.stringValidation().apply(schema, value, this);
+                case STRING, ENUM -> schema.stringValidation.apply(schema, value, this);
                 default -> checkType(schema, ShapeType.STRING); // it's invalid, and calling this adds an error.
             }
         }
@@ -398,7 +405,7 @@ public final class Validator {
         public void writeBlob(Schema schema, ByteBuffer value) {
             checkType(schema, ShapeType.BLOB);
             int length = value.remaining();
-            if (length < schema.minLengthConstraint() || length > schema.maxLengthConstraint()) {
+            if (length < schema.minLengthConstraint || length > schema.maxLengthConstraint) {
                 addError(new ValidationError.LengthValidationFailure(createPath(), length, schema));
             }
         }

@@ -27,16 +27,15 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 public class TypedDocumentMemberTest {
     // There's special handling for equality to account for the schema and normalized value.
     @Test
     public void equalityAndHashTest() {
-        var structSchema = Schema.builder()
-            .id("smithy.example#Struct1")
-            .type(ShapeType.STRUCTURE)
-            .members(Schema.memberBuilder("foo", PreludeSchemas.STRING))
+        var structSchema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct1"))
+            .putMember("foo", PreludeSchemas.STRING)
             .build();
 
         SerializableShape serializableShape = encoder -> {
@@ -61,15 +60,11 @@ public class TypedDocumentMemberTest {
 
     @Test
     public void inequalityAndHashTest() {
-        var structSchema1 = Schema.builder()
-            .id("smithy.example#Struct1")
-            .type(ShapeType.STRUCTURE)
-            .members(Schema.memberBuilder("foo", PreludeSchemas.STRING))
+        var structSchema1 = Schema.structureBuilder(ShapeId.from("smithy.example#Struct1"))
+            .putMember("foo", PreludeSchemas.STRING)
             .build();
-        var structSchema2 = Schema.builder()
-            .id("smithy.example#Struct2")
-            .type(ShapeType.STRUCTURE)
-            .members(Schema.memberBuilder("foo", PreludeSchemas.INTEGER))
+        var structSchema2 = Schema.structureBuilder(ShapeId.from("smithy.example#Struct2"))
+            .putMember("foo", PreludeSchemas.INTEGER)
             .build();
 
         var document1 = Document.createTyped(encoder -> {
@@ -111,10 +106,8 @@ public class TypedDocumentMemberTest {
             );
         }
 
-        Schema structSchema = Schema.builder()
-            .type(ShapeType.STRUCTURE)
-            .id("smithy.example#Foo")
-            .members(Schema.memberBuilder("a", targetSchema))
+        var structSchema = Schema.structureBuilder(ShapeId.from("smithy.example#Foo"))
+            .putMember("a", targetSchema)
             .build();
         var document = Document.createTyped(encoder -> {
             encoder.writeStruct(structSchema, SerializableStruct.create(structSchema, (schema, serializer) -> {
@@ -596,13 +589,9 @@ public class TypedDocumentMemberTest {
 
             // Get a member from a struct by name.
             Arguments.of(
-                Schema.builder()
-                    .type(ShapeType.STRUCTURE)
-                    .id("smithy.example#Foo")
-                    .members(
-                        Schema.memberBuilder("foo", PreludeSchemas.STRING),
-                        Schema.memberBuilder("bar", PreludeSchemas.STRING)
-                    )
+                Schema.structureBuilder(ShapeId.from("smithy.example#Foo"))
+                    .putMember("foo", PreludeSchemas.STRING)
+                    .putMember("bar", PreludeSchemas.STRING)
                     .build(),
                 "b",
                 (BiConsumer<Schema, ShapeSerializer>) (schema, s) -> {

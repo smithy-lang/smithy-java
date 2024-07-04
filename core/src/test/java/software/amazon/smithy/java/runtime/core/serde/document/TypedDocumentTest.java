@@ -17,18 +17,15 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 public class TypedDocumentTest {
 
     private SerializableShape createSerializableShape() {
-        var structSchema = Schema.builder()
-            .id("smithy.example#Struct")
-            .type(ShapeType.STRUCTURE)
-            .members(
-                Schema.memberBuilder("a", PreludeSchemas.STRING),
-                Schema.memberBuilder("b", PreludeSchemas.STRING)
-            )
+        var structSchema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
+            .putMember("a", PreludeSchemas.STRING)
+            .putMember("b", PreludeSchemas.STRING)
             .build();
 
         return encoder -> {
@@ -48,7 +45,7 @@ public class TypedDocumentTest {
         assertThat(
             result.toString(),
             equalTo(
-                "StructureDocument[schema=SdkSchema{id='smithy.example#Struct', type=structure}, members={a=StringDocument[schema=SdkSchema{id='smithy.example#Struct$a', type=string}, value=1], b=StringDocument[schema=SdkSchema{id='smithy.example#Struct$b', type=string}, value=2]}]"
+                "StructureDocument[schema=Schema{id='smithy.example#Struct', type=structure}, members={a=StringDocument[schema=Schema{id='smithy.example#Struct$a', type=string}, value=1], b=StringDocument[schema=Schema{id='smithy.example#Struct$b', type=string}, value=2]}]"
             )
         );
 
