@@ -334,12 +334,7 @@ public final class Validator {
         public void writeInteger(Schema schema, int value) {
             // Validate range traits for normal integers, and validate intEnum for INT_ENUM values.
             switch (schema.type()) {
-                case INTEGER -> validateRange(
-                    schema,
-                    value,
-                    schema.minLongConstraint,
-                    schema.maxLongConstraint
-                );
+                case INTEGER -> validateRange(schema, value, schema.minLongConstraint, schema.maxLongConstraint);
                 case INT_ENUM -> {
                     if (!schema.intEnumValues().isEmpty() && !schema.intEnumValues().contains(value)) {
                         addError(new ValidationError.IntEnumValidationFailure(createPath(), value, schema));
@@ -370,9 +365,7 @@ public final class Validator {
         @Override
         public void writeBigInteger(Schema schema, BigInteger value) {
             checkType(schema, ShapeType.BIG_INTEGER);
-            if (schema.minRangeConstraint != null && value.compareTo(
-                schema.minRangeConstraint.toBigInteger()
-            ) < 0) {
+            if (schema.minRangeConstraint != null && value.compareTo(schema.minRangeConstraint.toBigInteger()) < 0) {
                 emitRangeError(schema, value);
             } else if (schema.maxRangeConstraint != null && value.compareTo(
                 schema.maxRangeConstraint.toBigInteger()
@@ -386,9 +379,7 @@ public final class Validator {
             checkType(schema, ShapeType.BIG_DECIMAL);
             if (schema.minRangeConstraint != null && value.compareTo(schema.minRangeConstraint) < 0) {
                 emitRangeError(schema, value);
-            } else if (schema.maxRangeConstraint != null && value.compareTo(
-                schema.maxRangeConstraint
-            ) > 0) {
+            } else if (schema.maxRangeConstraint != null && value.compareTo(schema.maxRangeConstraint) > 0) {
                 emitRangeError(schema, value);
             }
         }

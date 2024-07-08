@@ -14,14 +14,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.TopologicalIndex;
 import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
-import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.Prelude;
 import software.amazon.smithy.model.shapes.Shape;
@@ -62,55 +59,28 @@ public final class SharedSchemasGenerator
                          * Defines shared shapes across the model package that are not part of another code-generated type.
                          */
                         final class SharedSchemas {
-
-                            ${schemas:C|}
-
+                            ${#schemas}
+                            ${value:C|}
+                            ${/schemas}
                             private SharedSchemas() {}
                         }
                         """;
-                    writer.putContext(
-                        "schemas",
-                        new SchemasGenerator(
-                            writer,
-                            common,
-                            directive.symbolProvider(),
-                            directive.model(),
-                            directive.context()
+                    var schemas = common.stream()
+                        .map(
+                            s -> new SchemaGenerator(
+                                writer,
+                                s,
+                                directive.symbolProvider(),
+                                directive.model(),
+                                directive.context()
+                            )
                         )
-                    );
+                        .toList();
+                    writer.putContext("schemas", schemas);
                     writer.write(template);
                     writer.popState();
                 }
             );
-    }
-
-    private record SchemasGenerator(
-        JavaWriter writer,
-        Set<Shape> shapes,
-        SymbolProvider symbolProvider,
-        Model model,
-        CodeGenerationContext context
-    ) implements Runnable {
-
-        @Override
-        public void run() {
-            writer.pushState();
-            writer.putContext("schemaClass", Schema.class);
-            for (var shape : shapes) {
-                writer.write(
-                    "static final ${schemaClass:T} $L = ${C}",
-                    CodegenUtils.toSchemaName(shape),
-                    new SchemaGenerator(
-                        writer,
-                        shape,
-                        symbolProvider,
-                        model,
-                        context
-                    )
-                );
-            }
-            writer.popState();
-        }
     }
 
     /**

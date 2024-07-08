@@ -15,11 +15,14 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.codegen.test.model.IntermediateListStructure;
 import software.amazon.smithy.java.codegen.test.model.IntermediateMapStructure;
+import software.amazon.smithy.java.codegen.test.model.RecursiveStructA;
+import software.amazon.smithy.java.codegen.test.model.RecursiveStructB;
 import software.amazon.smithy.java.codegen.test.model.SelfReferencing;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
+
 
 public class RecursionTests {
 
@@ -50,6 +53,15 @@ public class RecursionTests {
                             .build()
                     )
                 )
+                .build(),
+            RecursiveStructA.builder()
+                .b(
+                    RecursiveStructB.builder()
+                        .a(
+                            RecursiveStructA.builder().build()
+                        )
+                        .build()
+                )
                 .build()
         );
     }
@@ -70,7 +82,8 @@ public class RecursionTests {
             Arguments.of(
                 "{\"foo\":{\"a\":{\"foo\":{}},\"b\":{\"foo\":{\"c\":{\"foo\":{}}}}}}",
                 IntermediateMapStructure.builder()
-            )
+            ),
+            Arguments.of("{\"b\":{\"a\":{\"b\":{}}}}", RecursiveStructA.builder())
         );
     }
 

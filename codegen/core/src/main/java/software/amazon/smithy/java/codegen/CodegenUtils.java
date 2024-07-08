@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen;
 
 import java.net.URL;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -21,6 +22,7 @@ import software.amazon.smithy.model.loader.Prelude;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.CaseUtils;
@@ -44,6 +46,13 @@ public final class CodegenUtils {
         .build();
 
     private static final String SCHEMA_STATIC_NAME = "SCHEMA";
+    private static final EnumSet<ShapeType> SHAPES_WITH_INNER_SCHEMA = EnumSet.of(
+        ShapeType.OPERATION,
+        ShapeType.ENUM,
+        ShapeType.INT_ENUM,
+        ShapeType.UNION,
+        ShapeType.STRUCTURE
+    );
 
     private CodegenUtils() {
         // Utility class should not be instantiated
@@ -162,7 +171,7 @@ public final class CodegenUtils {
      */
     public static String toSchemaName(Shape shape) {
         // Shapes that generate their own classes have a static name
-        if (shape.isOperationShape() || shape.isStructureShape()) {
+        if (SHAPES_WITH_INNER_SCHEMA.contains(shape.getType())) {
             return SCHEMA_STATIC_NAME;
         }
         return CaseUtils.toSnakeCase(shape.toShapeId().getName()).toUpperCase(Locale.ENGLISH);
@@ -177,10 +186,14 @@ public final class CodegenUtils {
      * @param writer Writer to use for writing the Schema type.
      * @param shape shape to write Schema type for.
      */
-    public static String getSchemaType(JavaWriter writer, SymbolProvider provider, Shape shape) {
+    public static String getSchemaType(
+        JavaWriter writer,
+        SymbolProvider provider,
+        Shape shape
+    ) {
         if (Prelude.isPreludeShape(shape) && !shape.hasTrait(UnitTypeTrait.class)) {
             return writer.format("$T.$L", PreludeSchemas.class, shape.getType().name());
-        } else if (shape.isStructureShape() || shape.isUnionShape() || shape.isIntEnumShape() || shape.isEnumShape()) {
+        } else if (SHAPES_WITH_INNER_SCHEMA.contains(shape.getType())) {
             // Shapes that generate a class have their schemas as static properties on that class
             return writer.format("$T.SCHEMA", provider.toSymbol(shape));
         }
