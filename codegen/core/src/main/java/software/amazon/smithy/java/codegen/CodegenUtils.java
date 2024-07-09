@@ -15,10 +15,12 @@ import software.amazon.smithy.codegen.core.ReservedWords;
 import software.amazon.smithy.codegen.core.ReservedWordsBuilder;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.TopologicalIndex;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.Prelude;
+import software.amazon.smithy.model.selector.PathFinder;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
@@ -321,5 +323,28 @@ public final class CodegenUtils {
         return symbol.toBuilder()
             .name("Type")
             .build();
+    }
+
+
+    /**
+     * Determines if a shape is recursive and should use a schema builder when defined as a Root- or Member-Schema.
+     *
+     * <p>A builder is only required for shapes that appear more than once in the recursive closure (i.e. shapes
+     * that are actually recursive, not just in the closure of a recursive shape).
+     *
+     * @param model Smithy model to use for resolving recursive closure.
+     * @param shape shape to check.
+     * @return true if the shape should use a schema builder.
+     */
+    public static boolean recursiveShape(Model model, Shape shape) {
+        var closure = TopologicalIndex.of(model).getRecursiveClosure(shape);
+        if (closure.isEmpty()) {
+            return false;
+        }
+        return closure.stream()
+            .map(PathFinder.Path::getShapes)
+            .flatMap(List::stream)
+            .filter(shape::equals)
+            .count() > 1;
     }
 }

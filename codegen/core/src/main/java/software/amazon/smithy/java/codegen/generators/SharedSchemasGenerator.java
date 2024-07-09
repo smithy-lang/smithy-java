@@ -6,14 +6,12 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import software.amazon.smithy.codegen.core.TopologicalIndex;
 import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -89,22 +87,11 @@ public final class SharedSchemasGenerator
      * @return shapes that need a shared schema definition
      */
     private static Set<Shape> getCommonShapes(Collection<Shape> connectedShapes, Model model) {
-        Map<Shape, Integer> totalOrdering = new HashMap<>();
-
-        int count = 0;
-        for (Shape s : TopologicalIndex.of(model).getOrderedShapes()) {
-            totalOrdering.put(s, count++);
-        }
-
-        // Add all recursive shapes last
-        for (Shape s : TopologicalIndex.of(model).getRecursiveShapes()) {
-            totalOrdering.put(s, count++);
-        }
-
-        return connectedShapes.stream()
+        var index = TopologicalIndex.of(model);
+        return Stream.concat(index.getOrderedShapes().stream(), index.getRecursiveShapes().stream())
+            .filter(connectedShapes::contains)
             .filter(s -> !EXCLUDED_TYPES.contains(s.getType()))
             .filter(s -> !Prelude.isPreludeShape(s))
-            .sorted(Comparator.comparing(totalOrdering::get))
             .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
