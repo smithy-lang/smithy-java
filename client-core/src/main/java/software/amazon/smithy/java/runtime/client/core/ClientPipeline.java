@@ -137,9 +137,10 @@ public final class ClientPipeline<RequestT, ResponseT> {
             .thenApply(endpoint -> protocol.setServiceEndpoint(reqBeforeEndpointResolution, endpoint))
             .thenCompose(resolvedAuthScheme::sign)
             .thenApply(req -> {
-                interceptor.readAfterSigning(finalRequestHook);
-                req = interceptor.modifyBeforeTransmit(finalRequestHook);
-                interceptor.readBeforeTransmit(finalRequestHook.withRequest(req));
+                var reqHook = finalRequestHook.withRequest(req);
+                interceptor.readAfterSigning(reqHook);
+                req = interceptor.modifyBeforeTransmit(reqHook);
+                interceptor.readBeforeTransmit(reqHook.withRequest(req));
                 return req;
             })
             .thenCompose(finalRequest -> transport.send(context, finalRequest).thenCompose(response -> {
