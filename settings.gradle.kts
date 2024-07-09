@@ -21,7 +21,6 @@ include(":client-endpoint-api")
 include(":client-http")
 include(":client-auth")
 
-include(":identity-api")
 include(":auth-api")
 include(":sigv4")
 
