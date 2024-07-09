@@ -37,8 +37,10 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
+import software.amazon.smithy.model.traits.Trait;
 
 public class JsonDeserializerTest {
     @Test
@@ -343,15 +345,9 @@ public class JsonDeserializerTest {
         TimestampFormatter defaultFormat,
         String json
     ) {
-        Schema.Builder schemaBuilder = Schema.builder()
-            .type(ShapeType.TIMESTAMP)
-            .id("smithy.foo#Time");
+        Trait[] traits = trait == null ? null : new Trait[]{trait};
+        var schema = Schema.createTimestamp(ShapeId.from("smithy.foo#Time"), traits);
 
-        if (trait != null) {
-            schemaBuilder.traits(trait);
-        }
-
-        var schema = schemaBuilder.build();
         var codecBuilder = JsonCodec.builder().useTimestampFormat(useTrait);
         if (defaultFormat != null) {
             codecBuilder.defaultTimestampFormat(defaultFormat);
@@ -406,10 +402,7 @@ public class JsonDeserializerTest {
 
     @Test
     public void throwsWhenTimestampIsWrongType() {
-        Schema schema = Schema.builder()
-            .type(ShapeType.TIMESTAMP)
-            .id("smithy.foo#Time")
-            .build();
+        var schema = Schema.createTimestamp(ShapeId.from("smithy.foo#Time"));
 
         try (var codec = JsonCodec.builder().build()) {
             var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));

@@ -286,35 +286,21 @@ public class JsonDocumentTest {
 
         private static final ShapeId ID = ShapeId.from("smithy.example#Foo");
 
-        private static final Schema NAME = Schema.memberBuilder("name", PreludeSchemas.STRING)
-            .id(ID)
+        private static final Schema NUMBERS_LIST = Schema.listBuilder(ShapeId.from("smithy.example#Numbers"))
+            .putMember("member", PreludeSchemas.INTEGER)
             .build();
 
-        private static final Schema BINARY = Schema.memberBuilder("binary", PreludeSchemas.BLOB)
-            .id(ID)
-            .traits(new JsonNameTrait("BINARY"))
+        private static final Schema SCHEMA = Schema.structureBuilder(ID)
+            .putMember("name", PreludeSchemas.STRING)
+            .putMember("binary", PreludeSchemas.BLOB, new JsonNameTrait("BINARY"))
+            .putMember("date", PreludeSchemas.TIMESTAMP, new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
+            .putMember("numbers", NUMBERS_LIST)
             .build();
 
-        private static final Schema DATE = Schema.memberBuilder("date", PreludeSchemas.TIMESTAMP)
-            .id(ID)
-            .traits(new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
-            .build();
-
-        private static final Schema NUMBERS_LIST = Schema.builder()
-            .type(ShapeType.LIST)
-            .id("smithy.example#Numbers")
-            .members(Schema.memberBuilder("member", PreludeSchemas.INTEGER))
-            .build();
-
-        private static final Schema NUMBERS = Schema.memberBuilder("numbers", NUMBERS_LIST)
-            .id(ID)
-            .build();
-
-        private static final Schema SCHEMA = Schema.builder()
-            .id(ID)
-            .type(ShapeType.STRUCTURE)
-            .members(NAME, BINARY, DATE, NUMBERS)
-            .build();
+        private static final Schema NAME = SCHEMA.member("name");
+        private static final Schema BINARY = SCHEMA.member("binary");
+        private static final Schema DATE = SCHEMA.member("date");
+        private static final Schema NUMBERS = SCHEMA.member("numbers");
 
         private final String name;
         private final ByteBuffer binary;

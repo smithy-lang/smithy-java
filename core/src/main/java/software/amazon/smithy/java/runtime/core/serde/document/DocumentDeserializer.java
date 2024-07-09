@@ -104,6 +104,9 @@ public class DocumentDeserializer implements ShapeDeserializer {
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         for (var member : value.getMemberNames()) {
+            if (member.equals("__type")) {
+                continue;
+            }
             var memberSchema = schema.member(member);
             if (memberSchema != null) {
                 var memberValue = value.getMember(member);

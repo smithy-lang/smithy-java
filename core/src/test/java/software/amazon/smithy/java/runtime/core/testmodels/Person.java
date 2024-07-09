@@ -22,7 +22,6 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.HttpLabelTrait;
 import software.amazon.smithy.model.traits.LengthTrait;
 import software.amazon.smithy.model.traits.RangeTrait;
@@ -31,40 +30,26 @@ import software.amazon.smithy.model.traits.RequiredTrait;
 public final class Person implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Person");
-    private static final Schema SCHEMA_NAME = Schema.memberBuilder("name", PreludeSchemas.STRING)
-        .id(ID)
-        .traits(new HttpLabelTrait(), new RequiredTrait(), LengthTrait.builder().max(7L).build())
-        .build();
-    private static final Schema SCHEMA_FAVORITE_COLOR = Schema
-        .memberBuilder("favoriteColor", PreludeSchemas.STRING)
-        .id(ID)
-        .build();
-    private static final Schema SCHEMA_AGE = Schema.memberBuilder("age", PreludeSchemas.INTEGER)
-        .id(ID)
-        .traits(RangeTrait.builder().max(BigDecimal.valueOf(150)).build())
-        .build();
-    private static final Schema SCHEMA_BIRTHDAY = Schema.memberBuilder("birthday", SharedSchemas.BIRTHDAY)
-        .id(ID)
-        .build();
-    private static final Schema SCHEMA_BINARY = Schema.memberBuilder("binary", PreludeSchemas.BLOB)
-        .id(ID)
-        .build();
-    private static final Schema SCHEMA_QUERY_PARAMS = Schema
-        .memberBuilder("queryParams", SharedSchemas.MAP_LIST_STRING)
-        .id(ID)
-        .build();
-    static final Schema SCHEMA = Schema.builder()
-        .id(ID)
-        .type(ShapeType.STRUCTURE)
-        .members(
-            SCHEMA_NAME,
-            SCHEMA_FAVORITE_COLOR,
-            SCHEMA_AGE,
-            SCHEMA_BIRTHDAY,
-            SCHEMA_BINARY,
-            SCHEMA_QUERY_PARAMS
+    static final Schema SCHEMA = Schema.structureBuilder(ID)
+        .putMember(
+            "name",
+            PreludeSchemas.STRING,
+            new HttpLabelTrait(),
+            new RequiredTrait(),
+            LengthTrait.builder().max(7L).build()
         )
+        .putMember("favoriteColor", PreludeSchemas.STRING)
+        .putMember("age", PreludeSchemas.INTEGER, RangeTrait.builder().max(BigDecimal.valueOf(150)).build())
+        .putMember("birthday", SharedSchemas.BIRTHDAY)
+        .putMember("binary", PreludeSchemas.BLOB)
+        .putMember("queryParams", SharedSchemas.MAP_LIST_STRING)
         .build();
+    private static final Schema SCHEMA_NAME = SCHEMA.member("name");
+    private static final Schema SCHEMA_FAVORITE_COLOR = SCHEMA.member("favoriteColor");
+    private static final Schema SCHEMA_AGE = SCHEMA.member("age");
+    private static final Schema SCHEMA_BIRTHDAY = SCHEMA.member("birthday");
+    private static final Schema SCHEMA_BINARY = SCHEMA.member("binary");
+    private static final Schema SCHEMA_QUERY_PARAMS = SCHEMA.member("queryParams");
     private static final Schema SCHEMA_QUERY_PARAMS_KEY = SharedSchemas.MAP_LIST_STRING.member("key");
     private static final Schema SCHEMA_QUERY_PARAMS_VALUE = SharedSchemas.MAP_LIST_STRING.member("value");
     private static final Schema LIST_OF_STRING_MEMBER = SharedSchemas.LIST_OF_STRING.member("member");

@@ -94,9 +94,10 @@ public interface ValidationError {
             } else if (schema.maxRangeConstraint == null) {
                 return "Value must be greater than or equal to " + formatDecimal(schema.minRangeConstraint);
             } else {
-                return "Value must be between " + formatDecimal(schema.minRangeConstraint) + " and " + formatDecimal(
-                    schema.maxRangeConstraint
-                ) + ", inclusive";
+                return "Value must be between " + formatDecimal(schema.minRangeConstraint) + " and "
+                    + formatDecimal(
+                        schema.maxRangeConstraint
+                    ) + ", inclusive";
             }
         }
 

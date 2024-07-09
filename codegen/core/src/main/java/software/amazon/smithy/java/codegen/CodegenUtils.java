@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen;
 
 import java.net.URL;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -14,13 +15,16 @@ import software.amazon.smithy.codegen.core.ReservedWords;
 import software.amazon.smithy.codegen.core.ReservedWordsBuilder;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.TopologicalIndex;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.Prelude;
+import software.amazon.smithy.model.selector.PathFinder;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.CaseUtils;
@@ -44,6 +48,13 @@ public final class CodegenUtils {
         .build();
 
     private static final String SCHEMA_STATIC_NAME = "SCHEMA";
+    private static final EnumSet<ShapeType> SHAPES_WITH_INNER_SCHEMA = EnumSet.of(
+        ShapeType.OPERATION,
+        ShapeType.ENUM,
+        ShapeType.INT_ENUM,
+        ShapeType.UNION,
+        ShapeType.STRUCTURE
+    );
 
     private CodegenUtils() {
         // Utility class should not be instantiated
@@ -162,7 +173,7 @@ public final class CodegenUtils {
      */
     public static String toSchemaName(Shape shape) {
         // Shapes that generate their own classes have a static name
-        if (shape.isOperationShape() || shape.isStructureShape()) {
+        if (SHAPES_WITH_INNER_SCHEMA.contains(shape.getType())) {
             return SCHEMA_STATIC_NAME;
         }
         return CaseUtils.toSnakeCase(shape.toShapeId().getName()).toUpperCase(Locale.ENGLISH);
@@ -177,10 +188,14 @@ public final class CodegenUtils {
      * @param writer Writer to use for writing the Schema type.
      * @param shape shape to write Schema type for.
      */
-    public static String getSchemaType(JavaWriter writer, SymbolProvider provider, Shape shape) {
+    public static String getSchemaType(
+        JavaWriter writer,
+        SymbolProvider provider,
+        Shape shape
+    ) {
         if (Prelude.isPreludeShape(shape) && !shape.hasTrait(UnitTypeTrait.class)) {
             return writer.format("$T.$L", PreludeSchemas.class, shape.getType().name());
-        } else if (shape.isStructureShape() || shape.isUnionShape() || shape.isIntEnumShape() || shape.isEnumShape()) {
+        } else if (SHAPES_WITH_INNER_SCHEMA.contains(shape.getType())) {
             // Shapes that generate a class have their schemas as static properties on that class
             return writer.format("$T.SCHEMA", provider.toSymbol(shape));
         }
@@ -308,5 +323,28 @@ public final class CodegenUtils {
         return symbol.toBuilder()
             .name("Type")
             .build();
+    }
+
+
+    /**
+     * Determines if a shape is recursive and should use a schema builder when defined as a Root- or Member-Schema.
+     *
+     * <p>A builder is only required for shapes that appear more than once in the recursive closure (i.e. shapes
+     * that are actually recursive, not just in the closure of a recursive shape).
+     *
+     * @param model Smithy model to use for resolving recursive closure.
+     * @param shape shape to check.
+     * @return true if the shape should use a schema builder.
+     */
+    public static boolean recursiveShape(Model model, Shape shape) {
+        var closure = TopologicalIndex.of(model).getRecursiveClosure(shape);
+        if (closure.isEmpty()) {
+            return false;
+        }
+        return closure.stream()
+            .map(PathFinder.Path::getShapes)
+            .flatMap(List::stream)
+            .filter(shape::equals)
+            .count() > 1;
     }
 }

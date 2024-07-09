@@ -133,7 +133,7 @@ public abstract sealed class PresenceTracker {
         public Set<String> getMissingMembers() {
             Set<String> result = new TreeSet<>();
             for (var member : schema.members()) {
-                if (member.isRequiredByValidation() && (setBitfields & member.requiredByValidationBitmask) == 0L) {
+                if (member.isRequiredByValidation && (setBitfields & member.requiredByValidationBitmask) == 0L) {
                     result.add(member.memberName());
                 }
             }
@@ -155,7 +155,7 @@ public abstract sealed class PresenceTracker {
 
         @Override
         public void setMember(Schema memberSchema) {
-            if (memberSchema.isRequiredByValidation()) {
+            if (memberSchema.isRequiredByValidation) {
                 bitSet.set(memberSchema.memberIndex());
             }
         }
@@ -171,7 +171,7 @@ public abstract sealed class PresenceTracker {
                 return false;
             }
             for (var member : schema.members()) {
-                if (member.isRequiredByValidation() && !bitSet.get(member.memberIndex())) {
+                if (member.isRequiredByValidation && !bitSet.get(member.memberIndex())) {
                     return false;
                 }
             }
@@ -182,7 +182,7 @@ public abstract sealed class PresenceTracker {
         public Set<String> getMissingMembers() {
             Set<String> result = new TreeSet<>();
             for (var member : schema.members()) {
-                if (member.isRequiredByValidation() && !bitSet.get(member.memberIndex())) {
+                if (member.isRequiredByValidation && !bitSet.get(member.memberIndex())) {
                     result.add(member.memberName());
                 }
             }

@@ -6,6 +6,7 @@ resource RecursionTests {
     operations: [
         RecursiveLists
         RecursiveMaps
+        RecursiveStructs
         SelfReference
     ]
 }

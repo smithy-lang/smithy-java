@@ -13,7 +13,7 @@ import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
-public record TraitInitializerGenerator(JavaWriter writer, Shape shape, CodeGenerationContext context) implements
+record TraitInitializerGenerator(JavaWriter writer, Shape shape, CodeGenerationContext context) implements
     Runnable {
 
     @Override
@@ -22,20 +22,17 @@ public record TraitInitializerGenerator(JavaWriter writer, Shape shape, CodeGene
         if (traitsToAdd.isEmpty()) {
             return;
         }
-
-        writer.newLine();
+        writer.write(",");
         writer.indent();
-        writer.openBlock(".traits(", ")", () -> {
-            var iter = traitsToAdd.iterator();
-            while (iter.hasNext()) {
-                var trait = shape.getAllTraits().get(iter.next());
-                getInitializer(trait).accept(writer, trait);
-                if (iter.hasNext()) {
-                    writer.writeInline(",").newLine();
-                }
+        var iter = traitsToAdd.iterator();
+        while (iter.hasNext()) {
+            var trait = shape.getAllTraits().get(iter.next());
+            getInitializer(trait).accept(writer, trait);
+            if (iter.hasNext()) {
+                writer.write(",");
             }
-            writer.newLine();
-        });
+        }
+        writer.newLine();
         writer.dedent();
     }
 
@@ -48,5 +45,4 @@ public record TraitInitializerGenerator(JavaWriter writer, Shape shape, CodeGene
         }
         throw new IllegalArgumentException("Could not find initializer for " + trait);
     }
-
 }

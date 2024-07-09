@@ -8,23 +8,20 @@ package software.amazon.smithy.java.runtime.core.schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
 
 /**
  * Structure representing the {@code smithy.api#Unit} shape.
+ *
  * <p>This structure is used to represent union members or operation inputs or outputs
  * that have no meaningful value.
+ *
  * @see <a href="https://smithy.io/2.0/spec/model.html#unit-type">Smithy Unit type</a>
  */
 public final class Unit implements SerializableStruct {
-    public static final ShapeId ID = ShapeId.from("smithy.api#Unit");
 
-    public static final Schema SCHEMA = Schema.builder()
-        .type(ShapeType.STRUCTURE)
-        .id(ID)
-        .traits(new UnitTypeTrait())
-        .build();
+    public static final ShapeId ID = ShapeId.from("smithy.api#Unit");
+    public static final Schema SCHEMA = Schema.structureBuilder(ID, new UnitTypeTrait()).build();
 
     private static final Unit INSTANCE = new Unit();
 

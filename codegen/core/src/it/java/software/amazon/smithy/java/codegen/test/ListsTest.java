@@ -270,13 +270,12 @@ public class ListsTest {
         assertNull(nullDocument.getMember("listOfBoolean"));
     }
 
-    // TODO: Fix
     static Stream<String> nonUniqueSources() {
         return Stream.of(
             "{\"setOfBoolean\":[true, false, false]}",
             "{\"setOfNumber\":[1,2,2]}",
             "{\"setOfString\":[\"a\", \"a\", \"b\"]}",
-            // TODO: Re-add once fixed "{\"setOfBlobs\":[\"YmxvYg==\", \"YmxvYg==\"]}",
+            "{\"setOfBlobs\":[\"YmxvYg==\", \"YmxvYg==\"]}",
             "{\"setOfTimestamps\":[0, 20, 0]}",
             "{\"setOfUnion\":[{\"a\": \"str\"}, {\"b\": 1}, {\"a\": \"str\"}]}",
             "{\"setOfEnum\":[\"A\", \"B\", \"A\"]}",

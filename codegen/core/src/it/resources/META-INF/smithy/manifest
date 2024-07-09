@@ -15,6 +15,7 @@ naming/naming-collision.smithy
 recursion/mutual-recursion-list.smithy
 recursion/mutual-recursion-map.smithy
 recursion/recursion-tests.smithy
+recursion/mutual-recursion-struct.smithy
 recursion/self-referential-shape.smithy
 structures/big-decimal-members.smithy
 structures/big-integer-members.smithy

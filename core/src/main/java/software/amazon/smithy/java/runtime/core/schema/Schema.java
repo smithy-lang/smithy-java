@@ -6,11 +6,7 @@
 package software.amazon.smithy.java.runtime.core.schema;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -18,13 +14,7 @@ import java.util.Objects;
 import java.util.Set;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.DefaultTrait;
-import software.amazon.smithy.model.traits.LengthTrait;
-import software.amazon.smithy.model.traits.PatternTrait;
-import software.amazon.smithy.model.traits.RangeTrait;
-import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.model.traits.Trait;
-import software.amazon.smithy.utils.SmithyBuilder;
 
 /**
  * Describes a generated shape with important metadata from a Smithy model.
@@ -34,28 +24,47 @@ import software.amazon.smithy.utils.SmithyBuilder;
  *
  * <p>Note: when creating a structure schema, all required members must come before optional members.
  */
-public final class Schema {
+public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRootSchema,
+    DeferredMemberSchema {
 
-    private final ShapeId id;
     private final ShapeType type;
-    private final Map<Class<? extends Trait>, Trait> traits;
-    private final Map<String, Schema> members;
-    private final List<Schema> memberList;
-    private volatile int hashCode;
-
-    private final String memberName;
-    private final Schema memberTarget;
+    private final ShapeId id;
 
     /**
-     * The position of the member in a containing shape's {@link #members()} return value.
+     * Schema traits. This is package-private to allow MemberSchemaBuilder to eagerly merge member and target traits.
      */
-    private int memberIndex = -1;
+    final Map<Class<? extends Trait>, Trait> traits;
 
-    private final Set<String> stringEnumValues;
-    private final Set<Integer> intEnumValues;
+    private final String memberName;
 
-    // The following variables are used to speed up validation and prevent looking up constraints over and over.
+    /**
+     * The structure member count that are required by validation.
+     */
     final int requiredMemberCount;
+
+    /**
+     * The bitmask to use for this member to compute a required member bitfield. This value will match the
+     * memberIndex if the member is required and has no default value. It will be zero if
+     * isRequiredByValidation == false.
+     */
+    final long requiredByValidationBitmask;
+
+    /**
+     * Member index used for member deserialization and validation. This value is unstable across model updates.
+     */
+    private final int memberIndex;
+
+    /**
+     * The result of creating a bitfield of the memberIndex of every required member with no default value.
+     * This allows for an inexpensive comparison for required structure member validation.
+     */
+    final long requiredStructureMemberBitfield;
+
+    /**
+     * True if the shape is a member that has the required trait and a non-null default trait.
+     */
+    final boolean isRequiredByValidation;
+
     final long minLengthConstraint;
     final long maxLengthConstraint;
     final BigDecimal minRangeConstraint;
@@ -65,230 +74,209 @@ public final class Schema {
     final double minDoubleConstraint;
     final double maxDoubleConstraint;
     final ValidatorOfString stringValidation;
-    boolean isRequiredByValidation;
 
-    /**
-     * The bitmask to use for this member to compute a required member bitfield. This value will match the memberIndex
-     * if the member is required and has no default value. It will be zero if isRequiredByValidation == false.
-     */
-    long requiredByValidationBitmask;
+    Schema(
+        ShapeType type,
+        ShapeId id,
+        Map<Class<? extends Trait>, Trait> traits,
+        List<MemberSchemaBuilder> members,
+        Set<String> stringEnumValues
+    ) {
+        this.type = type;
+        this.id = id;
+        this.traits = traits;
+        this.memberName = null;
 
-    /**
-     * The result of creating a bitfield of the memberIndex of every required member with no default value.
-     * This allows for an inexpensive comparison for required structure member validation.
-     */
-    final long requiredStructureMemberBitfield;
+        // Structure shapes need to sort members so that required members come before optional members.
+        if (type == ShapeType.STRUCTURE) {
+            SchemaBuilder.sortMembers(members);
+        }
 
-    private Schema(Builder builder) {
-        this.id = Objects.requireNonNull(builder.id, "id is null");
-        this.type = Objects.requireNonNull(builder.type, "type is null");
-        this.traits = createTraitMap(builder.traits);
+        // Assign an appropriate memberIndex and validation bitfield to each member.
+        SchemaBuilder.assignMemberIndex(members);
 
-        // Member setting.s
-        this.memberName = builder.memberName;
-        this.memberTarget = builder.memberTarget;
-        this.members = MemberContainers.of(
-            this.type,
-            builder.members,
-            this.memberTarget != null ? this.memberTarget.members : null
+        // Root-level shapes can initialize these member-specific values to default zero values.
+        this.memberIndex = 0;
+        this.requiredByValidationBitmask = 0;
+        this.isRequiredByValidation = false;
+
+        // Even root-level shapes have computed validation information to allow for validating root strings directly.
+        var validationState = SchemaBuilder.ValidationState.of(type, traits, stringEnumValues);
+        this.minLengthConstraint = validationState.minLengthConstraint();
+        this.maxLengthConstraint = validationState.maxLengthConstraint();
+        this.minLongConstraint = validationState.minLongConstraint();
+        this.maxLongConstraint = validationState.maxLongConstraint();
+        this.minDoubleConstraint = validationState.minDoubleConstraint();
+        this.maxDoubleConstraint = validationState.maxDoubleConstraint();
+        this.minRangeConstraint = validationState.minRangeConstraint();
+        this.maxRangeConstraint = validationState.maxRangeConstraint();
+        this.stringValidation = validationState.stringValidation();
+
+        // Only use the slow version of required member validation if there are > 64 required members.
+        this.requiredMemberCount = SchemaBuilder.computeRequiredMemberCount(type, members);
+        this.requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(
+            type,
+            requiredMemberCount,
+            members,
+            m -> m.requiredByValidationBitmask
         );
-        this.memberList = builder.members == null ? Collections.emptyList() : List.copyOf(members.values());
-        // Validation requires the member is present if it's required and has no default value.
-        this.isRequiredByValidation = memberName != null
-            && !hasTrait(DefaultTrait.class)
-            && hasTrait(RequiredTrait.class);
-
-        this.stringEnumValues = builder.stringEnumValues;
-        this.intEnumValues = builder.intEnumValues;
-
-        // Precompute an allowed range, setting Long.MIN and Long.MAX when missing.
-        var lengthTrait = getTrait(LengthTrait.class);
-        if (lengthTrait == null) {
-            minLengthConstraint = Long.MIN_VALUE;
-            maxLengthConstraint = Long.MAX_VALUE;
-        } else {
-            minLengthConstraint = lengthTrait.getMin().orElse(Long.MIN_VALUE);
-            maxLengthConstraint = lengthTrait.getMax().orElse(Long.MAX_VALUE);
-        }
-
-        // If the shape is a string or enum, pre-compute necessary validation (or no-op if not a string/enum).
-        stringValidation = createStringValidator(this, lengthTrait);
-
-        // Range traits use BigDecimal, so use null when missing rather than any kind of default.
-        var rangeTrait = getTrait(RangeTrait.class);
-        if (rangeTrait != null) {
-            this.minRangeConstraint = rangeTrait.getMin().orElse(null);
-            this.maxRangeConstraint = rangeTrait.getMax().orElse(null);
-        } else {
-            this.minRangeConstraint = null;
-            this.maxRangeConstraint = null;
-        }
-
-        // Pre-compute allowable ranges so this doesn't have to be looked up during validation.
-        // BigInteger and BigDecimal just use the rangeConstraint BigDecimal directly.
-        switch (type) {
-            case BYTE -> {
-                minLongConstraint = minRangeConstraint == null ? Byte.MIN_VALUE : minRangeConstraint.byteValue();
-                maxLongConstraint = maxRangeConstraint == null ? Byte.MAX_VALUE : maxRangeConstraint.byteValue();
-                minDoubleConstraint = Double.MIN_VALUE;
-                maxDoubleConstraint = Double.MAX_VALUE;
-            }
-            case SHORT -> {
-                minLongConstraint = minRangeConstraint == null ? Short.MIN_VALUE : minRangeConstraint.shortValue();
-                maxLongConstraint = maxRangeConstraint == null ? Short.MAX_VALUE : maxRangeConstraint.shortValue();
-                minDoubleConstraint = Double.MIN_VALUE;
-                maxDoubleConstraint = Double.MAX_VALUE;
-            }
-            case INTEGER -> {
-                minLongConstraint = minRangeConstraint == null ? Integer.MIN_VALUE : minRangeConstraint.intValue();
-                maxLongConstraint = maxRangeConstraint == null ? Integer.MAX_VALUE : maxRangeConstraint.intValue();
-                minDoubleConstraint = Double.MIN_VALUE;
-                maxDoubleConstraint = Double.MAX_VALUE;
-            }
-            case LONG -> {
-                minLongConstraint = minRangeConstraint == null ? Long.MIN_VALUE : minRangeConstraint.longValue();
-                maxLongConstraint = maxRangeConstraint == null ? Long.MAX_VALUE : maxRangeConstraint.longValue();
-                minDoubleConstraint = Double.MIN_VALUE;
-                maxDoubleConstraint = Double.MAX_VALUE;
-            }
-            case FLOAT -> {
-                minLongConstraint = Long.MIN_VALUE;
-                maxLongConstraint = Long.MAX_VALUE;
-                minDoubleConstraint = minRangeConstraint == null ? Float.MIN_VALUE : minRangeConstraint.floatValue();
-                maxDoubleConstraint = maxRangeConstraint == null ? Float.MAX_VALUE : maxRangeConstraint.floatValue();
-            }
-            case DOUBLE -> {
-                minLongConstraint = Long.MIN_VALUE;
-                maxLongConstraint = Long.MAX_VALUE;
-                minDoubleConstraint = minRangeConstraint == null ? Double.MIN_VALUE : minRangeConstraint.doubleValue();
-                maxDoubleConstraint = maxRangeConstraint == null ? Double.MAX_VALUE : maxRangeConstraint.doubleValue();
-            }
-            default -> {
-                minLongConstraint = Long.MIN_VALUE;
-                maxLongConstraint = Long.MAX_VALUE;
-                minDoubleConstraint = Double.MIN_VALUE;
-                maxDoubleConstraint = Double.MAX_VALUE;
-            }
-        }
-
-        // Pre-compute where the shape contains any members marked as required.
-        // We only need to use the slow version of required member validation if there are > 64 required members.
-        this.requiredMemberCount = computeRequiredMemberCount(this.type, this.memberTarget, this.memberList);
-
-        if ((requiredMemberCount > 0) && (requiredMemberCount <= 64) && type == ShapeType.STRUCTURE) {
-            this.requiredStructureMemberBitfield = computeRequiredBitField(members());
-        } else {
-            this.requiredStructureMemberBitfield = 0;
-        }
     }
 
-    private static Map<Class<? extends Trait>, Trait> createTraitMap(Trait[] traits) {
-        if (traits == null) {
-            return Map.of();
-        } else if (traits.length == 1) {
-            return Map.of(traits[0].getClass(), traits[0]);
+    Schema(MemberSchemaBuilder builder) {
+        this.type = builder.type;
+        this.id = builder.id;
+        this.traits = builder.traits;
+        this.memberName = builder.id.getMember().orElseThrow();
+        this.memberIndex = builder.memberIndex;
+        this.requiredByValidationBitmask = builder.requiredByValidationBitmask;
+        this.requiredMemberCount = builder.requiredMemberCount;
+        this.isRequiredByValidation = builder.isRequiredByValidation;
+
+        this.minLengthConstraint = builder.validationState.minLengthConstraint();
+        this.maxLengthConstraint = builder.validationState.maxLengthConstraint();
+        this.minRangeConstraint = builder.validationState.minRangeConstraint();
+        this.maxRangeConstraint = builder.validationState.maxRangeConstraint();
+        this.stringValidation = builder.validationState.stringValidation();
+        this.minLongConstraint = builder.validationState.minLongConstraint();
+        this.maxLongConstraint = builder.validationState.maxLongConstraint();
+        this.minDoubleConstraint = builder.validationState.minDoubleConstraint();
+        this.maxDoubleConstraint = builder.validationState.maxDoubleConstraint();
+
+        // Compute the expected bitfield, and adjust how it's computed based on if the target is a builder or not.
+        if (builder.target != null) {
+            this.requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(
+                type,
+                requiredMemberCount,
+                builder.target.members(),
+                m -> m.requiredByValidationBitmask
+            );
         } else {
-            var result = new HashMap<Class<? extends Trait>, Trait>(traits.length);
-            for (Trait trait : traits) {
-                result.put(trait.getClass(), trait);
-            }
-            return Collections.unmodifiableMap(result);
-        }
-    }
-
-    private static ValidatorOfString createStringValidator(Schema schema, LengthTrait lengthTrait) {
-        List<ValidatorOfString> stringValidators = null;
-
-        if (schema.type == ShapeType.STRING || schema.type == ShapeType.ENUM) {
-            stringValidators = new ArrayList<>();
-
-            if (lengthTrait != null) {
-                stringValidators.add(
-                    new ValidatorOfString.LengthStringValidator(
-                        lengthTrait.getMin().orElse(Long.MIN_VALUE),
-                        lengthTrait.getMax().orElse(Long.MAX_VALUE)
-                    )
-                );
-            }
-
-            if (!schema.stringEnumValues.isEmpty()) {
-                stringValidators.add(ValidatorOfString.EnumStringValidator.INSTANCE);
-            }
-
-            var patternTrait = schema.getTrait(PatternTrait.class);
-            if (patternTrait != null) {
-                stringValidators.add(new ValidatorOfString.PatternStringValidator(patternTrait.getPattern()));
-            }
-        }
-
-        return ValidatorOfString.of(stringValidators);
-    }
-
-    private static int computeRequiredMemberCount(ShapeType type, Schema memberTarget, List<Schema> members) {
-        if (memberTarget != null) {
-            return memberTarget.requiredMemberCount;
-        } else if (type != ShapeType.STRUCTURE) {
-            return 0;
-        } else {
-            int result = 0;
-            for (var member : members) {
-                if (member.isRequiredByValidation) {
-                    result++;
-                }
-            }
-            return result;
-        }
-    }
-
-    private static long computeRequiredBitField(Collection<Schema> members) {
-        long setFields = 0L;
-        for (Schema member : members) {
-            setFields |= member.requiredByValidationBitmask;
-        }
-        return setFields;
-    }
-
-    private void setMemberIndex(int memberIndex) {
-        if (this.memberIndex != -1) {
-            throw new IllegalStateException(
-                "Member schema already has an assigned member index of "
-                    + this.memberIndex + ". Members cannot be reused across shapes. Member: " + this
+            this.requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(
+                type,
+                requiredMemberCount,
+                builder.targetBuilder.members,
+                m -> m.requiredByValidationBitmask
             );
         }
-
-        hashCode = 0; // reset the hashcode
-        this.memberIndex = memberIndex;
-        requiredByValidationBitmask = isRequiredByValidation ? 1L << memberIndex : 0L;
     }
 
-    /**
-     * Creates a builder for a non-member.
-     *
-     * @return Returns the created builder.
-     */
-    public static Builder builder() {
-        return new Builder();
+    public static Schema createBoolean(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.BOOLEAN, id, SchemaBuilder.createTraitMap(traits));
     }
 
-    /**
-     * Create a builder for a member.
-     *
-     * @param memberName   Name of the member.
-     * @param memberTarget Schema the member targets.
-     * @return Returns the member builder.
-     * @throws IllegalArgumentException if {@code memberIndex} is less than 1.
-     */
-    public static Builder memberBuilder(String memberName, Schema memberTarget) {
-        Builder builder = builder();
-        builder.memberTarget = Objects.requireNonNull(memberTarget, "memberTarget is null");
-        builder.memberName = Objects.requireNonNull(memberName, "memberName is null");
-        builder.type = memberTarget.type;
-        return builder;
+    public static Schema createByte(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.BYTE, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static Schema createShort(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.SHORT, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static Schema createInteger(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.INTEGER, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static Schema createIntEnum(ShapeId id, Set<Integer> values, Trait... traits) {
+        return new RootSchema(
+            ShapeType.INT_ENUM,
+            id,
+            SchemaBuilder.createTraitMap(traits),
+            Collections.emptyList(),
+            Collections.emptySet(),
+            values
+        );
+    }
+
+    public static Schema createLong(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.LONG, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static Schema createFloat(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.FLOAT, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static Schema createDouble(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.DOUBLE, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static Schema createBigInteger(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.BIG_INTEGER, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static Schema createBigDecimal(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.BIG_DECIMAL, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static Schema createString(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.STRING, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static Schema createEnum(ShapeId id, Set<String> values, Trait... traits) {
+        return new RootSchema(
+            ShapeType.ENUM,
+            id,
+            SchemaBuilder.createTraitMap(traits),
+            Collections.emptyList(),
+            values,
+            Collections.emptySet()
+        );
+    }
+
+    public static Schema createBlob(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.BLOB, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static Schema createDocument(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.DOCUMENT, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static Schema createTimestamp(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.TIMESTAMP, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static Schema createOperation(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.OPERATION, id, SchemaBuilder.createTraitMap(traits));
+    }
+
+    public static SchemaBuilder structureBuilder(ShapeId id, Trait... traits) {
+        return new SchemaBuilder(id, ShapeType.STRUCTURE, traits);
+    }
+
+    public static SchemaBuilder unionBuilder(ShapeId id, Trait... traits) {
+        return new SchemaBuilder(id, ShapeType.UNION, traits);
+    }
+
+    public static SchemaBuilder listBuilder(ShapeId id, Trait... traits) {
+        return new SchemaBuilder(id, ShapeType.LIST, traits);
+    }
+
+    public static SchemaBuilder mapBuilder(ShapeId id, Trait... traits) {
+        return new SchemaBuilder(id, ShapeType.MAP, traits);
     }
 
     @Override
-    public String toString() {
-        return "SdkSchema{id='" + id + '\'' + ", type=" + type + '}';
+    public final String toString() {
+        return "Schema{id='" + id + '\'' + ", type=" + type() + '}';
+    }
+
+    @Override
+    public final boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        } else if (obj == null || obj.getClass() != getClass()) {
+            return false;
+        }
+        var o = (Schema) obj;
+        return type == o.type
+            && id.equals(o.id)
+            && traits.equals(o.traits)
+            && members().equals(o.members())
+            && memberIndex == o.memberIndex;
+    }
+
+    @Override
+    public final int hashCode() {
+        return Objects.hash(type, id, traits, memberIndex);
     }
 
     /**
@@ -296,7 +284,7 @@ public final class Schema {
      *
      * @return Return the shape ID.
      */
-    public ShapeId id() {
+    public final ShapeId id() {
         return id;
     }
 
@@ -307,7 +295,7 @@ public final class Schema {
      *
      * @return Returns the schema shape type.
      */
-    public ShapeType type() {
+    public final ShapeType type() {
         return type;
     }
 
@@ -316,7 +304,7 @@ public final class Schema {
      *
      * @return Returns true if this is a member.
      */
-    public boolean isMember() {
+    public final boolean isMember() {
         return memberName != null;
     }
 
@@ -325,7 +313,7 @@ public final class Schema {
      *
      * @return Returns the member name or null if not a member.
      */
-    public String memberName() {
+    public final String memberName() {
         return memberName;
     }
 
@@ -338,17 +326,17 @@ public final class Schema {
      *
      * @return the member index of this schema starting from 1. 0 is used when a shape is not a member.
      */
-    public int memberIndex() {
+    public final int memberIndex() {
         return memberIndex;
     }
 
     /**
-     * Get the target of the member, or null if the schema is not a member.
+     * Get the target of the member, or null if this schema is not a member.
      *
      * @return Member target.
      */
     public Schema memberTarget() {
-        return memberTarget;
+        return null;
     }
 
     /**
@@ -359,12 +347,8 @@ public final class Schema {
      * @param <T> Trait type to get.
      */
     @SuppressWarnings("unchecked")
-    public <T extends Trait> T getTrait(Class<T> trait) {
-        var t = (T) traits.get(trait);
-        if (t == null && isMember()) {
-            return memberTarget.getTrait(trait);
-        }
-        return t;
+    public final <T extends Trait> T getTrait(Class<T> trait) {
+        return (T) traits.get(trait);
     }
 
     /**
@@ -374,8 +358,8 @@ public final class Schema {
      * @return true if the trait is found.
      * @param <T> Trait type.
      */
-    public <T extends Trait> boolean hasTrait(Class<T> trait) {
-        return traits.containsKey(trait) || (isMember() && memberTarget.hasTrait(trait));
+    public final <T extends Trait> boolean hasTrait(Class<T> trait) {
+        return traits.containsKey(trait);
     }
 
     /**
@@ -386,7 +370,7 @@ public final class Schema {
      * @param <T> Trait to get.
      * @throws NoSuchElementException if the value does not exist.
      */
-    public <T extends Trait> T expectTrait(Class<T> trait) {
+    public final <T extends Trait> T expectTrait(Class<T> trait) {
         var t = getTrait(trait);
         if (t == null) {
             throw new NoSuchElementException("Expected trait not found: " + trait.getName());
@@ -400,7 +384,7 @@ public final class Schema {
      * @return Returns the members.
      */
     public List<Schema> members() {
-        return memberList;
+        return Collections.emptyList();
     }
 
     /**
@@ -410,16 +394,7 @@ public final class Schema {
      * @return Returns the found member or null if not found.
      */
     public Schema member(String memberName) {
-        return members.get(memberName);
-    }
-
-    /**
-     * Returns true if this is a required member with no default value.
-     *
-     * @return true if required.
-     */
-    boolean isRequiredByValidation() {
-        return isRequiredByValidation;
+        return null;
     }
 
     /**
@@ -428,7 +403,7 @@ public final class Schema {
      * @return allowed string values (only relevant if not empty).
      */
     public Set<String> stringEnumValues() {
-        return stringEnumValues;
+        return Collections.emptySet();
     }
 
     /**
@@ -437,249 +412,6 @@ public final class Schema {
      * @return allowed integer values (only relevant if not empty).
      */
     public Set<Integer> intEnumValues() {
-        return intEnumValues;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        Schema sdkSchema = (Schema) o;
-        return memberIndex == sdkSchema.memberIndex && Objects.equals(id, sdkSchema.id)
-            && type == sdkSchema.type
-            && Objects.equals(traits, sdkSchema.traits)
-            && Objects.equals(members, sdkSchema.members)
-            && Objects.equals(stringEnumValues, sdkSchema.stringEnumValues)
-            && Objects.equals(intEnumValues, sdkSchema.intEnumValues)
-            && Objects.equals(memberName, sdkSchema.memberName)
-            && Objects.equals(memberTarget, sdkSchema.memberTarget);
-    }
-
-    @Override
-    public int hashCode() {
-        var code = hashCode;
-        if (code == 0) {
-            code = Objects.hash(
-                id,
-                type,
-                traits,
-                members,
-                stringEnumValues,
-                intEnumValues,
-                memberName,
-                memberTarget,
-                memberIndex
-            );
-            hashCode = code;
-        }
-        return code;
-    }
-
-    public static final class Builder implements SmithyBuilder<Schema> {
-
-        private ShapeId id;
-        private ShapeType type;
-        private Trait[] traits;
-        private List<Schema> members;
-        private String memberName;
-        private Schema memberTarget;
-
-        private Set<String> stringEnumValues = Collections.emptySet();
-        private Set<Integer> intEnumValues = Collections.emptySet();
-
-        @Override
-        public Schema build() {
-            return new Schema(this);
-        }
-
-        /**
-         * Set the shape ID.
-         *
-         * <p>For members, this is the container shape ID without the member name.
-         *
-         * @param id Shape ID to set.
-         * @return Returns the builder.
-         */
-        public Builder id(String id) {
-            return id(ShapeId.from(id));
-        }
-
-        /**
-         * Set the shape ID.
-         *
-         * <p>For members, this is the container shape ID without the member name.
-         *
-         * @param id Shape ID to set.
-         * @return Returns the builder.
-         */
-        public Builder id(ShapeId id) {
-            this.id = id;
-            if (memberName != null) {
-                this.id = id.withMember(memberName);
-            }
-            return this;
-        }
-
-        /**
-         * Set the shape type.
-         *
-         * @param type Type to set.
-         * @return Returns the builder.
-         * @throws IllegalArgumentException when member, service, or resource types are given.
-         */
-        public Builder type(ShapeType type) {
-            switch (type) {
-                case MEMBER, SERVICE, RESOURCE -> throw new IllegalStateException("Cannot set schema type to " + type);
-            }
-            this.type = type;
-            return this;
-        }
-
-        /**
-         * Set traits on the shape.
-         *
-         * @param traits Traits to set.
-         * @return Returns the builder.
-         */
-        public Builder traits(Trait... traits) {
-            this.traits = traits;
-            return this;
-        }
-
-        /**
-         * Set members on the shape.
-         *
-         * @param members Members to set.
-         * @return Returns the builder.
-         * @throws IllegalStateException if the schema is for a member.
-         */
-        public Builder members(Schema... members) {
-            List<Schema> result = new ArrayList<>(members.length);
-            Collections.addAll(result, members);
-            return membersWithOwnedList(result);
-        }
-
-        /**
-         * Set members on the shape using builders.
-         *
-         * @param members Members to set, and the ID of the current builder is used.
-         * @return Returns the builder.
-         * @throws IllegalStateException if the schema is for a member.
-         */
-        public Builder members(Builder... members) {
-            List<Schema> built = new ArrayList<>(members.length);
-            for (Builder member : members) {
-                built.add(member.id(id).build());
-            }
-            return membersWithOwnedList(built);
-        }
-
-        /**
-         * Set members on the shape.
-         *
-         * @param members Members to set.
-         * @return Returns the builder.
-         * @throws IllegalStateException if the schema is for a member, or if the member is owned by another shape.
-         */
-        public Builder members(List<Schema> members) {
-            return membersWithOwnedList(new ArrayList<>(members));
-        }
-
-        // Given a list that the builder owns and is free to mutate and keep, sort the members and store them.
-        private Builder membersWithOwnedList(List<Schema> members) {
-            if (memberTarget != null) {
-                throw new IllegalStateException("Cannot add members to a member");
-            }
-
-            // Sort members to ensure that required members with no default come before other members.
-            members.sort((a, b) -> {
-                if (a.isRequiredByValidation && !b.isRequiredByValidation) {
-                    return -1;
-                } else if (a.isRequiredByValidation) {
-                    return 0;
-                } else {
-                    return 1;
-                }
-            });
-
-            // Assign the member index for each, checking to ensure members aren't illegally shared across shapes.
-            int index = 0;
-            for (var member : members) {
-                member.setMemberIndex(index++);
-            }
-
-            this.members = members;
-            return this;
-        }
-
-        /**
-         * Set the allowed string enum values of an ENUM shape.
-         *
-         * <p>Enum values are stored on the schema in this way rather than as separate members to unify the enum trait
-         * and enum shapes, to simplify the Smithy data model and represent enums as strings, and to reduce the amount
-         * of complexity involved in validating string values against enums (for example, no need to iterate over enum
-         * members to determine if a member has a matching value).
-         *
-         * @param stringEnumValues Allowed string values.
-         * @return the builder.
-         * @throws ApiException if type has not been set or is not equal to ENUM or STRING.
-         */
-        public Builder stringEnumValues(Set<String> stringEnumValues) {
-            if (type != ShapeType.STRING && type != ShapeType.ENUM) {
-                throw new ApiException("Can only set enum values for STRING or ENUM types");
-            }
-            this.stringEnumValues = Objects.requireNonNull(stringEnumValues);
-            return this;
-        }
-
-        /**
-         * Set the allowed string enum values of a STRING or ENUM shape.
-         *
-         * @param stringEnumValues Allowed string values.
-         * @return the builder.
-         * @throws ApiException if type has not been set or is not equal to ENUM or STRING.
-         */
-        public Builder stringEnumValues(String... stringEnumValues) {
-            Set<String> values = new LinkedHashSet<>(stringEnumValues.length);
-            Collections.addAll(values, stringEnumValues);
-            return stringEnumValues(values);
-        }
-
-        /**
-         * Set the allowed intEnum values of an INT_ENUM shape.
-         *
-         * <p>IntEnum values are stored on the schema in this way rather than as separate members to simplify the
-         * Smithy data model and represent intEnums as integers, and to reduce the amount of complexity involved in
-         * validating number values against int enum values (for example, no need to iterate over members to determine
-         * if a member has a matching value).
-         *
-         * @param intEnumValues Allowed int values.
-         * @return the builder.
-         * @throws ApiException if type has not been set or is not equal to INT_ENUM.
-         */
-        public Builder intEnumValues(Set<Integer> intEnumValues) {
-            if (type != ShapeType.INT_ENUM) {
-                throw new ApiException("Can only set intEnum values for INT_ENUM types");
-            }
-            this.intEnumValues = Objects.requireNonNull(intEnumValues);
-            return this;
-        }
-
-        /**
-         * Set the allowed intEnum values of an INT_ENUM shape.
-         *
-         * @param intEnumValues Allowed int values.
-         * @return the builder.
-         * @throws ApiException if type has not been set or is not equal to INT_ENUM.
-         */
-        public Builder intEnumValues(Integer... intEnumValues) {
-            Set<Integer> values = new LinkedHashSet<>(intEnumValues.length);
-            Collections.addAll(values, intEnumValues);
-            return intEnumValues(values);
-        }
+        return Collections.emptySet();
     }
 }

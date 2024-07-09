@@ -49,6 +49,7 @@ public class OperationGenerator
                 writer.pushState(new ClassSection(shape));
                 var template = """
                     public final class ${shape:T} implements ${operationType:C} {
+                        ${id:C|}
 
                         ${schema:C|}
 
@@ -109,9 +110,9 @@ public class OperationGenerator
                 writer.putContext("shape", symbol);
                 writer.putContext("inputType", input);
                 writer.putContext("outputType", output);
+                writer.putContext("id", new IdStringGenerator(writer, shape));
                 writer.putContext("sdkSchema", Schema.class);
                 writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
-
 
                 writer.putContext(
                     "operationType",
@@ -203,15 +204,15 @@ public class OperationGenerator
 
             var inputInfo = index.getInputInfo(shape);
             var outputInfo = index.getOutputInfo(shape);
-            inputInfo.ifPresent(info -> {
-                writer.writeInline(
+            inputInfo.ifPresent(
+                info -> writer.writeInline(
                     "$1T<$2T, $3T, $4T>",
                     InputEventStreamingApiOperation.class,
                     input,
                     output,
                     symbolProvider.toSymbol(info.getEventStreamTarget())
-                );
-            });
+                )
+            );
             outputInfo.ifPresent(info -> {
                 if (inputInfo.isPresent()) {
                     writer.writeInline(", ");
