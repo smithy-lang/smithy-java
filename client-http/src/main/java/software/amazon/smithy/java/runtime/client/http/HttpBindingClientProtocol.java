@@ -82,7 +82,7 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
 
         LOGGER.log(System.Logger.Level.TRACE, () -> "Deserializing successful response with " + getClass().getName());
 
-        var outputBuilder = call.createOutputBuilder(call.context(), call.operation().outputSchema().id().toString());
+        var outputBuilder = call.operation().outputBuilder();
         ResponseDeserializer deser = HttpBinding.responseDeserializer()
             .payloadCodec(codec)
             .outputShapeBuilder(outputBuilder)

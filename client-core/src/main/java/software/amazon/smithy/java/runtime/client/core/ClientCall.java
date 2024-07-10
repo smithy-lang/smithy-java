@@ -121,18 +121,6 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
     }
 
     /**
-     * Create a builder for the output of the operation.
-     *
-     * @param context Context to pass to the creator.
-     * @param shapeId Nullable ID of the error shape to create, if known.
-     * @return Returns the created output builder.
-     */
-    public ShapeBuilder<O> createOutputBuilder(Context context, String shapeId) {
-        // TODO: Allow customizing this if needed.
-        return operation().outputBuilder();
-    }
-
-    /**
      * Attempts to create a builder for a modeled error.
      *
      * <p>If this method returns null, a protocol must create an appropriate error based on protocol hints.
