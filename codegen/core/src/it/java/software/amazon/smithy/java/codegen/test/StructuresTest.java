@@ -82,14 +82,17 @@ public class StructuresTest {
     @Test
     void blobSerialization() {
         var datastream = DataStream.ofBytes("data streeeeeeeeeeam".getBytes());
-        var builder = BlobMembersInput.builder().requiredBlob(wrap("data".getBytes()));
-        builder.setDataStream(datastream);
+        var builder = BlobMembersInput
+            .builder()
+            .requiredBlob(wrap("data".getBytes()))
+            .streamingBlob(datastream);
+
         var input = builder.build();
         var document = Document.createTyped(builder.build());
         var outputBuilder = BlobMembersInput.builder();
         document.deserializeInto(outputBuilder);
-        outputBuilder.setDataStream(input.streamingBlob());
         var output = builder.build();
+
         assertEquals(input.hashCode(), output.hashCode());
         assertEquals(input, output);
     }

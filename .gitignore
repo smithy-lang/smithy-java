@@ -10,4 +10,9 @@ build
 #Ignore mac files
 .DS_Store
 
+# Intellij stuff
+.classpath
+.project
+.settings
+
 smithy-java-core/out

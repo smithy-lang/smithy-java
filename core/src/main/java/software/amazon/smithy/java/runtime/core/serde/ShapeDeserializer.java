@@ -9,7 +9,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
@@ -164,6 +166,26 @@ public interface ShapeDeserializer extends AutoCloseable {
      */
     default <T> T readNull() {
         return null;
+    }
+
+    /**
+     * Read a data stream from the deserializer.
+     *
+     * @param schema Schema of the data stream to read.
+     * @return the data stream.
+     */
+    default DataStream readDataStream(Schema schema) {
+        throw new UnsupportedOperationException("Cannot read data stream from this deserializer");
+    }
+
+    /**
+     * Read an event stream from the deserializer.
+     *
+     * @param schema Schema of the event stream to read.
+     * @return the event stream.
+     */
+    default Flow.Publisher<? extends SerializableStruct> readEventStream(Schema schema) {
+        throw new UnsupportedOperationException("Cannot read event stream from this deserializer");
     }
 
     /**

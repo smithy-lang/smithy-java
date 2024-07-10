@@ -12,8 +12,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
-import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
@@ -41,22 +42,18 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private final HttpHeaders headers;
     private final Map<String, List<String>> queryStringParameters;
     private final int responseStatus;
-    private final String requestPath;
     private final Map<String, String> requestPathLabels;
     private final BindingMatcher bindingMatcher;
     private final DataStream body;
-    private final ShapeBuilder<?> shapeBuilder;
     private final EventDecoderFactory<?> eventDecoderFactory;
     private CompletableFuture<Void> bodyDeserializationCf;
 
     private HttpBindingDeserializer(Builder builder) {
-        this.shapeBuilder = Objects.requireNonNull(builder.shapeBuilder, "shapeBuilder not set");
         this.payloadCodec = Objects.requireNonNull(builder.payloadCodec, "payloadSerializer not set");
         this.headers = Objects.requireNonNull(builder.headers, "headers not set");
         this.bindingMatcher = builder.isRequest ? BindingMatcher.requestMatcher() : BindingMatcher.responseMatcher();
         this.eventDecoderFactory = builder.eventDecoderFactory;
         this.body = builder.body == null ? DataStream.ofEmpty() : builder.body;
-        this.requestPath = builder.requestPath;
         this.queryStringParameters = QueryStringParser.parse(builder.requestRawQueryString);
         this.responseStatus = builder.responseStatus;
         this.requestPathLabels = builder.requestPathLabels;
@@ -124,10 +121,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 case PAYLOAD -> {
                     if (member.type() == ShapeType.STRUCTURE) {
                         // Read the payload into a byte buffer to deserialize a shape in the body.
-                        LOGGER.log(
-                            System.Logger.Level.TRACE,
-                            () -> "Reading " + schema + " body to bytes for structured payload"
-                        );
                         bodyDeserializationCf = bodyAsBytes().thenAccept(bytes -> {
                             LOGGER.log(
                                 System.Logger.Level.TRACE,
@@ -136,16 +129,23 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                             structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bytes));
                         }).toCompletableFuture();
                     } else if (isEventStream(member)) {
-                        shapeBuilder.setEventStream(
-                            EventStreamFrameDecodingProcessor.create(body, eventDecoderFactory)
-                        );
-                    } else if (member.type() == ShapeType.BLOB
-                        && member.hasTrait(StreamingTrait.class)) {
-                            // Set the payload on shape builder directly. This will fail for misconfigured shapes.
-                            shapeBuilder.setDataStream(body);
-                        } else if (body != null && !(body.hasKnownLength() && body.contentLength() == 0)) {
-                            structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
-                        }
+                        structMemberConsumer.accept(state, member, new SpecificShapeDeserializer() {
+                            @Override
+                            public Flow.Publisher<? extends SerializableStruct> readEventStream(Schema schema) {
+                                return EventStreamFrameDecodingProcessor.create(body, eventDecoderFactory);
+                            }
+                        });
+                    } else if (member.hasTrait(StreamingTrait.class)) {
+                        // Set the payload on shape builder directly. This will fail for misconfigured shapes.
+                        structMemberConsumer.accept(state, member, new SpecificShapeDeserializer() {
+                            @Override
+                            public DataStream readDataStream(Schema schema) {
+                                return body;
+                            }
+                        });
+                    } else if (body != null && body.contentLength() > 0) {
+                        structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
+                    }
                 }
                 default -> throw new UnsupportedOperationException(bindingLoc + "not supported yet");
             }
@@ -217,9 +217,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         private HttpHeaders headers;
         private String requestRawQueryString;
         private DataStream body;
-        private String requestPath;
         private int responseStatus;
-        private ShapeBuilder<?> shapeBuilder;
         private EventDecoderFactory<?> eventDecoderFactory;
 
         private Builder() {
@@ -295,20 +293,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         }
 
         /**
-         * Set the raw path of a request as received on the wire.
-         *
-         * @param requestPath Path of the request.
-         * @return Returns the path.
-         */
-        Builder requestPath(String requestPath) {
-            if (!isRequest) {
-                throw new IllegalStateException("Cannot set path for a response");
-            }
-            this.requestPath = requestPath;
-            return this;
-        }
-
-        /**
          * Set the HTTP status code of a response.
          *
          * @param responseStatus Status to set.
@@ -330,17 +314,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          */
         Builder request(boolean isRequest) {
             this.isRequest = isRequest;
-            return this;
-        }
-
-        /**
-         * Set the shape builder that is being created.
-         *
-         * @param shapeBuilder Shape builder to create a shape.
-         * @return the builder.
-         */
-        Builder shapeBuilder(ShapeBuilder<?> shapeBuilder) {
-            this.shapeBuilder = shapeBuilder;
             return this;
         }
 

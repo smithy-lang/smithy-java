@@ -32,6 +32,7 @@ import software.amazon.smithy.model.shapes.StringShape;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
+import software.amazon.smithy.model.traits.StreamingTrait;
 
 final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> implements Runnable {
 
@@ -72,7 +73,11 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
 
     @Override
     public Void blobShape(BlobShape blobShape) {
-        writer.write("${deserializer:L}.readBlob(${schemaName:L})");
+        if (blobShape.hasTrait(StreamingTrait.class)) {
+            writer.write("${deserializer:L}.readDataStream(${schemaName:L})");
+        } else {
+            writer.write("${deserializer:L}.readBlob(${schemaName:L})");
+        }
         return null;
     }
 
@@ -162,7 +167,11 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
 
     @Override
     public Void stringShape(StringShape stringShape) {
-        writer.write("${deserializer:L}.readString(${schemaName:L})");
+        if (stringShape.hasTrait(StreamingTrait.class)) {
+            writer.write("${deserializer:L}.readDataStream(${schemaName:L})");
+        } else {
+            writer.write("${deserializer:L}.readString(${schemaName:L})");
+        }
         return null;
     }
 
@@ -180,7 +189,11 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
 
     @Override
     public Void unionShape(UnionShape unionShape) {
-        delegateDeser();
+        if (unionShape.hasTrait(StreamingTrait.class)) {
+            writer.write("${deserializer:L}.readEventStream(${schemaName:L})");
+        } else {
+            delegateDeser();
+        }
         return null;
     }
 

@@ -5,36 +5,20 @@
 
 package software.amazon.smithy.java.runtime.core.schema;
 
-import java.util.concurrent.Flow;
-import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
-import software.amazon.smithy.utils.SmithyBuilder;
 
 /**
  * Builds deserializable shapes.
  *
  * @param <T> Shape to build.
  */
-public interface ShapeBuilder<T extends SerializableShape> extends SmithyBuilder<T> {
+public interface ShapeBuilder<T extends SerializableShape> {
     /**
-     * Set a stream of data on the shape, if allowed.
+     * Build the shape.
      *
-     * @param stream Stream to set.
-     * @throws UnsupportedOperationException if the shape has no stream.
+     * @return the built shape.
      */
-    default void setDataStream(DataStream stream) {
-        throw new UnsupportedOperationException("This shape does not have a stream: " + getClass().getName());
-    }
-
-    /**
-     * Set an event stream on the shape, if allowed.
-     *
-     * @param eventStream Event stream to set.
-     * @throws UnsupportedOperationException if the shape has not event stream.
-     */
-    default void setEventStream(Flow.Publisher<? extends SerializableStruct> eventStream) {
-        throw new UnsupportedOperationException("This shape does not have an event stream: " + getClass().getName());
-    }
+    T build();
 
     /**
      * Deserializes data from the given decoder into the state of the builder.

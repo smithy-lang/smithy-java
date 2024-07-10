@@ -34,6 +34,7 @@ import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.ErrorTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
 
 final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void> implements
@@ -72,11 +73,11 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void blobShape(BlobShape blobShape) {
-        // Streaming Blobs do not generate a member serializer
         if (CodegenUtils.isStreamingBlob(blobShape)) {
-            return null;
+            writer.write("serializer.writeDataStream(${schema:L}, ${state:L})");
+        } else {
+            writer.write("serializer.writeBlob(${schema:L}, ${state:L})");
         }
-        writer.write("serializer.writeBlob(${schema:L}, ${state:L})");
         return null;
     }
 
@@ -166,7 +167,11 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void stringShape(StringShape stringShape) {
-        writer.write("serializer.writeString(${schema:L}, ${state:L})");
+        if (stringShape.hasTrait(StreamingTrait.class)) {
+            writer.write("serializer.writeDataStream(${schema:L}, ${state:L})");
+        } else {
+            writer.write("serializer.writeString(${schema:L}, ${state:L})");
+        }
         return null;
     }
 
@@ -188,7 +193,11 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void unionShape(UnionShape unionShape) {
-        writer.write("serializer.writeStruct(${schema:L}, ${state:L})");
+        if (unionShape.hasTrait(StreamingTrait.class)) {
+            writer.write("serializer.writeEventStream(${schema:L}, ${state:L})");
+        } else {
+            writer.write("serializer.writeStruct(${schema:L}, ${state:L})");
+        }
         return null;
     }
 

@@ -26,11 +26,11 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
      * @return Returns an exception to throw.
      */
     protected RuntimeException throwForInvalidState(String message, Schema schema) {
-        throw new SerializationException(message);
+        throw new IllegalStateException(message);
     }
 
     private RuntimeException throwForInvalidState(Schema schema) {
-        return throwForInvalidState("Unexpected schema type: " + schema, schema);
+        return new IllegalStateException("Unexpected schema type: " + schema);
     }
 
     @Override

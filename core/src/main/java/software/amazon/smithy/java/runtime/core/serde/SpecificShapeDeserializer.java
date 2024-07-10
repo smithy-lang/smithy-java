@@ -9,8 +9,10 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
@@ -21,7 +23,9 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
      * @param schema Unexpected encountered schema.
      * @return Returns an exception to throw.
      */
-    protected abstract RuntimeException throwForInvalidState(Schema schema);
+    protected RuntimeException throwForInvalidState(Schema schema) {
+        return new IllegalStateException("Unexpected schema type: " + schema);
+    }
 
     @Override
     public ByteBuffer readBlob(Schema schema) {
@@ -107,5 +111,15 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
     @Override
     public boolean isNull() {
         throw new UnsupportedOperationException("cannot look ahead for null values");
+    }
+
+    @Override
+    public Flow.Publisher<? extends SerializableStruct> readEventStream(Schema schema) {
+        throw throwForInvalidState(schema);
+    }
+
+    @Override
+    public DataStream readDataStream(Schema schema) {
+        throw throwForInvalidState(schema);
     }
 }

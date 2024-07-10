@@ -690,17 +690,6 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 writer.putContext("check", CodegenUtils.requiresSetterNullCheck(symbolProvider, member));
                 writer.putContext("schemaName", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
 
-                // If streaming blob then a setter must be added to allow
-                // operation to set on builder.
-                if (CodegenUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {
-                    writer.putContext("dataStream", DataStream.class);
-                    writer.write("""
-                        @Override
-                        public void setDataStream(${dataStream:T} stream) {
-                            ${memberName:L}(stream);
-                        }
-                        """);
-                }
                 writer.write(
                     """
                         public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {

@@ -51,11 +51,6 @@ record StructureSerializerGenerator(
         boolean isError = shape.hasTrait(ErrorTrait.class);
 
         for (var member : shape.members()) {
-            var target = model.expectShape(member.getTarget());
-            // Streaming blobs are not handled by deserialize method
-            if (CodegenUtils.isStreamingBlob(target)) {
-                continue;
-            }
             var memberName = symbolProvider.toMemberName(member);
             // if the shape is an error we need to use the `getMessage()` method for message field.
             var state = isError && memberName.equals("message") ? "getMessage()" : memberName;
