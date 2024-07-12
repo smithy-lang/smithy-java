@@ -6,6 +6,7 @@ plugins {
 dependencies {
     api(project(":client-aws-rest-json1"))
     api(libs.smithy.aws.traits)
+    compileOnly("com.github.spotbugs:spotbugs-annotations:4.8.6")
 }
 
 jmh {
