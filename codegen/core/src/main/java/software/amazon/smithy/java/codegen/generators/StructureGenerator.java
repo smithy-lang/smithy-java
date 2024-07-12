@@ -122,7 +122,10 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                     directive.context()
                 )
             );
-            writer.putContext("properties", new PropertyGenerator(writer, shape, directive.symbolProvider()));
+            writer.putContext(
+                "properties",
+                new PropertyGenerator(writer, shape, directive.symbolProvider(), directive.model())
+            );
             writer.putContext(
                 "constructor",
                 new ConstructorGenerator(writer, shape, directive.symbolProvider(), directive.model())
@@ -131,7 +134,10 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 "getters",
                 new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model())
             );
-            writer.putContext("equals", new EqualsGenerator(writer, shape, directive.symbolProvider()));
+            writer.putContext(
+                "equals",
+                new EqualsGenerator(writer, shape, directive.symbolProvider(), directive.model())
+            );
             writer.putContext("hashCode", new HashCodeGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext("toString", new ToStringGenerator(writer));
             writer.putContext(
@@ -160,7 +166,8 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         });
     }
 
-    private record PropertyGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements
+    private record PropertyGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model)
+        implements
         Runnable {
         @Override
         public void run() {
@@ -171,7 +178,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                     continue;
                 }
                 writer.pushState();
-                writer.putContext("isNullable", CodegenUtils.isNullableMember(member));
+                writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
 
 
                 writer.write(
@@ -210,7 +217,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                         }
                         writer.pushState();
                         writer.putContext("memberName", memberName);
-                        writer.putContext("nullable", CodegenUtils.isNullableMember(member));
+                        writer.putContext("nullable", CodegenUtils.isNullableMember(model, member));
                         var target = model.expectShape(member.getTarget());
                         // Wrap maps and lists with immutable collection
                         if (target.isMapShape() || target.isListShape()) {
@@ -266,7 +273,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 writer.pushState();
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
                 writer.putContext("member", symbolProvider.toSymbol(member));
-                writer.putContext("isNullable", CodegenUtils.isNullableMember(member));
+                writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
                 this.member = member;
                 member.accept(this);
                 writer.popState();
@@ -334,7 +341,8 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         }
     }
 
-    private record EqualsGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements Runnable {
+    private record EqualsGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model)
+        implements Runnable {
         @Override
         public void run() {
             if (shape.hasTrait(ErrorTrait.class)) {
@@ -383,9 +391,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 writer.pushState();
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
                 // Use `==` instead of `equals` for unboxed primitives
-                if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE) && !CodegenUtils.isNullableMember(
-                    member
-                )) {
+                if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE)
+                    && !CodegenUtils.isNullableMember(model, member)
+                ) {
                     writer.writeInline("this.${memberName:L} == that.${memberName:L}");
                 } else {
                     Class<?> comparator = CodegenUtils.isJavaArray(memberSymbol) ? Arrays.class : Objects.class;
@@ -659,7 +667,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             for (var member : shape.members()) {
                 var memberName = symbolProvider.toMemberName(member);
                 writer.pushState();
-                writer.putContext("nullable", CodegenUtils.isNullableMember(member));
+                writer.putContext("nullable", CodegenUtils.isNullableMember(model, member));
                 writer.putContext("default", member.hasNonNullDefault());
                 writer.putContext(
                     "static",

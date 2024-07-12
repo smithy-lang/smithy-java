@@ -19,12 +19,14 @@ import software.amazon.smithy.codegen.core.TopologicalIndex;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.knowledge.NullableIndex;
 import software.amazon.smithy.model.loader.Prelude;
 import software.amazon.smithy.model.selector.PathFinder;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.ClientOptionalTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.CaseUtils;
@@ -133,14 +135,16 @@ public final class CodegenUtils {
     }
 
     /**
-     * Determines if a given member represents a nullable type
+     * Determines if a given member represents a nullable type.
      *
-     * @param shape member to check for nullability
+     * @param model Model to use for resolving Nullable index.
+     * @param member member to check for nullability.
      *
      * @return if the shape is a nullable type
      */
-    public static boolean isNullableMember(MemberShape shape) {
-        return !shape.isRequired() && !shape.hasNonNullDefault();
+    public static boolean isNullableMember(Model model, MemberShape member) {
+        return member.hasTrait(ClientOptionalTrait.class)
+            || NullableIndex.of(model).isMemberNullable(member, NullableIndex.CheckMode.SERVER);
     }
 
     /**
