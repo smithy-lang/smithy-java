@@ -5,10 +5,7 @@
 
 package software.amazon.smithy.java.runtime.client.endpoint.api;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * Encapsulates endpoint resolver parameters.
@@ -16,11 +13,11 @@ import java.util.Set;
 public final class EndpointResolverParams {
 
     private final String operationName;
-    private final Map<EndpointProperty<?>, Object> immutableMap;
+    private final EndpointProperties properties;
 
-    private EndpointResolverParams(Map<EndpointProperty<?>, Object> map, String operationName) {
-        this.immutableMap = new HashMap<>(map);
-        this.operationName = Objects.requireNonNull(operationName, "operationName is null");
+    private EndpointResolverParams(Builder builder) {
+        this.operationName = Objects.requireNonNull(builder.operationName, "operationName is null");
+        this.properties = Objects.requireNonNullElseGet(builder.properties, () -> EndpointProperties.builder().build());
     }
 
     /**
@@ -33,32 +30,21 @@ public final class EndpointResolverParams {
     }
 
     /**
-     * Get the value of an EndpointProperty.
-     *
-     * @param property Endpoint property to get.
-     * @return the value or null if not found.
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T property(EndpointProperty<T> property) {
-        return (T) immutableMap.get(property);
-    }
-
-    /**
-     * Get all the properties available when resolving the endpoint.
-     *
-     * @return the properties.
-     */
-    public Set<EndpointProperty<?>> properties() {
-        return immutableMap.keySet();
-    }
-
-    /**
      * Get the name of the operation to resolve the endpoint for.
      *
-     * @return name of the operation.
+     * @return the operation name.
      */
     public String operationName() {
         return operationName;
+    }
+
+    /**
+     * Properties available when resolving the endpoint.
+     *
+     * @return properties.
+     */
+    public EndpointProperties properties() {
+        return properties;
     }
 
     @Override
@@ -71,63 +57,52 @@ public final class EndpointResolverParams {
         }
         EndpointResolverParams params = (EndpointResolverParams) o;
         return Objects.equals(operationName, params.operationName)
-            && Objects.equals(immutableMap, params.immutableMap);
+            && Objects.equals(properties, params.properties);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(operationName, immutableMap);
+        return Objects.hash(operationName, properties);
     }
 
     /**
-     * Create a builder from this {@link EndpointResolverParams}.
-     *
-     * @return the builder.
-     */
-    public Builder toBuilder() {
-        Builder builder = builder();
-        builder.map.putAll(immutableMap);
-        builder.operationName(operationName);
-        return builder;
-    }
-
-    /**
-     * Builder used to create and {@link EndpointResolverParams}.
+     * Builder used to create {@link EndpointResolverParams}.
      */
     public static final class Builder {
 
         private String operationName;
-        private final Map<EndpointProperty<?>, Object> map = new HashMap<>();
+        private EndpointProperties properties;
+
+        private Builder() {
+        }
 
         /**
          * Build the params.
          * @return the built params.
          */
         public EndpointResolverParams build() {
-            return new EndpointResolverParams(map, operationName);
+            return new EndpointResolverParams(this);
         }
 
         /**
-         * Put a typed property on the params.
-         *
-         * @param property Property to set.
-         * @param value    Value to associate with the property.
-         * @return the builder.
-         * @param <T> Value type.
-         */
-        public <T> Builder putProperty(EndpointProperty<T> property, T value) {
-            map.put(property, value);
-            return this;
-        }
-
-        /**
-         * Set the name of the operation to resolve.
+         * Set the name of the operation.
          *
          * @param operationName Name of the operation.
          * @return the builder.
          */
         public Builder operationName(String operationName) {
             this.operationName = operationName;
+            return this;
+        }
+
+        /**
+         * Set the endpoint properties.
+         *
+         * @param properties EndpointProperties to set.
+         * @return the builder.
+         */
+        public Builder properties(EndpointProperties properties) {
+            this.properties = properties;
             return this;
         }
     }

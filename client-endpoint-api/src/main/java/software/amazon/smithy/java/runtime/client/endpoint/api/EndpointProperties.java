@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.auth.api;
+package software.amazon.smithy.java.runtime.client.endpoint.api;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -11,28 +11,28 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * An immutable collection of auth-related properties used for signing, identity resolution, etc.
+ * An immutable collection of endpoint properties used for endpoint resolution.
  */
-public final class AuthProperties {
+public final class EndpointProperties {
 
-    private static final AuthProperties EMPTY = AuthProperties.builder().build();
-    private final Map<AuthProperty<?>, ?> properties;
+    private static final EndpointProperties EMPTY = EndpointProperties.builder().build();
+    private final Map<EndpointProperty<?>, ?> properties;
 
-    private AuthProperties(Map<AuthProperty<?>, ?> properties) {
+    private EndpointProperties(Map<EndpointProperty<?>, ?> properties) {
         this.properties = properties;
     }
 
     /**
-     * Get an empty AuthProperties object.
+     * Get an empty EndpointProperties object.
      *
-     * @return the empty AuthProperties.
+     * @return the empty EndpointProperties.
      */
-    public static AuthProperties empty() {
+    public static EndpointProperties empty() {
         return EMPTY;
     }
 
     /**
-     * Creates a builder used to build {@link AuthProperties}.
+     * Creates a builder used to build {@link EndpointProperties}.
      *
      * @return the builder.
      */
@@ -47,16 +47,16 @@ public final class AuthProperties {
      * @return the value or null if not found.
      */
     @SuppressWarnings("unchecked")
-    public <T> T get(AuthProperty<T> property) {
+    public <T> T get(EndpointProperty<T> property) {
         return (T) properties.get(property);
     }
 
     /**
-     * Get the properties that are set on the AuthProperties object.
+     * Get the properties that are set on the EndpointProperties object.
      *
      * @return the properties.
      */
-    public Set<AuthProperty<?>> properties() {
+    public Set<EndpointProperty<?>> properties() {
         return properties.keySet();
     }
 
@@ -79,7 +79,7 @@ public final class AuthProperties {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        AuthProperties that = (AuthProperties) o;
+        EndpointProperties that = (EndpointProperties) o;
         return Objects.equals(properties, that.properties);
     }
 
@@ -89,23 +89,23 @@ public final class AuthProperties {
     }
 
     /**
-     * Creates an {@link AuthProperties}.
+     * Creates an {@link EndpointProperties}.
      */
     public static final class Builder {
-        private Map<AuthProperty<?>, Object> properties = new HashMap<>();
+        private Map<EndpointProperty<?>, Object> properties = new HashMap<>();
 
         private Builder() {
         }
 
         /**
-         * Create the {@code AuthProperties} object.
+         * Create the {@code EndpointProperties} object.
          *
-         * @return the built AuthProperties object.
+         * @return the built EndpointProperties object.
          */
-        public AuthProperties build() {
+        public EndpointProperties build() {
             var copy = properties;
             this.properties = new HashMap<>();
-            return new AuthProperties(copy);
+            return new EndpointProperties(copy);
         }
 
         /**
@@ -116,7 +116,7 @@ public final class AuthProperties {
          * @return the builder.
          * @param <T> Value type.
          */
-        public <T> Builder put(AuthProperty<T> property, T value) {
+        public <T> Builder put(EndpointProperty<T> property, T value) {
             properties.put(property, value);
             return this;
         }

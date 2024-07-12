@@ -13,7 +13,7 @@ import java.util.Objects;
  *
  * @param <T> Value type associated with the property.
  */
-public class EndpointProperty<T> {
+public final class EndpointProperty<T> {
 
     private final String name;
 

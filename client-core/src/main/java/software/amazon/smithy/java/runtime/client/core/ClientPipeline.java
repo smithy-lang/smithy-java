@@ -14,7 +14,7 @@ import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
-import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
+import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolverParams;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.OutputHook;
@@ -153,7 +153,7 @@ public final class ClientPipeline<RequestT, ResponseT> {
         ClientCall<I, O> call,
         RequestT request
     ) {
-        var params = AuthSchemeResolver.paramsBuilder()
+        var params = AuthSchemeResolverParams.builder()
             .protocolId(protocol.id())
             .operationName(call.operation().schema().id().getName())
             // TODO: .properties(?)
