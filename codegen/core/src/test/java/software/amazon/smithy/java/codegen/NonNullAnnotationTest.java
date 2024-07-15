@@ -5,6 +5,11 @@
 
 package software.amazon.smithy.java.codegen;
 
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URL;
@@ -13,9 +18,9 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.codegen.utils.AbstractCodegenFileTest;
 import software.amazon.smithy.model.node.ObjectNode;
 
-public class NullAnnotationTest extends AbstractCodegenFileTest {
+public class NonNullAnnotationTest extends AbstractCodegenFileTest {
     private static final URL TEST_FILE = Objects.requireNonNull(
-        NullAnnotationTest.class.getResource("null-annotation-test.smithy")
+        NonNullAnnotationTest.class.getResource("null-annotation-test.smithy")
     );
 
     @Override
@@ -26,12 +31,12 @@ public class NullAnnotationTest extends AbstractCodegenFileTest {
     @Override
     protected ObjectNode settings() {
         return super.settings().toBuilder()
-            .withMember("nullAnnotation", "software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation")
+            .withMember("nonNullAnnotation", "software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation")
             .build();
     }
 
     @Test
-    void nullAnnotationsOnFieldsAndGetter() {
+    void nonNullAnnotationsOnFieldsAndGetter() {
         var fileStr = getFileStringForClass("NonNullAnnotationStructInput");
         var expectedField = "private transient final @TestNonNullAnnotation RequiredStruct requiredStruct;";
         var expectedGetter = "public @TestNonNullAnnotation RequiredStruct requiredStruct()";
@@ -45,7 +50,7 @@ public class NullAnnotationTest extends AbstractCodegenFileTest {
     }
 
     @Test
-    void nullAnnotationNotAddedForPrimitive() {
+    void nonNullAnnotationNotAddedForPrimitive() {
         var fileStr = getFileStringForClass("NonNullAnnotationStructInput");
 
         var expectedField = "private transient final boolean requiredPrimitive;";
@@ -57,7 +62,7 @@ public class NullAnnotationTest extends AbstractCodegenFileTest {
     }
 
     @Test
-    void nullAnnotationAddedForUnionVariant() {
+    void nonNullAnnotationAddedForUnionVariant() {
         var fileStr = getFileStringForClass("TestUnion");
         var expectedGetterBoxed = "public @TestNonNullAnnotation String boxedVariant() {";
         var expectedGetterPrimitive = "public @TestNonNullAnnotation String primitiveVariant() {";
@@ -71,7 +76,7 @@ public class NullAnnotationTest extends AbstractCodegenFileTest {
     }
 
     @Test
-    void nullAnnotationAddedForEnumVariant() {
+    void nonNullAnnotationAddedForEnumVariant() {
         var fileStr = getFileStringForClass("TestEnum");
         var expectedValueGetter = "public @TestNonNullAnnotation String value() {";
         var expectedValueField = "private final @TestNonNullAnnotation String value;";

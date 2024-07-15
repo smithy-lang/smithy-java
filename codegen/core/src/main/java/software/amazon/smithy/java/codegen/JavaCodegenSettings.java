@@ -26,29 +26,29 @@ public final class JavaCodegenSettings {
     private static final String SERVICE = "service";
     private static final String NAMESPACE = "namespace";
     private static final String HEADER_FILE = "headerFile";
-    private static final String NULL_ANNOTATION = "nullAnnotation";
+    private static final String NON_NULL_ANNOTATION = "nonNullAnnotation";
 
     private final ShapeId service;
     private final String packageNamespace;
     private final String header;
 
-    private final Symbol nullAnnotationSymbol;
+    private final Symbol nonNullAnnotationSymbol;
 
     JavaCodegenSettings(
         ShapeId service,
         String packageNamespace,
         String headerFile,
         String sourceLocation,
-        String nullAnnotationFullyQualifiedName
+        String nonNullAnnotationFullyQualifiedName
     ) {
         this.service = Objects.requireNonNull(service);
         this.packageNamespace = Objects.requireNonNull(packageNamespace);
         this.header = getHeader(headerFile, Objects.requireNonNull(sourceLocation));
 
-        if (!StringUtils.isEmpty(nullAnnotationFullyQualifiedName)) {
-            nullAnnotationSymbol = buildSymbolFromFullyQualifiedName(nullAnnotationFullyQualifiedName);
+        if (!StringUtils.isEmpty(nonNullAnnotationFullyQualifiedName)) {
+            nonNullAnnotationSymbol = buildSymbolFromFullyQualifiedName(nonNullAnnotationFullyQualifiedName);
         } else {
-            nullAnnotationSymbol = null;
+            nonNullAnnotationSymbol = null;
         }
     }
 
@@ -59,13 +59,13 @@ public final class JavaCodegenSettings {
      * @return Parsed settings
      */
     public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
-        settingsNode.warnIfAdditionalProperties(List.of(SERVICE, NAMESPACE, HEADER_FILE, NULL_ANNOTATION));
+        settingsNode.warnIfAdditionalProperties(List.of(SERVICE, NAMESPACE, HEADER_FILE, NON_NULL_ANNOTATION));
         return new JavaCodegenSettings(
             settingsNode.expectStringMember(SERVICE).expectShapeId(),
             settingsNode.expectStringMember(NAMESPACE).getValue(),
             settingsNode.getStringMemberOrDefault(HEADER_FILE, null),
             settingsNode.getSourceLocation().getFilename(),
-            settingsNode.getStringMemberOrDefault(NULL_ANNOTATION, "")
+            settingsNode.getStringMemberOrDefault(NON_NULL_ANNOTATION, "")
         );
     }
 
@@ -81,8 +81,8 @@ public final class JavaCodegenSettings {
         return header;
     }
 
-    public Symbol getNullAnnotationSymbol() {
-        return nullAnnotationSymbol;
+    public Symbol getNonNullAnnotationSymbol() {
+        return nonNullAnnotationSymbol;
     }
 
     private static Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {

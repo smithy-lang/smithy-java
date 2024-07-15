@@ -41,7 +41,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         putFormatter('T', new JavaTypeFormatter());
         putFormatter('B', new BoxedTypeFormatter());
         putFormatter('U', new CapitalizingFormatter());
-        putFormatter('N', new NullAnnotationFormatter());
+        putFormatter('N', new NonNullAnnotationFormatter());
 
     }
 
@@ -201,17 +201,17 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
     }
 
     /**
-     * Implements a formatter for {@code $N} that adds null annotation
+     * Implements a formatter for {@code $N} that adds non null annotation
      */
-    private final class NullAnnotationFormatter implements BiFunction<Object, String, String> {
+    private final class NonNullAnnotationFormatter implements BiFunction<Object, String, String> {
         private final JavaTypeFormatter javaTypeFormatter = new JavaTypeFormatter();
 
         @Override
         public String apply(Object type, String indent) {
 
-            Symbol nullAnnotationSymbol = settings.getNullAnnotationSymbol();
+            Symbol nonNullAnnotationSymbol = settings.getNonNullAnnotationSymbol();
 
-            if (nullAnnotationSymbol == null) {
+            if (nonNullAnnotationSymbol == null) {
                 return javaTypeFormatter.apply(type, indent);
             }
 
@@ -221,7 +221,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
                 return javaTypeFormatter.apply(typeSymbol, indent);
             }
 
-            return format("@$T $T", nullAnnotationSymbol, typeSymbol);
+            return format("@$T $T", nonNullAnnotationSymbol, typeSymbol);
         }
     }
 }
