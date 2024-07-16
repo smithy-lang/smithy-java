@@ -103,7 +103,6 @@ public final class ClientPipeline<RequestT, ResponseT> {
         var inputHook = new InputHook<>(context, input);
         interceptor.readBeforeExecution(inputHook);
         input = interceptor.modifyBeforeSerialization(inputHook);
-        context.put(CallContext.INPUT, input);
         inputHook = inputHook.withInput(input);
 
         interceptor.readBeforeSerialization(inputHook);
@@ -224,7 +223,6 @@ public final class ClientPipeline<RequestT, ResponseT> {
 
         return protocol.deserializeResponse(call, request, modifiedResponse)
             .thenApply(shape -> {
-                context.put(CallContext.OUTPUT, shape);
                 var outputHook = new OutputHook<>(context, input, request, response, shape);
                 RuntimeException error = null;
 
@@ -237,7 +235,6 @@ public final class ClientPipeline<RequestT, ResponseT> {
                 try {
                     shape = interceptor.modifyBeforeAttemptCompletion(outputHook, error);
                     outputHook = outputHook.withOutput(shape);
-                    context.put(CallContext.OUTPUT, shape);
                 } catch (RuntimeException e) {
                     error = e;
                 }
@@ -253,7 +250,6 @@ public final class ClientPipeline<RequestT, ResponseT> {
                 try {
                     shape = interceptor.modifyBeforeCompletion(outputHook, error);
                     outputHook = outputHook.withOutput(shape);
-                    context.put(CallContext.OUTPUT, shape);
                 } catch (RuntimeException e) {
                     error = e;
                 }

@@ -60,7 +60,6 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         executor = builder.executor == null ? Executors.newCachedThreadPool() : builder.executor;
 
         // Initialize the context.
-        context.put(CallContext.INPUT, input());
         context.put(CallContext.OPERATION_SCHEMA, operation().schema());
     }
 
