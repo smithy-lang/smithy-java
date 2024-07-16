@@ -58,9 +58,6 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
             .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity()));
         //TODO fix this to not use a cached thread pool.
         executor = builder.executor == null ? Executors.newCachedThreadPool() : builder.executor;
-
-        // Initialize the context.
-        context.put(CallContext.OPERATION_SCHEMA, operation().schema());
     }
 
     /**

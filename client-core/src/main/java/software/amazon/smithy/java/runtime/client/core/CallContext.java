@@ -9,17 +9,11 @@ import java.time.Duration;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.core.schema.Schema;
 
 /**
  * Context parameters made available to underlying transports like HTTP clients.
  */
 public final class CallContext {
-
-    /**
-     * Contains the schema of the operation being sent.
-     */
-    public static final Context.Key<Schema> OPERATION_SCHEMA = Context.key("Operation schema");
 
     /**
      * The total amount of time to wait for an API call to complete, including retries, and serialization.
