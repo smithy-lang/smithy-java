@@ -11,11 +11,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
-import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
@@ -29,36 +27,34 @@ import software.amazon.smithy.model.shapes.ShapeId;
 
 public abstract class Client {
 
-    private final EndpointResolver endpointResolver;
+    private final ClientConfig config;
     private final ClientPipeline<?, ?> pipeline;
     private final TypeRegistry typeRegistry;
     private final ClientInterceptor interceptor;
-    private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
-    private final AuthSchemeResolver authSchemeResolver;
     private final IdentityResolvers identityResolvers;
 
     protected Client(Builder<?, ?> builder) {
-        this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
+        ClientConfig.Builder configBuilder = ClientConfig.builder();
 
-        this.pipeline = ClientPipeline.of(
-            Objects.requireNonNull(builder.protocol, "protocol is null"),
-            Objects.requireNonNull(builder.transport, "transport is null")
-        );
+        configBuilder.transport(builder.transport);
+        configBuilder.protocol(builder.protocol);
+        configBuilder.endpointResolver(builder.endpointResolver);
+        builder.interceptors.forEach(configBuilder::addInterceptor);
+        configBuilder.authSchemeResolver(builder.authSchemeResolver);
+        builder.supportedAuthSchemes.forEach(configBuilder::putSupportedAuthSchemes);
+        builder.identityResolvers.forEach(configBuilder::addIdentityResolver);
+
+        for (ClientPlugin plugin : builder.plugins) {
+            plugin.configureClient(configBuilder);
+        }
+        this.config = configBuilder.build();
+
+        this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
 
         // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
-        this.interceptor = ClientInterceptor.chain(builder.interceptors);
+        this.interceptor = ClientInterceptor.chain(config.interceptors());
 
-        // By default, support NoAuthAuthScheme
-        AuthScheme<Object, Identity> noAuthAuthScheme = AuthScheme.noAuthAuthScheme();
-        this.supportedAuthSchemes.add(noAuthAuthScheme);
-        this.supportedAuthSchemes.addAll(builder.supportedAuthSchemes);
-
-        // TODO: Better defaults? Require these?
-        AuthSchemeResolver defaultAuthSchemeResolver = params -> List.of(
-            new AuthSchemeOption(noAuthAuthScheme.schemeId(), null, null)
-        );
-        this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, defaultAuthSchemeResolver);
-        this.identityResolvers = IdentityResolvers.of(builder.identityResolvers);
+        this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
 
         this.typeRegistry = TypeRegistry.builder().build();
     }
@@ -83,14 +79,16 @@ public abstract class Client {
             .putAllTypes(typeRegistry, operation.typeRegistry())
             .build();
 
+        Context mergedContext = merge(config.context(), context);
+
         var call = ClientCall.<I, O>builder()
             .input(input)
             .operation(operation)
-            .endpointResolver(endpointResolver)
-            .context(context)
+            .endpointResolver(config.endpointResolver())
+            .context(mergedContext)
             .interceptor(interceptor)
-            .supportedAuthSchemes(supportedAuthSchemes)
-            .authSchemeResolver(authSchemeResolver)
+            .supportedAuthSchemes(config.supportedAuthSchemes())
+            .authSchemeResolver(config.authSchemeResolver())
             .identityResolvers(identityResolvers)
             .errorCreator((c, id) -> {
                 ShapeId shapeId = ShapeId.from(id);
@@ -99,6 +97,24 @@ public abstract class Client {
             .build();
 
         return pipeline.send(call);
+    }
+
+    private Context merge(Context configContext, Context callContext) {
+        Context context = Context.create();
+
+        configContext.keys().forEachRemaining(key -> {
+            copyContext(configContext, key, context);
+        });
+
+        callContext.keys().forEachRemaining(key -> {
+            copyContext(callContext, key, context);
+        });
+
+        return context;
+    }
+
+    private <T> void copyContext(Context from, Context.Key<T> key, Context to) {
+        to.put(key, from.get(key));
     }
 
     /**
@@ -115,6 +131,9 @@ public abstract class Client {
         private AuthSchemeResolver authSchemeResolver;
         private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
         private final List<IdentityResolver<?>> identityResolvers = new ArrayList<>();
+
+        private final List<ClientPlugin> plugins = new ArrayList<>();
+
 
         /**
          * Set the transport used to send requests.
@@ -242,6 +261,18 @@ public abstract class Client {
         public B identityResolvers(List<IdentityResolver<?>> identityResolvers) {
             this.identityResolvers.clear();
             this.identityResolvers.addAll(identityResolvers);
+            return (B) this;
+        }
+
+        /**
+         * Add a plugin to the client.
+         *
+         * @param plugin Plugin to add.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B addPlugin(ClientPlugin plugin) {
+            plugins.add(Objects.requireNonNull(plugin, "plugin cannot be null"));
             return (B) this;
         }
 
