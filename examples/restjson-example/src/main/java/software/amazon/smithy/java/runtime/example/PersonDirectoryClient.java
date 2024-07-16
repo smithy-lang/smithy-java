@@ -40,7 +40,11 @@ public interface PersonDirectoryClient {
 
     final class Builder extends Client.Builder<PersonDirectoryClient, Builder> {
 
-        private Builder() {}
+        private Builder() {
+            // If a client needs to have default plugins, this is where client-codegen would add them.
+            // Using a no-op plugin for illustration purpose.
+            this.addPlugin(config -> {});
+        }
 
         @Override
         public PersonDirectoryClient build() {

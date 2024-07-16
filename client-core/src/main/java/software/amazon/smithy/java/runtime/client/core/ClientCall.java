@@ -277,7 +277,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
          */
         public Builder<I, O> supportedAuthSchemes(List<AuthScheme<?, ?>> supportedAuthSchemes) {
             this.supportedAuthSchemes.clear();
-            supportedAuthSchemes.forEach(this::addSupportedAuthScheme);
+            supportedAuthSchemes.forEach(this::putSupportedAuthScheme);
             return this;
         }
 
@@ -287,7 +287,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
          * @param supportedAuthScheme Supported scheme to add.
          * @return the builder.
          */
-        public Builder<I, O> addSupportedAuthScheme(AuthScheme<?, ?> supportedAuthScheme) {
+        public Builder<I, O> putSupportedAuthScheme(AuthScheme<?, ?> supportedAuthScheme) {
             supportedAuthSchemes.add(Objects.requireNonNull(supportedAuthScheme));
             return this;
         }
