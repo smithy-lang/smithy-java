@@ -18,6 +18,7 @@ import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
+import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointProperty;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolverParams;
 import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
@@ -42,31 +43,40 @@ public class ClientConfigTest {
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .endpoint("http://httpbin.org/anything")
             .build();
-
         callOperation(client);
+        // assert endpoint used is "http://httpbin.org/anything"
     }
 
     @Test
-    public void clientWithDefaults() {
+    public void clientWithDefaultEndpointResolver() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
             .build();
-
         callOperation(client);
+        // assert endpoint used starts with "http://httpbin.org/anything/random-" followed by upto 2 digits
     }
 
     @Test
-    public void clientWithDefaultsOverridden() {
+    public void clientWithDefaultEndpointResolverOverridden() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
             .endpoint("http://httpbin.org/anything")
             .build();
-
         callOperation(client);
+        // assert endpoint used is "http://httpbin.org/anything"
+    }
+
+    @Test
+    public void clientWithDefaultEndpointResolverWithConfigKeyOverridden() {
+        PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
+            .put(RandomEndpointPlugin.BASE, 100)
+            .build();
+        callOperation(client);
+        // assert endpoint used starts with "http://httpbin.org/anything/random-1" followed by 2 more digits
+        // 3 digits because of 100 + 2 digit number..
     }
 
     private static final class PersonDirectoryClientWithDefaults extends Client implements PersonDirectoryClient {
         public PersonDirectoryClientWithDefaults(PersonDirectoryClientWithDefaults.Builder builder) {
             super(builder);
-
         }
 
         @Override
@@ -110,38 +120,41 @@ public class ClientConfigTest {
                 return new PersonDirectoryClientWithDefaults(this);
             }
         }
+    }
 
-        static final class RandomEndpointPlugin implements ClientPlugin {
-            @Override
-            public void configureClient(ClientConfig.Builder config) {
-                config.endpointResolver(new RandomEndpointResolver());
-            }
+    static final class RandomEndpointPlugin implements ClientPlugin {
+
+        public static final Context.Key<Integer> BASE = Context.key("Random number base");
+
+        @Override
+        public void configureClient(ClientConfig.Builder config) {
+            config.endpointResolver(new RandomEndpointResolver());
+            // TODO: This should be putIfAbsent
+            config.put(BASE, 0);
         }
 
         static final class RandomEndpointResolver implements EndpointResolver {
             private static final Random RANDOM = new Random();
+            private static final EndpointProperty<Integer> BASE = EndpointProperty.of("Random number base");
 
             @Override
             public CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params) {
-                int bound = 32;
+                // TODO: We need something that takes Context.Key BASE and makes it available as EndpointProperty BASE
+                //  OR Make the Context available to EndpointResolver.resolveEndpoint()
+
+//                // this makes it required value, which is ok, since plugin sets a default
+//                int base = params.properties().get(BASE);
+                // TODO: for now it is not flowing so defaulting to 0 here.
+                int base = params.properties().get(BASE) != null ? params.properties().get(BASE) : 0;
+
+                int num = base + RANDOM.nextInt(99);
                 return CompletableFuture.completedFuture(
                     Endpoint.builder()
-                        .uri("http://httpbin.org/anything/random-" + RANDOM.nextInt(bound))
+                        .uri("http://httpbin.org/anything/random-" + num)
                         .build()
                 );
             }
         }
-    }
-
-    private static void callOperation(PersonDirectoryClient client) {
-        PutPersonInput input = PutPersonInput.builder()
-            .name("Michael")
-            .age(999)
-            .favoriteColor("Green")
-            .birthday(Instant.now())
-            .build();
-
-        PutPersonOutput output = client.putPerson(input);
     }
 
     @Test
@@ -168,5 +181,16 @@ public class ClientConfigTest {
             .build();
 
         callOperation(client);
+    }
+
+    private static void callOperation(PersonDirectoryClient client) {
+        PutPersonInput input = PutPersonInput.builder()
+            .name("Michael")
+            .age(999)
+            .favoriteColor("Green")
+            .birthday(Instant.now())
+            .build();
+
+        PutPersonOutput output = client.putPerson(input);
     }
 }
