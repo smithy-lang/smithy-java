@@ -74,6 +74,18 @@ public class ClientConfigTest {
         // 3 digits because of 100 + 2 digit number..
     }
 
+    @Test
+    public void clientWithDefaultEndpointResolverWithConfigKeyOverriddenWithPluginReAdded() {
+        PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
+            .addPlugin(new RandomEndpointPlugin())
+            .put(RandomEndpointPlugin.BASE, 100)
+            .build();
+        callOperation(client);
+        // assert endpoint used starts with "http://httpbin.org/anything/random-1" followed by 2 more digits
+        // 3 digits because of 100 + 2 digit number..
+        // TODO: this won't as expected right now, because RandomEndpointPlugin doesn't do putIfAbsent.
+    }
+
     private static final class PersonDirectoryClientWithDefaults extends Client implements PersonDirectoryClient {
         public PersonDirectoryClientWithDefaults(PersonDirectoryClientWithDefaults.Builder builder) {
             super(builder);
