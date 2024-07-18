@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.example;
 
 import java.net.http.HttpClient;
 import java.time.Instant;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,7 @@ public class ClientConfigTest {
     @Test
     public void clientWithDefaults() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
-                .build();
+            .build();
 
         callOperation(client);
     }
@@ -56,8 +57,8 @@ public class ClientConfigTest {
     @Test
     public void clientWithDefaultsOverridden() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
-                .endpoint("http://httpbin.org/anything")
-                .build();
+            .endpoint("http://httpbin.org/anything")
+            .build();
 
         callOperation(client);
     }
@@ -87,12 +88,21 @@ public class ClientConfigTest {
             return new PersonDirectoryClientWithDefaults.Builder();
         }
 
-        static final class Builder extends Client.Builder<PersonDirectoryClient, PersonDirectoryClientWithDefaults.Builder> {
+        static final class Builder extends
+            Client.Builder<PersonDirectoryClient, PersonDirectoryClientWithDefaults.Builder> {
 
             private Builder() {
-                this.protocol(new RestJsonClientProtocol());
-                this.transport(new JavaHttpClientTransport(HttpClient.newHttpClient()));
-                this.addPlugin(new RandomEndpointPlugin());
+                configBuilder.protocol(new RestJsonClientProtocol());
+                configBuilder.transport(new JavaHttpClientTransport(HttpClient.newHttpClient()));
+
+                List<ClientPlugin> defaultPlugins = List.of(new RandomEndpointPlugin());
+                // Default plugins are "applied" here in Builder constructor.
+                // They are not affected by any configuration added to Client.Builder.
+                // Only things available in configBuilder to these default plugins would be things added to
+                // configBuilder above.
+                for (ClientPlugin plugin : defaultPlugins) {
+                    plugin.configureClient(configBuilder);
+                }
             }
 
             @Override
@@ -114,19 +124,22 @@ public class ClientConfigTest {
             @Override
             public CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params) {
                 int bound = 32;
-                return CompletableFuture.completedFuture(Endpoint.builder()
-                        .uri("http://httpbin.org/anything/random-" + RANDOM.nextInt(bound)).build());
+                return CompletableFuture.completedFuture(
+                    Endpoint.builder()
+                        .uri("http://httpbin.org/anything/random-" + RANDOM.nextInt(bound))
+                        .build()
+                );
             }
         }
     }
 
     private static void callOperation(PersonDirectoryClient client) {
         PutPersonInput input = PutPersonInput.builder()
-                .name("Michael")
-                .age(999)
-                .favoriteColor("Green")
-                .birthday(Instant.now())
-                .build();
+            .name("Michael")
+            .age(999)
+            .favoriteColor("Green")
+            .birthday(Instant.now())
+            .build();
 
         PutPersonOutput output = client.putPerson(input);
     }

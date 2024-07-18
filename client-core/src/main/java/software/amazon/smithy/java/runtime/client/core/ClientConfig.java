@@ -116,6 +116,8 @@ public final class ClientConfig {
         private final List<IdentityResolver<?>> identityResolvers = new ArrayList<>();
         private final Context context = Context.create();
 
+        // TODO: Add getters for each, so that a ClientPlugin can read the existing values.
+
         /**
          * Set the transport used to send requests.
          *

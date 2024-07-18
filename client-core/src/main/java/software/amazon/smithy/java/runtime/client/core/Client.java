@@ -7,7 +7,6 @@ package software.amazon.smithy.java.runtime.client.core;
 
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -34,29 +33,20 @@ public abstract class Client {
     private final IdentityResolvers identityResolvers;
 
     protected Client(Builder<?, ?> builder) {
-        ClientConfig.Builder configBuilder = ClientConfig.builder();
+        ClientConfig.Builder configBuilder = builder.configBuilder;
 
-        configBuilder.transport(builder.transport);
-        configBuilder.protocol(builder.protocol);
-        configBuilder.endpointResolver(builder.endpointResolver);
-        builder.interceptors.forEach(configBuilder::addInterceptor);
-        configBuilder.authSchemeResolver(builder.authSchemeResolver);
-        builder.supportedAuthSchemes.forEach(configBuilder::putSupportedAuthSchemes);
-        builder.identityResolvers.forEach(configBuilder::addIdentityResolver);
-
-        // Initialize configBuilder's context with context provided to Client.Builder. This way these context keys are
-        // available to plugins.
-        builder.context.keys().forEachRemaining(key -> copyContext(key, builder.context, configBuilder));
+        // var copyOfContextBeforePlugins = configBuilder.context.keys();
 
         for (ClientPlugin plugin : builder.plugins) {
             plugin.configureClient(configBuilder);
         }
 
-        // Note, the below was already done before applying plugins. However, if plugin is setting a (default) value
-        // for a context key, context provided to Client.Builder should be considered as overriding any context
-        // key/values provided by ClientPlugins.
-        // TODO: This may be unnecessary if we assume plugins would use putIfAbsent().
-        builder.context.keys().forEachRemaining(key -> copyContext(key, builder.context, configBuilder));
+        // TODO: If a plugin is setting a (default) value for a context key, context provided to Client.Builder should
+        //  be considered as overriding any context key/values provided by plugins. So maybe we need to
+        //  update the configBuilder's context with values from before plugins are applied??
+        //  This may be unnecessary if we assume plugins would use putIfAbsent().
+//        copyOfContextBeforePlugins.keys().forEachRemaining(
+//            key -> copyContext(key, copyOfContextBeforePlugins, configBuilder));
 
         this.config = configBuilder.build();
 
@@ -123,10 +113,6 @@ public abstract class Client {
         dst.put(key, src.get(key));
     }
 
-    private <T> void copyContext(Context.Key<T> key, Context src, ClientConfig.Builder dst) {
-        dst.put(key, src.get(key));
-    }
-
     /**
      * Static builder for Clients.
      *
@@ -134,15 +120,12 @@ public abstract class Client {
      * @param <B> Implementing builder class
      */
     public static abstract class Builder<I, B extends Builder<I, B>> {
-        private ClientTransport<?, ?> transport;
-        private ClientProtocol<?, ?> protocol;
-        private EndpointResolver endpointResolver;
-        private final List<ClientInterceptor> interceptors = new ArrayList<>();
-        private AuthSchemeResolver authSchemeResolver;
-        private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
-        private final List<IdentityResolver<?>> identityResolvers = new ArrayList<>();
-        private final Context context = Context.create();
 
+        /**
+         * An empty ClientConfig.Builder available to subclasses to initialize in their constructors with any default
+         * values, before any overrides are provided to this Client.Builder's methods.
+         */
+        protected final ClientConfig.Builder configBuilder = ClientConfig.builder();
         private final List<ClientPlugin> plugins = new ArrayList<>();
 
         /**
@@ -153,7 +136,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B transport(ClientTransport<?, ?> transport) {
-            this.transport = transport;
+            this.configBuilder.transport(transport);
             return (B) this;
         }
 
@@ -165,7 +148,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B protocol(ClientProtocol<?, ?> protocol) {
-            this.protocol = protocol;
+            this.configBuilder.protocol(protocol);
             return (B) this;
         }
 
@@ -177,7 +160,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B endpointResolver(EndpointResolver endpointResolver) {
-            this.endpointResolver = endpointResolver;
+            this.configBuilder.endpointResolver(endpointResolver);
             return (B) this;
         }
 
@@ -219,7 +202,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B addInterceptor(ClientInterceptor interceptor) {
-            interceptors.add(interceptor);
+            this.configBuilder.addInterceptor(interceptor);
             return (B) this;
         }
 
@@ -231,7 +214,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B authSchemeResolver(AuthSchemeResolver authSchemeResolver) {
-            this.authSchemeResolver = authSchemeResolver;
+            this.configBuilder.authSchemeResolver(authSchemeResolver);
             return (B) this;
         }
 
@@ -245,7 +228,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B putSupportedAuthSchemes(AuthScheme<?, ?>... authSchemes) {
-            supportedAuthSchemes.addAll(Arrays.asList(authSchemes));
+            this.configBuilder.putSupportedAuthSchemes(authSchemes);
             return (B) this;
         }
 
@@ -257,7 +240,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B addIdentityResolver(IdentityResolver<?>... identityResolvers) {
-            this.identityResolvers.addAll(Arrays.asList(identityResolvers));
+            this.configBuilder.addIdentityResolver(identityResolvers);
             return (B) this;
         }
 
@@ -269,8 +252,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B identityResolvers(List<IdentityResolver<?>> identityResolvers) {
-            this.identityResolvers.clear();
-            this.identityResolvers.addAll(identityResolvers);
+            this.configBuilder.identityResolvers(identityResolvers);
             return (B) this;
         }
 
@@ -285,7 +267,7 @@ public abstract class Client {
         // TODO: Naming: Should this method name say "what" it is putting, like putXYZ? put/putContext/putConfig?
         @SuppressWarnings("unchecked")
         public <T> B put(Context.Key<T> key, T value) {
-            context.put(key, value);
+            this.configBuilder.put(key, value);
             return (B) this;
         }
 
