@@ -48,7 +48,7 @@ public class ClientConfigTest {
     }
 
     @Test
-    public void clientWithDefaultEndpointResolver() {
+    public void clientWithDefaults() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
             .build();
         callOperation(client);
@@ -56,7 +56,7 @@ public class ClientConfigTest {
     }
 
     @Test
-    public void clientWithDefaultEndpointResolverOverridden() {
+    public void clientWithDefaults_EndpointResolverOverridden() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
             .endpoint("http://httpbin.org/anything")
             .build();
@@ -65,7 +65,7 @@ public class ClientConfigTest {
     }
 
     @Test
-    public void clientWithDefaultEndpointResolverWithConfigKeyOverridden() {
+    public void clientWithDefaults_EndpointResolverConfigKeyOverridden() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
             .put(RandomEndpointPlugin.BASE, 100)
             .build();
@@ -75,8 +75,33 @@ public class ClientConfigTest {
     }
 
     @Test
-    public void clientWithDefaultEndpointResolverWithConfigKeyOverriddenWithPluginReAdded() {
+    public void clientWithDefaults_EndpointResolverConfigKeyOverridden_PluginReAdded() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
+            .addPlugin(new RandomEndpointPlugin())
+            .put(RandomEndpointPlugin.BASE, 100)
+            .build();
+        callOperation(client);
+        // assert endpoint used starts with "http://httpbin.org/anything/random-1" followed by 2 more digits
+        // 3 digits because of 100 + 2 digit number..
+        // TODO: this won't as expected right now, because RandomEndpointPlugin doesn't do putIfAbsent.
+    }
+
+    @Test
+    public void vanillaClient_EndpointResolverPluginExplicitlyAdded() {
+        PersonDirectoryClient client = PersonDirectoryClient.builder()
+            .protocol(new RestJsonClientProtocol())
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
+            .addPlugin(new RandomEndpointPlugin())
+            .build();
+        callOperation(client);
+        // assert endpoint used starts with "http://httpbin.org/anything/random-" followed by upto 2 digits
+    }
+
+    @Test
+    public void vanillaClient_EndpointResolverPluginExplicitlyAdded_EndpointResolverConfigKeyOverridde() {
+        PersonDirectoryClient client = PersonDirectoryClient.builder()
+            .protocol(new RestJsonClientProtocol())
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .addPlugin(new RandomEndpointPlugin())
             .put(RandomEndpointPlugin.BASE, 100)
             .build();
