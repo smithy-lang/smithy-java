@@ -34,20 +34,9 @@ public abstract class Client {
 
     protected Client(Builder<?, ?> builder) {
         ClientConfig.Builder configBuilder = builder.configBuilder;
-
-        // var copyOfContextBeforePlugins = configBuilder.context.keys();
-
         for (ClientPlugin plugin : builder.plugins) {
             plugin.configureClient(configBuilder);
         }
-
-        // TODO: If a plugin is setting a (default) value for a context key, context provided to Client.Builder should
-        //  be considered as overriding any context key/values provided by plugins. So maybe we need to
-        //  update the configBuilder's context with values from before plugins are applied??
-        //  This may be unnecessary if we assume plugins would use putIfAbsent().
-//        copyOfContextBeforePlugins.keys().forEachRemaining(
-//            key -> copyContext(key, copyOfContextBeforePlugins, configBuilder));
-
         this.config = configBuilder.build();
 
         this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
