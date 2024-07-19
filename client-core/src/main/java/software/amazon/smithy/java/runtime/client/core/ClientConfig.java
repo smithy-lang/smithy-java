@@ -254,6 +254,19 @@ public final class ClientConfig {
         }
 
         /**
+         * Put a strongly typed configuration on the builder, if not already present.
+         *
+         * @param key Configuration key.
+         * @param value Value to associate with the key.
+         * @return the builder.
+         * @param <T> Value type.
+         */
+        public <T> Builder putIfAbsent(Context.Key<T> key, T value) {
+            context.putIfAbsent(key, value);
+            return this;
+        }
+
+        /**
          * Creates the client configuration.
          *
          * @return the created client configuration.

@@ -272,6 +272,20 @@ public abstract class Client {
         }
 
         /**
+         * Put a strongly typed configuration on the builder, if not already present.
+         *
+         * @param key Configuration key.
+         * @param value Value to associate with the key.
+         * @return the builder.
+         * @param <T> Value type.
+         */
+        @SuppressWarnings("unchecked")
+        public <T> B putIfAbsent(Context.Key<T> key, T value) {
+            this.configBuilder.putIfAbsent(key, value);
+            return (B) this;
+        }
+
+        /**
          * Add a plugin to the client.
          *
          * @param plugin Plugin to add.
