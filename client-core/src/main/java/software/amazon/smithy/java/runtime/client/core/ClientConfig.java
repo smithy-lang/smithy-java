@@ -9,11 +9,8 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
-import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
-import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
@@ -30,11 +27,6 @@ import software.amazon.smithy.java.runtime.core.Context;
  */
 public final class ClientConfig {
 
-    private static final AuthScheme<Object, Identity> NO_AUTH_AUTH_SCHEME = AuthScheme.noAuthAuthScheme();
-    private static final AuthSchemeResolver DEFAULT_AUTH_SCHEME_RESOLVER = params -> List.of(
-        new AuthSchemeOption(NO_AUTH_AUTH_SCHEME.schemeId(), null, null)
-    );
-
     private final ClientTransport<?, ?> transport;
     private final ClientProtocol<?, ?> protocol;
     private final EndpointResolver endpointResolver;
@@ -45,21 +37,12 @@ public final class ClientConfig {
     private final Context context;
 
     private ClientConfig(Builder builder) {
-        this.transport = Objects.requireNonNull(builder.transport, "transport cannot be null");
-        this.protocol = Objects.requireNonNull(builder.protocol, "protocol cannot be null");
-        ClientPipeline.validateProtocolAndTransport(protocol, transport);
-
-        this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
-
+        this.transport = builder.transport;
+        this.protocol = builder.protocol;
+        this.endpointResolver = builder.endpointResolver;
         this.interceptors = List.copyOf(builder.interceptors);
-
-        // By default, support NoAuthAuthScheme
-        List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
-        supportedAuthSchemes.add(NO_AUTH_AUTH_SCHEME);
-        supportedAuthSchemes.addAll(builder.supportedAuthSchemes);
-        this.supportedAuthSchemes = List.copyOf(supportedAuthSchemes);
-
-        this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, DEFAULT_AUTH_SCHEME_RESOLVER);
+        this.supportedAuthSchemes = List.copyOf(builder.supportedAuthSchemes);
+        this.authSchemeResolver = builder.authSchemeResolver;
         this.identityResolvers = List.copyOf(builder.identityResolvers);
 
         // TODO: make a copy to prevent builder.context getting updated later and affecting this ClientConfig's context.

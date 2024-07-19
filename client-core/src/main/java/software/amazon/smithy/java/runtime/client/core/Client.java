@@ -10,9 +10,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
+import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
@@ -25,6 +27,11 @@ import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public abstract class Client {
+
+    private static final AuthScheme<Object, Identity> NO_AUTH_AUTH_SCHEME = AuthScheme.noAuthAuthScheme();
+    private static final AuthSchemeResolver DEFAULT_AUTH_SCHEME_RESOLVER = params -> List.of(
+        new AuthSchemeOption(NO_AUTH_AUTH_SCHEME.schemeId(), null, null)
+    );
 
     private final ClientConfig config;
     private final ClientPipeline<?, ?> pipeline;
@@ -39,11 +46,13 @@ public abstract class Client {
         }
         this.config = configBuilder.build();
 
+        // After config is built, validate it and save some derived objects from configuration, so it doesn't have to be
+        // calculated each time.
         this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
+        Objects.requireNonNull(config.endpointResolver(), "endpointResolver is null");
 
         // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
         this.interceptor = ClientInterceptor.chain(config.interceptors());
-
         this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
 
         this.typeRegistry = TypeRegistry.builder().build();
@@ -114,7 +123,10 @@ public abstract class Client {
          * An empty ClientConfig.Builder available to subclasses to initialize in their constructors with any default
          * values, before any overrides are provided to this Client.Builder's methods.
          */
-        protected final ClientConfig.Builder configBuilder = ClientConfig.builder();
+        protected final ClientConfig.Builder configBuilder = ClientConfig.builder()
+            .putSupportedAuthSchemes(NO_AUTH_AUTH_SCHEME)
+            .authSchemeResolver(DEFAULT_AUTH_SCHEME_RESOLVER);
+
         private final List<ClientPlugin> plugins = new ArrayList<>();
 
         /**
@@ -125,7 +137,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B transport(ClientTransport<?, ?> transport) {
-            this.configBuilder.transport(transport);
+            this.configBuilder.transport(Objects.requireNonNull(transport, "transport is null"));
             return (B) this;
         }
 
@@ -137,7 +149,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B protocol(ClientProtocol<?, ?> protocol) {
-            this.configBuilder.protocol(protocol);
+            this.configBuilder.protocol(Objects.requireNonNull(protocol, "protocol is null"));
             return (B) this;
         }
 
@@ -149,7 +161,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B endpointResolver(EndpointResolver endpointResolver) {
-            this.configBuilder.endpointResolver(endpointResolver);
+            this.configBuilder.endpointResolver(Objects.requireNonNull(endpointResolver, "endpointResolver is null"));
             return (B) this;
         }
 
@@ -191,7 +203,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B addInterceptor(ClientInterceptor interceptor) {
-            this.configBuilder.addInterceptor(interceptor);
+            this.configBuilder.addInterceptor(Objects.requireNonNull(interceptor, "interceptor is null"));
             return (B) this;
         }
 
@@ -203,7 +215,9 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B authSchemeResolver(AuthSchemeResolver authSchemeResolver) {
-            this.configBuilder.authSchemeResolver(authSchemeResolver);
+            this.configBuilder.authSchemeResolver(
+                Objects.requireNonNull(authSchemeResolver, "authSchemeResolver is null")
+            );
             return (B) this;
         }
 
