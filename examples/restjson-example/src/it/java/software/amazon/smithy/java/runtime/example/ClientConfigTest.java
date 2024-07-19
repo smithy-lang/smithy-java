@@ -5,11 +5,14 @@
 
 package software.amazon.smithy.java.runtime.example;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.net.http.HttpClient;
 import java.time.Instant;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.Client;
@@ -36,79 +39,99 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 
 public class ClientConfigTest {
 
+    private RequestCapturingInterceptor requestCapturingInterceptor;
+
+    @BeforeEach
+    public void setup() {
+        requestCapturingInterceptor = new RequestCapturingInterceptor();
+    }
+
     @Test
     public void vanillaClient() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
+            .addInterceptor(requestCapturingInterceptor)
             .protocol(new RestJsonClientProtocol())
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .endpoint("http://httpbin.org/anything")
             .build();
         callOperation(client);
-        // assert endpoint used is "http://httpbin.org/anything"
+        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
+        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/persons/.*");
     }
 
     @Test
     public void clientWithDefaults() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
+            .addInterceptor(requestCapturingInterceptor)
             .build();
         callOperation(client);
-        // assert endpoint used starts with "http://httpbin.org/anything/random-" followed by upto 2 digits
+        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
+        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/random-\\d/persons/.*");
     }
 
     @Test
     public void clientWithDefaults_EndpointResolverOverridden() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
+            .addInterceptor(requestCapturingInterceptor)
             .endpoint("http://httpbin.org/anything")
             .build();
         callOperation(client);
-        // assert endpoint used is "http://httpbin.org/anything"
+        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
+        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/persons/.*");
     }
 
     @Test
     public void clientWithDefaults_EndpointResolverConfigKeyOverridden() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
+            .addInterceptor(requestCapturingInterceptor)
             .put(RandomEndpointPlugin.BASE, 100)
             .build();
         callOperation(client);
-        // assert endpoint used starts with "http://httpbin.org/anything/random-1" followed by 2 more digits
-        // 3 digits because of 100 + 2 digit number..
+        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
+        // TODO: this won't as expected right now, because we aren't flowing Context BASE to EndpointResolver
+//        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/random-1\\d/persons/.*");
     }
 
     @Test
     public void clientWithDefaults_EndpointResolverConfigKeyOverridden_PluginReAdded() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
+            .addInterceptor(requestCapturingInterceptor)
             .addPlugin(new RandomEndpointPlugin())
             .put(RandomEndpointPlugin.BASE, 100)
             .build();
         callOperation(client);
-        // assert endpoint used starts with "http://httpbin.org/anything/random-1" followed by 2 more digits
-        // 3 digits because of 100 + 2 digit number..
+        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         // TODO: this won't as expected right now, because RandomEndpointPlugin doesn't do putIfAbsent.
+//        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/random-1\\d/persons/.*");
     }
 
     @Test
     public void vanillaClient_EndpointResolverPluginExplicitlyAdded() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
+            .addInterceptor(requestCapturingInterceptor)
             .protocol(new RestJsonClientProtocol())
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .addPlugin(new RandomEndpointPlugin())
             .build();
         callOperation(client);
+        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
+        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/random-\\d/persons/.*");
         // assert endpoint used starts with "http://httpbin.org/anything/random-" followed by upto 2 digits
     }
 
     @Test
     public void vanillaClient_EndpointResolverPluginExplicitlyAdded_EndpointResolverConfigKeyOverridde() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
+            .addInterceptor(requestCapturingInterceptor)
             .protocol(new RestJsonClientProtocol())
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .addPlugin(new RandomEndpointPlugin())
             .put(RandomEndpointPlugin.BASE, 100)
             .build();
         callOperation(client);
-        // assert endpoint used starts with "http://httpbin.org/anything/random-1" followed by 2 more digits
-        // 3 digits because of 100 + 2 digit number..
+        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         // TODO: this won't as expected right now, because RandomEndpointPlugin doesn't do putIfAbsent.
+//        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/random-1\\d/persons/.*");
     }
 
     private static final class PersonDirectoryClientWithDefaults extends Client implements PersonDirectoryClient {
@@ -184,7 +207,7 @@ public class ClientConfigTest {
                 // TODO: for now it is not flowing so defaulting to 0 here.
                 int base = params.properties().get(BASE) != null ? params.properties().get(BASE) : 0;
 
-                int num = base + RANDOM.nextInt(99);
+                int num = base + RANDOM.nextInt(9);
                 return CompletableFuture.completedFuture(
                     Endpoint.builder()
                         .uri("http://httpbin.org/anything/random-" + num)
@@ -229,5 +252,18 @@ public class ClientConfigTest {
             .build();
 
         PutPersonOutput output = client.putPerson(input);
+    }
+
+    private static class RequestCapturingInterceptor implements ClientInterceptor {
+        private SmithyHttpRequest request;
+
+        public SmithyHttpRequest lastCapturedRequest() {
+            return request;
+        }
+
+        @Override
+        public void readBeforeTransmit(RequestHook<?, ?> hook) {
+            request = (SmithyHttpRequest) hook.request();
+        }
     }
 }
