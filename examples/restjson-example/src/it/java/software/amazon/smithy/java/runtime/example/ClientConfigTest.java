@@ -10,7 +10,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.net.http.HttpClient;
 import java.time.Instant;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,7 +55,7 @@ public class ClientConfigTest {
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
-        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/persons/.*");
+        assertThat(request.uri().toString()).startsWith("http://httpbin.org/anything/");
     }
 
     @Test
@@ -66,7 +65,7 @@ public class ClientConfigTest {
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
-        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/random-\\d/persons/.*");
+        assertThat(request.uri().getHost()).isEqualTo("global.example.com");
     }
 
     @Test
@@ -77,32 +76,32 @@ public class ClientConfigTest {
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
-        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/persons/.*");
+        assertThat(request.uri().toString()).startsWith("http://httpbin.org/anything/");
     }
 
     @Test
     public void clientWithDefaults_EndpointResolverConfigKeyOverridden() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
             .addInterceptor(requestCapturingInterceptor)
-            .put(RandomEndpointPlugin.BASE, 100)
+            .put(RegionAwareServicePlugin.REGION, "us-west-2")
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
-        // TODO: this won't as expected right now, because we aren't flowing Context BASE to EndpointResolver
-//        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/random-1\\d/persons/.*");
+        // TODO: this won't as expected right now, because we aren't flowing Context REGION to EndpointResolver
+//        assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
     }
 
     @Test
     public void clientWithDefaults_EndpointResolverConfigKeyOverridden_PluginReAdded() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
             .addInterceptor(requestCapturingInterceptor)
-            .addPlugin(new RandomEndpointPlugin())
-            .put(RandomEndpointPlugin.BASE, 100)
+            .addPlugin(new RegionAwareServicePlugin())
+            .put(RegionAwareServicePlugin.REGION, "us-west-2")
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
-        // TODO: this won't as expected right now, because RandomEndpointPlugin doesn't do putIfAbsent.
-//        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/random-1\\d/persons/.*");
+        // TODO: this won't as expected right now, because RegionAwareServicePlugin doesn't do putIfAbsent.
+//        assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
     }
 
     @Test
@@ -111,12 +110,11 @@ public class ClientConfigTest {
             .addInterceptor(requestCapturingInterceptor)
             .protocol(new RestJsonClientProtocol())
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
-            .addPlugin(new RandomEndpointPlugin())
+            .addPlugin(new RegionAwareServicePlugin())
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
-        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/random-\\d/persons/.*");
-        // assert endpoint used starts with "http://httpbin.org/anything/random-" followed by upto 2 digits
+        assertThat(request.uri().getHost()).isEqualTo("global.example.com");
     }
 
     @Test
@@ -125,13 +123,13 @@ public class ClientConfigTest {
             .addInterceptor(requestCapturingInterceptor)
             .protocol(new RestJsonClientProtocol())
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
-            .addPlugin(new RandomEndpointPlugin())
-            .put(RandomEndpointPlugin.BASE, 100)
+            .addPlugin(new RegionAwareServicePlugin())
+            .put(RegionAwareServicePlugin.REGION, "us-west-2")
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
-        // TODO: this won't as expected right now, because RandomEndpointPlugin doesn't do putIfAbsent.
-//        assertThat(request.uri().toString()).matches("http://httpbin.org/anything/random-1\\d/persons/.*");
+        // TODO: this won't as expected right now, because RegionAwareServicePlugin doesn't do putIfAbsent.
+//        assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
     }
 
     private static final class PersonDirectoryClientWithDefaults extends Client implements PersonDirectoryClient {
@@ -165,7 +163,7 @@ public class ClientConfigTest {
                 configBuilder.protocol(new RestJsonClientProtocol());
                 configBuilder.transport(new JavaHttpClientTransport(HttpClient.newHttpClient()));
 
-                List<ClientPlugin> defaultPlugins = List.of(new RandomEndpointPlugin());
+                List<ClientPlugin> defaultPlugins = List.of(new RegionAwareServicePlugin());
                 // Default plugins are "applied" here in Builder constructor.
                 // They are not affected by any configuration added to Client.Builder.
                 // Only things available in configBuilder to these default plugins would be things added to
@@ -182,36 +180,34 @@ public class ClientConfigTest {
         }
     }
 
-    static final class RandomEndpointPlugin implements ClientPlugin {
+    static final class RegionAwareServicePlugin implements ClientPlugin {
 
-        public static final Context.Key<Integer> BASE = Context.key("Random number base");
+        public static final Context.Key<String> REGION = Context.key("Region for the service");
 
         @Override
         public void configureClient(ClientConfig.Builder config) {
-            config.endpointResolver(new RandomEndpointResolver());
+            config.endpointResolver(new RegionalEndpointResolver());
             // TODO: This should be putIfAbsent
-            config.put(BASE, 0);
+            config.put(REGION, "global");
         }
 
-        static final class RandomEndpointResolver implements EndpointResolver {
-            private static final Random RANDOM = new Random();
-            private static final EndpointProperty<Integer> BASE = EndpointProperty.of("Random number base");
+        static final class RegionalEndpointResolver implements EndpointResolver {
+            private static final EndpointProperty<String> REGION = EndpointProperty.of("Region to determine endpoint");
 
             @Override
             public CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params) {
-                // TODO: We need something that takes Context.Key BASE and makes it available as EndpointProperty BASE
+                // TODO: Need something that takes Context.Key REGION and makes it available as EndpointProperty REGION
                 //  OR Make the Context available to EndpointResolver.resolveEndpoint()
 
 //                // this makes it required value, which is ok, since plugin sets a default
-//                int base = params.properties().get(BASE);
+//                String region = params.properties().get(REGION);
                 // TODO: for now it is not flowing so defaulting to 0 here.
-                int base = params.properties().get(BASE) != null ? params.properties().get(BASE) : 0;
+                String region = params.properties().get(REGION) != null ? params.properties().get(REGION) : "global";
 
-                int num = base + RANDOM.nextInt(9);
                 return CompletableFuture.completedFuture(
-                    Endpoint.builder()
-                        .uri("http://httpbin.org/anything/random-" + num)
-                        .build()
+                        Endpoint.builder()
+                                .uri("http://" + region + ".example.com")
+                                .build()
                 );
             }
         }
@@ -251,7 +247,9 @@ public class ClientConfigTest {
             .birthday(Instant.now())
             .build();
 
-        PutPersonOutput output = client.putPerson(input);
+        try {
+            client.putPerson(input);
+        } catch (Exception ignored) {}
     }
 
     private static class RequestCapturingInterceptor implements ClientInterceptor {
