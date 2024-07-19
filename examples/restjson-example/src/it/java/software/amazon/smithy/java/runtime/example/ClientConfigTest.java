@@ -87,7 +87,7 @@ public class ClientConfigTest {
     public void clientWithDefaults_RegionKeyOverridden() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
             .addInterceptor(requestCapturingInterceptor)
-            .put(RegionAwareServicePlugin.REGION, "us-west-2")
+            .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
@@ -102,7 +102,7 @@ public class ClientConfigTest {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
             .addInterceptor(requestCapturingInterceptor)
             .addPlugin(new RegionAwareServicePlugin())
-            .put(RegionAwareServicePlugin.REGION, "us-west-2")
+            .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
@@ -135,7 +135,7 @@ public class ClientConfigTest {
             .protocol(new RestJsonClientProtocol())
             .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .addPlugin(new RegionAwareServicePlugin())
-            .put(RegionAwareServicePlugin.REGION, "us-west-2")
+            .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
@@ -200,7 +200,7 @@ public class ClientConfigTest {
         @Override
         public void configureClient(ClientConfig.Builder config) {
             config.endpointResolver(new RegionalEndpointResolver());
-            config.putIfAbsent(REGION, "global");
+            config.putConfigIfAbsent(REGION, "global");
         }
 
         static final class RegionalEndpointResolver implements EndpointResolver {

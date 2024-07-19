@@ -264,10 +264,9 @@ public abstract class Client {
          * @return the builder.
          * @param <T> Value type.
          */
-        // TODO: Naming: Should this method name say "what" it is putting, like putXYZ? put/putContext/putConfig?
         @SuppressWarnings("unchecked")
-        public <T> B put(Context.Key<T> key, T value) {
-            this.configBuilder.put(key, value);
+        public <T> B putConfig(Context.Key<T> key, T value) {
+            this.configBuilder.putConfig(key, value);
             return (B) this;
         }
 
@@ -280,8 +279,8 @@ public abstract class Client {
          * @param <T> Value type.
          */
         @SuppressWarnings("unchecked")
-        public <T> B putIfAbsent(Context.Key<T> key, T value) {
-            this.configBuilder.putIfAbsent(key, value);
+        public <T> B putConfigIfAbsent(Context.Key<T> key, T value) {
+            this.configBuilder.putConfigIfAbsent(key, value);
             return (B) this;
         }
 

@@ -247,8 +247,7 @@ public final class ClientConfig {
          * @return the builder.
          * @param <T> Value type.
          */
-        // TODO: Naming: Should this method name say "what" it is putting, like putXYZ? put/putContext/putConfig?
-        public <T> Builder put(Context.Key<T> key, T value) {
+        public <T> Builder putConfig(Context.Key<T> key, T value) {
             context.put(key, value);
             return this;
         }
@@ -261,7 +260,7 @@ public final class ClientConfig {
          * @return the builder.
          * @param <T> Value type.
          */
-        public <T> Builder putIfAbsent(Context.Key<T> key, T value) {
+        public <T> Builder putConfigIfAbsent(Context.Key<T> key, T value) {
             context.putIfAbsent(key, value);
             return this;
         }
