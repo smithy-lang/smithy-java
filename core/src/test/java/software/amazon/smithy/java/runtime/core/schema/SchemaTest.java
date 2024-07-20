@@ -63,4 +63,20 @@ public class SchemaTest {
         assertThat(mutuallyRecursiveA.member("b").memberTarget(), equalTo(mutuallyRecursiveB));
         assertThat(mutuallyRecursiveB.member("a").memberTarget(), equalTo(mutuallyRecursiveA));
     }
+
+    @Test
+    public void supportsSupercedingTargetTraits() {
+        var intSchema = Schema.createInteger(
+            ShapeId.from("smithy.example#DocumentedInt"),
+            new DocumentationTrait("Target")
+        );
+        var structWithMember = Schema.structureBuilder(ShapeId.from("smithy.example#StructWithMember"))
+            .putMember("member", intSchema, new DocumentationTrait("Member"))
+            .build();
+
+        assertThat(
+            structWithMember.member("member").expectTrait(DocumentationTrait.class).getValue(),
+            equalTo("Member")
+        );
+    }
 }

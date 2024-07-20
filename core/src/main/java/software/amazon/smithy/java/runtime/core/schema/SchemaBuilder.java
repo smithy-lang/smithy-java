@@ -10,6 +10,7 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -185,16 +186,11 @@ public final class SchemaBuilder {
         } else if (traits == null || traits.length == 0) {
             return targetTraits;
         } else {
-            int size = traits.length + targetTraits.size();
-            Map.Entry<Class<? extends Trait>, Trait>[] entries = new Map.Entry[size];
-            int position = 0;
-            for (var entry : targetTraits.entrySet()) {
-                entries[position++] = entry;
-            }
+            var result = new HashMap<>(targetTraits);
             for (Trait trait : traits) {
-                entries[position++] = Map.entry(trait.getClass(), trait);
+                result.put(trait.getClass(), trait);
             }
-            return Map.ofEntries(entries);
+            return result;
         }
     }
 
