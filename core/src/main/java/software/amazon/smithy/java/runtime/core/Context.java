@@ -57,6 +57,15 @@ public interface Context {
     <T> void put(Key<T> key, T value);
 
     /**
+     * Set a Property if not already present.
+     *
+     * @param key   Property key.
+     * @param value Value to set.
+     * @param <T>   Value type.
+     */
+    <T> void putIfAbsent(Key<T> key, T value);
+
+    /**
      * Get a property.
      *
      * @param key Property key to get by exact reference identity.
@@ -112,6 +121,11 @@ public interface Context {
             @Override
             public <T> void put(Key<T> key, T value) {
                 attributes.put(key, value);
+            }
+
+            @Override
+            public <T> void putIfAbsent(Key<T> key, T value) {
+                attributes.putIfAbsent(key, value);
             }
 
             @Override

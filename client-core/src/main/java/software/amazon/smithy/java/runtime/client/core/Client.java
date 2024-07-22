@@ -7,15 +7,12 @@ package software.amazon.smithy.java.runtime.client.core;
 
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
-import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
@@ -29,36 +26,25 @@ import software.amazon.smithy.model.shapes.ShapeId;
 
 public abstract class Client {
 
-    private final EndpointResolver endpointResolver;
+    private final ClientConfig config;
     private final ClientPipeline<?, ?> pipeline;
     private final TypeRegistry typeRegistry;
     private final ClientInterceptor interceptor;
-    private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
-    private final AuthSchemeResolver authSchemeResolver;
     private final IdentityResolvers identityResolvers;
 
     protected Client(Builder<?, ?> builder) {
-        this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
+        ClientConfig.Builder configBuilder = builder.configBuilder;
+        for (ClientPlugin plugin : builder.plugins) {
+            plugin.configureClient(configBuilder);
+        }
+        this.config = configBuilder.build();
 
-        this.pipeline = ClientPipeline.of(
-            Objects.requireNonNull(builder.protocol, "protocol is null"),
-            Objects.requireNonNull(builder.transport, "transport is null")
-        );
+        this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
 
         // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
-        this.interceptor = ClientInterceptor.chain(builder.interceptors);
+        this.interceptor = ClientInterceptor.chain(config.interceptors());
 
-        // By default, support NoAuthAuthScheme
-        AuthScheme<Object, Identity> noAuthAuthScheme = AuthScheme.noAuthAuthScheme();
-        this.supportedAuthSchemes.add(noAuthAuthScheme);
-        this.supportedAuthSchemes.addAll(builder.supportedAuthSchemes);
-
-        // TODO: Better defaults? Require these?
-        AuthSchemeResolver defaultAuthSchemeResolver = params -> List.of(
-            new AuthSchemeOption(noAuthAuthScheme.schemeId(), null, null)
-        );
-        this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, defaultAuthSchemeResolver);
-        this.identityResolvers = IdentityResolvers.of(builder.identityResolvers);
+        this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
 
         this.typeRegistry = TypeRegistry.builder().build();
     }
@@ -83,14 +69,16 @@ public abstract class Client {
             .putAllTypes(typeRegistry, operation.typeRegistry())
             .build();
 
+        Context mergedContext = merge(config.context(), context);
+
         var call = ClientCall.<I, O>builder()
             .input(input)
             .operation(operation)
-            .endpointResolver(endpointResolver)
-            .context(context)
+            .endpointResolver(config.endpointResolver())
+            .context(mergedContext)
             .interceptor(interceptor)
-            .supportedAuthSchemes(supportedAuthSchemes)
-            .authSchemeResolver(authSchemeResolver)
+            .supportedAuthSchemes(config.supportedAuthSchemes())
+            .authSchemeResolver(config.authSchemeResolver())
             .identityResolvers(identityResolvers)
             .errorCreator((c, id) -> {
                 ShapeId shapeId = ShapeId.from(id);
@@ -101,6 +89,19 @@ public abstract class Client {
         return pipeline.send(call);
     }
 
+    // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
+    //       We just merge the client's Context with the Context of the operation's call.
+    private Context merge(Context clientContext, Context operationContext) {
+        Context context = Context.create();
+        clientContext.keys().forEachRemaining(key -> copyContext(key, clientContext, context));
+        operationContext.keys().forEachRemaining(key -> copyContext(key, operationContext, context));
+        return context;
+    }
+
+    private <T> void copyContext(Context.Key<T> key, Context src, Context dst) {
+        dst.put(key, src.get(key));
+    }
+
     /**
      * Static builder for Clients.
      *
@@ -108,13 +109,13 @@ public abstract class Client {
      * @param <B> Implementing builder class
      */
     public static abstract class Builder<I, B extends Builder<I, B>> {
-        private ClientTransport<?, ?> transport;
-        private ClientProtocol<?, ?> protocol;
-        private EndpointResolver endpointResolver;
-        private final List<ClientInterceptor> interceptors = new ArrayList<>();
-        private AuthSchemeResolver authSchemeResolver;
-        private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
-        private final List<IdentityResolver<?>> identityResolvers = new ArrayList<>();
+
+        /**
+         * An empty ClientConfig.Builder available to subclasses to initialize in their constructors with any default
+         * values, before any overrides are provided to this Client.Builder's methods.
+         */
+        protected final ClientConfig.Builder configBuilder = ClientConfig.builder();
+        private final List<ClientPlugin> plugins = new ArrayList<>();
 
         /**
          * Set the transport used to send requests.
@@ -124,7 +125,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B transport(ClientTransport<?, ?> transport) {
-            this.transport = transport;
+            this.configBuilder.transport(transport);
             return (B) this;
         }
 
@@ -136,7 +137,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B protocol(ClientProtocol<?, ?> protocol) {
-            this.protocol = protocol;
+            this.configBuilder.protocol(protocol);
             return (B) this;
         }
 
@@ -148,7 +149,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B endpointResolver(EndpointResolver endpointResolver) {
-            this.endpointResolver = endpointResolver;
+            this.configBuilder.endpointResolver(endpointResolver);
             return (B) this;
         }
 
@@ -190,7 +191,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B addInterceptor(ClientInterceptor interceptor) {
-            interceptors.add(interceptor);
+            this.configBuilder.addInterceptor(interceptor);
             return (B) this;
         }
 
@@ -202,7 +203,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B authSchemeResolver(AuthSchemeResolver authSchemeResolver) {
-            this.authSchemeResolver = authSchemeResolver;
+            this.configBuilder.authSchemeResolver(authSchemeResolver);
             return (B) this;
         }
 
@@ -216,7 +217,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B putSupportedAuthSchemes(AuthScheme<?, ?>... authSchemes) {
-            supportedAuthSchemes.addAll(Arrays.asList(authSchemes));
+            this.configBuilder.putSupportedAuthSchemes(authSchemes);
             return (B) this;
         }
 
@@ -228,7 +229,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B addIdentityResolver(IdentityResolver<?>... identityResolvers) {
-            this.identityResolvers.addAll(Arrays.asList(identityResolvers));
+            this.configBuilder.addIdentityResolver(identityResolvers);
             return (B) this;
         }
 
@@ -240,8 +241,47 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B identityResolvers(List<IdentityResolver<?>> identityResolvers) {
-            this.identityResolvers.clear();
-            this.identityResolvers.addAll(identityResolvers);
+            this.configBuilder.identityResolvers(identityResolvers);
+            return (B) this;
+        }
+
+        /**
+         * Put a strongly typed configuration on the builder.
+         *
+         * @param key Configuration key.
+         * @param value Value to associate with the key.
+         * @return the builder.
+         * @param <T> Value type.
+         */
+        @SuppressWarnings("unchecked")
+        public <T> B putConfig(Context.Key<T> key, T value) {
+            this.configBuilder.putConfig(key, value);
+            return (B) this;
+        }
+
+        /**
+         * Put a strongly typed configuration on the builder, if not already present.
+         *
+         * @param key Configuration key.
+         * @param value Value to associate with the key.
+         * @return the builder.
+         * @param <T> Value type.
+         */
+        @SuppressWarnings("unchecked")
+        public <T> B putConfigIfAbsent(Context.Key<T> key, T value) {
+            this.configBuilder.putConfigIfAbsent(key, value);
+            return (B) this;
+        }
+
+        /**
+         * Add a plugin to the client.
+         *
+         * @param plugin Plugin to add.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B addPlugin(ClientPlugin plugin) {
+            plugins.add(Objects.requireNonNull(plugin, "plugin cannot be null"));
             return (B) this;
         }
 
