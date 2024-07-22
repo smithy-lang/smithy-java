@@ -186,7 +186,9 @@ public final class SchemaBuilder {
         } else if (traits == null || traits.length == 0) {
             return targetTraits;
         } else {
-            var result = new HashMap<>(targetTraits);
+            int size = traits.length + targetTraits.size();
+            var result = new HashMap<Class<? extends Trait>, Trait>(size);
+            result.putAll(targetTraits);
             for (Trait trait : traits) {
                 result.put(trait.getClass(), trait);
             }
