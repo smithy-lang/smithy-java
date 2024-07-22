@@ -6,7 +6,8 @@
 package software.amazon.smithy.java.runtime.example;
 
 import software.amazon.smithy.java.runtime.client.core.Client;
-import software.amazon.smithy.java.runtime.core.Context;
+import software.amazon.smithy.java.runtime.client.core.ClientConfig;
+import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImage;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
@@ -24,17 +25,29 @@ final class PersonDirectoryClientImpl extends Client implements PersonDirectoryC
     }
 
     @Override
-    public PutPersonOutput putPerson(PutPersonInput input, Context context) {
-        return call(input, new PutPerson(), context).join();
+    public PutPersonOutput putPerson(
+        PutPersonInput input,
+        ClientConfig overrideConfig,
+        ClientPlugin... overridePlugins
+    ) {
+        return call(input, new PutPerson(), overrideConfig, overridePlugins).join();
     }
 
     @Override
-    public PutPersonImageOutput putPersonImage(PutPersonImageInput input, Context context) {
-        return call(input, new PutPersonImage(), context).join();
+    public PutPersonImageOutput putPersonImage(
+        PutPersonImageInput input,
+        ClientConfig overrideConfig,
+        ClientPlugin... overridePlugins
+    ) {
+        return call(input, new PutPersonImage(), overrideConfig, overridePlugins).join();
     }
 
     @Override
-    public GetPersonImageOutput getPersonImage(GetPersonImageInput input, Context context) {
-        return call(input, new GetPersonImage(), context).join();
+    public GetPersonImageOutput getPersonImage(
+        GetPersonImageInput input,
+        ClientConfig overrideConfig,
+        ClientPlugin... overridePlugins
+    ) {
+        return call(input, new GetPersonImage(), overrideConfig, overridePlugins).join();
     }
 }

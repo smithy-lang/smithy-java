@@ -151,18 +151,30 @@ public class ClientConfigTest {
         }
 
         @Override
-        public GetPersonImageOutput getPersonImage(GetPersonImageInput input, Context context) {
-            return call(input, new GetPersonImage(), context).join();
+        public GetPersonImageOutput getPersonImage(
+            GetPersonImageInput input,
+            ClientConfig overrideConfig,
+            ClientPlugin... overridePlugins
+        ) {
+            return call(input, new GetPersonImage(), null).join();
         }
 
         @Override
-        public PutPersonOutput putPerson(PutPersonInput input, Context context) {
-            return call(input, new PutPerson(), context).join();
+        public PutPersonOutput putPerson(
+            PutPersonInput input,
+            ClientConfig overrideConfig,
+            ClientPlugin... overridePlugins
+        ) {
+            return call(input, new PutPerson(), null).join();
         }
 
         @Override
-        public PutPersonImageOutput putPersonImage(PutPersonImageInput input, Context context) {
-            return call(input, new PutPersonImage(), context).join();
+        public PutPersonImageOutput putPersonImage(
+            PutPersonImageInput input,
+            ClientConfig overrideConfig,
+            ClientPlugin... overridePlugins
+        ) {
+            return call(input, new PutPersonImage(), null).join();
         }
 
         static PersonDirectoryClientWithDefaults.Builder builder() {

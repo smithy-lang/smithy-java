@@ -7,7 +7,8 @@ package software.amazon.smithy.java.runtime.example;
 
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.client.core.Client;
-import software.amazon.smithy.java.runtime.core.Context;
+import software.amazon.smithy.java.runtime.client.core.ClientConfig;
+import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImage;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
@@ -25,17 +26,29 @@ final class PersonDirectoryAsyncClientImpl extends Client implements PersonDirec
     }
 
     @Override
-    public CompletableFuture<PutPersonOutput> putPerson(PutPersonInput input, Context context) {
-        return call(input, new PutPerson(), context);
+    public CompletableFuture<PutPersonOutput> putPerson(
+        PutPersonInput input,
+        ClientConfig overrideConfig,
+        ClientPlugin... overridePlugins
+    ) {
+        return call(input, new PutPerson(), overrideConfig, overridePlugins);
     }
 
     @Override
-    public CompletableFuture<PutPersonImageOutput> putPersonImage(PutPersonImageInput input, Context context) {
-        return call(input, new PutPersonImage(), context);
+    public CompletableFuture<PutPersonImageOutput> putPersonImage(
+        PutPersonImageInput input,
+        ClientConfig overrideConfig,
+        ClientPlugin... overridePlugins
+    ) {
+        return call(input, new PutPersonImage(), overrideConfig, overridePlugins);
     }
 
     @Override
-    public CompletableFuture<GetPersonImageOutput> getPersonImage(GetPersonImageInput input, Context context) {
-        return call(input, new GetPersonImage(), context);
+    public CompletableFuture<GetPersonImageOutput> getPersonImage(
+        GetPersonImageInput input,
+        ClientConfig overrideConfig,
+        ClientPlugin... overridePlugins
+    ) {
+        return call(input, new GetPersonImage(), overrideConfig, overridePlugins);
     }
 }

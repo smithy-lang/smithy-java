@@ -75,31 +75,13 @@ public abstract class Client {
      */
     @Deprecated // TODO: update usages to use the other call() signature
     protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
-            I input,
-            ApiOperation<I, O> operation,
-            Context context
+        I input,
+        ApiOperation<I, O> operation,
+        Context context
     ) {
         ClientConfig.Builder configBuilder = ClientConfig.builder();
         context.keys().forEachRemaining(key -> copyContext(key, context, configBuilder));
         return call(input, operation, configBuilder.build());
-    }
-
-    /**
-     * Performs the actual RPC call.
-     *
-     * @param input       Input to send.
-     * @param operation   The operation shape.
-     * @param overridePlugins Plugins to apply for the cal.
-     * @param <I>         Input shape.
-     * @param <O>         Output shape.
-     * @return Returns the deserialized output.
-     */
-    protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
-            I input,
-            ApiOperation<I, O> operation,
-            ClientPlugin... overridePlugins
-    ) {
-        return call(input, operation, null, overridePlugins);
     }
 
     /**
@@ -114,10 +96,10 @@ public abstract class Client {
      * @return Returns the deserialized output.
      */
     protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
-            I input,
-            ApiOperation<I, O> operation,
-            ClientConfig overrideConfig,
-            ClientPlugin... overridePlugins
+        I input,
+        ApiOperation<I, O> operation,
+        ClientConfig overrideConfig,
+        ClientPlugin... overridePlugins
     ) {
         // Create a copy of the type registry that adds the errors this operation can encounter.
         TypeRegistry operationRegistry = TypeRegistry.builder()
@@ -195,7 +177,9 @@ public abstract class Client {
 
         // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
         //       We just merge the client's Context with the Context of the operation's call.
-        overrideConfig.context().keys().forEachRemaining(key -> copyContext(key, overrideConfig.context(), configBuilder));
+        overrideConfig.context()
+            .keys()
+            .forEachRemaining(key -> copyContext(key, overrideConfig.context(), configBuilder));
     }
 
     private <T> void copyContext(Context.Key<T> key, Context src, ClientConfig.Builder dst) {
