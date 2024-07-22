@@ -192,7 +192,7 @@ public final class SchemaBuilder {
             for (Trait trait : traits) {
                 result.put(trait.getClass(), trait);
             }
-            return result;
+            return Collections.unmodifiableMap(result);
         }
     }
 
