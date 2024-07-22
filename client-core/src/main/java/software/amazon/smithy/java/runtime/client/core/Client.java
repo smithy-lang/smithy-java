@@ -46,16 +46,21 @@ public abstract class Client {
         }
         this.config = configBuilder.build();
 
-        // After config is built, validate it and save some derived objects from configuration, so it doesn't have to be
-        // calculated each time.
-        this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
-        Objects.requireNonNull(config.endpointResolver(), "endpointResolver is null");
+        // After config is built, validate it
+        validate(this.config);
 
+        // Save some derived objects from configuration, so it doesn't have to be calculated each time.
+        this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
         // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
         this.interceptor = ClientInterceptor.chain(config.interceptors());
         this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
 
         this.typeRegistry = TypeRegistry.builder().build();
+    }
+
+    private void validate(ClientConfig config) {
+        ClientPipeline.validateProtocolAndTransport(config.protocol(), config.transport());
+        Objects.requireNonNull(config.endpointResolver(), "endpointResolver is null");
     }
 
     /**
@@ -68,47 +73,133 @@ public abstract class Client {
      * @param <O>         Output shape.
      * @return Returns the deserialized output.
      */
+    @Deprecated // TODO: update usages to use the other call() signature
     protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
-        I input,
-        ApiOperation<I, O> operation,
-        Context context
+            I input,
+            ApiOperation<I, O> operation,
+            Context context
+    ) {
+        ClientConfig.Builder configBuilder = ClientConfig.builder();
+        context.keys().forEachRemaining(key -> copyContext(key, context, configBuilder));
+        return call(input, operation, configBuilder.build());
+    }
+
+    /**
+     * Performs the actual RPC call.
+     *
+     * @param input       Input to send.
+     * @param operation   The operation shape.
+     * @param overridePlugins Plugins to apply for the cal.
+     * @param <I>         Input shape.
+     * @param <O>         Output shape.
+     * @return Returns the deserialized output.
+     */
+    protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
+            I input,
+            ApiOperation<I, O> operation,
+            ClientPlugin... overridePlugins
+    ) {
+        return call(input, operation, null, overridePlugins);
+    }
+
+    /**
+     * Performs the actual RPC call.
+     *
+     * @param input       Input to send.
+     * @param operation   The operation shape.
+     * @param overrideConfig Configuration to override for the call.
+     * @param overridePlugins Plugins to apply for the cal.
+     * @param <I>         Input shape.
+     * @param <O>         Output shape.
+     * @return Returns the deserialized output.
+     */
+    protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
+            I input,
+            ApiOperation<I, O> operation,
+            ClientConfig overrideConfig,
+            ClientPlugin... overridePlugins
     ) {
         // Create a copy of the type registry that adds the errors this operation can encounter.
         TypeRegistry operationRegistry = TypeRegistry.builder()
             .putAllTypes(typeRegistry, operation.typeRegistry())
             .build();
 
-        Context mergedContext = merge(config.context(), context);
+        ClientPipeline<?, ?> callPipeline;
+        ClientInterceptor callInterceptor;
+        IdentityResolvers callIdentityResolvers;
+        ClientConfig callConfig;
+        if (overrideConfig == null & overridePlugins.length == 0) {
+            callConfig = config;
+            callPipeline = pipeline;
+            callInterceptor = interceptor;
+            callIdentityResolvers = identityResolvers;
+        } else {
+            callConfig = resolveConfig(overrideConfig, overridePlugins);
+            validate(callConfig);
+            callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
+            callInterceptor = ClientInterceptor.chain(config.interceptors());
+            callIdentityResolvers = IdentityResolvers.of(config.identityResolvers());
+        }
 
         var call = ClientCall.<I, O>builder()
             .input(input)
             .operation(operation)
-            .endpointResolver(config.endpointResolver())
-            .context(mergedContext)
-            .interceptor(interceptor)
-            .supportedAuthSchemes(config.supportedAuthSchemes())
-            .authSchemeResolver(config.authSchemeResolver())
-            .identityResolvers(identityResolvers)
+            .endpointResolver(callConfig.endpointResolver())
+            .context(callConfig.context())
+            .interceptor(callInterceptor)
+            .supportedAuthSchemes(callConfig.supportedAuthSchemes())
+            .authSchemeResolver(callConfig.authSchemeResolver())
+            .identityResolvers(callIdentityResolvers)
             .errorCreator((c, id) -> {
                 ShapeId shapeId = ShapeId.from(id);
                 return operationRegistry.create(shapeId, ModeledApiException.class);
             })
             .build();
 
-        return pipeline.send(call);
+        return callPipeline.send(call);
     }
 
-    // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
-    //       We just merge the client's Context with the Context of the operation's call.
-    private Context merge(Context clientContext, Context operationContext) {
-        Context context = Context.create();
-        clientContext.keys().forEachRemaining(key -> copyContext(key, clientContext, context));
-        operationContext.keys().forEachRemaining(key -> copyContext(key, operationContext, context));
-        return context;
+    private ClientConfig resolveConfig(ClientConfig overrideConfig, ClientPlugin[] overridePlugins) {
+        ClientConfig.Builder configBuilder = config.toBuilder();
+        if (overrideConfig != null) {
+            applyOverrides(configBuilder, overrideConfig);
+        }
+        for (ClientPlugin plugin : overridePlugins) {
+            plugin.configureClient(configBuilder);
+        }
+        return configBuilder.build();
     }
 
-    private <T> void copyContext(Context.Key<T> key, Context src, Context dst) {
-        dst.put(key, src.get(key));
+    private void applyOverrides(ClientConfig.Builder configBuilder, ClientConfig overrideConfig) {
+        if (overrideConfig.transport() != null) {
+            configBuilder.transport(overrideConfig.transport());
+        }
+        if (overrideConfig.protocol() != null) {
+            configBuilder.protocol(overrideConfig.protocol());
+        }
+        if (overrideConfig.endpointResolver() != null) {
+            configBuilder.endpointResolver(overrideConfig.endpointResolver());
+        }
+        if (overrideConfig.interceptors() != null) {
+            overrideConfig.interceptors().forEach(configBuilder::addInterceptor);
+        }
+        if (overrideConfig.authSchemeResolver() != null) {
+            configBuilder.authSchemeResolver(overrideConfig.authSchemeResolver());
+        }
+        if (overrideConfig.supportedAuthSchemes() != null) {
+            overrideConfig.supportedAuthSchemes().forEach(configBuilder::putSupportedAuthSchemes);
+        }
+        if (overrideConfig.identityResolvers() != null) {
+            configBuilder.identityResolvers(overrideConfig.identityResolvers());
+        }
+
+        // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
+        //       We just merge the client's Context with the Context of the operation's call.
+        overrideConfig.context().keys().forEachRemaining(key -> copyContext(key, overrideConfig.context(), configBuilder));
+    }
+
+    private <T> void copyContext(Context.Key<T> key, Context src, ClientConfig.Builder dst) {
+        dst.putConfig(key, src.get(key));
     }
 
     /**

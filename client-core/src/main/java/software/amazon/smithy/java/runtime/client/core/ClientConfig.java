@@ -86,6 +86,18 @@ public final class ClientConfig {
         return new Builder();
     }
 
+    public Builder toBuilder() {
+        Builder builder = builder()
+            .transport(transport)
+            .protocol(protocol)
+            .endpointResolver(endpointResolver)
+            .authSchemeResolver(authSchemeResolver)
+            .identityResolvers(identityResolvers);
+        interceptors.forEach(builder::addInterceptor);
+        supportedAuthSchemes.forEach(builder::putSupportedAuthSchemes);
+        return builder;
+    }
+
     /**
      * Static builder for ClientConfiguration.
      */
