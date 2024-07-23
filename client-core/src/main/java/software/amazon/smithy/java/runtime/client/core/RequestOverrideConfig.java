@@ -10,10 +10,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
-import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
@@ -21,19 +19,17 @@ import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.Context;
 
 // TODO: This is currently not truly immutable, since Context is mutable.
+
 /**
- * An immutable representation of configurations of a {@link Client}.
+ * An immutable representation of configuration overrides when invoking {@link Client#call}.
  *
  * <p>It has well-defined configuration elements that every {@link Client} needs. For extensible parts of a
  * {@link Client} that may need additional configuration, type safe configuration can be included using
- * {@link Context.Key}.
+ * {@link Context.Key}. It can also include {@link ClientPlugin}s that need to be applied.
  */
-public final class ClientConfig {
-
-    private static final AuthScheme<Object, Identity> NO_AUTH_AUTH_SCHEME = AuthScheme.noAuthAuthScheme();
-    private static final AuthSchemeResolver DEFAULT_AUTH_SCHEME_RESOLVER = params -> List.of(
-        new AuthSchemeOption(NO_AUTH_AUTH_SCHEME.schemeId(), null, null)
-    );
+// TODO: share internal code across ClientConfig and RequestOverrideConfig to avoid duplication/updating in 2 places.
+// TODO: Make this extensible for code generating named methods for Context.Keys.
+public final class RequestOverrideConfig {
 
     private final ClientTransport<?, ?> transport;
     private final ClientProtocol<?, ?> protocol;
@@ -43,27 +39,21 @@ public final class ClientConfig {
     private final AuthSchemeResolver authSchemeResolver;
     private final List<IdentityResolver<?>> identityResolvers;
     private final Context context;
+    private final List<ClientPlugin> plugins;
 
-    private ClientConfig(Builder builder) {
-        this.transport = Objects.requireNonNull(builder.transport, "transport cannot be null");
-        this.protocol = Objects.requireNonNull(builder.protocol, "protocol cannot be null");
-        ClientPipeline.validateProtocolAndTransport(protocol, transport);
-
-        this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
-
+    private RequestOverrideConfig(Builder builder) {
+        this.transport = builder.transport;
+        this.protocol = builder.protocol;
+        this.endpointResolver = builder.endpointResolver;
         this.interceptors = List.copyOf(builder.interceptors);
-
-        // By default, support NoAuthAuthScheme
-        List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
-        supportedAuthSchemes.add(NO_AUTH_AUTH_SCHEME);
-        supportedAuthSchemes.addAll(builder.supportedAuthSchemes);
-        this.supportedAuthSchemes = List.copyOf(supportedAuthSchemes);
-
-        this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, DEFAULT_AUTH_SCHEME_RESOLVER);
+        this.supportedAuthSchemes = List.copyOf(builder.supportedAuthSchemes);
+        this.authSchemeResolver = builder.authSchemeResolver;
         this.identityResolvers = List.copyOf(builder.identityResolvers);
 
         // TODO: make a copy to prevent builder.context getting updated later and affecting this ClientConfig's context.
         this.context = builder.context;
+
+        this.plugins = List.copyOf(builder.plugins);
     }
 
     // Note: Making all the accessors package-private for now as they are only needed by Client, but could be public.
@@ -99,6 +89,10 @@ public final class ClientConfig {
         return context; // TODO: return an unmodifiable view
     }
 
+    List<ClientPlugin> plugins() {
+        return plugins;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -112,16 +106,11 @@ public final class ClientConfig {
             .identityResolvers(identityResolvers);
         interceptors.forEach(builder::addInterceptor);
         supportedAuthSchemes.forEach(builder::putSupportedAuthSchemes);
-        context.keys().forEachRemaining(key -> copyContext(key, context, builder));
         return builder;
     }
 
-    private <T> void copyContext(Context.Key<T> key, Context src, ClientConfig.Builder dst) {
-        dst.putConfig(key, src.get(key));
-    }
-
     /**
-     * Static builder for ClientConfiguration.
+     * Static builder for {@link RequestOverrideConfig}.
      */
     public static final class Builder {
         private ClientTransport<?, ?> transport;
@@ -132,8 +121,7 @@ public final class ClientConfig {
         private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
         private final List<IdentityResolver<?>> identityResolvers = new ArrayList<>();
         private final Context context = Context.create();
-
-        // TODO: Add getters for each, so that a ClientPlugin can read the existing values.
+        private final List<ClientPlugin> plugins = new ArrayList<>();
 
         /**
          * Set the transport used to send requests.
@@ -283,12 +271,24 @@ public final class ClientConfig {
         }
 
         /**
+         * Add a plugin to the client.
+         *
+         * @param plugin Plugin to add.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public Builder addPlugin(ClientPlugin plugin) {
+            plugins.add(Objects.requireNonNull(plugin, "plugin cannot be null"));
+            return this;
+        }
+
+        /**
          * Creates the client configuration.
          *
          * @return the created client configuration.
          */
-        public ClientConfig build() {
-            return new ClientConfig(this);
+        public RequestOverrideConfig build() {
+            return new RequestOverrideConfig(this);
         }
     }
 }

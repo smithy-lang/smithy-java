@@ -6,8 +6,7 @@
 package software.amazon.smithy.java.runtime.example;
 
 import software.amazon.smithy.java.runtime.client.core.Client;
-import software.amazon.smithy.java.runtime.client.core.ClientConfig;
-import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
+import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImageInput;
@@ -17,31 +16,23 @@ import software.amazon.smithy.java.runtime.example.model.PutPersonOutput;
 
 public interface PersonDirectoryClient {
 
-    default GetPersonImageOutput getPersonImage(GetPersonImageInput input, ClientPlugin... plugins) {
-        return getPersonImage(input, null, plugins);
+    default GetPersonImageOutput getPersonImage(GetPersonImageInput input) {
+        return getPersonImage(input, null);
     }
 
-    GetPersonImageOutput getPersonImage(
-        GetPersonImageInput input,
-        ClientConfig overrideConfig,
-        ClientPlugin... overridePlugins
-    );
+    GetPersonImageOutput getPersonImage(GetPersonImageInput input, RequestOverrideConfig overrideConfig);
 
-    default PutPersonOutput putPerson(PutPersonInput input, ClientPlugin... plugins) {
-        return putPerson(input, null, plugins);
+    default PutPersonOutput putPerson(PutPersonInput input) {
+        return putPerson(input, null);
     }
 
-    PutPersonOutput putPerson(PutPersonInput input, ClientConfig overrideConfig, ClientPlugin... overridePlugins);
+    PutPersonOutput putPerson(PutPersonInput input, RequestOverrideConfig overrideConfig);
 
-    default PutPersonImageOutput putPersonImage(PutPersonImageInput input, ClientPlugin... overridePlugins) {
-        return putPersonImage(input, null, overridePlugins);
+    default PutPersonImageOutput putPersonImage(PutPersonImageInput input) {
+        return putPersonImage(input, null);
     }
 
-    PutPersonImageOutput putPersonImage(
-        PutPersonImageInput input,
-        ClientConfig overrideConfig,
-        ClientPlugin... overridePlugins
-    );
+    PutPersonImageOutput putPersonImage(PutPersonImageInput input, RequestOverrideConfig overrideConfig);
 
     static Builder builder() {
         return new Builder();
