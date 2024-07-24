@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiFunction;
@@ -38,7 +37,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
     private final EndpointResolver endpointResolver;
     private final ApiOperation<I, O> operation;
     private final Context context;
-    private final BiFunction<Context, String, Optional<ShapeBuilder<ModeledApiException>>> errorCreator;
+    private final BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator;
     private final ClientInterceptor interceptor;
     private final AuthSchemeResolver authSchemeResolver;
     private final Map<String, AuthScheme<?, ?>> supportedAuthSchemes;
@@ -124,9 +123,9 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
      * @param context Context to pass to the creator.
      * @param shapeId Nullable ID of the error shape to create, if known. A string is used because sometimes the
      *                only information we have is just a name.
-     * @return Returns the error deserializer if present.
+     * @return Returns the error deserializer, or null if no deserializer could be found.
      */
-    public Optional<ShapeBuilder<ModeledApiException>> createExceptionBuilder(Context context, String shapeId) {
+    public ShapeBuilder<ModeledApiException> createExceptionBuilder(Context context, String shapeId) {
         return errorCreator.apply(context, shapeId);
     }
 
@@ -178,7 +177,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         private EndpointResolver endpointResolver;
         private ApiOperation<I, O> operation;
         private Context context;
-        private BiFunction<Context, String, Optional<ShapeBuilder<ModeledApiException>>> errorCreator;
+        private BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator;
         private ClientInterceptor interceptor = ClientInterceptor.NOOP;
         private AuthSchemeResolver authSchemeResolver;
         private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
@@ -230,7 +229,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
          * @return Returns the builder.
          */
         public Builder<I, O> errorCreator(
-            BiFunction<Context, String, Optional<ShapeBuilder<ModeledApiException>>> errorCreator
+            BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator
         ) {
             this.errorCreator = errorCreator;
             return this;

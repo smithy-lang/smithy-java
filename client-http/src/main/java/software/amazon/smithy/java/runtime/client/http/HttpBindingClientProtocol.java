@@ -133,7 +133,7 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
             })
             // Attempt to match the extracted error ID to a modeled error type.
             .flatMap(
-                errorId -> call.createExceptionBuilder(call.context(), errorId)
+                errorId -> Optional.ofNullable(call.createExceptionBuilder(call.context(), errorId))
                     .<CompletableFuture<? extends ApiException>>map(
                         error -> createModeledException(codec, response, error)
                     )

@@ -16,9 +16,6 @@ import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientPr
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
-import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
-import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
-import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -28,7 +25,6 @@ import software.amazon.smithy.java.runtime.example.model.PutPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonOutput;
-import software.amazon.smithy.java.runtime.example.model.ValidationError;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 
@@ -108,18 +104,6 @@ public class GenericTest {
 
         // Now serialize that to see that it round-trips.
         System.out.println(codec.serializeToString(inputCopy));
-    }
-
-    @Test
-    public void testTypeRegistry() {
-        TypeRegistry registry = TypeRegistry.builder()
-            .putType(PutPersonInput.ID, PutPersonInput.class, PutPersonInput::builder)
-            .putType(ValidationError.ID, ValidationError.class, ValidationError::builder)
-            .build();
-
-        registry.create(ValidationError.ID, ModeledApiException.class)
-            .map(ShapeBuilder::build)
-            .ifPresent(System.out::println);
     }
 
     @Test

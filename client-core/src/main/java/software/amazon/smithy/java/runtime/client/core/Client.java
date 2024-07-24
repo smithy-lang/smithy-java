@@ -79,9 +79,7 @@ public abstract class Client {
         Context context
     ) {
         // Create a copy of the type registry that adds the errors this operation can encounter.
-        TypeRegistry operationRegistry = TypeRegistry.builder()
-            .putAllTypes(typeRegistry, operation.typeRegistry())
-            .build();
+        TypeRegistry operationRegistry = TypeRegistry.compose(operation.typeRegistry(), typeRegistry);
 
         var call = ClientCall.<I, O>builder()
             .input(input)

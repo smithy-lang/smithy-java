@@ -167,7 +167,7 @@ public class OperationGenerator
             });
     }
 
-
+    // Registers errors of an operation with the type registry.
     private record TypeRegistryGenerator(
         JavaWriter writer,
         OperationShape shape,
@@ -180,8 +180,6 @@ public class OperationGenerator
         public void run() {
             writer.write("private final ${typeRegistry:T} typeRegistry = ${typeRegistry:T}.builder()");
             writer.indent();
-            writer.write(".putType(${inputType:T}.ID, ${inputType:T}.class, ${inputType:T}::builder)");
-            writer.write(".putType(${outputType:T}.ID, ${outputType:T}.class, ${outputType:T}::builder)");
             for (var errorId : shape.getErrors(service)) {
                 var errorShape = model.expectShape(errorId);
                 writer.write(".putType($1T.ID, $1T.class, $1T::builder)", symbolProvider.toSymbol(errorShape));

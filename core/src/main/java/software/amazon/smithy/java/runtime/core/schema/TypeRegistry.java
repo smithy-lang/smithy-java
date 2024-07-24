@@ -7,83 +7,120 @@ package software.amazon.smithy.java.runtime.core.schema;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Supplier;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.utils.SmithyBuilder;
 
 /**
- * Creates shapes and polymorphic shapes using a shape registry of shape IDs to builders.
+ * Supports on-demand deserialization of types by providing a registry of shape IDs to shape builders.
  */
-public final class TypeRegistry {
-
-    private record Entry<T extends SerializableShape>(Class<T> type, Supplier<ShapeBuilder<T>> supplier) {}
-
-    private final Map<ShapeId, Entry<?>> supplierMap;
-
-    private TypeRegistry(Builder builder) {
-        this.supplierMap = builder.supplierMap;
-        builder.supplierMap = new HashMap<>();
-    }
-
+public interface TypeRegistry {
     /**
-     * Create a builder to create a TypeRegistry.
+     * Gets the shape class registered for the given shape ID.
      *
-     * @return the created builder.
+     * @param shapeId Shape ID to check.
+     * @return the shape class registered for this ID, or null if not found.
      */
-    public static Builder builder() {
-        return new Builder();
-    }
+    Class<? extends SerializableStruct> getShapeClass(ShapeId shapeId);
 
     /**
      * Create a shape builder only on the shape ID.
      *
      * @param shapeId Shape ID to attempt to create.
-     * @return the optionally created builder.
+     * @return the created builder, or null if no matching builder was found.
      */
-    public Optional<ShapeBuilder<?>> create(ShapeId shapeId) {
-        var mapping = supplierMap.get(shapeId);
-        if (mapping == null) {
-            return Optional.empty();
-        } else {
-            return Optional.ofNullable(mapping.supplier.get());
-        }
-    }
+    ShapeBuilder<?> create(ShapeId shapeId);
 
     /**
      * Create a shape builder based on a shape ID and expected type.
      *
      * @param shapeId Shape ID to attempt to create.
-     * @param type    Shape class.
-     * @return the optionally created builder.
-     * @param <T> Shape type.
+     * @param type The expected class of the created shape.
+     * @return the created builder, or null if no matching builder was found.
+     * @param <T> Shape type to create.
      * @throws SerializationException if the given type isn't compatible with the shape in the registry.
      */
     @SuppressWarnings("unchecked")
-    public <T extends SerializableShape> Optional<ShapeBuilder<T>> create(ShapeId shapeId, Class<T> type) {
-        var mapping = supplierMap.get(shapeId);
-        if (mapping == null) {
-            return Optional.empty();
-        } else if (type.isAssignableFrom(mapping.type)) {
-            return Optional.ofNullable((ShapeBuilder<T>) mapping.supplier.get());
-        } else {
+    default <T extends SerializableStruct> ShapeBuilder<T> create(ShapeId shapeId, Class<T> type) {
+        var builder = create(shapeId);
+        if (builder == null) {
+            return null;
+        }
+
+        var expectedType = getShapeClass(shapeId);
+        if (!type.isAssignableFrom(expectedType)) {
             throw new SerializationException("Polymorphic shape " + shapeId + " is not compatible with " + type);
         }
+
+        return (ShapeBuilder<T>) builder;
     }
 
     /**
-     * Builder used to create a {@link TypeRegistry}.
+     * Compose multiple type registries together.
+     *
+     * @param first First type registry to check.
+     * @param more Subsequent type registries to check.
+     * @return the composed type registry.
      */
-    public static final class Builder implements SmithyBuilder<TypeRegistry> {
+    static TypeRegistry compose(TypeRegistry first, TypeRegistry... more) {
+        return new TypeRegistry() {
+            @Override
+            public Class<? extends SerializableStruct> getShapeClass(ShapeId shapeId) {
+                var result = first.getShapeClass(shapeId);
+                if (result == null) {
+                    for (var subsequent : more) {
+                        result = subsequent.getShapeClass(shapeId);
+                        if (result != null) {
+                            break;
+                        }
+                    }
+                }
+                return result;
+            }
 
-        private Map<ShapeId, Entry<?>> supplierMap = new HashMap<>();
+            @Override
+            public ShapeBuilder<?> create(ShapeId shapeId) {
+                var result = first.create(shapeId);
+                if (result == null) {
+                    for (var subsequent : more) {
+                        result = subsequent.create(shapeId);
+                        if (result != null) {
+                            break;
+                        }
+                    }
+                }
+                return result;
+            }
+        };
+    }
+
+    /**
+     * Build up a TypeRegistry.
+     *
+     * @return the type registry builder.
+     */
+    static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Builder used to create a type registry.
+     */
+    final class Builder {
+
+        private record Entry<T extends SerializableStruct>(Class<T> type, Supplier<ShapeBuilder<T>> supplier) {}
+
+        private final Map<ShapeId, Entry<? extends SerializableStruct>> supplierMap = new HashMap<>();
 
         private Builder() {}
 
-        @Override
+        /**
+         * Create a type registry for the registered classes.
+         *
+         * @return the created registry.
+         */
         public TypeRegistry build() {
-            return new TypeRegistry(this);
+            return new DefaultRegistry(supplierMap);
         }
 
         /**
@@ -95,7 +132,7 @@ public final class TypeRegistry {
          * @return the builder.
          * @param <T> shape type.
          */
-        public <T extends SerializableShape> Builder putType(
+        public <T extends SerializableStruct> Builder putType(
             ShapeId shapeId,
             Class<T> type,
             Supplier<ShapeBuilder<T>> supplier
@@ -104,17 +141,24 @@ public final class TypeRegistry {
             return this;
         }
 
-        /**
-         * Put all the types contained in other registries into this registry.
-         *
-         * @param others Registries to copy.
-         * @return the builder.
-         */
-        public Builder putAllTypes(TypeRegistry... others) {
-            for (TypeRegistry other : others) {
-                supplierMap.putAll(other.supplierMap);
+        private static final class DefaultRegistry implements TypeRegistry {
+            private final Map<ShapeId, Entry<?>> supplierMap;
+
+            private DefaultRegistry(Map<ShapeId, Entry<? extends SerializableStruct>> supplierMap) {
+                this.supplierMap = Map.copyOf(supplierMap);
             }
-            return this;
+
+            @Override
+            public Class<? extends SerializableStruct> getShapeClass(ShapeId shapeId) {
+                var entry = supplierMap.get(shapeId);
+                return entry == null ? null : entry.type;
+            }
+
+            @Override
+            public ShapeBuilder<?> create(ShapeId shapeId) {
+                var entry = supplierMap.get(shapeId);
+                return entry == null ? null : entry.supplier.get();
+            }
         }
     }
 }
