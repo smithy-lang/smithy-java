@@ -100,7 +100,7 @@ public abstract class Client {
             callInterceptor = interceptor;
             callIdentityResolvers = identityResolvers;
         } else {
-            callConfig = resolveConfig(overrideConfig);
+            callConfig = config.withRequestOverride(overrideConfig);
             callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
             callInterceptor = ClientInterceptor.chain(config.interceptors());
             callIdentityResolvers = IdentityResolvers.of(config.identityResolvers());
@@ -122,49 +122,6 @@ public abstract class Client {
             .build();
 
         return callPipeline.send(call);
-    }
-
-    private ClientConfig resolveConfig(RequestOverrideConfig overrideConfig) {
-        ClientConfig.Builder configBuilder = config.toBuilder();
-        applyOverrides(configBuilder, overrideConfig);
-        for (ClientPlugin plugin : overrideConfig.plugins()) {
-            plugin.configureClient(configBuilder);
-        }
-        return configBuilder.build();
-    }
-
-    private void applyOverrides(ClientConfig.Builder configBuilder, RequestOverrideConfig overrideConfig) {
-        if (overrideConfig.transport() != null) {
-            configBuilder.transport(overrideConfig.transport());
-        }
-        if (overrideConfig.protocol() != null) {
-            configBuilder.protocol(overrideConfig.protocol());
-        }
-        if (overrideConfig.endpointResolver() != null) {
-            configBuilder.endpointResolver(overrideConfig.endpointResolver());
-        }
-        if (overrideConfig.interceptors() != null) {
-            overrideConfig.interceptors().forEach(configBuilder::addInterceptor);
-        }
-        if (overrideConfig.authSchemeResolver() != null) {
-            configBuilder.authSchemeResolver(overrideConfig.authSchemeResolver());
-        }
-        if (overrideConfig.supportedAuthSchemes() != null) {
-            overrideConfig.supportedAuthSchemes().forEach(configBuilder::putSupportedAuthSchemes);
-        }
-        if (overrideConfig.identityResolvers() != null) {
-            configBuilder.identityResolvers(overrideConfig.identityResolvers());
-        }
-
-        // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
-        //       We just merge the client's Context with the Context of the operation's call.
-        overrideConfig.context()
-            .keys()
-            .forEachRemaining(key -> copyContext(key, overrideConfig.context(), configBuilder));
-    }
-
-    private <T> void copyContext(Context.Key<T> key, Context src, ClientConfig.Builder dst) {
-        dst.putConfig(key, src.get(key));
     }
 
     private <T> void copyContext(Context.Key<T> key, Context src, RequestOverrideConfig.Builder dst) {

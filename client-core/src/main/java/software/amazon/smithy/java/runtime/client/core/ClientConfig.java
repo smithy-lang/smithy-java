@@ -103,7 +103,7 @@ public final class ClientConfig {
         return new Builder();
     }
 
-    public Builder toBuilder() {
+    private Builder toBuilder() {
         Builder builder = builder()
             .transport(transport)
             .protocol(protocol)
@@ -116,7 +116,47 @@ public final class ClientConfig {
         return builder;
     }
 
-    private <T> void copyContext(Context.Key<T> key, Context src, ClientConfig.Builder dst) {
+    public ClientConfig withRequestOverride(RequestOverrideConfig overrideConfig) {
+        Objects.requireNonNull(overrideConfig, "overrideConfig cannot be null");
+        Builder builder = toBuilder();
+        applyOverrides(builder, overrideConfig);
+        for (ClientPlugin plugin : overrideConfig.plugins()) {
+            plugin.configureClient(builder);
+        }
+        return builder.build();
+    }
+
+    private void applyOverrides(Builder builder, RequestOverrideConfig overrideConfig) {
+        if (overrideConfig.transport() != null) {
+            builder.transport(overrideConfig.transport());
+        }
+        if (overrideConfig.protocol() != null) {
+            builder.protocol(overrideConfig.protocol());
+        }
+        if (overrideConfig.endpointResolver() != null) {
+            builder.endpointResolver(overrideConfig.endpointResolver());
+        }
+        if (overrideConfig.interceptors() != null) {
+            overrideConfig.interceptors().forEach(builder::addInterceptor);
+        }
+        if (overrideConfig.authSchemeResolver() != null) {
+            builder.authSchemeResolver(overrideConfig.authSchemeResolver());
+        }
+        if (overrideConfig.supportedAuthSchemes() != null) {
+            overrideConfig.supportedAuthSchemes().forEach(builder::putSupportedAuthSchemes);
+        }
+        if (overrideConfig.identityResolvers() != null) {
+            builder.identityResolvers(overrideConfig.identityResolvers());
+        }
+
+        // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
+        //       We just merge the client's Context with the Context of the operation's call.
+        overrideConfig.context()
+            .keys()
+            .forEachRemaining(key -> copyContext(key, overrideConfig.context(), builder));
+    }
+
+    private <T> void copyContext(Context.Key<T> key, Context src, Builder dst) {
         dst.putConfig(key, src.get(key));
     }
 
