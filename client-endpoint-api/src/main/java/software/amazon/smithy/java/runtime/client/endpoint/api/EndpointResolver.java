@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.client.endpoint.api;
 
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -27,6 +28,7 @@ public interface EndpointResolver {
      * @return the endpoint resolver.
      */
     static EndpointResolver staticEndpoint(Endpoint endpoint) {
+        Objects.requireNonNull(endpoint);
         return params -> CompletableFuture.completedFuture(endpoint);
     }
 }

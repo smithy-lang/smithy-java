@@ -17,6 +17,7 @@ import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientPr
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.ClientConfig;
 import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
+import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
@@ -151,18 +152,18 @@ public class ClientConfigTest {
         }
 
         @Override
-        public GetPersonImageOutput getPersonImage(GetPersonImageInput input, Context context) {
-            return call(input, new GetPersonImage(), context).join();
+        public GetPersonImageOutput getPersonImage(GetPersonImageInput input, RequestOverrideConfig overrideConfig) {
+            return call(input, new GetPersonImage(), overrideConfig).join();
         }
 
         @Override
-        public PutPersonOutput putPerson(PutPersonInput input, Context context) {
-            return call(input, new PutPerson(), context).join();
+        public PutPersonOutput putPerson(PutPersonInput input, RequestOverrideConfig overrideConfig) {
+            return call(input, new PutPerson(), overrideConfig).join();
         }
 
         @Override
-        public PutPersonImageOutput putPersonImage(PutPersonImageInput input, Context context) {
-            return call(input, new PutPersonImage(), context).join();
+        public PutPersonImageOutput putPersonImage(PutPersonImageInput input, RequestOverrideConfig overrideConfig) {
+            return call(input, new PutPersonImage(), overrideConfig).join();
         }
 
         static PersonDirectoryClientWithDefaults.Builder builder() {
@@ -173,6 +174,7 @@ public class ClientConfigTest {
             Client.Builder<PersonDirectoryClient, PersonDirectoryClientWithDefaults.Builder> {
 
             private Builder() {
+                ClientConfig.Builder configBuilder = configBuilder();
                 configBuilder.protocol(new RestJsonClientProtocol());
                 configBuilder.transport(new JavaHttpClientTransport(HttpClient.newHttpClient()));
 

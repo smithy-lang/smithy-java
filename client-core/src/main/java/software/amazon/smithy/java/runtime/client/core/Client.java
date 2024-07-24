@@ -59,47 +59,73 @@ public abstract class Client {
      * @param <O>         Output shape.
      * @return Returns the deserialized output.
      */
+    @Deprecated // TODO: update usages to use the other call() signature
     protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
         I input,
         ApiOperation<I, O> operation,
         Context context
+    ) {
+        RequestOverrideConfig.Builder overrideConfigBuilder = RequestOverrideConfig.builder();
+        context.keys().forEachRemaining(key -> copyContext(key, context, overrideConfigBuilder));
+        return call(input, operation, overrideConfigBuilder.build());
+    }
+
+    /**
+     * Performs the actual RPC call.
+     *
+     * @param input       Input to send.
+     * @param operation   The operation shape.
+     * @param overrideConfig Configuration to override for the call.
+     * @param <I>         Input shape.
+     * @param <O>         Output shape.
+     * @return Returns the deserialized output.
+     */
+    protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
+        I input,
+        ApiOperation<I, O> operation,
+        RequestOverrideConfig overrideConfig
     ) {
         // Create a copy of the type registry that adds the errors this operation can encounter.
         TypeRegistry operationRegistry = TypeRegistry.builder()
             .putAllTypes(typeRegistry, operation.typeRegistry())
             .build();
 
-        Context mergedContext = merge(config.context(), context);
+        ClientPipeline<?, ?> callPipeline;
+        ClientInterceptor callInterceptor;
+        IdentityResolvers callIdentityResolvers;
+        ClientConfig callConfig;
+        if (overrideConfig == null) {
+            callConfig = config;
+            callPipeline = pipeline;
+            callInterceptor = interceptor;
+            callIdentityResolvers = identityResolvers;
+        } else {
+            callConfig = config.withRequestOverride(overrideConfig);
+            callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
+            callInterceptor = ClientInterceptor.chain(config.interceptors());
+            callIdentityResolvers = IdentityResolvers.of(config.identityResolvers());
+        }
 
         var call = ClientCall.<I, O>builder()
             .input(input)
             .operation(operation)
-            .endpointResolver(config.endpointResolver())
-            .context(mergedContext)
-            .interceptor(interceptor)
-            .supportedAuthSchemes(config.supportedAuthSchemes())
-            .authSchemeResolver(config.authSchemeResolver())
-            .identityResolvers(identityResolvers)
+            .endpointResolver(callConfig.endpointResolver())
+            .context(callConfig.context())
+            .interceptor(callInterceptor)
+            .supportedAuthSchemes(callConfig.supportedAuthSchemes())
+            .authSchemeResolver(callConfig.authSchemeResolver())
+            .identityResolvers(callIdentityResolvers)
             .errorCreator((c, id) -> {
                 ShapeId shapeId = ShapeId.from(id);
                 return operationRegistry.create(shapeId, ModeledApiException.class);
             })
             .build();
 
-        return pipeline.send(call);
+        return callPipeline.send(call);
     }
 
-    // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
-    //       We just merge the client's Context with the Context of the operation's call.
-    private Context merge(Context clientContext, Context operationContext) {
-        Context context = Context.create();
-        clientContext.keys().forEachRemaining(key -> copyContext(key, clientContext, context));
-        operationContext.keys().forEachRemaining(key -> copyContext(key, operationContext, context));
-        return context;
-    }
-
-    private <T> void copyContext(Context.Key<T> key, Context src, Context dst) {
-        dst.put(key, src.get(key));
+    private <T> void copyContext(Context.Key<T> key, Context src, RequestOverrideConfig.Builder dst) {
+        dst.putConfig(key, src.get(key));
     }
 
     /**
@@ -110,12 +136,17 @@ public abstract class Client {
      */
     public static abstract class Builder<I, B extends Builder<I, B>> {
 
+        private final ClientConfig.Builder configBuilder = ClientConfig.builder();
+
+        private final List<ClientPlugin> plugins = new ArrayList<>();
+
         /**
-         * An empty ClientConfig.Builder available to subclasses to initialize in their constructors with any default
+         * A ClientConfig.Builder available to subclasses to initialize in their constructors with any default
          * values, before any overrides are provided to this Client.Builder's methods.
          */
-        protected final ClientConfig.Builder configBuilder = ClientConfig.builder();
-        private final List<ClientPlugin> plugins = new ArrayList<>();
+        protected ClientConfig.Builder configBuilder() {
+            return configBuilder;
+        }
 
         /**
          * Set the transport used to send requests.
