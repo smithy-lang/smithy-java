@@ -366,14 +366,14 @@ public final class UnionGenerator
                 """);
 
             writer.pushState();
-            writer.putContext("serdeException", SerializationException.class);
+            writer.putContext("illegalArgument", IllegalArgumentException.class);
             writer.write("""
                 private void checkForExistingValue() {
                     if (this.value != null) {
                         if (this.value.type() == Type.$$UNKNOWN) {
-                            throw new ${serdeException:T}("Cannot change union from unknown to known variant");
+                            throw new ${illegalArgument:T}("Cannot change union from unknown to known variant");
                         }
-                        throw new ${serdeException:T}("Only one value may be set for unions");
+                        throw new ${illegalArgument:T}("Only one value may be set for unions");
                     }
                 }
                 """);
