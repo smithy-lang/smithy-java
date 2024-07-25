@@ -62,7 +62,12 @@ public final class JsonCodec implements Codec {
         var fieldMapper = builder.useJsonName
             ? new JsonFieldMapper.UseJsonNameTrait()
             : JsonFieldMapper.UseMemberName.INSTANCE;
-        settings = new Settings(timestampResolver, fieldMapper, builder.forbidUnknownUnionMembers);
+        settings = new Settings(
+            timestampResolver,
+            fieldMapper,
+            builder.forbidUnknownUnionMembers,
+            builder.defaultNamespace
+        );
         provider = builder.provider == null ? PROVIDER : builder.provider;
     }
 
@@ -96,6 +101,7 @@ public final class JsonCodec implements Codec {
         private TimestampFormatter defaultTimestampFormat = TimestampFormatter.Prelude.EPOCH_SECONDS;
         private JsonSerdeProvider provider;
         private boolean forbidUnknownUnionMembers;
+        private String defaultNamespace;
 
         private Builder() {}
 
@@ -123,6 +129,11 @@ public final class JsonCodec implements Codec {
             return this;
         }
 
+        public Builder defaultNamespace(String defaultNamespace) {
+            this.defaultNamespace = defaultNamespace;
+            return this;
+        }
+
         Builder overrideSerdeProvider(JsonSerdeProvider provider) {
             this.provider = Objects.requireNonNull(provider);
             return this;
@@ -135,6 +146,7 @@ public final class JsonCodec implements Codec {
                 ", useTimestampFormat=" + useTimestampFormat +
                 ", defaultTimestampFormat=" + defaultTimestampFormat +
                 ", provider=" + provider.getName() +
+                ", defaultNamespace=" + defaultNamespace +
                 '}';
         }
     }
@@ -142,6 +154,7 @@ public final class JsonCodec implements Codec {
     public record Settings(
         TimestampResolver timestampResolver,
         JsonFieldMapper fieldMapper,
-        boolean forbidUnknownUnionMembers
+        boolean forbidUnknownUnionMembers,
+        String defaultNamespace
     ) {}
 }

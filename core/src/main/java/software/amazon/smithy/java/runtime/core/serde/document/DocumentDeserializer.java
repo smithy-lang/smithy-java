@@ -12,6 +12,8 @@ import java.time.Instant;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeIdSyntaxException;
 
 /**
  * A deserializer for Document types.
@@ -21,6 +23,38 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 public class DocumentDeserializer implements ShapeDeserializer {
 
     private final Document value;
+
+    /**
+     * Helper method used to parse a document discriminator from a string.
+     *
+     * @param text Discriminator value to parse.
+     * @param defaultNamespace The default namespace to use if one is not in {@code text}. Use null for no default.
+     * @return the parsed shape ID discriminator.
+     * @throws DiscriminatorException if a discriminator cannot be parsed.
+     */
+    public static ShapeId parseDiscriminator(String text, String defaultNamespace) {
+        if (text == null) {
+            throw new DiscriminatorException("Unable to find a document discriminator");
+        }
+
+        try {
+            return ShapeId.fromOptionalNamespace(defaultNamespace, text);
+        } catch (ShapeIdSyntaxException e) {
+            if (defaultNamespace == null && !text.contains("#")) {
+                throw new DiscriminatorException(
+                    "Attempted to parse a document discriminator that only provides a "
+                        + "shape name, but no default namespace was configured: " + text,
+                    e
+                );
+            } else {
+                throw new DiscriminatorException(
+                    "Unable to parse the document discriminator into a valid shape ID: "
+                        + text,
+                    e
+                );
+            }
+        }
+    }
 
     public DocumentDeserializer(Document value) {
         this.value = value;
@@ -104,9 +138,6 @@ public class DocumentDeserializer implements ShapeDeserializer {
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         for (var member : value.getMemberNames()) {
-            if (member.equals("__type")) {
-                continue;
-            }
             var memberSchema = schema.member(member);
             if (memberSchema != null) {
                 var memberValue = value.getMember(member);

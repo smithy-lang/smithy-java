@@ -20,6 +20,7 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
@@ -82,6 +83,20 @@ public interface Document extends SerializableShape {
      * @return the Smithy data model type.
      */
     ShapeType type();
+
+    /**
+     * Attempts to find and parse a shape ID from the document in the document's discriminator field.
+     *
+     * <p>Typed documents must return the shape ID of the enclosed shape. When possible, document implementations
+     * should account for protocol-specific differences in how a discriminator is serialized. For example, a JSON codec
+     * should override this method, check __type, and parse a shape ID when this is called.
+     *
+     * @return the non-null, parsed shape ID.
+     * @throws DiscriminatorException if the document doesn't have a valid discriminator.
+     */
+    default ShapeId discriminator() {
+        throw new DiscriminatorException(type() + " document has no discriminator");
+    }
 
     /**
      * Serializes the Document as a document value in the Smithy data model.

@@ -195,7 +195,7 @@ public class DocumentTest {
             .build();
         var doc = Document.createTyped(person);
 
-        assertThat(doc.getMember("__type").asString(), equalTo(Person.ID.toString()));
+        assertThat(doc.discriminator(), equalTo(Person.ID));
         assertThat(doc.getMember("name").asString(), equalTo("A"));
         assertThat(doc.getMember("age").asInteger(), equalTo(1));
         assertThat(doc.getMember("binary").asBlob(), equalTo(wrap("hi".getBytes(StandardCharsets.UTF_8))));
@@ -552,5 +552,27 @@ public class DocumentTest {
         var document = Document.createFromObject(bird);
 
         assertThat(document.type(), is(ShapeType.STRUCTURE));
+    }
+
+    @Test
+    public void returnsNullForNonStructures() {
+        var document = Document.createString("Hi");
+
+        Assertions.assertThrows(DiscriminatorException.class, document::discriminator);
+    }
+
+    @Test
+    public void returnsNullForMapsMissingType() {
+        var document = Document.createStringMap(Map.of("hi", Document.createString("bye")));
+
+        Assertions.assertThrows(DiscriminatorException.class, document::discriminator);
+    }
+
+    @Test
+    public void returnsShapeIdForTypedDocuments() {
+        var person = Person.builder().build();
+        var document = Document.createTyped(person);
+
+        assertThat(document.discriminator(), equalTo(Person.ID));
     }
 }

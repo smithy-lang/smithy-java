@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,6 +16,7 @@ import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class Documents {
@@ -711,24 +711,23 @@ final class Documents {
         }
 
         @Override
+        public ShapeId discriminator() {
+            return schema.id();
+        }
+
+        @Override
         public Map<String, Document> asStringMap() {
             return getDocument().asStringMap();
         }
 
         @Override
         public Document getMember(String memberName) {
-            if (memberName.equals("__type")) {
-                return Document.createString(schema.id().toString());
-            } else {
-                return getDocument().getMember(memberName);
-            }
+            return getDocument().getMember(memberName);
         }
 
         @Override
         public Set<String> getMemberNames() {
-            var result = new HashSet<>(getDocument().getMemberNames());
-            result.add("__type");
-            return result;
+            return getDocument().getMemberNames();
         }
 
         @Override

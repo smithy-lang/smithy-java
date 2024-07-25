@@ -27,10 +27,12 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.document.DiscriminatorException;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.core.serde.document.DocumentDeserializer;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.java.runtime.json.TimestampResolver;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JacksonDocument implements Document {
@@ -75,6 +77,21 @@ final class JacksonDocument implements Document {
     @Override
     public ShapeType type() {
         return type;
+    }
+
+    @Override
+    public ShapeId discriminator() {
+        if (!root.isObject()) {
+            throw new DiscriminatorException("Cannot get a document discriminator from a " + type() + " document");
+        }
+
+        String discriminator = null;
+        var member = root.get("__type");
+        if (member.isTextual()) {
+            discriminator = member.asText();
+        }
+
+        return DocumentDeserializer.parseDiscriminator(discriminator, settings.defaultNamespace());
     }
 
     @Override

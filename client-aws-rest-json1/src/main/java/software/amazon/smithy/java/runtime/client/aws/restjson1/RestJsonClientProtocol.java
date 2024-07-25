@@ -20,8 +20,24 @@ import software.amazon.smithy.java.runtime.json.JsonCodec;
  * Implements aws.protocols#restJson1.
  */
 public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsEventFrame> {
+
     public RestJsonClientProtocol() {
-        super("aws.protocols#restJson1", JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build());
+        this(null);
+    }
+
+    /**
+     * @param serviceNamespace The namespace of the service being called. This is used when finding the
+     *                         discriminator of documents that use relative shape IDs.
+     */
+    public RestJsonClientProtocol(String serviceNamespace) {
+        super(
+            "aws.protocols#restJson1",
+            JsonCodec.builder()
+                .useJsonName(true)
+                .useTimestampFormat(true)
+                .defaultNamespace(serviceNamespace)
+                .build()
+        );
     }
 
     @Override

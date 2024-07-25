@@ -37,6 +37,7 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
+import software.amazon.smithy.java.runtime.core.serde.document.DiscriminatorException;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -421,5 +422,39 @@ public class JsonDocumentTest {
         var json = de.readDocument();
 
         assertThat(Document.equals(json, Document.createBoolean(true)), is(true));
+    }
+
+    @Test
+    public void throwsWhenGettingDisciminatorOfWrongType() {
+        var codec = JsonCodec.builder().build();
+        var de = codec.createDeserializer("\"hi\"".getBytes(StandardCharsets.UTF_8));
+        var json = de.readDocument();
+
+        Assertions.assertThrows(DiscriminatorException.class, json::discriminator);
+    }
+
+    @Test
+    public void findsDiscriminatorForAbsoluteShapeId() {
+        var codec = JsonCodec.builder().build();
+        var de = codec.createDeserializer("{\"__type\":\"com.example#Foo\"}".getBytes(StandardCharsets.UTF_8));
+        var json = de.readDocument();
+
+        assertThat(json.discriminator(), equalTo(ShapeId.from("com.example#Foo")));
+    }
+
+    @Test
+    public void findsDiscriminatorForRelativeShapeId() {
+        var codec = JsonCodec.builder().defaultNamespace("com.foo").build();
+        var de = codec.createDeserializer("{\"__type\":\"Foo\"}".getBytes(StandardCharsets.UTF_8));
+        var json = de.readDocument();
+
+        assertThat(json.discriminator(), equalTo(ShapeId.from("com.foo#Foo")));
+    }
+
+    @Test
+    public void failsToParseRelativeDiscriminatorWithNoDefaultNamespace() {
+        var codec = JsonCodec.builder().build();
+        var de = codec.createDeserializer("{\"__type\":\"Foo\"}".getBytes(StandardCharsets.UTF_8));
+        var json = de.readDocument();
     }
 }
