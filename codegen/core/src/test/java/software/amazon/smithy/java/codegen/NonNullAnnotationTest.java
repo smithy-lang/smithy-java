@@ -38,7 +38,7 @@ public class NonNullAnnotationTest extends AbstractCodegenFileTest {
     @Test
     void nonNullAnnotationsOnFieldsAndGetter() {
         var fileStr = getFileStringForClass("NonNullAnnotationStructInput");
-        var expectedField = "private transient final @TestNonNullAnnotation RequiredStruct requiredStruct;";
+        var expectedField = "private final transient @TestNonNullAnnotation RequiredStruct requiredStruct;";
         var expectedGetter = "public @TestNonNullAnnotation RequiredStruct requiredStruct()";
         var expectedImport = "import software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation;";
         var expectedToString = "public @TestNonNullAnnotation String toString() {";
@@ -53,7 +53,7 @@ public class NonNullAnnotationTest extends AbstractCodegenFileTest {
     void nonNullAnnotationNotAddedForPrimitive() {
         var fileStr = getFileStringForClass("NonNullAnnotationStructInput");
 
-        var expectedField = "private transient final boolean requiredPrimitive;";
+        var expectedField = "private final transient boolean requiredPrimitive;";
         var expectedGetter = "public boolean requiredPrimitive() {";
         var expectedToString = "public @TestNonNullAnnotation String toString() {";
 

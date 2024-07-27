@@ -182,7 +182,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
 
 
                 writer.write(
-                    "private transient final ${?isNullable}$1B${/isNullable}${^isNullable}$1N${/isNullable} $2L;",
+                    "private final transient ${?isNullable}$1B${/isNullable}${^isNullable}$1N${/isNullable} $2L;",
                     symbolProvider.toSymbol(member),
                     memberName
                 );

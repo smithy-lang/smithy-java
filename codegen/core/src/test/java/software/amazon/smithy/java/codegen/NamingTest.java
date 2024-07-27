@@ -66,9 +66,9 @@ public class NamingTest extends AbstractCodegenFileTest {
     void escapesMemberNames() {
         var fileStr = getFileStringForClass("ReservedWordMembersInput");
         var expected = """
-                private transient final Byte byteMember;
-                private transient final String staticMember;
-                private transient final Double doubleMember;
+                private final transient Byte byteMember;
+                private final transient String staticMember;
+                private final transient Double doubleMember;
             """;
         assertTrue(fileStr.contains(expected));
     }
@@ -86,7 +86,7 @@ public class NamingTest extends AbstractCodegenFileTest {
         // Member schema still uses the raw member name
         assertTrue(fileStr.contains("\"snake_case_member\", PreludeSchemas.STRING"));
         // Member property is renamed to java-friendly string
-        assertTrue(fileStr.contains("private transient final String snakeCaseMember;"));
+        assertTrue(fileStr.contains("private final transient String snakeCaseMember;"));
     }
 
     @Test
@@ -107,7 +107,7 @@ public class NamingTest extends AbstractCodegenFileTest {
         // Member schema still uses the raw member name
         assertTrue(fileStr.contains("\"ACRONYM_Inside_Member\", PreludeSchemas.STRING"));
         // Member property is renamed to java-friendly string
-        assertTrue(fileStr.contains("private transient final String acronymInsideMember;"));
+        assertTrue(fileStr.contains("private final transient String acronymInsideMember;"));
     }
 
     @Test
