@@ -3,39 +3,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.core.schema;
+package software.amazon.smithy.java.runtime.core.serde;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.runtime.core.serde.SerializationException;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.core.testmodels.Bird;
 import software.amazon.smithy.java.runtime.core.testmodels.Person;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public class TypeRegistryTest {
     @Test
-    public void deserializesDocumentFromRegistryToSpecificClass() {
+    public void deserializesFromRegistryToSpecificClass() {
         TypeRegistry registry = TypeRegistry.builder()
             .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
             .build();
 
-        assertThat(registry.create(ShapeId.from("smithy.example#Foo"), Person.class), is(nullValue()));
-        assertThat(registry.create(ShapeId.from("smithy.example#Person"), Person.class), not(nullValue()));
+        assertThat(registry.createBuilder(ShapeId.from("smithy.example#Foo"), Person.class), is(nullValue()));
+        assertThat(registry.createBuilder(ShapeId.from("smithy.example#Person"), Person.class), not(nullValue()));
     }
 
     @Test
-    public void deserializesDocumentFromRegistryWithJustId() {
+    public void deserializesFromRegistryWithJustId() {
         TypeRegistry registry = TypeRegistry.builder()
             .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
             .build();
 
-        assertThat(registry.create(ShapeId.from("smithy.example#Person")), not(nullValue()));
-        assertThat(registry.create(ShapeId.from("smithy.example#Foo")), is(nullValue()));
+        assertThat(registry.createBuilder(ShapeId.from("smithy.example#Person")), not(nullValue()));
+        assertThat(registry.createBuilder(ShapeId.from("smithy.example#Foo")), is(nullValue()));
     }
 
     @Test
@@ -46,7 +48,7 @@ public class TypeRegistryTest {
 
         Assertions.assertThrows(
             SerializationException.class,
-            () -> registry.create(ShapeId.from("smithy.example#Person"), Bird.class)
+            () -> registry.createBuilder(ShapeId.from("smithy.example#Person"), Bird.class)
         );
     }
 
@@ -62,8 +64,21 @@ public class TypeRegistryTest {
 
         TypeRegistry registry = TypeRegistry.compose(a, b);
 
-        assertThat(registry.create(ShapeId.from("smithy.example#Person")), not(nullValue()));
-        assertThat(registry.create(ShapeId.from("smithy.example#Foo")), is(nullValue()));
-        assertThat(registry.create(ShapeId.from("smithy.example#Bird")), not(nullValue()));
+        assertThat(registry.createBuilder(ShapeId.from("smithy.example#Person")), not(nullValue()));
+        assertThat(registry.createBuilder(ShapeId.from("smithy.example#Foo")), is(nullValue()));
+        assertThat(registry.createBuilder(ShapeId.from("smithy.example#Bird")), not(nullValue()));
+    }
+
+    @Test
+    public void deserializesDocumentsFromRegistry() {
+        TypeRegistry registry = TypeRegistry.builder()
+            .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
+            .build();
+        var person = Person.builder().name("Phreddie").build();
+        var document = Document.createTyped(person);
+        var deserialized = registry.deserialize(document);
+
+        assertThat(deserialized, instanceOf(Person.class));
+        assertThat(((Person) deserialized).name(), equalTo("Phreddie"));
     }
 }

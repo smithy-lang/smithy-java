@@ -24,7 +24,7 @@ import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
+import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public abstract class Client {
@@ -92,7 +92,7 @@ public abstract class Client {
             .identityResolvers(identityResolvers)
             .errorCreator((c, id) -> {
                 ShapeId shapeId = ShapeId.from(id);
-                return operationRegistry.create(shapeId, ModeledApiException.class);
+                return operationRegistry.createBuilder(shapeId, ModeledApiException.class);
             })
             .build();
 

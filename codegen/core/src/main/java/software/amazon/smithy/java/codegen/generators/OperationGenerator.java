@@ -19,7 +19,7 @@ import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOpe
 import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
-import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
+import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.EventStreamIndex;
 import software.amazon.smithy.model.shapes.OperationShape;

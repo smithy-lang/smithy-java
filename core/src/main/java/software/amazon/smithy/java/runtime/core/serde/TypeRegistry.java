@@ -3,12 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.core.schema;
+package software.amazon.smithy.java.runtime.core.serde;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
-import software.amazon.smithy.java.runtime.core.serde.SerializationException;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.runtime.core.serde.document.DiscriminatorException;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -29,7 +32,7 @@ public interface TypeRegistry {
      * @param shapeId Shape ID to attempt to create.
      * @return the created builder, or null if no matching builder was found.
      */
-    ShapeBuilder<?> create(ShapeId shapeId);
+    ShapeBuilder<?> createBuilder(ShapeId shapeId);
 
     /**
      * Create a shape builder based on a shape ID and expected type.
@@ -41,8 +44,8 @@ public interface TypeRegistry {
      * @throws SerializationException if the given type isn't compatible with the shape in the registry.
      */
     @SuppressWarnings("unchecked")
-    default <T extends SerializableStruct> ShapeBuilder<T> create(ShapeId shapeId, Class<T> type) {
-        var builder = create(shapeId);
+    default <T extends SerializableStruct> ShapeBuilder<T> createBuilder(ShapeId shapeId, Class<T> type) {
+        var builder = createBuilder(shapeId);
         if (builder == null) {
             return null;
         }
@@ -53,6 +56,26 @@ public interface TypeRegistry {
         }
 
         return (ShapeBuilder<T>) builder;
+    }
+
+    /**
+     * Deserializes a document into a shape from the registry.
+     *
+     * @param document Document to deserialize.
+     * @return the deserialized shape.
+     * @throws DiscriminatorException if the document has no discriminator.
+     * @throws UnsupportedOperationException if the document doesn't match a registered shape.
+     */
+    default SerializableStruct deserialize(Document document) {
+        var shapeId = document.discriminator();
+        var builder = createBuilder(shapeId, SerializableStruct.class);
+        if (builder == null) {
+            throw new UnsupportedOperationException(
+                "Cannot find a registered shape to deserialize document: "
+                    + shapeId
+            );
+        }
+        return document.asShape(builder);
     }
 
     /**
@@ -79,11 +102,11 @@ public interface TypeRegistry {
             }
 
             @Override
-            public ShapeBuilder<?> create(ShapeId shapeId) {
-                var result = first.create(shapeId);
+            public ShapeBuilder<?> createBuilder(ShapeId shapeId) {
+                var result = first.createBuilder(shapeId);
                 if (result == null) {
                     for (var subsequent : more) {
-                        result = subsequent.create(shapeId);
+                        result = subsequent.createBuilder(shapeId);
                         if (result != null) {
                             break;
                         }
@@ -155,7 +178,7 @@ public interface TypeRegistry {
             }
 
             @Override
-            public ShapeBuilder<?> create(ShapeId shapeId) {
+            public ShapeBuilder<?> createBuilder(ShapeId shapeId) {
                 var entry = supplierMap.get(shapeId);
                 return entry == null ? null : entry.supplier.get();
             }

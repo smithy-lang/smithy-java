@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.runtime.core.schema;
 
+import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
+
 /**
  * Represents a modeled Smithy operation.
  *
