@@ -102,12 +102,27 @@ public interface Context {
      */
     <T> T computeIfAbsent(Key<T> key, Function<Key<T>, ? extends T> mappingFunction);
 
+    // TODO: want to remove this, but difficult in supporting `add(Context context)` without it
     /**
      * Get the keys added to the context.
      *
      * @return the keys.
      */
     Iterator<Key<?>> keys();
+
+    /**
+     * Create a copy of Context with all the existing keys.
+     * // TODO: Does this change the thread-safety claims of Context?
+     * @return a copy of Context.
+     */
+    // TODO: This is currently unused. Could remove it for now, until really needed.
+    Context copyOf();
+
+    /**
+     * Add the given Context in. If a key was already present, it is overridden.
+     * @param context Context to merge in.
+     */
+    void add(Context context);
 
     /**
      * Creates a thread-safe, mutable context map.
@@ -143,6 +158,30 @@ public interface Context {
             @SuppressWarnings("unchecked")
             public <T> T computeIfAbsent(Key<T> key, Function<Key<T>, ? extends T> mappingFunction) {
                 return (T) attributes.computeIfAbsent(key, k -> mappingFunction.apply((Key<T>) k));
+            }
+
+            @Override
+            public Context copyOf() {
+                Context context = Context.create();
+                // this.keys().forEachRemaining(key -> copyContext(key, this, context));
+                // Not using the above, since we want to remove keys() from the interface
+                attributes.keySet().iterator().forEachRemaining(key -> copyContext(key, this, context));
+
+                // alternate impl
+//                Context context = Context.create();
+//                context.add(this);
+//                return context;
+
+                return context;
+            }
+
+            @Override
+            public void add(Context context) {
+                context.keys().forEachRemaining(key -> copyContext(key, context, this));
+            }
+
+            private <T> void copyContext(Context.Key<T> key, Context src, Context dst) {
+                dst.put(key, src.get(key));
             }
         };
     }
