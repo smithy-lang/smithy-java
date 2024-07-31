@@ -15,7 +15,7 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
-import software.amazon.smithy.java.server.core.RequestContext;
+import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi

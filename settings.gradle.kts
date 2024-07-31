@@ -32,6 +32,11 @@ include(":sigv4")
 // Protocols
 include(":client-aws-rest-json1")
 
+//server
+include("server-core")
+include("server")
+include("server-netty")
+
 // Examples
 include(":examples:restjson-example")
 

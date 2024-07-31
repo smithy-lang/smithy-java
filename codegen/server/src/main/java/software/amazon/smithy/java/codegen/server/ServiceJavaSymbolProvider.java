@@ -41,12 +41,13 @@ public class ServiceJavaSymbolProvider extends JavaSymbolProvider {
             .namespace(format("%s.service", getPackageNamespace()), ".")
             .declarationFile(format("./%s/service/%s.java", getPackageNamespace().replace(".", "/"), asyncStubName))
             .build();
-
+        var apiOperationSymbol = super.operationShape(operationShape);
         return baseSymbol.toBuilder()
             .putProperty(SymbolProperties.IS_PRIMITIVE, false)
             .putProperty(ServerSymbolProperties.OPERATION_FIELD_NAME, operationFieldName)
             .putProperty(ServerSymbolProperties.ASYNC_STUB_OPERATION, asyncStubSymbol)
             .putProperty(ServerSymbolProperties.STUB_OPERATION, stubSymbol)
+            .putProperty(ServerSymbolProperties.API_OPERATION, apiOperationSymbol)
             .build();
     }
 

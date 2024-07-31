@@ -21,9 +21,9 @@ import smithy.java.codegen.server.test.model.GetBeerOutput;
 import smithy.java.codegen.server.test.service.EchoOperation;
 import smithy.java.codegen.server.test.service.GetBeerOperationAsync;
 import smithy.java.codegen.server.test.service.TestService;
-import software.amazon.smithy.java.server.core.Operation;
-import software.amazon.smithy.java.server.core.RequestContext;
-import software.amazon.smithy.java.server.core.exceptions.UnknownOperationException;
+import software.amazon.smithy.java.server.Operation;
+import software.amazon.smithy.java.server.RequestContext;
+import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 
 
 public class ServiceBuilderTest {
@@ -53,9 +53,9 @@ public class ServiceBuilderTest {
 
     @Test
     void testRouting() throws ExecutionException, InterruptedException {
-        Operation<GetBeerInput, CompletableFuture<GetBeerOutput>> getBeer = service.getOperation("GetBeer");
+        Operation<GetBeerInput, GetBeerOutput> getBeer = service.getOperation("GetBeer");
         assertThat("GetBeer").isEqualTo(getBeer.name());
-        var output = getBeer.function().apply(GetBeerInput.builder().id(1).build(), null);
+        var output = getBeer.asyncFunction().apply(GetBeerInput.builder().id(1).build(), null);
         assertThat(output.get().value())
             .hasSize(1)
             .containsExactly(Beer.builder().id(1).name("TestBeer").build());

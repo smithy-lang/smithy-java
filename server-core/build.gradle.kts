@@ -8,5 +8,8 @@ extra["displayName"] = "Smithy :: Java :: Server Core"
 extra["moduleName"] = "software.amazon.smithy.java.server-core"
 
 dependencies {
-    api(project(":core"))
+    api(project(":server"))
+    implementation(project(":context"))
+    implementation(libs.smithy.model)
+    implementation(project(":core"))
 }

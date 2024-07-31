@@ -5,7 +5,5 @@
 
 package software.amazon.smithy.java.server.core;
 
-import java.util.function.BiFunction;
-
-public record Operation<I, O>(String name, boolean isAsync, BiFunction<I, RequestContext, O> function) {
+public final class RequestImpl implements Request {
 }

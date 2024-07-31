@@ -30,5 +30,10 @@ public final class ServerSymbolProperties {
     /**
      * TODO: DOCS
      */
+    public static final Property<Symbol> API_OPERATION = Property.named("api-operation");
+
+    /**
+     * TODO: DOCS
+     */
     public static final Property<String> OPERATION_FIELD_NAME = Property.named("operation-field-name");
 }

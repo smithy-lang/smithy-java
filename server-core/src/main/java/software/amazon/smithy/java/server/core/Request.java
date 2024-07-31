@@ -5,8 +5,5 @@
 
 package software.amazon.smithy.java.server.core;
 
-// TODO Fill with more stuff.
-public interface RequestContext {
-
-    String getRequestId();
+public sealed interface Request permits RequestImpl {
 }
