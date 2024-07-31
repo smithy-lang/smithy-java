@@ -322,7 +322,7 @@ public final class ClientConfig {
          * @param context Context to merge in.
          * @return the builder.
          */
-        Builder addContext(Context context) {
+        private Builder addContext(Context context) {
             this.context.add(context);
             return this;
         }
