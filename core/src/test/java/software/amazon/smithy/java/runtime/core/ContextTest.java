@@ -6,13 +6,10 @@
 package software.amazon.smithy.java.runtime.core;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 
-import java.util.HashSet;
-import java.util.Set;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -57,14 +54,17 @@ public class ContextTest {
     }
 
     @Test
-    public void returnsKeys() {
+    public void addContext() {
         var context = Context.create();
-        context.put(FOO, "test");
-        context.put(BAR, 1);
+        context.put(FOO, "hi");
 
-        Set<Context.Key<?>> keys = new HashSet<>();
-        context.keys().forEachRemaining(keys::add);
+        var overrides = Context.create();
+        overrides.put(FOO, "bye");
+        overrides.put(BAR, 1);
 
-        assertThat(keys, containsInAnyOrder(FOO, BAR));
+        context.add(overrides);
+
+        assertThat(context.get(FOO), equalTo("bye"));
+        assertThat(context.get(BAR), is(1));
     }
 }

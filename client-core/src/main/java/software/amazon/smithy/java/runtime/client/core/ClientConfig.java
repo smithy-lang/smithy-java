@@ -112,7 +112,7 @@ public final class ClientConfig {
             .identityResolvers(identityResolvers);
         interceptors.forEach(builder::addInterceptor);
         supportedAuthSchemes.forEach(builder::putSupportedAuthSchemes);
-        context.keys().forEachRemaining(key -> copyContext(key, context, builder));
+        builder.addContext(context);
         return builder;
     }
 
@@ -151,13 +151,7 @@ public final class ClientConfig {
 
         // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
         //       We just merge the client's Context with the Context of the operation's call.
-        overrideConfig.context()
-            .keys()
-            .forEachRemaining(key -> copyContext(key, overrideConfig.context(), builder));
-    }
-
-    private <T> void copyContext(Context.Key<T> key, Context src, Builder dst) {
-        dst.putConfig(key, src.get(key));
+        builder.addContext(overrideConfig.context());
     }
 
     /**
@@ -319,6 +313,17 @@ public final class ClientConfig {
          */
         public <T> Builder putConfigIfAbsent(Context.Key<T> key, T value) {
             context.putIfAbsent(key, value);
+            return this;
+        }
+
+        /**
+         * Add the given Context in. If a key was already present, it is overridden.
+         *
+         * @param context Context to merge in.
+         * @return the builder.
+         */
+        Builder addContext(Context context) {
+            this.context.add(context);
             return this;
         }
 

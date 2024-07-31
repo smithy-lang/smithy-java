@@ -60,14 +60,13 @@ public abstract class Client {
      * @return Returns the deserialized output.
      */
     @Deprecated // TODO: update usages to use the other call() signature
+    // Context is unused right now. This method will be removed after updating codegen to use other call() signature.
     protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
         I input,
         ApiOperation<I, O> operation,
         Context context
     ) {
-        RequestOverrideConfig.Builder overrideConfigBuilder = RequestOverrideConfig.builder();
-        context.keys().forEachRemaining(key -> copyContext(key, context, overrideConfigBuilder));
-        return call(input, operation, overrideConfigBuilder.build());
+        return call(input, operation, RequestOverrideConfig.builder().build());
     }
 
     /**

@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.core;
 
-import java.util.Iterator;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -14,13 +13,19 @@ import java.util.function.Function;
 /**
  * A thread safe, mutable, typed context map.
  */
-public interface Context {
+public final class Context {
+
+    private final ConcurrentMap<Key<?>, Object> attributes = new ConcurrentHashMap<>();
+
+    private Context() {
+    }
+
     /**
      * A {@code Key} provides an identity-based, immutable token.
      *
      * <p>The token also contains a name used to describe the value.
      */
-    final class Key<T> {
+    public static final class Key<T> {
         private final String name;
 
         /**
@@ -43,7 +48,7 @@ public interface Context {
      * @return the created key.
      * @param <T> Value type associated with the key.
      */
-    static <T> Key<T> key(String name) {
+    public static <T> Key<T> key(String name) {
         return new Key<>(name);
     }
 
@@ -54,7 +59,9 @@ public interface Context {
      * @param value Value to set.
      * @param <T>   Value type.
      */
-    <T> void put(Key<T> key, T value);
+    public <T> void put(Key<T> key, T value) {
+        attributes.put(key, value);
+    }
 
     /**
      * Set a Property if not already present.
@@ -63,7 +70,9 @@ public interface Context {
      * @param value Value to set.
      * @param <T>   Value type.
      */
-    <T> void putIfAbsent(Key<T> key, T value);
+    public <T> void putIfAbsent(Key<T> key, T value) {
+        attributes.putIfAbsent(key, value);
+    }
 
     /**
      * Get a property.
@@ -72,7 +81,10 @@ public interface Context {
      * @return    the value, or null if not present.
      * @param <T> Value type.
      */
-    <T> T get(Key<T> key);
+    @SuppressWarnings("unchecked")
+    public <T> T get(Key<T> key) {
+        return (T) attributes.get(key);
+    }
 
     /**
      * Get a property and throw if it isn't present.
@@ -82,7 +94,7 @@ public interface Context {
      * @throws NullPointerException if the property isn't found.
      * @param <T> Value type.
      */
-    default <T> T expect(Key<T> key) {
+    public <T> T expect(Key<T> key) {
         T value = get(key);
         if (value == null) {
             throw new NullPointerException("Unknown context property: " + key);
@@ -100,50 +112,25 @@ public interface Context {
      * @return the value assigned to the key.
      * @param <T> Value type.
      */
-    <T> T computeIfAbsent(Key<T> key, Function<Key<T>, ? extends T> mappingFunction);
+    @SuppressWarnings("unchecked")
+    public <T> T computeIfAbsent(Key<T> key, Function<Key<T>, ? extends T> mappingFunction) {
+        return (T) attributes.computeIfAbsent(key, k -> mappingFunction.apply((Key<T>) k));
+    }
 
     /**
-     * Get the keys added to the context.
-     *
-     * @return the keys.
+     * Add the given Context in. If a key was already present, it is overridden.
+     * @param context Context to merge in.
      */
-    Iterator<Key<?>> keys();
+    public void add(Context context) {
+        attributes.putAll(context.attributes);
+    }
 
     /**
      * Creates a thread-safe, mutable context map.
      *
      * @return the created context.
      */
-    static Context create() {
-        return new Context() {
-            private final ConcurrentMap<Key<?>, Object> attributes = new ConcurrentHashMap<>();
-
-            @Override
-            public <T> void put(Key<T> key, T value) {
-                attributes.put(key, value);
-            }
-
-            @Override
-            public <T> void putIfAbsent(Key<T> key, T value) {
-                attributes.putIfAbsent(key, value);
-            }
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public <T> T get(Key<T> key) {
-                return (T) attributes.get(key);
-            }
-
-            @Override
-            public Iterator<Key<?>> keys() {
-                return attributes.keySet().iterator();
-            }
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public <T> T computeIfAbsent(Key<T> key, Function<Key<T>, ? extends T> mappingFunction) {
-                return (T) attributes.computeIfAbsent(key, k -> mappingFunction.apply((Key<T>) k));
-            }
-        };
+    public static Context create() {
+        return new Context();
     }
 }
