@@ -99,6 +99,11 @@ public final class ClientConfig {
         return context; // TODO: return an unmodifiable view
     }
 
+    /**
+     * Create a new builder to build {@link ClientConfig}.
+     *
+     * @return the builder.
+     */
     public static Builder builder() {
         return new Builder();
     }
@@ -116,6 +121,12 @@ public final class ClientConfig {
         return builder;
     }
 
+    /**
+     * Create a copy of the ClientConfig after applying overrides.
+     *
+     * @param overrideConfig The overrides to apply.
+     * @return copy of ClientConfig with overrides applied.
+     */
     public ClientConfig withRequestOverride(RequestOverrideConfig overrideConfig) {
         Objects.requireNonNull(overrideConfig, "overrideConfig cannot be null");
         Builder builder = toBuilder();
@@ -146,7 +157,7 @@ public final class ClientConfig {
             overrideConfig.supportedAuthSchemes().forEach(builder::putSupportedAuthSchemes);
         }
         if (overrideConfig.identityResolvers() != null) {
-            builder.identityResolvers(overrideConfig.identityResolvers());
+            overrideConfig.identityResolvers().forEach(builder::addIdentityResolver);
         }
 
         // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
@@ -263,7 +274,7 @@ public final class ClientConfig {
         /**
          * Add supported auth schemes to the client that works in tandem with the {@link AuthSchemeResolver}.
          *
-         * <p> If the scheme ID is already supported, it will be replaced by the provided auth scheme.
+         * <p>If the scheme ID is already supported, it will be replaced by the provided auth scheme.
          *
          * @param authSchemes Auth schemes to add.
          * @return the builder.
