@@ -93,10 +93,20 @@ public final class RequestOverrideConfig {
         return plugins;
     }
 
+    /**
+     * Create a new builder to build {@link RequestOverrideConfig}.
+     *
+     * @return the builder.
+     */
     public static Builder builder() {
         return new Builder();
     }
 
+    /**
+     * Create a new builder using the same values as this object.
+     *
+     * @return the builder.
+     */
     public Builder toBuilder() {
         Builder builder = builder()
             .transport(transport)
