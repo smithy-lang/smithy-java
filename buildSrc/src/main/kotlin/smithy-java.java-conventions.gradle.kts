@@ -70,6 +70,7 @@ spotless {
     java {
         // Enforce a common license header on all files
         licenseHeaderFile("${project.rootDir}/config/spotless/license-header.txt")
+            .onlyIfContentMatches("^((?!SKIPLICENSECHECK)[\\s\\S])*\$")
         indentWithSpaces()
         endWithNewline()
 

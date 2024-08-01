@@ -10,6 +10,11 @@
         <Class name="~Test\.java$"/>
     </Match>
 
+    <!--  This is copy of Log4j's formatter.  -->
+    <Match>
+        <Class name="software.amazon.smithy.java.logging.ParameterFormatter$StringBuilders"/>
+    </Match>
+
     <!-- Excessive Defensive copies. -->
     <Match>
         <Bug pattern="EI_EXPOSE_REP"/>

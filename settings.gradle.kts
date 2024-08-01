@@ -30,5 +30,4 @@ include(":client-aws-rest-json1")
 // Examples
 include(":examples:restjson-example")
 include("server-core")
-
-
+include("logging")
