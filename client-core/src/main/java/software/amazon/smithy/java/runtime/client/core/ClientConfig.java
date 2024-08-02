@@ -117,7 +117,7 @@ public final class ClientConfig {
             .identityResolvers(identityResolvers);
         interceptors.forEach(builder::addInterceptor);
         supportedAuthSchemes.forEach(builder::putSupportedAuthSchemes);
-        context.keys().forEachRemaining(key -> copyContext(key, context, builder));
+        builder.putAllConfig(context);
         return builder;
     }
 
@@ -162,13 +162,7 @@ public final class ClientConfig {
 
         // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
         //       We just merge the client's Context with the Context of the operation's call.
-        overrideConfig.context()
-            .keys()
-            .forEachRemaining(key -> copyContext(key, overrideConfig.context(), builder));
-    }
-
-    private <T> void copyContext(Context.Key<T> key, Context src, Builder dst) {
-        dst.putConfig(key, src.get(key));
+        builder.putAllConfig(overrideConfig.context());
     }
 
     /**
@@ -308,7 +302,7 @@ public final class ClientConfig {
         }
 
         /**
-         * Put a strongly typed configuration on the builder.
+         * Put a strongly typed configuration on the builder. If a key was already present, it is overridden.
          *
          * @param key Configuration key.
          * @param value Value to associate with the key.
@@ -330,6 +324,18 @@ public final class ClientConfig {
          */
         public <T> Builder putConfigIfAbsent(Context.Key<T> key, T value) {
             context.putIfAbsent(key, value);
+            return this;
+        }
+
+        /**
+         * Put all the strongly typed configuration from the given Context. If a key was already present, it is
+         * overridden.
+         *
+         * @param context Context containing all the configuration to put.
+         * @return the builder.
+         */
+        private Builder putAllConfig(Context context) {
+            this.context.putAll(context);
             return this;
         }
 

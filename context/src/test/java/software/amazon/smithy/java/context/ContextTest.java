@@ -6,20 +6,19 @@
 package software.amazon.smithy.java.context;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.util.HashSet;
-import java.util.Set;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class ContextTest {
 
     private static final Context.Key<String> FOO = Context.key("Foo");
     private static final Context.Key<Integer> BAR = Context.key("Foo");
+    private static final Context.Key<Boolean> BAZ = Context.key("Foo");
 
     @Test
     public void getTypedValue() {
@@ -45,7 +44,7 @@ public class ContextTest {
     public void throwsWhenExpectedAndNotFound() {
         var context = Context.create();
 
-        Assertions.assertThrows(NullPointerException.class, () -> context.expect(FOO));
+        assertThrows(NullPointerException.class, () -> context.expect(FOO));
     }
 
     @Test
@@ -57,14 +56,65 @@ public class ContextTest {
     }
 
     @Test
-    public void returnsKeys() {
+    public void unmodifiableView() {
         var context = Context.create();
-        context.put(FOO, "test");
+        context.put(FOO, "hi");
         context.put(BAR, 1);
 
-        Set<Context.Key<?>> keys = new HashSet<>();
-        context.keys().forEachRemaining(keys::add);
+        Context unmodifiableView = Context.unmodifiableViewOf(context);
 
-        assertThat(keys, containsInAnyOrder(FOO, BAR));
+        assertThat(unmodifiableView.get(FOO), equalTo("hi"));
+        assertThat(unmodifiableView.expect(FOO), equalTo("hi"));
+        assertThat(unmodifiableView.get(BAR), is(1));
+        assertThat(unmodifiableView.expect(FOO), equalTo("hi"));
+
+        assertThrows(UnsupportedOperationException.class, () -> unmodifiableView.put(FOO, "bye"));
+        assertThrows(UnsupportedOperationException.class, () -> unmodifiableView.putIfAbsent(FOO, "bye"));
+        assertThrows(UnsupportedOperationException.class, () -> unmodifiableView.computeIfAbsent(FOO, key -> "bye"));
+        assertThrows(UnsupportedOperationException.class, () -> unmodifiableView.putAll(Context.create()));
+
+        Context unmodifiableView2 = Context.unmodifiableViewOf(unmodifiableView);
+        assertThat(unmodifiableView2, sameInstance(unmodifiableView));
+
+        context.put(FOO, "bye");
+        context.put(BAZ, true);
+
+        assertThat(unmodifiableView.get(FOO), equalTo("bye"));
+        assertThat(unmodifiableView.get(BAZ), equalTo(true));
+    }
+
+    @Test
+    public void putAll() {
+        var context = Context.create();
+        context.put(FOO, "hi");
+        context.put(BAR, 1);
+
+        var overrides = Context.create();
+        context.put(FOO, "bye");
+        context.put(BAZ, true);
+
+        context.putAll(overrides);
+
+        assertThat(context.get(FOO), equalTo("bye"));
+        assertThat(context.get(BAR), is(1));
+        assertThat(context.get(BAZ), equalTo(true));
+    }
+
+    @Test
+    public void putAllUnmodifiable() {
+        var context = Context.create();
+        context.put(FOO, "hi");
+        context.put(BAR, 1);
+
+        var overrides = Context.create();
+        context.put(FOO, "bye");
+        context.put(BAZ, true);
+
+        var unmodifiableOverrides = Context.unmodifiableViewOf(overrides);
+        context.putAll(unmodifiableOverrides);
+
+        assertThat(context.get(FOO), equalTo("bye"));
+        assertThat(context.get(BAR), is(1));
+        assertThat(context.get(BAZ), equalTo(true));
     }
 }

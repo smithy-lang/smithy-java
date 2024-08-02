@@ -5,16 +5,13 @@
 
 package software.amazon.smithy.java.context;
 
-import java.util.Iterator;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
 
 /**
- * A thread safe, mutable, typed context map.
+ * A typed context map.
  */
-public interface Context {
+public sealed interface Context permits ContextImpl, UnmodifiableContext {
     /**
      * A {@code Key} provides an identity-based, immutable token.
      *
@@ -48,7 +45,7 @@ public interface Context {
     }
 
     /**
-     * Set a Property.
+     * Set a Property. If it was already present, it is overridden.
      *
      * @param key   Property key.
      * @param value Value to set.
@@ -103,47 +100,33 @@ public interface Context {
     <T> T computeIfAbsent(Key<T> key, Function<Key<T>, ? extends T> mappingFunction);
 
     /**
-     * Get the keys added to the context.
+     * Set all the properties from the given Context in. If it was already present, it is overridden.
      *
-     * @return the keys.
+     * @param context Context containing all the properties to put.
      */
-    Iterator<Key<?>> keys();
+    void putAll(Context context);
 
     /**
-     * Creates a thread-safe, mutable context map.
+     * Creates an empty Context.
      *
      * @return the created context.
      */
     static Context create() {
-        return new Context() {
-            private final ConcurrentMap<Key<?>, Object> attributes = new ConcurrentHashMap<>();
+        return new ContextImpl();
+    }
 
-            @Override
-            public <T> void put(Key<T> key, T value) {
-                attributes.put(key, value);
-            }
-
-            @Override
-            public <T> void putIfAbsent(Key<T> key, T value) {
-                attributes.putIfAbsent(key, value);
-            }
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public <T> T get(Key<T> key) {
-                return (T) attributes.get(key);
-            }
-
-            @Override
-            public Iterator<Key<?>> keys() {
-                return attributes.keySet().iterator();
-            }
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public <T> T computeIfAbsent(Key<T> key, Function<Key<T>, ? extends T> mappingFunction) {
-                return (T) attributes.computeIfAbsent(key, k -> mappingFunction.apply((Key<T>) k));
-            }
-        };
+    /**
+     * Get an unmodifiable view of the Context.
+     *
+     * @return an unmodifiable view of the Context.
+     */
+    static Context unmodifiableViewOf(Context context) {
+        if (context instanceof ContextImpl impl) {
+            return new UnmodifiableContext(impl);
+        } else if (context instanceof UnmodifiableContext unmodifiableContext) {
+            return unmodifiableContext;
+        } else {
+            throw new IllegalArgumentException("Unsupported context type: " + context.getClass().getName());
+        }
     }
 }
