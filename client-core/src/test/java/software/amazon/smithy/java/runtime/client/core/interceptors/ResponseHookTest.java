@@ -10,7 +10,7 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.sameInstance;
 
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.runtime.core.Context;
+import software.amazon.smithy.java.context.Context;
 
 public class ResponseHookTest {
     @Test

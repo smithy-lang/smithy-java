@@ -8,7 +8,7 @@ package software.amazon.smithy.java.runtime.client.core.interceptors;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import software.amazon.smithy.java.runtime.core.Context;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**

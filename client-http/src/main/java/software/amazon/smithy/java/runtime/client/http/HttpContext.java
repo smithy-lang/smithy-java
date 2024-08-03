@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.client.http;
 
 import java.time.Duration;
-import software.amazon.smithy.java.runtime.core.Context;
+import software.amazon.smithy.java.context.Context;
 
 /**
  * {@link Context} keys used with HTTP-based clients.

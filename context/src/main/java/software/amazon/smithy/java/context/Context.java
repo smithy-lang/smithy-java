@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.core;
+package software.amazon.smithy.java.context;
 
 import java.util.Iterator;
 import java.util.Objects;

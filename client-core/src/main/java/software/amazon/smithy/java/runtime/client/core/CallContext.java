@@ -6,9 +6,9 @@
 package software.amazon.smithy.java.runtime.client.core;
 
 import java.time.Duration;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
-import software.amazon.smithy.java.runtime.core.Context;
 
 /**
  * Context parameters made available to underlying transports like HTTP clients.

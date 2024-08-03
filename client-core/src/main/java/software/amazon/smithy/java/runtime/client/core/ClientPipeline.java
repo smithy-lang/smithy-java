@@ -10,6 +10,7 @@ import java.net.URISyntaxException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
@@ -22,7 +23,6 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ResponseHook;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolverParams;
-import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 

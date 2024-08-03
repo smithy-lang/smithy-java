@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.client.core;
 
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.runtime.core.Context;
+import software.amazon.smithy.java.context.Context;
 
 /**
  * Sends a serialized request and returns a response.

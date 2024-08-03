@@ -1,5 +1,7 @@
 rootProject.name = "smithy-java"
 
+include("logging")
+include(":context")
 include(":core")
 
 // Codegen
@@ -29,5 +31,6 @@ include(":client-aws-rest-json1")
 
 // Examples
 include(":examples:restjson-example")
+
+// Server
 include("server-core")
-include("logging")
