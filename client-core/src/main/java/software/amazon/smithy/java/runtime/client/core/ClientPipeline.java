@@ -155,7 +155,7 @@ public final class ClientPipeline<RequestT, ResponseT> {
         var params = AuthSchemeResolverParams.builder()
             .protocolId(protocol.id())
             .operationName(call.operation().schema().id().getName())
-            // TODO: .properties(?)
+            .context(call.context()) // TODO: use an immutable view of the context
             .build();
         var authSchemeOptions = call.authSchemeResolver().resolveAuthScheme(params);
 
@@ -260,12 +260,14 @@ public final class ClientPipeline<RequestT, ResponseT> {
             });
     }
 
-    // TODO: Add more parameters here somehow from the caller.
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<Endpoint> resolveEndpoint(
         ClientCall<I, O> call
     ) {
         var operation = call.operation().schema();
-        var request = EndpointResolverParams.builder().operationName(operation.id().getName()).build();
+        var request = EndpointResolverParams.builder()
+            .operationName(operation.id().getName())
+            .context(call.context()) // TODO: use an immutable view of the context
+            .build();
         return call.endpointResolver().resolveEndpoint(request);
     }
 }

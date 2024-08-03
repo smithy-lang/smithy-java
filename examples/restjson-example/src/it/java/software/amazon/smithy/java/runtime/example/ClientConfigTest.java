@@ -22,7 +22,6 @@ import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
-import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointProperty;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolverParams;
 import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
@@ -66,11 +65,7 @@ public class ClientConfigTest {
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
-
-        // TODO: this won't as expected right now, because we aren't flowing Context REGION to EndpointResolver
-//        assertThat(request.uri().getHost()).isEqualTo("global.example.com");
-        // so ends up using the default non-regionalized value in RegionalEndpointResolver.
-        assertThat(request.uri().getHost()).isEqualTo("example.com");
+        assertThat(request.uri().getHost()).isEqualTo("global.example.com");
     }
 
     @Test
@@ -92,10 +87,7 @@ public class ClientConfigTest {
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
-        // TODO: this won't as expected right now, because we aren't flowing Context REGION to EndpointResolver
-//        assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
-        // so ends up using the default non-regionalized value in RegionalEndpointResolver.
-        assertThat(request.uri().getHost()).isEqualTo("example.com");
+        assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
     }
 
     @Test
@@ -107,10 +99,7 @@ public class ClientConfigTest {
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
-        // TODO: this won't as expected right now, because we aren't flowing Context REGION to EndpointResolver
-//        assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
-        // so ends up using the default non-regionalized value in RegionalEndpointResolver.
-        assertThat(request.uri().getHost()).isEqualTo("example.com");
+        assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
     }
 
     @Test
@@ -123,10 +112,7 @@ public class ClientConfigTest {
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
-        // TODO: this won't as expected right now, because we aren't flowing Context REGION to EndpointResolver
-//        assertThat(request.uri().getHost()).isEqualTo("global.example.com");
-        // so ends up using the default non-regionalized value in RegionalEndpointResolver.
-        assertThat(request.uri().getHost()).isEqualTo("example.com");
+        assertThat(request.uri().getHost()).isEqualTo("global.example.com");
     }
 
     @Test
@@ -140,10 +126,7 @@ public class ClientConfigTest {
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
-        // TODO: this won't as expected right now, because we aren't flowing Context REGION to EndpointResolver
-//        assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
-        // so ends up using the default non-regionalized value in RegionalEndpointResolver.
-        assertThat(request.uri().getHost()).isEqualTo("example.com");
+        assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
     }
 
     private static final class PersonDirectoryClientWithDefaults extends Client implements PersonDirectoryClient {
@@ -206,21 +189,13 @@ public class ClientConfigTest {
         }
 
         static final class RegionalEndpointResolver implements EndpointResolver {
-            private static final EndpointProperty<String> REGION = EndpointProperty.of("Region to determine endpoint");
 
             @Override
             public CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params) {
-                // TODO: Need something that takes Context.Key REGION and makes it available as EndpointProperty REGION
-                //  OR Make the Context available to EndpointResolver.resolveEndpoint()
-
-//                // this makes it required value, which is ok, since plugin sets a default
-//                String region = params.properties().get(REGION);
-                // TODO: for now it is not flowing so defaulting to 0 here.
-                String region = params.properties().get(REGION) != null ? params.properties().get(REGION) + "." : "";
-
+                String region = params.context().get(REGION);
                 return CompletableFuture.completedFuture(
                     Endpoint.builder()
-                        .uri("http://" + region + "example.com")
+                        .uri("http://" + region + ".example.com")
                         .build()
                 );
             }

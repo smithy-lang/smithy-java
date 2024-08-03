@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.auth.api.scheme;
 
 import java.util.Objects;
-import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
+import software.amazon.smithy.java.context.Context;
 
 /**
  * AuthSchemeResolver parameters.
@@ -15,12 +15,12 @@ public final class AuthSchemeResolverParams {
 
     private final String protocolId;
     private final String operationName;
-    private final AuthProperties properties;
+    private final Context context;
 
     private AuthSchemeResolverParams(Builder builder) {
         this.protocolId = Objects.requireNonNull(builder.protocolId, "protocolId is null");
         this.operationName = Objects.requireNonNull(builder.operationName, "operationName is null");
-        this.properties = Objects.requireNonNullElseGet(builder.properties, () -> AuthProperties.builder().build());
+        this.context = Objects.requireNonNullElseGet(builder.context, Context::create);
     }
 
     /**
@@ -51,12 +51,12 @@ public final class AuthSchemeResolverParams {
     }
 
     /**
-     * Properties available when resolving the auth schemes.
+     * Context available when resolving the auth schemes.
      *
-     * @return properties.
+     * @return context.
      */
-    public AuthProperties properties() {
-        return properties;
+    public Context context() {
+        return context;
     }
 
     @Override
@@ -70,12 +70,12 @@ public final class AuthSchemeResolverParams {
         AuthSchemeResolverParams params = (AuthSchemeResolverParams) o;
         return Objects.equals(protocolId, params.protocolId)
             && Objects.equals(operationName, params.operationName)
-            && Objects.equals(properties, params.properties);
+            && Objects.equals(context, params.context);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(protocolId, operationName, properties);
+        return Objects.hash(protocolId, operationName, context);
     }
 
     /**
@@ -85,7 +85,7 @@ public final class AuthSchemeResolverParams {
 
         private String protocolId;
         private String operationName;
-        private AuthProperties properties;
+        private Context context;
 
         private Builder() {
         }
@@ -121,13 +121,13 @@ public final class AuthSchemeResolverParams {
         }
 
         /**
-         * Set the auth properties.
+         * Set the client's context.
          *
-         * @param properties AuthProperties to set.
+         * @param context Context to set.
          * @return the builder.
          */
-        public Builder properties(AuthProperties properties) {
-            this.properties = properties;
+        public Builder context(Context context) {
+            this.context = context;
             return this;
         }
     }

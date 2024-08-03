@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.client.endpoint.api;
 
 import java.util.Objects;
+import software.amazon.smithy.java.context.Context;
 
 /**
  * Encapsulates endpoint resolver parameters.
@@ -13,11 +14,11 @@ import java.util.Objects;
 public final class EndpointResolverParams {
 
     private final String operationName;
-    private final EndpointProperties properties;
+    private final Context context;
 
     private EndpointResolverParams(Builder builder) {
         this.operationName = Objects.requireNonNull(builder.operationName, "operationName is null");
-        this.properties = Objects.requireNonNullElseGet(builder.properties, () -> EndpointProperties.builder().build());
+        this.context = Objects.requireNonNullElseGet(builder.context, Context::create);
     }
 
     /**
@@ -39,12 +40,12 @@ public final class EndpointResolverParams {
     }
 
     /**
-     * Properties available when resolving the endpoint.
+     * Context available when resolving the endpoint.
      *
-     * @return properties.
+     * @return context.
      */
-    public EndpointProperties properties() {
-        return properties;
+    public Context context() {
+        return context;
     }
 
     @Override
@@ -57,12 +58,12 @@ public final class EndpointResolverParams {
         }
         EndpointResolverParams params = (EndpointResolverParams) o;
         return Objects.equals(operationName, params.operationName)
-            && Objects.equals(properties, params.properties);
+            && Objects.equals(context, params.context);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(operationName, properties);
+        return Objects.hash(operationName, context);
     }
 
     /**
@@ -71,7 +72,7 @@ public final class EndpointResolverParams {
     public static final class Builder {
 
         private String operationName;
-        private EndpointProperties properties;
+        private Context context;
 
         private Builder() {
         }
@@ -96,13 +97,13 @@ public final class EndpointResolverParams {
         }
 
         /**
-         * Set the endpoint properties.
+         * Set the client's context.
          *
-         * @param properties EndpointProperties to set.
+         * @param context Context to set.
          * @return the builder.
          */
-        public Builder properties(EndpointProperties properties) {
-            this.properties = properties;
+        public Builder context(Context context) {
+            this.context = context;
             return this;
         }
     }
