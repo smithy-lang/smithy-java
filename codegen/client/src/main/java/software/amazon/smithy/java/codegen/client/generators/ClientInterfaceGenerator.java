@@ -16,8 +16,8 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.core.Client;
+import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
@@ -92,13 +92,13 @@ public final class ClientInterfaceGenerator
             writer.pushState();
             var template = """
                 default ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input) {
-                    return ${name:L}(input, ${context:T}.create());
+                    return ${name:L}(input, null);
                 }
 
-                ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${context:T} context);
+                ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig);
                 """;
             writer.putContext("async", symbol.expectProperty(ClientSymbolProperties.ASYNC));
-            writer.putContext("context", Context.class);
+            writer.putContext("overrideConfig", RequestOverrideConfig.class);
             writer.putContext("future", CompletableFuture.class);
 
             var opIndex = OperationIndex.of(model);

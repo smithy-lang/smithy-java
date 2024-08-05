@@ -54,27 +54,6 @@ public abstract class Client {
      *
      * @param input       Input to send.
      * @param operation   The operation shape.
-     * @param context     Context of the call.
-     * @param <I>         Input shape.
-     * @param <O>         Output shape.
-     * @return Returns the deserialized output.
-     */
-    @Deprecated // TODO: update usages to use the other call() signature
-    protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
-        I input,
-        ApiOperation<I, O> operation,
-        Context context
-    ) {
-        RequestOverrideConfig.Builder overrideConfigBuilder = RequestOverrideConfig.builder();
-        context.keys().forEachRemaining(key -> copyContext(key, context, overrideConfigBuilder));
-        return call(input, operation, overrideConfigBuilder.build());
-    }
-
-    /**
-     * Performs the actual RPC call.
-     *
-     * @param input       Input to send.
-     * @param operation   The operation shape.
      * @param overrideConfig Configuration to override for the call.
      * @param <I>         Input shape.
      * @param <O>         Output shape.

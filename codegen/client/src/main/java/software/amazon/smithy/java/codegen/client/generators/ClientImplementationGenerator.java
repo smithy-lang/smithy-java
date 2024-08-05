@@ -16,8 +16,8 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.core.Client;
+import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
@@ -81,7 +81,7 @@ public final class ClientImplementationGenerator
         public void run() {
             writer.pushState();
             writer.putContext("async", async);
-            writer.putContext("context", Context.class);
+            writer.putContext("overrideConfig", RequestOverrideConfig.class);
             var opIndex = OperationIndex.of(model);
             for (var operation : TopDownIndex.of(model).getContainedOperations(service)) {
                 writer.pushState();
@@ -92,8 +92,8 @@ public final class ClientImplementationGenerator
                 writer.write(
                     """
                         @Override
-                        public ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${context:T} context) {
-                            return call(input, new ${operation:T}(), context)${^async}.join()${/async};
+                        public ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig) {
+                            return call(input, new ${operation:T}(), overrideConfig)${^async}.join()${/async};
                         }
                         """
                 );
