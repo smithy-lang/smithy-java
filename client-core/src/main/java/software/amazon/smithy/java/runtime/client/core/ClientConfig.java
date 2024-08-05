@@ -20,7 +20,6 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterc
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 
-// TODO: This is currently not truly immutable, since Context is mutable.
 /**
  * An immutable representation of configurations of a {@link Client}.
  *
@@ -62,8 +61,7 @@ public final class ClientConfig {
         this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, DEFAULT_AUTH_SCHEME_RESOLVER);
         this.identityResolvers = List.copyOf(builder.identityResolvers);
 
-        // TODO: make a copy to prevent builder.context getting updated later and affecting this ClientConfig's context.
-        this.context = builder.context;
+        this.context = Context.unmodifiableCopyOf(builder.context);
     }
 
     // Note: Making all the accessors package-private for now as they are only needed by Client, but could be public.
@@ -96,7 +94,7 @@ public final class ClientConfig {
     }
 
     Context context() {
-        return context; // TODO: return an unmodifiable view
+        return context;
     }
 
     /**

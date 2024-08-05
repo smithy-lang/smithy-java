@@ -87,7 +87,7 @@ public abstract class Client {
             .input(input)
             .operation(operation)
             .endpointResolver(callConfig.endpointResolver())
-            .context(callConfig.context())
+            .context(Context.modifiableCopyOf(callConfig.context()))
             .interceptor(callInterceptor)
             .supportedAuthSchemes(callConfig.supportedAuthSchemes())
             .authSchemeResolver(callConfig.authSchemeResolver())
@@ -99,10 +99,6 @@ public abstract class Client {
             .build();
 
         return callPipeline.send(call);
-    }
-
-    private <T> void copyContext(Context.Key<T> key, Context src, RequestOverrideConfig.Builder dst) {
-        dst.putConfig(key, src.get(key));
     }
 
     /**

@@ -116,15 +116,41 @@ public sealed interface Context permits ContextImpl, UnmodifiableContext {
     }
 
     /**
+     * Get a modifiable copy of the Context.
+     *
+     * @return a modifiable copy of the Context.
+     */
+    static Context modifiableCopyOf(Context context) {
+        Context copy = Context.create();
+        copy.putAll(context);
+        return copy;
+    }
+
+    /**
+     * Get an unmodifiable copy of the Context.
+     *
+     * @return an unmodifiable copy of the Context.
+     */
+    static Context unmodifiableCopyOf(Context context) {
+        return unmodifiableViewOf(modifiableCopyOf(context));
+//        if (context instanceof ContextImpl impl) {
+//            return new ContextImpl(Map.copyOf(impl.attributes());
+//        } else {
+//            throw new IllegalArgumentException("Unsupported context type: " + context.getClass().getName());
+//        }
+    }
+
+    /**
      * Get an unmodifiable view of the Context.
      *
      * @return an unmodifiable view of the Context.
      */
     static Context unmodifiableViewOf(Context context) {
+        if (context instanceof UnmodifiableContext) {
+            return context;
+        }
         if (context instanceof ContextImpl impl) {
             return new UnmodifiableContext(impl);
-        } else if (context instanceof UnmodifiableContext unmodifiableContext) {
-            return unmodifiableContext;
         } else {
             throw new IllegalArgumentException("Unsupported context type: " + context.getClass().getName());
         }

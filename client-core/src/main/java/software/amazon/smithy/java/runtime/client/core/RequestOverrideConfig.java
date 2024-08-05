@@ -18,8 +18,6 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterc
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 
-// TODO: This is currently not truly immutable, since Context is mutable.
-
 /**
  * An immutable representation of configuration overrides when invoking {@link Client#call}.
  *
@@ -50,8 +48,7 @@ public final class RequestOverrideConfig {
         this.authSchemeResolver = builder.authSchemeResolver;
         this.identityResolvers = List.copyOf(builder.identityResolvers);
 
-        // TODO: make a copy to prevent builder.context getting updated later and affecting this ClientConfig's context.
-        this.context = builder.context;
+        this.context = Context.unmodifiableCopyOf(builder.context);
 
         this.plugins = List.copyOf(builder.plugins);
     }
@@ -86,7 +83,7 @@ public final class RequestOverrideConfig {
     }
 
     Context context() {
-        return context; // TODO: return an unmodifiable view
+        return context;
     }
 
     List<ClientPlugin> plugins() {

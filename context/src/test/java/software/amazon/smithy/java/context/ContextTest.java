@@ -8,6 +8,7 @@ package software.amazon.smithy.java.context;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -56,7 +57,7 @@ public class ContextTest {
     }
 
     @Test
-    public void unmodifiableView() {
+    public void unmodifiableViewOf() {
         var context = Context.create();
         context.put(FOO, "hi");
         context.put(BAR, 1);
@@ -64,9 +65,7 @@ public class ContextTest {
         Context unmodifiableView = Context.unmodifiableViewOf(context);
 
         assertThat(unmodifiableView.get(FOO), equalTo("hi"));
-        assertThat(unmodifiableView.expect(FOO), equalTo("hi"));
         assertThat(unmodifiableView.get(BAR), is(1));
-        assertThat(unmodifiableView.expect(FOO), equalTo("hi"));
 
         assertThrows(UnsupportedOperationException.class, () -> unmodifiableView.put(FOO, "bye"));
         assertThrows(UnsupportedOperationException.class, () -> unmodifiableView.putIfAbsent(FOO, "bye"));
@@ -81,6 +80,58 @@ public class ContextTest {
 
         assertThat(unmodifiableView.get(FOO), equalTo("bye"));
         assertThat(unmodifiableView.get(BAZ), equalTo(true));
+    }
+
+    @Test
+    public void unmodifiableCopyOf() {
+        var context = Context.create();
+        context.put(FOO, "hi");
+        context.put(BAR, 1);
+
+        Context unmodifiableCopy = Context.unmodifiableCopyOf(context);
+
+        assertThat(unmodifiableCopy.get(FOO), equalTo("hi"));
+        assertThat(unmodifiableCopy.get(BAR), is(1));
+
+        assertThrows(UnsupportedOperationException.class, () -> unmodifiableCopy.put(FOO, "bye"));
+        assertThrows(UnsupportedOperationException.class, () -> unmodifiableCopy.putIfAbsent(FOO, "bye"));
+        assertThrows(UnsupportedOperationException.class, () -> unmodifiableCopy.computeIfAbsent(FOO, key -> "bye"));
+        assertThrows(UnsupportedOperationException.class, () -> unmodifiableCopy.putAll(Context.create()));
+
+        Context unmodifiableCopy2 = Context.unmodifiableCopyOf(unmodifiableCopy);
+        assertThat(unmodifiableCopy2, not(sameInstance(unmodifiableCopy)));
+
+        context.put(FOO, "bye");
+        context.put(BAZ, true);
+
+        assertThat(unmodifiableCopy2.get(FOO), equalTo("hi"));
+        assertThat(unmodifiableCopy2.get(BAZ), nullValue());
+    }
+
+    @Test
+    public void modifiableCopyOf() {
+        var context = Context.create();
+        context.put(FOO, "hi");
+        context.put(BAR, 1);
+
+        Context modifiableCopyOf = Context.modifiableCopyOf(context);
+
+        assertThat(modifiableCopyOf.get(FOO), equalTo("hi"));
+        assertThat(modifiableCopyOf.get(BAR), is(1));
+
+        modifiableCopyOf.put(FOO, "bye");
+        modifiableCopyOf.put(BAZ, true);
+
+        assertThat(modifiableCopyOf.get(FOO), equalTo("bye"));
+        assertThat(context.get(FOO), equalTo("hi"));
+        assertThat(modifiableCopyOf.get(BAZ), equalTo(true));
+        assertThat(context.get(BAZ), nullValue());
+
+        context.put(FOO, "hello");
+        context.put(BAZ, false);
+
+        assertThat(modifiableCopyOf.get(FOO), equalTo("bye"));
+        assertThat(modifiableCopyOf.get(BAZ), equalTo(true));
     }
 
     @Test
