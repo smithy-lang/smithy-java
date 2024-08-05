@@ -87,7 +87,7 @@ public abstract class Client {
             .input(input)
             .operation(operation)
             .endpointResolver(callConfig.endpointResolver())
-            .context(Context.modifiableCopyOf(callConfig.context()))
+            .context(Context.modifiableCopy(callConfig.context()))
             .interceptor(callInterceptor)
             .supportedAuthSchemes(callConfig.supportedAuthSchemes())
             .authSchemeResolver(callConfig.authSchemeResolver())

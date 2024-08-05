@@ -48,7 +48,7 @@ public final class RequestOverrideConfig {
         this.authSchemeResolver = builder.authSchemeResolver;
         this.identityResolvers = List.copyOf(builder.identityResolvers);
 
-        this.context = Context.unmodifiableCopyOf(builder.context);
+        this.context = Context.unmodifiableCopy(builder.context);
 
         this.plugins = List.copyOf(builder.plugins);
     }

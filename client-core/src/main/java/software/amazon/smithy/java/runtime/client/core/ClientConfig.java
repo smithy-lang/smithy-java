@@ -61,7 +61,7 @@ public final class ClientConfig {
         this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, DEFAULT_AUTH_SCHEME_RESOLVER);
         this.identityResolvers = List.copyOf(builder.identityResolvers);
 
-        this.context = Context.unmodifiableCopyOf(builder.context);
+        this.context = Context.unmodifiableCopy(builder.context);
     }
 
     // Note: Making all the accessors package-private for now as they are only needed by Client, but could be public.

@@ -57,12 +57,12 @@ public class ContextTest {
     }
 
     @Test
-    public void unmodifiableViewOf() {
+    public void unmodifiableView() {
         var context = Context.create();
         context.put(FOO, "hi");
         context.put(BAR, 1);
 
-        Context unmodifiableView = Context.unmodifiableViewOf(context);
+        Context unmodifiableView = Context.unmodifiableView(context);
 
         assertThat(unmodifiableView.get(FOO), equalTo("hi"));
         assertThat(unmodifiableView.get(BAR), is(1));
@@ -72,7 +72,7 @@ public class ContextTest {
         assertThrows(UnsupportedOperationException.class, () -> unmodifiableView.computeIfAbsent(FOO, key -> "bye"));
         assertThrows(UnsupportedOperationException.class, () -> unmodifiableView.putAll(Context.create()));
 
-        Context unmodifiableView2 = Context.unmodifiableViewOf(unmodifiableView);
+        Context unmodifiableView2 = Context.unmodifiableView(unmodifiableView);
         assertThat(unmodifiableView2, sameInstance(unmodifiableView));
 
         context.put(FOO, "bye");
@@ -83,12 +83,12 @@ public class ContextTest {
     }
 
     @Test
-    public void unmodifiableCopyOf() {
+    public void unmodifiableCopy() {
         var context = Context.create();
         context.put(FOO, "hi");
         context.put(BAR, 1);
 
-        Context unmodifiableCopy = Context.unmodifiableCopyOf(context);
+        Context unmodifiableCopy = Context.unmodifiableCopy(context);
 
         assertThat(unmodifiableCopy.get(FOO), equalTo("hi"));
         assertThat(unmodifiableCopy.get(BAR), is(1));
@@ -98,7 +98,7 @@ public class ContextTest {
         assertThrows(UnsupportedOperationException.class, () -> unmodifiableCopy.computeIfAbsent(FOO, key -> "bye"));
         assertThrows(UnsupportedOperationException.class, () -> unmodifiableCopy.putAll(Context.create()));
 
-        Context unmodifiableCopy2 = Context.unmodifiableCopyOf(unmodifiableCopy);
+        Context unmodifiableCopy2 = Context.unmodifiableCopy(unmodifiableCopy);
         assertThat(unmodifiableCopy2, not(sameInstance(unmodifiableCopy)));
 
         context.put(FOO, "bye");
@@ -109,29 +109,29 @@ public class ContextTest {
     }
 
     @Test
-    public void modifiableCopyOf() {
+    public void modifiableCopy() {
         var context = Context.create();
         context.put(FOO, "hi");
         context.put(BAR, 1);
 
-        Context modifiableCopyOf = Context.modifiableCopyOf(context);
+        Context modifiableCopy = Context.modifiableCopy(context);
 
-        assertThat(modifiableCopyOf.get(FOO), equalTo("hi"));
-        assertThat(modifiableCopyOf.get(BAR), is(1));
+        assertThat(modifiableCopy.get(FOO), equalTo("hi"));
+        assertThat(modifiableCopy.get(BAR), is(1));
 
-        modifiableCopyOf.put(FOO, "bye");
-        modifiableCopyOf.put(BAZ, true);
+        modifiableCopy.put(FOO, "bye");
+        modifiableCopy.put(BAZ, true);
 
-        assertThat(modifiableCopyOf.get(FOO), equalTo("bye"));
+        assertThat(modifiableCopy.get(FOO), equalTo("bye"));
         assertThat(context.get(FOO), equalTo("hi"));
-        assertThat(modifiableCopyOf.get(BAZ), equalTo(true));
+        assertThat(modifiableCopy.get(BAZ), equalTo(true));
         assertThat(context.get(BAZ), nullValue());
 
         context.put(FOO, "hello");
         context.put(BAZ, false);
 
-        assertThat(modifiableCopyOf.get(FOO), equalTo("bye"));
-        assertThat(modifiableCopyOf.get(BAZ), equalTo(true));
+        assertThat(modifiableCopy.get(FOO), equalTo("bye"));
+        assertThat(modifiableCopy.get(BAZ), equalTo(true));
     }
 
     @Test
@@ -161,7 +161,7 @@ public class ContextTest {
         context.put(FOO, "bye");
         context.put(BAZ, true);
 
-        var unmodifiableOverrides = Context.unmodifiableViewOf(overrides);
+        var unmodifiableOverrides = Context.unmodifiableView(overrides);
         context.putAll(unmodifiableOverrides);
 
         assertThat(context.get(FOO), equalTo("bye"));

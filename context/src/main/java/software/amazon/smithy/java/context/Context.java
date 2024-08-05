@@ -120,7 +120,7 @@ public sealed interface Context permits ContextImpl, UnmodifiableContext {
      *
      * @return a modifiable copy of the Context.
      */
-    static Context modifiableCopyOf(Context context) {
+    static Context modifiableCopy(Context context) {
         Context copy = Context.create();
         copy.putAll(context);
         return copy;
@@ -131,13 +131,8 @@ public sealed interface Context permits ContextImpl, UnmodifiableContext {
      *
      * @return an unmodifiable copy of the Context.
      */
-    static Context unmodifiableCopyOf(Context context) {
-        return unmodifiableViewOf(modifiableCopyOf(context));
-//        if (context instanceof ContextImpl impl) {
-//            return new ContextImpl(Map.copyOf(impl.attributes());
-//        } else {
-//            throw new IllegalArgumentException("Unsupported context type: " + context.getClass().getName());
-//        }
+    static Context unmodifiableCopy(Context context) {
+        return unmodifiableView(modifiableCopy(context));
     }
 
     /**
@@ -145,7 +140,7 @@ public sealed interface Context permits ContextImpl, UnmodifiableContext {
      *
      * @return an unmodifiable view of the Context.
      */
-    static Context unmodifiableViewOf(Context context) {
+    static Context unmodifiableView(Context context) {
         if (context instanceof UnmodifiableContext) {
             return context;
         }
