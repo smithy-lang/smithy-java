@@ -11,11 +11,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -28,6 +26,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
 
     JsonGenerator generator;
     final JsonCodec.Settings settings;
+    private SerializeDocumentContents serializeDocumentContents;
 
     JacksonJsonSerializer(
         JsonGenerator generator,
@@ -86,7 +85,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     @Override
     public void writeBlob(Schema schema, byte[] value) {
         try {
-            generator.writeString(Base64.getEncoder().encodeToString(value));
+            generator.writeBinary(value);
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -122,21 +121,19 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     @Override
     public void writeFloat(Schema schema, float value) {
         try {
-            if (Float.isNaN(value)) {
-                generator.writeString("NaN");
-            } else if (Float.isInfinite(value)) {
-                if (Float.POSITIVE_INFINITY == value) {
-                    generator.writeString("Infinity");
-                } else {
-                    generator.writeString("-Infinity");
-                }
-            } else {
+            if (Float.isFinite(value)) {
                 int intValue = (int) value;
                 if (value - intValue > 0) {
                     generator.writeNumber(value);
                 } else {
                     generator.writeNumber(intValue);
                 }
+            } else if (Float.isNaN(value)) {
+                generator.writeString("NaN");
+            } else if (Float.POSITIVE_INFINITY == value) {
+                generator.writeString("Infinity");
+            } else {
+                generator.writeString("-Infinity");
             }
         } catch (Exception e) {
             throw new SerializationException(e);
@@ -146,21 +143,19 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     @Override
     public void writeDouble(Schema schema, double value) {
         try {
-            if (Double.isNaN(value)) {
-                generator.writeString("NaN");
-            } else if (Double.isInfinite(value)) {
-                if (Double.POSITIVE_INFINITY == value) {
-                    generator.writeString("Infinity");
-                } else {
-                    generator.writeString("-Infinity");
-                }
-            } else {
+            if (Double.isFinite(value)) {
                 long longValue = (long) value;
                 if (value - longValue > 0) {
                     generator.writeNumber(value);
                 } else {
                     generator.writeNumber(longValue);
                 }
+            } else if (Double.isNaN(value)) {
+                generator.writeString("NaN");
+            } else if (Double.POSITIVE_INFINITY == value) {
+                generator.writeString("Infinity");
+            } else {
+                generator.writeString("-Infinity");
             }
         } catch (Exception e) {
             throw new SerializationException(e);
@@ -214,7 +209,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     public <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
         try {
             generator.writeStartArray();
-            consumer.accept(listState, new ListSerializer(this, (pos) -> {}));
+            consumer.accept(listState, this);
             generator.writeEndArray();
         } catch (Exception e) {
             throw new SerializationException(e);
@@ -238,19 +233,30 @@ final class JacksonJsonSerializer implements ShapeSerializer {
         if (value.type() != ShapeType.STRUCTURE) {
             value.serializeContents(this);
         } else {
-            value.serializeContents(new SpecificShapeSerializer() {
-                @Override
-                public void writeStruct(Schema schema, SerializableStruct struct) {
-                    try {
-                        generator.writeStartObject();
-                        generator.writeStringField("__type", schema.id().toString());
-                        struct.serializeMembers(new JacksonStructSerializer(JacksonJsonSerializer.this));
-                        generator.writeEndObject();
-                    } catch (Exception e) {
-                        throw new SerializationException(e);
-                    }
-                }
-            });
+            if (serializeDocumentContents == null) {
+                serializeDocumentContents = new SerializeDocumentContents(this);
+            }
+            value.serializeContents(serializeDocumentContents);
+        }
+    }
+
+    private static final class SerializeDocumentContents extends SpecificShapeSerializer {
+        private final JacksonJsonSerializer parent;
+
+        SerializeDocumentContents(JacksonJsonSerializer parent) {
+            this.parent = parent;
+        }
+
+        @Override
+        public void writeStruct(Schema schema, SerializableStruct struct) {
+            try {
+                parent.generator.writeStartObject();
+                parent.generator.writeStringField("__type", schema.id().toString());
+                struct.serializeMembers(new JacksonStructSerializer(parent));
+                parent.generator.writeEndObject();
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
         }
     }
 

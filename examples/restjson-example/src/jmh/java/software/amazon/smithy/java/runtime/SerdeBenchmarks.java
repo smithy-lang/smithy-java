@@ -51,6 +51,14 @@ public class SerdeBenchmarks {
     }
 
     @Benchmark
+    public void documentToJson(Blackhole bh) throws IOException {
+        try (var sink = new ByteArrayOutputStream(); var serializer = codec.createSerializer(sink)) {
+            inputAsDocument.serialize(serializer);
+            bh.consume(sink.size());
+        }
+    }
+
+    @Benchmark
     public void jsonToShape(Blackhole bh) {
         String json = "{\"name\":\"Michael\",\"Age\":999,\"birthday\":1709591329,"
             + "\"favoriteColor\":\"Green\",\"binary\":\"SGVsbG8=\"}";
