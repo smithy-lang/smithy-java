@@ -9,6 +9,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.lang.reflect.InvocationTargetException;
+import java.util.LinkedHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.CodegenException;
@@ -28,6 +30,10 @@ import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
+import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
+import software.amazon.smithy.java.runtime.client.core.annotations.Configuration;
+import software.amazon.smithy.java.runtime.client.core.annotations.Parameter;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
@@ -71,6 +77,7 @@ public final class ClientInterfaceGenerator
                         }
 
                         final class Builder extends ${client:T}.Builder<${interface:T}, Builder> {
+                            ${defaultPlugins:C|}
                             ${?hasDefaultProtocol}${defaultProtocol:C|}
                             ${/hasDefaultProtocol}private Builder() {
                                 ${?hasDefaultProtocol}configBuilder().protocol(factory.createProtocol(settings, protocolTrait));${/hasDefaultProtocol}
@@ -78,8 +85,11 @@ public final class ClientInterfaceGenerator
                                 ${?transport}configBuilder().transport(new ${transport:T}());${/transport}
                             }
 
+                            ${pluginSetters:C|}
+
                             @Override
                             public ${interface:T} build() {
+                                ${applyDefaults:C|}
                                 return new ${impl:T}(this);
                             }
                         }
@@ -111,6 +121,10 @@ public final class ClientInterfaceGenerator
                     )
                 );
                 writer.putContext("authSchemes", getAuthSchemes(directive.model(), directive.service()));
+                var defaultPlugins = resolveDefaultPlugins(directive.settings());
+                writer.putContext("defaultPlugins", writer.consumer(w -> writePluginProperties(w, defaultPlugins)));
+                writer.putContext("pluginSetters", new DefaultPluginSetterGenerator(writer, defaultPlugins));
+                writer.putContext("applyDefaults", writer.consumer(w -> writePluginApplication(w, defaultPlugins)));
                 writer.write(template);
                 writer.popState();
             });
@@ -246,5 +260,94 @@ public final class ClientInterfaceGenerator
             }
         }
         return result.values();
+
+    private static void writePluginProperties(JavaWriter writer, Map<String, Class<? extends ClientPlugin>> pluginMap) {
+        for (var pluginEntry : pluginMap.entrySet()) {
+            writer.write("private final $1T $2L = new $1T();", pluginEntry.getValue(), pluginEntry.getKey());
+        }
+        if (!pluginMap.isEmpty()) {
+            writer.newLine();
+        }
+    }
+
+    private record DefaultPluginSetterGenerator(JavaWriter writer, Map<String, Class<? extends ClientPlugin>> pluginMap)
+        implements Runnable {
+
+        @Override
+        public void run() {
+            for (var pluginEntry : pluginMap.entrySet()) {
+                for (var method : pluginEntry.getValue().getDeclaredMethods()) {
+                    if (method.isAnnotationPresent(Configuration.class)) {
+                        writer.pushState();
+                        if (!method.getReturnType().equals(Void.TYPE)) {
+                            throw new CodegenException("Default plugin setters cannot return a value");
+                        }
+                        // TODO: Handle varargs
+                        Map<String, Class<?>> argMap = new LinkedHashMap<>();
+                        for (var param : method.getParameters()) {
+                            var paramName = param.isAnnotationPresent(Parameter.class)
+                                ? param.getAnnotation(Parameter.class).value()
+                                : param.getName();
+                            argMap.put(paramName, param.getType());
+                        }
+                        writer.putContext("pluginName", pluginEntry.getKey());
+                        writer.putContext("name", method.getName());
+                        writer.putContext("args", argMap);
+                        writer.write("""
+                            public Builder ${name:L}(${#args}${value:T} ${key:L}${^key.last}, ${/key.last}${/args}) {
+                                ${pluginName:L}.${name:L}(${#args}${key:L}${^key.last}, ${/key.last}${/args});
+                                return this;
+                            }
+                            """);
+                        writer.popState();
+                    }
+                }
+            }
+        }
+    }
+
+    private static void writePluginApplication(
+        JavaWriter writer,
+        Map<String, Class<? extends ClientPlugin>> pluginMap
+    ) {
+        for (var pluginProperty : pluginMap.keySet()) {
+            writer.write("$L.configureClient(configBuilder());", pluginProperty);
+        }
+    }
+
+    private static Map<String, Class<? extends ClientPlugin>> resolveDefaultPlugins(JavaCodegenSettings settings) {
+        Map<String, Class<? extends ClientPlugin>> pluginMap = new LinkedHashMap<>();
+        Map<String, Integer> frequencyMap = new HashMap<>();
+
+        for (var pluginFqn : settings.defaultPlugins()) {
+            var pluginClass = getPluginClass(pluginFqn);
+            // Ensure plugin names used as properties never clash
+            var pluginName = StringUtils.uncapitalize(pluginClass.getSimpleName());
+            int val = frequencyMap.getOrDefault(pluginName, 0);
+            if (val != 0) {
+                pluginName += val;
+            }
+            frequencyMap.put(pluginName, val + 1);
+            pluginMap.put(pluginName, pluginClass);
+        }
+
+        return pluginMap;
+    }
+
+    private static Class<? extends ClientPlugin> getPluginClass(String name) {
+        try {
+            var instance = Class.forName(name).getDeclaredConstructor().newInstance();
+            if (instance instanceof ClientPlugin cp) {
+                return cp.getClass();
+            } else {
+                throw new CodegenException("Class " + name + " is not a `ClientPlugin`");
+            }
+        } catch (ClassNotFoundException exc) {
+            throw new CodegenException("Could not find class " + name + ". Check your dependencies.", exc);
+        } catch (NoSuchMethodException exc) {
+            throw new CodegenException("Could not find no-arg constructor for " + name, exc);
+        } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
+            throw new CodegenException("Could not invoke constructor for " + name, e);
+        }
     }
 }

@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.BeforeAll;
@@ -60,7 +61,7 @@ public class CodegenContextTest {
     void getsCorrectRuntimeTraitsForProtocolsAndAuth() {
         var context = new CodeGenerationContext(
             model,
-            new JavaCodegenSettings(SERVICE_ID, "ns.foo", null, "", "", null, null),
+            new JavaCodegenSettings(SERVICE_ID, "ns.foo", null, "", "", null, null,  Collections.emptyList()),
             new JavaSymbolProvider(model, model.expectShape(SERVICE_ID).asServiceShape().get(), "ns.foo"),
             new MockManifest(),
             List.of()
@@ -108,7 +109,7 @@ public class CodegenContextTest {
     void getsCorrectTraitsWithNoProtocolOrAuth() {
         var context = new CodeGenerationContext(
             model,
-            new JavaCodegenSettings(NO_PROTOCOL_SERVICE_ID, "ns.foo", null, "", "", null, null),
+            new JavaCodegenSettings(NO_PROTOCOL_SERVICE_ID, "ns.foo", null, "", "", null, null, Collections.emptyList()),
             new JavaSymbolProvider(model, model.expectShape(NO_PROTOCOL_SERVICE_ID).asServiceShape().get(), "ns.foo"),
             new MockManifest(),
             List.of()

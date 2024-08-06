@@ -10,6 +10,7 @@ import java.nio.file.Paths;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.ObjectNode;
 
 
@@ -39,6 +40,7 @@ public final class TestServerJavaClientCodegenRunner {
                             .withMember("http-java", ObjectNode.builder().build())
                             .build()
                     )
+                    .withMember("defaultPlugins", ArrayNode.fromStrings(TestClientPlugin.class.getCanonicalName()))
                     .build()
             )
             .model(model)

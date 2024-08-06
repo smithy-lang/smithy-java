@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.codegen.core.CodegenException;
@@ -30,6 +31,7 @@ public final class JavaCodegenSettings {
     private static final String NON_NULL_ANNOTATION = "nonNullAnnotation";
     private static final String DEFAULT_PROTOCOL = "protocol";
     private static final String TRANSPORT = "transport";
+    private static final String DEFAULT_PLUGINS = "defaultPlugins";
 
     private final ShapeId service;
     private final String packageNamespace;
@@ -38,6 +40,7 @@ public final class JavaCodegenSettings {
     private final ShapeId defaultProtocol;
     private final String transportName;
     private final ObjectNode transportSettings;
+    private final List<String> defaultPlugins;
 
     JavaCodegenSettings(
         ShapeId service,
@@ -46,7 +49,8 @@ public final class JavaCodegenSettings {
         String sourceLocation,
         String nonNullAnnotationFullyQualifiedName,
         String defaultProtocol,
-        ObjectNode transportNode
+        ObjectNode transportNode,
+        List<String> defaultPlugins
     ) {
         this.service = Objects.requireNonNull(service);
         this.packageNamespace = Objects.requireNonNull(packageNamespace);
@@ -77,6 +81,7 @@ public final class JavaCodegenSettings {
             transportName = null;
             transportSettings = null;
         }
+        this.defaultPlugins = defaultPlugins;
     }
 
     /**
@@ -87,7 +92,7 @@ public final class JavaCodegenSettings {
      */
     public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
         settingsNode.warnIfAdditionalProperties(
-            List.of(SERVICE, NAMESPACE, HEADER_FILE, NON_NULL_ANNOTATION, DEFAULT_PROTOCOL, TRANSPORT)
+            List.of(SERVICE, NAMESPACE, HEADER_FILE, NON_NULL_ANNOTATION, DEFAULT_PROTOCOL, TRANSPORT, DEFAULT_PLUGINS)
         );
         return new JavaCodegenSettings(
             settingsNode.expectStringMember(SERVICE).expectShapeId(),
@@ -96,7 +101,10 @@ public final class JavaCodegenSettings {
             settingsNode.getSourceLocation().getFilename(),
             settingsNode.getStringMemberOrDefault(NON_NULL_ANNOTATION, ""),
             settingsNode.getStringMemberOrDefault(DEFAULT_PROTOCOL, null),
-            settingsNode.getObjectMember(TRANSPORT).orElse(null)
+            settingsNode.getObjectMember(TRANSPORT).orElse(null),
+            settingsNode.getArrayMember(DEFAULT_PLUGINS)
+                .map(n -> n.getElementsAs(el -> el.expectStringNode().getValue()))
+                .orElse(Collections.emptyList())
         );
     }
 
@@ -126,6 +134,10 @@ public final class JavaCodegenSettings {
 
     public ObjectNode transportSettings() {
         return transportSettings;
+    }
+
+    public List<String> defaultPlugins() {
+        return defaultPlugins;
     }
 
     private static Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {

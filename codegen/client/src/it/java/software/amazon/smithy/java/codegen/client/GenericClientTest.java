@@ -5,12 +5,16 @@
 
 package software.amazon.smithy.java.codegen.client;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.math.BigDecimal;
+import java.net.http.HttpClient;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
 import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.runtime.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ResponseHook;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
@@ -22,6 +26,7 @@ public class GenericClientTest {
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol())
             .endpoint("https://httpbin.org")
+            .value(5L)
             .build();
 
         var value = "hello world";
@@ -55,6 +60,31 @@ public class GenericClientTest {
             .protocol(new RestJsonClientProtocol())
             .endpoint("https://httpbin.org")
             .addInterceptor(interceptor)
+            .value(2.2)
+            .build();
+
+        var input = EchoInput.builder().string("hello world").build();
+        var output = client.echo(input);
+    }
+
+    // TODO: Update to use context directly once we have a method that returns that
+    @Test
+    public void correctlyAppliesDefaultPlugins() {
+        var interceptor = new ClientInterceptor() {
+            @Override
+            public void readBeforeExecution(InputHook<?> hook) {
+                var constant = hook.context().get(TestClientPlugin.CONSTANT_KEY);
+                assertEquals(constant, "CONSTANT");
+                var value = hook.context().get(TestClientPlugin.VALUE_KEY);
+                assertEquals(value, BigDecimal.valueOf(2L));
+            }
+        };
+        var client = TestServiceClient.builder()
+            .protocol(new RestJsonClientProtocol())
+            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
+            .endpoint("https://httpbin.org")
+            .addInterceptor(interceptor)
+            .value(2L)
             .build();
 
         var input = EchoInput.builder().string("hello world").build();
