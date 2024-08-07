@@ -6,18 +6,21 @@
 package software.amazon.smithy.java.codegen;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.model.node.ObjectNode;
+import software.amazon.smithy.model.selector.Selector;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.IoUtils;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 import software.amazon.smithy.utils.StringUtils;
 
 /**
- * Settings for {@code JavaCodegenPlugin}.
+ * Common settings for {@code JavaCodegenPlugin}'s.
  */
 @SmithyUnstableApi
 public final class JavaCodegenSettings {
@@ -27,19 +30,32 @@ public final class JavaCodegenSettings {
     private static final String NAMESPACE = "namespace";
     private static final String HEADER_FILE = "headerFile";
     private static final String NON_NULL_ANNOTATION = "nonNullAnnotation";
+    private static final String SHAPES = "shapes";
+    private static final String SELECTOR = "selector";
+    private static final List<String> PROPERTIES = List.of(
+        SERVICE,
+        NAMESPACE,
+        HEADER_FILE,
+        NON_NULL_ANNOTATION,
+        SHAPES,
+        SELECTOR
+    );
 
     private final ShapeId service;
     private final String packageNamespace;
     private final String header;
-
     private final Symbol nonNullAnnotationSymbol;
+    private final List<ShapeId> shapes = new ArrayList<>();
+    private final Selector selector;
 
     JavaCodegenSettings(
         ShapeId service,
         String packageNamespace,
         String headerFile,
         String sourceLocation,
-        String nonNullAnnotationFullyQualifiedName
+        String nonNullAnnotationFullyQualifiedName,
+        List<ShapeId> shapes,
+        Selector selector
     ) {
         this.service = Objects.requireNonNull(service);
         this.packageNamespace = Objects.requireNonNull(packageNamespace);
@@ -50,22 +66,34 @@ public final class JavaCodegenSettings {
         } else {
             nonNullAnnotationSymbol = null;
         }
+        this.shapes.addAll(shapes);
+        this.selector = selector;
+    }
+
+    public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
+        settingsNode.warnIfAdditionalProperties(PROPERTIES);
+        return fromNode(settingsNode.expectStringMember(SERVICE).expectShapeId(), settingsNode);
     }
 
     /**
      * Creates a settings object from a plugin settings node
      *
+     * @param service service shape to use
      * @param settingsNode Settings node to load
      * @return Parsed settings
      */
-    public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
-        settingsNode.warnIfAdditionalProperties(List.of(SERVICE, NAMESPACE, HEADER_FILE, NON_NULL_ANNOTATION));
+    public static JavaCodegenSettings fromNode(ShapeId service, ObjectNode settingsNode) {
+        settingsNode.warnIfAdditionalProperties(PROPERTIES);
         return new JavaCodegenSettings(
-            settingsNode.expectStringMember(SERVICE).expectShapeId(),
+            service,
             settingsNode.expectStringMember(NAMESPACE).getValue(),
             settingsNode.getStringMemberOrDefault(HEADER_FILE, null),
             settingsNode.getSourceLocation().getFilename(),
-            settingsNode.getStringMemberOrDefault(NON_NULL_ANNOTATION, "")
+            settingsNode.getStringMemberOrDefault(NON_NULL_ANNOTATION, ""),
+            settingsNode.getArrayMember(SHAPES)
+                .map(n -> n.getElementsAs(el -> el.expectStringNode().expectShapeId()))
+                .orElse(Collections.emptyList()),
+            Selector.parse(settingsNode.getStringMemberOrDefault(SELECTOR, "*"))
         );
     }
 
@@ -83,6 +111,14 @@ public final class JavaCodegenSettings {
 
     public Symbol getNonNullAnnotationSymbol() {
         return nonNullAnnotationSymbol;
+    }
+
+    public Selector selector() {
+        return selector;
+    }
+
+    public List<ShapeId> shapes() {
+        return shapes;
     }
 
     private static Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {
@@ -107,5 +143,4 @@ public final class JavaCodegenSettings {
         LOGGER.log(System.Logger.Level.TRACE, () -> "Reading header file: " + file.getAbsolutePath());
         return IoUtils.readUtf8File(file.getAbsolutePath());
     }
-
 }
