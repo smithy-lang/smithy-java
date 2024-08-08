@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.math.BigDecimal;
 import java.net.http.HttpClient;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
@@ -77,6 +78,14 @@ public class GenericClientTest {
                 assertEquals(constant, "CONSTANT");
                 var value = hook.context().get(TestClientPlugin.VALUE_KEY);
                 assertEquals(value, BigDecimal.valueOf(2L));
+                var ab = hook.context().get(TestClientPlugin.AB_KEY);
+                assertEquals(ab, "ab");
+                var singleVarargs = hook.context().get(TestClientPlugin.STRING_LIST_KEY);
+                assertEquals(List.of("a", "b", "c", "d"), singleVarargs);
+                var foo = hook.context().get(TestClientPlugin.FOO_KEY);
+                assertEquals(foo, "string");
+                var multiVarargs = hook.context().get(TestClientPlugin.BAZ_KEY);
+                assertEquals(List.of("a", "b", "c"), multiVarargs);
             }
         };
         var client = TestServiceClient.builder()
@@ -85,6 +94,9 @@ public class GenericClientTest {
             .endpoint("https://httpbin.org")
             .addInterceptor(interceptor)
             .value(2L)
+            .multiValue("a", "b")
+            .multiVarargs("string", "a", "b", "c")
+            .singleVarargs("a", "b", "c", "d")
             .build();
 
         var input = EchoInput.builder().string("hello world").build();

@@ -7,6 +7,12 @@ package software.amazon.smithy.java.codegen.client.generators;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.lang.reflect.InvocationTargetException;
@@ -33,7 +39,6 @@ import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.client.core.annotations.Configuration;
-import software.amazon.smithy.java.runtime.client.core.annotations.Parameter;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
@@ -89,8 +94,10 @@ public final class ClientInterfaceGenerator
 
                             @Override
                             public ${interface:T} build() {
-                                ${applyDefaults:C|}
-                                return new ${impl:T}(this);
+                                ${?hasDefaults}for (var plugin : defaultPlugins) {
+                                    plugin.configureClient(configBuilder());
+                                }
+                                ${/hasDefaults}return new ${impl:T}(this);
                             }
                         }
                     }
@@ -106,6 +113,7 @@ public final class ClientInterfaceGenerator
                         directive.context()
                     )
                 );
+                writer.putContext("clientPlugin", ClientPlugin.class);
                 writer.putContext("client", Client.class);
                 writer.putContext("interface", symbol);
                 writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
@@ -122,9 +130,9 @@ public final class ClientInterfaceGenerator
                 );
                 writer.putContext("authSchemes", getAuthSchemes(directive.model(), directive.service()));
                 var defaultPlugins = resolveDefaultPlugins(directive.settings());
-                writer.putContext("defaultPlugins", writer.consumer(w -> writePluginProperties(w, defaultPlugins)));
+                writer.putContext("hasDefaults", !defaultPlugins.isEmpty());
+                writer.putContext("defaultPlugins", new PluginPropertyWriter(writer, defaultPlugins));
                 writer.putContext("pluginSetters", new DefaultPluginSetterGenerator(writer, defaultPlugins));
-                writer.putContext("applyDefaults", writer.consumer(w -> writePluginApplication(w, defaultPlugins)));
                 writer.write(template);
                 writer.popState();
             });
@@ -261,13 +269,26 @@ public final class ClientInterfaceGenerator
         }
         return result.values();
 
-    private static void writePluginProperties(JavaWriter writer, Map<String, Class<? extends ClientPlugin>> pluginMap) {
-        for (var pluginEntry : pluginMap.entrySet()) {
-            writer.write("private final $1T $2L = new $1T();", pluginEntry.getValue(), pluginEntry.getKey());
+    private record PluginPropertyWriter(JavaWriter writer, Map<String, Class<? extends ClientPlugin>> pluginMap)
+        implements Runnable {
+        @Override
+        public void run() {
+            if (pluginMap.isEmpty()) {
+                return;
+            }
+            writer.pushState();
+            writer.putContext("list", List.class);
+            writer.putContext("plugins", pluginMap);
+            writer.write(
+                """
+                    ${#plugins}private final ${value:T} ${key:L} = new ${value:T}();
+                    ${/plugins}
+                    private final ${list:T}<${clientPlugin:T}> defaultPlugins = List.of(${#plugins}${key:L}${^key.last}, ${/key.last}${/plugins});
+                    """
+            );
+            writer.popState();
         }
-        if (!pluginMap.isEmpty()) {
-            writer.newLine();
-        }
+
     }
 
     private record DefaultPluginSetterGenerator(JavaWriter writer, Map<String, Class<? extends ClientPlugin>> pluginMap)
@@ -282,19 +303,11 @@ public final class ClientInterfaceGenerator
                         if (!method.getReturnType().equals(Void.TYPE)) {
                             throw new CodegenException("Default plugin setters cannot return a value");
                         }
-                        // TODO: Handle varargs
-                        Map<String, Class<?>> argMap = new LinkedHashMap<>();
-                        for (var param : method.getParameters()) {
-                            var paramName = param.isAnnotationPresent(Parameter.class)
-                                ? param.getAnnotation(Parameter.class).value()
-                                : param.getName();
-                            argMap.put(paramName, param.getType());
-                        }
                         writer.putContext("pluginName", pluginEntry.getKey());
                         writer.putContext("name", method.getName());
-                        writer.putContext("args", argMap);
+                        writer.putContext("args", getParamMap(method));
                         writer.write("""
-                            public Builder ${name:L}(${#args}${value:T} ${key:L}${^key.last}, ${/key.last}${/args}) {
+                            public Builder ${name:L}(${#args}${value:P} ${key:L}${^key.last}, ${/key.last}${/args}) {
                                 ${pluginName:L}.${name:L}(${#args}${key:L}${^key.last}, ${/key.last}${/args});
                                 return this;
                             }
@@ -304,14 +317,19 @@ public final class ClientInterfaceGenerator
                 }
             }
         }
-    }
 
-    private static void writePluginApplication(
-        JavaWriter writer,
-        Map<String, Class<? extends ClientPlugin>> pluginMap
-    ) {
-        for (var pluginProperty : pluginMap.keySet()) {
-            writer.write("$L.configureClient(configBuilder());", pluginProperty);
+        private static Map<String, Parameter> getParamMap(Method method) {
+            Map<String, java.lang.reflect.Parameter> parameterMap = new LinkedHashMap<>();
+            for (var param : method.getParameters()) {
+                var paramName = param.isAnnotationPresent(
+                    software.amazon.smithy.java.runtime.client.core.annotations.Parameter.class
+                )
+                    ? param.getAnnotation(software.amazon.smithy.java.runtime.client.core.annotations.Parameter.class)
+                        .value()
+                    : param.getName();
+                parameterMap.put(paramName, param);
+            }
+            return parameterMap;
         }
     }
 

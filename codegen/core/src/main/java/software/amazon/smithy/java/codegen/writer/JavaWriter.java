@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.writer;
 
+import java.lang.reflect.Parameter;
 import java.util.Set;
 import java.util.function.BiFunction;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -42,7 +43,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         putFormatter('B', new BoxedTypeFormatter());
         putFormatter('U', new CapitalizingFormatter());
         putFormatter('N', new NonNullAnnotationFormatter());
-
+        putFormatter('P', new ParameterFormatter());
     }
 
     // Java does not support aliases, so just import normally
@@ -222,6 +223,28 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
             }
 
             return format("@$T $T", nonNullAnnotationSymbol, typeSymbol);
+        }
+    }
+
+    /**
+     * Implements a formatter for {@code $P} that formats a {@link Parameter} as a type.
+     */
+    private final class ParameterFormatter implements BiFunction<Object, String, String> {
+
+        @Override
+        public String apply(Object type, String indent) {
+            if (type instanceof Parameter param) {
+                if (param.isVarArgs()) {
+                    // Get type of array element. I.e. String instead of String[]
+                    return format("$T...", param.getType().getComponentType());
+                }
+                return format("$T", param.getType());
+            }
+            throw new IllegalArgumentException(
+                "Invalid type provided for $U. Expected a String but found: `"
+                    + type + "`."
+            );
+
         }
     }
 }
