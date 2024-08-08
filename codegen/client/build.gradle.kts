@@ -34,7 +34,17 @@ tasks {
     compileItJava {
         dependsOn(generateSrcTask)
     }
+    test {
+        finalizedBy(integ)
+    }
     spotbugsIt {
         enabled = false
+    }
+}
+
+sourceSets {
+    it {
+        // Add test plugin to classpath
+        compileClasspath += sourceSets["test"].output
     }
 }
