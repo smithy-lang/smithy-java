@@ -11,10 +11,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
-import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolverParams;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.InputHook;
@@ -156,15 +156,16 @@ public final class ClientPipeline<RequestT, ResponseT> {
             .protocolId(protocol.id())
             .operationName(call.operation().schema().id().getName())
             .context(Context.unmodifiableView(call.context()))
+            .operationAuthSchemes(call.operation().effectiveAuthSchemes())
             .build();
         var authSchemeOptions = call.authSchemeResolver().resolveAuthScheme(params);
 
         // Determine if the auth scheme option is actually supported.
         for (var authSchemeOption : authSchemeOptions) {
-            AuthScheme<?, ?> authScheme = call.supportedAuthSchemes().get(authSchemeOption.schemeId());
+            AuthScheme<?, ?> authScheme = call.supportedAuthSchemes().get(authSchemeOption);
             if (authScheme != null && authScheme.requestClass().isAssignableFrom(request.getClass())) {
                 AuthScheme<RequestT, ?> castAuthScheme = (AuthScheme<RequestT, ?>) authScheme;
-                var resolved = createResolvedSchema(call.identityResolvers(), castAuthScheme, authSchemeOption)
+                var resolved = createResolvedSchema(call.identityResolvers(), castAuthScheme, call.context())
                     .orElse(null);
                 if (resolved != null) {
                     return resolved;
@@ -179,22 +180,24 @@ public final class ClientPipeline<RequestT, ResponseT> {
     private <IdentityT extends Identity> Optional<ResolvedScheme<IdentityT, RequestT>> createResolvedSchema(
         IdentityResolvers identityResolvers,
         AuthScheme<RequestT, IdentityT> authScheme,
-        AuthSchemeOption option
+        Context context
     ) {
+        var identityProperties = authScheme.getIdentityProperties(context);
         return authScheme.identityResolver(identityResolvers).map(identityResolver -> {
-            CompletableFuture<IdentityT> identity = identityResolver.resolveIdentity(option.identityProperties());
-            return new ResolvedScheme<>(option, authScheme, identity);
+            CompletableFuture<IdentityT> identity = identityResolver.resolveIdentity(identityProperties);
+            var signerProperties = authScheme.getSignerProperties(context);
+            return new ResolvedScheme<>(signerProperties, authScheme, identity);
         });
     }
 
     private record ResolvedScheme<IdentityT extends Identity, RequestT>(
-        AuthSchemeOption option,
+        AuthProperties properties,
         AuthScheme<RequestT, IdentityT> authScheme,
         CompletableFuture<IdentityT> identity
     ) {
         public CompletableFuture<RequestT> sign(RequestT request) {
             return identity.thenApply(
-                identity -> authScheme.signer().sign(request, identity, option.signerProperties())
+                identity -> authScheme.signer().sign(request, identity, properties)
             );
         }
     }
