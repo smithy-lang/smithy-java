@@ -33,7 +33,7 @@ public final class JavaCodegenSettings {
     private final String packageNamespace;
     private final String header;
     private final Symbol nonNullAnnotationSymbol;
-    private final String defaultProtocol;
+    private final ShapeId defaultProtocol;
 
     JavaCodegenSettings(
         ShapeId service,
@@ -52,8 +52,7 @@ public final class JavaCodegenSettings {
         } else {
             nonNullAnnotationSymbol = null;
         }
-
-        this.defaultProtocol = defaultProtocol;
+        this.defaultProtocol = defaultProtocol != null ? ShapeId.from(defaultProtocol) : null;
     }
 
     /**
@@ -92,7 +91,7 @@ public final class JavaCodegenSettings {
         return nonNullAnnotationSymbol;
     }
 
-    public String getDefaultProtocol() {
+    public ShapeId getDefaultProtocol() {
         return defaultProtocol;
     }
 

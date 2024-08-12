@@ -12,4 +12,5 @@ dependencies {
     api(project(":http-binding"))
     api(project(":json-codec"))
     api(project(":aws-event-streams"))
+    api(libs.smithy.aws.traits)
 }

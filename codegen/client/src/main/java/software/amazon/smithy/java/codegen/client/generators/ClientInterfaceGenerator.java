@@ -129,7 +129,7 @@ public final class ClientInterfaceGenerator
         }
     }
 
-    private record DefaultProtocolGenerator(JavaWriter writer, String namespace, String defaultProtocol) implements
+    private record DefaultProtocolGenerator(JavaWriter writer, String namespace, ShapeId defaultProtocol) implements
         Runnable {
         @Override
         public void run() {
@@ -157,7 +157,7 @@ public final class ClientInterfaceGenerator
         }
     }
 
-    private static String getDefaultProtocol(Model model, JavaCodegenSettings settings) {
+    private static ShapeId getDefaultProtocol(Model model, JavaCodegenSettings settings) {
         var defaultProtocol = settings.getDefaultProtocol();
         if (defaultProtocol == null) {
             return null;
@@ -166,7 +166,7 @@ public final class ClientInterfaceGenerator
         // Check that specified protocol matches one of the protocol traits on the service shape
         var index = ServiceIndex.of(model);
         var protocols = index.getProtocols(settings.service());
-        if (protocols.containsKey(ShapeId.from(defaultProtocol))) {
+        if (protocols.containsKey(defaultProtocol)) {
             return defaultProtocol;
         }
 
@@ -176,7 +176,7 @@ public final class ClientInterfaceGenerator
         );
     }
 
-    private static Class<? extends ClientProtocolFactory> getFactory(String defaultProtocol) {
+    private static Class<? extends ClientProtocolFactory> getFactory(ShapeId defaultProtocol) {
         for (var factory : ServiceLoader.load(
             ClientProtocolFactory.class,
             ClientInterfaceGenerator.class.getClassLoader()

@@ -18,12 +18,13 @@ import software.amazon.smithy.java.runtime.events.aws.AwsEventDecoderFactory;
 import software.amazon.smithy.java.runtime.events.aws.AwsEventEncoderFactory;
 import software.amazon.smithy.java.runtime.events.aws.AwsEventFrame;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * Implements aws.protocols#restJson1.
  */
 public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsEventFrame> {
-    private static final String ID = "aws.protocols#restJson1";
+    public static final ShapeId ID = ShapeId.from("aws.protocols#restJson1");
 
     public RestJsonClientProtocol() {
         this(null);
@@ -35,7 +36,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
      */
     public RestJsonClientProtocol(String serviceNamespace) {
         super(
-            ID,
+            ID.toString(),
             JsonCodec.builder()
                 .useJsonName(true)
                 .useTimestampFormat(true)
@@ -69,7 +70,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
 
     public static final class Factory implements ClientProtocolFactory {
         @Override
-        public String id() {
+        public ShapeId id() {
             return ID;
         }
 

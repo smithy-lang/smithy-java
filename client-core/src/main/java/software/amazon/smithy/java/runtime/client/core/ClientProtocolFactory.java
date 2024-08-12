@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.runtime.client.core;
 
+import software.amazon.smithy.model.shapes.ShapeId;
+
 /**
  * Creates a {@link ClientProtocol}.
  *
@@ -17,7 +19,7 @@ public interface ClientProtocolFactory {
      *
      * @return the protocol ID.
      */
-    String id();
+    ShapeId id();
 
     /**
      * Factory method to create the protocol.
