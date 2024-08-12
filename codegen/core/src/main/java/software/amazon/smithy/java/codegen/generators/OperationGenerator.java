@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -22,6 +23,7 @@ import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.EventStreamIndex;
+import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 
@@ -54,6 +56,8 @@ public class OperationGenerator
                         ${schema:C|}
 
                         ${typeRegistrySection:C|}
+
+                        private static final ${list:T}<${string:T}> SCHEMES = ${list:T}.of(${#schemes}${key:S}${^key.last}, ${/key.last}${/schemes});
 
                         @Override
                         public ${sdkShapeBuilder:N}<${inputType:T}> inputBuilder() {
@@ -105,6 +109,11 @@ public class OperationGenerator
                         public ${typeRegistry:N} typeRegistry() {
                             return typeRegistry;
                         }
+
+                        @Override
+                        public ${list:T}<${string:T}> effectiveAuthSchemes() {
+                            return SCHEMES;
+                        }
                     }
                     """;
                 writer.putContext("shape", symbol);
@@ -113,6 +122,8 @@ public class OperationGenerator
                 writer.putContext("id", new IdStringGenerator(writer, shape));
                 writer.putContext("sdkSchema", Schema.class);
                 writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
+                writer.putContext("list", List.class);
+                writer.putContext("string", String.class);
 
                 writer.putContext(
                     "operationType",
@@ -145,6 +156,15 @@ public class OperationGenerator
                         directive.symbolProvider(),
                         directive.model(),
                         directive.service()
+                    )
+                );
+                var serviceIndex = ServiceIndex.of(directive.model());
+                writer.putContext(
+                    "schemes",
+                    serviceIndex.getEffectiveAuthSchemes(
+                        directive.service(),
+                        shape,
+                        ServiceIndex.AuthSchemeMode.NO_AUTH_AWARE
                     )
                 );
                 eventStreamIndex.getInputInfo(shape).ifPresent(info -> {

@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.core.schema;
 
+import java.util.List;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 
 /**
@@ -55,4 +56,11 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
      * @return Returns the type registry.
      */
     TypeRegistry typeRegistry();
+
+    /**
+     * Get a list of effective authScheme for
+     *
+     * @return List of effective auth schemes
+     */
+    List<String> effectiveAuthSchemes();
 }

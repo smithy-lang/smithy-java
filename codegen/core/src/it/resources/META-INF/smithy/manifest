@@ -44,5 +44,6 @@ traits/traits.smithy
 unions/union-tests.smithy
 unions/unions-all-types.smithy
 common.smithy
+authScheme.smithy
 main.smithy
 

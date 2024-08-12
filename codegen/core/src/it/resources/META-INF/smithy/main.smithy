@@ -12,6 +12,8 @@ use smithy.java.codegen.test.structures#StructureTests
 use smithy.java.codegen.test.traits#Traits
 use smithy.java.codegen.test.unions#UnionTests
 
+@httpApiKeyAuth(name: "X-Api-Key", in: "header")
+@httpBasicAuth
 service TestService {
     version: "today"
     resources: [
@@ -26,5 +28,8 @@ service TestService {
     operations: [
         Naming
         Traits
+        AllAuth
+        ScopedAuth
+        NoAuth
     ]
 }
