@@ -20,7 +20,7 @@ public interface ClientProtocolFactory {
     String id();
 
     /**
-     * Factory method to create
+     * Factory method to create the protocol.
      * @param settings protocol settings to use for instantiating a protocol.
      * @return protocol implementation
      */
