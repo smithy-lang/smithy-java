@@ -12,6 +12,8 @@ dependencies {
 
     testImplementation(project(":client-aws-rest-json1"))
     testImplementation(libs.smithy.aws.traits)
+
+    itImplementation(project(":client-aws-rest-json1"))
 }
 
 // Execute building of Java classes using an executable class

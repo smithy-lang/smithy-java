@@ -5,8 +5,10 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
+import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
@@ -17,11 +19,16 @@ import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.client.core.Client;
+import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
+import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
+import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
@@ -55,8 +62,10 @@ public final class ClientInterfaceGenerator
                         }
 
                         final class Builder extends ${client:T}.Builder<${interface:T}, Builder> {
-
-                            private Builder() {}
+                            ${?hasDefaultProtocol}${defaultProtocol:C|}
+                            ${/hasDefaultProtocol}private Builder() {${?hasDefaultProtocol}
+                                configBuilder().protocol(factory.createProtocol(settings, protocolTrait));
+                            ${/hasDefaultProtocol}}
 
                             @Override
                             public ${interface:T} build() {
@@ -65,6 +74,17 @@ public final class ClientInterfaceGenerator
                         }
                     }
                     """;
+                var defaultProtocolTrait = getDefaultProtocolTrait(directive.model(), directive.settings());
+                writer.putContext("hasDefaultProtocol", defaultProtocolTrait != null);
+                writer.putContext(
+                    "defaultProtocol",
+                    new DefaultProtocolGenerator(
+                        writer,
+                        directive.settings().packageNamespace(),
+                        defaultProtocolTrait,
+                        directive.context()
+                    )
+                );
                 writer.putContext("client", Client.class);
                 writer.putContext("interface", symbol);
                 writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
@@ -112,5 +132,70 @@ public final class ClientInterfaceGenerator
             }
             writer.popState();
         }
+    }
+
+    private record DefaultProtocolGenerator(
+        JavaWriter writer, String namespace, Trait defaultProtocolTrait, CodeGenerationContext context
+    ) implements
+        Runnable {
+        @Override
+        public void run() {
+            if (defaultProtocolTrait == null) {
+                return;
+            }
+            writer.pushState();
+            var template = """
+                private static final ${protocolSettings:T} settings = ${protocolSettings:T}.builder()
+                        .namespace(${serviceNamespace:S})
+                        .build();
+                private static final ${trait:T} protocolTrait = ${initializer:C};
+                private static final ${clientProtocolFactory:T}<${trait:T}> factory = new ${?outer}${outer:T}.${name:L}${/outer}${^outer}${type:T}${/outer}();
+                """;
+            writer.putContext("protocolSettings", ProtocolSettings.class);
+            writer.putContext("clientProtocolFactory", ClientProtocolFactory.class);
+            writer.putContext("trait", defaultProtocolTrait.getClass());
+            var initializer = context.getInitializer(defaultProtocolTrait);
+            writer.putContext("initializer", writer.consumer(w -> initializer.accept(w, defaultProtocolTrait)));
+            writer.putContext("serviceNamespace", namespace);
+            var factoryClass = getFactory(defaultProtocolTrait.toShapeId());
+            if (factoryClass.isMemberClass()) {
+                writer.putContext("outer", factoryClass.getEnclosingClass());
+            }
+            writer.putContext("name", factoryClass.getSimpleName());
+            writer.putContext("type", factoryClass);
+            writer.write(template);
+            writer.popState();
+        }
+    }
+
+    private static Trait getDefaultProtocolTrait(Model model, JavaCodegenSettings settings) {
+        var defaultProtocol = settings.getDefaultProtocol();
+        if (defaultProtocol == null) {
+            return null;
+        }
+
+        // Check that specified protocol matches one of the protocol traits on the service shape
+        var index = ServiceIndex.of(model);
+        var protocols = index.getProtocols(settings.service());
+        if (protocols.containsKey(defaultProtocol)) {
+            return protocols.get(defaultProtocol);
+        }
+
+        throw new UnsupportedOperationException(
+            "Specified protocol `" + defaultProtocol + "` not found on service "
+                + settings.service() + ". Expected one of: " + protocols.keySet() + "."
+        );
+    }
+
+    private static Class<? extends ClientProtocolFactory> getFactory(ShapeId defaultProtocol) {
+        for (var factory : ServiceLoader.load(
+            ClientProtocolFactory.class,
+            ClientInterfaceGenerator.class.getClassLoader()
+        )) {
+            if (factory.id().equals(defaultProtocol)) {
+                return factory.getClass();
+            }
+        }
+        throw new CodegenException("Could not find factory for " + defaultProtocol);
     }
 }

@@ -1,9 +1,10 @@
 /*
- * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * Example file license header.
+ * File header line two
  */
 
-package software.amazon.smithy.java.runtime.example;
+
+package software.amazon.smithy.java.runtime.example.client;
 
 import software.amazon.smithy.aws.traits.protocols.RestJson1Trait;
 import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
@@ -17,7 +18,11 @@ import software.amazon.smithy.java.runtime.example.model.PutPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonOutput;
+import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.utils.SmithyGenerated;
 
+@SmithyGenerated
 public interface PersonDirectoryClient {
 
     default GetPersonImageOutput getPersonImage(GetPersonImageInput input) {
@@ -43,8 +48,14 @@ public interface PersonDirectoryClient {
     }
 
     final class Builder extends Client.Builder<PersonDirectoryClient, Builder> {
-        private static final ProtocolSettings settings = ProtocolSettings.builder().namespace("foo.bar").build();
-        private static final RestJson1Trait protocolTrait = RestJson1Trait.builder().build();
+        private static final ProtocolSettings settings = ProtocolSettings.builder()
+                .namespace("software.amazon.smithy.java.runtime.example")
+                .build();
+        private static final RestJson1Trait protocolTrait = new RestJson1Trait.Provider().createTrait(
+            ShapeId.from("aws.protocols#restJson1"),
+            Node.objectNodeBuilder()
+                .build()
+        );
         private static final ClientProtocolFactory<RestJson1Trait> factory = new RestJsonClientProtocol.Factory();
 
         private Builder() {
@@ -57,3 +68,4 @@ public interface PersonDirectoryClient {
         }
     }
 }
+

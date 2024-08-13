@@ -4,7 +4,8 @@
     "java-client-codegen": {
       "service": "smithy.example#PersonDirectory",
       "namespace": "software.amazon.smithy.java.runtime.example",
-      "headerFile": "license.txt"
+      "headerFile": "license.txt",
+      "protocol": "aws.protocols#restJson1"
     },
     "java-server-codegen": {
       "service": "smithy.example#PersonDirectory",
