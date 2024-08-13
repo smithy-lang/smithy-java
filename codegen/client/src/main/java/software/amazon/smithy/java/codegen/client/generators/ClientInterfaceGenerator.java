@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -18,6 +20,7 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
@@ -29,12 +32,15 @@ import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.Trait;
+import software.amazon.smithy.model.shapes.ToShapeId;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
 @SmithyInternalApi
 public final class ClientInterfaceGenerator
     implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
+
+    private static final System.Logger LOGGER = System.getLogger(ClientInterfaceGenerator.class.getName());
 
     @Override
     public void accept(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
@@ -64,9 +70,10 @@ public final class ClientInterfaceGenerator
                         final class Builder extends ${client:T}.Builder<${interface:T}, Builder> {
                             ${?hasDefaultProtocol}${defaultProtocol:C|}
                             ${/hasDefaultProtocol}private Builder() {${?hasDefaultProtocol}
-                                configBuilder().protocol(factory.createProtocol(settings, protocolTrait));
-                            ${/hasDefaultProtocol}}
-
+                                configBuilder().protocol(factory.createProtocol(settings, protocolTrait));${/hasDefaultProtocol}${?authSchemes}
+                                configBuilder().putSupportedAuthSchemes(${#authSchemes}new ${value:T}()${^key.last}, ${/key.last}${/authSchemes});
+                            ${/authSchemes}}
+                    
                             @Override
                             public ${interface:T} build() {
                                 return new ${impl:T}(this);
@@ -98,6 +105,7 @@ public final class ClientInterfaceGenerator
                         directive.model()
                     )
                 );
+                writer.putContext("authSchemes", getAuthSchemes(directive.model(), directive.service()));
                 writer.write(template);
                 writer.popState();
             });
@@ -189,13 +197,27 @@ public final class ClientInterfaceGenerator
 
     private static Class<? extends ClientProtocolFactory> getFactory(ShapeId defaultProtocol) {
         for (var factory : ServiceLoader.load(
-            ClientProtocolFactory.class,
-            ClientInterfaceGenerator.class.getClassLoader()
+                ClientProtocolFactory.class,
+                ClientInterfaceGenerator.class.getClassLoader()
         )) {
             if (factory.id().equals(defaultProtocol)) {
                 return factory.getClass();
             }
         }
         throw new CodegenException("Could not find factory for " + defaultProtocol);
+    }
+
+    private static List<Class<? extends AuthScheme>> getAuthSchemes(Model model, ToShapeId service) {
+        var index = ServiceIndex.of(model);
+        var schemes = index.getAuthSchemes(service);
+        List<Class<? extends AuthScheme>> result = new ArrayList<>();
+        for (var scheme : ServiceLoader.load(AuthScheme.class, ClientInterfaceGenerator.class.getClassLoader())) {
+            if (schemes.containsKey(ShapeId.from(scheme.schemeId()))) {
+                result.add(scheme.getClass());
+            } else {
+                LOGGER.log(System.Logger.Level.WARNING, "Could not find implementation for auth scheme " + scheme);
+            }
+        }
+        return result;
     }
 }

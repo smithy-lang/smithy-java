@@ -26,3 +26,9 @@ tasks {
         dependsOn(generateSrcTask)
     }
 }
+
+sourceSets {
+    it {
+        compileClasspath += sourceSets["test"].output
+    }
+}
