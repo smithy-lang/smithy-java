@@ -28,6 +28,7 @@ import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
@@ -60,11 +61,10 @@ public final class ClientInterfaceGenerator
                             return new Builder();
                         }
 
-                        final class Builder extends ${client:T}.Builder<${interface:T}, Builder> {${?hasDefaultProtocol}
-                            ${defaultProtocol:C|}
-                            ${/hasDefaultProtocol}
-                            private Builder() {${?hasDefaultProtocol}
-                                configBuilder().protocol(factory.createProtocol(settings));
+                        final class Builder extends ${client:T}.Builder<${interface:T}, Builder> {
+                            ${?hasDefaultProtocol}${defaultProtocol:C|}
+                            ${/hasDefaultProtocol}private Builder() {${?hasDefaultProtocol}
+                                configBuilder().protocol(factory.createProtocol(settings, protocolTrait));
                             ${/hasDefaultProtocol}}
 
                             @Override
@@ -74,11 +74,16 @@ public final class ClientInterfaceGenerator
                         }
                     }
                     """;
-                var defaultProtocol = getDefaultProtocol(directive.model(), directive.settings());
-                writer.putContext("hasDefaultProtocol", defaultProtocol != null);
+                var defaultProtocolTrait = getDefaultProtocolTrait(directive.model(), directive.settings());
+                writer.putContext("hasDefaultProtocol", defaultProtocolTrait != null);
                 writer.putContext(
                     "defaultProtocol",
-                    new DefaultProtocolGenerator(writer, directive.settings().packageNamespace(), defaultProtocol)
+                    new DefaultProtocolGenerator(
+                        writer,
+                        directive.settings().packageNamespace(),
+                        defaultProtocolTrait,
+                        directive.context()
+                    )
                 );
                 writer.putContext("client", Client.class);
                 writer.putContext("interface", symbol);
@@ -129,11 +134,13 @@ public final class ClientInterfaceGenerator
         }
     }
 
-    private record DefaultProtocolGenerator(JavaWriter writer, String namespace, ShapeId defaultProtocol) implements
+    private record DefaultProtocolGenerator(
+        JavaWriter writer, String namespace, Trait defaultProtocolTrait, CodeGenerationContext context
+    ) implements
         Runnable {
         @Override
         public void run() {
-            if (defaultProtocol == null) {
+            if (defaultProtocolTrait == null) {
                 return;
             }
             writer.pushState();
@@ -141,12 +148,16 @@ public final class ClientInterfaceGenerator
                 private static final ${protocolSettings:T} settings = ${protocolSettings:T}.builder()
                         .namespace(${serviceNamespace:S})
                         .build();
-                private static final ${clientProtocolFactory:T} factory = new ${?outer}${outer:T}.${name:L}${/outer}${^outer}${type:T}${/outer}();
+                private static final ${trait:T} protocolTrait = ${initializer:C};
+                private static final ${clientProtocolFactory:T}<${trait:T}> factory = new ${?outer}${outer:T}.${name:L}${/outer}${^outer}${type:T}${/outer}();
                 """;
             writer.putContext("protocolSettings", ProtocolSettings.class);
             writer.putContext("clientProtocolFactory", ClientProtocolFactory.class);
+            writer.putContext("trait", defaultProtocolTrait.getClass());
+            var initializer = context.getInitializer(defaultProtocolTrait);
+            writer.putContext("initializer", writer.consumer(w -> initializer.accept(w, defaultProtocolTrait)));
             writer.putContext("serviceNamespace", namespace);
-            var factoryClass = getFactory(defaultProtocol);
+            var factoryClass = getFactory(defaultProtocolTrait.toShapeId());
             if (factoryClass.isMemberClass()) {
                 writer.putContext("outer", factoryClass.getEnclosingClass());
             }
@@ -157,7 +168,7 @@ public final class ClientInterfaceGenerator
         }
     }
 
-    private static ShapeId getDefaultProtocol(Model model, JavaCodegenSettings settings) {
+    private static Trait getDefaultProtocolTrait(Model model, JavaCodegenSettings settings) {
         var defaultProtocol = settings.getDefaultProtocol();
         if (defaultProtocol == null) {
             return null;
@@ -167,7 +178,7 @@ public final class ClientInterfaceGenerator
         var index = ServiceIndex.of(model);
         var protocols = index.getProtocols(settings.service());
         if (protocols.containsKey(defaultProtocol)) {
-            return defaultProtocol;
+            return protocols.get(defaultProtocol);
         }
 
         throw new UnsupportedOperationException(

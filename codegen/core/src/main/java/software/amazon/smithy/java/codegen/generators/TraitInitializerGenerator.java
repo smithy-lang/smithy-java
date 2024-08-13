@@ -6,10 +6,8 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
-import software.amazon.smithy.java.codegen.TraitInitializer;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
-import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
@@ -27,22 +25,12 @@ record TraitInitializerGenerator(JavaWriter writer, Shape shape, CodeGenerationC
         var iter = traitsToAdd.iterator();
         while (iter.hasNext()) {
             var trait = shape.getAllTraits().get(iter.next());
-            getInitializer(trait).accept(writer, trait);
+            context.getInitializer(trait).accept(writer, trait);
             if (iter.hasNext()) {
                 writer.write(",");
             }
         }
         writer.newLine();
         writer.dedent();
-    }
-
-    @SuppressWarnings("unchecked")
-    private <T extends Trait> TraitInitializer<T> getInitializer(T trait) {
-        for (var initializer : context.traitInitializers()) {
-            if (initializer.traitClass().isInstance(trait)) {
-                return (TraitInitializer<T>) initializer;
-            }
-        }
-        throw new IllegalArgumentException("Could not find initializer for " + trait);
     }
 }

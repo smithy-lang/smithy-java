@@ -39,7 +39,6 @@ public interface PersonDirectoryClient {
     }
 
     final class Builder extends Client.Builder<PersonDirectoryClient, Builder> {
-
         private Builder() {}
 
         @Override

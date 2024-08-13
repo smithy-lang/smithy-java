@@ -40,6 +40,7 @@ import software.amazon.smithy.model.traits.RetryableTrait;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
+import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.model.traits.XmlAttributeTrait;
 import software.amazon.smithy.model.traits.XmlFlattenedTrait;
@@ -142,10 +143,6 @@ public class CodeGenerationContext
         return runtimeTraits;
     }
 
-    public List<TraitInitializer<?>> traitInitializers() {
-        return traitInitializers;
-    }
-
     /**
      * Determines the "runtime traits" for a service, i.e. traits that should be included in Shape schemas.
      *
@@ -196,5 +193,22 @@ public class CodeGenerationContext
             initializers.addAll(integration.traitInitializers());
         }
         return initializers;
+    }
+
+    /**
+     * Gets the {@link TraitInitializer} for a given trait.
+     *
+     * @param trait trait to get initializer for.
+     * @return Trait initializer for trait class.
+     * @throws IllegalArgumentException if no initializer can be found for a trait.
+     */
+    @SuppressWarnings("unchecked")
+    public <T extends Trait> TraitInitializer<T> getInitializer(T trait) {
+        for (var initializer : traitInitializers) {
+            if (initializer.traitClass().isInstance(trait)) {
+                return (TraitInitializer<T>) initializer;
+            }
+        }
+        throw new IllegalArgumentException("Could not find initializer for " + trait);
     }
 }
