@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.codegen.client;
 
 
-import java.net.http.HttpClient;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
@@ -14,7 +13,6 @@ import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientPr
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ResponseHook;
-import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 
 
@@ -23,7 +21,6 @@ public class GenericClientTest {
     public void echoTest() {
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol())
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .endpoint("https://httpbin.org")
             .build();
 
@@ -56,7 +53,6 @@ public class GenericClientTest {
 
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol())
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .endpoint("https://httpbin.org")
             .addInterceptor(interceptor)
             .build();

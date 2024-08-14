@@ -28,12 +28,14 @@ public final class JavaCodegenSettings {
     private static final String HEADER_FILE = "headerFile";
     private static final String NON_NULL_ANNOTATION = "nonNullAnnotation";
     private static final String DEFAULT_PROTOCOL = "protocol";
+    private static final String TRANSPORT = "transport";
 
     private final ShapeId service;
     private final String packageNamespace;
     private final String header;
     private final Symbol nonNullAnnotationSymbol;
     private final ShapeId defaultProtocol;
+    private final String transport;
 
     JavaCodegenSettings(
         ShapeId service,
@@ -41,7 +43,8 @@ public final class JavaCodegenSettings {
         String headerFile,
         String sourceLocation,
         String nonNullAnnotationFullyQualifiedName,
-        String defaultProtocol
+        String defaultProtocol,
+        String transport
     ) {
         this.service = Objects.requireNonNull(service);
         this.packageNamespace = Objects.requireNonNull(packageNamespace);
@@ -53,6 +56,7 @@ public final class JavaCodegenSettings {
             nonNullAnnotationSymbol = null;
         }
         this.defaultProtocol = defaultProtocol != null ? ShapeId.from(defaultProtocol) : null;
+        this.transport = transport;
     }
 
     /**
@@ -63,7 +67,7 @@ public final class JavaCodegenSettings {
      */
     public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
         settingsNode.warnIfAdditionalProperties(
-            List.of(SERVICE, NAMESPACE, HEADER_FILE, NON_NULL_ANNOTATION, DEFAULT_PROTOCOL)
+            List.of(SERVICE, NAMESPACE, HEADER_FILE, NON_NULL_ANNOTATION, DEFAULT_PROTOCOL, TRANSPORT)
         );
         return new JavaCodegenSettings(
             settingsNode.expectStringMember(SERVICE).expectShapeId(),
@@ -71,7 +75,8 @@ public final class JavaCodegenSettings {
             settingsNode.getStringMemberOrDefault(HEADER_FILE, null),
             settingsNode.getSourceLocation().getFilename(),
             settingsNode.getStringMemberOrDefault(NON_NULL_ANNOTATION, ""),
-            settingsNode.getStringMemberOrDefault(DEFAULT_PROTOCOL, null)
+            settingsNode.getStringMemberOrDefault(DEFAULT_PROTOCOL, null),
+            settingsNode.getStringMemberOrDefault(TRANSPORT, null)
         );
     }
 
@@ -93,6 +98,10 @@ public final class JavaCodegenSettings {
 
     public ShapeId getDefaultProtocol() {
         return defaultProtocol;
+    }
+
+    public String transport() {
+        return transport;
     }
 
     private static Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {
@@ -117,5 +126,4 @@ public final class JavaCodegenSettings {
         LOGGER.log(System.Logger.Level.TRACE, () -> "Reading header file: " + file.getAbsolutePath());
         return IoUtils.readUtf8File(file.getAbsolutePath());
     }
-
 }

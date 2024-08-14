@@ -5,7 +5,8 @@
       "service": "smithy.example#PersonDirectory",
       "namespace": "software.amazon.smithy.java.runtime.example",
       "headerFile": "license.txt",
-      "protocol": "aws.protocols#restJson1"
+      "protocol": "aws.protocols#restJson1",
+      "transport": "http-java"
     },
     "java-server-codegen": {
       "service": "smithy.example#PersonDirectory",

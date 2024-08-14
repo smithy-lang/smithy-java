@@ -9,6 +9,7 @@ extra["moduleName"] = "software.amazon.smithy.java.codegen.client"
 
 dependencies {
     implementation(project(":client-core"))
+    implementation(project(":client-http"))
 
     testImplementation(project(":client-aws-rest-json1"))
     testImplementation(libs.smithy.aws.traits)

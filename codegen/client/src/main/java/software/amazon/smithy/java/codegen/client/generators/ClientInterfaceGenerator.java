@@ -25,6 +25,7 @@ import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
+import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
@@ -73,6 +74,7 @@ public final class ClientInterfaceGenerator
                             ${/hasDefaultProtocol}private Builder() {
                                 ${?hasDefaultProtocol}configBuilder().protocol(factory.createProtocol(settings, protocolTrait));${/hasDefaultProtocol}
                                 ${?authSchemes}configBuilder().putSupportedAuthSchemes(${#authSchemes}new ${value:T}()${^key.last}, ${/key.last}${/authSchemes});${/authSchemes}
+                                ${?transport}configBuilder().transport(new ${transport:T}());${/transport}
                             }
 
                             @Override
@@ -96,6 +98,7 @@ public final class ClientInterfaceGenerator
                 writer.putContext("client", Client.class);
                 writer.putContext("interface", symbol);
                 writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
+                writer.putContext("transport", getTransportClass(directive.settings()));
                 writer.putContext(
                     "operations",
                     new OperationMethodGenerator(
@@ -110,6 +113,22 @@ public final class ClientInterfaceGenerator
                 writer.write(template);
                 writer.popState();
             });
+    }
+
+    private static Class<? extends ClientTransport> getTransportClass(JavaCodegenSettings settings) {
+        if (settings.transport() == null) {
+            return null;
+        }
+        // Use one of the built-in transports
+        if (settings.transport().equals("http-java")) {
+            return JavaHttpClientTransport.class;
+        } else if (settings.transport().equals("http-netty")) {
+            // TODO: Add netty transport once supported
+            throw new CodegenException("Netty default transport not yet supported");
+        }
+
+        // If custom transport is provided, attempt to load that from the classpath.
+        return CodegenUtils.getImplemenationByName(ClientTransport.class, settings.transport());
     }
 
     private record OperationMethodGenerator(
