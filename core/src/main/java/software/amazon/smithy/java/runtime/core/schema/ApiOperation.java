@@ -58,7 +58,7 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
     TypeRegistry typeRegistry();
 
     /**
-     * Get a list of effective authScheme for
+     * Get a list of effective authScheme for the operation.
      *
      * @return List of effective auth schemes
      */
