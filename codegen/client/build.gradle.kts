@@ -14,27 +14,13 @@ dependencies {
     testImplementation(libs.smithy.aws.traits)
 }
 
-// Execute building of Java classes using an executable class
-// These classes will then be used by integration tests and benchmarks
-val generatedSrcDir = layout.buildDirectory.dir("generated-src").get()
-val generateSrcTask = tasks.register<JavaExec>("generateSources") {
-    delete(files(generatedSrcDir))
-    dependsOn("test")
-    classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
-    mainClass = "software.amazon.smithy.java.codegen.client.TestServerJavaClientCodegenRunner"
-    environment("service", "smithy.java.codegen.server.test#TestService")
-    environment("namespace", "smithy.java.codegen.server.test")
-    environment("output", generatedSrcDir)
-}
-
 tasks {
+    val generateSrcTask = addGenerateSrcsTask("software.amazon.smithy.java.codegen.client.TestServerJavaClientCodegenRunner")
+
     integ {
         dependsOn(generateSrcTask)
     }
     compileItJava {
         dependsOn(generateSrcTask)
-    }
-    spotbugsIt {
-        enabled = false
     }
 }

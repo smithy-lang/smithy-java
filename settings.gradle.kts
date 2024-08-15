@@ -10,6 +10,9 @@ include(":codegen:client")
 include(":codegen:server")
 include(":codegen:types")
 
+// Protocol tests
+include(":protocol-tests:client")
+
 include("tracing-api")
 
 include(":http-api")

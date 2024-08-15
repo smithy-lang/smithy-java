@@ -11,27 +11,16 @@ dependencies {
     itImplementation(project(":json-codec"))
 }
 
-// Execute building of Java classes using an executable class
-// These classes will then be used by integration tests and benchmarks
-val generatedSrcDir = layout.buildDirectory.dir("generated-src").get()
-tasks.register<JavaExec>("generateSources") {
-    delete(generatedSrcDir)
-    dependsOn("test")
-    classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
-    mainClass = "software.amazon.smithy.java.codegen.utils.TestJavaCodegenRunner"
-    environment("service", "smithy.java.codegen.test#TestService")
-    environment("namespace", "software.amazon.smithy.java.codegen.test")
-    environment("output", generatedSrcDir)
-}
-
 tasks {
-    test {
-        finalizedBy("integ")
-    }
+    val generateSrcs = addGenerateSrcsTask("software.amazon.smithy.java.codegen.utils.TestJavaCodegenRunner")
+
     integ {
-        dependsOn("generateSources")
+        dependsOn(generateSrcs)
     }
     compileItJava {
-        dependsOn("generateSources")
+        dependsOn(generateSrcs)
+    }
+    test {
+        finalizedBy(integ)
     }
 }

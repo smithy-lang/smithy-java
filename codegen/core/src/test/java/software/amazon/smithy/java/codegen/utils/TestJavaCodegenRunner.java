@@ -30,8 +30,8 @@ public final class TestJavaCodegenRunner {
             .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
             .settings(
                 ObjectNode.builder()
-                    .withMember("service", System.getenv("service"))
-                    .withMember("namespace", System.getenv("namespace"))
+                    .withMember("service", "smithy.java.codegen.test#TestService")
+                    .withMember("namespace", "software.amazon.smithy.java.codegen.test")
                     .build()
             )
             .model(model)
