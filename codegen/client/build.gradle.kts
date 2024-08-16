@@ -38,3 +38,9 @@ tasks {
         enabled = false
     }
 }
+
+sourceSets {
+    it {
+        compileClasspath += sourceSets["test"].output
+    }
+}

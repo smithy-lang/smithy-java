@@ -5,8 +5,13 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
@@ -16,18 +21,24 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
+import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ToShapeId;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
 @SmithyInternalApi
 public final class ClientInterfaceGenerator
     implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
+
+    private static final System.Logger LOGGER = System.getLogger(ClientInterfaceGenerator.class.getName());
 
     @Override
     public void accept(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
@@ -56,7 +67,9 @@ public final class ClientInterfaceGenerator
 
                         final class Builder extends ${client:T}.Builder<${interface:T}, Builder> {
 
-                            private Builder() {}
+                            private Builder() {${?authSchemes}
+                                configBuilder().putSupportedAuthSchemes(${#authSchemes}new ${value:T}()${^key.last}, ${/key.last}${/authSchemes});
+                            ${/authSchemes}}
 
                             @Override
                             public ${interface:T} build() {
@@ -78,6 +91,7 @@ public final class ClientInterfaceGenerator
                         directive.model()
                     )
                 );
+                writer.putContext("authSchemes", getAuthSchemes(directive.model(), directive.service()));
                 writer.write(template);
                 writer.popState();
             });
@@ -112,5 +126,25 @@ public final class ClientInterfaceGenerator
             }
             writer.popState();
         }
+    }
+
+    private static Collection<Class<? extends AuthScheme>> getAuthSchemes(Model model, ToShapeId service) {
+        var index = ServiceIndex.of(model);
+        var schemes = index.getAuthSchemes(service);
+        Map<String, Class<? extends AuthScheme>> result = new HashMap<>();
+        for (var scheme : ServiceLoader.load(AuthScheme.class, ClientInterfaceGenerator.class.getClassLoader())) {
+            if (schemes.containsKey(ShapeId.from(scheme.schemeId()))) {
+                var existing = result.put(scheme.schemeId(), scheme.getClass());
+                if (existing != null) {
+                    throw new CodegenException(
+                        "Multiple auth scheme implementations found for scheme: " + scheme.schemeId()
+                            + "Found: " + scheme + " and " + existing
+                    );
+                }
+            } else {
+                LOGGER.log(System.Logger.Level.WARNING, "Could not find implementation for auth scheme " + scheme);
+            }
+        }
+        return result.values();
     }
 }
