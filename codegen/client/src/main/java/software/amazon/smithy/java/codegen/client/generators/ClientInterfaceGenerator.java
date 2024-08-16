@@ -32,8 +32,8 @@ import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.model.shapes.ToShapeId;
+import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
@@ -70,11 +70,11 @@ public final class ClientInterfaceGenerator
 
                         final class Builder extends ${client:T}.Builder<${interface:T}, Builder> {
                             ${?hasDefaultProtocol}${defaultProtocol:C|}
-                            ${/hasDefaultProtocol}private Builder() {${?hasDefaultProtocol}
-                                configBuilder().protocol(factory.createProtocol(settings, protocolTrait));${/hasDefaultProtocol}${?authSchemes}
-                                configBuilder().putSupportedAuthSchemes(${#authSchemes}new ${value:T}()${^key.last}, ${/key.last}${/authSchemes});
-                            ${/authSchemes}}
-                    
+                            ${/hasDefaultProtocol}private Builder() {
+                                ${?hasDefaultProtocol}configBuilder().protocol(factory.createProtocol(settings, protocolTrait));${/hasDefaultProtocol}
+                                ${?authSchemes}configBuilder().putSupportedAuthSchemes(${#authSchemes}new ${value:T}()${^key.last}, ${/key.last}${/authSchemes});${/authSchemes}
+                            }
+
                             @Override
                             public ${interface:T} build() {
                                 return new ${impl:T}(this);
@@ -198,8 +198,8 @@ public final class ClientInterfaceGenerator
 
     private static Class<? extends ClientProtocolFactory> getFactory(ShapeId defaultProtocol) {
         for (var factory : ServiceLoader.load(
-                ClientProtocolFactory.class,
-                ClientInterfaceGenerator.class.getClassLoader()
+            ClientProtocolFactory.class,
+            ClientInterfaceGenerator.class.getClassLoader()
         )) {
             if (factory.id().equals(defaultProtocol)) {
                 return factory.getClass();
