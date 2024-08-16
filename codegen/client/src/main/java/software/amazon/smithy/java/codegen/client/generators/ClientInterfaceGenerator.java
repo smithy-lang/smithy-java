@@ -5,8 +5,9 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -207,17 +208,23 @@ public final class ClientInterfaceGenerator
         throw new CodegenException("Could not find factory for " + defaultProtocol);
     }
 
-    private static List<Class<? extends AuthScheme>> getAuthSchemes(Model model, ToShapeId service) {
+    private static Collection<Class<? extends AuthScheme>> getAuthSchemes(Model model, ToShapeId service) {
         var index = ServiceIndex.of(model);
         var schemes = index.getAuthSchemes(service);
-        List<Class<? extends AuthScheme>> result = new ArrayList<>();
+        Map<String, Class<? extends AuthScheme>> result = new HashMap<>();
         for (var scheme : ServiceLoader.load(AuthScheme.class, ClientInterfaceGenerator.class.getClassLoader())) {
             if (schemes.containsKey(ShapeId.from(scheme.schemeId()))) {
-                result.add(scheme.getClass());
+                var existing = result.put(scheme.schemeId(), scheme.getClass());
+                if (existing != null) {
+                    throw new CodegenException(
+                        "Multiple auth scheme implementations found for scheme: " + scheme.schemeId()
+                            + "Found: " + scheme + " and " + existing
+                    );
+                }
             } else {
                 LOGGER.log(System.Logger.Level.WARNING, "Could not find implementation for auth scheme " + scheme);
             }
         }
-        return result;
+        return result.values();
     }
 }
