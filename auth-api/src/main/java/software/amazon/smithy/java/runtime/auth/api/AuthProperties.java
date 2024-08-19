@@ -68,6 +68,12 @@ public final class AuthProperties {
      * @return New auth properties that use the default.
      */
     public AuthProperties merge(AuthProperties other) {
+        if (other.properties.isEmpty()) {
+            return this;
+        }
+        if (this.properties.isEmpty()) {
+            return other;
+        }
         var builder = toBuilder();
         for (var property : other.properties()) {
             copyPropertyToBuilder(property, other, builder);
