@@ -128,8 +128,8 @@ public final class ClientInterfaceGenerator
             throw new CodegenException("Netty default transport not yet supported");
         }
 
-        // If custom transport is provided, attempt to load that from the classpath.
-        return CodegenUtils.getImplemenationByName(ClientTransport.class, settings.transport());
+        // TODO: Handle custom transports
+        throw new UnsupportedOperationException("Custom default transports not yet supported");
     }
 
     private record OperationMethodGenerator(
