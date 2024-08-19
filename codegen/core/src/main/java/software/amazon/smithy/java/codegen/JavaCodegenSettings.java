@@ -11,6 +11,7 @@ import java.util.Objects;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.model.node.ObjectNode;
+import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.IoUtils;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -35,7 +36,8 @@ public final class JavaCodegenSettings {
     private final String header;
     private final Symbol nonNullAnnotationSymbol;
     private final ShapeId defaultProtocol;
-    private final String transport;
+    private final String transportName;
+    private final ObjectNode transportSettings;
 
     JavaCodegenSettings(
         ShapeId service,
@@ -44,7 +46,7 @@ public final class JavaCodegenSettings {
         String sourceLocation,
         String nonNullAnnotationFullyQualifiedName,
         String defaultProtocol,
-        String transport
+        ObjectNode transportNode
     ) {
         this.service = Objects.requireNonNull(service);
         this.packageNamespace = Objects.requireNonNull(packageNamespace);
@@ -56,7 +58,25 @@ public final class JavaCodegenSettings {
             nonNullAnnotationSymbol = null;
         }
         this.defaultProtocol = defaultProtocol != null ? ShapeId.from(defaultProtocol) : null;
-        this.transport = transport;
+
+        if (transportNode != null) {
+            if (transportNode.getMembers().size() > 1) {
+                throw new CodegenException(
+                    "Only a single transport can be configured at a time. Found "
+                        + transportNode.getMembers().keySet()
+                );
+            }
+            transportName = transportNode.getMembers()
+                .keySet()
+                .stream()
+                .findFirst()
+                .map(StringNode::getValue)
+                .orElse(null);
+            transportSettings = transportNode.expectObjectMember(transportName);
+        } else {
+            transportName = null;
+            transportSettings = null;
+        }
     }
 
     /**
@@ -76,7 +96,7 @@ public final class JavaCodegenSettings {
             settingsNode.getSourceLocation().getFilename(),
             settingsNode.getStringMemberOrDefault(NON_NULL_ANNOTATION, ""),
             settingsNode.getStringMemberOrDefault(DEFAULT_PROTOCOL, null),
-            settingsNode.getStringMemberOrDefault(TRANSPORT, null)
+            settingsNode.getObjectMember(TRANSPORT).orElse(null)
         );
     }
 
@@ -101,7 +121,11 @@ public final class JavaCodegenSettings {
     }
 
     public String transport() {
-        return transport;
+        return transportName;
+    }
+
+    public ObjectNode transportSettings() {
+        return transportSettings;
     }
 
     private static Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {

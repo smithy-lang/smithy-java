@@ -33,7 +33,12 @@ public final class TestServerJavaClientCodegenRunner {
                 ObjectNode.builder()
                     .withMember("service", "smithy.java.codegen.server.test#TestService")
                     .withMember("namespace", "smithy.java.codegen.server.test")
-                    .withMember("transport", "http-java")
+                    .withMember(
+                        "transport",
+                        ObjectNode.builder()
+                            .withMember("http-java", ObjectNode.builder().build())
+                            .build()
+                    )
                     .build()
             )
             .model(model)
