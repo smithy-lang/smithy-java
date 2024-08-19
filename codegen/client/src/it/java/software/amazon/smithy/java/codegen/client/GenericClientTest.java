@@ -8,7 +8,6 @@ package software.amazon.smithy.java.codegen.client;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.math.BigDecimal;
-import java.net.http.HttpClient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.client.TestServiceClient;
@@ -90,7 +89,6 @@ public class GenericClientTest {
         };
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol())
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .endpoint("https://httpbin.org")
             .addInterceptor(interceptor)
             .value(2L)

@@ -26,19 +26,11 @@ tasks {
     compileItJava {
         dependsOn(generateSrcTask)
     }
-<<<<<<< HEAD
-}
-
-sourceSets {
-    it {
-        compileClasspath += sourceSets["test"].output
-=======
     test {
         finalizedBy(integ)
     }
     spotbugsIt {
         enabled = false
->>>>>>> 2683dbc4 (Initial implementation of default plugins for clients.)
     }
 }
 

@@ -61,7 +61,6 @@ public final class JavaCodegenSettings {
         } else {
             nonNullAnnotationSymbol = null;
         }
-<<<<<<< HEAD
         this.defaultProtocol = defaultProtocol != null ? ShapeId.from(defaultProtocol) : null;
 
         if (transportNode != null) {
@@ -82,11 +81,7 @@ public final class JavaCodegenSettings {
             transportName = null;
             transportSettings = null;
         }
-        this.defaultPlugins = defaultPlugins;
-=======
-
         this.defaultPlugins = Collections.unmodifiableList(defaultPlugins);
->>>>>>> 1e621b3d (Update to handle varargs and addresss PR feedback)
     }
 
     /**
