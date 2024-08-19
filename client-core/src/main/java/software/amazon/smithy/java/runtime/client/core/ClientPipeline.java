@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
@@ -164,7 +165,12 @@ public final class ClientPipeline<RequestT, ResponseT> {
             AuthScheme<?, ?> authScheme = call.supportedAuthSchemes().get(authSchemeOption.schemeId());
             if (authScheme != null && authScheme.requestClass().isAssignableFrom(request.getClass())) {
                 AuthScheme<RequestT, ?> castAuthScheme = (AuthScheme<RequestT, ?>) authScheme;
-                var resolved = createResolvedSchema(call.identityResolvers(), castAuthScheme, authSchemeOption)
+                var resolved = createResolvedSchema(
+                    call.identityResolvers(),
+                    call.context(),
+                    castAuthScheme,
+                    authSchemeOption
+                )
                     .orElse(null);
                 if (resolved != null) {
                     return resolved;
@@ -178,23 +184,26 @@ public final class ClientPipeline<RequestT, ResponseT> {
 
     private <IdentityT extends Identity> Optional<ResolvedScheme<IdentityT, RequestT>> createResolvedSchema(
         IdentityResolvers identityResolvers,
+        Context context,
         AuthScheme<RequestT, IdentityT> authScheme,
         AuthSchemeOption option
     ) {
+        var identityProperties = authScheme.getIdentityProperties(context).merge(option.identityPropertyOverrides());
+        var signerProperties = authScheme.getSignerProperties(context).merge(option.signerPropertyOverrides());
         return authScheme.identityResolver(identityResolvers).map(identityResolver -> {
-            CompletableFuture<IdentityT> identity = identityResolver.resolveIdentity(option.identityProperties());
-            return new ResolvedScheme<>(option, authScheme, identity);
+            CompletableFuture<IdentityT> identity = identityResolver.resolveIdentity(identityProperties);
+            return new ResolvedScheme<>(signerProperties, authScheme, identity);
         });
     }
 
     private record ResolvedScheme<IdentityT extends Identity, RequestT>(
-        AuthSchemeOption option,
+        AuthProperties signerProperties,
         AuthScheme<RequestT, IdentityT> authScheme,
         CompletableFuture<IdentityT> identity
     ) {
         public CompletableFuture<RequestT> sign(RequestT request) {
             return identity.thenApply(
-                identity -> authScheme.signer().sign(request, identity, option.signerProperties())
+                identity -> authScheme.signer().sign(request, identity, signerProperties)
             );
         }
     }

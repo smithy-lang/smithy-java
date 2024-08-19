@@ -6,6 +6,8 @@
 package software.amazon.smithy.java.runtime.auth.api.scheme;
 
 import java.util.Optional;
+import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
@@ -64,6 +66,24 @@ public interface AuthScheme<RequestT, IdentityT extends Identity> {
      */
     default Optional<IdentityResolver<IdentityT>> identityResolver(IdentityResolvers resolvers) {
         return Optional.ofNullable(resolvers.identityResolver(identityClass()));
+    }
+
+    /**
+     * Gets the default signer properties from the context.
+     *
+     * @param context request context
+     */
+    default AuthProperties getSignerProperties(Context context) {
+        return AuthProperties.empty();
+    }
+
+    /**
+     * Gets the default identity properties from the context.
+     *
+     * @param context request context
+     */
+    default AuthProperties getIdentityProperties(Context context) {
+        return AuthProperties.empty();
     }
 
     /**

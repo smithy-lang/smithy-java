@@ -14,7 +14,6 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
-import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
@@ -30,9 +29,6 @@ import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 public final class ClientConfig {
 
     private static final AuthScheme<Object, Identity> NO_AUTH_AUTH_SCHEME = AuthScheme.noAuthAuthScheme();
-    private static final AuthSchemeResolver DEFAULT_AUTH_SCHEME_RESOLVER = params -> List.of(
-        new AuthSchemeOption(NO_AUTH_AUTH_SCHEME.schemeId(), null, null)
-    );
 
     private final ClientTransport<?, ?> transport;
     private final ClientProtocol<?, ?> protocol;
@@ -58,7 +54,7 @@ public final class ClientConfig {
         supportedAuthSchemes.addAll(builder.supportedAuthSchemes);
         this.supportedAuthSchemes = List.copyOf(supportedAuthSchemes);
 
-        this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, DEFAULT_AUTH_SCHEME_RESOLVER);
+        this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, AuthSchemeResolver.DEFAULT);
         this.identityResolvers = List.copyOf(builder.identityResolvers);
 
         this.context = Context.unmodifiableCopy(builder.context);

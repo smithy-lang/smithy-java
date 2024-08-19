@@ -61,6 +61,25 @@ public final class AuthProperties {
     }
 
     /**
+     * Creates a new set of {@link AuthProperties} that is the merged result of these properties and another set of
+     * properties.
+     *
+     * @param other Auth properties to merge with this instance.
+     * @return New auth properties that use the default.
+     */
+    public AuthProperties merge(AuthProperties other) {
+        var builder = toBuilder();
+        for (var property : other.properties()) {
+            copyPropertyToBuilder(property, other, builder);
+        }
+        return builder.build();
+    }
+
+    private static <T> void copyPropertyToBuilder(AuthProperty<T> key, AuthProperties src, Builder dst) {
+        dst.put(key, src.get(key));
+    }
+
+    /**
      * Create a new builder using the same properties as this object.
      *
      * @return the created builder.

@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.runtime.auth.api.scheme;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.java.context.Context;
 
@@ -15,12 +17,14 @@ public final class AuthSchemeResolverParams {
 
     private final String protocolId;
     private final String operationName;
+    private final List<String> operationAuthSchemes;
     private final Context context;
 
     private AuthSchemeResolverParams(Builder builder) {
         this.protocolId = Objects.requireNonNull(builder.protocolId, "protocolId is null");
         this.operationName = Objects.requireNonNull(builder.operationName, "operationName is null");
         this.context = Objects.requireNonNullElseGet(builder.context, Context::create);
+        this.operationAuthSchemes = Objects.requireNonNullElse(builder.operationAuthSchemes, Collections.emptyList());
     }
 
     /**
@@ -48,6 +52,15 @@ public final class AuthSchemeResolverParams {
      */
     public String operationName() {
         return operationName;
+    }
+
+    /**
+     * List of effective authSchemes for the operation being called.
+     *
+     * @return list of authScheme id's
+     */
+    public List<String> operationAuthSchemes() {
+        return operationAuthSchemes;
     }
 
     /**
@@ -85,6 +98,7 @@ public final class AuthSchemeResolverParams {
 
         private String protocolId;
         private String operationName;
+        public List<String> operationAuthSchemes;
         private Context context;
 
         private Builder() {
@@ -117,6 +131,17 @@ public final class AuthSchemeResolverParams {
          */
         public Builder operationName(String operationName) {
             this.operationName = operationName;
+            return this;
+        }
+
+        /**
+         * Set the effective auth scheme list for the operation.
+         *
+         * @param operationAuthSchemes list of auth scheme ids.
+         * @return the builder.
+         */
+        public Builder operationAuthSchemes(List<String> operationAuthSchemes) {
+            this.operationAuthSchemes = operationAuthSchemes;
             return this;
         }
 
