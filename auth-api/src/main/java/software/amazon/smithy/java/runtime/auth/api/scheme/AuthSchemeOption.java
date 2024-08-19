@@ -9,7 +9,7 @@ import java.util.Objects;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 
 /**
- * An authentication scheme option, composed of the scheme ID and properties overrides for use when resolving the
+ * An authentication scheme option, composed of the scheme ID and property overrides for use when resolving the
  * identity and signing the request.
  *
  * <p>This is used in the output from the {@link AuthSchemeResolver}. The resolver returns a list of these, in the order
