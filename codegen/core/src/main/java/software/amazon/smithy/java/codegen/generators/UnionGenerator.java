@@ -72,7 +72,7 @@ public final class UnionGenerator
 
                     @Override
                     public int hashCode() {
-                        return ${objects:T}.hash(getValue());
+                        return ${objects:T}.hash(type, getValue());
                     }
 
                     @Override
