@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Collection;
@@ -300,9 +299,13 @@ public final class ClientInterfaceGenerator
                         if (!method.getReturnType().equals(Void.TYPE)) {
                             throw new CodegenException("Default plugin setters cannot return a value");
                         }
+                        var configurationAnnotation = method.getAnnotation(Configuration.class);
+                        var methodName = configurationAnnotation.value().isEmpty()
+                            ? method.getName()
+                            : configurationAnnotation.value();
                         writer.putContext("pluginName", pluginEntry.getKey());
-                        writer.putContext("name", method.getName());
-                        writer.putContext("args", getParamMap(method));
+                        writer.putContext("name", methodName);
+                        writer.putContext("args", getParamMap(method, methodName));
                         writer.write("""
                             public Builder ${name:L}(${#args}${value:P} ${key:L}${^key.last}, ${/key.last}${/args}) {
                                 ${pluginName:L}.${name:L}(${#args}${key:L}${^key.last}, ${/key.last}${/args});
@@ -315,15 +318,22 @@ public final class ClientInterfaceGenerator
             }
         }
 
-        private static Map<String, Parameter> getParamMap(Method method) {
+        private static Map<String, Parameter> getParamMap(Method method, String methodName) {
             Map<String, java.lang.reflect.Parameter> parameterMap = new LinkedHashMap<>();
-            for (var param : method.getParameters()) {
-                var paramName = param.isAnnotationPresent(
+            var parameters = method.getParameters();
+            for (int idx = 0; idx < parameters.length; idx++) {
+                var param = parameters[idx];
+                var paramName = methodName;
+                if (param.isAnnotationPresent(
                     software.amazon.smithy.java.runtime.client.core.annotations.Parameter.class
-                )
-                    ? param.getAnnotation(software.amazon.smithy.java.runtime.client.core.annotations.Parameter.class)
-                        .value()
-                    : param.getName();
+                )) {
+                    paramName = param.getAnnotation(
+                        software.amazon.smithy.java.runtime.client.core.annotations.Parameter.class
+                    )
+                        .value();
+                } else if (idx != 0) {
+                    paramName += idx;
+                }
                 parameterMap.put(paramName, param);
             }
             return parameterMap;
@@ -335,7 +345,7 @@ public final class ClientInterfaceGenerator
         Map<String, Integer> frequencyMap = new HashMap<>();
 
         for (var pluginFqn : settings.defaultPlugins()) {
-            var pluginClass = getPluginClass(pluginFqn);
+            var pluginClass = CodegenUtils.getImplemenationByName(ClientPlugin.class, pluginFqn);
             // Ensure plugin names used as properties never clash
             var pluginName = StringUtils.uncapitalize(pluginClass.getSimpleName());
             int val = frequencyMap.getOrDefault(pluginName, 0);
@@ -347,22 +357,5 @@ public final class ClientInterfaceGenerator
         }
 
         return pluginMap;
-    }
-
-    private static Class<? extends ClientPlugin> getPluginClass(String name) {
-        try {
-            var instance = Class.forName(name).getDeclaredConstructor().newInstance();
-            if (instance instanceof ClientPlugin cp) {
-                return cp.getClass();
-            } else {
-                throw new CodegenException("Class " + name + " is not a `ClientPlugin`");
-            }
-        } catch (ClassNotFoundException exc) {
-            throw new CodegenException("Could not find class " + name + ". Check your dependencies.", exc);
-        } catch (NoSuchMethodException exc) {
-            throw new CodegenException("Could not find no-arg constructor for " + name, exc);
-        } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
-            throw new CodegenException("Could not invoke constructor for " + name, e);
-        }
     }
 }

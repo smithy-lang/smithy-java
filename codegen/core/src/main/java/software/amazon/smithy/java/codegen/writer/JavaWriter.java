@@ -227,7 +227,12 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
     }
 
     /**
-     * Implements a formatter for {@code $P} that formats a {@link Parameter} as a type.
+     * Implements a formatter for {@code $P} that formats a Java method {@link Parameter} as a type symbol.
+     *
+     * <p>A {@link Parameter} will be converted directly into the declared type the parameter represents
+     * unless the {@code Parameter} is a VarArg. {@code Parameter}'s representing VarArgs will be converted
+     * into a string consisting of their component type followed by {@code ...}. This is to avoid printing VarArgs as
+     * array types.
      */
     private final class ParameterFormatter implements BiFunction<Object, String, String> {
 
