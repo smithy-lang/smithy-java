@@ -13,6 +13,7 @@ group = "software.amazon.smithy.java.codegen"
 dependencies {
     implementation(libs.smithy.codegen)
     implementation(project(":core"))
+    implementation(project(":logging"))
 
     // Avoid circular dependency in codegen core
     if (project.name != "core") {

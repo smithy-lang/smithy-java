@@ -21,6 +21,7 @@ import java.util.Set;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.core.schema.Unit;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -60,7 +61,7 @@ import software.amazon.smithy.utils.CaseUtils;
  */
 public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider {
 
-    private static final System.Logger LOGGER = System.getLogger(JavaSymbolProvider.class.getName());
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaSymbolProvider.class);
     private static final Symbol UNIT_SYMBOL = CodegenUtils.fromClass(Unit.class);
 
     private final Model model;
@@ -76,7 +77,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
     @Override
     public Symbol toSymbol(Shape shape) {
         Symbol symbol = shape.accept(this);
-        LOGGER.log(System.Logger.Level.TRACE, () -> "Creating symbol from " + shape + ": " + symbol);
+        LOGGER.trace("Creating symbol from {}: {}", shape, symbol);
         return symbol;
     }
 

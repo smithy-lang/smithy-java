@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -22,7 +23,7 @@ import software.amazon.smithy.utils.StringUtils;
  */
 @SmithyUnstableApi
 public final class JavaCodegenSettings {
-    private static final System.Logger LOGGER = System.getLogger(JavaCodegenSettings.class.getName());
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaCodegenSettings.class);
 
     private static final String SERVICE = "service";
     private static final String NAMESPACE = "namespace";
@@ -147,7 +148,7 @@ public final class JavaCodegenSettings {
         if (!file.exists()) {
             throw new CodegenException("Header file " + file.getAbsolutePath() + " does not exist.");
         }
-        LOGGER.log(System.Logger.Level.TRACE, () -> "Reading header file: " + file.getAbsolutePath());
+        LOGGER.trace("Reading header file: {}" + file.getAbsolutePath());
         return IoUtils.readUtf8File(file.getAbsolutePath());
     }
 }

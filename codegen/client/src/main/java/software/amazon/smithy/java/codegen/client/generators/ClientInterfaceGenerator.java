@@ -21,6 +21,7 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
@@ -43,7 +44,7 @@ import software.amazon.smithy.utils.StringUtils;
 public final class ClientInterfaceGenerator
     implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
-    private static final System.Logger LOGGER = System.getLogger(ClientInterfaceGenerator.class.getName());
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientInterfaceGenerator.class);
 
     @Override
     public void accept(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
@@ -242,7 +243,7 @@ public final class ClientInterfaceGenerator
                     );
                 }
             } else {
-                LOGGER.log(System.Logger.Level.WARNING, "Could not find implementation for auth scheme " + scheme);
+                LOGGER.warn("Could not find implementation for auth scheme {}", scheme);
             }
         }
         return result.values();
