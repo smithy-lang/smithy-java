@@ -59,9 +59,32 @@ public final class UnionGenerator
 
                     ${toString:C|}
 
+                    @Override
+                    public void serialize(${shapeSerializer:N} serializer) {
+                        serializer.writeStruct(SCHEMA, this);
+                    }
+
                     ${valueCasters:C|}
 
                     ${valueClasses:C|}
+
+                    protected abstract ${object:T} getValue();
+
+                    @Override
+                    public int hashCode() {
+                        return ${objects:T}.hash(getValue());
+                    }
+
+                    @Override
+                    public boolean equals(${object:T} other) {
+                        if (other == this) {
+                            return true;
+                        }
+                        if (other == null || getClass() != other.getClass()) {
+                            return false;
+                        }
+                        return getValue().equals(((${shape:T}) other).getValue());
+                    }
 
                     ${builder:C|}
                 }
@@ -69,6 +92,9 @@ public final class UnionGenerator
             writer.putContext("shape", directive.symbol());
             writer.putContext("type", CodegenUtils.getInnerTypeEnumSymbol(directive.symbol()));
             writer.putContext("serializableStruct", SerializableStruct.class);
+            writer.putContext("shapeSerializer", ShapeSerializer.class);
+            writer.putContext("object", Object.class);
+            writer.putContext("objects", Objects.class);
             writer.putContext("document", Document.class);
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(
@@ -148,7 +174,6 @@ public final class UnionGenerator
         @Override
         public void run() {
             writer.pushState();
-            writer.putContext("shapeSerializer", ShapeSerializer.class);
             writer.putContext("objects", Objects.class);
             writer.putContext("collections", Collections.class);
             for (var member : shape.members()) {
@@ -164,11 +189,6 @@ public final class UnionGenerator
                         }
 
                         @Override
-                        public void serialize(${shapeSerializer:N} serializer) {
-                            serializer.writeStruct(SCHEMA, this);
-                        }
-
-                        @Override
                         public void serializeMembers(${shapeSerializer:N} serializer) {
                             ${serializeMember:C};
                         }${^unit}
@@ -178,9 +198,10 @@ public final class UnionGenerator
                             return value;
                         }${/unit}
 
-                        ${equals:C|}
-
-                        ${hashCode:C|}
+                        @Override
+                        protected ${object:T} getValue() {
+                            return ${^unit}value${/unit}${?unit}true${/unit};
+                        }
                     }
                     """;
                 var memberSymbol = symbolProvider.toSymbol(member);
@@ -191,8 +212,6 @@ public final class UnionGenerator
                     "serializeMember",
                     new SerializerMemberGenerator(writer, symbolProvider, model, service, member, "value")
                 );
-                writer.putContext("equals", new EqualsGenerator(writer, symbolProvider, member));
-                writer.putContext("hashCode", new HashCodeGenerator(writer, symbolProvider, member));
                 writer.putContext("primitive", memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE));
                 writer.putContext(
                     "wrap",
@@ -233,24 +252,12 @@ public final class UnionGenerator
                     public void serializeMembers(${shapeSerializer:T} serializer) {}
 
                     @Override
-                    public boolean equals(${object:T} other) {
-                        if (other == this) {
-                            return true;
-                        }
-                        if (other == null || getClass() != other.getClass()) {
-                            return false;
-                        }
-                        return memberName.equals((($$UnknownMember) other).memberName);
-                    }
-
-                    @Override
-                    public int hashCode() {
-                        return memberName.hashCode();
+                    protected ${object:T} getValue() {
+                        return memberName;
                     }
                 }
                 """;
             writer.putContext("serdeException", SerializationException.class);
-            writer.putContext("object", Object.class);
             writer.putContext("string", String.class);
             writer.write(template);
             writer.popState();
@@ -261,14 +268,14 @@ public final class UnionGenerator
         Runnable {
         @Override
         public void run() {
+            writer.pushState();
+            writer.putContext("objects", Objects.class);
             writer.write(
                 """
-                    @Override
-                    public int hashCode() {
-                        return ${^unit}${C|}${/unit}${?unit}${memberName:U}Member.class.hashCode();${/unit}
-                    }""",
+                    """,
                 writer.consumer(this::generate)
             );
+            writer.popState();
         }
 
         private void generate(JavaWriter writer) {
@@ -291,7 +298,6 @@ public final class UnionGenerator
         public void run() {
             writer.pushState();
             writer.putContext("memberName", symbolProvider.toMemberName(shape));
-            writer.putContext("object", Object.class);
             writer.write(
                 """
                     @Override
@@ -349,9 +355,7 @@ public final class UnionGenerator
                 writer.putContext("unit", target.hasTrait(UnitTypeTrait.class));
                 writer.write("""
                     public BuildStage ${memberName:L}(${member:T} value) {
-                        checkForExistingValue();
-                        this.value = new ${memberName:U}Member(${^unit}value${/unit});
-                        return this;
+                        return setValue(new ${memberName:U}Member(${^unit}value${/unit}));
                     }
                     """);
                 writer.popState();
@@ -359,22 +363,22 @@ public final class UnionGenerator
 
             writer.write("""
                 public BuildStage $$unknownMember(String memberName) {
-                    checkForExistingValue();
-                    this.value = new $$UnknownMember(memberName);
-                    return this;
+                    return setValue(new $$UnknownMember(memberName));
                 }
                 """);
 
             writer.pushState();
             writer.putContext("illegalArgument", IllegalArgumentException.class);
             writer.write("""
-                private void checkForExistingValue() {
+                private BuildStage setValue(${shape:T} value) {
                     if (this.value != null) {
                         if (this.value.type() == Type.$$UNKNOWN) {
                             throw new ${illegalArgument:T}("Cannot change union from unknown to known variant");
                         }
                         throw new ${illegalArgument:T}("Only one value may be set for unions");
                     }
+                    this.value = value;
+                    return this;
                 }
                 """);
 
@@ -397,15 +401,12 @@ public final class UnionGenerator
 
         @Override
         protected void generateBuild(JavaWriter writer) {
-            writer.pushState();
-            writer.putContext("objects", Objects.class);
             writer.write("""
                 @Override
                 public ${shape:N} build() {
                     return ${objects:T}.requireNonNull(value, "no union value set");
                 }
                 """);
-            writer.popState();
         }
     }
 }
