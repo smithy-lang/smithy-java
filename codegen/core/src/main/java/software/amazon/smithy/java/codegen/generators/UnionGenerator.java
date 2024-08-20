@@ -83,7 +83,7 @@ public final class UnionGenerator
                         if (other == null || getClass() != other.getClass()) {
                             return false;
                         }
-                        return getValue().equals(((${shape:T}) other).getValue());
+                        return ${objects:T}.equals(getValue(), ((${shape:T}) other).getValue());
                     }
 
                     ${builder:C|}
