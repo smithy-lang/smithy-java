@@ -7,7 +7,6 @@ package software.amazon.smithy.java.runtime.auth.api.scheme;
 
 import java.util.ArrayList;
 import java.util.List;
-import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 
 /**
  * Resolves the authentication scheme that should be used to sign a request.
@@ -30,9 +29,7 @@ public interface AuthSchemeResolver {
      *
      * <p>This resolver can be used to bypass auth logic when testing clients.
      */
-    AuthSchemeResolver NO_AUTH = (param) -> List.of(
-        new AuthSchemeOption(NoAuthAuthScheme.INSTANCE.schemeId(), AuthProperties.empty(), AuthProperties.empty())
-    );
+    AuthSchemeResolver NO_AUTH = (param) -> List.of(AuthSchemeOption.forId(NoAuthAuthScheme.INSTANCE.schemeId()));
 
     /**
      * Resolve the auth scheme options using the given parameters.
@@ -63,7 +60,7 @@ public interface AuthSchemeResolver {
         public List<AuthSchemeOption> resolveAuthScheme(AuthSchemeResolverParams params) {
             var result = new ArrayList<AuthSchemeOption>();
             for (var schemeId : params.operationAuthSchemes()) {
-                result.add(new AuthSchemeOption(schemeId, AuthProperties.empty(), AuthProperties.empty()));
+                result.add(AuthSchemeOption.forId(schemeId));
             }
             return result;
         }
