@@ -12,6 +12,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
+import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.InputHook;
@@ -26,6 +27,7 @@ public class GenericClientTest {
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol())
             .endpoint("https://httpbin.org")
+            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
             .value(5L)
             .build();
 
@@ -60,6 +62,7 @@ public class GenericClientTest {
             .protocol(new RestJsonClientProtocol())
             .endpoint("https://httpbin.org")
             .addInterceptor(interceptor)
+            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
             .value(2.2)
             .build();
 
@@ -91,6 +94,7 @@ public class GenericClientTest {
             .protocol(new RestJsonClientProtocol())
             .endpoint("https://httpbin.org")
             .addInterceptor(interceptor)
+            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
             .value(2L)
             .multiValue("a", "b")
             .multiVarargs("string", "a", "b", "c")

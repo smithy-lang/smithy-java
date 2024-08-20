@@ -8,16 +8,15 @@ package software.amazon.smithy.java.codegen.client;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.net.http.HttpClient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
+import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
-import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 
 public class AuthSchemeTest {
@@ -34,10 +33,14 @@ public class AuthSchemeTest {
         };
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol())
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
-            .authSchemeResolver((params -> List.of(new AuthSchemeOption(TestAuthScheme.ID, null, null))))
+            .authSchemeResolver(
+                (params -> List.of(
+                    new AuthSchemeOption(TestAuthScheme.ID, AuthProperties.empty(), AuthProperties.empty())
+                ))
+            )
             .endpoint("https://httpbin.org")
             .addInterceptor(interceptor)
+            .value(2L)
             .build();
 
         var input = EchoInput.builder().string("hello world").build();
