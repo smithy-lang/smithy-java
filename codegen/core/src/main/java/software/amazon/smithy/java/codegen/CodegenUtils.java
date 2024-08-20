@@ -354,17 +354,20 @@ public final class CodegenUtils {
             .count() > 1;
     }
 
-
     /**
      * Gets an implementation of a class from the classpath by name.
+     *
+     * <p><strong>NOTE</strong>: The provided class must have a public, no-arg constructor.
      *
      * @param clazz interface to get implementation of
      * @param name fully-qualified class name
      * @return Class instance.
      * @param <T> Type to get implementation for.
+     * @throws CodegenException if no valid implementation with a public no-arg constructor could be found on the
+     * classpath for the given class name.
      */
     @SuppressWarnings("unchecked")
-    public static <T> Class<? extends T> getImplemenationByName(Class<T> clazz, String name) {
+    public static <T> Class<? extends T> getImplementationByName(Class<T> clazz, String name) {
         try {
             var instance = Class.forName(name).getDeclaredConstructor().newInstance();
             if (clazz.isAssignableFrom(instance.getClass())) {

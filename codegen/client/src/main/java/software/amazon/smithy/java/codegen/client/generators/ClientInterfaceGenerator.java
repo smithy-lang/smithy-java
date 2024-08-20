@@ -345,7 +345,7 @@ public final class ClientInterfaceGenerator
         Map<String, Integer> frequencyMap = new HashMap<>();
 
         for (var pluginFqn : settings.defaultPlugins()) {
-            var pluginClass = CodegenUtils.getImplemenationByName(ClientPlugin.class, pluginFqn);
+            var pluginClass = CodegenUtils.getImplementationByName(ClientPlugin.class, pluginFqn);
             // Ensure plugin names used as properties never clash
             var pluginName = StringUtils.uncapitalize(pluginClass.getSimpleName());
             int val = frequencyMap.getOrDefault(pluginName, 0);

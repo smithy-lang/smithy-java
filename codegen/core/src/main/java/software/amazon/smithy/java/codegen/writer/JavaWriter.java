@@ -246,10 +246,9 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
                 return format("$T", param.getType());
             }
             throw new IllegalArgumentException(
-                "Invalid type provided for $U. Expected a String but found: `"
+                "Invalid type provided for $P. Expected a Parameter but found: `"
                     + type + "`."
             );
-
         }
     }
 }
