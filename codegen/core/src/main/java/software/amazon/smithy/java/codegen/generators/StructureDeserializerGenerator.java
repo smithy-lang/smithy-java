@@ -57,6 +57,10 @@ record StructureDeserializerGenerator(
         int idx = 0;
         for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {
             var member = iter.next();
+            // skip data streams
+            if (CodegenUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {
+                continue;
+            }
             writer.pushState();
             writer.putContext("memberName", symbolProvider.toMemberName(member));
             writer.write(

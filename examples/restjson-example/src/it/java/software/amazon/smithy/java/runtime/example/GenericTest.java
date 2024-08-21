@@ -7,18 +7,16 @@ package software.amazon.smithy.java.runtime.example;
 
 import static java.nio.ByteBuffer.wrap;
 
-import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
-import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.runtime.example.client.PersonDirectoryClient;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImageInput;
@@ -34,8 +32,6 @@ public class GenericTest {
     public void putPerson() {
         // Create a generated client using rest-json and a fixed endpoint.
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .protocol(new RestJsonClientProtocol())
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .endpoint("http://httpbin.org/anything")
             .build();
 
@@ -52,8 +48,6 @@ public class GenericTest {
     @Test
     public void getPersonImage() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .protocol(new RestJsonClientProtocol())
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .endpoint("http://httpbin.org/anything")
             .build();
 
@@ -66,8 +60,6 @@ public class GenericTest {
     @Test
     public void streamingRequestPayload() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .protocol(new RestJsonClientProtocol())
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .endpoint("http://httpbin.org/anything")
             .build();
 
@@ -137,15 +129,11 @@ public class GenericTest {
 
             @Override
             public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, RequestT> hook) {
-                return hook.mapRequest(SmithyHttpRequest.class, request -> {
-                    return request.withAddedHeaders("X-Foo", "Bar");
-                });
+                return hook.mapRequest(SmithyHttpRequest.class, request -> request.withAddedHeaders("X-Foo", "Bar"));
             }
         };
 
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .protocol(new RestJsonClientProtocol())
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .endpoint("http://httpbin.org/anything")
             .addInterceptor(interceptor)
             .build();

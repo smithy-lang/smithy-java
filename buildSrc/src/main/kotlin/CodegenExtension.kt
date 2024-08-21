@@ -10,11 +10,15 @@ import org.gradle.kotlin.dsl.*
  */
 fun Project.addGenerateSrcsTask(className: String): TaskProvider<JavaExec> {
     val generatedSrcDir = layout.buildDirectory.dir("generated-src").get()
-    return tasks.register<JavaExec>("generateSources") {
+    val task = tasks.register<JavaExec>("generateSources") {
         delete(files(generatedSrcDir))
         dependsOn("test")
         classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
         mainClass = className
         environment("output", generatedSrcDir)
     }
+    tasks.getByName("integ").dependsOn(task)
+    tasks.getByName("compileItJava").dependsOn(task)
+
+    return task;
 }

@@ -14,3 +14,5 @@ tasks.register<Test>("integ") {
     testClassesDirs = project.the<SourceSetContainer>()["it"].output.classesDirs
     classpath = project.the<SourceSetContainer>()["it"].runtimeClasspath
 }
+
+tasks["test"].finalizedBy("integ")

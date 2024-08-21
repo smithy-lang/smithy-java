@@ -14,7 +14,6 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.ClientConfig;
@@ -26,6 +25,7 @@ import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolverParams;
 import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.runtime.example.client.PersonDirectoryClient;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImage;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageOutput;
@@ -50,9 +50,6 @@ public class ClientConfigTest {
     public void vanillaClient() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
             .addInterceptor(requestCapturingInterceptor)
-            .protocol(new RestJsonClientProtocol())
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
             .endpoint("http://httpbin.org/anything")
             .build();
         callOperation(client);
@@ -108,9 +105,6 @@ public class ClientConfigTest {
     public void vanillaClient_RegionPluginExplicitlyAdded() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
             .addInterceptor(requestCapturingInterceptor)
-            .protocol(new RestJsonClientProtocol())
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
             .addPlugin(new RegionAwareServicePlugin())
             .build();
         callOperation(client);
@@ -122,10 +116,7 @@ public class ClientConfigTest {
     public void vanillaClient_RegionPluginExplicitlyAdded_RegionKeyOverridden() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
             .addInterceptor(requestCapturingInterceptor)
-            .protocol(new RestJsonClientProtocol())
-            .transport(new JavaHttpClientTransport(HttpClient.newHttpClient()))
             .addPlugin(new RegionAwareServicePlugin())
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
             .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
             .build();
         callOperation(client);
@@ -164,7 +155,6 @@ public class ClientConfigTest {
                 ClientConfig.Builder configBuilder = configBuilder();
                 configBuilder.protocol(new RestJsonClientProtocol());
                 configBuilder.transport(new JavaHttpClientTransport(HttpClient.newHttpClient()));
-                configBuilder.authSchemeResolver(AuthSchemeResolver.NO_AUTH);
 
                 List<ClientPlugin> defaultPlugins = List.of(new RegionAwareServicePlugin());
                 // Default plugins are "applied" here in Builder constructor.

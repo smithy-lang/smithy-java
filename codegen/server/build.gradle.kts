@@ -11,16 +11,4 @@ dependencies {
     implementation(project(":server-core"))
 }
 
-tasks {
-    val generateSrcTask = addGenerateSrcsTask("software.amazon.smithy.java.codegen.server.TestServerJavaCodegenRunner")
-
-    integ {
-        dependsOn(generateSrcTask)
-    }
-    compileItJava {
-        dependsOn(generateSrcTask)
-    }
-    test {
-        finalizedBy(integ)
-    }
-}
+addGenerateSrcsTask("software.amazon.smithy.java.codegen.server.TestServerJavaCodegenRunner")

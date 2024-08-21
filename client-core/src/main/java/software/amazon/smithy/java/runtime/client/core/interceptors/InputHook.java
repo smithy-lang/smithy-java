@@ -64,7 +64,7 @@ public sealed class InputHook<I extends SerializableStruct> permits RequestHook 
      */
     @SuppressWarnings("unchecked")
     public <R extends SerializableStruct> I mapInput(Class<R> predicateType, Function<R, R> mapper) {
-        if (input.getClass() == predicateType) {
+        if (input.getClass().isAssignableFrom(predicateType)) {
             return (I) mapper.apply((R) input);
         } else {
             return input;

@@ -156,6 +156,7 @@ public final class ClientPipeline<RequestT, ResponseT> {
         var params = AuthSchemeResolverParams.builder()
             .protocolId(protocol.id())
             .operationName(call.operation().schema().id().getName())
+            .operationAuthSchemes(call.operation().effectiveAuthSchemes())
             .context(Context.unmodifiableView(call.context()))
             .build();
         var authSchemeOptions = call.authSchemeResolver().resolveAuthScheme(params);

@@ -55,7 +55,7 @@ public sealed class RequestHook<I extends SerializableStruct, RequestT> extends 
      */
     @SuppressWarnings("unchecked")
     public <R> RequestT mapRequest(Class<R> predicateType, Function<R, R> mapper) {
-        if (request.getClass() == predicateType) {
+        if (predicateType.isAssignableFrom(request.getClass())) {
             return (RequestT) mapper.apply((R) request);
         } else {
             return request;

@@ -17,22 +17,7 @@ dependencies {
     itImplementation(project(":client-aws-rest-json1"))
 }
 
-tasks {
-    val generateSrcTask = addGenerateSrcsTask("software.amazon.smithy.java.codegen.client.TestServerJavaClientCodegenRunner")
-
-    integ {
-        dependsOn(generateSrcTask)
-    }
-    compileItJava {
-        dependsOn(generateSrcTask)
-    }
-    test {
-        finalizedBy(integ)
-    }
-    spotbugsIt {
-        enabled = false
-    }
-}
+addGenerateSrcsTask("software.amazon.smithy.java.codegen.client.TestServerJavaClientCodegenRunner")
 
 sourceSets {
     it {

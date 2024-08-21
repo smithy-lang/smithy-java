@@ -17,7 +17,7 @@ service TestService {
     ]
 }
 
-@http(method: "PUT", uri: "/anything")
+@http(method: "PUT", uri: "/echo")
 operation Echo {
     input := {
         string: String

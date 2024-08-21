@@ -11,16 +11,4 @@ dependencies {
     itImplementation(project(":json-codec"))
 }
 
-tasks {
-    val generateSrcs = addGenerateSrcsTask("software.amazon.smithy.java.codegen.utils.TestJavaCodegenRunner")
-
-    integ {
-        dependsOn(generateSrcs)
-    }
-    compileItJava {
-        dependsOn(generateSrcs)
-    }
-    test {
-        finalizedBy(integ)
-    }
-}
+addGenerateSrcsTask("software.amazon.smithy.java.codegen.utils.TestJavaCodegenRunner")
