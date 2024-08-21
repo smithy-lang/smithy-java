@@ -8,5 +8,6 @@ resource RecursionTests {
         RecursiveMaps
         RecursiveStructs
         SelfReference
+        MultipleRecursion
     ]
 }
