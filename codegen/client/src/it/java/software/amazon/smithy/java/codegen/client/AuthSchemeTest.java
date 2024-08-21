@@ -32,7 +32,7 @@ public class AuthSchemeTest {
         };
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol())
-            .authSchemeResolver(params -> List.of(AuthSchemeOption.forId(TestAuthScheme.ID)))
+            .authSchemeResolver(params -> List.of(new AuthSchemeOption(TestAuthScheme.ID)))
             .endpoint("https://httpbin.org")
             .addInterceptor(interceptor)
             .value(2L)

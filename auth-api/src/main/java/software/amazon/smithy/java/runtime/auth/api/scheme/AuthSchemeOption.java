@@ -42,7 +42,7 @@ public record AuthSchemeOption(
      * @param schemeId id of auth scheme to create an option for.
      * @return AuthSchemeOption instance with no identity or signer property overrides.
      */
-    public static AuthSchemeOption forId(String schemeId) {
-        return new AuthSchemeOption(schemeId, AuthProperties.empty(), AuthProperties.empty());
+    public AuthSchemeOption(String schemeId) {
+        this(schemeId, AuthProperties.empty(), AuthProperties.empty());
     }
 }

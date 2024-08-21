@@ -29,7 +29,7 @@ public interface AuthSchemeResolver {
      *
      * <p>This resolver can be used to bypass auth logic when testing clients.
      */
-    AuthSchemeResolver NO_AUTH = (param) -> List.of(AuthSchemeOption.forId(NoAuthAuthScheme.INSTANCE.schemeId()));
+    AuthSchemeResolver NO_AUTH = (param) -> List.of(new AuthSchemeOption(NoAuthAuthScheme.INSTANCE.schemeId()));
 
     /**
      * Resolve the auth scheme options using the given parameters.
@@ -60,7 +60,7 @@ public interface AuthSchemeResolver {
         public List<AuthSchemeOption> resolveAuthScheme(AuthSchemeResolverParams params) {
             var result = new ArrayList<AuthSchemeOption>();
             for (var schemeId : params.operationAuthSchemes()) {
-                result.add(AuthSchemeOption.forId(schemeId));
+                result.add(new AuthSchemeOption(schemeId));
             }
             return result;
         }
