@@ -57,12 +57,17 @@ public final class SharedSchemasGenerator
                          * Defines shared shapes across the model package that are not part of another code-generated type.
                          */
                         final class SharedSchemas {
-                            ${#schemas}
+                            ${#builders}${value:C|}
+                            ${/builders}${#schemas}
                             ${value:C|}
                             ${/schemas}
                             private SharedSchemas() {}
                         }
                         """;
+                    var builders = common.stream()
+                        .filter(s -> CodegenUtils.recursiveShape(directive.model(), s))
+                        .map(s -> new SchemaBuilderGenerator(writer, s, directive.model(), directive.context()))
+                        .toList();
                     var schemas = common.stream()
                         .map(
                             s -> new SchemaGenerator(
@@ -75,6 +80,7 @@ public final class SharedSchemasGenerator
                         )
                         .toList();
                     writer.putContext("schemas", schemas);
+                    writer.putContext("builders", builders);
                     writer.write(template);
                     writer.popState();
                 }

@@ -102,8 +102,7 @@ final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
     public Void listShape(ListShape shape) {
         writer.write(
             """
-                ${?recursive}static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.listBuilder(${shapeId:T}.from(${id:S})${traits:C});
-                ${/recursive}static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.listBuilder(${shapeId:T}.from(${id:S})${traits:C})${/recursive}
+                static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.listBuilder(${shapeId:T}.from(${id:S})${traits:C})${/recursive}
                     ${C|}
                     .build();
                 """,
@@ -116,8 +115,7 @@ final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
     public Void mapShape(MapShape shape) {
         writer.write(
             """
-                ${?recursive}static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.mapBuilder(${shapeId:T}.from(${id:S})${traits:C});
-                ${/recursive}static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.mapBuilder(${shapeId:T}.from(${id:S})${traits:C})${/recursive}
+                static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.mapBuilder(${shapeId:T}.from(${id:S})${traits:C})${/recursive}
                     ${C|}
                     ${C|}
                     .build();
@@ -241,11 +239,12 @@ final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
         writer.putContext("hasMembers", !shape.members().isEmpty());
         writer.write(
             """
-                ${?recursive}static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.structureBuilder(ID${traits:C});
+                ${?recursive}${C}
                 ${/recursive}static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.structureBuilder(ID${traits:C})${/recursive}${?hasMembers}
                     ${C|}
                     ${/hasMembers}.build();
                 """,
+            new SchemaBuilderGenerator(writer, shape, model, context),
             (Runnable) () -> shape.members().forEach(m -> m.accept(this))
         );
 
