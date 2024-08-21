@@ -19,13 +19,13 @@ import software.amazon.smithy.model.shapes.ShapeVisitor;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.UnionShape;
 
-public class SchemaBuilderGenerator extends ShapeVisitor.Default<Void> implements Runnable {
+final class SchemaBuilderGenerator extends ShapeVisitor.Default<Void> implements Runnable {
     private final JavaWriter writer;
     private final Shape shape;
     private final Model model;
     private final CodeGenerationContext context;
 
-    public SchemaBuilderGenerator(
+    SchemaBuilderGenerator(
         JavaWriter writer,
         Shape shape,
         Model model,
