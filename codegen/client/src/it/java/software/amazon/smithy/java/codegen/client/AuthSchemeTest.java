@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
 import software.amazon.smithy.java.codegen.client.util.EchoServer;
-import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
@@ -50,12 +49,8 @@ public class AuthSchemeTest {
         };
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol())
-            .authSchemeResolver(
-                (params -> List.of(
-                    new AuthSchemeOption(TestAuthScheme.ID, AuthProperties.empty(), AuthProperties.empty())
-                ))
-            )
             .endpoint(ENDPOINT)
+            .authSchemeResolver(params -> List.of(new AuthSchemeOption(TestAuthScheme.ID)))
             .addInterceptor(interceptor)
             .value(2L)
             .build();

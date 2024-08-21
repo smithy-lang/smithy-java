@@ -32,4 +32,17 @@ public record AuthSchemeOption(
         Objects.requireNonNull(identityPropertyOverrides, "identityPropertyOverrides cannot be null.");
         Objects.requireNonNull(signerPropertyOverrides, "signerPropertyOverrides cannot be null.");
     }
+
+    /**
+     * Creates an {@code AuthSchemeOption} for a given auth scheme ID.
+     *
+     * <p><strong>NOTE:</strong>The resulting AuthSchemeOption will have no
+     * identity or signer property overrides.
+     *
+     * @param schemeId id of auth scheme to create an option for.
+     * @return AuthSchemeOption instance with no identity or signer property overrides.
+     */
+    public AuthSchemeOption(String schemeId) {
+        this(schemeId, AuthProperties.empty(), AuthProperties.empty());
+    }
 }
