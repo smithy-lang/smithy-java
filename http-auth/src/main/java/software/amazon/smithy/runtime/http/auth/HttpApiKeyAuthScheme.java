@@ -5,6 +5,10 @@
 
 package software.amazon.smithy.runtime.http.auth;
 
+import java.util.Objects;
+import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
+import software.amazon.smithy.java.runtime.auth.api.AuthProperty;
 import software.amazon.smithy.java.runtime.auth.api.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
@@ -15,6 +19,26 @@ import software.amazon.smithy.model.traits.HttpApiKeyAuthTrait;
 
 // TODO: Should API key identity be distinct from TokenIdentity?
 public final class HttpApiKeyAuthScheme implements AuthScheme<SmithyHttpRequest, TokenIdentity> {
+    static final AuthProperty<String> NAME = AuthProperty.of(
+        "Name of the header or query parameter that contains the API key"
+    );
+    static final AuthProperty<HttpApiKeyAuthTrait.Location> IN = AuthProperty.of(
+        "Defines the location of where the key is serialized."
+    );
+    static final AuthProperty<String> SCHEME = AuthProperty.of(
+        "Defines the IANA scheme to use on the Authorization header value."
+    );
+
+    private final String scheme;
+    private final String name;
+    private final HttpApiKeyAuthTrait.Location in;
+
+    public HttpApiKeyAuthScheme(String name, HttpApiKeyAuthTrait.Location in, String scheme) {
+        this.name = Objects.requireNonNull(name, "name cannot be null.");
+        this.in = Objects.requireNonNull(in, "in cannot be null.");
+        this.scheme = scheme;
+    }
+
     @Override
     public ShapeId schemeId() {
         return HttpApiKeyAuthTrait.ID;
@@ -31,6 +55,17 @@ public final class HttpApiKeyAuthScheme implements AuthScheme<SmithyHttpRequest,
     }
 
     @Override
+    public AuthProperties getSignerProperties(Context context) {
+        var builder = AuthProperties.builder();
+        builder.put(IN, in);
+        builder.put(NAME, name);
+        if (scheme != null) {
+            builder.put(SCHEME, scheme);
+        }
+        return builder.build();
+    }
+
+    @Override
     public Signer<SmithyHttpRequest, TokenIdentity> signer() {
         return HttpApiKeyAuthSigner.INSTANCE;
     }
@@ -44,7 +79,7 @@ public final class HttpApiKeyAuthScheme implements AuthScheme<SmithyHttpRequest,
 
         @Override
         public AuthScheme<?, ?> createAuthScheme(HttpApiKeyAuthTrait trait) {
-            return new HttpApiKeyAuthScheme();
+            return new HttpApiKeyAuthScheme(trait.getName(), trait.getIn(), trait.getScheme().orElse(null));
         }
     }
 }
