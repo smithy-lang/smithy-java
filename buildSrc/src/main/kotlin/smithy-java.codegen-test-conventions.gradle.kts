@@ -24,3 +24,12 @@ afterEvaluate {
 tasks.named("compileJava") {
     dependsOn("smithyBuild")
 }
+
+// Helps Intellij plugin identify models
+sourceSets {
+    main {
+        java {
+            srcDir("model")
+        }
+    }
+}
