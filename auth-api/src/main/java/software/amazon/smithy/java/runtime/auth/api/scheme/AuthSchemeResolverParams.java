@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * AuthSchemeResolver parameters.
@@ -17,7 +18,7 @@ public final class AuthSchemeResolverParams {
 
     private final String protocolId;
     private final String operationName;
-    private final List<String> operationAuthSchemes;
+    private final List<ShapeId> operationAuthSchemes;
     private final Context context;
 
     private AuthSchemeResolverParams(Builder builder) {
@@ -59,7 +60,7 @@ public final class AuthSchemeResolverParams {
      *
      * @return list of authScheme id's
      */
-    public List<String> operationAuthSchemes() {
+    public List<ShapeId> operationAuthSchemes() {
         return operationAuthSchemes;
     }
 
@@ -98,7 +99,7 @@ public final class AuthSchemeResolverParams {
 
         private String protocolId;
         private String operationName;
-        public List<String> operationAuthSchemes;
+        public List<ShapeId> operationAuthSchemes;
         private Context context;
 
         private Builder() {
@@ -140,7 +141,7 @@ public final class AuthSchemeResolverParams {
          * @param operationAuthSchemes list of auth scheme ids.
          * @return the builder.
          */
-        public Builder operationAuthSchemes(List<String> operationAuthSchemes) {
+        public Builder operationAuthSchemes(List<ShapeId> operationAuthSchemes) {
             this.operationAuthSchemes = operationAuthSchemes;
             return this;
         }

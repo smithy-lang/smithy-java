@@ -26,7 +26,7 @@ import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
-import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
+import software.amazon.smithy.java.runtime.auth.api.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
@@ -80,9 +80,10 @@ public final class ClientInterfaceGenerator
                         final class Builder extends ${client:T}.Builder<${interface:T}, Builder> {
                             ${defaultPlugins:C|}
                             ${?hasDefaultProtocol}${defaultProtocol:C|}
-                            ${/hasDefaultProtocol}private Builder() {
+                            ${/hasDefaultProtocol}${?defaultSchemes}${defaultAuth:C|}
+                            ${/defaultSchemes}private Builder() {
                                 ${?hasDefaultProtocol}configBuilder().protocol(factory.createProtocol(settings, protocolTrait));${/hasDefaultProtocol}
-                                ${?authSchemes}configBuilder().putSupportedAuthSchemes(${#authSchemes}new ${value:T}()${^key.last}, ${/key.last}${/authSchemes});${/authSchemes}
+                                ${?defaultSchemes}configBuilder().putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes});${/defaultSchemes}
                                 ${?transport}configBuilder().transport(new ${transport:T}());${/transport}
                             }
 
@@ -124,7 +125,13 @@ public final class ClientInterfaceGenerator
                         directive.model()
                     )
                 );
-                writer.putContext("authSchemes", getAuthSchemes(directive.model(), directive.service()));
+                var defaultAuth = getAuthFactoryMapping(directive.model(), directive.service());
+                writer.putContext(
+                    "defaultAuth",
+                    new AuthInitializerGenerator(writer, directive.context(), defaultAuth)
+                );
+                var schemes = getAuthSchemes(defaultAuth.keySet());
+                writer.putContext("defaultSchemes", schemes);
                 var defaultPlugins = resolveDefaultPlugins(directive.settings());
                 writer.putContext("hasDefaults", !defaultPlugins.isEmpty());
                 writer.putContext("defaultPlugins", new PluginPropertyWriter(writer, defaultPlugins));
@@ -246,24 +253,75 @@ public final class ClientInterfaceGenerator
         throw new CodegenException("Could not find factory for " + defaultProtocol);
     }
 
-    private static Collection<Class<? extends AuthScheme>> getAuthSchemes(Model model, ToShapeId service) {
+    private static Map<Trait, Class<? extends AuthSchemeFactory>> getAuthFactoryMapping(
+        Model model,
+        ToShapeId service
+    ) {
         var index = ServiceIndex.of(model);
         var schemes = index.getAuthSchemes(service);
-        Map<String, Class<? extends AuthScheme>> result = new HashMap<>();
-        for (var scheme : ServiceLoader.load(AuthScheme.class, ClientInterfaceGenerator.class.getClassLoader())) {
-            if (schemes.containsKey(ShapeId.from(scheme.schemeId()))) {
-                var existing = result.put(scheme.schemeId(), scheme.getClass());
+        Map<Trait, Class<? extends AuthSchemeFactory>> result = new HashMap<>();
+        for (var schemeFactory : ServiceLoader.load(
+            AuthSchemeFactory.class,
+            ClientInterfaceGenerator.class.getClassLoader()
+        )) {
+            if (schemes.containsKey(schemeFactory.schemeId())) {
+                var existing = result.put(schemes.get(schemeFactory.schemeId()), schemeFactory.getClass());
                 if (existing != null) {
                     throw new CodegenException(
-                        "Multiple auth scheme implementations found for scheme: " + scheme.schemeId()
-                            + "Found: " + scheme + " and " + existing
+                        "Multiple auth scheme factory implementations found for scheme: " + schemeFactory.schemeId()
+                            + "Found: " + schemeFactory + " and " + existing
                     );
                 }
             } else {
-                LOGGER.warn("Could not find implementation for auth scheme {}", scheme);
+                LOGGER.warn("Could not find implementation for auth scheme {}", schemeFactory);
             }
         }
-        return result.values();
+        return result;
+    }
+
+    private record AuthInitializerGenerator(
+        JavaWriter writer,
+        CodeGenerationContext context,
+        Map<Trait, Class<? extends AuthSchemeFactory>> authMapping
+    ) implements Runnable {
+
+        @Override
+        public void run() {
+            writer.pushState();
+            for (var entry : authMapping.entrySet()) {
+                // TODO: figure out how to tell if trait initializer needs casting?
+                var template = """
+                    private static final ${trait:T} ${traitName:L} = (${trait:T}) ${initializer:C};
+                    private static final ${authFactory:T}<${trait:T}> ${traitName:L}Factory = new ${?outer}${outer:T}.${authFactoryImplName:L}${/outer}${^outer}${authFactoryImpl:T}${/outer}();
+                    """;
+                var trait = entry.getKey();
+                writer.putContext("trait", trait.getClass());
+                writer.putContext("traitName", getAuthTraitPropertyName(trait));
+                var initializer = context.getInitializer(entry.getKey());
+                writer.putContext("initializer", writer.consumer(w -> initializer.accept(w, entry.getKey())));
+                writer.putContext("authFactory", AuthSchemeFactory.class);
+                writer.putContext("authFactoryImpl", entry.getValue());
+                if (entry.getValue().isMemberClass()) {
+                    writer.putContext("outer", entry.getValue().getEnclosingClass());
+                }
+                writer.putContext("authFactoryImplName", entry.getValue().getSimpleName());
+                writer.write(template);
+            }
+            writer.popState();
+        }
+    }
+
+    public static Map<String, String> getAuthSchemes(Collection<Trait> traits) {
+        Map<String, String> authSchemes = new HashMap<>();
+        for (var trait : traits) {
+            var traitName = getAuthTraitPropertyName(trait);
+            authSchemes.put(traitName, traitName + "Factory");
+        }
+        return authSchemes;
+    }
+
+    private static String getAuthTraitPropertyName(Trait trait) {
+        return StringUtils.uncapitalize(trait.toShapeId().getName()) + "Scheme";
     }
 
     private record PluginPropertyWriter(JavaWriter writer, Map<String, Class<? extends ClientPlugin>> pluginMap)

@@ -24,6 +24,7 @@ import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * Contains the information needed to send a request from a client using a protocol.
@@ -40,7 +41,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
     private final BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator;
     private final ClientInterceptor interceptor;
     private final AuthSchemeResolver authSchemeResolver;
-    private final Map<String, AuthScheme<?, ?>> supportedAuthSchemes;
+    private final Map<ShapeId, AuthScheme<?, ?>> supportedAuthSchemes;
     private final IdentityResolvers identityResolvers;
     private final ExecutorService executor;
 
@@ -143,7 +144,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
      *
      * @return supported auth schemes.
      */
-    public Map<String, AuthScheme<?, ?>> supportedAuthSchemes() {
+    public Map<ShapeId, AuthScheme<?, ?>> supportedAuthSchemes() {
         return supportedAuthSchemes;
     }
 

@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.auth.api.scheme;
 
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * An authentication scheme option, composed of the scheme ID and property overrides for use when resolving the
@@ -23,7 +24,7 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
  * @see AuthScheme
  */
 public record AuthSchemeOption(
-    String schemeId,
+    ShapeId schemeId,
     AuthProperties identityPropertyOverrides,
     AuthProperties signerPropertyOverrides
 ) {
@@ -41,7 +42,7 @@ public record AuthSchemeOption(
      *
      * @param schemeId id of auth scheme to create an option for.
      */
-    public AuthSchemeOption(String schemeId) {
+    public AuthSchemeOption(ShapeId schemeId) {
         this(schemeId, AuthProperties.empty(), AuthProperties.empty());
     }
 }

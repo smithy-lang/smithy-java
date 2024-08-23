@@ -20,6 +20,7 @@ import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientPr
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.model.traits.HttpBasicAuthTrait;
 
 public class AuthSchemeTest {
     private static final EchoServer server = new EchoServer();
@@ -50,7 +51,7 @@ public class AuthSchemeTest {
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol())
             .endpoint(ENDPOINT)
-            .authSchemeResolver(params -> List.of(new AuthSchemeOption(TestAuthScheme.ID)))
+            .authSchemeResolver(params -> List.of(new AuthSchemeOption(HttpBasicAuthTrait.ID)))
             .addInterceptor(interceptor)
             .value(2L)
             .build();
