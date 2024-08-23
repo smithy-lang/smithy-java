@@ -22,13 +22,14 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * AWS signature version 4 signing implementation.
  */
 public final class SigV4 {
 
-    private static final System.Logger LOGGER = System.getLogger(SigV4.class.getName());
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(SigV4.class);
     private static final String ALGORITHM = "AWS4-HMAC-SHA256";
     private static final String TERMINATOR = "aws4_request";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -118,14 +119,14 @@ public final class SigV4 {
         var canonicalRequest = method + "\n" + uri.getRawPath() + "\n" + getCanonicalizedQueryString(uri) + "\n"
             + getCanonicalizedHeaderString(httpHeaders) + "\n" + getSignedHeaders(httpHeaders) + "\n" + payloadHash;
 
-        LOGGER.log(System.Logger.Level.TRACE, () -> "AWS4 Canonical Request: '" + canonicalRequest + "'");
+        LOGGER.trace("AWS4 Canonical Request: '{}'", canonicalRequest);
 
         var scope = dateStamp + '/' + regionName + '/' + serviceName + '/' + TERMINATOR;
         var signingCredentials = accessKeyId + '/' + scope;
         var stringToSign = ALGORITHM + '\n' + dateTime + '\n' + scope + '\n'
             + HexFormat.of().formatHex(hash(canonicalRequest));
 
-        LOGGER.log(System.Logger.Level.TRACE, () -> "AWS4 String to Sign: '" + stringToSign + "'");
+        LOGGER.trace("AWS4 String to Sign: '{}'", stringToSign);
 
         // AWS4 uses a series of derived keys, formed by hashing different pieces of data
         var kSecret = ("AWS4" + secretKey).getBytes(StandardCharsets.UTF_8);
@@ -143,7 +144,7 @@ public final class SigV4 {
         var authorizationHeader = ALGORITHM + ' ' + credentialsAuthorizationHeader + ", "
             + signedHeadersAuthorizationHeader + ", " + signatureAuthorizationHeader;
 
-        LOGGER.log(System.Logger.Level.TRACE, () -> "Authorization: " + authorizationHeader);
+        LOGGER.trace("Authorization: {}", authorizationHeader);
 
         headers.put("Authorization", List.of(authorizationHeader));
 

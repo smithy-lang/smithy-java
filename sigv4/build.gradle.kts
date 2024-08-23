@@ -6,3 +6,7 @@ description = "This module provides SigV4 signing functionality"
 
 extra["displayName"] = "Smithy :: Java :: SigV4"
 extra["moduleName"] = "software.amazon.smithy.java.sigv4"
+
+dependencies {
+    implementation(project(":logging"))
+}

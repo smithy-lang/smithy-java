@@ -8,12 +8,13 @@ package software.amazon.smithy.java.runtime.client.core.interceptors;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.utils.TriConsumer;
 
 final class ClientInterceptorChain implements ClientInterceptor {
 
-    private static final System.Logger LOGGER = System.getLogger(ClientInterceptorChain.class.getName());
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientInterceptorChain.class);
     private final List<ClientInterceptor> interceptors;
 
     public ClientInterceptorChain(List<ClientInterceptor> interceptors) {
@@ -33,7 +34,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
                 consumer.accept(interceptor, hook);
             } catch (RuntimeException e) {
                 if (error != null) {
-                    LOGGER.log(System.Logger.Level.ERROR, e);
+                    LOGGER.error("Encountered Exception: {}", e);
                 }
                 error = e;
             }
@@ -176,7 +177,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
                 consumer.accept(interceptor, hook, error);
             } catch (RuntimeException e) {
                 if (error != null) {
-                    LOGGER.log(System.Logger.Level.ERROR, error);
+                    LOGGER.error("Encountered Exception: {}", error);
                 }
                 error = e;
             }

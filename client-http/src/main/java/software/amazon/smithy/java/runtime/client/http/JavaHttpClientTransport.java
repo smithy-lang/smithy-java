@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
@@ -25,7 +26,7 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
  */
 public class JavaHttpClientTransport implements ClientTransport<SmithyHttpRequest, SmithyHttpResponse> {
 
-    private static final System.Logger LOGGER = System.getLogger(JavaHttpClientTransport.class.getName());
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;
 
     public JavaHttpClientTransport() {
@@ -83,10 +84,7 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
     }
 
     private SmithyHttpResponse createSmithyResponse(HttpResponse<Flow.Publisher<List<ByteBuffer>>> response) {
-        LOGGER.log(
-            System.Logger.Level.TRACE,
-            () -> "Got response: " + response + "; headers: " + response.headers().map()
-        );
+        LOGGER.trace("Got response: {}; headers: {}", response, response.headers().map());
         return SmithyHttpResponse.builder()
             .httpVersion(javaToSmithyVersion(response.version()))
             .statusCode(response.statusCode())

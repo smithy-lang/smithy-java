@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
@@ -37,7 +38,7 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
  */
 public final class ClientPipeline<RequestT, ResponseT> {
 
-    private static final System.Logger LOGGER = System.getLogger(ClientPipeline.class.getName());
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientPipeline.class);
     private static final URI UNRESOLVED;
 
     static {
@@ -216,10 +217,7 @@ public final class ClientPipeline<RequestT, ResponseT> {
         ClientInterceptor interceptor
     ) {
         var input = call.input();
-        LOGGER.log(
-            System.Logger.Level.TRACE,
-            () -> "Deserializing response with" + protocol.getClass() + " for " + request + ": " + response
-        );
+        LOGGER.trace("Deserializing response with {} for {}:{}", protocol.getClass(), request, response);
 
         Context context = call.context();
         var responseHook = new ResponseHook<>(context, input, request, response);

@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
@@ -37,7 +38,7 @@ import software.amazon.smithy.utils.SmithyBuilder;
  */
 final class HttpBindingDeserializer extends SpecificShapeDeserializer implements ShapeDeserializer {
 
-    private static final System.Logger LOGGER = System.getLogger(HttpBindingDeserializer.class.getName());
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpBindingDeserializer.class);
     private final Codec payloadCodec;
     private final HttpHeaders headers;
     private final Map<String, List<String>> queryStringParameters;
@@ -122,9 +123,10 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                     if (member.type() == ShapeType.STRUCTURE) {
                         // Read the payload into a byte buffer to deserialize a shape in the body.
                         bodyDeserializationCf = bodyAsBytes().thenAccept(bytes -> {
-                            LOGGER.log(
-                                System.Logger.Level.TRACE,
-                                () -> "Deserializing the payload of " + schema + " via " + payloadCodec.getMediaType()
+                            LOGGER.trace(
+                                "Deserializing the payload of {} schema via {}",
+                                schema,
+                                payloadCodec.getMediaType()
                             );
                             structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bytes));
                         }).toCompletableFuture();
@@ -156,10 +158,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
             validateMediaType();
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
             bodyDeserializationCf = bodyAsBytes().thenAccept(bytes -> {
-                LOGGER.log(
-                    System.Logger.Level.TRACE,
-                    () -> "Deserializing the structured body of " + schema + " via " + payloadCodec.getMediaType()
-                );
+                LOGGER.trace("Deserializing the structured body of {} via {}", schema, payloadCodec.getMediaType());
                 payloadCodec.createDeserializer(bytes).readStruct(schema, bodyMembers, (body, m, de) -> {
                     if (body.contains(m.memberName())) {
                         body.structMemberConsumer.accept(body.state, m, de);

@@ -9,6 +9,7 @@ import java.net.URI;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.core.ClientCall;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOperation;
@@ -35,7 +36,7 @@ import software.amazon.smithy.java.runtime.http.binding.ResponseDeserializer;
  */
 public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientProtocol {
 
-    private static final System.Logger LOGGER = System.getLogger(HttpBindingClientProtocol.class.getName());
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpBindingClientProtocol.class);
     private static final String X_AMZN_ERROR_TYPE = "X-Amzn-Errortype";
 
     protected final Codec codec;
@@ -80,7 +81,7 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
             });
         }
 
-        LOGGER.log(System.Logger.Level.TRACE, () -> "Deserializing successful response with " + getClass().getName());
+        LOGGER.trace("Deserializing successful response with {}", getClass().getName());
 
         var outputBuilder = call.operation().outputBuilder();
         ResponseDeserializer deser = HttpBinding.responseDeserializer()
@@ -98,10 +99,7 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
                 O output = outputBuilder.errorCorrection().build();
 
                 // TODO: error handling from the builder.
-                LOGGER.log(
-                    System.Logger.Level.TRACE,
-                    () -> "Successfully built " + output + " from HTTP response with " + getClass().getName()
-                );
+                LOGGER.trace("Successfully built {} from HTTP response with {}", output, getClass().getName());
 
                 return output;
             });
