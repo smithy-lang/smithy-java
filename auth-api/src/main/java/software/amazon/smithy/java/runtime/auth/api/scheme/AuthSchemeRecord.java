@@ -7,9 +7,10 @@ package software.amazon.smithy.java.runtime.auth.api.scheme;
 
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 record AuthSchemeRecord<RequestT, IdentityT extends Identity>(
-    String schemeId, Class<RequestT> requestClass,
+    ShapeId schemeId, Class<RequestT> requestClass,
     Class<IdentityT> identityClass, Signer<RequestT, IdentityT> signer
 ) implements AuthScheme<RequestT, IdentityT> {
 }

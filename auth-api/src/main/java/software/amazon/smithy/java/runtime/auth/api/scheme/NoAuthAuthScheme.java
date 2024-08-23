@@ -12,20 +12,22 @@ import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * An auth scheme for {@code smithy.api#noAuth} that represents no authentication.
  */
 final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
 
-    public static NoAuthAuthScheme INSTANCE = new NoAuthAuthScheme();
+    public static final NoAuthAuthScheme INSTANCE = new NoAuthAuthScheme();
     private static final IdentityResolver<Identity> NULL_IDENTITY_RESOLVER = new NullIdentityResolver();
+    private static final ShapeId ID = ShapeId.from("smithy.api#noAuth");
 
     private NoAuthAuthScheme() {}
 
     @Override
-    public String schemeId() {
-        return "smithy.api#noAuth";
+    public ShapeId schemeId() {
+        return ID;
     }
 
     @Override

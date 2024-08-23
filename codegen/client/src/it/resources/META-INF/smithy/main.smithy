@@ -4,12 +4,8 @@ namespace smithy.java.codegen.server.test
 
 use aws.protocols#restJson1
 
-@authDefinition
-@trait(selector: "service")
-structure exampleAuth {}
-
 @restJson1
-@exampleAuth
+@httpBasicAuth
 service TestService {
     version: "today"
     operations: [

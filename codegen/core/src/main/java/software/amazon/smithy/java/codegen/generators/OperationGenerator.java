@@ -26,6 +26,7 @@ import software.amazon.smithy.model.knowledge.EventStreamIndex;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 
 public class OperationGenerator
@@ -57,7 +58,7 @@ public class OperationGenerator
 
                         ${typeRegistrySection:C|}
 
-                        private static final ${list:T}<${string:T}> SCHEMES = ${list:T}.of(${#schemes}${key:S}${^key.last}, ${/key.last}${/schemes});
+                        private static final ${list:T}<${shapeId:T}> SCHEMES = ${list:T}.of(${#schemes}${shapeId:T}.from(${key:S})${^key.last}, ${/key.last}${/schemes});
 
                         @Override
                         public ${sdkShapeBuilder:N}<${inputType:T}> inputBuilder() {
@@ -111,7 +112,7 @@ public class OperationGenerator
                         }
 
                         @Override
-                        public ${list:T}<${string:T}> effectiveAuthSchemes() {
+                        public ${list:T}<${shapeId:T}> effectiveAuthSchemes() {
                             return SCHEMES;
                         }
                     }
@@ -121,6 +122,7 @@ public class OperationGenerator
                 writer.putContext("outputType", output);
                 writer.putContext("id", new IdStringGenerator(writer, shape));
                 writer.putContext("sdkSchema", Schema.class);
+                writer.putContext("shapeId", ShapeId.class);
                 writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
                 writer.putContext("list", List.class);
                 writer.putContext("string", String.class);

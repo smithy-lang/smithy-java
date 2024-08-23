@@ -14,6 +14,7 @@ import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * An authentication scheme, composed of:
@@ -35,7 +36,7 @@ public interface AuthScheme<RequestT, IdentityT extends Identity> {
      *
      * @return the scheme ID.
      */
-    String schemeId();
+    ShapeId schemeId();
 
     /**
      * Get the request type that this auth scheme can sign.
@@ -108,7 +109,7 @@ public interface AuthScheme<RequestT, IdentityT extends Identity> {
      * @param <IdentityT> Identity type.
      */
     static <RequestT, IdentityT extends Identity> AuthScheme<RequestT, IdentityT> of(
-        String schemeId,
+        ShapeId schemeId,
         Class<RequestT> requestClass,
         Class<IdentityT> identityClass,
         Signer<RequestT, IdentityT> signer
