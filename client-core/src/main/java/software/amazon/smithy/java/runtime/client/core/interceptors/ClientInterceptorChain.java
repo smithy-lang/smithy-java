@@ -34,7 +34,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
                 consumer.accept(interceptor, hook);
             } catch (RuntimeException e) {
                 if (error != null) {
-                    LOGGER.error("Encountered Exception: {}", e);
+                    LOGGER.error("Encountered Exception", e);
                 }
                 error = e;
             }
@@ -177,7 +177,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
                 consumer.accept(interceptor, hook, error);
             } catch (RuntimeException e) {
                 if (error != null) {
-                    LOGGER.error("Encountered Exception: {}", error);
+                    LOGGER.error("Encountered Exception", error);
                 }
                 error = e;
             }
