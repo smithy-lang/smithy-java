@@ -29,6 +29,11 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;
 
+    static {
+        // Allow clients to reset Host header.
+        System.setProperty("jdk.httpclient.allowRestrictedHeaders", "Host");
+    }
+
     public JavaHttpClientTransport() {
         this(HttpClient.newHttpClient());
     }

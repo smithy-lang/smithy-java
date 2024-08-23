@@ -25,7 +25,7 @@ import java.util.function.Function;
  *
  * @param <T> Result to transform the published data into.
  */
-interface DataStreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
+public interface DataStreamSubscriber<T> extends Flow.Subscriber<ByteBuffer> {
     /**
      * Returns a {@code CompletionStage} which when completed will return the created result. This method can be called
      * at any time relative to the other {@link Flow.Subscriber} methods.

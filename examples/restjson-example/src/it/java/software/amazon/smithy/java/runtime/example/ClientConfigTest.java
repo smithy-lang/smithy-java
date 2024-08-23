@@ -14,6 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.ClientConfig;
@@ -50,11 +51,13 @@ public class ClientConfigTest {
     public void vanillaClient() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
             .addInterceptor(requestCapturingInterceptor)
+            .region("us-east-2")
             .endpoint("http://httpbin.org/anything")
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().toString()).startsWith("http://httpbin.org/anything/");
+        System.out.println(request);
     }
 
     @Test
@@ -106,6 +109,7 @@ public class ClientConfigTest {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
             .addInterceptor(requestCapturingInterceptor)
             .addPlugin(new RegionAwareServicePlugin())
+            .region("us-east-2")
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
@@ -118,6 +122,7 @@ public class ClientConfigTest {
             .addInterceptor(requestCapturingInterceptor)
             .addPlugin(new RegionAwareServicePlugin())
             .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
+            .region("us-east-2")
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
@@ -155,6 +160,9 @@ public class ClientConfigTest {
                 ClientConfig.Builder configBuilder = configBuilder();
                 configBuilder.protocol(new RestJsonClientProtocol());
                 configBuilder.transport(new JavaHttpClientTransport(HttpClient.newHttpClient()));
+
+                // Use no auth resolver
+                configBuilder.authSchemeResolver(AuthSchemeResolver.NO_AUTH);
 
                 List<ClientPlugin> defaultPlugins = List.of(new RegionAwareServicePlugin());
                 // Default plugins are "applied" here in Builder constructor.

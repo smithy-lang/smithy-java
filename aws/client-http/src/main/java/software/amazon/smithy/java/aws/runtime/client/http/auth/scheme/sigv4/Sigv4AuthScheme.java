@@ -1,0 +1,85 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.aws.http.auth.scheme.sigv4;
+
+import software.amazon.smithy.aws.traits.auth.SigV4Trait;
+import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
+import software.amazon.smithy.java.runtime.auth.api.AuthSchemeFactory;
+import software.amazon.smithy.java.runtime.auth.api.Signer;
+import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
+import software.amazon.smithy.java.runtime.aws.http.AwsConfigurationProperties;
+import software.amazon.smithy.java.runtime.aws.http.auth.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.model.shapes.ShapeId;
+
+/**
+ * Provides the AWS Signature Version 4 (SigV4) auth Scheme for Http requests.
+ *
+ * <p>SigV4 is the AWS signing protocol for adding authentication information to AWS API requests. The scheme uses
+ * provided AWS credentials (aws access key and signing key) to sign the provided request. To use this auth
+ * scheme, either add an initialized instance to your client builder or apply the sigv4 auth scheme to your service
+ * in your Smithy model as follows:
+ * <pre>{@code
+ * use aws.auth#sigv4
+ *
+ * @sigv4(name: "service)
+ * service MyService
+ * }</pre>
+ *
+ * <p><strong>Note:</strong> The SigV4 auth scheme factory must be accessibly on the client code generator classpath for
+ * it to be added to any generate clients.
+ *
+ * @see <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-signing.html">SigV4 Request Signing</a>
+ */
+public class Sigv4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsCredentialsIdentity> {
+    private final String signingName;
+
+    public Sigv4AuthScheme(String signingName) {
+        this.signingName = signingName;
+    }
+
+    @Override
+    public ShapeId schemeId() {
+        return SigV4Trait.ID;
+    }
+
+    @Override
+    public Class<SmithyHttpRequest> requestClass() {
+        return SmithyHttpRequest.class;
+    }
+
+    @Override
+    public Class<AwsCredentialsIdentity> identityClass() {
+        return AwsCredentialsIdentity.class;
+    }
+
+    @Override
+    public AuthProperties getSignerProperties(Context context) {
+        return AuthProperties.builder()
+            .put(SigningProperties.SERVICE, signingName)
+            .put(SigningProperties.REGION, context.get(AwsConfigurationProperties.REGION))
+            .build();
+    }
+
+    @Override
+    public Signer<SmithyHttpRequest, AwsCredentialsIdentity> signer() {
+        return SigV4Signer.INSTANCE;
+    }
+
+    public static final class Factory implements AuthSchemeFactory<SigV4Trait> {
+
+        @Override
+        public ShapeId schemeId() {
+            return SigV4Trait.ID;
+        }
+
+        @Override
+        public AuthScheme<?, ?> createAuthScheme(SigV4Trait trait) {
+            return new Sigv4AuthScheme(trait.getName());
+        }
+    }
+}

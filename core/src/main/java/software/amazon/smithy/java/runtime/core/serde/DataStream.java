@@ -231,7 +231,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the eventually transformed result.
      * @param <T> Value to transform into.
      */
-    private <T> CompletionStage<T> transform(DataStreamSubscriber<T> subscriber) {
+    default <T> CompletionStage<T> transform(DataStreamSubscriber<T> subscriber) {
         subscribe(subscriber);
         return subscriber.result();
     }

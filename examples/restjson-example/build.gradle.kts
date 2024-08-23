@@ -6,6 +6,7 @@ plugins {
 dependencies {
     api(project(":client-aws-rest-json1"))
     api(libs.smithy.aws.traits)
+    implementation(project(":aws:client-http"))
 }
 
 jmh {
@@ -15,7 +16,6 @@ jmh {
     //profilers = ['async:output=flamegraph', 'gc']
 }
 
-// TODO: eventually re-enable
 // Disable spotbugs
 tasks {
     spotbugsMain {

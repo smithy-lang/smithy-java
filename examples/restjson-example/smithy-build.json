@@ -6,6 +6,9 @@
       "namespace": "software.amazon.smithy.java.runtime.example",
       "headerFile": "license.txt",
       "protocol": "aws.protocols#restJson1",
+      "defaultPlugins": [
+        "software.amazon.smithy.java.runtime.aws.http.AwsBasePlugin"
+      ],
       "transport": {
         "http-java": {}
       }

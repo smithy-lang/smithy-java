@@ -28,7 +28,6 @@ include(":client-http")
 include(":client-auth")
 
 include(":auth-api")
-include(":sigv4")
 
 // Protocols
 include(":client-aws-rest-json1")
