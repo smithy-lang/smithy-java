@@ -13,7 +13,11 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpDigestAuthTrait;
 
-public class HttpDigestAuthAuthScheme implements AuthScheme<SmithyHttpRequest, LoginIdentity> {
+/**
+ * Implements the HTTP Digest Authentication Scheme as defined in
+ * <a href="https://datatracker.ietf.org/doc/html/rfc2617.html>RFC 2617</a>.
+ */
+public final class HttpDigestAuthAuthScheme implements AuthScheme<SmithyHttpRequest, LoginIdentity> {
 
     @Override
     public ShapeId schemeId() {

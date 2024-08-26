@@ -11,12 +11,14 @@ import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 
 final class HttpBearerAuthSigner implements Signer<SmithyHttpRequest, TokenIdentity> {
-    public static final HttpBearerAuthSigner INSTANCE = new HttpBearerAuthSigner();
+    static final HttpBearerAuthSigner INSTANCE = new HttpBearerAuthSigner();
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String SCHEME = "Bearer";
 
     private HttpBearerAuthSigner() {}
 
     @Override
     public SmithyHttpRequest sign(SmithyHttpRequest request, TokenIdentity identity, AuthProperties properties) {
-        return null;
+        return request.withAddedHeaders(AUTHORIZATION_HEADER, SCHEME + " " + identity.token());
     }
 }

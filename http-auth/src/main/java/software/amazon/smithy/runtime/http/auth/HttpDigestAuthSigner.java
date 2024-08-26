@@ -10,8 +10,11 @@ import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.LoginIdentity;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 
+/**
+ * TODO: Fully implement
+ */
 final class HttpDigestAuthSigner implements Signer<SmithyHttpRequest, LoginIdentity> {
-    public static final HttpDigestAuthSigner INSTANCE = new HttpDigestAuthSigner();
+    static final HttpDigestAuthSigner INSTANCE = new HttpDigestAuthSigner();
 
     private HttpDigestAuthSigner() {}
 

@@ -13,6 +13,10 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpBearerAuthTrait;
 
+/**
+ * Implements the HTTP Bearer Authentication Scheme as defined in
+ * <a href="https://datatracker.ietf.org/doc/html/rfc2617.html>RFC 2617</a>.
+ */
 public final class HttpBearerAuthScheme implements AuthScheme<SmithyHttpRequest, TokenIdentity> {
     @Override
     public ShapeId schemeId() {

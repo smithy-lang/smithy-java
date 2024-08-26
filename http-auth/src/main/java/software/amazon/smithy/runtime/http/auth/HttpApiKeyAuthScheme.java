@@ -11,14 +11,16 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperty;
 import software.amazon.smithy.java.runtime.auth.api.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
-import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
+import software.amazon.smithy.java.runtime.auth.api.identity.ApiKeyIdentity;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpApiKeyAuthTrait;
 
-// TODO: Should API key identity be distinct from TokenIdentity?
-public final class HttpApiKeyAuthScheme implements AuthScheme<SmithyHttpRequest, TokenIdentity> {
+/**
+ * Implements HTTP-specific authentication using an API key sent in a header or query string parameter.
+ */
+public final class HttpApiKeyAuthScheme implements AuthScheme<SmithyHttpRequest, ApiKeyIdentity> {
     static final AuthProperty<String> NAME = AuthProperty.of(
         "Name of the header or query parameter that contains the API key"
     );
@@ -50,8 +52,8 @@ public final class HttpApiKeyAuthScheme implements AuthScheme<SmithyHttpRequest,
     }
 
     @Override
-    public Class<TokenIdentity> identityClass() {
-        return TokenIdentity.class;
+    public Class<ApiKeyIdentity> identityClass() {
+        return ApiKeyIdentity.class;
     }
 
     @Override
@@ -66,7 +68,7 @@ public final class HttpApiKeyAuthScheme implements AuthScheme<SmithyHttpRequest,
     }
 
     @Override
-    public Signer<SmithyHttpRequest, TokenIdentity> signer() {
+    public Signer<SmithyHttpRequest, ApiKeyIdentity> signer() {
         return HttpApiKeyAuthSigner.INSTANCE;
     }
 
