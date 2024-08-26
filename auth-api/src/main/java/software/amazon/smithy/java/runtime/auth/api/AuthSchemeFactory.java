@@ -10,7 +10,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.Trait;
 
 /**
- * Creates a {@link AuthScheme}.
+ * Creates an {@link AuthScheme}.
  * <p>This is the interface used to create protocols within a client builder (i.e. when a
  * protocol is used as the default protocol for a client).
  *
