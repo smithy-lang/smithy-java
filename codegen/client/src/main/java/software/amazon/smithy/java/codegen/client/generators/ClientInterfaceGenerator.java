@@ -311,7 +311,7 @@ public final class ClientInterfaceGenerator
         }
     }
 
-    public static Map<String, String> getAuthSchemes(Collection<Trait> traits) {
+    private static Map<String, String> getAuthSchemes(Collection<Trait> traits) {
         Map<String, String> authSchemes = new HashMap<>();
         for (var trait : traits) {
             var traitName = getAuthTraitPropertyName(trait);
