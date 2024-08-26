@@ -18,7 +18,7 @@ import software.amazon.smithy.java.runtime.auth.api.identity.IdentityResolvers;
  */
 final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
 
-    public static NoAuthAuthScheme INSTANCE = new NoAuthAuthScheme();
+    public static final NoAuthAuthScheme INSTANCE = new NoAuthAuthScheme();
     private static final IdentityResolver<Identity> NULL_IDENTITY_RESOLVER = new NullIdentityResolver();
 
     private NoAuthAuthScheme() {}

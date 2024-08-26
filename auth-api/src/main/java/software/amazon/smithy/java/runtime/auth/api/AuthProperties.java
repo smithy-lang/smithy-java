@@ -52,6 +52,22 @@ public final class AuthProperties {
     }
 
     /**
+     * Get the value of a property.
+     *
+     * @param property Property to get.
+     * @return the value of the property.
+     * @throws ExpectationNotMetException if the property is not found.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T expect(AuthProperty<T> property) {
+        var value = properties.get(property);
+        if (value == null) {
+            throw new ExpectationNotMetException("Could not find expected property: " + property);
+        }
+        return (T) value;
+    }
+
+    /**
      * Get the properties that are set on the AuthProperties object.
      *
      * @return the properties.
