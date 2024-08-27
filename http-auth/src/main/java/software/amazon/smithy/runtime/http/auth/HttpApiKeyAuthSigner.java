@@ -36,9 +36,8 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
                 var updated = new LinkedHashMap<>(request.headers().map());
                 var existing = updated.put(name, List.of(value));
                 if (existing != null) {
-                    LOGGER.debug("Replaced header value for {}. Previous value was {}.", name, existing);
+                    LOGGER.debug("Replaced header value for {}", name);
                 }
-                ;
                 yield request.withHeaders(HttpHeaders.of(updated, (k, v) -> true));
             }
             case QUERY -> {
@@ -47,10 +46,7 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
                 queryBuilder.put(name, identity.apiKey());
                 var stringBuilder = new StringBuilder();
                 var existingQuery = request.uri().getQuery();
-                if (existingQuery != null) {
-                    addExistingQueryParams(stringBuilder, existingQuery, name);
-                }
-
+                addExistingQueryParams(stringBuilder, existingQuery, name);
                 queryBuilder.write(stringBuilder);
                 yield request.withUri(uriBuilder.query(stringBuilder.toString()).build());
             }
@@ -58,12 +54,15 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
     }
 
     private static void addExistingQueryParams(StringBuilder stringBuilder, String existingQuery, String name) {
+        if (existingQuery == null) {
+            return;
+        }
         for (var query : existingQuery.split("&")) {
             if (!query.startsWith(name + "=")) {
                 stringBuilder.append(query);
                 stringBuilder.append('&');
             } else {
-                LOGGER.debug("Removing conflicting query param for `{}`. Existing: {}.", name, query);
+                LOGGER.debug("Removing conflicting query param for `{}`", name);
             }
         }
     }

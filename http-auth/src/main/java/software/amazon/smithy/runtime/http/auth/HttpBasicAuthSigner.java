@@ -31,7 +31,7 @@ final class HttpBasicAuthSigner implements Signer<SmithyHttpRequest, LoginIdenti
         var headers = new LinkedHashMap<>(request.headers().map());
         var existing = headers.put(AUTHORIZATION_HEADER, List.of(SCHEME + " " + base64Value));
         if (existing != null) {
-            LOGGER.debug("Replaced existing Authorization header value. Previous value: {}", existing);
+            LOGGER.debug("Replaced existing Authorization header value.");
         }
         return request.withHeaders(HttpHeaders.of(headers, (k, v) -> true));
     }
