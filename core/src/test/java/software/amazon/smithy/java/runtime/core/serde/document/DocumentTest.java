@@ -575,4 +575,11 @@ public class DocumentTest {
 
         assertThat(document.discriminator(), equalTo(Person.ID));
     }
+
+    @Test
+    public void documentsDefaultToSizeNegativeOne() {
+        var document = Document.createInteger(1);
+
+        assertThat(document.size(), is(-1));
+    }
 }

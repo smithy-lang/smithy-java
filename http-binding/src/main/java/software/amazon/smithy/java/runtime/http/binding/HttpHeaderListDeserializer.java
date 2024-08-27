@@ -33,4 +33,9 @@ final class HttpHeaderListDeserializer extends SpecificShapeDeserializer {
     public boolean isNull() {
         return values == null;
     }
+
+    @Override
+    public int containerSize() {
+        return values == null ? 0 : values.size();
+    }
 }

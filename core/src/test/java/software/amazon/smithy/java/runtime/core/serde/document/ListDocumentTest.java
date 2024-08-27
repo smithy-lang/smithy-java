@@ -28,6 +28,7 @@ public class ListDocumentTest {
         var document = Document.createList(values);
 
         assertThat(document.type(), equalTo(ShapeType.LIST));
+        assertThat(document.size(), is(2));
         assertThat(document.asList(), equalTo(values));
         assertThat(document, equalTo(Document.createList(values)));
     }

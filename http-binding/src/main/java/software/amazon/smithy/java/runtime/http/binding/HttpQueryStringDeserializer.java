@@ -29,4 +29,9 @@ final class HttpQueryStringDeserializer extends BasicStringValueDeserializer {
             consumer.accept(state, new HttpQueryStringDeserializer(List.of(value)));
         }
     }
+
+    @Override
+    public int containerSize() {
+        return values.size();
+    }
 }

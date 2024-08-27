@@ -56,7 +56,8 @@ public final class ListGenerator
                         }
 
                         static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
-                            ${shape:T} result = new ${collectionImpl:T}<>();
+                            var size = deserializer.containerSize();
+                            ${shape:T} result = size == -1 ? new ${collectionImpl:T}<>() : new ${collectionImpl:T}<>(size);
                             deserializer.readList(schema, result, ${name:U}MemberDeserializer.INSTANCE);
                             return result;
                         }

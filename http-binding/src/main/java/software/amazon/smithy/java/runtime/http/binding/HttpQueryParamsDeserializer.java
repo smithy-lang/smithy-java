@@ -29,4 +29,9 @@ final class HttpQueryParamsDeserializer extends SpecificShapeDeserializer {
             consumer.accept(state, e.getKey(), new HttpQueryStringDeserializer(e.getValue()));
         }
     }
+
+    @Override
+    public int containerSize() {
+        return queryParams.size();
+    }
 }

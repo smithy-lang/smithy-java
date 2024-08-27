@@ -598,6 +598,11 @@ final class Documents {
         }
 
         @Override
+        public int size() {
+            return values.size();
+        }
+
+        @Override
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeList(schema, values, (values, ser) -> {
                 for (var element : values) {
@@ -616,6 +621,11 @@ final class Documents {
         @Override
         public Map<String, Document> asStringMap() {
             return members;
+        }
+
+        @Override
+        public int size() {
+            return members.size();
         }
 
         @Override

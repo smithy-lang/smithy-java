@@ -143,6 +143,18 @@ public interface ShapeDeserializer extends AutoCloseable {
     <T> void readList(Schema schema, T state, ListMemberConsumer<T> consumer);
 
     /**
+     * If the value about to be read is a list or map, returns the number of entries it contains.
+     *
+     * <p>This method returns -1 if the size of the container is unknown or if the next value is not a list or
+     * container.
+     *
+     * @return the number of entries in the next list or map to read, or -1 when unknown.
+     */
+    default int containerSize() {
+        return -1;
+    }
+
+    /**
      * Attempt to read a map value.
      *
      * @param schema   Schema of the shape.

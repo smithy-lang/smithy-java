@@ -193,6 +193,14 @@ final class JacksonDocument implements Document {
     }
 
     @Override
+    public int size() {
+        return switch (root.getNodeType()) {
+            case ARRAY, OBJECT -> root.size();
+            default -> -1;
+        };
+    }
+
+    @Override
     public Map<String, Document> asStringMap() {
         if (!root.isObject()) {
             return Document.super.asStringMap();

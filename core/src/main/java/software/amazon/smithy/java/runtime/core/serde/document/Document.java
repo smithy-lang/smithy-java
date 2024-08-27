@@ -303,6 +303,15 @@ public interface Document extends SerializableShape {
     }
 
     /**
+     * Get the number of elements in an array document, or the number of key value pairs in a map document.
+     *
+     * @return the number of elements. Defaults to -1 for all other documents.
+     */
+    default int size() {
+        return -1;
+    }
+
+    /**
      * Get the list contents of the Document if it is a list.
      *
      * @return the list contents.

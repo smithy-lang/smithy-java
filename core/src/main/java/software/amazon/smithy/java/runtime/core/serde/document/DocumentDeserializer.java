@@ -158,6 +158,11 @@ public class DocumentDeserializer implements ShapeDeserializer {
     }
 
     @Override
+    public int containerSize() {
+        return value.size();
+    }
+
+    @Override
     public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
         var map = value.asStringMap();
         for (var entry : map.entrySet()) {

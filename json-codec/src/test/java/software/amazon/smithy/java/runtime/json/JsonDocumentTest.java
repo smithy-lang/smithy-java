@@ -136,6 +136,7 @@ public class JsonDocumentTest {
 
         var document = de.readDocument();
         assertThat(document.type(), is(ShapeType.LIST));
+        assertThat(document.size(), is(3));
 
         var list = document.asList();
         assertThat(list, hasSize(3));
@@ -152,6 +153,7 @@ public class JsonDocumentTest {
 
         var document = de.readDocument();
         assertThat(document.type(), is(ShapeType.MAP));
+        assertThat(document.size(), is(2));
 
         var map = document.asStringMap();
         assertThat(map.keySet(), hasSize(2));
@@ -162,6 +164,15 @@ public class JsonDocumentTest {
         assertThat(map.get("b").type(), is(ShapeType.BOOLEAN));
         assertThat(map.get("b").asBoolean(), is(true));
         assertThat(document.getMember("b").type(), is(ShapeType.BOOLEAN));
+    }
+
+    @Test
+    public void otherDocumentsReturnSizeOfNegativeOne() {
+        var codec = JsonCodec.builder().build();
+        var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
+        var document = de.readDocument();
+
+        assertThat(document.size(), is(-1));
     }
 
     @Test

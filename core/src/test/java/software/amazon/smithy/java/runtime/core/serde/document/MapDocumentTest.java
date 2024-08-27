@@ -34,6 +34,7 @@ public class MapDocumentTest {
         var map = Document.createStringMap(entries);
 
         assertThat(map.type(), is(ShapeType.MAP));
+        assertThat(map.size(), is(2));
         assertThat(map.asStringMap(), equalTo(entries));
         assertThat(Document.createStringMap(map.asStringMap()), equalTo(map));
     }
