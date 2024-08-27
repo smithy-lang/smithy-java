@@ -12,14 +12,14 @@ import java.util.Objects;
  */
 public interface ApiKeyIdentity extends Identity {
     /**
-     * Retrieves string field representing the literal api key string.
+     * Retrieves string field representing the literal API key string.
      *
-     * @return the api Key.
+     * @return the API key.
      */
     String apiKey();
 
     /**
-     * Constructs a new apiKey object, which can be used to authorize requests to services that use api key-based auth.
+     * Constructs a new apiKey object, which can be used to authorize requests to services that use API key-based auth.
      *
      * @param apiKey The apiKey used to authorize requests.
      */
