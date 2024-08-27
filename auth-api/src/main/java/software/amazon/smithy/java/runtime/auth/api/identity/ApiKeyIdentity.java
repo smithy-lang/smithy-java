@@ -8,7 +8,7 @@ package software.amazon.smithy.java.runtime.auth.api.identity;
 import java.util.Objects;
 
 /**
- * A api key identity used to securely authorize requests to services that use api key auth.
+ * An API key identity used to securely authorize requests to services that use API key-based auth.
  */
 public interface ApiKeyIdentity extends Identity {
     /**
