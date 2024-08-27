@@ -20,6 +20,6 @@ final class HttpDigestAuthSigner implements Signer<SmithyHttpRequest, LoginIdent
 
     @Override
     public SmithyHttpRequest sign(SmithyHttpRequest request, LoginIdentity identity, AuthProperties properties) {
-        return null;
+        throw new UnsupportedOperationException();
     }
 }
