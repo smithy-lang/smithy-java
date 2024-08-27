@@ -65,7 +65,7 @@ public class MapDocumentTest {
             }
 
             @Override
-            public <T> void writeMap(Schema schema, T state, BiConsumer<T, MapSerializer> consumer) {
+            public <T> void writeMap(Schema schema, T state, int size, BiConsumer<T, MapSerializer> consumer) {
                 assertThat(schema.type(), equalTo(ShapeType.MAP));
                 consumer.accept(state, new MapSerializer() {
                     @Override

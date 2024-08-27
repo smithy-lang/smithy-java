@@ -79,8 +79,8 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
-        List<Document> elements = new ArrayList<>();
+    public <T> void writeList(Schema schema, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
+        List<Document> elements = size == -1 ? new ArrayList<>() : new ArrayList<>(size);
         var elementParser = new DocumentParser();
         ListSerializer serializer = new ListSerializer(elementParser, position -> {
             if (position > 0) {
@@ -96,14 +96,14 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeMap(Schema schema, T state, BiConsumer<T, MapSerializer> consumer) {
+    public <T> void writeMap(Schema schema, T state, int size, BiConsumer<T, MapSerializer> consumer) {
         var keyMember = schema.member("key");
         if (keyMember == null) {
             throw new SerializationException(
                 "Cannot create a map from a schema that does not define a map key: " + schema
             );
         } else if (keyMember.type() == ShapeType.STRING || keyMember.type() == ShapeType.ENUM) {
-            var serializer = new DocumentMapSerializer();
+            var serializer = new DocumentMapSerializer(size);
             consumer.accept(state, serializer);
             setResult(new Documents.StringMapDocument(schema, serializer.entries));
         } else {
@@ -112,7 +112,11 @@ final class DocumentParser implements ShapeSerializer {
     }
 
     private static final class DocumentMapSerializer implements MapSerializer {
-        private final Map<String, Document> entries = new LinkedHashMap<>();
+        private final Map<String, Document> entries;
+
+        DocumentMapSerializer(int size) {
+            entries = size == -1 ? new LinkedHashMap<>() : new LinkedHashMap<>(size);
+        }
 
         @Override
         public <U> void writeEntry(

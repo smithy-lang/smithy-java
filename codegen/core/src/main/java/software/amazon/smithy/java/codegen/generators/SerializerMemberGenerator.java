@@ -90,7 +90,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     @Override
     public Void listShape(ListShape listShape) {
         writer.write(
-            "serializer.writeList(${schema:L}, ${state:L}, SharedSerde.$USerializer.INSTANCE)",
+            "serializer.writeList(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
             CodegenUtils.getDefaultName(listShape, service)
         );
         return null;
@@ -99,7 +99,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     @Override
     public Void mapShape(MapShape mapShape) {
         writer.write(
-            "serializer.writeMap(${schema:L}, ${state:L}, SharedSerde.$USerializer.INSTANCE)",
+            "serializer.writeMap(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
             CodegenUtils.getDefaultName(mapShape, service)
         );
         return null;

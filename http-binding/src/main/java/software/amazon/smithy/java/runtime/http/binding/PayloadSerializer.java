@@ -93,13 +93,13 @@ final class PayloadSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
-        structSerializer.writeList(schema, listState, consumer);
+    public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+        structSerializer.writeList(schema, listState, size, consumer);
     }
 
     @Override
-    public <T> void writeMap(Schema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {
-        structSerializer.writeMap(schema, mapState, consumer);
+    public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
+        structSerializer.writeMap(schema, mapState, size, consumer);
     }
 
     @Override

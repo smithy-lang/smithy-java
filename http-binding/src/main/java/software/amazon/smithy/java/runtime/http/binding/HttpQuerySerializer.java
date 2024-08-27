@@ -14,7 +14,6 @@ import java.time.Instant;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
-import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
@@ -30,8 +29,8 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
-        consumer.accept(listState, new ListSerializer(this, position -> {}));
+    public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+        consumer.accept(listState, this);
     }
 
     void writeQuery(Schema schema, Supplier<String> supplier) {

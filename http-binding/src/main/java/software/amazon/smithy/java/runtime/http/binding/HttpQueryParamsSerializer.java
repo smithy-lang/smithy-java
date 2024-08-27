@@ -23,7 +23,7 @@ final class HttpQueryParamsSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public <T> void writeMap(Schema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {
+    public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
         consumer.accept(mapState, mapEntrySerializer);
     }
 
@@ -42,7 +42,12 @@ final class HttpQueryParamsSerializer extends SpecificShapeSerializer {
                 }
 
                 @Override
-                public <L> void writeList(Schema schema, L listState, BiConsumer<L, ShapeSerializer> consumer) {
+                public <L> void writeList(
+                    Schema schema,
+                    L listState,
+                    int size,
+                    BiConsumer<L, ShapeSerializer> consumer
+                ) {
                     consumer.accept(listState, new SpecificShapeSerializer() {
                         @Override
                         public void writeString(Schema schema, String value) {

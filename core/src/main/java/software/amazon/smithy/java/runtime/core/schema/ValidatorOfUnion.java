@@ -179,19 +179,19 @@ final class ValidatorOfUnion implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema member, T state, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T> void writeList(Schema member, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
-            validator.writeList(member, state, consumer);
+            validator.writeList(member, state, size, consumer);
         }
         validator.popPath();
     }
 
     @Override
-    public <T> void writeMap(Schema member, T state, BiConsumer<T, MapSerializer> consumer) {
+    public <T> void writeMap(Schema member, T state, int size, BiConsumer<T, MapSerializer> consumer) {
         validator.pushPath(member.memberName());
         if (validateSetValue(member)) {
-            validator.writeMap(member, state, consumer);
+            validator.writeMap(member, state, size, consumer);
         }
         validator.popPath();
     }

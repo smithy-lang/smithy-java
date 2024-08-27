@@ -53,18 +53,20 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      *
      * @param schema    List schema.
      * @param listState State to pass into the consumer.
+     * @param size      Number of elements in the list, or -1 if unknown.
      * @param consumer  Received in the context of the list and writes zero or more values.
      */
-    <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer);
+    <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer);
 
     /**
      * Begin a map and write zero or more entries into it using the provided serializer.
      *
      * @param schema   List schema.
      * @param mapState State to pass into the consumer.
+     * @param size     Number of entries in the map, or -1 if unknown.
      * @param consumer Received in the context of the map and writes zero or more entries.
      */
-    <T> void writeMap(Schema schema, T mapState, BiConsumer<T, MapSerializer> consumer);
+    <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer);
 
     /**
      * Serialize a boolean.

@@ -230,26 +230,30 @@ public final class Validator {
         }
 
         @Override
-        public <T> void writeList(Schema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
+        public <T> void writeList(Schema schema, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
             checkType(schema, ShapeType.LIST);
 
-            // Track the current schema and count.
-            var previousSchema = currentSchema;
-            var previousCount = elementCount;
-            currentSchema = schema;
-            elementCount = 0;
+            if (size == 0) {
+                checkListLength(schema, 0);
+            } else {
+                // Track the current schema and count.
+                var previousSchema = currentSchema;
+                var previousCount = elementCount;
+                currentSchema = schema;
+                elementCount = 0;
 
-            // Push a preliminary value of null. Each list element will swap this path position with its index.
-            pushPath(null);
-            consumer.accept(state, listValidator);
-            popPath();
+                // Push a preliminary value of null. Each list element will swap this path position with its index.
+                pushPath(null);
+                consumer.accept(state, listValidator);
+                popPath();
 
-            // Grab the count and reset the schema and count.
-            var count = elementCount;
-            currentSchema = previousSchema;
-            elementCount = previousCount;
+                // Grab the count and reset the schema and count.
+                var count = elementCount;
+                currentSchema = previousSchema;
+                elementCount = previousCount;
 
-            checkListLength(schema, count);
+                checkListLength(schema, count);
+            }
         }
 
         private void checkListLength(Schema schema, int count) {
@@ -262,29 +266,31 @@ public final class Validator {
         }
 
         @Override
-        public <T> void writeMap(Schema schema, T state, BiConsumer<T, MapSerializer> consumer) {
+        public <T> void writeMap(Schema schema, T state, int size, BiConsumer<T, MapSerializer> consumer) {
             checkType(schema, ShapeType.MAP);
+            if (size == 0) {
+                checkMapLength(schema, 0);
+            } else {
+                // Track the current schema and count.
+                var previousSchema = currentSchema;
+                var previousCount = elementCount;
+                currentSchema = schema;
+                elementCount = 0;
 
-            // Track the current schema and count.
-            var previousSchema = currentSchema;
-            var previousCount = elementCount;
-            currentSchema = schema;
-            elementCount = 0;
+                // Push a preliminary map key and key/value holder of null. These values are replaced as map keys and
+                // values are validated.
+                pushPath(null);
+                pushPath(null);
+                consumer.accept(state, this);
+                popPath();
+                popPath();
 
-            // Push a preliminary map key and key/value holder of null. These values are replaced as map keys and
-            // values are validated.
-            pushPath(null);
-            pushPath(null);
-            consumer.accept(state, this);
-            popPath();
-            popPath();
-
-            // Grab the count and reset the schema and count.
-            var count = elementCount;
-            currentSchema = previousSchema;
-            elementCount = previousCount;
-
-            checkMapLength(schema, count);
+                // Grab the count and reset the schema and count.
+                var count = elementCount;
+                currentSchema = previousSchema;
+                elementCount = previousCount;
+                checkMapLength(schema, count);
+            }
         }
 
         private void checkMapLength(Schema schema, int count) {

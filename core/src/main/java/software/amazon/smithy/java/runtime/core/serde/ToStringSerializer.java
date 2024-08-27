@@ -76,7 +76,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T> void writeList(Schema schema, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
         builder.append('[');
         consumer.accept(state, new ListSerializer(this, this::writeComma));
         builder.append(']');
@@ -89,7 +89,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeMap(Schema schema, T state, BiConsumer<T, MapSerializer> consumer) {
+    public <T> void writeMap(Schema schema, T state, int size, BiConsumer<T, MapSerializer> consumer) {
         builder.append('{');
         consumer.accept(state, new ToStringMapSerializer(this));
         builder.append('}');

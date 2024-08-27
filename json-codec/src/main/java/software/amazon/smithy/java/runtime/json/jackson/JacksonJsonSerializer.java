@@ -206,7 +206,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
         try {
             generator.writeStartArray();
             consumer.accept(listState, this);
@@ -217,7 +217,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeMap(Schema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {
+    public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
         try {
             generator.writeStartObject();
             consumer.accept(mapState, new JacksonMapSerializer(this));

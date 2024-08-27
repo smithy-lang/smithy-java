@@ -44,14 +44,14 @@ public abstract class InterceptingSerializer implements ShapeSerializer {
     }
 
     @Override
-    public final <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
-        before(schema).writeList(schema, listState, consumer);
+    public final <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+        before(schema).writeList(schema, listState, size, consumer);
         after(schema);
     }
 
     @Override
-    public final <T> void writeMap(Schema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {
-        before(schema).writeMap(schema, mapState, consumer);
+    public final <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
+        before(schema).writeMap(schema, mapState, size, consumer);
         after(schema);
     }
 

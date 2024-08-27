@@ -56,15 +56,15 @@ public final class ListSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T state, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T> void writeList(Schema schema, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
         beforeWrite();
-        delegate.writeList(schema, state, consumer);
+        delegate.writeList(schema, state, size, consumer);
     }
 
     @Override
-    public <T> void writeMap(Schema schema, T state, BiConsumer<T, MapSerializer> consumer) {
+    public <T> void writeMap(Schema schema, T state, int size, BiConsumer<T, MapSerializer> consumer) {
         beforeWrite();
-        delegate.writeMap(schema, state, consumer);
+        delegate.writeMap(schema, state, size, consumer);
     }
 
     @Override

@@ -64,7 +64,7 @@ public class ToStringSerializerTest {
 
         var str = ToStringSerializer.serialize(e -> {
             e.writeStruct(schema, SerializableStruct.create(schema, (s, ser) -> {
-                ser.writeMap(s.member("foo"), mapSchema, (innerMapSchema, map) -> {
+                ser.writeMap(s.member("foo"), mapSchema, 2, (innerMapSchema, map) -> {
                     map.writeEntry(innerMapSchema.member("key"), "a", innerMapSchema, (mapSchema2, ms) -> {
                         ms.writeString(mapSchema2.member("value"), "hi");
                     });

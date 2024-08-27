@@ -76,8 +76,8 @@ public final class PojoWithValidatedCollection implements SerializableStruct {
 
     @Override
     public void serializeMembers(ShapeSerializer st) {
-        st.writeList(SCHEMA_LIST, list, InnerListSerializer.INSTANCE);
-        st.writeMap(SCHEMA_MAP, map, InnerMapSerializer.INSTANCE);
+        st.writeList(SCHEMA_LIST, list, list.size(), InnerListSerializer.INSTANCE);
+        st.writeMap(SCHEMA_MAP, map, map.size(), InnerMapSerializer.INSTANCE);
     }
 
     private static final class InnerListSerializer implements BiConsumer<List<ValidatedPojo>, ShapeSerializer> {

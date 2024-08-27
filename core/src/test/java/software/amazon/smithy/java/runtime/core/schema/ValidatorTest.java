@@ -109,10 +109,10 @@ public class ValidatorTest {
         Validator validator = Validator.builder().maxDepth(3).build();
 
         var errors = validator.validate(s1 -> {
-            s1.writeList(schemas.get(0), null, (v2, s2) -> {
-                s2.writeList(schemas.get(1), null, (v3, s3) -> {
-                    s3.writeList(schemas.get(2), null, (v4, s4) -> {
-                        s4.writeList(schemas.get(3), null, (v5, s5) -> {
+            s1.writeList(schemas.get(0), null, 1, (v2, s2) -> {
+                s2.writeList(schemas.get(1), null, 1, (v3, s3) -> {
+                    s3.writeList(schemas.get(2), null, 1, (v4, s4) -> {
+                        s4.writeList(schemas.get(3), null, 1, (v5, s5) -> {
                             s5.writeString(PreludeSchemas.STRING, "Hi");
                         });
                     });
@@ -158,16 +158,16 @@ public class ValidatorTest {
         Validator validator = Validator.builder().maxDepth(25).build();
 
         var errors = validator.validate(s1 -> {
-            s1.writeList(schemas.get(0), null, (v2, s2) -> {
-                s2.writeList(schemas.get(1), null, (v3, s3) -> {
-                    s3.writeList(schemas.get(2), null, (v4, s4) -> {
-                        s4.writeList(schemas.get(3), null, (v5, s5) -> {
-                            s5.writeList(schemas.get(4), null, (v6, s6) -> {
-                                s6.writeList(schemas.get(5), null, (v7, s7) -> {
-                                    s7.writeList(schemas.get(6), null, (v8, s8) -> {
-                                        s8.writeList(schemas.get(7), null, (v9, s9) -> {
-                                            s9.writeList(schemas.get(8), null, (v10, s10) -> {
-                                                s10.writeList(schemas.get(9), null, (v11, s11) -> {
+            s1.writeList(schemas.get(0), null, 1, (v2, s2) -> {
+                s2.writeList(schemas.get(1), null, 1, (v3, s3) -> {
+                    s3.writeList(schemas.get(2), null, 1, (v4, s4) -> {
+                        s4.writeList(schemas.get(3), null, 1, (v5, s5) -> {
+                            s5.writeList(schemas.get(4), null, 1, (v6, s6) -> {
+                                s6.writeList(schemas.get(5), null, 1, (v7, s7) -> {
+                                    s7.writeList(schemas.get(6), null, 1, (v8, s8) -> {
+                                        s8.writeList(schemas.get(7), null, 1, (v9, s9) -> {
+                                            s9.writeList(schemas.get(8), null, 1, (v10, s10) -> {
+                                                s10.writeList(schemas.get(9), null, 1, (v11, s11) -> {
                                                     s10.writeString(PreludeSchemas.STRING, "Hi");
                                                 });
                                             });
@@ -300,7 +300,7 @@ public class ValidatorTest {
             .build();
 
         var errors = validator.validate(s -> {
-            s.writeList(list, list.member("member"), (member, ls) -> {
+            s.writeList(list, list.member("member"), 3, (member, ls) -> {
                 ls.writeString(member, "n");
                 ls.writeString(member, "no");
                 ls.writeString(member, "good");
@@ -331,7 +331,7 @@ public class ValidatorTest {
             .build();
 
         var errors = validator.validate(s -> {
-            s.writeMap(map, map.member("key"), (mapKey, ms) -> {
+            s.writeMap(map, map.member("key"), 4, (mapKey, ms) -> {
                 ms.writeEntry(mapKey, "fine", null, (v, vs) -> vs.writeString(PreludeSchemas.STRING, "ok"));
                 ms.writeEntry(mapKey, "a", null, (v, vs) -> vs.writeString(PreludeSchemas.STRING, "too few"));
                 ms.writeEntry(mapKey, "b", null, (v, vs) -> vs.writeString(PreludeSchemas.STRING, "too few"));
@@ -539,7 +539,7 @@ public class ValidatorTest {
             .build();
 
         var errors = validator.validate(s -> {
-            s.writeList(listSchema, listSchema.member("member"), (member, ls) -> {
+            s.writeList(listSchema, listSchema.member("member"), 2, (member, ls) -> {
                 ls.writeString(member, "this is fine"); // fine
                 ls.writeNull(member); // fine
             });
@@ -574,7 +574,7 @@ public class ValidatorTest {
             .build();
 
         var errors = validator.validate(s -> {
-            s.writeList(listSchema, listSchema.member("member"), (member, ls) -> {
+            s.writeList(listSchema, listSchema.member("member"), 2, (member, ls) -> {
                 ls.writeString(member, "this is fine"); // fine
                 ls.writeNull(member); // bad
             });
@@ -598,7 +598,7 @@ public class ValidatorTest {
             .build();
 
         var errors = validator.validate(s -> {
-            s.writeMap(mapSchema, mapSchema, (schema, ms) -> {
+            s.writeMap(mapSchema, mapSchema, 2, (schema, ms) -> {
                 ms.writeEntry(
                     schema.member("key"),
                     "hi",
@@ -715,12 +715,18 @@ public class ValidatorTest {
                 (Consumer<ShapeSerializer>) serializer -> serializer.writeList(
                     PreludeSchemas.STRING,
                     null,
+                    0,
                     (v, s) -> {}
                 )
             ),
             Arguments.of(
                 ShapeType.MAP,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeMap(PreludeSchemas.STRING, null, (v, s) -> {})
+                (Consumer<ShapeSerializer>) serializer -> serializer.writeMap(
+                    PreludeSchemas.STRING,
+                    null,
+                    0,
+                    (v, s) -> {}
+                )
             )
         );
     }
@@ -939,6 +945,7 @@ public class ValidatorTest {
                 (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeList(
                     schema,
                     null,
+                    1,
                     (v, ls) -> ls.writeString(PreludeSchemas.STRING, "a")
                 )
             ),
@@ -953,6 +960,7 @@ public class ValidatorTest {
                 (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeMap(
                     schema,
                     null,
+                    1,
                     (mapStateValue, mapSerializer) -> mapSerializer.writeEntry(
                         PreludeSchemas.STRING,
                         "a",
@@ -987,6 +995,7 @@ public class ValidatorTest {
                 (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeList(
                     schema,
                     null,
+                    0,
                     (v, ls) -> {}
                 )
             ),
@@ -999,7 +1008,7 @@ public class ValidatorTest {
                         .build();
                 },
                 (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> {
-                    serializer.writeMap(schema, null, (mapStateValue, mapSerializer) -> {});
+                    serializer.writeMap(schema, null, 0, (mapStateValue, mapSerializer) -> {});
                 }
             ),
 
@@ -1029,6 +1038,7 @@ public class ValidatorTest {
                 (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeList(
                     schema,
                     null,
+                    11,
                     (v, ls) -> {
                         for (int i = 0; i < 11; i++) {
                             ls.writeString(PreludeSchemas.STRING, "a");
@@ -1045,7 +1055,7 @@ public class ValidatorTest {
                         .build();
                 },
                 (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> {
-                    serializer.writeMap(schema, null, (mapState, mapSerializer) -> {
+                    serializer.writeMap(schema, null, 11, (mapState, mapSerializer) -> {
                         for (int i = 0; i < 11; i++) {
                             mapSerializer.writeEntry(
                                 PreludeSchemas.STRING,
@@ -1117,7 +1127,7 @@ public class ValidatorTest {
             .putMember("member", PreludeSchemas.STRING)
             .build();
         var validator = Validator.builder().build();
-        var errors = validator.validate(e -> e.writeList(schema, null, (v, ser) -> {}));
+        var errors = validator.validate(e -> e.writeList(schema, null, 0, (v, ser) -> {}));
 
         assertThat(errors, hasSize(1));
         assertThat(errors.get(0), instanceOf(ValidationError.LengthValidationFailure.class));
@@ -1133,7 +1143,7 @@ public class ValidatorTest {
             .putMember("member", PreludeSchemas.STRING)
             .build();
         var validator = Validator.builder().build();
-        var errors = validator.validate(e -> e.writeList(schema, schema.member("member"), (member, ser) -> {
+        var errors = validator.validate(e -> e.writeList(schema, schema.member("member"), 2, (member, ser) -> {
             ser.writeString(member, "a");
             ser.writeString(member, "b");
         }));
@@ -1152,7 +1162,7 @@ public class ValidatorTest {
             .putMember("member", PreludeSchemas.STRING)
             .build();
         var validator = Validator.builder().build();
-        var errors = validator.validate(e -> e.writeList(schema, schema.member("member"), (member, ser) -> {
+        var errors = validator.validate(e -> e.writeList(schema, schema.member("member"), 3, (member, ser) -> {
             ser.writeString(member, "a");
             ser.writeString(member, "b");
             ser.writeString(member, "c");

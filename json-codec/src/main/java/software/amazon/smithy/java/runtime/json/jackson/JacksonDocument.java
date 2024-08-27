@@ -234,7 +234,7 @@ final class JacksonDocument implements Document {
             case INTEGER -> encoder.writeInteger(schema, asInteger());
             case DOUBLE -> encoder.writeDouble(schema, asDouble());
             case STRING -> encoder.writeString(schema, asString());
-            case MAP -> encoder.writeMap(schema, asStringMap(), (stringMap, mapSerializer) -> {
+            case MAP -> encoder.writeMap(schema, asStringMap(), size(), (stringMap, mapSerializer) -> {
                 for (var entry : stringMap.entrySet()) {
                     mapSerializer.writeEntry(
                         STRING_MAP_KEY,
@@ -244,7 +244,7 @@ final class JacksonDocument implements Document {
                     );
                 }
             });
-            case LIST -> encoder.writeList(schema, asList(), (list, c) -> {
+            case LIST -> encoder.writeList(schema, asList(), size(), (list, c) -> {
                 for (Document entry : list) {
                     entry.serializeContents(c);
                 }

@@ -604,7 +604,7 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeList(schema, values, (values, ser) -> {
+            serializer.writeList(schema, values, values.size(), (values, ser) -> {
                 for (var element : values) {
                     element.serialize(ser);
                 }
@@ -640,7 +640,7 @@ final class Documents {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeMap(schema, members, (members, s) -> {
+            serializer.writeMap(schema, members, members.size(), (members, s) -> {
                 var key = schema.member("key");
                 for (var entry : members.entrySet()) {
                     s.writeEntry(key, entry.getKey(), entry.getValue(), Document::serialize);

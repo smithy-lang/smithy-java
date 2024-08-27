@@ -26,7 +26,7 @@ final class HttpPrefixHeadersSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public <T> void writeMap(Schema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {
+    public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
         consumer.accept(mapState, prefixHeadersMapSerializer);
     }
 

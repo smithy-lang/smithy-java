@@ -548,6 +548,7 @@ public class TypedDocumentMemberTest {
                 (BiConsumer<Schema, ShapeSerializer>) (schema, s) -> s.writeList(
                     schema,
                     null,
+                    1,
                     (v, c) -> c.writeInteger(PreludeSchemas.INTEGER, 1)
                 ),
                 (Function<Document, Object>) d -> Document.createTyped(Document.createList(d.asList())).asList()
@@ -560,6 +561,7 @@ public class TypedDocumentMemberTest {
                 (BiConsumer<Schema, ShapeSerializer>) (schema, s) -> s.writeMap(
                     schema,
                     null,
+                    1,
                     (mapValue, mapSerializer) -> mapSerializer.writeEntry(
                         schema.member("key"),
                         "a",
@@ -577,6 +579,7 @@ public class TypedDocumentMemberTest {
                 (BiConsumer<Schema, ShapeSerializer>) (schema, s) -> s.writeMap(
                     schema,
                     null,
+                    1,
                     (mapState, m) -> m.writeEntry(
                         schema.member("key"),
                         "a",

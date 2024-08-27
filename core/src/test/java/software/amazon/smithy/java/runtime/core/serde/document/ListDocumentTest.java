@@ -59,7 +59,7 @@ public class ListDocumentTest {
             }
 
             @Override
-            public <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
+            public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
                 assertThat(schema.type(), equalTo(ShapeType.LIST));
                 consumer.accept(listState, new SpecificShapeSerializer() {
                     @Override

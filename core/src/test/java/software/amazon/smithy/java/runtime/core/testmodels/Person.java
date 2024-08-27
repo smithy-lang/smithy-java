@@ -118,7 +118,7 @@ public final class Person implements SerializableStruct {
             serializer.writeTimestamp(SCHEMA_BIRTHDAY, birthday);
         }
         if (!queryParams.isEmpty()) {
-            serializer.writeMap(SCHEMA_QUERY_PARAMS, this, Person::writeQueryParamsMember);
+            serializer.writeMap(SCHEMA_QUERY_PARAMS, this, queryParams.size(), Person::writeQueryParamsMember);
         }
     }
 
@@ -134,7 +134,12 @@ public final class Person implements SerializableStruct {
     }
 
     private static void writeQueryParamsMemberEntry(List<String> values, ShapeSerializer serializer) {
-        serializer.writeList(SCHEMA_QUERY_PARAMS_VALUE, values, Person::writeQueryParamsMemberEntryElement);
+        serializer.writeList(
+            SCHEMA_QUERY_PARAMS_VALUE,
+            values,
+            values.size(),
+            Person::writeQueryParamsMemberEntryElement
+        );
     }
 
     private static void writeQueryParamsMemberEntryElement(List<String> listValue, ShapeSerializer serializer) {
