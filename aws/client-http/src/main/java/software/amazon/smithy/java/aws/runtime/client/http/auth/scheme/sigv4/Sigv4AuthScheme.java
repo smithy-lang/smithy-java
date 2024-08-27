@@ -17,10 +17,10 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
- * Provides the AWS Signature Version 4 (SigV4) auth Scheme for Http requests.
+ * Provides the AWS Signature Version 4 (SigV4) auth Scheme for HTTP requests.
  *
  * <p>SigV4 is the AWS signing protocol for adding authentication information to AWS API requests. The scheme uses
- * provided AWS credentials (aws access key and signing key) to sign the provided request. To use this auth
+ * provided AWS credentials (AWS access key and signing key) to sign the provided request. To use this auth
  * scheme, either add an initialized instance to your client builder or apply the sigv4 auth scheme to your service
  * in your Smithy model as follows:
  * <pre>{@code
@@ -30,8 +30,8 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * service MyService
  * }</pre>
  *
- * <p><strong>Note:</strong> The SigV4 auth scheme factory must be accessibly on the client code generator classpath for
- * it to be added to any generate clients.
+ * <p><strong>Note:</strong> The SigV4 auth scheme factory must be accessible on the client code generator classpath for
+ * it to be added to any generated clients.
  *
  * @see <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-signing.html">SigV4 Request Signing</a>
  */
