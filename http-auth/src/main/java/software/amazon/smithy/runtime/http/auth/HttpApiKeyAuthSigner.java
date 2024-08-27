@@ -5,6 +5,10 @@
 
 package software.amazon.smithy.runtime.http.auth;
 
+import java.net.http.HttpHeaders;
+import java.util.LinkedHashMap;
+import java.util.List;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.ApiKeyIdentity;
@@ -14,6 +18,7 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 
 final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIdentity> {
     static final HttpApiKeyAuthSigner INSTANCE = new HttpApiKeyAuthSigner();
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpApiKeyAuthScheme.class);
 
     private HttpApiKeyAuthSigner() {}
 
@@ -28,7 +33,13 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
                 if (schemeValue != null) {
                     value = schemeValue + " " + value;
                 }
-                yield request.withAddedHeaders(name, value);
+                var updated = new LinkedHashMap<>(request.headers().map());
+                var existing = updated.put(name, List.of(value));
+                if (existing != null) {
+                    LOGGER.debug("Replaced header value for {}. Previous value was {}.", name, existing);
+                }
+                ;
+                yield request.withHeaders(HttpHeaders.of(updated, (k, v) -> true));
             }
             case QUERY -> {
                 var uriBuilder = URIBuilder.of(request.uri());
@@ -37,12 +48,23 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
                 var stringBuilder = new StringBuilder();
                 var existingQuery = request.uri().getQuery();
                 if (existingQuery != null) {
-                    stringBuilder.append(existingQuery);
-                    stringBuilder.append('&');
+                    addExistingQueryParams(stringBuilder, existingQuery, name);
                 }
+
                 queryBuilder.write(stringBuilder);
                 yield request.withUri(uriBuilder.query(stringBuilder.toString()).build());
             }
         };
+    }
+
+    private static void addExistingQueryParams(StringBuilder stringBuilder, String existingQuery, String name) {
+        for (var query : existingQuery.split("&")) {
+            if (!query.startsWith(name + "=")) {
+                stringBuilder.append(query);
+                stringBuilder.append('&');
+            } else {
+                LOGGER.debug("Removing conflicting query param for `{}`. Existing: {}.", name, query);
+            }
+        }
     }
 }

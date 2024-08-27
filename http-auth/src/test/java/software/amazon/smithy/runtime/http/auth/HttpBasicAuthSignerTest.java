@@ -9,8 +9,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.net.URI;
+import java.net.http.HttpHeaders;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.LoginIdentity;
@@ -26,6 +29,26 @@ public class HttpBasicAuthSignerTest {
         var request = SmithyHttpRequest.builder()
             .httpVersion(SmithyHttpVersion.HTTP_1_1)
             .method("PUT")
+            .uri(URI.create("https://www.example.com"))
+            .build();
+
+        var expectedHeader = "Basic " + Base64.getEncoder()
+            .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
+        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, AuthProperties.empty());
+        var authHeader = signedRequest.headers().map().get("Authorization");
+        assertNotNull(authHeader);
+        assertEquals(authHeader.get(0), expectedHeader);
+    }
+
+    @Test
+    void overwritesExistingHeader() {
+        var username = "username";
+        var password = "password";
+        var testIdentity = LoginIdentity.create(username, password);
+        var request = SmithyHttpRequest.builder()
+            .httpVersion(SmithyHttpVersion.HTTP_1_1)
+            .method("PUT")
+            .headers(HttpHeaders.of(Map.of("Authorization", List.of("FOO", "BAR")), (k, v) -> true))
             .uri(URI.create("https://www.example.com"))
             .build();
 
