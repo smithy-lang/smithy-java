@@ -32,7 +32,6 @@ public interface IdentityResolver<IdentityT extends Identity> {
      */
     Class<IdentityT> identityType();
 
-
     /**
      * Combines multiple identity resolvers with the same identity type into a single resolver.
      *
@@ -40,6 +39,13 @@ public interface IdentityResolver<IdentityT extends Identity> {
      * @return the combined resolvers.
      */
     static <I extends Identity> IdentityResolver<I> chain(List<IdentityResolver<I>> resolvers) {
-        return new IdentityResolverChain<I>(resolvers);
+        return new IdentityResolverChain<>(resolvers);
+    }
+
+    /**
+     * Create an implementation of {@link IdentityResolver} that returns a specific, pre-defined instance of {@link Identity}.
+     */
+    static <I extends Identity> IdentityResolver<I> of(I identity) {
+        return new StaticIdentityResolver<>(identity);
     }
 }
