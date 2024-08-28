@@ -11,7 +11,7 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
-import software.amazon.smithy.java.runtime.aws.http.AwsConfigurationProperties;
+import software.amazon.smithy.java.runtime.aws.http.AwsConfigProperties;
 import software.amazon.smithy.java.runtime.aws.http.auth.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -35,7 +35,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
  *
  * @see <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-signing.html">SigV4 Request Signing</a>
  */
-public class Sigv4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsCredentialsIdentity> {
+public final class Sigv4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsCredentialsIdentity> {
     private final String signingName;
 
     public Sigv4AuthScheme(String signingName) {
@@ -60,8 +60,8 @@ public class Sigv4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsCredent
     @Override
     public AuthProperties getSignerProperties(Context context) {
         return AuthProperties.builder()
-            .put(SigningProperties.SERVICE, signingName)
-            .put(SigningProperties.REGION, context.get(AwsConfigurationProperties.REGION))
+            .put(Sigv4Properties.SERVICE, signingName)
+            .put(Sigv4Properties.REGION, context.get(AwsConfigProperties.REGION))
             .build();
     }
 

@@ -35,7 +35,6 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.aws.http.auth.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
-import software.amazon.smithy.java.runtime.core.serde.DataStreamSubscriber;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 
 /**
@@ -67,9 +66,9 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         AwsCredentialsIdentity identity,
         AuthProperties properties
     ) {
-        var region = properties.expect(SigningProperties.REGION);
-        var name = properties.expect(SigningProperties.SERVICE);
-        var timestamp = Objects.requireNonNullElseGet(properties.get(SigningProperties.TIMESTAMP), Instant::now);
+        var region = properties.expect(Sigv4Properties.REGION);
+        var name = properties.expect(Sigv4Properties.SERVICE);
+        var timestamp = Objects.requireNonNullElseGet(properties.get(Sigv4Properties.TIMESTAMP), Instant::now);
         var requestIs = getBodyDataStream(request);
         // TODO: Handle streaming?
         var signedHeaders = createSignedHeaders(
@@ -215,7 +214,9 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
 
     private static byte[] hash(DataStream dataStream) {
         try {
-            return dataStream.transform(new HashingSubscriber()).toCompletableFuture().get();
+            var subscriber = new HashingSubscriber();
+            dataStream.subscribe(subscriber);
+            return subscriber.result.get();
         } catch (ExecutionException | InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -368,9 +369,9 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
     }
 
     /**
-     * Subscriber that computes the s
+     * Subscriber that computes the hash of a given byte buffer flow.
      */
-    private static final class HashingSubscriber implements DataStreamSubscriber<byte[]> {
+    private static final class HashingSubscriber implements Flow.Subscriber<ByteBuffer> {
         private final MessageDigest md;
         private final CompletableFuture<byte[]> result = new CompletableFuture<>();
 
@@ -405,7 +406,6 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
             result.complete(md.digest());
         }
 
-        @Override
         public CompletionStage<byte[]> result() {
             return result;
         }
