@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.auth.api.identity;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 
@@ -30,4 +31,15 @@ public interface IdentityResolver<IdentityT extends Identity> {
      * @return the class of the identity.
      */
     Class<IdentityT> identityType();
+
+
+    /**
+     * Combines multiple identity resolvers with the same identity type into a single resolver.
+     *
+     * @param resolvers Resolvers to combine.
+     * @return the combined resolvers.
+     */
+    static <I extends Identity> IdentityResolver<I> chain(List<IdentityResolver<I>> resolvers) {
+        return new IdentityResolverChain<I>(resolvers);
+    }
 }
