@@ -52,6 +52,18 @@ public final class AuthProperties {
     }
 
     /**
+     * Get the value of a property or a default value.
+     *
+     * @param property Property to get.
+     * @param defaultValue Default to return if property is not found.
+     * @return the value or default if not found.
+     */
+    public <T> T getOrDefault(AuthProperty<T> property, T defaultValue) {
+        T value = get(property);
+        return value != null ? value : defaultValue;
+    }
+
+    /**
      * Get the value of a property.
      *
      * @param property Property to get.
