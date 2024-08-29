@@ -3,17 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-<<<<<<< HEAD:aws/client-http/src/main/java/software/amazon/smithy/java/aws/runtime/client/http/auth/identity/SystemPropertiesIdentityResolver.java
 package software.amazon.smithy.java.aws.runtime.client.http.auth.identity;
-=======
-package software.amazon.smithy.java.runtime.aws.http.auth.identity;
->>>>>>> 95767d49 (Add default resolvers):aws-client-http/src/main/java/software/amazon/smithy/java/runtime/aws/http/auth/identity/SystemPropertiesIdentityResolver.java
 
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityNotFoundException;
 
-<<<<<<< HEAD:aws/client-http/src/main/java/software/amazon/smithy/java/aws/runtime/client/http/auth/identity/SystemPropertiesIdentityResolver.java
 /**
  * {@link AwsCredentialsResolver} implementation that loads credentials from Java system properties.
  *
@@ -31,9 +26,6 @@ import software.amazon.smithy.java.runtime.auth.api.identity.IdentityNotFoundExc
  * @see <a href="https://docs.oracle.com/javase/tutorial/essential/environment/sysprop.html">Java System Properties</a>
  */
 public final class SystemPropertiesIdentityResolver implements AwsCredentialsResolver {
-=======
-public class SystemPropertiesIdentityResolver implements AwsCredentialsResolver {
->>>>>>> 95767d49 (Add default resolvers):aws-client-http/src/main/java/software/amazon/smithy/java/runtime/aws/http/auth/identity/SystemPropertiesIdentityResolver.java
     private static final String ACCESS_KEY_PROPERTY = "aws.accessKeyId";
     private static final String SECRET_KEY_PROPERTY = "aws.secretAccessKey";
     private static final String SESSION_TOKEN_PROPERTY = "aws.sessionToken";

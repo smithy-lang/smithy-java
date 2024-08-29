@@ -3,16 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.aws.http.auth.scheme.sigv4;
+package software.amazon.smithy.java.aws.runtime.client.http.auth.scheme.sigv4;
 
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
+import software.amazon.smithy.java.aws.runtime.client.http.AwsClientConfigProperties;
+import software.amazon.smithy.java.aws.runtime.client.http.auth.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
-import software.amazon.smithy.java.runtime.aws.http.AwsConfigProperties;
-import software.amazon.smithy.java.runtime.aws.http.auth.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -61,7 +61,7 @@ public final class Sigv4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsC
     public AuthProperties getSignerProperties(Context context) {
         return AuthProperties.builder()
             .put(Sigv4Properties.SERVICE, signingName)
-            .put(Sigv4Properties.REGION, context.get(AwsConfigProperties.REGION))
+            .put(Sigv4Properties.REGION, context.get(AwsClientConfigProperties.REGION))
             .build();
     }
 

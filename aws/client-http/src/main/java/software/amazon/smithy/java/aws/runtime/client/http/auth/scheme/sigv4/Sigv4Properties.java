@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.aws.http.auth.scheme.sigv4;
+package software.amazon.smithy.java.aws.runtime.client.http.auth.scheme.sigv4;
 
 import java.time.Instant;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperty;

@@ -3,17 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-<<<<<<< HEAD:aws/client-http/src/main/java/software/amazon/smithy/java/aws/runtime/client/http/auth/identity/EnvironmentVariableIdentityResolver.java
 package software.amazon.smithy.java.aws.runtime.client.http.auth.identity;
-=======
-package software.amazon.smithy.java.runtime.aws.http.auth.identity;
->>>>>>> 95767d49 (Add default resolvers):aws-client-http/src/main/java/software/amazon/smithy/java/runtime/aws/http/auth/identity/EnvironmentVariableIdentityResolver.java
 
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.IdentityNotFoundException;
-
-<<<<<<< HEAD:aws/client-http/src/main/java/software/amazon/smithy/java/aws/runtime/client/http/auth/identity/EnvironmentVariableIdentityResolver.java
 
 /**
  * {@link AwsCredentialsResolver} implementation that loads credentials from environment variables.
@@ -30,9 +24,6 @@ import software.amazon.smithy.java.runtime.auth.api.identity.IdentityNotFoundExc
  * </dl>
  */
 public final class EnvironmentVariableIdentityResolver implements AwsCredentialsResolver {
-=======
-public class EnvironmentVariableIdentityResolver implements AwsCredentialsResolver {
->>>>>>> 95767d49 (Add default resolvers):aws-client-http/src/main/java/software/amazon/smithy/java/runtime/aws/http/auth/identity/EnvironmentVariableIdentityResolver.java
     private static final String ACCESS_KEY_PROPERTY = "AWS_ACCESS_KEY_ID";
     private static final String SECRET_KEY_PROPERTY = "AWS_SECRET_ACCESS_KEY";
     private static final String SESSION_TOKEN_PROPERTY = "AWS_SESSION_TOKEN";
@@ -47,11 +38,7 @@ public class EnvironmentVariableIdentityResolver implements AwsCredentialsResolv
             return CompletableFuture.failedFuture(
                 new IdentityNotFoundException(
                     "Could not find access and secret key environment variables",
-<<<<<<< HEAD:aws/client-http/src/main/java/software/amazon/smithy/java/aws/runtime/client/http/auth/identity/EnvironmentVariableIdentityResolver.java
                     EnvironmentVariableIdentityResolver.class,
-=======
-                    SystemPropertiesIdentityResolver.class,
->>>>>>> 95767d49 (Add default resolvers):aws-client-http/src/main/java/software/amazon/smithy/java/runtime/aws/http/auth/identity/EnvironmentVariableIdentityResolver.java
                     AwsCredentialsIdentity.class
                 )
             );

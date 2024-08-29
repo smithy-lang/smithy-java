@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.aws.http.auth.scheme.sigv4;
+package software.amazon.smithy.java.aws.runtime.client.http.auth.scheme.sigv4;
 
 import java.net.URI;
 import java.net.http.HttpHeaders;
@@ -30,10 +30,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import software.amazon.smithy.java.aws.runtime.client.http.auth.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
-import software.amazon.smithy.java.runtime.aws.http.auth.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 
