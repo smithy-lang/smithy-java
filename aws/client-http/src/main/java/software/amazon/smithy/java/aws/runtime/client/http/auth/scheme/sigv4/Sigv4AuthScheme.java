@@ -62,6 +62,7 @@ public final class Sigv4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsC
         return AuthProperties.builder()
             .put(Sigv4Properties.SERVICE, signingName)
             .put(Sigv4Properties.REGION, context.get(AwsClientConfigProperties.REGION))
+            .put(Sigv4Properties.CLOCK, context.get(AwsClientConfigProperties.CLOCK))
             .build();
     }
 

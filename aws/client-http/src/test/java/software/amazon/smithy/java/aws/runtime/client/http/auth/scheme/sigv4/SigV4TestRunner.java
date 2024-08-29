@@ -12,7 +12,9 @@ import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -188,11 +190,12 @@ public class SigV4TestRunner {
             return AuthProperties.builder()
                 .put(Sigv4Properties.SERVICE, objectNode.expectStringMember("service").getValue())
                 .put(Sigv4Properties.REGION, objectNode.expectStringMember("region").getValue())
-                .put(
-                    Sigv4Properties.TIMESTAMP,
-                    Instant.parse(objectNode.expectStringMember("timestamp").getValue())
-                )
+                .put(Sigv4Properties.CLOCK, getStaticClock(objectNode.expectStringMember("timestamp").getValue()))
                 .build();
+        }
+
+        private static Clock getStaticClock(String timeString) {
+            return Clock.fixed(Instant.parse(timeString), ZoneId.of("UTC"));
         }
     }
 

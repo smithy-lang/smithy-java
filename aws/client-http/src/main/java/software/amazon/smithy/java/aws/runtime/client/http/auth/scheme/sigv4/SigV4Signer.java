@@ -19,7 +19,6 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -68,7 +67,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
     ) {
         var region = properties.expect(Sigv4Properties.REGION);
         var name = properties.expect(Sigv4Properties.SERVICE);
-        var timestamp = Objects.requireNonNullElseGet(properties.get(Sigv4Properties.TIMESTAMP), Instant::now);
+        var timestamp = properties.expect(Sigv4Properties.CLOCK).instant();
         var requestIs = getBodyDataStream(request);
         // TODO: Handle streaming?
         var signedHeaders = createSignedHeaders(
