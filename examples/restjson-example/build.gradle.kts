@@ -6,7 +6,6 @@ plugins {
 dependencies {
     api(project(":client-aws-rest-json1"))
     api(libs.smithy.aws.traits)
-    implementation(project(":aws:client-http"))
 }
 
 jmh {
@@ -16,6 +15,7 @@ jmh {
     //profilers = ['async:output=flamegraph', 'gc']
 }
 
+// TODO: eventually re-enable
 // Disable spotbugs
 tasks {
     spotbugsMain {
@@ -24,11 +24,5 @@ tasks {
 
     spotbugsIt {
         enabled = false
-    }
-
-    integ {
-        // Ensure AWS credentials providers can find example values
-        systemProperties["aws.accessKeyId"] = "property_access_key"
-        systemProperties["aws.secretAccessKey"] = "property_secret_key"
     }
 }

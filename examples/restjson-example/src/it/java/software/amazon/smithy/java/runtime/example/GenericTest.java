@@ -33,7 +33,6 @@ public class GenericTest {
         // Create a generated client using rest-json and a fixed endpoint.
         PersonDirectoryClient client = PersonDirectoryClient.builder()
             .endpoint("http://httpbin.org/anything")
-            .region("us-east-1")
             .build();
 
         PutPersonInput input = PutPersonInput.builder()
@@ -50,7 +49,6 @@ public class GenericTest {
     public void getPersonImage() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
             .endpoint("http://httpbin.org/anything")
-            .region("us-east-1")
             .build();
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
@@ -63,7 +61,6 @@ public class GenericTest {
     public void streamingRequestPayload() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
             .endpoint("http://httpbin.org/anything")
-            .region("us-east-2")
             .build();
 
         PutPersonImageInput input = PutPersonImageInput.builder()
@@ -139,7 +136,6 @@ public class GenericTest {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
             .endpoint("http://httpbin.org/anything")
             .addInterceptor(interceptor)
-            .region("us-east-1")
             .build();
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
