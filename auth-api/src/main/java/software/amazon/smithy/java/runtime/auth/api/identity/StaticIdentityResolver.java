@@ -18,7 +18,7 @@ final class StaticIdentityResolver<IdentityT extends Identity> implements Identi
 
     @Override
     public CompletableFuture<IdentityT> resolveIdentity(AuthProperties requestProperties) {
-        return CompletableFuture.supplyAsync(() -> identity);
+        return CompletableFuture.completedFuture(identity);
     }
 
     @SuppressWarnings("unchecked")
