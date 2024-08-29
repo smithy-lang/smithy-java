@@ -59,16 +59,19 @@ public final class Sigv4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsC
 
     @Override
     public AuthProperties getSignerProperties(Context context) {
-        return AuthProperties.builder()
+        var builder = AuthProperties.builder()
             .put(Sigv4Properties.SERVICE, signingName)
-            .put(Sigv4Properties.REGION, context.get(AwsClientConfigProperties.REGION))
-            .put(Sigv4Properties.CLOCK, context.get(AwsClientConfigProperties.CLOCK))
-            .build();
+            .put(Sigv4Properties.REGION, context.expect(AwsClientConfigProperties.REGION));
+        var clock = context.get(AwsClientConfigProperties.CLOCK);
+        if (clock != null) {
+            builder.put(Sigv4Properties.CLOCK, clock);
+        }
+        builder.build();
     }
 
     @Override
     public Signer<SmithyHttpRequest, AwsCredentialsIdentity> signer() {
-        return SigV4Signer.INSTANCE;
+        return Sigv4Signer.INSTANCE;
     }
 
     public static final class Factory implements AuthSchemeFactory<SigV4Trait> {

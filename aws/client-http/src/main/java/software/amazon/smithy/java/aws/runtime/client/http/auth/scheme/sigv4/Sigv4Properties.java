@@ -16,5 +16,9 @@ public final class Sigv4Properties {
 
     public static final AuthProperty<String> REGION = AuthProperty.of("signingRegion");
     public static final AuthProperty<String> SERVICE = AuthProperty.of("signingName");
+    /**
+     * Optional override of the clock to use for signing. If no override is provided, then the
+     * default system UTC clock is used.
+     */
     public static final AuthProperty<Clock> CLOCK = AuthProperty.of("signingClock");
 }
