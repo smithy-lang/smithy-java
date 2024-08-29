@@ -25,4 +25,10 @@ tasks {
     spotbugsIt {
         enabled = false
     }
+
+    integ {
+        // Ensure AWS credentials providers can find example values
+        systemProperties["aws.accessKeyId"] = "property_access_key"
+        systemProperties["aws.secretAccessKey"] = "property_secret_key"
+    }
 }
