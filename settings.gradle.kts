@@ -18,7 +18,7 @@ include("tracing-api")
 include(":http-api")
 include(":http-binding")
 include(":http-auth")
-include(":aws-event-streams")
+
 
 include(":json-codec")
 
@@ -43,3 +43,7 @@ include(":examples:restjson-example")
 
 // Server
 include("server-core")
+
+// AWS specific
+include(":aws:event-streams")
+include(":aws:client-http")

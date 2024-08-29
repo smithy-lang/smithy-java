@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.auth.api.identity;
+package software.amazon.smithy.java.aws.runtime.client.http.auth.identity;
 
 import java.util.Objects;
 import java.util.Optional;
+import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 
 /**
  * AWS credentials used for accessing services: AWS access key ID, secret access key, and session tokens. These

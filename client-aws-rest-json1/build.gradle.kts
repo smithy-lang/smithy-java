@@ -11,6 +11,6 @@ dependencies {
     api(project(":client-http"))
     api(project(":http-binding"))
     api(project(":json-codec"))
-    api(project(":aws-event-streams"))
+    api(project(":aws:event-streams"))
     api(libs.smithy.aws.traits)
 }
