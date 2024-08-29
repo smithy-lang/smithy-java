@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.auth.api;
 
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 
 /**
@@ -24,7 +25,7 @@ public interface Signer<RequestT, IdentityT extends Identity> {
      * @param properties Signing properties.
      * @return the signed request.
      */
-    RequestT sign(RequestT request, IdentityT identity, AuthProperties properties);
+    CompletableFuture<RequestT> sign(RequestT request, IdentityT identity, AuthProperties properties);
 
     @SuppressWarnings("unchecked")
     static <RequestT, IdentityT extends Identity> Signer<RequestT, IdentityT> nullSigner() {

@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.client;
 
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
@@ -54,8 +55,14 @@ public final class TestAuthScheme implements AuthScheme<SmithyHttpRequest, Ident
 
     private static final class TestSigner implements Signer<SmithyHttpRequest, Identity> {
         @Override
-        public SmithyHttpRequest sign(SmithyHttpRequest request, Identity identity, AuthProperties properties) {
-            return request.withAddedHeaders(SIGNATURE_HEADER, "smithy-test-signature");
+        public CompletableFuture<SmithyHttpRequest> sign(
+            SmithyHttpRequest request,
+            Identity identity,
+            AuthProperties properties
+        ) {
+            return CompletableFuture.completedFuture(
+                request.withAddedHeaders(SIGNATURE_HEADER, "smithy-test-signature")
+            );
         }
     }
 

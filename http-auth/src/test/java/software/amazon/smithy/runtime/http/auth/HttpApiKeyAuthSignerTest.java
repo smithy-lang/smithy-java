@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.net.URI;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.ApiKeyIdentity;
@@ -26,96 +27,96 @@ public class HttpApiKeyAuthSignerTest {
         .build();
 
     @Test
-    void testApiKeyAuthSignerAddsHeaderNoScheme() {
+    void testApiKeyAuthSignerAddsHeaderNoScheme() throws ExecutionException, InterruptedException {
         var authProperties = AuthProperties.builder()
             .put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.HEADER)
             .put(HttpApiKeyAuthScheme.NAME, "x-api-key")
             .build();
 
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties);
+        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties).get();
         var authHeader = signedRequest.headers().map().get("x-api-key");
         assertNotNull(authHeader);
         assertEquals(authHeader.get(0), API_KEY);
     }
 
     @Test
-    void testApiKeyAuthSignerAddsHeaderParamWithCustomScheme() {
+    void testApiKeyAuthSignerAddsHeaderParamWithCustomScheme() throws ExecutionException, InterruptedException {
         var authProperties = AuthProperties.builder()
             .put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.HEADER)
             .put(HttpApiKeyAuthScheme.NAME, "x-api-key")
             .put(HttpApiKeyAuthScheme.SCHEME, "SCHEME")
             .build();
 
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties);
+        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties).get();
         var authHeader = signedRequest.headers().map().get("x-api-key");
         assertNotNull(authHeader);
         assertEquals(authHeader.get(0), "SCHEME " + API_KEY);
     }
 
     @Test
-    void testOverwritesExistingHeader() {
+    void testOverwritesExistingHeader() throws ExecutionException, InterruptedException {
         var authProperties = AuthProperties.builder()
             .put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.HEADER)
             .put(HttpApiKeyAuthScheme.NAME, "x-api-key")
             .put(HttpApiKeyAuthScheme.SCHEME, "SCHEME")
             .build();
         var updateRequest = TEST_REQUEST.withAddedHeaders("x-api-key", "foo");
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updateRequest, TEST_IDENTITY, authProperties);
+        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updateRequest, TEST_IDENTITY, authProperties).get();
         var authHeader = signedRequest.headers().map().get("x-api-key");
         assertNotNull(authHeader);
         assertEquals(authHeader.get(0), "SCHEME " + API_KEY);
     }
 
     @Test
-    void testApiKeyAuthSignerAddsQueryParam() {
+    void testApiKeyAuthSignerAddsQueryParam() throws ExecutionException, InterruptedException {
         var authProperties = AuthProperties.builder()
             .put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY)
             .put(HttpApiKeyAuthScheme.NAME, "apiKey")
             .build();
 
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties);
+        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties).get();
         var queryParam = signedRequest.uri().getQuery();
         assertNotNull(queryParam);
         assertEquals(queryParam, "apiKey=my-api-key");
     }
 
     @Test
-    void testApiKeyAuthSignerAddsQueryParamIgnoresScheme() {
+    void testApiKeyAuthSignerAddsQueryParamIgnoresScheme() throws ExecutionException, InterruptedException {
         var authProperties = AuthProperties.builder()
             .put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY)
             .put(HttpApiKeyAuthScheme.NAME, "apiKey")
             .put(HttpApiKeyAuthScheme.SCHEME, "SCHEME")
             .build();
 
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties);
+        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties).get();
         var queryParam = signedRequest.uri().getQuery();
         assertNotNull(queryParam);
         assertEquals(queryParam, "apiKey=my-api-key");
     }
 
     @Test
-    void testApiKeyAuthSignerAddsQueryParamsAppendsToExisting() {
+    void testApiKeyAuthSignerAddsQueryParamsAppendsToExisting() throws ExecutionException, InterruptedException {
         var authProperties = AuthProperties.builder()
             .put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY)
             .put(HttpApiKeyAuthScheme.NAME, "apiKey")
             .build();
         var updatedRequest = TEST_REQUEST.withUri(URI.create("https://www.example.com?x=1"));
 
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties);
+        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties).get();
         var queryParam = signedRequest.uri().getQuery();
         assertNotNull(queryParam);
         assertEquals(queryParam, "x=1&apiKey=my-api-key");
     }
 
     @Test
-    void testOverwritesExistingQuery() {
+    void testOverwritesExistingQuery() throws ExecutionException, InterruptedException {
         var authProperties = AuthProperties.builder()
             .put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY)
             .put(HttpApiKeyAuthScheme.NAME, "apiKey")
             .build();
         var updatedRequest = TEST_REQUEST.withUri(URI.create("https://www.example.com?x=1&apiKey=foo"));
 
-        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties);
+        var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties).get();
         var queryParam = signedRequest.uri().getQuery();
         assertNotNull(queryParam);
         assertEquals(queryParam, "x=1&apiKey=my-api-key");

@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
@@ -25,7 +26,11 @@ final class HttpBasicAuthSigner implements Signer<SmithyHttpRequest, LoginIdenti
     private HttpBasicAuthSigner() {}
 
     @Override
-    public SmithyHttpRequest sign(SmithyHttpRequest request, LoginIdentity identity, AuthProperties properties) {
+    public CompletableFuture<SmithyHttpRequest> sign(
+        SmithyHttpRequest request,
+        LoginIdentity identity,
+        AuthProperties properties
+    ) {
         var identityString = identity.username() + ":" + identity.password();
         var base64Value = Base64.getEncoder().encodeToString(identityString.getBytes(StandardCharsets.UTF_8));
         var headers = new LinkedHashMap<>(request.headers().map());
@@ -33,6 +38,6 @@ final class HttpBasicAuthSigner implements Signer<SmithyHttpRequest, LoginIdenti
         if (existing != null) {
             LOGGER.debug("Replaced existing Authorization header value.");
         }
-        return request.withHeaders(HttpHeaders.of(headers, (k, v) -> true));
+        return CompletableFuture.completedFuture(request.withHeaders(HttpHeaders.of(headers, (k, v) -> true)));
     }
 }

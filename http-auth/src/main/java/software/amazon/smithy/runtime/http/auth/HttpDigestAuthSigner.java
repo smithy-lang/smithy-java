@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.runtime.http.auth;
 
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.LoginIdentity;
@@ -19,7 +20,11 @@ final class HttpDigestAuthSigner implements Signer<SmithyHttpRequest, LoginIdent
     private HttpDigestAuthSigner() {}
 
     @Override
-    public SmithyHttpRequest sign(SmithyHttpRequest request, LoginIdentity identity, AuthProperties properties) {
+    public CompletableFuture<SmithyHttpRequest> sign(
+        SmithyHttpRequest request,
+        LoginIdentity identity,
+        AuthProperties properties
+    ) {
         throw new UnsupportedOperationException();
     }
 }

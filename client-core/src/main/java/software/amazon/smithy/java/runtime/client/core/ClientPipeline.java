@@ -204,7 +204,7 @@ public final class ClientPipeline<RequestT, ResponseT> {
         CompletableFuture<IdentityT> identity
     ) {
         public CompletableFuture<RequestT> sign(RequestT request) {
-            return identity.thenApply(
+            return identity.thenCompose(
                 identity -> authScheme.signer().sign(request, identity, signerProperties)
             );
         }

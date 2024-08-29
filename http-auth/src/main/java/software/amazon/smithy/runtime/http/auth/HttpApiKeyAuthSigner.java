@@ -8,6 +8,7 @@ package software.amazon.smithy.runtime.http.auth;
 import java.net.http.HttpHeaders;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
@@ -23,7 +24,11 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
     private HttpApiKeyAuthSigner() {}
 
     @Override
-    public SmithyHttpRequest sign(SmithyHttpRequest request, ApiKeyIdentity identity, AuthProperties properties) {
+    public CompletableFuture<SmithyHttpRequest> sign(
+        SmithyHttpRequest request,
+        ApiKeyIdentity identity,
+        AuthProperties properties
+    ) {
         var name = properties.expect(HttpApiKeyAuthScheme.NAME);
         return switch (properties.expect(HttpApiKeyAuthScheme.IN)) {
             case HEADER -> {
@@ -38,7 +43,7 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
                 if (existing != null) {
                     LOGGER.debug("Replaced header value for {}", name);
                 }
-                yield request.withHeaders(HttpHeaders.of(updated, (k, v) -> true));
+                yield CompletableFuture.completedFuture(request.withHeaders(HttpHeaders.of(updated, (k, v) -> true)));
             }
             case QUERY -> {
                 var uriBuilder = URIBuilder.of(request.uri());
@@ -48,7 +53,9 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
                 var existingQuery = request.uri().getQuery();
                 addExistingQueryParams(stringBuilder, existingQuery, name);
                 queryBuilder.write(stringBuilder);
-                yield request.withUri(uriBuilder.query(stringBuilder.toString()).build());
+                yield CompletableFuture.completedFuture(
+                    request.withUri(uriBuilder.query(stringBuilder.toString()).build())
+                );
             }
         };
     }

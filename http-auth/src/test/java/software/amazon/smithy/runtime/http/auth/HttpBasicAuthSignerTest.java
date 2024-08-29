@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.LoginIdentity;
@@ -22,7 +23,7 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
 
 public class HttpBasicAuthSignerTest {
     @Test
-    void testBasicAuthSigner() {
+    void testBasicAuthSigner() throws ExecutionException, InterruptedException {
         var username = "username";
         var password = "password";
         var testIdentity = LoginIdentity.create(username, password);
@@ -34,14 +35,14 @@ public class HttpBasicAuthSignerTest {
 
         var expectedHeader = "Basic " + Base64.getEncoder()
             .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, AuthProperties.empty());
+        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, AuthProperties.empty()).get();
         var authHeader = signedRequest.headers().map().get("Authorization");
         assertNotNull(authHeader);
         assertEquals(authHeader.get(0), expectedHeader);
     }
 
     @Test
-    void overwritesExistingHeader() {
+    void overwritesExistingHeader() throws ExecutionException, InterruptedException {
         var username = "username";
         var password = "password";
         var testIdentity = LoginIdentity.create(username, password);
@@ -54,7 +55,7 @@ public class HttpBasicAuthSignerTest {
 
         var expectedHeader = "Basic " + Base64.getEncoder()
             .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, AuthProperties.empty());
+        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, AuthProperties.empty()).get();
         var authHeader = signedRequest.headers().map().get("Authorization");
         assertNotNull(authHeader);
         assertEquals(authHeader.get(0), expectedHeader);
