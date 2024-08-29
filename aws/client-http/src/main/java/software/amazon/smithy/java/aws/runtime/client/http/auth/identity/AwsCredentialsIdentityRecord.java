@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.auth.api.identity;
+package software.amazon.smithy.java.aws.runtime.client.http.auth.identity;
 
 import java.util.Optional;
 

@@ -40,6 +40,6 @@ public interface IdentityResolver<IdentityT extends Identity> {
      * @return the combined resolvers.
      */
     static <I extends Identity> IdentityResolver<I> chain(List<IdentityResolver<I>> resolvers) {
-        return new IdentityResolverChain<I>(resolvers);
+        return new IdentityResolverChain<>(resolvers);
     }
 }
