@@ -66,7 +66,7 @@ public final class Sigv4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsC
         if (clock != null) {
             builder.put(Sigv4Properties.CLOCK, clock);
         }
-        builder.build();
+        return builder.build();
     }
 
     @Override

@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 import software.amazon.smithy.java.aws.runtime.client.http.auth.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
@@ -70,7 +71,7 @@ public class SigV4TestRunner {
 
     public Stream<Object[]> parameterizedTestSource() {
         return testCases.stream().map(testCase -> {
-            Callable<Result> callable = () -> testCase.createResult(SigV4Signer.INSTANCE);
+            Callable<Result> callable = () -> testCase.createResult(Sigv4Signer.INSTANCE);
             Callable<Result> wrappedCallable = () -> callable.call().unwrap();
             return new Object[]{testCase.name(), wrappedCallable};
         });
@@ -156,8 +157,10 @@ public class SigV4TestRunner {
                 .build();
         }
 
-        Result createResult(Signer<SmithyHttpRequest, AwsCredentialsIdentity> signer) {
-            var signedRequest = signer.sign(request, context.identity, context.properties);
+        Result createResult(
+            Signer<SmithyHttpRequest, AwsCredentialsIdentity> signer
+        ) throws ExecutionException, InterruptedException {
+            var signedRequest = signer.sign(request, context.identity, context.properties).get();
             // TODO: Figure out how to test body?
             boolean isValid = signedRequest.headers().equals(expected.headers())
                 && signedRequest.uri().equals(expected.uri())

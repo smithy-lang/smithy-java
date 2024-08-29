@@ -19,35 +19,29 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.aws.runtime.client.http.auth.identity.AwsCredentialsIdentity;
-import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.utils.StringUtils;
 
 /**
  * AWS signature version 4 signing implementation.
  */
-final class Sigv4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdentity> {
+final class Sigv4Signer extends AbstractSigv4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdentity> {
     static final Sigv4Signer INSTANCE = new Sigv4Signer();
-    private static final InternalLogger LOGGER = InternalLogger.getLogger(Sigv4Signer.class);
-
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter
-            .ofPattern("yyyyMMdd")
-            .withZone(ZoneId.of("UTC"));
+        .ofPattern("yyyyMMdd")
+        .withZone(ZoneId.of("UTC"));
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter
-            .ofPattern("yyyyMMdd'T'HHmmss'Z'")
-            .withZone(ZoneId.of("UTC"));
+        .ofPattern("yyyyMMdd'T'HHmmss'Z'")
+        .withZone(ZoneId.of("UTC"));
 
-    // TODO: Should this be async?
     @Override
     public CompletableFuture<SmithyHttpRequest> sign(
         SmithyHttpRequest request,
@@ -56,42 +50,31 @@ final class Sigv4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
     ) {
         var region = properties.expect(Sigv4Properties.REGION);
         var name = properties.expect(Sigv4Properties.SERVICE);
-        var clock = properties.get(Sigv4Properties.CLOCK);
-        if (clock == null) {
-            clock = Clock.systemUTC();
-        }
+        var clock = properties.getOrDefault(Sigv4Properties.CLOCK, Clock.systemUTC());
         var timestamp = clock.instant();
         var bodyDataStream = getBodyDataStream(request);
 
-        // Create a mutable copy of the existing headers.
-        // TODO: Use mutable header container when available
-        var headers = new HashMap<>(request.headers().map());
-
-        // TODO: Handle streaming / unsigned?
+        // TODO: Add support for query signing
+        // TODO: support streaming
+        // TODO: support UNSIGNED
 
         return getPayloadHash(bodyDataStream)
-                .thenCompose(hash -> {
-
-                });
-
-
-        var signedHeaders = createSignedHeaders(
-            region,
-            name,
-            request.method(),
-            request.uri(),
-            request.headers(),
-            identity.accessKeyId(),
-            identity.secretAccessKey(),
-            requestIs,
-            false,
-            timestamp,
-            identity.sessionToken().orElse(null)
-        );
-
-        return CompletableFuture.completedFuture(
-                request.withHeaders(HttpHeaders.of(signedHeaders, (a, b) -> true))
-        );
+            .thenApply(payloadHash -> {
+                var signedHeaders = createSignedHeaders(
+                    request.method(),
+                    request.uri(),
+                    request.headers(),
+                    payloadHash,
+                    region,
+                    name,
+                    timestamp,
+                    StringUtils.trim(identity.accessKeyId()),
+                    StringUtils.trim(identity.secretAccessKey()),
+                    identity.sessionToken().map(StringUtils::trim).orElse(null),
+                    false
+                );
+                return request.withHeaders(HttpHeaders.of(signedHeaders, (a, b) -> true));
+            });
     }
 
     private static DataStream getBodyDataStream(SmithyHttpRequest request) {
@@ -109,94 +92,66 @@ final class Sigv4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         return subscriber.result.thenApply(HexFormat.of()::formatHex);
     }
 
-
-
-    static String computeSignature(
-        String regionName,
-        String serviceName,
+    private static Map<String, List<String>> createSignedHeaders(
         String method,
         URI uri,
-        Map<String, List<String>> headers,
-        String accessKeyId,
-        String secretKey,
+        HttpHeaders HttpHeaders,
         String payloadHash,
-        boolean isStreaming,
+        String regionName,
+        String serviceName,
         Instant signingTimestamp,
-        String sessionToken
+        String sanitizedAccessKeyId,
+        String sanitizedSecretAccessKey,
+        String sanitizedSessionToken,
+        boolean isStreaming
     ) {
-        // AWS4 requires that we sign the Host header, so we have to have it in the request by the time we sign.
+        // TODO: Use mutable header container when available
+        var headers = new HashMap<>(HttpHeaders.map());
+
+        // AWS4 requires a number of headers to be set before signing.
         var hostHeader = uri.getHost();
-        if (uri.getPort() > 0) {
+        if (uriUsingNonStandardPort(uri)) {
             hostHeader += ":" + uri.getPort();
         }
         headers.put("Host", List.of(hostHeader));
 
-        // AWS SigV4 requires that we sign the date header, so it must also be added to the request
         var requestTime = TIME_FORMATTER.format(signingTimestamp);
         headers.put("X-Amz-Date", List.of(requestTime));
 
-        // Add the x-amz-content-sha256 header
         if (isStreaming) {
             headers.put("x-amz-content-sha256", List.of(payloadHash));
         }
-
-        // If the identity has session credentials add the session token
-        if (sessionToken != null) {
-            headers.put("X-Amz-Security-Token", List.of(sessionToken));
+        if (sanitizedSessionToken != null) {
+            headers.put("X-Amz-Security-Token", List.of(sanitizedSessionToken));
         }
 
-        // Sort header names/keys
+        // Determine sorted list of headers to sign
         Set<String> sortedHeaderKeys = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         sortedHeaderKeys.addAll(headers.keySet());
-
-        // TODO: allow un-normalized? (this is the same step as:
-        //  https://github.com/aws/aws-sdk-java-v2/blob/master/core/auth/src/main/java/software/amazon/awssdk/auth/signer/internal/AbstractAws4Signer.java#L525)
-        // Build canonicalRequest
         var signedHeaders = getSignedHeaders(sortedHeaderKeys);
 
+        // Build canonicalRequest and compute its signature
+        var canonicalRequest = getCanonicalRequest(method, uri, headers, sortedHeaderKeys, signedHeaders, payloadHash);
+        var dateStamp = DATE_FORMATTER.format(signingTimestamp);
+        var scope = dateStamp + "/" + regionName + "/" + serviceName + "/" + TERMINATOR;
+        var signingKey = deriveSigningKey(sanitizedSecretAccessKey, dateStamp, regionName, serviceName);
+        var signature = computeSignature(canonicalRequest, scope, requestTime, signingKey);
 
-
-
-    }
-
-
-
-
-    private static Map<String, List<String>> createSignedHeaders(
-        String regionName,
-        String serviceName,
-        String method,
-        URI uri,
-        HttpHeaders httpHeaders,
-        String accessKeyId,
-        String secretKey,
-        String payloadHash,
-        boolean isStreaming,
-        Instant signingTimestamp,
-        String sessionToken
-    ) {
-
-
-
-
+        var authorizationHeader = getAuthHeader(sanitizedAccessKeyId, scope, signedHeaders, signature);
         headers.put("Authorization", List.of(authorizationHeader));
+
         return headers;
     }
 
-    public static String getAuthHeader(String accessKeyId,
-                                       String scope,
-                                       String signingCredentials,
-                                       String signedHeaders,
-                                       String signature
-    ) {
-        // Set signing header values and assemble full Auth header
-        var signingCredentials = accessKeyId + '/' + scope;
-        var credentialsAuthorizationHeader = "Credential=" + signingCredentials;
-        var signedHeadersAuthorizationHeader = "SignedHeaders=" + signedHeaders;
-        var signatureAuthorizationHeader = "Signature=" + HexFormat.of().formatHex(signature);
-        var authorizationHeader = ALGORITHM + ' ' + credentialsAuthorizationHeader + ", "
-                + signedHeadersAuthorizationHeader + ", " + signatureAuthorizationHeader;
-        LOGGER.trace("Authorization: {}", authorizationHeader);
+    private static boolean uriUsingNonStandardPort(URI uri) {
+        if (uri.getPort() == -1) {
+            return false;
+        }
+        return switch (uri.getScheme()) {
+            case "http" -> uri.getPort() == 80;
+            case "https" -> uri.getPort() == 443;
+            default -> throw new IllegalStateException("Unexpected value for URI scheme: " + uri.getScheme());
+        };
     }
 
     private static String getSignedHeaders(Set<String> sortedHeaderKeys) {
@@ -215,13 +170,20 @@ final class Sigv4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         return builder.toString();
     }
 
-
-
-    static String getScope() {
-        var dateStamp = DATE_FORMATTER.format(signingTimestamp);
-        var scope = dateStamp + "/" + regionName + "/" + serviceName + "/" + TERMINATOR;
+    private static String getAuthHeader(
+        String accessKeyId,
+        String scope,
+        String signedHeaders,
+        String signature
+    ) {
+        // Set signing header values and assemble full Auth header
+        var signingCredentials = accessKeyId + '/' + scope;
+        var credentialsAuthorizationHeader = "Credential=" + signingCredentials;
+        var signedHeadersAuthorizationHeader = "SignedHeaders=" + signedHeaders;
+        var signatureAuthorizationHeader = "Signature=" + signature;
+        return ALGORITHM + ' ' + credentialsAuthorizationHeader + ", "
+            + signedHeadersAuthorizationHeader + ", " + signatureAuthorizationHeader;
     }
-
 
     /**
      * Subscriber that computes the hash of a given byte buffer flow.

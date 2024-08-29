@@ -1,10 +1,13 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.aws.runtime.client.http.auth.scheme.sigv4;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -18,43 +21,82 @@ import software.amazon.smithy.java.logging.InternalLogger;
 
 // TODO: move into shared location for both server and client
 /**
- * Interface that provides common Sigv4 signing methods for request signing and validation
+ * Abstract class that provides common Sigv4 signing methods for request signing and validation.
  */
 public abstract class AbstractSigv4Signer {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(AbstractSigv4Signer.class);
     protected static final String ALGORITHM = "AWS4-HMAC-SHA256";
-    private static final String TERMINATOR = "aws4_request";
+    protected static final String TERMINATOR = "aws4_request";
     protected static final List<String> HEADERS_TO_IGNORE_IN_LOWER_CASE = List.of(
-            "connection",
-            "x-amzn-trace-id",
-            "user-agent",
-            "expect"
+        "connection",
+        "x-amzn-trace-id",
+        "user-agent",
+        "expect"
     );
+    private static final String HMAC_SHA_256 = "HmacSHA256";
 
-    private static String HMAC_SHA_256 = "HmacSHA256";
 
-
-    static String getCanonicalRequest(String method, URI uri, ) {
+    protected static String getCanonicalRequest(
+        String method,
+        URI uri,
+        Map<String, List<String>> headers,
+        Set<String> sortedHeaderKeys,
+        String signedHeaders,
+        String payloadHash
+    ) {
+        // TODO: allow un-normalized uri? this is the same step as:
+        //  https://github.com/aws/aws-sdk-java-v2/blob/master/core/auth/src/main/java/software/amazon/awssdk/auth/signer/internal/AbstractAws4Signer.java#L525
         String canonicalRequest = method + "\n"
-                + uri.normalize().getRawPath() + "\n"
-                + getCanonicalizedQueryString(uri) + "\n"
-                + getCanonicalizedHeaderString(headers, sortedHeaderKeys) + "\n"
-                + signedHeaders + "\n"
-                + payloadHash;
+            + uri.normalize().getRawPath() + "\n"
+            + getCanonicalizedQueryString(uri) + "\n"
+            + getCanonicalizedHeaderString(headers, sortedHeaderKeys) + "\n"
+            + signedHeaders + "\n"
+            + payloadHash;
         LOGGER.trace("AWS SigV4 Canonical Request: '{}'", canonicalRequest);
+        return canonicalRequest;
     }
 
-    /**
-     * <pre>
-     *
-     * </pre>
-     * @param headers
-     * @param sortedHeaderKeys
-     * @return
-     */
-    protected static String getCanonicalizedHeaderString(
-            Map<String, List<String>> headers,
-            Set<String> sortedHeaderKeys
+    private static String getCanonicalizedQueryString(URI uri) {
+        SortedMap<String, String> sorted = new TreeMap<>();
+
+        // Getting the raw query means the keys and values don't need to be encoded again.
+        var query = uri.getRawQuery();
+        if (query == null) {
+            return "";
+        }
+
+        var params = query.split("&");
+
+        for (var param : params) {
+            var keyVal = param.split("=");
+            if (keyVal.length == 2) {
+                sorted.put(keyVal[0], keyVal[1]);
+            } else {
+                sorted.put(keyVal[0], "");
+            }
+        }
+
+        var builder = new StringBuilder();
+        var pairs = sorted.entrySet().iterator();
+
+        while (pairs.hasNext()) {
+            var pair = pairs.next();
+            var key = pair.getKey();
+            var value = pair.getValue();
+            builder.append(key);
+            builder.append("=");
+            builder.append(value);
+            if (pairs.hasNext()) {
+                builder.append("&");
+            }
+        }
+
+        return builder.toString();
+    }
+
+    private static String getCanonicalizedHeaderString(
+        Map<String, List<String>> headers,
+        Set<String> sortedHeaderKeys
     ) {
         // 2048 was determined experimentally by the JavaSdkV2 to minimize resizing.
         var buffer = new StringBuilder(2048);
@@ -133,51 +175,15 @@ public abstract class AbstractSigv4Signer {
         return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\u000b' || ch == '\r' || ch == '\f';
     }
 
-    private static String getCanonicalizedQueryString(URI uri) {
-        SortedMap<String, String> sorted = new TreeMap<>();
-
-        // Getting the raw query means the keys and values don't need to be encoded again.
-        var query = uri.getRawQuery();
-        if (query == null) {
-            return "";
-        }
-
-        var params = query.split("&");
-
-        for (var param : params) {
-            var keyVal = param.split("=");
-            if (keyVal.length == 2) {
-                sorted.put(keyVal[0], keyVal[1]);
-            } else {
-                sorted.put(keyVal[0], "");
-            }
-        }
-
-        var builder = new StringBuilder();
-        var pairs = sorted.entrySet().iterator();
-
-        while (pairs.hasNext()) {
-            var pair = pairs.next();
-            var key = pair.getKey();
-            var value = pair.getValue();
-            builder.append(key);
-            builder.append("=");
-            builder.append(value);
-            if (pairs.hasNext()) {
-                builder.append("&");
-            }
-        }
-
-        return builder.toString();
-    }
-
-
-
-
     /**
      * AWS4 uses a series of derived keys, formed by hashing different pieces of data
      */
-    static byte[] deriveSigningKey(String secretKey, String dateStamp, String regionName, String serviceName) {
+    protected static byte[] deriveSigningKey(
+        String secretKey,
+        String dateStamp,
+        String regionName,
+        String serviceName
+    ) {
         var kSecret = ("AWS4" + secretKey).getBytes(StandardCharsets.UTF_8);
         var kDate = sign(dateStamp, kSecret);
         var kRegion = sign(regionName, kDate);
@@ -185,29 +191,20 @@ public abstract class AbstractSigv4Signer {
         return sign(TERMINATOR, kService);
     }
 
-    /**
-     * Used by clients and servers to compute the Signature for a request.
-     *
-     * @param canonicalRequest
-     * @param scope
-     * @param requestTime formatted Date Time of to use as signing time
-     * @param signingKey
-     * @return
-     */
-    static byte[] computeSignature(
-            String canonicalRequest,
-            String scope,
-            String requestTime,
-            byte[] signingKey
+    protected static String computeSignature(
+        String canonicalRequest,
+        String scope,
+        String requestTime,
+        byte[] signingKey
     ) {
         var stringToSign = ALGORITHM + "\n"
-                + requestTime + "\n"
-                + scope + "\n"
-                + HexFormat.of().formatHex(hash(canonicalRequest));
-        return sign(stringToSign.getBytes(StandardCharsets.UTF_8), signingKey);
+            + requestTime + "\n"
+            + scope + "\n"
+            + HexFormat.of().formatHex(hash(canonicalRequest));
+        return HexFormat.of().formatHex(sign(stringToSign.getBytes(StandardCharsets.UTF_8), signingKey));
     }
 
-    static byte[] sign(String data, byte[] key) {
+    protected static byte[] sign(String data, byte[] key) {
         try {
             return sign(data.getBytes(StandardCharsets.UTF_8), key);
         } catch (Exception e) {
