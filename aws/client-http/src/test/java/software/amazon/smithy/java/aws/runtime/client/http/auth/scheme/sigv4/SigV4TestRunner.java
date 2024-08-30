@@ -16,6 +16,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -113,12 +114,11 @@ public class SigV4TestRunner {
             // Parse http header line
             var headerLine = fileLines.remove(0).split(" ");
             var method = headerLine[0];
-            var path = headerLine[1];
-            var httpVersion = switch (headerLine[2]) {
-                case "HTTP/1.1" -> SmithyHttpVersion.HTTP_1_1;
-                case "HTTP/2" -> SmithyHttpVersion.HTTP_2;
-                default -> throw new IllegalStateException("Unexpected value: " + headerLine[2]);
-            };
+            var end = headerLine.length - 1;
+            var path = String.join("%20", Arrays.copyOfRange(headerLine, 1, end));
+            if (!headerLine[end].equals("HTTP/1.1")) {
+                throw new UnsupportedOperationException("Unsupported HTTP version " + headerLine[end]);
+            }
 
             // Now read all headers in the request
             String hostValue = null;
@@ -150,7 +150,7 @@ public class SigV4TestRunner {
             var httpHeaders = HttpHeaders.of(headers, (k, v) -> true);
             return SmithyHttpRequest.builder()
                 .method(method)
-                .httpVersion(httpVersion)
+                .httpVersion(SmithyHttpVersion.HTTP_1_1)
                 .uri(URI.create("http://" + Objects.requireNonNull(hostValue) + path))
                 .headers(httpHeaders)
                 .body(body != null ? HttpRequest.BodyPublishers.ofString(body.toString()) : null)

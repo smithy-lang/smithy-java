@@ -20,7 +20,6 @@ import org.junit.jupiter.params.provider.MethodSource;
  *     <li>get-header-value-order</li>
  *     <li>get-header-key-duplicate</li>
  *     <li>all unnormalized tests</li>
- *     <li>get space normalized</li>
  * </ul>
  */
 public class Sigv4Tests {
