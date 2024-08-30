@@ -12,7 +12,18 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test cases are duplicated from:
- * <a href="https://github.com/awslabs/aws-c-auth/tree/main/tests/aws-signing-test-suite/v4">...</a>
+ * <a href="https://github.com/awslabs/aws-c-auth/tree/main/tests/aws-signing-test-suite/v4">CRT tests</a>
+ *
+ * <p>TODO: the following test cases are still not supported
+ * <ul>
+ *     <li>get-header-value-multiline</li>
+ *     <li>get-header-value-order</li>
+ *     <li>get-header-key-duplicate</li>
+ *     <li>all unnormalized tests</li>
+ *     <li>get space normalized</li>
+ *     <li>get-utf8</li>
+ *     <li>get-vanilla-utf8-query</li>
+ * </ul>
  */
 public class Sigv4Tests {
     @ParameterizedTest(name = "{0}")

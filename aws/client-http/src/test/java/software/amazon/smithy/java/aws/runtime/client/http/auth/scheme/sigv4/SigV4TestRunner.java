@@ -185,7 +185,8 @@ public class SigV4TestRunner {
         private static AwsCredentialsIdentity getIdentity(ObjectNode credentialsNode) {
             return AwsCredentialsIdentity.create(
                 credentialsNode.expectStringMember("access_key_id").getValue(),
-                credentialsNode.expectStringMember("secret_access_key").getValue()
+                credentialsNode.expectStringMember("secret_access_key").getValue(),
+                credentialsNode.getStringMemberOrDefault("token", null)
             );
         }
 
