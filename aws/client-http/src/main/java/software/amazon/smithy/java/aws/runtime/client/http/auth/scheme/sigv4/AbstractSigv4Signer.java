@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.aws.runtime.client.http.auth.scheme.sigv4;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -35,6 +36,13 @@ public abstract class AbstractSigv4Signer {
     );
     private static final String HMAC_SHA_256 = "HmacSHA256";
 
+    /**
+     * Characters that we need to fix up after URLEncoder.encode().
+     */
+    private static final String[] ENCODED_CHARACTERS_WITH_SLASHES = new String[]{"+", "*", "%7E", "%2F", "%25"};
+    private static final String[] ENCODED_CHARACTERS_WITH_SLASHES_REPLACEMENTS = new String[]{"%20", "%2A", "~", "/", "%"};
+    private static final String[] ENCODED_CHARACTERS_WITHOUT_SLASHES = new String[]{"+", "*", "%7E", "%25"};
+    private static final String[] ENCODED_CHARACTERS_WITHOUT_SLASHES_REPLACEMENTS = new String[]{"%20", "%2A", "~", "%"};
 
     protected static String getCanonicalRequest(
         String method,
@@ -47,13 +55,27 @@ public abstract class AbstractSigv4Signer {
         // TODO: allow un-normalized uri? this is the same step as:
         //  https://github.com/aws/aws-sdk-java-v2/blob/master/core/auth/src/main/java/software/amazon/awssdk/auth/signer/internal/AbstractAws4Signer.java#L525
         String canonicalRequest = method + "\n"
-            + uri.normalize().getRawPath() + "\n"
+            + getCanonicalizedResourcePath(uri) + "\n"
             + getCanonicalizedQueryString(uri) + "\n"
             + getCanonicalizedHeaderString(headers, sortedHeaderKeys) + "\n"
             + signedHeaders + "\n"
             + payloadHash;
         LOGGER.trace("AWS SigV4 Canonical Request: '{}'", canonicalRequest);
         return canonicalRequest;
+    }
+
+    // Based on: https://github.com/aws/aws-sdk-java-v2/blob/master/core/auth/src/main/java/software/amazon/awssdk/auth/signer/internal/AbstractAws4Signer.java#L525
+    private static String getCanonicalizedResourcePath(URI uri) {
+        // TODO: handle unnormalized?
+        String path = uri.normalize().getRawPath();
+        if (path.isEmpty()) {
+            return "/";
+        }
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
+        // TODO: allow unencoded?
+        return urlEncode(path, true);
     }
 
     private static String getCanonicalizedQueryString(URI uri) {
@@ -69,10 +91,13 @@ public abstract class AbstractSigv4Signer {
 
         for (var param : params) {
             var keyVal = param.split("=");
+            var key = keyVal[0];
+            var encodedKey = urlEncode(key, false);
             if (keyVal.length == 2) {
-                sorted.put(keyVal[0], keyVal[1]);
+                var encodedValue = urlEncode(keyVal[1], false);
+                sorted.put(encodedKey, encodedValue);
             } else {
-                sorted.put(keyVal[0], "");
+                sorted.put(key, "");
             }
         }
 
@@ -230,5 +255,20 @@ public abstract class AbstractSigv4Signer {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    // TODO: Should this go in a utils package?
+    private static String urlEncode(String string, boolean ignoreSlashes) {
+        var encodedString = URLEncoder.encode(string, StandardCharsets.UTF_8);
+        // Consider using this method from JAVAV2 if this is a performance issue:
+        // https://github.com/aws/aws-sdk-java-v2/blob/master/utils/src/main/java/software/amazon/awssdk/utils/StringUtils.java#L747
+        var chars = ignoreSlashes ? ENCODED_CHARACTERS_WITH_SLASHES : ENCODED_CHARACTERS_WITHOUT_SLASHES;
+        var replacements = ignoreSlashes
+            ? ENCODED_CHARACTERS_WITH_SLASHES_REPLACEMENTS
+            : ENCODED_CHARACTERS_WITHOUT_SLASHES_REPLACEMENTS;
+        for (int i = 0; i < chars.length; ++i) {
+            encodedString = encodedString.replace(chars[i], replacements[i]);
+        }
+        return encodedString;
     }
 }

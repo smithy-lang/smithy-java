@@ -21,8 +21,6 @@ import org.junit.jupiter.params.provider.MethodSource;
  *     <li>get-header-key-duplicate</li>
  *     <li>all unnormalized tests</li>
  *     <li>get space normalized</li>
- *     <li>get-utf8</li>
- *     <li>get-vanilla-utf8-query</li>
  * </ul>
  */
 public class Sigv4Tests {
