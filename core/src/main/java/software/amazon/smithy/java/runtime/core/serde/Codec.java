@@ -80,6 +80,18 @@ public interface Codec extends AutoCloseable {
     }
 
     /**
+     * Helper method to deserialize and build a shape.
+     *
+     * @param source  What to parse.
+     * @param builder Builder to populate.
+     * @return Returns the built and error-corrected shape.
+     * @param <T> Shape to build.
+     */
+    default <T extends SerializableShape> T deserializeShape(ByteBuffer source, ShapeBuilder<T> builder) {
+        return builder.deserialize(createDeserializer(source)).errorCorrection().build();
+    }
+
+    /**
      * Helper method to deserialize and build a shape using a String as input.
      *
      * @param source  What to parse.

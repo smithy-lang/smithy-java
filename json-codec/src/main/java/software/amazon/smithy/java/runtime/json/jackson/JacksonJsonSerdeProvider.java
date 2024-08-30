@@ -6,6 +6,8 @@
 package software.amazon.smithy.java.runtime.json.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonFactoryBuilder;
+import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream;
 import java.io.IOException;
@@ -19,7 +21,17 @@ import software.amazon.smithy.java.runtime.json.JsonSerdeProvider;
 
 public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
 
-    private static final JsonFactory FACTORY = new ObjectMapper().getFactory();
+    private static final JsonFactory FACTORY;
+    static final SerializedStringCache SERIALIZED_STRINGS = new SerializedStringCache();
+
+    static {
+        var serBuilder = new JsonFactoryBuilder();
+        serBuilder.disable(JsonFactory.Feature.INTERN_FIELD_NAMES);
+        serBuilder.enable(StreamReadFeature.USE_FAST_DOUBLE_PARSER);
+        serBuilder.enable(StreamReadFeature.USE_FAST_BIG_NUMBER_PARSER);
+        FACTORY = serBuilder.build();
+        FACTORY.setCodec(new ObjectMapper(FACTORY));
+    }
 
     @Override
     public int getPriority() {

@@ -44,6 +44,22 @@ import software.amazon.smithy.model.traits.Trait;
 
 public class JsonDeserializerTest {
     @Test
+    public void detectsUnclosedStructureObject() {
+        Set<String> members = new LinkedHashSet<>();
+
+        Assertions.assertThrows(SerializationException.class, () -> {
+            try (var codec = JsonCodec.builder().useJsonName(true).build()) {
+                var de = codec.createDeserializer("{\"name\":\"Sam\"".getBytes(StandardCharsets.UTF_8));
+                de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
+                    memberResult.add(member.memberName());
+                });
+            }
+        });
+
+        assertThat(members, contains("name"));
+    }
+
+    @Test
     public void deserializesByte() {
         try (var codec = JsonCodec.builder().build()) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));

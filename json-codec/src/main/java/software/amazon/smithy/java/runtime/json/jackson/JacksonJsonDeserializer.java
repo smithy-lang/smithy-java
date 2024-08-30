@@ -6,9 +6,7 @@
 package software.amazon.smithy.java.runtime.json.jackson;
 
 import static com.fasterxml.jackson.core.JsonToken.END_ARRAY;
-import static com.fasterxml.jackson.core.JsonToken.END_OBJECT;
 import static com.fasterxml.jackson.core.JsonToken.VALUE_NULL;
-import static com.fasterxml.jackson.core.JsonToken.VALUE_STRING;
 
 import com.fasterxml.jackson.core.Base64Variants;
 import com.fasterxml.jackson.core.JsonParser;
@@ -103,13 +101,11 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public float readFloat(Schema schema) {
         try {
-            if (parser.currentToken().isNumeric()) {
-                return parser.getFloatValue();
-            }
-            if (parser.getCurrentToken() == VALUE_STRING) {
-                return Float.parseFloat(parser.getText().trim());
-            }
-            throw new SerializationException("Unexpected token: " + parser.getCurrentToken());
+            return switch (parser.currentToken()) {
+                case VALUE_NUMBER_FLOAT, VALUE_NUMBER_INT -> parser.getFloatValue();
+                case VALUE_STRING -> Float.parseFloat(parser.getText().trim()); // TODO: is this right?
+                default -> throw new SerializationException("Unexpected token: " + parser.getCurrentToken());
+            };
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -118,13 +114,13 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public double readDouble(Schema schema) {
         try {
-            if (parser.currentToken().isNumeric()) {
-                return parser.getDoubleValue();
-            }
-            if (parser.getCurrentToken() == VALUE_STRING) {
-                return Double.parseDouble(parser.getText().trim());
-            }
-            throw new SerializationException("Unexpected token: " + parser.getCurrentToken());
+            return switch (parser.currentToken()) {
+                case VALUE_NUMBER_FLOAT, VALUE_NUMBER_INT -> parser.getDoubleValue();
+                case VALUE_STRING -> Double.parseDouble(parser.getText().trim()); // TODO: is this right?
+                default -> throw new SerializationException("Unexpected token: " + parser.getCurrentToken());
+            };
+        } catch (SerializationException e) {
+            throw e;
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -201,26 +197,19 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         try {
-            if (parser.currentToken() == null) {
-                parser.nextToken();
-            }
-            for (var token = parser.nextToken(); token != END_OBJECT; token = parser.nextToken()) {
-                var memberName = parser.getText();
-                token = parser.nextToken();
+            for (var memberName = parser.nextFieldName(); memberName != null; memberName = parser.nextFieldName()) {
+                var token = parser.nextToken();
                 var member = settings.fieldMapper().fieldToMember(schema, memberName);
-                if (member != null) {
-                    if (token != VALUE_NULL) {
-                        structMemberConsumer.accept(state, member, this);
-                    }
-                } else {
+                if (member == null) {
                     if (schema.type() != ShapeType.UNION || !settings.forbidUnknownUnionMembers()) {
                         structMemberConsumer.unknownMember(state, memberName);
                     } else {
                         throw new SerializationException("Unknown member " + memberName + " encountered");
                     }
-                    if (token.isStructStart()) {
-                        parser.skipChildren();
-                    }
+                    // Don't parse members of unknown members.
+                    parser.skipChildren();
+                } else if (token != VALUE_NULL) {
+                    structMemberConsumer.accept(state, member, this);
                 }
             }
         } catch (Exception e) {
@@ -242,10 +231,9 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
         try {
-            for (var token = parser.nextToken(); token != END_OBJECT; token = parser.nextToken()) {
-                var key = parser.getText();
+            for (var fieldName = parser.nextFieldName(); fieldName != null; fieldName = parser.nextFieldName()) {
                 parser.nextToken();
-                mapMemberConsumer.accept(state, key, this);
+                mapMemberConsumer.accept(state, fieldName, this);
             }
         } catch (Exception e) {
             throw new SerializationException(e);

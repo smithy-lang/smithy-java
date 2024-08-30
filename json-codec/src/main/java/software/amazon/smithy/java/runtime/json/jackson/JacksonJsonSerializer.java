@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.json.jackson;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -14,6 +15,7 @@ import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -24,9 +26,10 @@ import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JacksonJsonSerializer implements ShapeSerializer {
 
-    JsonGenerator generator;
-    final JsonCodec.Settings settings;
+    private JsonGenerator generator;
+    private final JsonCodec.Settings settings;
     private SerializeDocumentContents serializeDocumentContents;
+    private final ShapeSerializer structSerializer = new JsonStructSerializer();
 
     JacksonJsonSerializer(
         JsonGenerator generator,
@@ -198,10 +201,23 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     public void writeStruct(Schema schema, SerializableStruct struct) {
         try {
             generator.writeStartObject();
-            struct.serializeMembers(new JacksonStructSerializer(this));
+            struct.serializeMembers(structSerializer);
             generator.writeEndObject();
         } catch (Exception e) {
             throw new SerializationException(e);
+        }
+    }
+
+    private final class JsonStructSerializer extends InterceptingSerializer {
+        @Override
+        protected ShapeSerializer before(Schema schema) {
+            try {
+                final String fieldName = settings.fieldMapper().memberToField(schema);
+                generator.writeFieldName(JacksonJsonSerdeProvider.SERIALIZED_STRINGS.create(fieldName));
+                return JacksonJsonSerializer.this;
+            } catch (IOException e) {
+                throw new SerializationException(e);
+            }
         }
     }
 
@@ -220,10 +236,27 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
         try {
             generator.writeStartObject();
-            consumer.accept(mapState, new JacksonMapSerializer(this));
+            consumer.accept(mapState, new JsonMapSerializer());
             generator.writeEndObject();
         } catch (Exception e) {
             throw new SerializationException(e);
+        }
+    }
+
+    private final class JsonMapSerializer implements MapSerializer {
+        @Override
+        public <T> void writeEntry(
+            Schema keySchema,
+            String key,
+            T state,
+            BiConsumer<T, ShapeSerializer> valueSerializer
+        ) {
+            try {
+                generator.writeFieldName(key);
+                valueSerializer.accept(state, JacksonJsonSerializer.this);
+            } catch (IOException e) {
+                throw new SerializationException(e);
+            }
         }
     }
 
@@ -252,7 +285,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
             try {
                 parent.generator.writeStartObject();
                 parent.generator.writeStringField("__type", schema.id().toString());
-                struct.serializeMembers(new JacksonStructSerializer(parent));
+                struct.serializeMembers(parent.structSerializer);
                 parent.generator.writeEndObject();
             } catch (Exception e) {
                 throw new SerializationException(e);

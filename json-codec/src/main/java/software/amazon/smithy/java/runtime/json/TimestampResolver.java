@@ -90,10 +90,12 @@ public sealed interface TimestampResolver {
 
         @Override
         public TimestampFormatter resolve(Schema schema) {
-            return cache.computeIfAbsent(schema, s -> {
+            var result = cache.get(schema);
+            if (result == null) {
                 var trait = schema.getTrait(TimestampFormatTrait.class);
-                return trait != null ? TimestampFormatter.of(trait) : defaultFormat;
-            });
+                result = trait != null ? TimestampFormatter.of(trait) : defaultFormat;
+            }
+            return result;
         }
 
         @Override

@@ -63,18 +63,21 @@ public sealed interface JsonFieldMapper {
 
         @Override
         public Schema fieldToMember(Schema container, String field) {
-            return jsonNameCache.computeIfAbsent(container, schema -> {
-                Map<String, Schema> map = new HashMap<>(schema.members().size());
-                for (Schema m : schema.members()) {
+            var members = jsonNameCache.get(container);
+
+            if (members == null) {
+                members = new HashMap<>(container.members().size());
+                for (Schema m : container.members()) {
                     var jsonName = m.getTrait(JsonNameTrait.class);
                     if (jsonName != null) {
-                        map.put(jsonName.getValue(), m);
+                        members.put(jsonName.getValue(), m);
                     } else {
-                        map.put(m.memberName(), m);
+                        members.put(m.memberName(), m);
                     }
                 }
-                return map;
-            }).get(field);
+            }
+
+            return members.get(field);
         }
 
         @Override
