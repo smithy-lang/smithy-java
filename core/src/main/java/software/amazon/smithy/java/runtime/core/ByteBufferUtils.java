@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.runtime.core;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 public final class ByteBufferUtils {
@@ -15,10 +14,14 @@ public final class ByteBufferUtils {
     }
 
     public static String base64Encode(ByteBuffer buffer) {
+        byte[] bytes;
         if (isExact(buffer)) {
-            return Base64.getEncoder().encodeToString(buffer.array());
+            bytes = buffer.array();
+        } else {
+            bytes = new byte[buffer.remaining()];
+            buffer.asReadOnlyBuffer().get(bytes);
         }
-        return StandardCharsets.UTF_8.decode(Base64.getEncoder().encode(buffer.asReadOnlyBuffer())).toString();
+        return Base64.getEncoder().encodeToString(bytes);
     }
 
     public static byte[] getBytes(ByteBuffer buffer) {
