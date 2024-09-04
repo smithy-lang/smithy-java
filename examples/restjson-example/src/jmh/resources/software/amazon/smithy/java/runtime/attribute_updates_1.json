@@ -1,0 +1,16 @@
+{
+    "requestId": "123456",
+    "timestamp": "2024-01-05T17:16:21Z",
+    "metadata": {
+        "privacy": "some-privacy-settings-information"
+    },
+    "attributes": {
+        "loremip.loremip.front.wham.hoop.fiddlydo.": {
+            "value": {
+                "doubleValue": 26.764523987469
+            },
+            "edgeSubscriptionId": "abc-global-foo",
+            "timestamp": "2024-01-05T17:16:21Z"
+        }
+    }
+}

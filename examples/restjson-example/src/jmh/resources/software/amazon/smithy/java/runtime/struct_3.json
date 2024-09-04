@@ -1,0 +1,190 @@
+{
+    "bool1": true,
+    "d": 1.5,
+    "f": 3.700000047683716,
+    "i": 9182741,
+    "intList": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+    ],
+    "l": 1,
+    "optionalInt": 2147483647,
+    "requiredStruct": {
+        "string": "howdy",
+        "timestamp": 123.456
+    },
+    "signedI": 1,
+    "string": "really cool string 0 true",
+    "stringMap": {
+        "key1": "value1",
+        "key2": "value2",
+        "key0": "value0",
+        "key5": "value5",
+        "key6": "value6",
+        "key3": "value3",
+        "key4": "value4",
+        "key9": "value9",
+        "key7": "value7",
+        "key8": "value8"
+    },
+    "structList": [
+        {
+            "bool1": true,
+            "d": 1.5,
+            "f": 3.700000047683716,
+            "i": 9182741,
+            "l": 1,
+            "optionalInt": 2147483647,
+            "requiredStruct": {
+                "string": "howdy",
+                "timestamp": 123.456
+            },
+            "signedI": 1,
+            "string": "really cool string 0 false",
+            "stringMap": {}
+        },
+        {
+            "bool1": true,
+            "d": 1.5,
+            "f": 3.700000047683716,
+            "i": 9182741,
+            "l": 1,
+            "optionalInt": 2147483647,
+            "requiredStruct": {
+                "string": "howdy",
+                "timestamp": 123.456
+            },
+            "signedI": 1,
+            "string": "really cool string 0 false",
+            "stringMap": {}
+        },
+        {
+            "bool1": true,
+            "d": 1.5,
+            "f": 3.700000047683716,
+            "i": 9182741,
+            "l": 1,
+            "optionalInt": 2147483647,
+            "requiredStruct": {
+                "string": "howdy",
+                "timestamp": 123.456
+            },
+            "signedI": 1,
+            "string": "really cool string 0 false",
+            "stringMap": {}
+        },
+        {
+            "bool1": true,
+            "d": 1.5,
+            "f": 3.700000047683716,
+            "i": 9182741,
+            "l": 1,
+            "optionalInt": 2147483647,
+            "requiredStruct": {
+                "string": "howdy",
+                "timestamp": 123.456
+            },
+            "signedI": 1,
+            "string": "really cool string 0 false",
+            "stringMap": {}
+        },
+        {
+            "bool1": true,
+            "d": 1.5,
+            "f": 3.700000047683716,
+            "i": 9182741,
+            "l": 1,
+            "optionalInt": 2147483647,
+            "requiredStruct": {
+                "string": "howdy",
+                "timestamp": 123.456
+            },
+            "signedI": 1,
+            "string": "really cool string 0 false",
+            "stringMap": {}
+        },
+        {
+            "bool1": true,
+            "d": 1.5,
+            "f": 3.700000047683716,
+            "i": 9182741,
+            "l": 1,
+            "optionalInt": 2147483647,
+            "requiredStruct": {
+                "string": "howdy",
+                "timestamp": 123.456
+            },
+            "signedI": 1,
+            "string": "really cool string 0 false",
+            "stringMap": {}
+        },
+        {
+            "bool1": true,
+            "d": 1.5,
+            "f": 3.700000047683716,
+            "i": 9182741,
+            "l": 1,
+            "optionalInt": 2147483647,
+            "requiredStruct": {
+                "string": "howdy",
+                "timestamp": 123.456
+            },
+            "signedI": 1,
+            "string": "really cool string 0 false",
+            "stringMap": {}
+        },
+        {
+            "bool1": true,
+            "d": 1.5,
+            "f": 3.700000047683716,
+            "i": 9182741,
+            "l": 1,
+            "optionalInt": 2147483647,
+            "requiredStruct": {
+                "string": "howdy",
+                "timestamp": 123.456
+            },
+            "signedI": 1,
+            "string": "really cool string 0 false",
+            "stringMap": {}
+        },
+        {
+            "bool1": true,
+            "d": 1.5,
+            "f": 3.700000047683716,
+            "i": 9182741,
+            "l": 1,
+            "optionalInt": 2147483647,
+            "requiredStruct": {
+                "string": "howdy",
+                "timestamp": 123.456
+            },
+            "signedI": 1,
+            "string": "really cool string 0 false",
+            "stringMap": {}
+        },
+        {
+            "bool1": true,
+            "d": 1.5,
+            "f": 3.700000047683716,
+            "i": 9182741,
+            "l": 1,
+            "optionalInt": 2147483647,
+            "requiredStruct": {
+                "string": "howdy",
+                "timestamp": 123.456
+            },
+            "signedI": 1,
+            "string": "really cool string 0 false",
+            "stringMap": {}
+        }
+    ]
+}

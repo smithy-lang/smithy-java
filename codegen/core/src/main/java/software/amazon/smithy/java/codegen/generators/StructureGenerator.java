@@ -232,7 +232,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                             );
                         } else if (target.isBlobShape() && !CodegenUtils.isStreamingBlob(target)) {
                             writer.write(
-                                "this.${memberName:L} = ${?nullable}builder.${memberName:L} == null ? null : ${/nullable}builder.${memberName:L}.asReadOnlyBuffer();"
+                                "this.${memberName:L} = ${?nullable}builder.${memberName:L} == null ? null : ${/nullable}builder.${memberName:L}.duplicate();"
                             );
                         } else {
                             writer.write("this.${memberName:L} = builder.${memberName:L};");
@@ -779,7 +779,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                         writer.write("${byteBuf:T}.allocate(0);");
                     } else {
                         writer.write(
-                            "${byteBuf:T}.wrap(${b64:T}.getDecoder().decode($S)).asReadOnlyBuffer()",
+                            "${byteBuf:T}.wrap(${b64:T}.getDecoder().decode($S)).duplicate()",
                             strValue
                         );
                     }

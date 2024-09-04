@@ -1,0 +1,14 @@
+{
+    "clusterHostId": "cluster host id",
+    "customerId": "customer id",
+    "delaySeconds": 15,
+    "messageAttributes": "aXQncyBteSBtZXNzYWdlIGF0dHJpYnV0ZXMh",
+    "messageAttributesMd5": "MTIzNDU2Nzg5MDEyMzQ1Ng==",
+    "messageBody": "aXQncyBteSBtZXNzYWdlIGJvZHkh",
+    "messageId": "message id",
+    "messageMd5": "MTIzNDU2Nzg5MDEyMzQ1Ng==",
+    "messageMeteringSize": 123,
+    "messageSystemAttributes": "aXQncyBteSBtZXNzYWdlIHN5c3RlbSBhdHRyaWJ1dGVzIQ==",
+    "messageSystemAttributesMd5": "MTIzNDU2Nzg5MDEyMzQ1Ng==",
+    "queueId": "queue id"
+}

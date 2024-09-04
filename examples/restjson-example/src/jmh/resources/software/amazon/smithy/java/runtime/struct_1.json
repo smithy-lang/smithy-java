@@ -1,0 +1,15 @@
+{
+    "bool1": true,
+    "d": 1.5,
+    "f": 3.700000047683716,
+    "i": 9182741,
+    "l": 1,
+    "optionalInt": 2147483647,
+    "requiredStruct": {
+        "string": "howdy",
+        "timestamp": 123.456
+    },
+    "signedI": 1,
+    "string": "really cool string 0 false",
+    "stringMap": {}
+}

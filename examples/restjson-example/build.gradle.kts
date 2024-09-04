@@ -12,7 +12,8 @@ jmh {
     warmupIterations = 2
     iterations = 5
     fork = 1
-    //profilers = ['async:output=flamegraph', 'gc']
+    //profilers.add("async:output=flamegraph")
+    //profilers.add('gc')
 }
 
 // TODO: eventually re-enable

@@ -1,0 +1,51 @@
+{
+    "requestId": "123456",
+    "timestamp": "2024-01-05T17:16:21Z",
+    "metadata": {
+        "privacy": "some-privacy-settings-information"
+    },
+    "attributes": {
+        "loremip.AbcLoremIpsumDolorFoo": {
+            "value": {
+                "stringValue": "LOCK"
+            },
+            "edgeSubscriptionId": "abc-global-foo",
+            "timestamp": "2024-01-05T17:16:21Z"
+        },
+        "loremip.MaxFooBlamBlooms": {
+            "value": {
+                "longValue": 456
+            },
+            "edgeSubscriptionId": "abc-global-foo",
+            "timestamp": "2024-01-05T17:16:21Z"
+        },
+        "loremip.loremip.front.wham.hoop.fiddlydoo": {
+            "value": {
+                "doubleValue": 26.764523987469
+            },
+            "edgeSubscriptionId": "abc-global-foo",
+            "timestamp": "2024-01-05T17:16:21Z"
+        },
+        "loremip.currentLocation.Grandads": {
+            "value": {
+                "doubleValue": 26.764523987469
+            },
+            "edgeSubscriptionId": "abc-global-foo",
+            "timestamp": "2024-01-05T17:16:21Z"
+        },
+        "loremip.currentLocation.Marmoset": {
+            "value": {
+                "doubleValue": 26.764523987469
+            },
+            "edgeSubscriptionId": "abc-global-foo",
+            "timestamp": "2024-01-05T17:16:21Z"
+        },
+        "loremip.currentLocation.Peregrine": {
+            "value": {
+                "doubleValue": 26.764523987469
+            },
+            "edgeSubscriptionId": "abc-global-foo",
+            "timestamp": "2024-01-05T17:16:21Z"
+        }
+    }
+}

@@ -2,6 +2,8 @@ $version: "2"
 
 namespace smithy.example
 
+use trials#Trials
+
 resource Person {
     identifiers: { name: String }
     properties: { favoriteColor: String, age: Integer, birthday: Birthday }
@@ -48,5 +50,8 @@ operation PutPerson {
         $age = 1
 
         $birthday
+
+        @notProperty
+        trials: Trials
     }
 }
