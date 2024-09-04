@@ -97,7 +97,13 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     @Override
     public void writeBlob(Schema schema, ByteBuffer value) {
         try {
-            generator.writeBinary(new ByteBufferBackedInputStream(value), value.remaining());
+            int len = value.remaining();
+            if (value.hasArray()) {
+                generator.writeBinary(value.array(), value.arrayOffset() + value.position(), len);
+            } else {
+                // don't disturb the mark on the existing buffer
+                generator.writeBinary(new ByteBufferBackedInputStream(value.duplicate()), len);
+            }
         } catch (Exception e) {
             throw new SerializationException(e);
         }
