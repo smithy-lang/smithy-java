@@ -8,7 +8,7 @@ package software.amazon.smithy.java.server.netty;
 import io.netty.util.concurrent.Future;
 import java.util.concurrent.CompletableFuture;
 
-public class NettyUtils {
+final class NettyUtils {
 
     private NettyUtils() {
     }

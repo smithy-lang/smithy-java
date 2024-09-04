@@ -35,13 +35,13 @@ include(":auth-api")
 include("server-core")
 include("server")
 include("server-netty")
+include("server-core")
+include("server-aws-rest-json1")
 
 // Examples
 include(":examples:restjson-example")
 include(":examples:dynamodb")
-
-// Server
-include("server-core")
+include(":examples:server-example")
 
 // AWS specific
 include(":aws:event-streams")

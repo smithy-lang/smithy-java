@@ -5,14 +5,10 @@
 
 package software.amazon.smithy.java.server.core;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.ServiceLoader;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import software.amazon.smithy.java.server.Operation;
-import software.amazon.smithy.java.server.Service;
+import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public final class ProtocolResolver {
@@ -26,22 +22,28 @@ public final class ProtocolResolver {
         .collect(Collectors.toMap(ServerProtocolProvider::getProtocolId, Function.identity()));
 
     private final List<? extends ServerProtocol> serverProtocolHandlers;
+    private final ServiceMatcher serviceMatcher;
 
-    public ProtocolResolver(List<Service> services) {
+    public ProtocolResolver(ServiceMatcher serviceMatcher) {
         serverProtocolHandlers = SERVER_PROTOCOL_HANDLERS.values()
             .stream()
-            .sorted(Comparator.<ServerProtocolProvider, Integer>comparing(ServerProtocolProvider::priority).reversed())
-            .map(p -> p.provideProtocolHandler(services))
+            .sorted(Comparator.comparing(ServerProtocolProvider::priority).reversed())
+            .map(p -> p.provideProtocolHandler(serviceMatcher.getAllServices()))
             .toList();
+        this.serviceMatcher = serviceMatcher;
     }
 
-    public ResolutionResult resolveServiceAndOperation(ResolutionRequest request) {
-        return null;
-    }
-
-    public record ResolutionRequest(String path) {
-    }
-
-    public record ResolutionResult(Operation operation) {
+    public ServiceProtocolResolutionResult resolve(ServiceProtocolResolutionRequest request) {
+        var candidates = serviceMatcher.getCandidateServices(request);
+        if (candidates.isEmpty()) {
+            throw new UnknownOperationException("No matching services found for request");
+        }
+        for (ServerProtocol protocol : serverProtocolHandlers) {
+            var resolutionResult = protocol.resolveOperation(request, candidates);
+            if (resolutionResult != null) {
+                return resolutionResult;
+            }
+        }
+        throw new UnknownOperationException("No matching operations found for request");
     }
 }

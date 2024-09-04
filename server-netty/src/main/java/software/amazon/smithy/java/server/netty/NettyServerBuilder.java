@@ -7,16 +7,16 @@ package software.amazon.smithy.java.server.netty;
 
 import java.net.URI;
 import java.util.List;
+import software.amazon.smithy.java.server.Route;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.ServerBuilder;
-import software.amazon.smithy.java.server.Service;
-import software.amazon.smithy.java.server.ServiceMatcher;
+import software.amazon.smithy.java.server.core.ServiceMatcher;
 
-public class NettyServerBuilder extends ServerBuilder<NettyServerBuilder> {
+final class NettyServerBuilder extends ServerBuilder<NettyServerBuilder> {
 
-    List<Service> services;
     ServiceMatcher serviceMatcher;
     List<URI> endpoints;
+    int numberOfWorkers = Runtime.getRuntime().availableProcessors() * 2;
 
     @Override
     public NettyServerBuilder endpoints(URI... endpoints) {
@@ -25,14 +25,14 @@ public class NettyServerBuilder extends ServerBuilder<NettyServerBuilder> {
     }
 
     @Override
-    protected NettyServerBuilder addServices(List<Service> services) {
-        this.services = services;
+    public NettyServerBuilder numberOfWorkers(int numberOfWorkers) {
+        this.numberOfWorkers = numberOfWorkers;
         return self();
     }
 
     @Override
-    protected NettyServerBuilder setServiceMatcher(ServiceMatcher serviceMatcher) {
-        this.serviceMatcher = serviceMatcher;
+    protected NettyServerBuilder setServerRoutes(List<Route> routes) {
+        this.serviceMatcher = new ServiceMatcher(routes);
         return null;
     }
 
@@ -43,6 +43,8 @@ public class NettyServerBuilder extends ServerBuilder<NettyServerBuilder> {
     }
 
     private void validate() {
-        //TODO add validations
+        if (numberOfWorkers <= 0) {
+            throw new IllegalArgumentException("Number of workers must be greater than zero");
+        }
     }
 }

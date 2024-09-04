@@ -5,8 +5,10 @@
 
 package software.amazon.smithy.java.codegen.server.generators;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
@@ -62,6 +64,11 @@ public final class ServiceGenerator implements
                     public <I extends ${serializableStruct:T}, O extends ${serializableStruct:T}> ${operationHolder:T}<I, O> getOperation(String operationName) {
                         ${getOperation:C|}
                     }
+
+                    @Override
+                    public ${operationList:T}<${operationHolder:T}<? extends ${serializableStruct:T}, ? extends ${serializableStruct:T}>> getAllOperations() {
+                         return allOperations;
+                    }
                 }
                 """;
             writer.putContext("operationHolder", Operation.class);
@@ -85,6 +92,7 @@ public final class ServiceGenerator implements
                 "getOperation",
                 new GetOperationGenerator(writer, shape, directive.symbolProvider(), operations)
             );
+            writer.putContext("operationList", List.class);
             writer.write(template);
             writer.popState();
         });
@@ -93,7 +101,7 @@ public final class ServiceGenerator implements
 
     private record PropertyGenerator(
         JavaWriter writer, ServiceShape serviceShape, SymbolProvider symbolProvider,
-        List<OperationInfo> operations, boolean notFinal
+        List<OperationInfo> operations, boolean forBuilder
     ) implements Runnable {
 
         @Override
@@ -101,15 +109,30 @@ public final class ServiceGenerator implements
             for (OperationInfo operation : operations) {
                 var operationName = operation.symbol.getProperty(ServerSymbolProperties.OPERATION_FIELD_NAME);
                 writer.pushState();
-                writer.putContext("notFinal", notFinal);
+                writer.putContext("forBuilder", forBuilder);
                 writer.putContext("input", operation.inputSymbol);
                 writer.putContext("output", operation.outputSymbol);
-                writer.putContext("notFinal", notFinal);
-                writer.write(
-                    "private${^notFinal} final${/notFinal} ${operationHolder:T}<${input:T}, ${output:T}> $L;",
-                    operationName
-                );
+                writer.putContext("fn", Function.class);
+                writer.putContext("serviceType", Service.class);
+                if (forBuilder) {
+                    writer.write(
+                        "private ${fn:T}<${serviceType:T}, ${operationHolder:T}<${input:T}, ${output:T}>> $L;",
+                        operationName
+                    );
+                } else {
+                    writer.write(
+                        "private final ${operationHolder:T}<${input:T}, ${output:T}> $L;",
+                        operationName
+                    );
+                }
                 writer.popState();
+            }
+            if (!forBuilder) {
+                writer.write(
+                    "private final $T<$T<? extends ${serializableStruct:T}, ? extends ${serializableStruct:T}>> allOperations;",
+                    List.class,
+                    Operation.class
+                );
             }
         }
     }
@@ -127,10 +150,19 @@ public final class ServiceGenerator implements
                     }
                     """,
                 writer.consumer(w -> {
+                    List<String> operationNames = new ArrayList<>();
                     for (Symbol operation : operations) {
-                        var operationName = operation.getProperty(ServerSymbolProperties.OPERATION_FIELD_NAME);
-                        w.write("this.$1L = builder.$1L;", operationName);
+                        var operationName = operation.expectProperty(ServerSymbolProperties.OPERATION_FIELD_NAME);
+                        w.write("this.$1L = builder.$1L.apply(this);", operationName);
+                        operationNames.add(operationName);
                     }
+                    writer.pushState();
+                    writer.putContext("operations", operationNames);
+                    w.write(
+                        "this.allOperations = $T.of(${#operations}${value:L}${^key.last}, ${/key.last}${/operations});",
+                        List.class
+                    );
+                    writer.popState();
                 })
             );
         }
@@ -210,13 +242,13 @@ public final class ServiceGenerator implements
                 var template = """
                     @Override
                     public ${nextStage:L} add${operation:T}Operation(${asyncOperationType:T} operation) {
-                        this.${operationFieldName:L} = ${operationClass:T}.ofAsync("${operation:T}", operation::${operationFieldName:L}, new ${apiOperationClass:T}());
+                        this.${operationFieldName:L} = s -> ${operationClass:T}.ofAsync("${operation:T}", operation::${operationFieldName:L}, new ${apiOperationClass:T}(), s);
                         return this;
                     }
 
                     @Override
                     public ${nextStage:L} add${operation:T}Operation(${syncOperationType:T} operation) {
-                        this.${operationFieldName:L} = ${operationClass:T}.of("${operation:T}", operation::${operationFieldName:L}, new ${apiOperationClass:T}());
+                        this.${operationFieldName:L} = s -> ${operationClass:T}.of("${operation:T}", operation::${operationFieldName:L}, new ${apiOperationClass:T}(), s);
                         return this;
                     }
                     """;

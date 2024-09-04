@@ -72,7 +72,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         this.payloadCodec = payloadCodec;
         this.bindingMatcher = bindingMatcher;
         headerSerializer = new HttpHeaderSerializer(headerConsumer);
-        querySerializer = new HttpQuerySerializer(queryStringParams::put);
+        querySerializer = new HttpQuerySerializer(queryStringParams::add);
         labelSerializer = new HttpLabelSerializer(labels::put);
     }
 
@@ -241,7 +241,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                     serializer.bindingMatcher.prefixHeaders(),
                     serializer.headerConsumer
                 );
-                case QUERY_PARAMS -> new HttpQueryParamsSerializer(serializer.queryStringParams::put);
+                case QUERY_PARAMS -> new HttpQueryParamsSerializer(serializer.queryStringParams::add);
                 case BODY -> ShapeSerializer.nullSerializer(); // handled in HttpBindingSerializer#writeStruct.
                 case PAYLOAD -> {
                     payloadSerializer = new PayloadSerializer(serializer, serializer.payloadCodec);

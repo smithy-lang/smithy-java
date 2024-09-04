@@ -5,5 +5,38 @@
 
 package software.amazon.smithy.java.server.core;
 
-public final class RequestImpl implements Request {
+import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
+
+public abstract sealed class RequestImpl implements Request permits HttpRequest {
+
+    private final Context context = Context.create();
+    private DataStream dataStream;
+    private SerializableStruct deserializedValue;
+
+    @Override
+    public final Context context() {
+        return context;
+    }
+
+    @Override
+    public DataStream getDataStream() {
+        return dataStream;
+    }
+
+    @Override
+    public void setDataStream(DataStream dataStream) {
+        this.dataStream = dataStream;
+    }
+
+    @Override
+    public <T extends SerializableStruct> T getDeserializedValue() {
+        return (T) deserializedValue;
+    }
+
+    @Override
+    public void setDeserializedValue(SerializableStruct serializableStruct) {
+        this.deserializedValue = serializableStruct;
+    }
 }

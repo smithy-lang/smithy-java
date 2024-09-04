@@ -9,11 +9,6 @@
       "transport": {
         "http-java": {}
       }
-    },
-    "java-server-codegen": {
-      "service": "smithy.example#PersonDirectory",
-      "namespace": "software.amazon.smithy.java.runtime.example.codegen",
-      "headerFile": "license.txt"
     }
   }
 }

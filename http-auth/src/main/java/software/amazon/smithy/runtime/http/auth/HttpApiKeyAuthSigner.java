@@ -48,7 +48,7 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
             case QUERY -> {
                 var uriBuilder = URIBuilder.of(request.uri());
                 var queryBuilder = new QueryStringBuilder();
-                queryBuilder.put(name, identity.apiKey());
+                queryBuilder.add(name, identity.apiKey());
                 var stringBuilder = new StringBuilder();
                 var existingQuery = request.uri().getQuery();
                 addExistingQueryParams(stringBuilder, existingQuery, name);

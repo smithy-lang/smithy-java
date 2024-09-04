@@ -17,12 +17,14 @@ public final class Operation<I extends SerializableStruct, O extends Serializabl
     private final BiFunction<I, RequestContext, O> operation;
     private final BiFunction<I, RequestContext, CompletableFuture<O>> asyncOperation;
     private final ApiOperation<I, O> sdkOperation;
+    private final Service service;
 
     private Operation(
         String name,
         BiFunction<I, RequestContext, O> operation,
         BiFunction<I, RequestContext, CompletableFuture<O>> asyncOperation,
-        ApiOperation<I, O> sdkOperation
+        ApiOperation<I, O> sdkOperation,
+        Service service
     ) {
         if (operation != null && asyncOperation != null) {
             throw new IllegalArgumentException("At least one of operation and asyncOperation must be null");
@@ -37,22 +39,25 @@ public final class Operation<I extends SerializableStruct, O extends Serializabl
             this.asyncOperation = null;
         }
         this.sdkOperation = sdkOperation;
+        this.service = service;
     }
 
     public static <I extends SerializableStruct, O extends SerializableStruct> Operation<I, O> of(
         String name,
         BiFunction<I, RequestContext, O> operation,
-        ApiOperation<I, O> sdkOperation
+        ApiOperation<I, O> sdkOperation,
+        Service service
     ) {
-        return new Operation<>(name, operation, null, sdkOperation);
+        return new Operation<>(name, operation, null, sdkOperation, service);
     }
 
     public static <I extends SerializableStruct, O extends SerializableStruct> Operation<I, O> ofAsync(
         String name,
         BiFunction<I, RequestContext, CompletableFuture<O>> operation,
-        ApiOperation<I, O> sdkOperation
+        ApiOperation<I, O> sdkOperation,
+        Service service
     ) {
-        return new Operation<>(name, null, operation, sdkOperation);
+        return new Operation<>(name, null, operation, sdkOperation, service);
     }
 
     public boolean isAsync() {
@@ -79,5 +84,9 @@ public final class Operation<I extends SerializableStruct, O extends Serializabl
 
     public ApiOperation<I, O> getApiOperation() {
         return sdkOperation;
+    }
+
+    public Service getOwningService() {
+        return service;
     }
 }

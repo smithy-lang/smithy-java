@@ -26,9 +26,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.server.Server;
-import software.amazon.smithy.java.server.core.DefaultOrchestrator;
-import software.amazon.smithy.java.server.core.Orchestrator;
+import software.amazon.smithy.java.server.core.HandlerAssembler;
+import software.amazon.smithy.java.server.core.OrchestratorGroup;
 import software.amazon.smithy.java.server.core.ProtocolResolver;
+import software.amazon.smithy.java.server.core.SingleThreadOrchestrator;
 
 final class NettyServer implements Server {
 
@@ -38,15 +39,21 @@ final class NettyServer implements Server {
     private final EventLoopGroup bossGroup;
     private final EventLoopGroup workerGroup;
     private final List<URI> endpoints;
-    private final Orchestrator orchestrator;
+    private final OrchestratorGroup orchestrator;
 
     NettyServer(NettyServerBuilder builder) {
         var bootstrap = new ServerBootstrap();
 
-        var protocolResolver = new ProtocolResolver(builder.services);
-        orchestrator = new DefaultOrchestrator(builder.services, builder.serviceMatcher);
+        var protocolResolver = new ProtocolResolver(builder.serviceMatcher);
 
-        bootstrap.childHandler(new NettyChannelInitializer(orchestrator, protocolResolver));
+        var handlers = new HandlerAssembler().assembleHandlers(builder.serviceMatcher.getAllServices());
+        orchestrator = new OrchestratorGroup(
+            builder.numberOfWorkers,
+            () -> new SingleThreadOrchestrator(handlers),
+            OrchestratorGroup.Strategy.roundRobin()
+        );
+
+        bootstrap.childHandler(new ServerChannelInitializer(orchestrator, protocolResolver));
         int numWorkers = Runtime.getRuntime().availableProcessors() * 2;
         final Function<Integer, EventLoopGroup> eventLoopProvider;
         final ChannelFactory<? extends ServerChannel> channelFactory;

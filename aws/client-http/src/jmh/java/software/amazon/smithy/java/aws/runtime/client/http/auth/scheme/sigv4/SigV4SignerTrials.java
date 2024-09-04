@@ -106,7 +106,7 @@ public class SigV4SignerTrials {
         var uriString = "http://example.com";
         if (!queryParameters.isEmpty()) {
             var queryBuilder = new QueryStringBuilder();
-            queryParameters.forEach(queryBuilder::put);
+            queryParameters.forEach(queryBuilder::add);
             uriString += "?" + queryBuilder;
         }
         return SmithyHttpRequest.builder()

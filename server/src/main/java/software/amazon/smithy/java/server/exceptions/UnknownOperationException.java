@@ -31,4 +31,9 @@ public class UnknownOperationException extends ModeledApiException {
     public void serialize(ShapeSerializer encoder) {
         encoder.writeStruct(SCHEMA, this);
     }
+
+    @Override
+    public synchronized Throwable fillInStackTrace() {
+        return this;
+    }
 }

@@ -8,7 +8,7 @@ package software.amazon.smithy.java.server.netty;
 import software.amazon.smithy.java.server.ServerBuilder;
 import software.amazon.smithy.java.server.ServerProvider;
 
-public class NettyServerProvider implements ServerProvider {
+public final class NettyServerProvider implements ServerProvider {
     @Override
     public String name() {
         return "smithy-java-netty-server";

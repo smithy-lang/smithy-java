@@ -7,7 +7,7 @@ package software.amazon.smithy.java.server.core;
 
 import java.util.concurrent.CompletableFuture;
 
-public sealed interface Orchestrator permits DefaultOrchestrator {
+public sealed interface Orchestrator permits ObservableOrchestrator {
 
     CompletableFuture<Void> enqueue(Job job);
 

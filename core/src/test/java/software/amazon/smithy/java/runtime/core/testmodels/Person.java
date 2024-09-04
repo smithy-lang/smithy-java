@@ -112,7 +112,7 @@ public final class Person implements SerializableStruct {
             serializer.writeString(SCHEMA_FAVORITE_COLOR, favoriteColor);
         }
         if (binary != null) {
-            serializer.writeBlob(SCHEMA_BINARY, binary);
+            serializer.writeBlob(SCHEMA_BINARY, binary.asReadOnlyBuffer());
         }
         if (birthday != null) {
             serializer.writeTimestamp(SCHEMA_BIRTHDAY, birthday);

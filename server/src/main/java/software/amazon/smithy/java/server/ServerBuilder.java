@@ -7,8 +7,6 @@ package software.amazon.smithy.java.server;
 
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,15 +15,20 @@ import java.util.Objects;
 public abstract class ServerBuilder<T extends ServerBuilder<T>> {
 
     private static final URI DEFAULT_ENDPOINT = URI.create("http://localhost:8080");
-    private Map<String, List<Service>> servicePathMappings = new HashMap<>();
-    private boolean customServiceMatcherSet = false;
+    private final Map<String, List<Service>> servicePathMappings = new HashMap<>();
+    private final List<Route> routes = new ArrayList<>();
 
     public final Server build() {
-        addServices(servicePathMappings.values().stream().flatMap(Collection::stream).toList());
-        //If all services are just added to "/", we don't set a ServiceMatcher. Or if the user has set their own service matcher
-        if (!customServiceMatcherSet && !(servicePathMappings.size() == 1 && servicePathMappings.containsKey("/"))) {
-            setServiceMatcher(new ExactPathServiceMatcher(Collections.unmodifiableMap(servicePathMappings)));
+        if (routes.isEmpty()) {
+            for (var entry : servicePathMappings.entrySet()) {
+                var serviceMatcher = Route.builder()
+                    .pathPrefix(entry.getKey())
+                    .services(entry.getValue())
+                    .build();
+                routes.add(serviceMatcher);
+            }
         }
+        setServerRoutes(routes);
 
         return buildServer();
     }
@@ -42,6 +45,11 @@ public abstract class ServerBuilder<T extends ServerBuilder<T>> {
     }
 
     public final T addService(String path, Service service) {
+        if (!routes.isEmpty()) {
+            throw new IllegalStateException(
+                "Either use addService(ServiceDefinition...) or addService(Service...), not both"
+            );
+        }
         servicePathMappings.computeIfAbsent(path, k -> new ArrayList<>()).add(service);
         return self();
     }
@@ -50,29 +58,26 @@ public abstract class ServerBuilder<T extends ServerBuilder<T>> {
         return addService("/", service);
     }
 
-    public abstract T endpoints(URI... endpoints);
-
-    protected abstract T addServices(List<Service> services);
-
-    public final T serviceMatcher(ServiceMatcher serviceMatcher) {
-        customServiceMatcherSet = true;
-        return setServiceMatcher(Objects.requireNonNull(serviceMatcher, "A non-null service matcher is required"));
+    public final T addService(Route route) {
+        if (!servicePathMappings.isEmpty()) {
+            throw new IllegalStateException(
+                "Either use addService(ServiceDefinition...) or addService(Service...), not both"
+            );
+        }
+        routes.add(Objects.requireNonNull(route, "A non-null service matcher is required"));
+        return self();
     }
 
-    protected abstract T setServiceMatcher(ServiceMatcher serviceMatcher);
+    public abstract T endpoints(URI... endpoints);
+
+    public abstract T numberOfWorkers(int numberOfWorkers);
+
+    protected abstract T setServerRoutes(List<Route> routes);
 
     protected abstract Server buildServer();
 
     protected final T self() {
         return (T) this;
-    }
-
-    private record ExactPathServiceMatcher(Map<String, List<Service>> servicePathMappings) implements ServiceMatcher {
-
-        @Override
-        public List<Service> getCandidateServices(ServiceMatcherInput input) {
-            return servicePathMappings.get(input.getRequestPath());
-        }
     }
 
 }

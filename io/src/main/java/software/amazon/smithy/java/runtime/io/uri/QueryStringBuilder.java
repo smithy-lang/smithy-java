@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.io.uri;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Used to build a query string from key value pair parameters.
@@ -31,9 +32,38 @@ public final class QueryStringBuilder {
      * @param key   Key of the parameter.
      * @param value Value of the parameter (or null).
      */
-    public void put(String key, String value) {
+    public void add(String key, String value) {
         values.add(key);
         values.add(value);
+    }
+
+    /**
+     * Add a query string parameter and values to the query string.
+     * <p>
+     * The given key and values will be percent-encoded. If the values are already percent-encoded, it will be
+     * double percent-encoded.
+     *
+     * @param key   Key of the parameter.
+     * @param values List of values
+     */
+    public void add(String key, List<String> values) {
+        for (String value : values) {
+            add(key, value);
+        }
+    }
+
+    /**
+     * Add a query string parameter and values to the query string.
+     * <p>
+     * The given key and values will be percent-encoded. If the values are already percent-encoded, it will be
+     * double percent-encoded.
+     *
+     * @param values List of values
+     */
+    public void add(Map<String, List<String>> values) {
+        for (var entry : values.entrySet()) {
+            add(entry.getKey(), entry.getValue());
+        }
     }
 
     /**

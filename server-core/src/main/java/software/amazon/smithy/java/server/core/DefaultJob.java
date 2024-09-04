@@ -5,53 +5,50 @@
 
 package software.amazon.smithy.java.server.core;
 
-import software.amazon.smithy.java.context.Context;
+import java.util.Objects;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Operation;
 
-public final class DefaultJob implements Job {
-    @Override
-    public Request request() {
-        return null;
+public abstract sealed class DefaultJob implements Job permits HttpJob {
+
+    private final Operation<? extends SerializableStruct, ? extends SerializableStruct> operation;
+    private final ServerProtocol protocol;
+
+    protected DefaultJob(
+        Operation<? extends SerializableStruct, ? extends SerializableStruct> operation,
+        ServerProtocol protocol
+    ) {
+        this.operation = Objects.requireNonNull(operation, "Operation must not be null");
+        this.protocol = Objects.requireNonNull(protocol, "Protocol must not be null");
     }
 
     @Override
-    public Response response() {
-        return null;
-    }
-
-    @Override
-    public Context context() {
-        return null;
-    }
-
-    @Override
-    public boolean isCompleted() {
+    public final boolean isCompleted() {
         return false;
     }
 
     @Override
-    public void complete() {
+    public final void complete() {
 
     }
 
     @Override
-    public Throwable getFailure() {
+    public final Throwable getFailure() {
         return null;
     }
 
     @Override
-    public void setFailure(Throwable failure) {
+    public final void setFailure(Throwable failure) {
 
     }
 
     @Override
-    public Operation<? extends SerializableStruct, ? extends SerializableStruct> operation() {
-        return null;
+    public final Operation<? extends SerializableStruct, ? extends SerializableStruct> operation() {
+        return operation;
     }
 
     @Override
-    public ServerProtocol chosenProtocol() {
-        return null;
+    public final ServerProtocol chosenProtocol() {
+        return protocol;
     }
 }
