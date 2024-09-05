@@ -25,7 +25,7 @@ public class ApiException extends RuntimeException {
      */
     public enum Fault {
         /**
-         * The client is at fault for this error (e.g., it omitted a require parameter or sent an invalid request).
+         * The client is at fault for this error (e.g., it omitted a required parameter or sent an invalid request).
          */
         CLIENT,
 

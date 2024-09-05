@@ -10,6 +10,7 @@ import static java.nio.ByteBuffer.wrap;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
@@ -26,12 +27,13 @@ import software.amazon.smithy.java.runtime.example.model.PutPersonOutput;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 
+
 public class GenericTest {
 
     @Test
-    public void putPerson() {
+    public void putPerson() throws ExecutionException, InterruptedException {
         // Create a generated client using rest-json and a fixed endpoint.
-        PersonDirectoryClient client = PersonDirectoryClient.builder()
+        var client = PersonDirectoryClient.builder()
             .endpoint("http://httpbin.org/anything")
             .build();
 

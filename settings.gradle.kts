@@ -11,7 +11,7 @@ include(":codegen:server")
 include(":codegen:types")
 
 // Protocol tests
-include(":protocol-tests:client")
+include(":protocol-tests")
 
 include("tracing-api")
 

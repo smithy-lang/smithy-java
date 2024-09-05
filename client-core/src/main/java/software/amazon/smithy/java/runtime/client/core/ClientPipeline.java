@@ -144,9 +144,12 @@ public final class ClientPipeline<RequestT, ResponseT> {
                 interceptor.readBeforeTransmit(reqHook.withRequest(req));
                 return req;
             })
-            .thenCompose(finalRequest -> transport.send(context, finalRequest).thenCompose(response -> {
-                return deserialize(call, finalRequest, response, call.interceptor());
-            }));
+            .thenCompose(
+                finalRequest -> transport.send(context, finalRequest)
+                    .thenCompose(
+                        response -> deserialize(call, finalRequest, response, call.interceptor())
+                    )
+            );
     }
 
     @SuppressWarnings("unchecked")
