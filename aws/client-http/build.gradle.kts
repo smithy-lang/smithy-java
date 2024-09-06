@@ -9,15 +9,6 @@ extra["moduleName"] = "software.amazon.smithy.java.aws.client-http"
 
 dependencies {
     implementation(project(":auth-api"))
-    // Provides sigv4 trait
-    implementation(libs.smithy.aws.traits)
-    implementation(project(":logging"))
-    // Provides SmithyHttpRequest
-    implementation(project(":http-api"))
-    // Provides Datastream
-    implementation(project(":core"))
-    // Provides clientPlugin and associated annotations
-    implementation(project(":client-core"))
 }
 
 tasks {
