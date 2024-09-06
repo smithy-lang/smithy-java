@@ -9,7 +9,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
@@ -56,16 +55,11 @@ public class IntegerDocumentTest {
     }
 
     @Test
-    public void canWidenType() {
+    public void canCast() {
         var document = Document.createInteger(10);
 
         assertThat(document.asLong(), equalTo(10L));
         assertThat(document.asFloat(), equalTo(10f));
         assertThat(document.asDouble(), equalTo(10.0));
-    }
-
-    @Test
-    public void detectsOverflow() {
-        Assertions.assertThrows(ArithmeticException.class, () -> Document.createInteger(Integer.MAX_VALUE).asShort());
     }
 }

@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.runtime.json.jackson;
 
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;

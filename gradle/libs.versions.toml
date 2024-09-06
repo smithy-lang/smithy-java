@@ -19,7 +19,6 @@ smithy-protocol-traits = { module = "software.amazon.smithy:smithy-protocol-trai
 smithy-aws-protocol-tests = { module = "software.amazon.smithy:smithy-aws-protocol-tests", version.ref = "smithy" }
 
 jackson-core = {module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson"}
-jackson-databind = {module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson"}
 
 netty-all = {module = "io.netty:netty-all", version.ref = "netty"}
 

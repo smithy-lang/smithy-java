@@ -114,7 +114,7 @@ public class JsonDocumentTest {
         var document = de.readDocument();
 
         var e = Assertions.assertThrows(SerializationException.class, document::asTimestamp);
-        assertThat(e.getMessage(), containsString("Expected a timestamp, but found boolean"));
+        assertThat(e.getMessage(), containsString("Expected a timestamp document, but found boolean"));
     }
 
     @Test

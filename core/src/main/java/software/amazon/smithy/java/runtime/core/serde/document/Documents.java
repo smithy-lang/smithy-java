@@ -49,30 +49,6 @@ final class Documents {
         }
     }
 
-    private static byte toByteExact(ShapeType source, long value) {
-        var converted = (byte) value;
-        if (value != converted) {
-            throw new ArithmeticException(source + " value is out of range of byte");
-        }
-        return converted;
-    }
-
-    private static short toShortExact(ShapeType source, long value) {
-        var converted = (short) value;
-        if (value != converted) {
-            throw new ArithmeticException(source + " value is out of range of short");
-        }
-        return converted;
-    }
-
-    private static int toIntExact(ShapeType source, long value) {
-        var converted = (int) value;
-        if (value != converted) {
-            throw new ArithmeticException(source + " value is out of range of integer");
-        }
-        return converted;
-    }
-
     record ByteDocument(Schema schema, byte value) implements Document {
         @Override
         public ShapeType type() {
@@ -133,7 +109,7 @@ final class Documents {
 
         @Override
         public byte asByte() {
-            return toByteExact(type(), value);
+            return (byte) value;
         }
 
         @Override
@@ -185,12 +161,12 @@ final class Documents {
 
         @Override
         public byte asByte() {
-            return toByteExact(type(), value);
+            return (byte) value;
         }
 
         @Override
         public short asShort() {
-            return toShortExact(type(), value);
+            return (short) value;
         }
 
         @Override
@@ -237,17 +213,17 @@ final class Documents {
 
         @Override
         public byte asByte() {
-            return toByteExact(type(), value);
+            return (byte) value;
         }
 
         @Override
         public short asShort() {
-            return toShortExact(type(), value);
+            return (short) value;
         }
 
         @Override
         public int asInteger() {
-            return toIntExact(type(), value);
+            return (int) value;
         }
 
         @Override
@@ -283,13 +259,6 @@ final class Documents {
 
     record FloatDocument(Schema schema, float value) implements Document {
 
-        private static long convertFloatToLong(ShapeType dest, float value) {
-            if (!Float.isFinite(value)) {
-                throw new ArithmeticException("Value must be finite to convert to " + dest);
-            }
-            return (long) value;
-        }
-
         @Override
         public ShapeType type() {
             return ShapeType.FLOAT;
@@ -297,22 +266,22 @@ final class Documents {
 
         @Override
         public byte asByte() {
-            return toByteExact(type(), convertFloatToLong(ShapeType.BYTE, value));
+            return (byte) value;
         }
 
         @Override
         public short asShort() {
-            return toShortExact(type(), convertFloatToLong(ShapeType.SHORT, value));
+            return (short) value;
         }
 
         @Override
         public int asInteger() {
-            return toIntExact(type(), convertFloatToLong(ShapeType.INTEGER, value));
+            return (int) value;
         }
 
         @Override
         public long asLong() {
-            return convertFloatToLong(ShapeType.LONG, value);
+            return (long) value;
         }
 
         @Override
@@ -343,13 +312,6 @@ final class Documents {
 
     record DoubleDocument(Schema schema, double value) implements Document {
 
-        private static long convertDoubleToLong(ShapeType dest, double value) {
-            if (!Double.isFinite(value)) {
-                throw new ArithmeticException("Value must be finite to convert to " + dest);
-            }
-            return (long) value;
-        }
-
         @Override
         public ShapeType type() {
             return ShapeType.DOUBLE;
@@ -357,39 +319,27 @@ final class Documents {
 
         @Override
         public byte asByte() {
-            return toByteExact(type(), convertDoubleToLong(ShapeType.BYTE, value));
+            return (byte) value;
         }
 
         @Override
         public short asShort() {
-            return toShortExact(type(), convertDoubleToLong(ShapeType.SHORT, value));
+            return (short) value;
         }
 
         @Override
         public int asInteger() {
-            return toIntExact(type(), convertDoubleToLong(ShapeType.INTEGER, value));
+            return (int) value;
         }
 
         @Override
         public long asLong() {
-            return convertDoubleToLong(ShapeType.LONG, value);
+            return (long) value;
         }
 
         @Override
         public float asFloat() {
-            if (Double.isFinite(value)) {
-                var converted = (float) value;
-                if (converted != value) {
-                    throw new ArithmeticException("Value of double exceeds float");
-                }
-                return converted;
-            } else if (Double.isNaN(value)) {
-                return Float.NaN;
-            } else if (value < 0) {
-                return Float.NEGATIVE_INFINITY;
-            } else {
-                return Float.POSITIVE_INFINITY;
-            }
+            return (float) value;
         }
 
         @Override

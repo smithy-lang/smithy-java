@@ -10,5 +10,4 @@ extra["moduleName"] = "software.amazon.smithy.java.json"
 dependencies {
     api(project(":core"))
     implementation(libs.jackson.core)
-    implementation(libs.jackson.databind) // for documents :(
 }

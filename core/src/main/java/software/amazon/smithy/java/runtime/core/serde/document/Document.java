@@ -153,11 +153,10 @@ public interface Document extends SerializableShape {
     /**
      * Get the byte value of the Document if it is a byte.
      *
-     * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
+     * <p>Numeric values of a different type are cast when necessary. See JLS 5.1.3 for details.
      *
      * @return the byte value.
      * @throws SerializationException if the Document is not a number.
-     * @throws ArithmeticException if the value is out of range for this type.
      */
     default byte asByte() {
         throw new SerializationException("Expected a byte document, but found " + type());
@@ -166,11 +165,10 @@ public interface Document extends SerializableShape {
     /**
      * Get the short value of the Document if it is a short.
      *
-     * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
+     * <p>Numeric values of a different type are cast when necessary. See JLS 5.1.3 for details.
      *
      * @return the short value.
      * @throws SerializationException if the Document is not a number.
-     * @throws ArithmeticException if the value is out of range for this type.
      */
     default short asShort() {
         throw new SerializationException("Expected a short document, but found " + type());
@@ -179,11 +177,10 @@ public interface Document extends SerializableShape {
     /**
      * Get the integer value of the Document if it is an integer.
      *
-     * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
+     * <p>Numeric values of a different type are cast when necessary. See JLS 5.1.3 for details.
      *
      * @return the integer value.
      * @throws SerializationException if the Document is not a number.
-     * @throws ArithmeticException if the value is out of range for this type.
      */
     default int asInteger() {
         throw new SerializationException("Expected an integer document, but found " + type());
@@ -192,11 +189,10 @@ public interface Document extends SerializableShape {
     /**
      * Get the long value of the Document if it is a long.
      *
-     * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
+     * <p>Numeric values of a different type are cast when necessary. See JLS 5.1.3 for details.
      *
      * @return the long value.
      * @throws SerializationException if the Document is not a number.
-     * @throws ArithmeticException if the value is out of range for this type.
      */
     default long asLong() {
         throw new SerializationException("Expected a long document, but found " + type());
@@ -205,11 +201,10 @@ public interface Document extends SerializableShape {
     /**
      * Get the float value of the Document if it is a float.
      *
-     * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
+     * <p>Numeric values of a different type are cast when necessary. See JLS 5.1.3 for details.
      *
      * @return the float value.
      * @throws SerializationException if the Document is not a number.
-     * @throws ArithmeticException if the value is out of range for this type.
      */
     default float asFloat() {
         throw new SerializationException("Expected a float document, but found " + type());
@@ -218,11 +213,10 @@ public interface Document extends SerializableShape {
     /**
      * Get the double value of the Document if it is a double.
      *
-     * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
+     * <p>Numeric values of a different type are cast when necessary. See JLS 5.1.3 for details.
      *
      * @return the double value.
      * @throws SerializationException if the Document is not a number.
-     * @throws ArithmeticException if the value is out of range for this type.
      */
     default double asDouble() {
         throw new SerializationException("Expected a double document, but found " + type());
@@ -231,7 +225,7 @@ public interface Document extends SerializableShape {
     /**
      * Get the BigInteger value of the Document if it is a bigInteger.
      *
-     * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
+     * <p>Numeric values of a different type are cast when necessary. See JLS 5.1.3 for details.
      *
      * @return the BigInteger value.
      * @throws SerializationException if the Document is not a number.
@@ -243,7 +237,7 @@ public interface Document extends SerializableShape {
     /**
      * Get the BigDecimal value of the Document if it is a bigDecimal.
      *
-     * <p>If the value is a number of a different type, the value is cast, which can result in a loss of precision.
+     * <p>Numeric values of a different type are cast when necessary. See JLS 5.1.3 for details.
      *
      * @return the BigDecimal value.
      * @throws SerializationException if the Document is not a number.
