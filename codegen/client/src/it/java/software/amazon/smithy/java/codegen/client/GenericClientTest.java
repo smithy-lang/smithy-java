@@ -17,10 +17,10 @@ import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
 import software.amazon.smithy.java.codegen.client.util.EchoServer;
 import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
-import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.runtime.client.core.interceptors.InputHook;
-import software.amazon.smithy.java.runtime.client.core.interceptors.OutputHook;
-import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.runtime.client.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.runtime.client.interceptors.InputHook;
+import software.amazon.smithy.java.runtime.client.interceptors.OutputHook;
+import software.amazon.smithy.java.runtime.client.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 

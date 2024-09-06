@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.client.core.interceptors;
+package software.amazon.smithy.java.runtime.client.interceptors;
 
 import java.util.Objects;
 import java.util.function.BiFunction;

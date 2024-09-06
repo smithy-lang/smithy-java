@@ -8,4 +8,7 @@ extra["displayName"] = "Smithy :: Java :: Client API"
 extra["moduleName"] = "software.amazon.smithy.smithy.java.client-api"
 
 dependencies {
+    api(project(":context"))
+    api(project(":core"))
+    implementation(project(":logging"))
 }

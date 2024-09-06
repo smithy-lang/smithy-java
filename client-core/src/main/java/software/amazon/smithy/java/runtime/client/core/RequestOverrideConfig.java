@@ -14,9 +14,9 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeResolver;
-import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
+import software.amazon.smithy.java.runtime.client.interceptors.ClientInterceptor;
 
 /**
  * An immutable representation of configuration overrides when invoking {@link Client#call}.

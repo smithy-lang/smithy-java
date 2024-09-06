@@ -15,9 +15,9 @@ import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityReso
 import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeResolver;
-import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
+import software.amazon.smithy.java.runtime.client.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;

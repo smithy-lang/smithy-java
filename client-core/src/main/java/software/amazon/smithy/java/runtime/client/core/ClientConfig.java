@@ -15,9 +15,9 @@ import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeResolver;
-import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
+import software.amazon.smithy.java.runtime.client.interceptors.ClientInterceptor;
 
 /**
  * An immutable representation of configurations of a {@link Client}.

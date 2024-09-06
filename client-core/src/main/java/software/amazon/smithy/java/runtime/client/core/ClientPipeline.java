@@ -18,13 +18,13 @@ import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityReso
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeResolverParams;
-import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.runtime.client.core.interceptors.InputHook;
-import software.amazon.smithy.java.runtime.client.core.interceptors.OutputHook;
-import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
-import software.amazon.smithy.java.runtime.client.core.interceptors.ResponseHook;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolverParams;
+import software.amazon.smithy.java.runtime.client.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.runtime.client.interceptors.InputHook;
+import software.amazon.smithy.java.runtime.client.interceptors.OutputHook;
+import software.amazon.smithy.java.runtime.client.interceptors.RequestHook;
+import software.amazon.smithy.java.runtime.client.interceptors.ResponseHook;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
