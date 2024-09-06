@@ -14,6 +14,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
+import software.amazon.smithy.java.runtime.client.ClientTransport;
 import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeOption;
