@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.client.core.annotations;
+package software.amazon.smithy.java.runtime.client.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

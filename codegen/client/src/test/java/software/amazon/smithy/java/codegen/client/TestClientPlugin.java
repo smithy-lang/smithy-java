@@ -11,10 +11,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.client.annotations.Configuration;
+import software.amazon.smithy.java.runtime.client.annotations.Parameter;
 import software.amazon.smithy.java.runtime.client.core.ClientConfig;
 import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
-import software.amazon.smithy.java.runtime.client.core.annotations.Configuration;
-import software.amazon.smithy.java.runtime.client.core.annotations.Parameter;
 
 public final class TestClientPlugin implements ClientPlugin {
     public static final Context.Key<String> CONSTANT_KEY = Context.key("A constant value.");

@@ -26,6 +26,7 @@ import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.java.runtime.client.annotations.Configuration;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
@@ -33,7 +34,6 @@ import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
-import software.amazon.smithy.java.runtime.client.core.annotations.Configuration;
 import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
@@ -384,10 +384,10 @@ public final class ClientInterfaceGenerator
                 var param = parameters[idx];
                 var paramName = methodName;
                 if (param.isAnnotationPresent(
-                    software.amazon.smithy.java.runtime.client.core.annotations.Parameter.class
+                    software.amazon.smithy.java.runtime.client.annotations.Parameter.class
                 )) {
                     paramName = param.getAnnotation(
-                        software.amazon.smithy.java.runtime.client.core.annotations.Parameter.class
+                        software.amazon.smithy.java.runtime.client.annotations.Parameter.class
                     )
                         .value();
                 } else if (idx != 0) {
