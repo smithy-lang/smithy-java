@@ -109,7 +109,7 @@ public final class ClientPipeline<RequestT, ResponseT> {
 
         interceptor.readBeforeSerialization(inputHook);
         // Use the UNRESOLVED URI of "/" for now, and resolve the actual endpoint later.
-        RequestT request = protocol.createRequest(call, UNRESOLVED);
+        RequestT request = protocol.createRequest(call.operation(), input, context, UNRESOLVED);
         var requestHook = new RequestHook<>(context, input, request);
         interceptor.readAfterSerialization(requestHook);
 

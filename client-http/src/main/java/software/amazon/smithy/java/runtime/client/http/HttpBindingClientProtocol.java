@@ -9,9 +9,11 @@ import java.net.URI;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.core.ClientCall;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingApiOperation;
@@ -55,14 +57,19 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
     }
 
     @Override
-    public SmithyHttpRequest createRequest(ClientCall<?, ?> call, URI endpoint) {
+    public <I extends SerializableStruct, O extends SerializableStruct> SmithyHttpRequest createRequest(
+        ApiOperation<I, O> operation,
+        I input,
+        Context context,
+        URI endpoint
+    ) {
         RequestSerializer serializer = HttpBinding.requestSerializer()
-            .operation(call.operation())
+            .operation(operation)
             .payloadCodec(codec)
-            .shapeValue(call.input())
+            .shapeValue(input)
             .endpoint(endpoint);
 
-        if (call.operation() instanceof InputEventStreamingApiOperation<?, ?, ?> i) {
+        if (operation instanceof InputEventStreamingApiOperation<?, ?, ?> i) {
             serializer.eventEncoderFactory(getEventEncoderFactory(i));
         }
 

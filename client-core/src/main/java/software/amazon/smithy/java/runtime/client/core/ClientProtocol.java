@@ -7,8 +7,10 @@ package software.amazon.smithy.java.runtime.client.core;
 
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
@@ -42,11 +44,18 @@ public interface ClientProtocol<RequestT, ResponseT> {
     /**
      * Creates the underlying transport request.
      *
-     * @param call     Call being sent.
-     * @param endpoint Where to send the request.
+     * @param operation Operation to create request for.
+     * @param input     Input shape for the request.
+     * @param context   Context for the request.
+     * @param endpoint  Where to send the request.
      * @return Returns the request to send.
      */
-    RequestT createRequest(ClientCall<?, ?> call, URI endpoint);
+    <I extends SerializableStruct, O extends SerializableStruct> RequestT createRequest(
+        ApiOperation<I, O> operation,
+        I input,
+        Context context,
+        URI endpoint
+    );
 
     /**
      * Updates the underlying transport request to use the service endpoint.
