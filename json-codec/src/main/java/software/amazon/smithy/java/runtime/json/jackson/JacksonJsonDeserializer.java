@@ -174,15 +174,10 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                 case VALUE_STRING -> JsonDocuments.createString(parser.getText(), settings);
                 case VALUE_TRUE -> JsonDocuments.createBoolean(true, settings);
                 case VALUE_FALSE -> JsonDocuments.createBoolean(false, settings);
-                case VALUE_NUMBER_INT, VALUE_NUMBER_FLOAT -> {
-                    yield switch (parser.getNumberType()) {
-                        case INT -> JsonDocuments.createInt(parser.getIntValue(), settings);
-                        case FLOAT, DOUBLE -> JsonDocuments.createDouble(parser.getDoubleValue(), settings);
-                        case LONG -> JsonDocuments.createLong(parser.getLongValue(), settings);
-                        case BIG_INTEGER -> JsonDocuments.createBigInteger(parser.getBigIntegerValue(), settings);
-                        case BIG_DECIMAL -> JsonDocuments.createBigDecimal(parser.getDecimalValue(), settings);
-                    };
-                }
+                case VALUE_NUMBER_INT, VALUE_NUMBER_FLOAT -> JsonDocuments.createNumber(
+                    parser.getNumberValue(),
+                    settings
+                );
                 case START_ARRAY -> {
                     List<Document> values = new ArrayList<>();
                     for (var token = parser.nextToken(); token != END_ARRAY; token = parser.nextToken()) {

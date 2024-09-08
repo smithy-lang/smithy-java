@@ -115,7 +115,16 @@ public class TypedDocumentMemberTest {
             }));
         });
 
-        assertThat(extractor.apply(document.getMember("a")), equalTo(value));
+        var actual = extractor.apply(document.getMember("a"));
+        if (actual instanceof BigDecimal b) {
+            actual = b.stripTrailingZeros();
+        }
+
+        if (value instanceof BigDecimal b) {
+            value = b.stripTrailingZeros();
+        }
+
+        assertThat(actual, equalTo(value));
     }
 
     public static List<Arguments> convertsMemberProvider() {

@@ -11,6 +11,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.BiConsumer;
 import org.junit.jupiter.api.Test;
@@ -79,5 +80,47 @@ public class ListDocumentTest {
         document.serializeContents(serializer);
 
         assertThat(writtenStrings, contains("a", "b"));
+    }
+
+    @Test
+    public void handlesNullValues() {
+        List<Document> values = Arrays.asList(Document.createString("a"), null);
+        var document = Document.createList(values);
+
+        List<String> writtenStrings = new ArrayList<>();
+
+        ShapeSerializer serializer = new SpecificShapeSerializer() {
+            @Override
+            public void writeDocument(Schema schema, Document value) {
+                value.serializeContents(this);
+            }
+
+            @Override
+            public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+                assertThat(schema.type(), equalTo(ShapeType.LIST));
+                consumer.accept(listState, new SpecificShapeSerializer() {
+                    @Override
+                    public void writeDocument(Schema schema, Document value) {
+                        value.serializeContents(this);
+                    }
+
+                    @Override
+                    public void writeString(Schema schema, String value) {
+                        assertThat(schema, equalTo(PreludeSchemas.STRING));
+                        writtenStrings.add(value);
+                    }
+
+                    @Override
+                    public void writeNull(Schema schema) {
+                        assertThat(schema, equalTo(PreludeSchemas.DOCUMENT));
+                        writtenStrings.add(null);
+                    }
+                });
+            }
+        };
+
+        document.serializeContents(serializer);
+
+        assertThat(writtenStrings, contains("a", null));
     }
 }

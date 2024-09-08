@@ -91,7 +91,7 @@ public class DocumentTest {
         assertThat(value.asFloat(), is(1f));
         assertThat(value.asDouble(), is(1.0));
         assertThat(value.asBigInteger(), equalTo(BigInteger.valueOf(1)));
-        assertThat(value.asBigDecimal(), equalTo(BigDecimal.valueOf(1)));
+        assertThat(value.asBigDecimal(), equalTo(new BigDecimal("1.0")));
     }
 
     public static List<Arguments> onesProvider() {
@@ -103,7 +103,7 @@ public class DocumentTest {
             Arguments.of(Document.createFloat(1f)),
             Arguments.of(Document.createDouble(1.0)),
             Arguments.of(Document.createBigInteger(BigInteger.valueOf(1))),
-            Arguments.of(Document.createBigDecimal(new BigDecimal(1)))
+            Arguments.of(Document.createBigDecimal(new BigDecimal("1.0")))
         );
     }
 

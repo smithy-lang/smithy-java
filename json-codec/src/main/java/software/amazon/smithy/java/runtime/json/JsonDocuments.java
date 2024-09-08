@@ -21,6 +21,7 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.core.serde.document.DocumentDeserializer;
+import software.amazon.smithy.java.runtime.core.serde.document.DocumentUtils;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -47,24 +48,8 @@ public final class JsonDocuments {
         return new BooleanDocument(value, settings);
     }
 
-    public static Document createInt(int value, JsonCodec.Settings settings) {
-        return new IntDocument(value, settings);
-    }
-
-    public static Document createLong(long value, JsonCodec.Settings settings) {
-        return new LongDocument(value, settings);
-    }
-
-    public static Document createDouble(double value, JsonCodec.Settings settings) {
-        return new DoubleDocument(value, settings);
-    }
-
-    public static Document createBigDecimal(BigDecimal value, JsonCodec.Settings settings) {
-        return new BigDecimalDocument(value, settings);
-    }
-
-    public static Document createBigInteger(BigInteger value, JsonCodec.Settings settings) {
-        return new BigIntegerDocument(value, settings);
+    public static Document createNumber(Number value, JsonCodec.Settings settings) {
+        return new NumberDocument(value, settings, DocumentUtils.getSchemaForNumber(value));
     }
 
     public static Document createList(List<Document> values, JsonCodec.Settings settings) {
@@ -113,199 +98,10 @@ public final class JsonDocuments {
         }
     }
 
-    record IntDocument(int value, JsonCodec.Settings settings) implements Document {
+    record NumberDocument(Number value, JsonCodec.Settings settings, Schema schema) implements Document {
         @Override
         public ShapeType type() {
-            return ShapeType.INTEGER;
-        }
-
-        @Override
-        public byte asByte() {
-            return (byte) value;
-        }
-
-        @Override
-        public short asShort() {
-            return (short) value;
-        }
-
-        @Override
-        public int asInteger() {
-            return value;
-        }
-
-        @Override
-        public long asLong() {
-            return value;
-        }
-
-        @Override
-        public float asFloat() {
-            return value;
-        }
-
-        @Override
-        public double asDouble() {
-            return value;
-        }
-
-        @Override
-        public BigInteger asBigInteger() {
-            return BigInteger.valueOf(value);
-        }
-
-        @Override
-        public BigDecimal asBigDecimal() {
-            return BigDecimal.valueOf(value);
-        }
-
-        @Override
-        public Instant asTimestamp() {
-            // Always use the default JSON timestamp format with untyped documents.
-            return TimestampResolver.readTimestamp(value, settings.timestampResolver().defaultFormat());
-        }
-
-        @Override
-        public <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
-            builder.deserialize(new JsonDocumentDeserializer(settings, this));
-        }
-
-        @Override
-        public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeInteger(PreludeSchemas.INTEGER, value);
-        }
-    }
-
-    record LongDocument(long value, JsonCodec.Settings settings) implements Document {
-        @Override
-        public ShapeType type() {
-            return ShapeType.LONG;
-        }
-
-        @Override
-        public byte asByte() {
-            return (byte) value;
-        }
-
-        @Override
-        public short asShort() {
-            return (short) value;
-        }
-
-        @Override
-        public int asInteger() {
-            return (int) value;
-        }
-
-        @Override
-        public long asLong() {
-            return value;
-        }
-
-        @Override
-        public float asFloat() {
-            return value;
-        }
-
-        @Override
-        public double asDouble() {
-            return value;
-        }
-
-        @Override
-        public BigInteger asBigInteger() {
-            return BigInteger.valueOf(value);
-        }
-
-        @Override
-        public BigDecimal asBigDecimal() {
-            return BigDecimal.valueOf(value);
-        }
-
-        @Override
-        public Instant asTimestamp() {
-            // Always use the default JSON timestamp format with untyped documents.
-            return TimestampResolver.readTimestamp(value, settings.timestampResolver().defaultFormat());
-        }
-
-        @Override
-        public <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
-            builder.deserialize(new JsonDocumentDeserializer(settings, this));
-        }
-
-        @Override
-        public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeLong(PreludeSchemas.LONG, value);
-        }
-    }
-
-    record DoubleDocument(double value, JsonCodec.Settings settings) implements Document {
-        @Override
-        public ShapeType type() {
-            return ShapeType.DOUBLE;
-        }
-
-        @Override
-        public byte asByte() {
-            return (byte) value;
-        }
-
-        @Override
-        public short asShort() {
-            return (short) value;
-        }
-
-        @Override
-        public int asInteger() {
-            return (int) value;
-        }
-
-        @Override
-        public long asLong() {
-            return (long) value;
-        }
-
-        @Override
-        public float asFloat() {
-            return (float) value;
-        }
-
-        @Override
-        public double asDouble() {
-            return value;
-        }
-
-        @Override
-        public BigInteger asBigInteger() {
-            return BigInteger.valueOf((long) value);
-        }
-
-        @Override
-        public BigDecimal asBigDecimal() {
-            return BigDecimal.valueOf(value);
-        }
-
-        @Override
-        public Instant asTimestamp() {
-            // Always use the default JSON timestamp format with untyped documents.
-            return TimestampResolver.readTimestamp(value, settings.timestampResolver().defaultFormat());
-        }
-
-        @Override
-        public <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
-            builder.deserialize(new JsonDocumentDeserializer(settings, this));
-        }
-
-        @Override
-        public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeDouble(PreludeSchemas.DOUBLE, value);
-        }
-    }
-
-    record BigDecimalDocument(BigDecimal value, JsonCodec.Settings settings) implements Document {
-        @Override
-        public ShapeType type() {
-            return ShapeType.BIG_DECIMAL;
+            return schema.type();
         }
 
         @Override
@@ -340,12 +136,12 @@ public final class JsonDocuments {
 
         @Override
         public BigInteger asBigInteger() {
-            return value.toBigInteger();
+            return value instanceof BigInteger ? (BigInteger) value : BigInteger.valueOf(value.longValue());
         }
 
         @Override
         public BigDecimal asBigDecimal() {
-            return value;
+            return value instanceof BigDecimal ? (BigDecimal) value : BigDecimal.valueOf(value.doubleValue());
         }
 
         @Override
@@ -361,70 +157,7 @@ public final class JsonDocuments {
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeBigDecimal(PreludeSchemas.BIG_DECIMAL, value);
-        }
-    }
-
-    record BigIntegerDocument(BigInteger value, JsonCodec.Settings settings) implements Document {
-        @Override
-        public ShapeType type() {
-            return ShapeType.BIG_INTEGER;
-        }
-
-        @Override
-        public byte asByte() {
-            return value.byteValue();
-        }
-
-        @Override
-        public short asShort() {
-            return value.shortValue();
-        }
-
-        @Override
-        public int asInteger() {
-            return value.intValue();
-        }
-
-        @Override
-        public long asLong() {
-            return value.longValue();
-        }
-
-        @Override
-        public float asFloat() {
-            return value.floatValue();
-        }
-
-        @Override
-        public double asDouble() {
-            return value.doubleValue();
-        }
-
-        @Override
-        public BigInteger asBigInteger() {
-            return value;
-        }
-
-        @Override
-        public BigDecimal asBigDecimal() {
-            return new BigDecimal(value);
-        }
-
-        @Override
-        public Instant asTimestamp() {
-            // Always use the default JSON timestamp format with untyped documents.
-            return TimestampResolver.readTimestamp(value, settings.timestampResolver().defaultFormat());
-        }
-
-        @Override
-        public <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
-            builder.deserialize(new JsonDocumentDeserializer(settings, this));
-        }
-
-        @Override
-        public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeBigInteger(PreludeSchemas.BIG_INTEGER, value);
+            DocumentUtils.serializeNumber(serializer, schema, value);
         }
     }
 
@@ -470,7 +203,11 @@ public final class JsonDocuments {
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeList(PreludeSchemas.DOCUMENT, values, values.size(), (values, ser) -> {
                 for (var element : values) {
-                    element.serialize(ser);
+                    if (element == null) {
+                        ser.writeNull(PreludeSchemas.DOCUMENT);
+                    } else {
+                        element.serialize(ser);
+                    }
                 }
             });
         }

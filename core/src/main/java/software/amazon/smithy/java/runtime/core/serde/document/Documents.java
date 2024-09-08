@@ -49,344 +49,30 @@ final class Documents {
         }
     }
 
-    record ByteDocument(Schema schema, byte value) implements Document {
+    record NumberDocument(Schema schema, Number value) implements Document {
         @Override
         public ShapeType type() {
-            return ShapeType.BYTE;
+            return schema.type();
         }
 
         @Override
         public byte asByte() {
-            return value;
+            return value.byteValue();
         }
 
         @Override
         public short asShort() {
-            return value;
+            return value.shortValue();
         }
 
         @Override
         public int asInteger() {
-            return value;
+            return value.intValue();
         }
 
         @Override
         public long asLong() {
-            return value;
-        }
-
-        @Override
-        public float asFloat() {
-            return value;
-        }
-
-        @Override
-        public double asDouble() {
-            return value;
-        }
-
-        @Override
-        public BigInteger asBigInteger() {
-            return BigInteger.valueOf(value);
-        }
-
-        @Override
-        public BigDecimal asBigDecimal() {
-            return new BigDecimal(value);
-        }
-
-        @Override
-        public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeByte(schema, value);
-        }
-    }
-
-    record ShortDocument(Schema schema, short value) implements Document {
-        @Override
-        public ShapeType type() {
-            return ShapeType.SHORT;
-        }
-
-        @Override
-        public byte asByte() {
-            return (byte) value;
-        }
-
-        @Override
-        public short asShort() {
-            return value;
-        }
-
-        @Override
-        public int asInteger() {
-            return value;
-        }
-
-        @Override
-        public long asLong() {
-            return value;
-        }
-
-        @Override
-        public float asFloat() {
-            return value;
-        }
-
-        @Override
-        public double asDouble() {
-            return value;
-        }
-
-        @Override
-        public BigInteger asBigInteger() {
-            return BigInteger.valueOf(value);
-        }
-
-        @Override
-        public BigDecimal asBigDecimal() {
-            return new BigDecimal(value);
-        }
-
-        @Override
-        public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeShort(schema, value);
-        }
-    }
-
-    record IntegerDocument(Schema schema, int value) implements Document {
-        @Override
-        public ShapeType type() {
-            return ShapeType.INTEGER;
-        }
-
-        @Override
-        public byte asByte() {
-            return (byte) value;
-        }
-
-        @Override
-        public short asShort() {
-            return (short) value;
-        }
-
-        @Override
-        public int asInteger() {
-            return value;
-        }
-
-        @Override
-        public long asLong() {
-            return value;
-        }
-
-        @Override
-        public float asFloat() {
-            return value;
-        }
-
-        @Override
-        public double asDouble() {
-            return value;
-        }
-
-        @Override
-        public BigInteger asBigInteger() {
-            return BigInteger.valueOf(value);
-        }
-
-        @Override
-        public BigDecimal asBigDecimal() {
-            return new BigDecimal(value);
-        }
-
-        @Override
-        public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeInteger(schema, value);
-        }
-    }
-
-    record LongDocument(Schema schema, long value) implements Document {
-        @Override
-        public ShapeType type() {
-            return ShapeType.LONG;
-        }
-
-        @Override
-        public byte asByte() {
-            return (byte) value;
-        }
-
-        @Override
-        public short asShort() {
-            return (short) value;
-        }
-
-        @Override
-        public int asInteger() {
-            return (int) value;
-        }
-
-        @Override
-        public long asLong() {
-            return value;
-        }
-
-        @Override
-        public float asFloat() {
-            return value;
-        }
-
-        @Override
-        public double asDouble() {
-            return value;
-        }
-
-        @Override
-        public BigInteger asBigInteger() {
-            return BigInteger.valueOf(value);
-        }
-
-        @Override
-        public BigDecimal asBigDecimal() {
-            return new BigDecimal(value);
-        }
-
-        @Override
-        public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeLong(schema, value);
-        }
-    }
-
-    record FloatDocument(Schema schema, float value) implements Document {
-
-        @Override
-        public ShapeType type() {
-            return ShapeType.FLOAT;
-        }
-
-        @Override
-        public byte asByte() {
-            return (byte) value;
-        }
-
-        @Override
-        public short asShort() {
-            return (short) value;
-        }
-
-        @Override
-        public int asInteger() {
-            return (int) value;
-        }
-
-        @Override
-        public long asLong() {
-            return (long) value;
-        }
-
-        @Override
-        public float asFloat() {
-            return value;
-        }
-
-        @Override
-        public double asDouble() {
-            return value;
-        }
-
-        @Override
-        public BigInteger asBigInteger() {
-            return asBigDecimal().toBigInteger();
-        }
-
-        @Override
-        public BigDecimal asBigDecimal() {
-            return new BigDecimal(value);
-        }
-
-        @Override
-        public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeFloat(schema, value);
-        }
-    }
-
-    record DoubleDocument(Schema schema, double value) implements Document {
-
-        @Override
-        public ShapeType type() {
-            return ShapeType.DOUBLE;
-        }
-
-        @Override
-        public byte asByte() {
-            return (byte) value;
-        }
-
-        @Override
-        public short asShort() {
-            return (short) value;
-        }
-
-        @Override
-        public int asInteger() {
-            return (int) value;
-        }
-
-        @Override
-        public long asLong() {
-            return (long) value;
-        }
-
-        @Override
-        public float asFloat() {
-            return (float) value;
-        }
-
-        @Override
-        public double asDouble() {
-            return value;
-        }
-
-        @Override
-        public BigInteger asBigInteger() {
-            return asBigDecimal().toBigInteger();
-        }
-
-        @Override
-        public BigDecimal asBigDecimal() {
-            return new BigDecimal(value);
-        }
-
-        @Override
-        public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeDouble(schema, value);
-        }
-    }
-
-    record BigIntegerDocument(Schema schema, BigInteger value) implements Document {
-        @Override
-        public ShapeType type() {
-            return ShapeType.BIG_INTEGER;
-        }
-
-        @Override
-        public byte asByte() {
-            return value.byteValueExact();
-        }
-
-        @Override
-        public short asShort() {
-            return value.shortValueExact();
-        }
-
-        @Override
-        public int asInteger() {
-            return value.intValueExact();
-        }
-
-        @Override
-        public long asLong() {
-            return value.longValueExact();
+            return value.longValue();
         }
 
         @Override
@@ -401,69 +87,17 @@ final class Documents {
 
         @Override
         public BigInteger asBigInteger() {
-            return value;
+            return value instanceof BigInteger ? (BigInteger) value : BigInteger.valueOf(value.longValue());
         }
 
         @Override
         public BigDecimal asBigDecimal() {
-            return new BigDecimal(value);
+            return value instanceof BigDecimal ? (BigDecimal) value : BigDecimal.valueOf(value.doubleValue());
         }
 
         @Override
         public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeBigInteger(schema, value);
-        }
-    }
-
-    record BigDecimalDocument(Schema schema, BigDecimal value) implements Document {
-        @Override
-        public ShapeType type() {
-            return ShapeType.BIG_DECIMAL;
-        }
-
-        @Override
-        public byte asByte() {
-            return value.byteValueExact();
-        }
-
-        @Override
-        public short asShort() {
-            return value.shortValueExact();
-        }
-
-        @Override
-        public int asInteger() {
-            return value.intValueExact();
-        }
-
-        @Override
-        public long asLong() {
-            return value.longValueExact();
-        }
-
-        @Override
-        public float asFloat() {
-            return value.floatValue();
-        }
-
-        @Override
-        public double asDouble() {
-            return value.doubleValue();
-        }
-
-        @Override
-        public BigInteger asBigInteger() {
-            return value.toBigInteger();
-        }
-
-        @Override
-        public BigDecimal asBigDecimal() {
-            return value;
-        }
-
-        @Override
-        public void serializeContents(ShapeSerializer serializer) {
-            serializer.writeBigDecimal(schema, value);
+            DocumentUtils.serializeNumber(serializer, schema, value);
         }
     }
 
@@ -556,7 +190,11 @@ final class Documents {
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeList(schema, values, values.size(), (values, ser) -> {
                 for (var element : values) {
-                    element.serialize(ser);
+                    if (element == null) {
+                        ser.writeNull(PreludeSchemas.DOCUMENT);
+                    } else {
+                        element.serialize(ser);
+                    }
                 }
             });
         }

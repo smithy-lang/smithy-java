@@ -410,13 +410,23 @@ public interface Document extends SerializableShape {
     }
 
     /**
+     * Create a number document.
+     *
+     * @param value Value to wrap.
+     * @return the Document type.
+     */
+    static Document createNumber(Number value) {
+        return new Documents.NumberDocument(DocumentUtils.getSchemaForNumber(value), value);
+    }
+
+    /**
      * Create a byte Document.
      *
      * @param value Value to wrap.
      * @return the Document type.
      */
     static Document createByte(byte value) {
-        return new Documents.ByteDocument(PreludeSchemas.BYTE, value);
+        return new Documents.NumberDocument(PreludeSchemas.BYTE, value);
     }
 
     /**
@@ -426,7 +436,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document createShort(short value) {
-        return new Documents.ShortDocument(PreludeSchemas.SHORT, value);
+        return new Documents.NumberDocument(PreludeSchemas.SHORT, value);
     }
 
     /**
@@ -436,7 +446,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document createInteger(int value) {
-        return new Documents.IntegerDocument(PreludeSchemas.INTEGER, value);
+        return new Documents.NumberDocument(PreludeSchemas.INTEGER, value);
     }
 
     /**
@@ -446,7 +456,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document createLong(long value) {
-        return new Documents.LongDocument(PreludeSchemas.LONG, value);
+        return new Documents.NumberDocument(PreludeSchemas.LONG, value);
     }
 
     /**
@@ -456,7 +466,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document createFloat(float value) {
-        return new Documents.FloatDocument(PreludeSchemas.FLOAT, value);
+        return new Documents.NumberDocument(PreludeSchemas.FLOAT, value);
     }
 
     /**
@@ -466,7 +476,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document createDouble(double value) {
-        return new Documents.DoubleDocument(PreludeSchemas.DOUBLE, value);
+        return new Documents.NumberDocument(PreludeSchemas.DOUBLE, value);
     }
 
     /**
@@ -476,7 +486,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document createBigInteger(BigInteger value) {
-        return new Documents.BigIntegerDocument(PreludeSchemas.BIG_INTEGER, value);
+        return new Documents.NumberDocument(PreludeSchemas.BIG_INTEGER, value);
     }
 
     /**
@@ -486,7 +496,7 @@ public interface Document extends SerializableShape {
      * @return the Document type.
      */
     static Document createBigDecimal(BigDecimal value) {
-        return new Documents.BigDecimalDocument(PreludeSchemas.BIG_DECIMAL, value);
+        return new Documents.NumberDocument(PreludeSchemas.BIG_DECIMAL, value);
     }
 
     /**
@@ -590,22 +600,8 @@ public interface Document extends SerializableShape {
             return createString(s);
         } else if (o instanceof Boolean b) {
             return createBoolean(b);
-        } else if (o instanceof Byte b) {
-            return createByte(b);
-        } else if (o instanceof Short s) {
-            return createShort(s);
-        } else if (o instanceof Integer i) {
-            return createInteger(i);
-        } else if (o instanceof Long l) {
-            return createLong(l);
-        } else if (o instanceof Float f) {
-            return createFloat(f);
-        } else if (o instanceof Double d) {
-            return createDouble(d);
-        } else if (o instanceof BigInteger b) {
-            return createBigInteger(b);
-        } else if (o instanceof BigDecimal b) {
-            return createBigDecimal(b);
+        } else if (o instanceof Number n) {
+            return createNumber(n);
         } else if (o instanceof ByteBuffer b) {
             return createBlob(b);
         } else if (o instanceof byte[] b) {
