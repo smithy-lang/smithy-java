@@ -9,9 +9,9 @@ import java.net.URI;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
-import software.amazon.smithy.java.runtime.client.core.ClientCall;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOperation;
@@ -78,25 +78,27 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
 
     @Override
     public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
-        ClientCall<I, O> call,
+        ApiOperation<I, O> operation,
+        Context context,
+        BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator,
         SmithyHttpRequest request,
         SmithyHttpResponse response
     ) {
         if (!isSuccess(response)) {
-            return createError(call, response).thenApply(e -> {
+            return createError(operation, context, errorCreator, response).thenApply(e -> {
                 throw e;
             });
         }
 
         LOGGER.trace("Deserializing successful response with {}", getClass().getName());
 
-        var outputBuilder = call.operation().outputBuilder();
+        var outputBuilder = operation.outputBuilder();
         ResponseDeserializer deser = HttpBinding.responseDeserializer()
             .payloadCodec(codec)
             .outputShapeBuilder(outputBuilder)
             .response(response);
 
-        if (call.operation() instanceof OutputEventStreamingApiOperation<?, ?, ?> o) {
+        if (operation instanceof OutputEventStreamingApiOperation<?, ?, ?> o) {
             deser.eventDecoderFactory(getEventDecoderFactory(o));
         }
 
@@ -120,12 +122,13 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
     /**
      * An overrideable error deserializer.
      *
-     * @param call     Call being sent.
      * @param response HTTP response to deserialize.
      * @return Returns the deserialized error.
      */
-    protected CompletableFuture<? extends ApiException> createError(
-        ClientCall<?, ?> call,
+    protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<? extends ApiException> createError(
+        ApiOperation<I, O> operation,
+        Context context,
+        BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator,
         SmithyHttpResponse response
     ) {
         return response.headers()
@@ -138,14 +141,14 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
             })
             // Attempt to match the extracted error ID to a modeled error type.
             .flatMap(
-                errorId -> Optional.ofNullable(call.createExceptionBuilder(call.context(), errorId))
+                errorId -> Optional.ofNullable(errorCreator.apply(context, errorId))
                     .<CompletableFuture<? extends ApiException>>map(
                         error -> createModeledException(codec, response, error)
                     )
             )
             // If no error was matched, then create an error from protocol hints.
             .orElseGet(() -> {
-                String operationId = call.operation().schema().id().toString();
+                String operationId = operation.schema().id().toString();
                 return HttpClientProtocol.createErrorFromHints(operationId, response);
             });
     }

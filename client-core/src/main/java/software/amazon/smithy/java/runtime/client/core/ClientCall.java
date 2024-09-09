@@ -117,17 +117,15 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
     }
 
     /**
-     * Attempts to create a builder for a modeled error.
+     * Get the error creator of the call.
      *
-     * <p>If this method returns null, a protocol must create an appropriate error based on protocol hints.
+     * <p>If the errorCreator is null or that function returns null, a protocol must create an appropriate error based
+     * on protocol hints.
      *
-     * @param context Context to pass to the creator.
-     * @param shapeId Nullable ID of the error shape to create, if known. A string is used because sometimes the
-     *                only information we have is just a name.
-     * @return Returns the error deserializer, or null if no deserializer could be found.
+     * @return Return the error creator.
      */
-    public ShapeBuilder<ModeledApiException> createExceptionBuilder(Context context, String shapeId) {
-        return errorCreator.apply(context, shapeId);
+    public BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator() {
+        return errorCreator;
     }
 
     /**
@@ -221,12 +219,12 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         }
 
         /**
-         * Sets a supplier used to create an error based on the context and extracted shape ID.
+         * Sets a function used to create an error based on the context and extracted shape ID.
          *
-         * <p>If the supplier returns null or no supplier is provided, the protocol will create an error based on
+         * <p>If the function returns null or no function is provided, the protocol will create an error based on
          * protocol hints (e.g., HTTP status codes).
          *
-         * @param errorCreator Error supplier to create the builder for an error.
+         * @param errorCreator Function to create the builder for an error.
          * @return Returns the builder.
          */
         public Builder<I, O> errorCreator(

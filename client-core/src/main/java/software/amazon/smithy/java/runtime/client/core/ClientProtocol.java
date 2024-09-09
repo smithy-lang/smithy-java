@@ -7,11 +7,14 @@ package software.amazon.smithy.java.runtime.client.core;
 
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 
 /**
  * Handles request and response serialization.
@@ -74,14 +77,19 @@ public interface ClientProtocol<RequestT, ResponseT> {
     /**
      * Deserializes the output from the transport response or throws a modeled or unmodeled exception.
      *
-     * @param call     Call being sent.
+     * <p>For modeled exceptions, the {@code errorCreator} is used to build the error. If the errorCreator returns null
+     * or none is provided, the protocol can create an error based on protocol hints (e.g., HTTP status codes).
+     *
      * @param request  Request that was sent for this response.
      * @param response Response to deserialize.
+     * @param errorCreator A function used to create an error based on the context and extracted shape ID.
      * @return the deserialized output shape.
      * @throws ApiException if an error occurs, including deserialized modeled errors and protocol errors.
      */
     <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
-        ClientCall<I, O> call,
+        ApiOperation<I, O> operation,
+        Context context,
+        BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator,
         RequestT request,
         ResponseT response
     );
