@@ -9,7 +9,6 @@ import java.net.URI;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
@@ -20,6 +19,7 @@ import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingApiOp
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
+import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.Frame;
@@ -28,6 +28,7 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.binding.HttpBinding;
 import software.amazon.smithy.java.runtime.http.binding.RequestSerializer;
 import software.amazon.smithy.java.runtime.http.binding.ResponseDeserializer;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * An HTTP-based protocol that uses HTTP binding traits.
@@ -80,12 +81,12 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
     public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
         ApiOperation<I, O> operation,
         Context context,
-        BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator,
+        TypeRegistry typeRegistry,
         SmithyHttpRequest request,
         SmithyHttpResponse response
     ) {
         if (!isSuccess(response)) {
-            return createError(operation, context, errorCreator, response).thenApply(e -> {
+            return createError(operation, context, typeRegistry, response).thenApply(e -> {
                 throw e;
             });
         }
@@ -128,7 +129,7 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
     protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<? extends ApiException> createError(
         ApiOperation<I, O> operation,
         Context context,
-        BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator,
+        TypeRegistry typeRegistry,
         SmithyHttpResponse response
     ) {
         return response.headers()
@@ -141,7 +142,9 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
             })
             // Attempt to match the extracted error ID to a modeled error type.
             .flatMap(
-                errorId -> Optional.ofNullable(errorCreator.apply(context, errorId))
+                errorId -> Optional.ofNullable(
+                    typeRegistry.createBuilder(ShapeId.from(errorId), ModeledApiException.class)
+                )
                     .<CompletableFuture<? extends ApiException>>map(
                         error -> createModeledException(codec, response, error)
                     )

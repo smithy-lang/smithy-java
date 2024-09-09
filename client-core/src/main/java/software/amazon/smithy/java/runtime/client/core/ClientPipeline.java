@@ -229,7 +229,7 @@ public final class ClientPipeline<RequestT, ResponseT> {
 
         interceptor.readBeforeDeserialization(responseHook);
 
-        return protocol.deserializeResponse(call.operation(), context, call.errorCreator(), request, modifiedResponse)
+        return protocol.deserializeResponse(call.operation(), context, call.typeRegistry(), request, modifiedResponse)
             .thenApply(shape -> {
                 var outputHook = new OutputHook<>(context, input, request, response, shape);
                 RuntimeException error = null;

@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.context.Context;
@@ -21,9 +20,8 @@ import software.amazon.smithy.java.runtime.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
-import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -38,7 +36,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
     private final EndpointResolver endpointResolver;
     private final ApiOperation<I, O> operation;
     private final Context context;
-    private final BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator;
+    private final TypeRegistry typeRegistry;
     private final ClientInterceptor interceptor;
     private final AuthSchemeResolver authSchemeResolver;
     private final Map<ShapeId, AuthScheme<?, ?>> supportedAuthSchemes;
@@ -49,7 +47,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         input = Objects.requireNonNull(builder.input, "input is null");
         operation = Objects.requireNonNull(builder.operation, "operation is null");
         context = Objects.requireNonNull(builder.context, "context is null");
-        errorCreator = Objects.requireNonNull(builder.errorCreator, "errorCreator is null");
+        typeRegistry = Objects.requireNonNull(builder.typeRegistry, "typeRegistry is null");
         endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
         interceptor = Objects.requireNonNull(builder.interceptor, "interceptor is null");
         authSchemeResolver = Objects.requireNonNull(builder.authSchemeResolver, "authSchemeResolver is null");
@@ -117,15 +115,12 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
     }
 
     /**
-     * Get the error creator of the call.
+     * Get the type registry of the call.
      *
-     * <p>If the errorCreator is null or that function returns null, a protocol must create an appropriate error based
-     * on protocol hints.
-     *
-     * @return Return the error creator.
+     * @return Return the type registry.
      */
-    public BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator() {
-        return errorCreator;
+    public TypeRegistry typeRegistry() {
+        return typeRegistry;
     }
 
     /**
@@ -176,7 +171,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         private EndpointResolver endpointResolver;
         private ApiOperation<I, O> operation;
         private Context context;
-        private BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator;
+        private TypeRegistry typeRegistry;
         private ClientInterceptor interceptor = ClientInterceptor.NOOP;
         private AuthSchemeResolver authSchemeResolver;
         private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
@@ -219,18 +214,13 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         }
 
         /**
-         * Sets a function used to create an error based on the context and extracted shape ID.
+         * Sets the TypeRegistry of the call.
          *
-         * <p>If the function returns null or no function is provided, the protocol will create an error based on
-         * protocol hints (e.g., HTTP status codes).
-         *
-         * @param errorCreator Function to create the builder for an error.
+         * @param typeRegistry TypeRegistry to use.
          * @return Returns the builder.
          */
-        public Builder<I, O> errorCreator(
-            BiFunction<Context, String, ShapeBuilder<ModeledApiException>> errorCreator
-        ) {
-            this.errorCreator = errorCreator;
+        public Builder<I, O> typeRegistry(TypeRegistry typeRegistry) {
+            this.typeRegistry = typeRegistry;
             return this;
         }
 

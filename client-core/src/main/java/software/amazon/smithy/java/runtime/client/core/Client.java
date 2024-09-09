@@ -19,10 +19,8 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterc
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
-import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
-import software.amazon.smithy.model.shapes.ShapeId;
 
 public abstract class Client {
 
@@ -92,10 +90,7 @@ public abstract class Client {
             .supportedAuthSchemes(callConfig.supportedAuthSchemes())
             .authSchemeResolver(callConfig.authSchemeResolver())
             .identityResolvers(callIdentityResolvers)
-            .errorCreator((c, id) -> {
-                ShapeId shapeId = ShapeId.from(id);
-                return operationRegistry.createBuilder(shapeId, ModeledApiException.class);
-            })
+            .typeRegistry(operationRegistry)
             .build();
 
         return callPipeline.send(call);
