@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 
 public final class DocumentUtils {
@@ -96,5 +97,39 @@ public final class DocumentUtils {
                 )
             );
         }
+    }
+
+    // Emulate JLS 5.1.2 type promotion.
+    static boolean compareWithPromotion(Number a, Document rightDocument) {
+        try {
+            return compareWithPromotion(a, rightDocument.asNumber());
+        } catch (SerializationException e) {
+            // If the other document can't be converted to a number, then don't fail. Instead, report false.
+            return false;
+        }
+    }
+
+    // Emulate JLS 5.1.2 type promotion.
+    private static boolean compareWithPromotion(Number a, Number b) {
+        // Exact matches.
+        if (a.equals(b)) {
+            return true;
+        } else if (isBig(a, b)) {
+            // When the values have a BigDecimal or BigInteger, normalize them both to BigDecimal. This is used even
+            // for BigInteger to avoid dropping decimals from doubles or floats (e.g., 10.01 != 10).
+            return DocumentUtils.toBigDecimal(a)
+                .stripTrailingZeros()
+                .compareTo(DocumentUtils.toBigDecimal(b).stripTrailingZeros()) == 0;
+        } else if (a instanceof Double || b instanceof Double || a instanceof Float || b instanceof Float) {
+            // Treat floats as double to allow for comparing larger values from rhs, like longs.
+            return a.doubleValue() == b.doubleValue();
+        } else {
+            return a.longValue() == b.longValue();
+        }
+    }
+
+    private static boolean isBig(Number a, Number b) {
+        return a instanceof BigDecimal || b instanceof BigDecimal
+            || a instanceof BigInteger || b instanceof BigInteger;
     }
 }

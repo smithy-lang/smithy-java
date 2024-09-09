@@ -49,11 +49,20 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
 
     @Override
     public void close() {
-        try {
-            parser.close();
-            parser = null;
-        } catch (Exception e) {
-            throw new SerializationException(e);
+        if (parser != null && !parser.isClosed()) {
+            try {
+                // Close the parser, but also ensure there's no trailing garbage input.
+                var nextToken = parser.nextToken();
+                parser.close();
+                parser = null;
+                if (nextToken != null) {
+                    throw new SerializationException("Unexpected JSON content: " + JsonToken.valueDescFor(nextToken));
+                }
+            } catch (SerializationException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
         }
     }
 
@@ -169,7 +178,11 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public Document readDocument() {
         try {
-            return switch (parser.currentToken()) {
+            var token = parser.currentToken();
+            if (token == null) {
+                throw new SerializationException("Expected a JSON value");
+            }
+            return switch (token) {
                 case VALUE_NULL -> null;
                 case VALUE_STRING -> JsonDocuments.createString(parser.getText(), settings);
                 case VALUE_TRUE -> JsonDocuments.createBoolean(true, settings);
@@ -180,7 +193,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                 );
                 case START_ARRAY -> {
                     List<Document> values = new ArrayList<>();
-                    for (var token = parser.nextToken(); token != END_ARRAY; token = parser.nextToken()) {
+                    for (token = parser.nextToken(); token != END_ARRAY; token = parser.nextToken()) {
                         values.add(readDocument());
                     }
                     yield JsonDocuments.createList(values, settings);

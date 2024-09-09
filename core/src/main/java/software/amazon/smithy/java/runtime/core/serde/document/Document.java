@@ -652,47 +652,81 @@ public interface Document extends SerializableShape {
      * @return true if they are equal.
      */
     static boolean equals(Object left, Object right) {
+        return equals(left, right, 0);
+    }
+
+    /**
+     * Determines if two documents are equal, ignoring schemas and protocol details.
+     *
+     * @param left  Left document to compare.
+     * @param right Right document to compare.
+     * @param options A bitfield of flages OR'd together from {@link DocumentEqualsFlags}.
+     * @return true if they are equal.
+     */
+    static boolean equals(Object left, Object right, int options) {
         if (left instanceof Document l) {
             if (right instanceof Document r) {
                 if (l == r) {
                     return true;
-                } else if (l.type() != r.type()) {
-                    return false;
                 }
                 return switch (l.type()) {
-                    case BLOB -> l.asBlob().equals(r.asBlob());
-                    case BOOLEAN -> l.asBoolean() == r.asBoolean();
-                    case STRING, ENUM -> l.asString().equals(r.asString());
-                    case TIMESTAMP -> l.asTimestamp().equals(r.asTimestamp());
-                    case BYTE -> l.asByte() == r.asByte();
-                    case SHORT -> l.asShort() == r.asShort();
-                    case INTEGER, INT_ENUM -> l.asInteger() == r.asInteger();
-                    case LONG -> l.asLong() == r.asLong();
-                    case FLOAT -> l.asFloat() == r.asFloat();
-                    case DOUBLE -> l.asDouble() == r.asDouble();
-                    case BIG_DECIMAL -> l.asBigDecimal().equals(r.asBigDecimal());
-                    case BIG_INTEGER -> l.asBigInteger().equals(r.asBigInteger());
+                    case BLOB -> l.type() == r.type() && l.asBlob().equals(r.asBlob());
+                    case BOOLEAN -> l.type() == r.type() && l.asBoolean() == r.asBoolean();
+                    case STRING, ENUM -> l.type() == r.type() && l.asString().equals(r.asString());
+                    case TIMESTAMP -> l.type() == r.type() && l.asTimestamp().equals(r.asTimestamp());
+                    case BYTE -> (options & DocumentEqualsFlags.NUMBER_PROMOTION) != 0
+                        ? DocumentUtils.compareWithPromotion(l.asByte(), r)
+                        : l.type() == r.type() && l.asByte() == r.asByte();
+                    case SHORT -> (options & DocumentEqualsFlags.NUMBER_PROMOTION) != 0
+                        ? DocumentUtils.compareWithPromotion(l.asShort(), r)
+                        : l.type() == r.type() && l.asShort() == r.asShort();
+                    case INTEGER, INT_ENUM -> (options & DocumentEqualsFlags.NUMBER_PROMOTION) != 0
+                        ? DocumentUtils.compareWithPromotion(l.asInteger(), r)
+                        : l.type() == r.type() && l.asInteger() == r.asInteger();
+                    case LONG -> (options & DocumentEqualsFlags.NUMBER_PROMOTION) != 0
+                        ? DocumentUtils.compareWithPromotion(l.asLong(), r)
+                        : l.type() == r.type() && l.asLong() == r.asLong();
+                    case FLOAT -> (options & DocumentEqualsFlags.NUMBER_PROMOTION) != 0
+                        ? DocumentUtils.compareWithPromotion(l.asFloat(), r)
+                        : l.type() == r.type() && l.asFloat() == r.asFloat();
+                    case DOUBLE -> (options & DocumentEqualsFlags.NUMBER_PROMOTION) != 0
+                        ? DocumentUtils.compareWithPromotion(l.asDouble(), r)
+                        : l.type() == r.type() && l.asDouble() == r.asDouble();
+                    case BIG_DECIMAL -> (options & DocumentEqualsFlags.NUMBER_PROMOTION) != 0
+                        ? DocumentUtils.compareWithPromotion(l.asBigDecimal(), r)
+                        : l.type() == r.type() && l.asBigDecimal()
+                            .stripTrailingZeros()
+                            .equals(r.asBigDecimal().stripTrailingZeros());
+                    case BIG_INTEGER -> (options & DocumentEqualsFlags.NUMBER_PROMOTION) != 0
+                        ? DocumentUtils.compareWithPromotion(l.asBigInteger(), r)
+                        : l.type() == r.type() && l.asBigInteger().equals(r.asBigInteger());
                     case LIST, SET -> {
+                        if (l.type() != r.type()) {
+                            yield false;
+                        }
                         var ll = l.asList();
                         var rl = r.asList();
                         if (ll.size() != rl.size()) {
                             yield false;
                         }
                         for (int i = 0; i < ll.size(); i++) {
-                            if (!equals(ll.get(i), rl.get(i))) {
+                            if (!equals(ll.get(i), rl.get(i), options)) {
                                 yield false;
                             }
                         }
                         yield true;
                     }
                     case MAP, STRUCTURE, UNION -> {
+                        if (l.type() != r.type()) {
+                            yield false;
+                        }
                         var lm = l.asStringMap();
                         var rm = r.asStringMap();
                         if (lm.size() != rm.size()) {
                             yield false;
                         }
                         for (var entry : lm.entrySet()) {
-                            if (!equals(entry.getValue(), rm.get(entry.getKey()))) {
+                            if (!equals(entry.getValue(), rm.get(entry.getKey()), options)) {
                                 yield false;
                             }
                         }

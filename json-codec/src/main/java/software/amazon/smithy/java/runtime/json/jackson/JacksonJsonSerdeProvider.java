@@ -16,7 +16,9 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.java.runtime.json.JsonSerdeProvider;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
+@SmithyInternalApi
 public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
 
     private static final JsonFactory FACTORY;

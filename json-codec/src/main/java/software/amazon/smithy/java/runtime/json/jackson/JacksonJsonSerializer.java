@@ -131,7 +131,8 @@ final class JacksonJsonSerializer implements ShapeSerializer {
         try {
             if (Float.isFinite(value)) {
                 int intValue = (int) value;
-                if (value - intValue > 0) {
+                if (value - intValue != 0) {
+                    // Avoid writing 1.0 and instead write 1.
                     generator.writeNumber(value);
                 } else {
                     generator.writeNumber(intValue);
@@ -153,7 +154,8 @@ final class JacksonJsonSerializer implements ShapeSerializer {
         try {
             if (Double.isFinite(value)) {
                 long longValue = (long) value;
-                if (value - longValue > 0) {
+                if (value - longValue != 0) {
+                    // Avoid writing 1.0 and instead write 1.
                     generator.writeNumber(value);
                 } else {
                     generator.writeNumber(longValue);
