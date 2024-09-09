@@ -1,1 +1,11 @@
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+=========================================================================
+This project includes software licensed under the MIT License:
+
+Component: json-iter
+Copyright (c) 2016 Tao Wen
+Licensed under the MIT License.
+You may obtain a copy of the MIT License at:
+
+    https://github.com/json-iterator/java/blob/master/LICENSE

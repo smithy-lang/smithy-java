@@ -36,7 +36,7 @@ public sealed interface JsonFieldMapper {
      * Uses the member name and ignores the jsonName trait.
      */
     final class UseMemberName implements JsonFieldMapper {
-        static final UseMemberName INSTANCE = new UseMemberName();
+        public static final UseMemberName INSTANCE = new UseMemberName();
 
         private UseMemberName() {}
 

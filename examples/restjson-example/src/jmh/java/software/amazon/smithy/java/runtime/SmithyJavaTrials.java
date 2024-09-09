@@ -25,6 +25,7 @@ import software.amazon.smithy.java.runtime.example.model.AttributeUpdates;
 import software.amazon.smithy.java.runtime.example.model.CodegenStruct;
 import software.amazon.smithy.java.runtime.example.model.SendMessageRequest;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
+import software.amazon.smithy.java.runtime.json.jsoniter.JsonIterProvider;
 import software.amazon.smithy.utils.IoUtils;
 
 @State(Scope.Benchmark)
@@ -32,7 +33,7 @@ import software.amazon.smithy.utils.IoUtils;
 @BenchmarkMode(Mode.AverageTime)
 public class SmithyJavaTrials {
 
-    private static final JsonCodec CODEC = JsonCodec.builder().build();
+    private static final JsonCodec CODEC = JsonCodec.builder().overrideSerdeProvider(new JsonIterProvider()).build();
 
     private static final Map<String, Class<? extends ShapeBuilder<?>>> CASES = Map.ofEntries(
         Map.entry("all_fields_optional_0", AllFieldsOptional.Builder.class),
@@ -66,7 +67,7 @@ public class SmithyJavaTrials {
 
         // The bytes of the JSON for the test case. Each JSON document is serialized using no jsonName or
         // timestamp format trait.
-        var preparationCodec = JsonCodec.builder().build();
+        var preparationCodec = JsonCodec.builder().overrideSerdeProvider(new JsonIterProvider()).build();
         testName = testName + ".json";
 
         // TODO: for some reason, I can't access resources using relative paths with Class#getResource.

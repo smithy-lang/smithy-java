@@ -28,4 +28,14 @@
     <Match>
         <Bug pattern="CT_CONSTRUCTOR_THROW"/>
     </Match>
+
+    <!-- JSON iter false positives -->
+    <Match>
+        <Bug pattern="SA_FIELD_SELF_ASSIGNMENT"/>
+        <Class name="software.amazon.smithy.java.runtime.json.jsoniter.internal.IterImplForStreaming"/>
+    </Match>
+    <Match>
+        <Bug pattern="ICAST_INTEGER_MULTIPLY_CAST_TO_LONG"/>
+        <Class name="software.amazon.smithy.java.runtime.json.jsoniter.internal.IterImpl"/>
+    </Match>
 </FindBugsFilter>

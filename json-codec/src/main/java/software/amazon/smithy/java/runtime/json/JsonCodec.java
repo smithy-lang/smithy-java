@@ -134,7 +134,7 @@ public final class JsonCodec implements Codec {
             return this;
         }
 
-        Builder overrideSerdeProvider(JsonSerdeProvider provider) {
+        public Builder overrideSerdeProvider(JsonSerdeProvider provider) {
             this.provider = Objects.requireNonNull(provider);
             return this;
         }
