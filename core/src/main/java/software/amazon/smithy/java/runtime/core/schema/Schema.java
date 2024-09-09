@@ -30,6 +30,9 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
     private final ShapeType type;
     private final ShapeId id;
 
+    private Schema[][] memberLookupTable;
+    private boolean skipLengthLookups;
+
     /**
      * Schema traits. This is package-private to allow MemberSchemaBuilder to eagerly merge member and target traits.
      */
@@ -158,6 +161,110 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
                 m -> m.requiredByValidationBitmask
             );
         }
+    }
+
+    /**
+     * Efficiently find a member using a byte array, comparing against member names.
+     *
+     * @param array  Data to check.
+     * @param head Start of data.
+     * @param tail End of data.
+     * @return the matched member schema, or null if not found.
+     */
+    public final Schema findMember(byte[] array, int head, int tail) {
+        var lookupTable = getMemberLookupTable();
+        var len = tail - head;
+
+        if (skipLengthLookups) {
+            outer:
+            for (var member : members()) {
+                var memberName = member.memberName;
+                if (memberName.length() == len) {
+                    for (var i = head; i < tail; i++) {
+                        if (memberName.charAt(i - head) != array[i]) {
+                            continue outer;
+                        }
+                    }
+                    return member;
+                }
+            }
+        } else {
+            if (len > 0 && len < lookupTable.length) {
+                var table = lookupTable[len];
+                outer:
+                for (var member : table) {
+                    var memberName = member.memberName;
+                    for (var i = head; i < head + len; i++) {
+                        if (memberName.charAt(i - head) != array[i]) {
+                            continue outer;
+                        }
+                    }
+                    return member;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private Schema[][] getMemberLookupTable() {
+        var table = memberLookupTable;
+
+        if (table == null) {
+
+            if (memberTarget() != null) {
+                // Don't recompute on members.
+                memberLookupTable = memberTarget().memberLookupTable;
+                skipLengthLookups = memberTarget().skipLengthLookups;
+                return memberLookupTable;
+            } else if (members().size() <= 2) {
+                // Don't make a table when the size wouldn't benefit.
+                memberLookupTable = new Schema[0][];
+                skipLengthLookups = true;
+                return memberLookupTable;
+            }
+
+            // First compute the largest member name to allocate the buckets of length -> members.
+            int maxSize = 0;
+            for (var member : members()) {
+                maxSize = Math.max(maxSize, member.memberName.length());
+            }
+
+            // Allocate the member name buckets and buckets used to track the position in the array to add members.
+            table = new Schema[maxSize + 1][];
+            int[] remaining = new int[maxSize + 1];
+
+            var uniqueMemberNameLengths = 0;
+            for (var member : members()) {
+                var len = member.memberName.length();
+                if (remaining[len] == 0) {
+                    uniqueMemberNameLengths++;
+                }
+                remaining[len]++;
+            }
+
+            for (var member : members()) {
+                var length = member.memberName.length();
+                int currentIndex = remaining[length];
+                // If this is the first member for this length, allocate the bucket with the known remaining size.
+                if (table[length] == null) {
+                    table[length] = new Schema[currentIndex];
+                }
+                table[length][currentIndex - 1] = member;
+                // We're inserting from the end to the beginning so decrement the number.
+                remaining[length]--;
+            }
+
+            memberLookupTable = table;
+
+            // Skip length-based bucketing if all members have the same size. In this case, clear out the table.
+            if (uniqueMemberNameLengths == 1) {
+                skipLengthLookups = true;
+                memberLookupTable = new Schema[0][];
+            }
+        }
+
+        return table;
     }
 
     public static Schema createBoolean(ShapeId id, Trait... traits) {
