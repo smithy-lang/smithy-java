@@ -5,10 +5,10 @@
 
 package software.amazon.smithy.runtime.http.auth;
 
-import software.amazon.smithy.java.runtime.auth.api.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
-import software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme;
+import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthScheme;
+import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpBearerAuthTrait;

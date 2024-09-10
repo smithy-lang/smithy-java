@@ -8,7 +8,7 @@ extra["displayName"] = "Smithy :: Java :: HTTP :: Auth"
 extra["moduleName"] = "software.amazon.smithy.java.http-auth"
 
 dependencies {
-    implementation(project(":auth-api"))
+    implementation(project(":client-auth-api"))
     implementation(project(":http-api"))
     implementation(project(":logging"))
     // for Query param builder

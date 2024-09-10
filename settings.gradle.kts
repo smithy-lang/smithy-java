@@ -25,7 +25,7 @@ include(":json-codec")
 include(":client-core")
 include(":client-endpoint-api")
 include(":client-http")
-include(":client-auth")
+include(":client-auth-api")
 
 include(":auth-api")
 include(":sigv4")

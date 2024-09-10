@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.auth.api.scheme;
+package software.amazon.smithy.java.runtime.client.auth.api.scheme;
 
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
@@ -21,7 +21,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * @param identityPropertyOverrides The identity property overrides.
  * @param signerPropertyOverrides The signer property overrides.
  *
- * @see AuthScheme
+ * @see software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme
  */
 public record AuthSchemeOption(
     ShapeId schemeId,

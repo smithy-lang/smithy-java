@@ -9,6 +9,4 @@ extra["moduleName"] = "software.amazon.smithy.java.auth-api"
 
 dependencies {
     api(project(":context"))
-    // TODO: Can we avoid this in this package?
-    api(libs.smithy.model)
 }
