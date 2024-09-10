@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.auth.api.identity;
+package software.amazon.smithy.java.runtime.client.auth.api.identity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -13,6 +13,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
+import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
 
 public class IdentityResolverTest {
     private static final TokenIdentity TEST_IDENTITY = TokenIdentity.create("==MyToken==");

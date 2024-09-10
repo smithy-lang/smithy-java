@@ -3,9 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.auth.api.identity;
+package software.amazon.smithy.java.runtime.client.auth.api.identity;
 
-import software.amazon.smithy.java.runtime.auth.api.AuthException;
+import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
+import software.amazon.smithy.java.runtime.client.auth.api.AuthException;
 
 /**
  * Thrown when an {@link IdentityResolver} is unable to resolve an identity.

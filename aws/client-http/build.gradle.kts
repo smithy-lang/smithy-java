@@ -8,7 +8,7 @@ extra["displayName"] = "Smithy :: Java :: AWS :: Client-HTTP"
 extra["moduleName"] = "software.amazon.smithy.java.aws.client-http"
 
 dependencies {
-    implementation(project(":auth-api"))
+    implementation(project(":client-auth-api"))
 }
 
 tasks {

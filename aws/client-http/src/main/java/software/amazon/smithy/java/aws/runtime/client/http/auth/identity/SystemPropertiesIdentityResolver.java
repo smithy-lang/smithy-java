@@ -7,7 +7,7 @@ package software.amazon.smithy.java.aws.runtime.client.http.auth.identity;
 
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
-import software.amazon.smithy.java.runtime.auth.api.identity.IdentityNotFoundException;
+import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityNotFoundException;
 
 /**
  * {@link AwsCredentialsResolver} implementation that loads credentials from Java system properties.
