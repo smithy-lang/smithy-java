@@ -59,7 +59,9 @@ public final class JsonCodec implements Codec {
         var timestampResolver = builder.useTimestampFormat
             ? new TimestampResolver.UseTimestampFormatTrait(builder.defaultTimestampFormat)
             : new TimestampResolver.StaticFormat(builder.defaultTimestampFormat);
-        var fieldMapper = builder.useJsonName ? JsonFieldMapper.JSON_NAME : JsonFieldMapper.MEMBER_NAME;
+        var fieldMapper = builder.useJsonName
+            ? new JsonFieldMapper.UseJsonNameTrait()
+            : JsonFieldMapper.UseMemberName.INSTANCE;
         settings = new Settings(
             timestampResolver,
             fieldMapper,

@@ -93,7 +93,9 @@ public sealed interface TimestampResolver {
             var result = cache.get(schema);
             if (result == null) {
                 var trait = schema.getTrait(TimestampFormatTrait.class);
-                result = trait != null ? TimestampFormatter.of(trait) : defaultFormat;
+                var fresh = trait != null ? TimestampFormatter.of(trait) : defaultFormat;
+                var previous = cache.putIfAbsent(schema, fresh);
+                result = previous == null ? fresh : previous;
             }
             return result;
         }
