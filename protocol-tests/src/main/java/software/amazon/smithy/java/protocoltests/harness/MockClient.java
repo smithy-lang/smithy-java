@@ -12,7 +12,6 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.Client;
-import software.amazon.smithy.java.runtime.client.core.ClientCall;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
@@ -20,6 +19,7 @@ import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 
 /**
  * A mock client used to execute protocol tests.
@@ -107,7 +107,9 @@ final class MockClient extends Client {
 
         @Override
         public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
-            ClientCall<I, O> call,
+            ApiOperation<I, O> operation,
+            Context context,
+            TypeRegistry typeRegistry,
             Object request,
             Object response
         ) {

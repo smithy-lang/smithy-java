@@ -36,5 +36,4 @@ public final class ClientProtocolTestGenerator {
             .build();
         plugin.execute(context);
     }
-
 }
