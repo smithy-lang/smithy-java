@@ -6,9 +6,9 @@
 package software.amazon.smithy.java.runtime.client.aws.restjson1;
 
 import software.amazon.smithy.aws.traits.protocols.RestJson1Trait;
-import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
-import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
-import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
+import software.amazon.smithy.java.runtime.client.ClientProtocol;
+import software.amazon.smithy.java.runtime.client.ClientProtocolFactory;
+import software.amazon.smithy.java.runtime.client.ProtocolSettings;
 import software.amazon.smithy.java.runtime.client.http.HttpBindingClientProtocol;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingApiOperation;

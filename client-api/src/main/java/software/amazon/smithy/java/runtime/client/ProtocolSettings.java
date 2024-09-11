@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.client.core;
+package software.amazon.smithy.java.runtime.client;
 
 /**
  * Settings used to instantiate a {@link ClientProtocol} implementation.
