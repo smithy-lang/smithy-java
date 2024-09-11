@@ -26,7 +26,7 @@ abstract class ProtocolTestProvider<T extends Annotation> implements TestTemplat
     @Override
     public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(ExtensionContext context) {
         // Get all test filters for the given test provider
-        var filter = TestFilter.fromAnnotation(context.getRequiredTestMethod().getAnnotation(Filter.class));
+        var filter = TestFilter.fromAnnotation(context.getRequiredTestMethod().getAnnotation(ProtocolTestFilter.class));
 
         // Retrieve shared data from extension store
         var outerContext = context.getParent().orElseThrow();

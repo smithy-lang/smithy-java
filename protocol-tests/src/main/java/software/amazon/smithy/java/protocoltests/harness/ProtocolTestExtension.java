@@ -73,7 +73,7 @@ public final class ProtocolTestExtension implements BeforeAllCallback {
         }
         var serviceId = ShapeId.from(protocolTestAnnotation.service());
 
-        var filter = TestFilter.fromAnnotation(testClass.getAnnotation(Filter.class));
+        var filter = TestFilter.fromAnnotation(testClass.getAnnotation(ProtocolTestFilter.class));
         Model filtered = getFilteredModel(filter);
 
         // Apply basic service transforms

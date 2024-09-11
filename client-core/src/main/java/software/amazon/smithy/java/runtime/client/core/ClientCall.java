@@ -54,10 +54,7 @@ public final class ClientCall<I extends SerializableStruct, O extends Serializab
         identityResolvers = Objects.requireNonNull(builder.identityResolvers, "identityResolvers is null");
         // TODO: figure out why there is duplication here from protocol tests
         supportedAuthSchemes = builder.supportedAuthSchemes.stream()
-            .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity(), (key1, key2) -> {
-                System.out.println("duplicate found!");
-                return key1;
-            }));
+            .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity(), (key1, key2) -> key1));
         //TODO fix this to not use a cached thread pool.
         executor = builder.executor == null ? Executors.newCachedThreadPool() : builder.executor;
     }

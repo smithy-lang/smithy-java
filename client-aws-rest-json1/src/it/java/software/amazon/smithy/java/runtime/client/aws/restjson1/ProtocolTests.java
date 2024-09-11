@@ -5,13 +5,13 @@
 
 package software.amazon.smithy.java.runtime.client.aws.restjson1;
 
-import software.amazon.smithy.java.protocoltests.harness.Filter;
 import software.amazon.smithy.java.protocoltests.harness.HttpClientRequestTests;
 import software.amazon.smithy.java.protocoltests.harness.HttpClientResponseTests;
 import software.amazon.smithy.java.protocoltests.harness.ProtocolTest;
+import software.amazon.smithy.java.protocoltests.harness.ProtocolTestFilter;
 
 @ProtocolTest(service = "aws.protocoltests.restjson#RestJson")
-@Filter(skipOperations = {
+@ProtocolTestFilter(skipOperations = {
     // Endpoint traits are not yet supported
     "aws.protocoltests.restjson#EndpointWithHostLabelOperation", "aws.protocoltests.restjson#EndpointOperation",
     // We dont ignore defaults on input shapes
@@ -28,7 +28,7 @@ import software.amazon.smithy.java.protocoltests.harness.ProtocolTest;
 )
 public class ProtocolTests {
     @HttpClientRequestTests
-    @Filter(skipTests = {
+    @ProtocolTestFilter(skipTests = {
         // The order of the return values is different for some reason?
         "RestJsonSerializesSparseNullMapValues",
         // We do not yet support checksums in requests
@@ -41,7 +41,7 @@ public class ProtocolTests {
     }
 
     @HttpClientResponseTests
-    @Filter(skipTests = {
+    @ProtocolTestFilter(skipTests = {
         // Null values are not skipped in deserialization
         "RestJsonDeserializesDenseSetMapAndSkipsNull",
         // STATUS is not supported yet? TODO?

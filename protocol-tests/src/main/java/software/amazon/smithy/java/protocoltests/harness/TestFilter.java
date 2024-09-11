@@ -14,7 +14,7 @@ import software.amazon.smithy.protocoltests.traits.AppliesTo;
 import software.amazon.smithy.protocoltests.traits.HttpMessageTestCase;
 
 /**
- * Test filter class that implements filtering of protocol tests. This filter is configured by the {@link Filter} annotation.
+ * Test filter class that implements filtering of protocol tests. This filter is configured by the {@link ProtocolTestFilter} annotation.
  */
 sealed interface TestFilter {
     TestFilter EMPTY = new EmptyFilter();
@@ -33,7 +33,7 @@ sealed interface TestFilter {
         return skipTestCase(testCase, null);
     }
 
-    static TestFilter fromAnnotation(Filter filterAnnotation) {
+    static TestFilter fromAnnotation(ProtocolTestFilter filterAnnotation) {
         if (filterAnnotation == null) {
             return EMPTY;
         }
@@ -46,7 +46,7 @@ sealed interface TestFilter {
         private static final Set<String> tests = new HashSet<>();
         private static final Set<String> skippedTests = new HashSet<>();
 
-        public FilterImpl(Filter filter) {
+        public FilterImpl(ProtocolTestFilter filter) {
             skippedOperations.addAll(
                 Arrays.stream(filter.skipOperations()).map(ShapeId::from).collect(Collectors.toSet())
             );

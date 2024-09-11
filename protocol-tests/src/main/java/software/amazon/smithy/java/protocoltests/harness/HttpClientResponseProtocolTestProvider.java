@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.protocoltests.harness;
 
 import java.net.http.HttpHeaders;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,47 +45,38 @@ final class HttpClientResponseProtocolTestProvider extends ProtocolTestProvider<
         ProtocolTestExtension.SharedTestData store,
         TestFilter filter
     ) {
-        List<TestTemplateInvocationContext> tests = new ArrayList<>();
-        for (var operation : store.operations()) {
-            if (filter.skipOperation(operation.id())) {
-                LOGGER.debug("Skipping operation {}", operation.id());
-                continue;
-            }
-            var operationModel = operation.operationModel();
-            for (var testCase : operation.responseTestCases()) {
-                if (filter.skipTestCase(testCase, AppliesTo.CLIENT)) {
-                    LOGGER.debug("Skipping testCase {}", testCase.getId());
-                    continue;
-                }
-
-                // Get specific values to use for this test case's context
-                var testProtocol = store.getProtocol(testCase.getProtocol());
-                var testResolver = testCase.getAuthScheme().isEmpty()
-                    ? AuthSchemeResolver.NO_AUTH
-                    : (AuthSchemeResolver) p -> List.of(new AuthSchemeOption(testCase.getAuthScheme().get()));
-                var testTransport = new TestTransport(testCase);
-                var overrideBuilder = RequestOverrideConfig.builder()
-                    .transport(testTransport)
-                    .protocol(testProtocol)
-                    .authSchemeResolver(testResolver);
-                var input = operationModel.inputBuilder().errorCorrection().build();
-                var outputBuilder = operationModel.outputBuilder();
-                new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
-                    .deserializeInto(outputBuilder);
-                tests.add(
-                    new ResponseTestInvocationContext(
-                        testCase,
-                        store.mockClient(),
-                        operationModel,
-                        input,
-                        outputBuilder.build(),
-                        overrideBuilder.build()
-                    )
-                );
-
-            }
-        }
-        return tests.stream();
+        return store.operations()
+            .stream()
+            .filter(op -> !filter.skipOperation(op.id()))
+            .flatMap(
+                operation -> operation.responseTestCases()
+                    .stream()
+                    .filter(testCase -> !filter.skipTestCase(testCase, AppliesTo.CLIENT))
+                    .map(testCase -> {
+                        // Get specific values to use for this test case's context
+                        var testProtocol = store.getProtocol(testCase.getProtocol());
+                        var testResolver = testCase.getAuthScheme().isEmpty()
+                            ? AuthSchemeResolver.NO_AUTH
+                            : (AuthSchemeResolver) p -> List.of(new AuthSchemeOption(testCase.getAuthScheme().get()));
+                        var testTransport = new TestTransport(testCase);
+                        var overrideBuilder = RequestOverrideConfig.builder()
+                            .transport(testTransport)
+                            .protocol(testProtocol)
+                            .authSchemeResolver(testResolver);
+                        var input = operation.operationModel().inputBuilder().errorCorrection().build();
+                        var outputBuilder = operation.operationModel().outputBuilder();
+                        new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
+                            .deserializeInto(outputBuilder);
+                        return new ResponseTestInvocationContext(
+                            testCase,
+                            store.mockClient(),
+                            operation.operationModel(),
+                            input,
+                            outputBuilder.build(),
+                            overrideBuilder.build()
+                        );
+                    })
+            );
     }
 
     record ResponseTestInvocationContext(
@@ -107,7 +97,7 @@ final class HttpClientResponseProtocolTestProvider extends ProtocolTestProvider<
         public List<Extension> getAdditionalExtensions() {
             return List.of((ProtocolTestParameterResolver) () -> {
                 mockClient.clientRequest(input, apiOperation, overrideConfig);
-                // No additional assertions are need if the request successfully completes.
+                // No additional assertions are needed if the request successfully completes.
             });
         }
     }

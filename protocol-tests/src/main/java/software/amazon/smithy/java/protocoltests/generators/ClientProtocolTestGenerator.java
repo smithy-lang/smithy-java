@@ -13,7 +13,9 @@ import software.amazon.smithy.java.codegen.client.JavaClientCodegenPlugin;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
+@SmithyInternalApi
 public final class ClientProtocolTestGenerator {
     public static void main(String[] args) {
         JavaClientCodegenPlugin plugin = new JavaClientCodegenPlugin();

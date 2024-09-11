@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.protocoltests.harness;
 
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -14,7 +13,6 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
@@ -31,7 +29,6 @@ import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
  * usage instructions.
  */
 final class HttpClientRequestProtocolTestProvider extends ProtocolTestProvider<HttpClientRequestTests> {
-    private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpClientRequestProtocolTestProvider.class);
 
     @Override
     public Class<HttpClientRequestTests> getAnnotationType() {
@@ -43,48 +40,42 @@ final class HttpClientRequestProtocolTestProvider extends ProtocolTestProvider<H
         ProtocolTestExtension.SharedTestData store,
         TestFilter filter
     ) {
-        List<TestTemplateInvocationContext> tests = new ArrayList<>();
-        for (var operation : store.operations()) {
-            if (filter.skipOperation(operation.id())) {
-                LOGGER.debug("Skipping operation {}", operation.id());
-                continue;
-            }
-            var operationModel = operation.operationModel();
-            for (var testCase : operation.requestTestCases()) {
-                if (filter.skipTestCase(testCase, AppliesTo.CLIENT)) {
-                    LOGGER.debug("Skipping testCase {}", testCase.getId());
-                    continue;
-                }
-                var testProtocol = store.getProtocol(testCase.getProtocol());
-                var testResolver = testCase.getAuthScheme().isEmpty()
-                    ? AuthSchemeResolver.NO_AUTH
-                    : (AuthSchemeResolver) p -> List.of(new AuthSchemeOption(testCase.getAuthScheme().get()));
-                var testTransport = new TestTransport();
-                var overrideBuilder = RequestOverrideConfig.builder()
-                    .transport(testTransport)
-                    .protocol(testProtocol)
-                    .authSchemeResolver(testResolver);
-                if (testCase.getHost().isPresent()) {
-                    overrideBuilder = overrideBuilder.endpoint("https://" + testCase.getHost().get());
-                }
+        return store.operations()
+            .stream()
+            .filter(op -> !filter.skipOperation(op.id()))
+            .flatMap(
+                operation -> operation.requestTestCases()
+                    .stream()
+                    .filter(testCase -> !filter.skipTestCase(testCase, AppliesTo.CLIENT))
+                    .map(testCase -> {
+                        var testProtocol = store.getProtocol(testCase.getProtocol());
+                        var testResolver = testCase.getAuthScheme().isEmpty()
+                            ? AuthSchemeResolver.NO_AUTH
+                            : (AuthSchemeResolver) p -> List.of(new AuthSchemeOption(testCase.getAuthScheme().get()));
+                        var testTransport = new TestTransport();
+                        var overrideBuilder = RequestOverrideConfig.builder()
+                            .transport(testTransport)
+                            .protocol(testProtocol)
+                            .authSchemeResolver(testResolver);
+                        if (testCase.getHost().isPresent()) {
+                            overrideBuilder = overrideBuilder.endpoint("https://" + testCase.getHost().get());
+                        }
 
-                var inputBuilder = operationModel.inputBuilder();
-                new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
-                    .deserializeInto(inputBuilder);
+                        var inputBuilder = operation.operationModel().inputBuilder();
+                        new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
+                            .deserializeInto(inputBuilder);
 
-                tests.add(
-                    new RequestTestInvocationContext(
-                        testCase,
-                        store.mockClient(),
-                        operationModel,
-                        inputBuilder.build(),
-                        overrideBuilder.build(),
-                        testTransport::getCapturedRequest
-                    )
-                );
-            }
-        }
-        return tests.stream();
+
+                        return new RequestTestInvocationContext(
+                            testCase,
+                            store.mockClient(),
+                            operation.operationModel(),
+                            inputBuilder.build(),
+                            overrideBuilder.build(),
+                            testTransport::getCapturedRequest
+                        );
+                    })
+            );
     }
 
     record RequestTestInvocationContext(
@@ -110,7 +101,7 @@ final class HttpClientRequestProtocolTestProvider extends ProtocolTestProvider<H
                 testCase.getResolvedHost()
                     .ifPresent(resolvedHost -> Assertions.assertHostEquals(request, resolvedHost));
                 Assertions.assertHeadersEqual(request, testCase.getHeaders());
-                Assertions.assertBodyEquals(request, testCase.getBody().orElse(""));
+                Assertions.assertJsonBodyEquals(request, testCase.getBody().orElse(""));
             });
         }
     }

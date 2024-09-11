@@ -18,26 +18,11 @@ import org.junit.platform.commons.annotation.Testable;
  * <p>A filter can be applied to a Test Class with the {@link ProtocolTest} annotation to filter all protocol tests
  * within that class or to a specific test method with a specific protocol test provider annotation (such as
  * {@link HttpClientResponseTests}) to only filter the tests supplied to that method.
- * <dl>
- *     <dt>skipTests</dt>
- *     <dd>A list of test cases to skip based on the test case ID</dd>
- *     <dt>skipOperations</dt>
- *     <dd>A list of operations to skip by shape ID. All test cases attached to these operations will be skipped</dd>
- *     <dt>tests</dt>
- *     <dd>An explicit list of tests to run, ignoring all other test. This list cannot overlap with {@code skippedTests}.
- *     <strong>Note:</strong> This filter is useful for debugging specific test cases.
- *     </dd>
- *     <dt>operations</dt>
- *     <dd>An explicit list of operations to run all tests for, ignoring all other operations. This list cannot overlap
- *     with {@code skippedOperations}.
- *     <strong>Note:</strong> This filter is useful for debugging specific test cases.
- *     }</dd>
- * </dl>
  */
 @Testable
 @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Filter {
+public @interface ProtocolTestFilter {
     /**
      * List of test case IDs to exclude from executed tests.
      */
@@ -51,7 +36,7 @@ public @interface Filter {
     /**
      * A list of Test IDs to run. All other tests will be skipped.
      *
-     * <p>This filter can be used to
+     * <p>This filter can be useful in limiting executed tests for debugging.
      */
     String[] tests() default {};
 

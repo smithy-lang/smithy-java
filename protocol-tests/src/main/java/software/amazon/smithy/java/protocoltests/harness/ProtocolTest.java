@@ -20,7 +20,7 @@ import org.junit.platform.commons.annotation.Testable;
  * needed by all protocol tests and storing this common information in an {@link ExtensionContext.Store} for use by
  * specific protocol tests.
  *
- * <p><strong>Note</strong>: This extension does not actually provide any protocol tests, instead, use on of the following
+ * <p><strong>Note</strong>: This extension does not actually provide any protocol tests, instead, use one of the following
  * protocol test providers on a test method in your test class to actually execute specific protocol tests:
  * <ul>
  *     <li>{@link HttpClientRequestTests}</li>

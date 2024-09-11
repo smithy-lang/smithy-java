@@ -81,7 +81,7 @@ final class Assertions {
     }
 
 
-    static void assertBodyEquals(SmithyHttpMessage message, String jsonBody) {
+    static void assertJsonBodyEquals(SmithyHttpMessage message, String jsonBody) {
         var body = new StringBuildingSubscriber(message.body()).getResult();
 
         // TODO: This should be "", not "{}". Issue is in json codec.
