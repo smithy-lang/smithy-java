@@ -149,7 +149,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                         structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
                     }
                 }
-                default -> throw new UnsupportedOperationException(bindingLoc + "not supported yet");
+                default -> throw new UnsupportedOperationException(bindingLoc + "not supported");
             }
         }
 
@@ -219,8 +219,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         private int responseStatus;
         private EventDecoderFactory<?> eventDecoderFactory;
 
-        private Builder() {
-        }
+        private Builder() {}
 
         @Override
         public HttpBindingDeserializer build() {

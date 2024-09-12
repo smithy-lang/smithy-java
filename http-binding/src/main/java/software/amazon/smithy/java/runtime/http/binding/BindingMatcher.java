@@ -30,12 +30,7 @@ final class BindingMatcher {
 
     private final boolean isRequest;
     private HttpHeaderTrait header;
-    private HttpLabelTrait label;
-    private HttpQueryTrait query;
-    private HttpPayloadTrait payload;
-    private HttpResponseCodeTrait responseCode;
     private HttpPrefixHeadersTrait prefixHeaders;
-    private HttpQueryParamsTrait queryParams;
 
     private BindingMatcher(boolean isRequest) {
         this.isRequest = isRequest;
@@ -51,21 +46,19 @@ final class BindingMatcher {
 
     Binding match(Schema member) {
         if (isRequest) {
-            label = member.getTrait(HttpLabelTrait.class);
-            if (label != null) {
+            if (member.getTrait(HttpLabelTrait.class) != null) {
                 return Binding.LABEL;
             }
-            query = member.getTrait(HttpQueryTrait.class);
-            if (query != null) {
+
+            if (member.getTrait(HttpQueryTrait.class) != null) {
                 return Binding.QUERY;
             }
-            queryParams = member.getTrait(HttpQueryParamsTrait.class);
-            if (queryParams != null) {
+
+            if (member.getTrait(HttpQueryParamsTrait.class) != null) {
                 return Binding.QUERY_PARAMS;
             }
         } else {
-            responseCode = member.getTrait(HttpResponseCodeTrait.class);
-            if (responseCode != null) {
+            if (member.getTrait(HttpResponseCodeTrait.class) != null) {
                 return Binding.STATUS;
             }
         }
@@ -80,8 +73,7 @@ final class BindingMatcher {
             return Binding.PREFIX_HEADERS;
         }
 
-        payload = member.getTrait(HttpPayloadTrait.class);
-        if (payload != null) {
+        if (member.getTrait(HttpPayloadTrait.class) != null) {
             return Binding.PAYLOAD;
         }
 

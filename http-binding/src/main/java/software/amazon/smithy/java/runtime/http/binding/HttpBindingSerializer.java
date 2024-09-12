@@ -132,14 +132,12 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         if (mediaType != null) {
             contentType = mediaType.getValue();
         } else {
-            contentType = value.contentType()
-                .orElseGet(() -> {
-                    if (schema.type() == ShapeType.BLOB) {
-                        return DEFAULT_BLOB_CONTENT_TYPE;
-                    } else {
-                        return DEFAULT_STRING_CONTENT_TYPE;
-                    }
-                });
+            contentType = value.contentType();
+            if (contentType == null) {
+                contentType = schema.type() == ShapeType.BLOB
+                    ? DEFAULT_BLOB_CONTENT_TYPE
+                    : DEFAULT_STRING_CONTENT_TYPE;
+            }
         }
         headers.put("Content-Type", List.of(contentType));
     }

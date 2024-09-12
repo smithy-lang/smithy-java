@@ -14,7 +14,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.core.ByteBufferUtils;
@@ -44,9 +43,9 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     /**
      * Returns the content-type of the data, if known.
      *
-     * @return the optionally available content-type.
+     * @return the optionally available content-type, or null if not known.
      */
-    Optional<String> contentType();
+    String contentType();
 
     /**
      * Create an empty DataStream.
@@ -213,8 +212,8 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
             }
 
             @Override
-            public Optional<String> contentType() {
-                return Optional.ofNullable(contentType);
+            public String contentType() {
+                return contentType;
             }
 
             @Override
