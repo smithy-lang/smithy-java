@@ -13,7 +13,7 @@ import java.lang.annotation.Target;
 /**
  * Declares a method as a configuration setter for {@code ClientPlugin}'s.
  *
- * <p>Methods on {@link software.amazon.smithy.java.runtime.client.core.ClientPlugin} implementations
+ * <p>Methods on {@link software.amazon.smithy.java.runtime.client.ClientPlugin} implementations
  * that are marked with this annotation can be used by code generation to create builder setters for
  * default plugins.
  *

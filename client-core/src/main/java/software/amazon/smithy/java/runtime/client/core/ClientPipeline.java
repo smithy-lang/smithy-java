@@ -14,6 +14,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
+import software.amazon.smithy.java.runtime.client.ClientConfig;
 import software.amazon.smithy.java.runtime.client.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.ClientTransport;
 import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityResolvers;
@@ -78,23 +79,8 @@ public final class ClientPipeline<RequestT, ResponseT> {
         ClientProtocol<?, ?> protocol,
         ClientTransport<?, ?> transport
     ) {
-        validateProtocolAndTransport(protocol, transport);
+        ClientConfig.validateProtocolAndTransport(protocol, transport);
         return new ClientPipeline(protocol, transport);
-    }
-
-    /**
-     * Ensures that the given protocol and transport are compatible by comparing their request and response classes.
-     *
-     * @param protocol Protocol to check.
-     * @param transport Transport to check.
-     * @throws IllegalStateException if the protocol and transport use different request or response classes.
-     */
-    public static void validateProtocolAndTransport(ClientProtocol<?, ?> protocol, ClientTransport<?, ?> transport) {
-        if (protocol.requestClass() != transport.requestClass()) {
-            throw new IllegalStateException("Protocol request != transport: " + protocol + " vs " + transport);
-        } else if (protocol.responseClass() != transport.responseClass()) {
-            throw new IllegalStateException("Protocol response != transport: " + protocol + " vs " + transport);
-        }
     }
 
     public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> send(

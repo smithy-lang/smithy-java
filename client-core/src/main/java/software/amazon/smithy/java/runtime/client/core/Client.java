@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.client.ClientConfig;
+import software.amazon.smithy.java.runtime.client.ClientPlugin;
 import software.amazon.smithy.java.runtime.client.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.ClientTransport;
 import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityResolver;
@@ -77,7 +79,7 @@ public abstract class Client {
             callInterceptor = interceptor;
             callIdentityResolvers = identityResolvers;
         } else {
-            callConfig = config.withRequestOverride(overrideConfig);
+            callConfig = configWithRequestOverride(config, overrideConfig);
             callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
             callInterceptor = ClientInterceptor.chain(config.interceptors());
             callIdentityResolvers = IdentityResolvers.of(config.identityResolvers());
@@ -96,6 +98,50 @@ public abstract class Client {
             .build();
 
         return callPipeline.send(call);
+    }
+
+    /**
+     * Create a copy of the ClientConfig after applying overrides.
+     *
+     * @param config         The initial config.
+     * @param overrideConfig The overrides to apply.
+     * @return copy of ClientConfig with overrides applied.
+     */
+    private ClientConfig configWithRequestOverride(ClientConfig config, RequestOverrideConfig overrideConfig) {
+        ClientConfig.Builder builder = config.toBuilder();
+        applyOverrides(builder, overrideConfig);
+        for (ClientPlugin plugin : overrideConfig.plugins()) {
+            plugin.configureClient(builder);
+        }
+        return builder.build();
+    }
+
+    private void applyOverrides(ClientConfig.Builder builder, RequestOverrideConfig overrideConfig) {
+        if (overrideConfig.transport() != null) {
+            builder.transport(overrideConfig.transport());
+        }
+        if (overrideConfig.protocol() != null) {
+            builder.protocol(overrideConfig.protocol());
+        }
+        if (overrideConfig.endpointResolver() != null) {
+            builder.endpointResolver(overrideConfig.endpointResolver());
+        }
+        if (overrideConfig.interceptors() != null) {
+            overrideConfig.interceptors().forEach(builder::addInterceptor);
+        }
+        if (overrideConfig.authSchemeResolver() != null) {
+            builder.authSchemeResolver(overrideConfig.authSchemeResolver());
+        }
+        if (overrideConfig.supportedAuthSchemes() != null) {
+            overrideConfig.supportedAuthSchemes().forEach(builder::putSupportedAuthSchemes);
+        }
+        if (overrideConfig.identityResolvers() != null) {
+            overrideConfig.identityResolvers().forEach(builder::addIdentityResolver);
+        }
+
+        // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
+        //       We just merge the client's Context with the Context of the operation's call.
+        builder.putAllConfig(overrideConfig.context());
     }
 
     /**

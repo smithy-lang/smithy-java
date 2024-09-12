@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.client.core;
+package software.amazon.smithy.java.runtime.client;
 
 /**
  * A plugin modifies a client's configuration when the client is created or at request execution time.

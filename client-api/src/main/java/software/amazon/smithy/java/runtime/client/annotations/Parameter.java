@@ -13,7 +13,7 @@ import java.lang.annotation.Target;
 /**
  * Sets a name to use for a parameter in a default plugin setter method.
  *
- * <p>A default plugin setter method is a method on a {@link software.amazon.smithy.java.runtime.client.core.ClientPlugin}
+ * <p>A default plugin setter method is a method on a {@link software.amazon.smithy.java.runtime.client.ClientPlugin}
  * implementation annotated with {@link Configuration} and with no return value.
  *
  * <p>The {@code @Parameter} annotation is used to set the name of a setter argument.

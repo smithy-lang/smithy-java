@@ -11,5 +11,6 @@ dependencies {
     api(project(":context"))
     api(project(":core"))
     api(project(":client-endpoint-api"))
+    api(project(":client-auth-api"))
     implementation(project(":logging"))
 }

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.client.core;
+package software.amazon.smithy.java.runtime.client;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -12,8 +12,6 @@ import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
-import software.amazon.smithy.java.runtime.client.ClientProtocol;
-import software.amazon.smithy.java.runtime.client.ClientTransport;
 import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeResolver;
@@ -22,10 +20,10 @@ import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.client.interceptors.ClientInterceptor;
 
 /**
- * An immutable representation of configurations of a {@link Client}.
+ * An immutable representation of configurations of a Client.
  *
- * <p>It has well-defined configuration elements that every {@link Client} needs. For extensible parts of a
- * {@link Client} that may need additional configuration, type safe configuration can be included using
+ * <p>It has well-defined configuration elements that every Client needs. For extensible parts of a
+ * Client that may need additional configuration, type safe configuration can be included using
  * {@link Context.Key}.
  */
 public final class ClientConfig {
@@ -44,7 +42,7 @@ public final class ClientConfig {
     private ClientConfig(Builder builder) {
         this.transport = Objects.requireNonNull(builder.transport, "transport cannot be null");
         this.protocol = Objects.requireNonNull(builder.protocol, "protocol cannot be null");
-        ClientPipeline.validateProtocolAndTransport(protocol, transport);
+        validateProtocolAndTransport(protocol, transport);
 
         this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
 
@@ -62,36 +60,35 @@ public final class ClientConfig {
         this.context = Context.unmodifiableCopy(builder.context);
     }
 
-    // Note: Making all the accessors package-private for now as they are only needed by Client, but could be public.
-    ClientTransport<?, ?> transport() {
+    public ClientTransport<?, ?> transport() {
         return transport;
     }
 
-    ClientProtocol<?, ?> protocol() {
+    public ClientProtocol<?, ?> protocol() {
         return protocol;
     }
 
-    EndpointResolver endpointResolver() {
+    public EndpointResolver endpointResolver() {
         return endpointResolver;
     }
 
-    List<ClientInterceptor> interceptors() {
+    public List<ClientInterceptor> interceptors() {
         return interceptors;
     }
 
-    List<AuthScheme<?, ?>> supportedAuthSchemes() {
+    public List<AuthScheme<?, ?>> supportedAuthSchemes() {
         return supportedAuthSchemes;
     }
 
-    AuthSchemeResolver authSchemeResolver() {
+    public AuthSchemeResolver authSchemeResolver() {
         return authSchemeResolver;
     }
 
-    List<IdentityResolver<?>> identityResolvers() {
+    public List<IdentityResolver<?>> identityResolvers() {
         return identityResolvers;
     }
 
-    Context context() {
+    public Context context() {
         return context;
     }
 
@@ -104,7 +101,7 @@ public final class ClientConfig {
         return new Builder();
     }
 
-    private Builder toBuilder() {
+    public Builder toBuilder() {
         Builder builder = builder()
             .transport(transport)
             .protocol(protocol)
@@ -118,47 +115,18 @@ public final class ClientConfig {
     }
 
     /**
-     * Create a copy of the ClientConfig after applying overrides.
+     * Ensures that the given protocol and transport are compatible by comparing their request and response classes.
      *
-     * @param overrideConfig The overrides to apply.
-     * @return copy of ClientConfig with overrides applied.
+     * @param protocol Protocol to check.
+     * @param transport Transport to check.
+     * @throws IllegalStateException if the protocol and transport use different request or response classes.
      */
-    public ClientConfig withRequestOverride(RequestOverrideConfig overrideConfig) {
-        Objects.requireNonNull(overrideConfig, "overrideConfig cannot be null");
-        Builder builder = toBuilder();
-        applyOverrides(builder, overrideConfig);
-        for (ClientPlugin plugin : overrideConfig.plugins()) {
-            plugin.configureClient(builder);
+    public static void validateProtocolAndTransport(ClientProtocol<?, ?> protocol, ClientTransport<?, ?> transport) {
+        if (protocol.requestClass() != transport.requestClass()) {
+            throw new IllegalStateException("Protocol request != transport: " + protocol + " vs " + transport);
+        } else if (protocol.responseClass() != transport.responseClass()) {
+            throw new IllegalStateException("Protocol response != transport: " + protocol + " vs " + transport);
         }
-        return builder.build();
-    }
-
-    private void applyOverrides(Builder builder, RequestOverrideConfig overrideConfig) {
-        if (overrideConfig.transport() != null) {
-            builder.transport(overrideConfig.transport());
-        }
-        if (overrideConfig.protocol() != null) {
-            builder.protocol(overrideConfig.protocol());
-        }
-        if (overrideConfig.endpointResolver() != null) {
-            builder.endpointResolver(overrideConfig.endpointResolver());
-        }
-        if (overrideConfig.interceptors() != null) {
-            overrideConfig.interceptors().forEach(builder::addInterceptor);
-        }
-        if (overrideConfig.authSchemeResolver() != null) {
-            builder.authSchemeResolver(overrideConfig.authSchemeResolver());
-        }
-        if (overrideConfig.supportedAuthSchemes() != null) {
-            overrideConfig.supportedAuthSchemes().forEach(builder::putSupportedAuthSchemes);
-        }
-        if (overrideConfig.identityResolvers() != null) {
-            overrideConfig.identityResolvers().forEach(builder::addIdentityResolver);
-        }
-
-        // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
-        //       We just merge the client's Context with the Context of the operation's call.
-        builder.putAllConfig(overrideConfig.context());
     }
 
     /**
@@ -330,7 +298,7 @@ public final class ClientConfig {
          * @param context Context containing all the configuration to put.
          * @return the builder.
          */
-        private Builder putAllConfig(Context context) {
+        public Builder putAllConfig(Context context) {
             this.context.putAll(context);
             return this;
         }
