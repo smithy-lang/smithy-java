@@ -51,7 +51,20 @@ public class SmithyJavaTrials {
     );
 
     @Param(
-        {"all_fields_optional_0", "all_fields_optional_1", "all_fields_optional_3", "all_fields_optional_5", "all_fields_optional_6", "attribute_updates_1", "attribute_updates_2", "attribute_updates_3", "struct_1", "struct_2", "struct_3", "struct_4", "send_message_request_1"
+        {
+            "all_fields_optional_0",
+            "all_fields_optional_1",
+            "all_fields_optional_3",
+            "all_fields_optional_5",
+            "all_fields_optional_6",
+            "attribute_updates_1",
+            "attribute_updates_2",
+            "attribute_updates_3",
+            "struct_1",
+            "struct_2",
+            "struct_3",
+            "struct_4",
+            "send_message_request_1"
         }
     )
     private String testName;

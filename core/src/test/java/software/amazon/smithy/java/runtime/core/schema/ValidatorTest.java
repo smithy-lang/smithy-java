@@ -738,11 +738,13 @@ public class ValidatorTest {
         BiFunction<ShapeId, Trait[], Schema> creator,
         BiConsumer<Schema, ShapeSerializer> consumer
     ) {
-        var traits = new Trait[]{RangeTrait.builder().min(BigDecimal.ONE).max(BigDecimal.TEN).build(), LengthTrait
-            .builder()
-            .min(1L)
-            .max(10L)
-            .build()
+        var traits = new Trait[]{
+            RangeTrait.builder().min(BigDecimal.ONE).max(BigDecimal.TEN).build(),
+            LengthTrait
+                .builder()
+                .min(1L)
+                .max(10L)
+                .build()
         };
         Schema schema = creator.apply(ShapeId.from("smithy.example#Number"), traits);
 
