@@ -155,7 +155,7 @@ public final class ProtocolTestExtension implements BeforeAllCallback {
             if (protocolFactory == null) {
                 continue;
             }
-            var protocolSettings = ProtocolSettings.builder().namespace(service.toShapeId().getNamespace()).build();
+            var protocolSettings = ProtocolSettings.builder().namespace(service.getId()).build();
             var instance = protocolFactory.createProtocol(protocolSettings, protocolTraitEntry.getValue());
             protocols.put(protocolTraitEntry.getKey(), instance);
         }
