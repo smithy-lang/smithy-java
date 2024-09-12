@@ -3,6 +3,12 @@
 
 [Smithy](https://smithy.io/2.0/index.html) code generators for [Java](https://java.com/).
 
+> [!Caution]
+> This project is confidential until the repository is made public.
+
+> [!WARNING]
+> This project is in early development and is not intended for use in production. 
+
 ## Development
 
 ### Pre-commit hooks
