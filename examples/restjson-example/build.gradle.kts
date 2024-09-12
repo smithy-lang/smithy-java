@@ -1,5 +1,5 @@
 plugins {
-    id("smithy-java.codegen-test-conventions")
+    id("smithy-java.examples-conventions")
     alias(libs.plugins.jmh)
 }
 

@@ -25,6 +25,11 @@ tasks.named("compileJava") {
     dependsOn("smithyBuild")
 }
 
+// Only run integration tests if explicitly called
+tasks.named("integ") {
+    enabled = false
+}
+
 // Helps Intellij plugin identify models
 sourceSets {
     main {

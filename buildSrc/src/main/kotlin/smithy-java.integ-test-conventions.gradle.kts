@@ -15,4 +15,5 @@ tasks.register<Test>("integ") {
     classpath = project.the<SourceSetContainer>()["it"].runtimeClasspath
 }
 
+// Execute all integration tests by default as part of test suite
 tasks["test"].finalizedBy("integ")
