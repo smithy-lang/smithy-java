@@ -5,18 +5,20 @@
 
 package software.amazon.smithy.java.runtime.client.core;
 
+import software.amazon.smithy.model.shapes.ShapeId;
+
 /**
  * Settings used to instantiate a {@link ClientProtocol} implementation.
  */
 public final class ProtocolSettings {
-    private final String namespace;
+    private final ShapeId service;
 
     public ProtocolSettings(Builder builder) {
-        this.namespace = builder.namespace;
+        this.service = builder.service;
     }
 
-    public String namespace() {
-        return namespace;
+    public ShapeId service() {
+        return service;
     }
 
     public static Builder builder() {
@@ -24,12 +26,12 @@ public final class ProtocolSettings {
     }
 
     public static class Builder {
-        private String namespace;
+        private ShapeId service;
 
         private Builder() {}
 
-        public Builder namespace(String namespace) {
-            this.namespace = namespace;
+        public Builder namespace(ShapeId service) {
+            this.service = service;
             return this;
         }
 

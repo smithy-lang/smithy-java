@@ -75,7 +75,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
 
         @Override
         public ClientProtocol<?, ?> createProtocol(ProtocolSettings settings, RestJson1Trait trait) {
-            return new RestJsonClientProtocol(settings.namespace());
+            return new RestJsonClientProtocol(settings.service().getNamespace());
         }
     }
 }

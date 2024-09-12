@@ -105,7 +105,7 @@ public final class ClientInterfaceGenerator
                     "defaultProtocol",
                     new DefaultProtocolGenerator(
                         writer,
-                        directive.settings().packageNamespace(),
+                        directive.settings().service(),
                         defaultProtocolTrait,
                         directive.context()
                     )
@@ -189,7 +189,7 @@ public final class ClientInterfaceGenerator
     }
 
     private record DefaultProtocolGenerator(
-        JavaWriter writer, String namespace, Trait defaultProtocolTrait, CodeGenerationContext context
+        JavaWriter writer, ShapeId service, Trait defaultProtocolTrait, CodeGenerationContext context
     ) implements
         Runnable {
         @Override
@@ -200,7 +200,7 @@ public final class ClientInterfaceGenerator
             writer.pushState();
             var template = """
                 private static final ${protocolSettings:T} settings = ${protocolSettings:T}.builder()
-                        .namespace(${serviceNamespace:S})
+                        .namespace(${shapeId:T}.from(${service:S}))
                         .build();
                 private static final ${trait:T} protocolTrait = ${initializer:C};
                 private static final ${clientProtocolFactory:T}<${trait:T}> factory = new ${?outer}${outer:T}.${name:L}${/outer}${^outer}${type:T}${/outer}();
@@ -210,7 +210,8 @@ public final class ClientInterfaceGenerator
             writer.putContext("trait", defaultProtocolTrait.getClass());
             var initializer = context.getInitializer(defaultProtocolTrait);
             writer.putContext("initializer", writer.consumer(w -> initializer.accept(w, defaultProtocolTrait)));
-            writer.putContext("serviceNamespace", namespace);
+            writer.putContext("shapeId", ShapeId.class);
+            writer.putContext("service", service);
             var factoryClass = getFactory(defaultProtocolTrait.toShapeId());
             if (factoryClass.isMemberClass()) {
                 writer.putContext("outer", factoryClass.getEnclosingClass());
