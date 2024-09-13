@@ -152,7 +152,7 @@ final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
 
     @Override
     public Void intEnumShape(IntEnumShape shape) {
-        writer.putContext("variants", shape.members().stream().map(CodegenUtils::getEnumVariantName).toList());
+        writer.putContext("variants", shape.members().stream().map(symbolProvider::toMemberName).toList());
         writer.putContext("set", Set.class);
         writer.write("""
             static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createIntEnum(ID,
@@ -212,7 +212,7 @@ final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
 
     @Override
     public Void enumShape(EnumShape shape) {
-        writer.putContext("variants", shape.members().stream().map(CodegenUtils::getEnumVariantName).toList());
+        writer.putContext("variants", shape.members().stream().map(symbolProvider::toMemberName).toList());
         writer.putContext("set", Set.class);
         writer.write("""
             static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createEnum(ID,

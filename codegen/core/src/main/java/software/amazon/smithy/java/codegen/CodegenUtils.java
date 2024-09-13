@@ -299,15 +299,6 @@ public final class CodegenUtils {
     }
 
     /**
-     * Gets the uppers snake case name to use for an enum variant for a member shape.
-     *
-     * @param memberShape member shape to get enum name for
-     */
-    public static String getEnumVariantName(MemberShape memberShape) {
-        return toUpperSnakeCase(memberShape.getMemberName());
-    }
-
-    /**
      * Converts a string from camel-case or pascal-case to upper snake-case.
      *
      * <p>For example {@code MyString} would be converted to {@code MY_STRING}.

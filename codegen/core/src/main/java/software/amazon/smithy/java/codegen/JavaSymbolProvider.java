@@ -55,6 +55,7 @@ import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.CaseUtils;
+import software.amazon.smithy.utils.StringUtils;
 
 /**
  * Maps Smithy types to Java Symbols
@@ -85,8 +86,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
     public String toMemberName(MemberShape shape) {
         Shape containerShape = model.expectShape(shape.getContainer());
         if (containerShape.isEnumShape() || containerShape.isIntEnumShape()) {
-            return CaseUtils.toSnakeCase(CodegenUtils.MEMBER_ESCAPER.escape(shape.getMemberName()))
-                .toUpperCase(Locale.ENGLISH);
+            return CaseUtils.toSnakeCase(shape.getMemberName()).toUpperCase(Locale.ENGLISH);
         }
 
         // If a member name contains an underscore, convert to camel case
@@ -94,7 +94,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
             return CodegenUtils.MEMBER_ESCAPER.escape(CaseUtils.toCamelCase(shape.getMemberName()));
         }
 
-        return CodegenUtils.MEMBER_ESCAPER.escape(shape.getMemberName());
+        return CodegenUtils.MEMBER_ESCAPER.escape(StringUtils.uncapitalize(shape.getMemberName()));
     }
 
     @Override

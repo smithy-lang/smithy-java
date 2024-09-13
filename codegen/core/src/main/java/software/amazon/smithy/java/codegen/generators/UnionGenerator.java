@@ -184,7 +184,7 @@ public final class UnionGenerator
                         ${^unit}private final transient ${member:T} value;${/unit}
 
                         public ${memberName:U}Member(${^unit}${member:N} value${/unit}) {
-                            super(Type.${enumValue:L});${^unit}
+                            super(Type.${memberName:L});${^unit}
                             this.value = ${?col}${collections:T}.${wrap:L}(${/col}${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Union value cannot be null")${/primitive}${?col})${/col};${/unit}
                         }
 
@@ -207,7 +207,6 @@ public final class UnionGenerator
                 var memberSymbol = symbolProvider.toSymbol(member);
                 writer.putContext("member", memberSymbol);
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
-                writer.putContext("enumValue", CodegenUtils.getEnumVariantName(member));
                 writer.putContext(
                     "serializeMember",
                     new SerializerMemberGenerator(writer, symbolProvider, model, service, member, "value")

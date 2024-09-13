@@ -8,7 +8,6 @@ package software.amazon.smithy.java.codegen.generators;
 import java.util.ArrayList;
 import java.util.List;
 import software.amazon.smithy.codegen.core.SymbolProvider;
-import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 
@@ -20,7 +19,7 @@ record TypeEnumGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolPr
         List<String> enumList = new ArrayList<>();
         enumList.add("$UNKNOWN");
         for (var member : shape.members()) {
-            enumList.add(CodegenUtils.getEnumVariantName(member));
+            enumList.add(symbolProvider.toMemberName(member));
         }
         writer.pushState();
         writer.putContext("variants", enumList);
