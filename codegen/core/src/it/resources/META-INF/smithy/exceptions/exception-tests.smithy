@@ -13,6 +13,7 @@ operation Exceptions {
         ExceptionWithExtraStringException
         SimpleException
         EmptyException
+        OptionalMessageException
     ]
 }
 
@@ -27,6 +28,11 @@ structure ExceptionWithExtraStringException {
 @error("server")
 structure SimpleException {
     @required
+    message: String
+}
+
+@error("server")
+structure OptionalMessageException {
     message: String
 }
 

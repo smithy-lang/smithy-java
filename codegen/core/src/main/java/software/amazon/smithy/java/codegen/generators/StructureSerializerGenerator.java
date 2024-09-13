@@ -57,7 +57,7 @@ record StructureSerializerGenerator(
 
             writer.pushState();
             writer.putContext("nullable", CodegenUtils.isNullableMember(model, member));
-            writer.putContext("memberName", memberName);
+            writer.putContext("memberName", state);
             writer.writeInline("""
                 ${?nullable}if (${memberName:L} != null) {
                     ${/nullable}${C|};${?nullable}

@@ -13,6 +13,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.codegen.test.model.EmptyException;
 import software.amazon.smithy.java.codegen.test.model.ExceptionWithExtraStringException;
+import software.amazon.smithy.java.codegen.test.model.OptionalMessageException;
 import software.amazon.smithy.java.codegen.test.model.SimpleException;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
@@ -22,7 +23,9 @@ public class ExceptionsTest {
         return Stream.of(
             SimpleException.builder().message("OOOPS!").build(),
             ExceptionWithExtraStringException.builder().message("whoopsy").extra("daisy").build(),
-            EmptyException.builder().build()
+            EmptyException.builder().build(),
+            OptionalMessageException.builder().build(),
+            OptionalMessageException.builder().message("optional").build()
         );
     }
 
