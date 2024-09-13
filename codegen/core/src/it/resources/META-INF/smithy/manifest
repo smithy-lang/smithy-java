@@ -1,6 +1,7 @@
 enums/enum-tests.smithy
 enums/non-sequential.smithy
 enums/unsafe-value-name.smithy
+enums/lower-case-variant-names.smithy
 exceptions/exception-tests.smithy
 lists/list-all-types.smithy
 lists/list-tests.smithy

@@ -120,7 +120,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             var enumValues = getEnumValues(shape);
             for (var member : shape.members()) {
                 writer.pushState(new EnumVariantSection(member));
-                writer.putContext("var", CodegenUtils.toUpperSnakeCase(member.getMemberName()));
+                writer.putContext("var", CodegenUtils.getEnumVariantName(member));
                 writer.putContext("val", enumValues.get(member.getMemberName()));
                 writer.write(
                     "public static final ${shape:T} ${var:L} = new ${shape:T}(Type.${var:L}, ${?string}${val:S}${/string}${^string}${val:L}${/string});"

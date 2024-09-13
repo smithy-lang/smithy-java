@@ -207,7 +207,7 @@ public final class UnionGenerator
                 var memberSymbol = symbolProvider.toSymbol(member);
                 writer.putContext("member", memberSymbol);
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
-                writer.putContext("enumValue", CodegenUtils.getEnumVariantName(symbolProvider, member));
+                writer.putContext("enumValue", CodegenUtils.getEnumVariantName(member));
                 writer.putContext(
                     "serializeMember",
                     new SerializerMemberGenerator(writer, symbolProvider, model, service, member, "value")

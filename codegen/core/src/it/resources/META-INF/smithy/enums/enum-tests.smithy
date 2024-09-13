@@ -6,5 +6,6 @@ resource EnumTests {
     operations: [
         NonSequentialIntEnum
         UnsafeValueName
+        LowerCaseVariantNames
     ]
 }

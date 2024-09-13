@@ -20,7 +20,7 @@ record TypeEnumGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolPr
         List<String> enumList = new ArrayList<>();
         enumList.add("$UNKNOWN");
         for (var member : shape.members()) {
-            enumList.add(CodegenUtils.getEnumVariantName(symbolProvider, member));
+            enumList.add(CodegenUtils.getEnumVariantName(member));
         }
         writer.pushState();
         writer.putContext("variants", enumList);

@@ -152,11 +152,11 @@ final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
 
     @Override
     public Void intEnumShape(IntEnumShape shape) {
-        writer.putContext("variants", shape.getEnumValues().keySet());
+        writer.putContext("variants", shape.members().stream().map(CodegenUtils::getEnumVariantName).toList());
         writer.putContext("set", Set.class);
         writer.write("""
             static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createIntEnum(ID,
-                ${set:T}.of(${#variants}${value:L}.value${^key.last},${/key.last}${/variants})${traits:C}
+                ${set:T}.of(${#variants}${value:L}.value${^key.last}, ${/key.last}${/variants})${traits:C}
             );
             """);
         return null;
@@ -212,11 +212,11 @@ final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
 
     @Override
     public Void enumShape(EnumShape shape) {
-        writer.putContext("variants", shape.getEnumValues().keySet());
+        writer.putContext("variants", shape.members().stream().map(CodegenUtils::getEnumVariantName).toList());
         writer.putContext("set", Set.class);
         writer.write("""
             static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createEnum(ID,
-                ${set:T}.of(${#variants}${value:L}.value${^key.last},${/key.last}${/variants})${traits:C}
+                ${set:T}.of(${#variants}${value:L}.value${^key.last}, ${/key.last}${/variants})${traits:C}
             );
             """);
         return null;
