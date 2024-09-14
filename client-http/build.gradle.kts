@@ -11,4 +11,6 @@ dependencies {
     api(project(":http-binding"))
     api(project(":client-core"))
     implementation(project(":logging"))
+
+    testImplementation(project(":json-codec"))
 }

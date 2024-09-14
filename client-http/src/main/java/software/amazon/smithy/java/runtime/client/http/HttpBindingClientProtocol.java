@@ -6,18 +6,14 @@
 package software.amazon.smithy.java.runtime.client.http;
 
 import java.net.URI;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOperation;
-import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
@@ -28,26 +24,23 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.binding.HttpBinding;
 import software.amazon.smithy.java.runtime.http.binding.RequestSerializer;
 import software.amazon.smithy.java.runtime.http.binding.ResponseDeserializer;
-import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * An HTTP-based protocol that uses HTTP binding traits.
  *
- * <p>TODO: Allow for a custom matcher to identity errors beyond X-Amzn-Errortype.
- *
  * @param <F> the framing type for event streams.
  */
-public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientProtocol {
+public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientProtocol {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpBindingClientProtocol.class);
-    private static final String X_AMZN_ERROR_TYPE = "X-Amzn-Errortype";
 
-    protected final Codec codec;
-
-    public HttpBindingClientProtocol(String id, Codec codec) {
+    public HttpBindingClientProtocol(String id) {
         super(id);
-        this.codec = Objects.requireNonNull(codec, "codec is null");
     }
+
+    abstract protected Codec codec();
+
+    abstract protected HttpErrorDeserializer getErrorDeserializer(Context context);
 
     protected EventEncoderFactory<F> getEventEncoderFactory(InputEventStreamingApiOperation<?, ?, ?> inputOperation) {
         throw new UnsupportedOperationException("This protocol does not support event streaming");
@@ -66,7 +59,7 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
     ) {
         RequestSerializer serializer = HttpBinding.requestSerializer()
             .operation(operation)
-            .payloadCodec(codec)
+            .payloadCodec(codec())
             .shapeValue(input)
             .endpoint(endpoint);
 
@@ -85,8 +78,8 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
         SmithyHttpRequest request,
         SmithyHttpResponse response
     ) {
-        if (!isSuccess(response)) {
-            return createError(operation, context, typeRegistry, response).thenApply(e -> {
+        if (!isSuccess(operation, context, response)) {
+            return createError(operation, context, typeRegistry, request, response).thenApply(e -> {
                 throw e;
             });
         }
@@ -95,7 +88,7 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
 
         var outputBuilder = operation.outputBuilder();
         ResponseDeserializer deser = HttpBinding.responseDeserializer()
-            .payloadCodec(codec)
+            .payloadCodec(codec())
             .outputShapeBuilder(outputBuilder)
             .response(response);
 
@@ -115,14 +108,25 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
             });
     }
 
-    private boolean isSuccess(SmithyHttpResponse response) {
-        // TODO: Better error checking.
+    /**
+     * Check if the response is a success or failure.
+     *
+     * @param response Response to check.
+     * @return true if it is a success.
+     */
+    protected boolean isSuccess(ApiOperation<?, ?> operation, Context context, SmithyHttpResponse response) {
         return response.statusCode() >= 200 && response.statusCode() <= 299;
     }
 
     /**
      * An overrideable error deserializer.
      *
+     * <p>Override this class if using {@link HttpErrorDeserializer} is impossible for your protocol.
+     *
+     * @param operation Operation being called.
+     * @param context Call context.
+     * @param typeRegistry Registry used to deserialize errors.
+     * @param request Request that was sent.
      * @param response HTTP response to deserialize.
      * @return Returns the deserialized error.
      */
@@ -130,42 +134,9 @@ public class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientPro
         ApiOperation<I, O> operation,
         Context context,
         TypeRegistry typeRegistry,
+        SmithyHttpRequest request,
         SmithyHttpResponse response
     ) {
-        return response.headers()
-            // Grab the error ID from the header first.
-            .firstValue(X_AMZN_ERROR_TYPE)
-            // If not in the header, check the payload for __type.
-            .or(() -> {
-                // TODO: check payload for type.
-                return Optional.empty();
-            })
-            // Attempt to match the extracted error ID to a modeled error type.
-            .flatMap(
-                errorId -> Optional.ofNullable(
-                    typeRegistry.createBuilder(ShapeId.from(errorId), ModeledApiException.class)
-                )
-                    .<CompletableFuture<? extends ApiException>>map(
-                        error -> createModeledException(codec, response, error)
-                    )
-            )
-            // If no error was matched, then create an error from protocol hints.
-            .orElseGet(() -> {
-                String operationId = operation.schema().id().toString();
-                return HttpClientProtocol.createErrorFromHints(operationId, response);
-            });
-    }
-
-    private CompletableFuture<ModeledApiException> createModeledException(
-        Codec codec,
-        SmithyHttpResponse response,
-        ShapeBuilder<ModeledApiException> error
-    ) {
-        return HttpBinding.responseDeserializer()
-            .payloadCodec(codec)
-            .errorShapeBuilder(error)
-            .response(response)
-            .deserialize()
-            .thenApply(ignore -> error.errorCorrection().build());
+        return getErrorDeserializer(context).createError(context, operation.schema().id(), typeRegistry, response);
     }
 }

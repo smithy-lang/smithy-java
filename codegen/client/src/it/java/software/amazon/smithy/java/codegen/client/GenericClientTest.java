@@ -16,11 +16,12 @@ import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
 import software.amazon.smithy.java.codegen.client.util.EchoServer;
-import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
+import software.amazon.smithy.java.runtime.client.aws.jsonprotocols.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.OutputHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 
@@ -43,7 +44,7 @@ public class GenericClientTest {
     public void echoTest() {
         System.out.println("DOING THINGS");
         var client = TestServiceClient.builder()
-            .protocol(new RestJsonClientProtocol())
+            .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
             .endpoint(ENDPOINT)
             .value(5L)
             .build();
@@ -74,7 +75,7 @@ public class GenericClientTest {
         };
 
         var client = TestServiceClient.builder()
-            .protocol(new RestJsonClientProtocol())
+            .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
             .endpoint(ENDPOINT)
             .addInterceptor(interceptor)
             .value(2.2)
@@ -107,7 +108,7 @@ public class GenericClientTest {
             }
         };
         var client = TestServiceClient.builder()
-            .protocol(new RestJsonClientProtocol())
+            .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
             .endpoint(ENDPOINT)
             .addInterceptor(interceptor)
             .value(2L)

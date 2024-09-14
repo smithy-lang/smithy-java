@@ -517,16 +517,12 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             var visitor = new ErrorCorrectionVisitor(writer, symbolProvider, model);
             for (var member : shape.members()) {
                 var target = model.expectShape(member.getTarget());
-                if (target.isStructureShape() || target.isUnionShape()) {
-                    // Skip unions and structs
-                    continue;
-                }
                 if (CodegenUtils.isRequiredWithNoDefault(member)) {
                     var memberName = symbolProvider.toMemberName(member);
                     var schemaName = CodegenUtils.toMemberSchemaName(memberName);
                     visitor.memberShape = member;
                     writer.openBlock("if (!tracker.checkMember($L)) {", "}", schemaName, () -> {
-                        if (CodegenUtils.hasBuiltinDefault(symbolProvider, model, member)) {
+                        if (assumeShapeHasErrorCorrectedDefault(target, member, symbolProvider, model)) {
                             writer.write("tracker.setMember($1L);", schemaName);
                         } else {
                             writer.write("$L($C);", memberName, visitor);
@@ -534,6 +530,19 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                     });
                 }
             }
+        }
+
+        private static boolean assumeShapeHasErrorCorrectedDefault(
+            Shape target,
+            MemberShape member,
+            SymbolProvider symbolProvider,
+            Model model
+        ) {
+            return target.isStructureShape() || target.isUnionShape() || CodegenUtils.hasBuiltinDefault(
+                symbolProvider,
+                model,
+                member
+            );
         }
 
 

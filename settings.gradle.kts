@@ -30,16 +30,14 @@ include(":client-auth-api")
 include(":auth-api")
 include(":sigv4")
 
-// Protocols
-include(":client-aws-rest-json1")
-
-//server
+// server
 include("server-core")
 include("server")
 include("server-netty")
 
 // Examples
 include(":examples:restjson-example")
+include(":examples:dynamodb")
 
 // Server
 include("server-core")
@@ -47,3 +45,4 @@ include("server-core")
 // AWS specific
 include(":aws:event-streams")
 include(":aws:client-http")
+include(":aws:client-json-protocols")

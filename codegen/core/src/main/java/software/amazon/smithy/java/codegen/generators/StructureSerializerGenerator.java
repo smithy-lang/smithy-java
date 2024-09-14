@@ -57,8 +57,14 @@ record StructureSerializerGenerator(
                 memberName = "getMessage()";
             }
 
+            var target = model.expectShape(member.getTarget());
+
             writer.pushState();
-            writer.putContext("nullable", CodegenUtils.isNullableMember(model, member));
+            writer.putContext(
+                "nullable",
+                CodegenUtils.isNullableMember(model, member)
+                    || target.isStructureShape() || target.isUnionShape()
+            );
             writer.putContext("memberName", memberName);
             writer.writeInline("""
                 ${?nullable}if (${memberName:L} != null) {

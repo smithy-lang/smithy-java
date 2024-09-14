@@ -11,10 +11,10 @@ dependencies {
     implementation(project(":client-core"))
     implementation(project(":client-http"))
 
-    testImplementation(project(":client-aws-rest-json1"))
+    testImplementation(project(":aws:client-json-protocols"))
     testImplementation(libs.smithy.aws.traits)
 
-    itImplementation(project(":client-aws-rest-json1"))
+    itImplementation(project(":aws:client-json-protocols"))
 }
 
 addGenerateSrcsTask("software.amazon.smithy.java.codegen.client.TestServerJavaClientCodegenRunner")

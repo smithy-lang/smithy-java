@@ -14,7 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.runtime.client.aws.restjson1.RestJsonClientProtocol;
+import software.amazon.smithy.java.runtime.client.aws.jsonprotocols.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.ClientConfig;
 import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
@@ -25,6 +25,7 @@ import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolverParams;
 import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.example.client.PersonDirectoryClient;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImage;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
@@ -153,7 +154,7 @@ public class ClientConfigTest {
 
             private Builder() {
                 ClientConfig.Builder configBuilder = configBuilder();
-                configBuilder.protocol(new RestJsonClientProtocol());
+                configBuilder.protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()));
                 configBuilder.transport(new JavaHttpClientTransport(HttpClient.newHttpClient()));
 
                 List<ClientPlugin> defaultPlugins = List.of(new RegionAwareServicePlugin());

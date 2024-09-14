@@ -13,11 +13,9 @@ jmh {
     iterations = 5
     fork = 1
     //profilers.add("async:output=flamegraph")
-    //profilers.add('gc')
+    //profilers.add("gc")
 }
 
-// TODO: eventually re-enable
-// Disable spotbugs
 tasks {
     spotbugsMain {
         enabled = false

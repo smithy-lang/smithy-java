@@ -223,7 +223,7 @@ public final class JsonDocuments {
         public ShapeId discriminator() {
             String discriminator = null;
             var member = values.get("__type");
-            if (member.type() == ShapeType.STRING) {
+            if (member != null && member.type() == ShapeType.STRING) {
                 discriminator = member.asString();
             }
             return DocumentDeserializer.parseDiscriminator(discriminator, settings.defaultNamespace());

@@ -19,6 +19,23 @@ public interface SmithyHttpMessage {
 
     SmithyHttpMessage withHttpVersion(SmithyHttpVersion version);
 
+    default String contentType() {
+        return contentType(null);
+    }
+
+    default String contentType(String defaultValue) {
+        return headers().firstValue("content-type").orElse(defaultValue);
+    }
+
+    default Long contentLength() {
+        return headers().firstValue("content-length").map(Long::parseLong).orElse(null);
+    }
+
+    default long contentLength(long defaultValue) {
+        var length = contentLength();
+        return length == null ? defaultValue : length;
+    }
+
     HttpHeaders headers();
 
     /**
