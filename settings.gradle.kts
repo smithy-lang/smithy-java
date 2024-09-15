@@ -21,6 +21,7 @@ include(":http-auth")
 
 
 include(":json-codec")
+include(":rpcv2-cbor-codec")
 
 include(":client-core")
 include(":client-endpoint-api")

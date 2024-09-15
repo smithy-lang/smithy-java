@@ -75,6 +75,8 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
     final double maxDoubleConstraint;
     final ValidatorOfString stringValidation;
 
+    private final int hashCode;
+
     Schema(
         ShapeType type,
         ShapeId id,
@@ -120,6 +122,8 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
             members,
             m -> m.requiredByValidationBitmask
         );
+
+        this.hashCode = Objects.hash(type, id, traits, memberIndex);
     }
 
     Schema(MemberSchemaBuilder builder) {
@@ -158,6 +162,8 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
                 m -> m.requiredByValidationBitmask
             );
         }
+
+        this.hashCode = Objects.hash(type, id, traits, memberIndex);
     }
 
     public static Schema createBoolean(ShapeId id, Trait... traits) {
@@ -267,7 +273,8 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
             return false;
         }
         var o = (Schema) obj;
-        return type == o.type
+        return hashCode == o.hashCode
+            && type == o.type
             && id.equals(o.id)
             && traits.equals(o.traits)
             && members().equals(o.members())
@@ -276,7 +283,7 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
 
     @Override
     public final int hashCode() {
-        return Objects.hash(type, id, traits, memberIndex);
+        return hashCode;
     }
 
     /**

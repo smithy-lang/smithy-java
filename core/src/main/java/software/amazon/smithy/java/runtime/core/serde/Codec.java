@@ -67,6 +67,14 @@ public interface Codec extends AutoCloseable {
         return stream.toString(StandardCharsets.UTF_8);
     }
 
+    default byte[] serialize(SerializableShape shape) {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        ShapeSerializer serializer = createSerializer(stream);
+        shape.serialize(serializer);
+        serializer.flush();
+        return stream.toByteArray();
+    }
+
     /**
      * Helper method to deserialize and build a shape.
      *
