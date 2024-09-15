@@ -21,6 +21,7 @@ include(":http-binding")
 
 include(":json-codec")
 include(":xml-codec")
+include(":rpcv2-cbor-codec")
 
 include(":client-core")
 include(":client-http")
@@ -53,3 +54,4 @@ include(":aws:sigv4")
 include(":aws:client-awsjson")
 include(":aws:client-restjson")
 include(":aws:client-restxml")
+include(":aws:client-rpcv2-cbor-protocol")

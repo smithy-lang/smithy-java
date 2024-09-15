@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.protocoltests.harness;
 
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -129,7 +130,12 @@ final class HttpClientResponseProtocolTestProvider extends
             // Add request body if present;
             testCase.getBody().ifPresent(body -> {
                 if (testCase.getBodyMediaType().isPresent()) {
-                    builder.body(DataStream.ofString(body, testCase.getBodyMediaType().get()));
+                    var type = testCase.getBodyMediaType().get();
+                    if (ProtocolTestProvider.isBinaryMediaType(type)) {
+                        builder.body(DataStream.ofBytes(Base64.getDecoder().decode(body), type));
+                    } else {
+                        builder.body(DataStream.ofString(body, type));
+                    }
                 } else {
                     builder.body(DataStream.ofString(body));
                 }

@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     api(project(":aws:client-restjson"))
+    api(project(":rpcv2-cbor-codec"))
     api(libs.smithy.aws.traits)
 }
 

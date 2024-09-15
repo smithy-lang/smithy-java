@@ -20,6 +20,7 @@ smithy-aws-traits = { module = "software.amazon.smithy:smithy-aws-traits", versi
 smithy-protocol-traits = { module = "software.amazon.smithy:smithy-protocol-traits", version.ref = "smithy" }
 smithy-protocol-test-traits = { module = "software.amazon.smithy:smithy-protocol-test-traits", version.ref = "smithy"}
 smithy-aws-protocol-tests = { module = "software.amazon.smithy:smithy-aws-protocol-tests", version.ref = "smithy" }
+smithy-protocol-tests = { module = "software.amazon.smithy:smithy-protocol-tests", version.ref = "smithy" }
 
 # AWS SDK for Java V2 retries bridge dependencies.
 aws-sdk-retries-spi = {module = "software.amazon.awssdk:retries-spi", version.ref = "aws-sdk"}

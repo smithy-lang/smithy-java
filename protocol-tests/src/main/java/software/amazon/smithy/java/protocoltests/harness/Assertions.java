@@ -56,7 +56,11 @@ final class Assertions {
             var headerValues = message.headers().allValues(headerEntry.getKey());
             assertNotNull(headerValues);
             var converted = convertHeaderToString(headerEntry.getKey(), headerValues);
-            assertEquals(headerEntry.getValue(), converted);
+            assertEquals(
+                headerEntry.getValue(),
+                converted,
+                "Mismatch for header \"%s\"".formatted(headerEntry.getKey())
+            );
         }
     }
 
