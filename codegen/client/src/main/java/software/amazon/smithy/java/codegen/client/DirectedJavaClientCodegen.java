@@ -10,7 +10,6 @@ import software.amazon.smithy.codegen.core.directed.*;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
-import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.client.generators.ClientImplementationGenerator;
 import software.amazon.smithy.java.codegen.client.generators.ClientInterfaceGenerator;
 import software.amazon.smithy.java.codegen.generators.EnumGenerator;
@@ -31,7 +30,7 @@ public class DirectedJavaClientCodegen implements
     public SymbolProvider createSymbolProvider(
         CreateSymbolProviderDirective<JavaCodegenSettings> directive
     ) {
-        return new JavaSymbolProvider(
+        return new ClientJavaSymbolProvider(
             directive.model(),
             directive.service(),
             directive.settings().packageNamespace()
