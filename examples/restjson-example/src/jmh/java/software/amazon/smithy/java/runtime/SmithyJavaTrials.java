@@ -67,15 +67,23 @@ public class SmithyJavaTrials {
     );
 
     public enum Protocol {
-        Jackson(JsonCodec.builder()
-            .forbidUnknownUnionMembers(true)
-            .overrideSerdeProvider(new JacksonJsonSerdeProvider()).build()),
-        JsonIter(JsonCodec.builder()
-            .forbidUnknownUnionMembers(true)
-            .overrideSerdeProvider(new JsonIterProvider()).build()),
-        RpcV2(Rpcv2CborCodec.builder()
-            .forbidUnknownMembers(true)
-            .build()),
+        Jackson(
+            JsonCodec.builder()
+                .forbidUnknownUnionMembers(true)
+                .overrideSerdeProvider(new JacksonJsonSerdeProvider())
+                .build()
+        ),
+        JsonIter(
+            JsonCodec.builder()
+                .forbidUnknownUnionMembers(true)
+                .overrideSerdeProvider(new JsonIterProvider())
+                .build()
+        ),
+        RpcV2(
+            Rpcv2CborCodec.builder()
+                .forbidUnknownMembers(true)
+                .build()
+        ),
         ;
 
         private final Codec codec;
@@ -92,24 +100,20 @@ public class SmithyJavaTrials {
     @Param(
         {
 //            "Jackson",
-            "JsonIter",
-            "RpcV2",
+            "JsonIter", "RpcV2",
         }
     )
     private Protocol type;
 
 
     @Param(
-        {
-            "all_fields_optional_0",
+        {"all_fields_optional_0",
 //            "all_fields_optional_1",
             "all_fields_optional_3",
 //            "all_fields_optional_5",
-            "all_fields_optional_6",
-            "attribute_updates_1",
+            "all_fields_optional_6", "attribute_updates_1",
 //            "attribute_updates_2",
-            "attribute_updates_3",
-            "struct_1",
+            "attribute_updates_3", "struct_1",
 //            "struct_2",
 //            "struct_3",
             "struct_4",

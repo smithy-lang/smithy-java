@@ -386,7 +386,7 @@ final class CborDeserializer implements ShapeDeserializer {
 //    private HashCanonicalizer getCanonicalizer(Schema schema) {
         var canonicalizer = CANONICALIZERS.get(schema);
         if (canonicalizer == null) {
-             canonicalizer = new Canonicalizer(schema);
+            canonicalizer = new Canonicalizer(schema);
 //            canonicalizer = new HashCanonicalizer(schema);
             CANONICALIZERS.put(schema, canonicalizer);
         }

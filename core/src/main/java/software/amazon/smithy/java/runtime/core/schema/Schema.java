@@ -5,10 +5,6 @@
 
 package software.amazon.smithy.java.runtime.core.schema;
 
-import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.Trait;
-
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -20,6 +16,9 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.Trait;
 
 /**
  * Describes a generated shape with important metadata from a Smithy model.
@@ -34,7 +33,7 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
     protected static final Canonicalizer NULL_CANONICALIZER = new Canonicalizer();
 
     protected static final class Canonicalizer {
-         protected record Canonical(Schema member, byte[] utf8) implements Comparable<Canonical> {
+        protected record Canonical(Schema member, byte[] utf8) implements Comparable<Canonical> {
             @Override
             public int compareTo(Canonical o) {
                 return Arrays.compare(utf8, o.utf8);
