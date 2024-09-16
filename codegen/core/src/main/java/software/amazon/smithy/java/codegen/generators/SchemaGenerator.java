@@ -224,23 +224,24 @@ final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
 
     @Override
     public Void structureShape(StructureShape shape) {
-        generateStructMemberSchemas(shape);
+        generateStructMemberSchemas(shape, "structureBuilder");
         return null;
     }
 
     @Override
     public Void unionShape(UnionShape shape) {
-        generateStructMemberSchemas(shape);
+        generateStructMemberSchemas(shape, "unionBuilder");
         return null;
     }
 
-    private void generateStructMemberSchemas(Shape shape) {
+    private void generateStructMemberSchemas(Shape shape, String builderMethod) {
         writer.pushState();
         writer.putContext("hasMembers", !shape.members().isEmpty());
+        writer.putContext("builderMethod", builderMethod);
         writer.write(
             """
                 ${?recursive}${C}
-                ${/recursive}static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.structureBuilder(ID${traits:C})${/recursive}${?hasMembers}
+                ${/recursive}static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.${builderMethod:L}(ID${traits:C})${/recursive}${?hasMembers}
                     ${C|}
                     ${/hasMembers}.build();
                 """,
