@@ -61,8 +61,6 @@ public class ProtocolTests {
             // STATUS is not supported yet? TODO?
             "RestJsonHttpResponseCodeWithNoPayload",
             "RestJsonHttpResponseCode",
-            // "Cannot change union from unknown to known variant"
-            "RestJsonDeserializeIgnoreType",
             // Invalid ints, bools, etc in headers
             "RestJsonInputAndOutputWithNumericHeaders",
             "RestJsonInputAndOutputWithBooleanHeaders",
