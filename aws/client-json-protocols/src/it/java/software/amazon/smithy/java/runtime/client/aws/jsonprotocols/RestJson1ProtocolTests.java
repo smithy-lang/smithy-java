@@ -56,8 +56,6 @@ public class RestJson1ProtocolTests {
     @HttpClientResponseTests
     @ProtocolTestFilter(
         skipTests = {
-            // Null values are not skipped in deserialization
-            "RestJsonDeserializesDenseSetMapAndSkipsNull",
             // Invalid ints, bools, etc in headers
             "RestJsonInputAndOutputWithNumericHeaders",
             "RestJsonInputAndOutputWithBooleanHeaders",
