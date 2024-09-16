@@ -11,11 +11,9 @@ extra["moduleName"] = "software.amazon.smithy.java.aws.client-http"
 dependencies {
     implementation(project(":client-auth-api"))
     implementation(project(":http-api"))
+    implementation(project(":io"))
     implementation(project(":logging"))
     implementation(libs.smithy.aws.traits)
-
-    // for Query param builder
-    jmhImplementation(project(":core"))
 }
 
 jmh {

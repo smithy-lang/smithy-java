@@ -7,79 +7,48 @@ package software.amazon.smithy.java.aws.runtime.client.http.auth.scheme.sigv4;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.StampedLock;
 
 /**
- * A bounded cache that has a FIFO eviction policy when the cache is full.
- * <p>Adapted from JavaV2's {@code software.amazon.awssdk.auth.signer.internal.FifoCache}.
+ * A bounded cache for {@link SigningKey}s that has a FIFO eviction policy when the cache is full.
  */
-final class SigningCache extends LinkedHashMap<String, SigningKey> {
-    private final int maxSize;
-    private final ReentrantReadWriteLock.ReadLock readLock;
-    private final ReentrantReadWriteLock.WriteLock writeLock;
+final class SigningCache {
+    private final LinkedHashMap<String, SigningKey> fifoStore;
+    private final StampedLock lock = new StampedLock();
 
-    public SigningCache(int maxSize) {
+    SigningCache(int maxSize) {
         if (maxSize < 1) {
             throw new IllegalArgumentException("maxSize " + maxSize + " must be at least 1");
         }
-        ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-        readLock = lock.readLock();
-        writeLock = lock.writeLock();
-        this.maxSize = maxSize;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * Returns true if the size of this map exceeds the maximum.
-     */
-    @Override
-    protected boolean removeEldestEntry(Map.Entry<String, SigningKey> eldest) {
-        return size() > maxSize;
+        this.fifoStore = new LinkedHashMap<>() {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, SigningKey> eldest) {
+                return size() > maxSize;
+            }
+        };
     }
 
     /**
      * Adds an entry to the cache, evicting the earliest entry if necessary.
      */
-    @Override
-    public SigningKey put(String key, SigningKey value) {
-        writeLock.lock();
+    void put(String key, SigningKey value) {
+        long stamp = lock.writeLock();
         try {
-            return super.put(key, value);
+            fifoStore.put(key, value);
         } finally {
-            writeLock.unlock();
-        }
-    }
-
-    /** Returns the value of the given key; or null of no such entry exists. */
-    public SigningKey get(String key) {
-        readLock.lock();
-        try {
-            return super.get(key);
-        } finally {
-            readLock.unlock();
+            lock.unlockWrite(stamp);
         }
     }
 
     /**
-     * Returns the current size of the cache.
+     * @return Signing key if it exists in the store, otherwise {@code null}.
      */
-    public int size() {
-        readLock.lock();
+    SigningKey get(String key) {
+        long stamp = lock.readLock();
         try {
-            return super.size();
+            return fifoStore.get(key);
         } finally {
-            readLock.unlock();
-        }
-    }
-
-    @Override
-    public String toString() {
-        readLock.lock();
-        try {
-            return super.toString();
-        } finally {
-            readLock.unlock();
+            lock.unlockRead(stamp);
         }
     }
 }

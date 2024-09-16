@@ -9,7 +9,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.http.HttpHeaders;
-import java.net.http.HttpRequest;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Clock;
@@ -29,6 +28,7 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.utils.IoUtils;
@@ -72,7 +72,7 @@ public class SigV4TestRunner {
 
     public Stream<Object[]> parameterizedTestSource() {
         return testCases.stream().map(testCase -> {
-            Callable<Result> callable = () -> testCase.createResult(Sigv4Signer.INSTANCE);
+            Callable<Result> callable = () -> testCase.createResult(SigV4Signer.INSTANCE);
             Callable<Result> wrappedCallable = () -> callable.call().unwrap();
             return new Object[]{testCase.name(), wrappedCallable};
         });
@@ -153,7 +153,7 @@ public class SigV4TestRunner {
                 .httpVersion(SmithyHttpVersion.HTTP_1_1)
                 .uri(URI.create("http://" + Objects.requireNonNull(hostValue) + path))
                 .headers(httpHeaders)
-                .body(body != null ? HttpRequest.BodyPublishers.ofString(body.toString()) : null)
+                .body(body != null ? DataStream.ofBytes(body.toString().getBytes()) : null)
                 .build();
         }
 
@@ -192,9 +192,9 @@ public class SigV4TestRunner {
 
         private static AuthProperties getAuthProperties(ObjectNode objectNode) {
             return AuthProperties.builder()
-                .put(Sigv4Properties.SERVICE, objectNode.expectStringMember("service").getValue())
-                .put(Sigv4Properties.REGION, objectNode.expectStringMember("region").getValue())
-                .put(Sigv4Properties.CLOCK, getStaticClock(objectNode.expectStringMember("timestamp").getValue()))
+                .put(SigV4Properties.SERVICE, objectNode.expectStringMember("service").getValue())
+                .put(SigV4Properties.REGION, objectNode.expectStringMember("region").getValue())
+                .put(SigV4Properties.CLOCK, getStaticClock(objectNode.expectStringMember("timestamp").getValue()))
                 .build();
         }
 

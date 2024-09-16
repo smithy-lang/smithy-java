@@ -22,7 +22,12 @@ public class URLEncoding {
      * @param source The raw string to encode. Note that any existing percent-encoding will be encoded again.
      * @param sink   Where to write the percent-encoded string.
      */
+
     public static void encodeUnreserved(String source, StringBuilder sink) {
+        encodeUnreserved(source, sink, false);
+    }
+
+    public static void encodeUnreserved(String source, StringBuilder sink, boolean ignoreSlashes) {
         // Encode the path segment and undo some of the assumption of URLEncoder to make it with unreserved.
         String result = java.net.URLEncoder.encode(source, StandardCharsets.UTF_8);
         for (int i = 0; i < result.length(); i++) {
@@ -31,14 +36,37 @@ public class URLEncoding {
                 case '+' -> sink.append("%20");
                 case '*' -> sink.append("%2A");
                 case '%' -> {
-                    if (result.charAt(i + 1) == '7') {
-                        if (i < result.length() - 1 && result.charAt(i + 2) == 'E') {
-                            sink.append('~');
-                            i += 2;
-                            break;
-                        }
+                    if (i >= result.length() - 1) {
+                        sink.append(c);
                     }
-                    sink.append(c);
+                    switch (result.charAt(i + 1)) {
+                        case '7' -> {
+                            if (result.charAt(i + 2) == 'E') {
+                                sink.append('~');
+                                i += 2;
+                            } else {
+                                sink.append(c);
+                            }
+                        }
+                        case '2' -> {
+                            switch (result.charAt(i + 2)) {
+                                case 'F' -> {
+                                    if (ignoreSlashes) {
+                                        sink.append('/');
+                                        i += 2;
+                                    } else {
+                                        sink.append(c);
+                                    }
+                                }
+                                case '5' -> {
+                                    sink.append('%');
+                                    i += 2;
+                                }
+                                default -> sink.append(c);
+                            }
+                        }
+                        default -> sink.append(c);
+                    }
                 }
                 default -> sink.append(c);
             }

@@ -25,9 +25,9 @@ import org.openjdk.jmh.annotations.State;
 import software.amazon.smithy.java.aws.runtime.client.http.auth.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
-import software.amazon.smithy.java.runtime.core.uri.QueryStringBuilder;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
+import software.amazon.smithy.java.runtime.io.uri.QueryStringBuilder;
 
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -38,8 +38,8 @@ public class SigV4SignerTrials {
         "secret-key"
     );
     private static final AuthProperties TEST_PROPERTIES = AuthProperties.builder()
-        .put(Sigv4Properties.SERVICE, "service")
-        .put(Sigv4Properties.REGION, "us-east-1")
+        .put(SigV4Properties.SERVICE, "service")
+        .put(SigV4Properties.REGION, "us-east-1")
         .build();
     private static final Map<String, SmithyHttpRequest> CASES = Map.ofEntries(
         Map.entry(
@@ -88,7 +88,7 @@ public class SigV4SignerTrials {
     @Setup
     public void setup() throws Exception {
         request = CASES.get(testName);
-        signer = Sigv4Signer.INSTANCE;
+        signer = SigV4Signer.INSTANCE;
     }
 
     @Benchmark

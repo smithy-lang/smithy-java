@@ -10,18 +10,25 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Represents a SigningKey with an expiration time to be stored in the {@code SigningCache}.
+ * Represents a SigningKey with a creation date to be stored in the {@code SigningCache}.
+ *
+ * <p>This key is considered valid for the same day on which it was created and is considered invalid for any other
+ * day.
  */
 final class SigningKey {
     private final byte[] signingKey;
     private final long date;
 
-    public SigningKey(byte[] signingKey, Instant instant) {
+    SigningKey(byte[] signingKey, Instant instant) {
         this.signingKey = Objects.requireNonNull(signingKey, "signingKey must not be null");
         this.date = daysSinceEpoch(Objects.requireNonNull(instant, "instant must not be null"));
     }
 
-    public boolean isValidForDate(Instant other) {
+    byte[] signingKey() {
+        return signingKey;
+    }
+
+    boolean isValidFor(Instant other) {
         return date == daysSinceEpoch(other);
     }
 
@@ -29,7 +36,4 @@ final class SigningKey {
         return Duration.ofMillis(instant.toEpochMilli()).toDays();
     }
 
-    public byte[] signingKey() {
-        return signingKey;
-    }
 }

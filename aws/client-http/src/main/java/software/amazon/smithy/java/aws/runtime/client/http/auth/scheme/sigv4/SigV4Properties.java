@@ -11,8 +11,8 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperty;
 /**
  * Signing properties used for SigV4 signing.
  */
-public final class Sigv4Properties {
-    private Sigv4Properties() {}
+public final class SigV4Properties {
+    private SigV4Properties() {}
 
     /**
      * Region to use for signing. For example {@code us-east-2}.
