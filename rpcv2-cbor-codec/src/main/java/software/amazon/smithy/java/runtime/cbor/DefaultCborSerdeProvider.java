@@ -23,12 +23,12 @@ final class DefaultCborSerdeProvider implements CborSerdeProvider {
 
     @Override
     public ShapeDeserializer newDeserializer(byte[] source, Rpcv2CborCodec.Settings settings) {
-        return new CborDeserializer(source);
+        return new CborDeserializer(source, settings);
     }
 
     @Override
     public ShapeDeserializer newDeserializer(ByteBuffer source, Rpcv2CborCodec.Settings settings) {
-        return new CborDeserializer(source);
+        return new CborDeserializer(source, settings);
     }
 
     @Override

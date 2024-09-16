@@ -5,8 +5,11 @@
 
 package software.amazon.smithy.java.runtime.core.schema;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,10 +22,12 @@ import software.amazon.smithy.model.traits.Trait;
  */
 final class DeferredRootSchema extends Schema {
 
+
     private final List<MemberSchemaBuilder> memberBuilders;
     private final Set<String> stringEnumValues;
     private final Set<Integer> intEnumValues;
     private volatile ResolvedMembers resolvedMembers;
+    private Canonicalizer canonicalizer;
 
     DeferredRootSchema(
         ShapeType type,
@@ -47,6 +52,7 @@ final class DeferredRootSchema extends Schema {
                 memberList.add(builder.build());
             }
             resolvedMembers = new ResolvedMembers(SchemaBuilder.createMembers(memberList), memberList);
+            canonicalizer = Canonicalizer.from(this);
         }
     }
 
@@ -70,5 +76,11 @@ final class DeferredRootSchema extends Schema {
     @Override
     public Set<String> stringEnumValues() {
         return stringEnumValues;
+    }
+
+    @Override
+    public Schema findMember2(byte[] paylpad, int off, int len) {
+        resolve();
+        return canonicalizer.resolve(paylpad, off, len);
     }
 }

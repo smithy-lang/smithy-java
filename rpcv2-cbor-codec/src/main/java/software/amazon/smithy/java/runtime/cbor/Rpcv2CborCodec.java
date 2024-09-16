@@ -37,8 +37,10 @@ public final class Rpcv2CborCodec implements Codec {
         PROVIDER = selected;
     }
 
-    private Rpcv2CborCodec() {
+    private final Settings settings;
 
+    private Rpcv2CborCodec(Settings settings) {
+        this.settings = settings;
     }
 
     public static Builder builder() {
@@ -52,24 +54,31 @@ public final class Rpcv2CborCodec implements Codec {
 
     @Override
     public ShapeSerializer createSerializer(OutputStream sink) {
-        return PROVIDER.newSerializer(sink, new Rpcv2CborCodec.Settings());
+        return PROVIDER.newSerializer(sink, settings);
     }
 
     @Override
     public ShapeDeserializer createDeserializer(byte[] source) {
-        return PROVIDER.newDeserializer(source, new Rpcv2CborCodec.Settings());
+        return PROVIDER.newDeserializer(source, settings);
     }
 
     @Override
     public ShapeDeserializer createDeserializer(ByteBuffer source) {
-        return PROVIDER.newDeserializer(source, new Rpcv2CborCodec.Settings());
+        return PROVIDER.newDeserializer(source, settings);
     }
 
-    public record Settings() {}
+    public record Settings(boolean forbidUnknownMembers) {}
 
     public static final class Builder {
+        private boolean forbidUnknownMembers;
+
+        public Builder forbidUnknownMembers(boolean forbidUnknownMembers) {
+            this.forbidUnknownMembers = forbidUnknownMembers;
+            return this;
+        }
+
         public Rpcv2CborCodec build() {
-            return new Rpcv2CborCodec();
+            return new Rpcv2CborCodec(new Settings(forbidUnknownMembers));
         }
     }
 }

@@ -253,7 +253,9 @@ final class JsonIterDeserializer implements ShapeDeserializer {
                     continue;
                 }
 
-                var member = schema.findMember(field.data(), field.head(), field.tail());
+                int pos = field.head();
+                int len = field.tail() - pos;
+                var member = schema.findMember2(field.data(), pos, len);
                 if (member != null) {
                     structMemberConsumer.accept(state, member, this);
                 } else if (schema.type() == ShapeType.UNION && settings.forbidUnknownUnionMembers()) {

@@ -67,9 +67,15 @@ public class SmithyJavaTrials {
     );
 
     public enum Protocol {
-        Jackson(JsonCodec.builder().overrideSerdeProvider(new JacksonJsonSerdeProvider()).build()),
-        JsonIter(JsonCodec.builder().overrideSerdeProvider(new JsonIterProvider()).build()),
-        RpcV2(Rpcv2CborCodec.builder().build()),
+        Jackson(JsonCodec.builder()
+            .forbidUnknownUnionMembers(true)
+            .overrideSerdeProvider(new JacksonJsonSerdeProvider()).build()),
+        JsonIter(JsonCodec.builder()
+            .forbidUnknownUnionMembers(true)
+            .overrideSerdeProvider(new JsonIterProvider()).build()),
+        RpcV2(Rpcv2CborCodec.builder()
+            .forbidUnknownMembers(true)
+            .build()),
         ;
 
         private final Codec codec;
@@ -85,7 +91,8 @@ public class SmithyJavaTrials {
 
     @Param(
         {
-//            "RestJson",
+//            "Jackson",
+            "JsonIter",
             "RpcV2",
         }
     )
@@ -93,7 +100,20 @@ public class SmithyJavaTrials {
 
 
     @Param(
-        {"all_fields_optional_0", "all_fields_optional_1", "all_fields_optional_3", "all_fields_optional_5", "all_fields_optional_6", "attribute_updates_1", "attribute_updates_2", "attribute_updates_3", "struct_1", "struct_2", "struct_3", "struct_4", "send_message_request_1",
+        {
+            "all_fields_optional_0",
+//            "all_fields_optional_1",
+            "all_fields_optional_3",
+//            "all_fields_optional_5",
+            "all_fields_optional_6",
+            "attribute_updates_1",
+//            "attribute_updates_2",
+            "attribute_updates_3",
+            "struct_1",
+//            "struct_2",
+//            "struct_3",
+            "struct_4",
+//            "send_message_request_1",
         }
     )
     private String testName;
@@ -109,7 +129,7 @@ public class SmithyJavaTrials {
 
         // The bytes of the JSON for the test case. Each JSON document is serialized using no jsonName or
         // timestamp format trait.
-        var preparationCodec = JsonCodec.builder().overrideSerdeProvider(new JsonIterProvider()).build();
+        var preparationCodec = Protocol.Jackson.codec;
         testName = testName + ".json";
 
         // TODO: for some reason, I can't access resources using relative paths with Class#getResource.
@@ -145,14 +165,13 @@ public class SmithyJavaTrials {
     }
 
     @Benchmark
-    public void deserialize(Blackhole bh) {
-        bh.consume(type.codec.deserializeShape(bytes, cleanBuilder));
+    public Object deserialize() {
+        return type.codec.deserializeShape(bytes, cleanBuilder);
     }
-
 
     public static final class Runner {
         public static void main(String[] args) throws Exception {
-            run(Protocol.RpcV2, "struct_4");
+            run(Protocol.RpcV2, "all_fields_optional_6");
         }
 
         private void runAll() throws Exception {
@@ -166,14 +185,17 @@ public class SmithyJavaTrials {
 
         private static void run(Protocol type, String testName) throws Exception {
             var trial = new SmithyJavaTrials();
-            trial.type = Protocol.RpcV2;
+            trial.type = type;
             trial.testName = testName;
             trial.setup();
             var bh = new Blackhole(
                 "Today's password is swordfish. I understand instantiating Blackholes directly is dangerous."
             );
             trial.serialize(bh);
-            trial.deserialize(bh);
+            var ret = trial.deserialize();
+            if (!ret.equals(trial.shape)) {
+                throw new RuntimeException("aw beans");
+            }
         }
     }
 }

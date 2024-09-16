@@ -10,8 +10,8 @@ dependencies {
 }
 
 jmh {
-    //profilers.add("async:output=flamegraph")
-    //profilers.add('gc')
+//    profilers.add("async:output=flamegraph")
+//    profilers.add('gc')
 }
 
 // TODO: eventually re-enable

@@ -138,19 +138,22 @@ final class CborDeserializer implements ShapeDeserializer {
         }
     }
 
-//    private static final Map<Schema, Canonicalizer> CANONICALIZERS = new ConcurrentHashMap<>();
-    private static final Map<Schema, HashCanonicalizer> CANONICALIZERS = new ConcurrentHashMap<>();
+    private static final Map<Schema, Canonicalizer> CANONICALIZERS = new ConcurrentHashMap<>();
+//    private static final Map<Schema, HashCanonicalizer> CANONICALIZERS = new ConcurrentHashMap<>();
 
     private final CborParser parser;
     private final byte[] payload;
+    private final boolean forbidUnknownMembers;
 
-    CborDeserializer(byte[] payload) {
+    CborDeserializer(byte[] payload, Rpcv2CborCodec.Settings settings) {
         this.parser = new CborParser(payload);
         this.payload = payload;
+        this.forbidUnknownMembers = settings.forbidUnknownMembers();
         parser.advance();
     }
 
-    CborDeserializer(ByteBuffer byteBuffer) {
+    CborDeserializer(ByteBuffer byteBuffer, Rpcv2CborCodec.Settings settings) {
+        this.forbidUnknownMembers = settings.forbidUnknownMembers();
         if (byteBuffer.hasArray()) {
             byte[] payload = byteBuffer.array();
             this.payload = payload;
@@ -339,13 +342,13 @@ final class CborDeserializer implements ShapeDeserializer {
             throw badType("struct", token);
         }
 
-        var canonicalizer = getCanonicalizer(schema);
+//        var canonicalizer = getCanonicalizer(schema);
         for (token = parser.advance(); token != Token.END_OBJECT; token = parser.advance()) {
             if (token != Token.KEY) {
                 throw badType("struct member", token);
             }
 
-            Object member = resolveMember(schema, canonicalizer);
+            Object member = resolveMember(schema);
             parser.advance();
             if (member.getClass() == String.class) {
                 consumer.unknownMember(state, (String) member);
@@ -355,19 +358,22 @@ final class CborDeserializer implements ShapeDeserializer {
         }
     }
 
-//    private Object resolveMember(Schema host, Canonicalizer canonicalizer) {
-    private Object resolveMember(Schema host, HashCanonicalizer canonicalizer) {
+    private Object resolveMember(Schema host) {
+//    private Object resolveMember(Schema host, HashCanonicalizer canonicalizer) {
         int len = parser.getItemLength();
         if (CborParser.isIndefinite(len)) {
             return resolveSlow(host, len);
         }
 
         int pos = parser.getPosition();
-        var schema = canonicalizer.resolve(payload, pos, len);
+        var schema = host.findMember2(payload, pos, len);
         if (schema != null) {
             return schema;
+        } else if (forbidUnknownMembers) {
+            throw new SerializationException("Unknown member");
+        } else {
+            return CborReadUtil.readTextString(payload, pos, len);
         }
-        return CborReadUtil.readTextString(payload, pos, len);
     }
 
     private Object resolveSlow(Schema host, int len) {
@@ -376,12 +382,12 @@ final class CborDeserializer implements ShapeDeserializer {
         return schema != null ? schema : host;
     }
 
-//    private Canonicalizer getCanonicalizer(Schema schema) {
-    private HashCanonicalizer getCanonicalizer(Schema schema) {
+    private Canonicalizer getCanonicalizer(Schema schema) {
+//    private HashCanonicalizer getCanonicalizer(Schema schema) {
         var canonicalizer = CANONICALIZERS.get(schema);
         if (canonicalizer == null) {
-//             canonicalizer = new Canonicalizer(schema);
-            canonicalizer = new HashCanonicalizer(schema);
+             canonicalizer = new Canonicalizer(schema);
+//            canonicalizer = new HashCanonicalizer(schema);
             CANONICALIZERS.put(schema, canonicalizer);
         }
 

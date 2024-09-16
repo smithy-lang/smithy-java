@@ -5,16 +5,21 @@
 
 package software.amazon.smithy.java.runtime.core.schema;
 
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.Trait;
+
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
-import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.Trait;
 
 /**
  * Describes a generated shape with important metadata from a Smithy model.
@@ -26,6 +31,104 @@ import software.amazon.smithy.model.traits.Trait;
  */
 public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRootSchema,
     DeferredMemberSchema {
+    protected static final Canonicalizer NULL_CANONICALIZER = new Canonicalizer();
+
+    protected static final class Canonicalizer {
+         protected record Canonical(Schema member, byte[] utf8) implements Comparable<Canonical> {
+            @Override
+            public int compareTo(Canonical o) {
+                return Arrays.compare(utf8, o.utf8);
+            }
+
+            private Schema isSame(byte[] bytes, int off, int len) {
+                if (Arrays.compare(utf8, 0, utf8.length, bytes, off, off + len) == 0) {
+                    return member;
+                }
+                return null;
+            }
+        }
+
+        static Canonicalizer from(Schema s) {
+            if (s.members() != null) {
+                return new Canonicalizer(s);
+            }
+            return NULL_CANONICALIZER;
+        }
+
+        private final Object[][] canonicals;
+
+        private Canonicalizer(Schema schema) {
+            int biggest = 0;
+            Map<Integer, List<Canonical>> bySize = new HashMap<>();
+            for (var member : schema.members()) {
+                byte[] utf8 = member.memberName().getBytes(StandardCharsets.UTF_8);
+                biggest = Math.max(biggest, utf8.length);
+                bySize.computeIfAbsent(utf8.length, $ -> new ArrayList<>())
+                    .add(new Canonical(member, utf8));
+            }
+
+            canonicals = new Object[biggest + 1][];
+            for (var entry : bySize.entrySet()) {
+                int len = entry.getKey();
+                var canonsForLen = entry.getValue().toArray(new Canonical[0]);
+                Arrays.sort(canonsForLen);
+                canonicals[len] = canonsForLen;
+            }
+        }
+
+        private Canonicalizer() {
+            this.canonicals = new Object[0][];
+        }
+
+        Schema resolve(byte[] payload, int off, int len) {
+            if (len >= canonicals.length) {
+                return null;
+            }
+
+            Object[] canonicals = this.canonicals[len];
+            if (canonicals == null) {
+                return null;
+            }
+
+            if (canonicals.length == 1) {
+                return getMemberIfSame(canonicals[0], payload, off, len);
+            } else {
+                // TODO: consider a binary search if we have enough collisions
+                for (int i = 0; i < canonicals.length; i++) {
+                    var member = getMemberIfSame(canonicals[i], payload, off, len);
+                    if (member != null) {
+                        return member;
+                    }
+                }
+                return null;
+//                return binarySearch(canonicals, payload, off, len);
+            }
+        }
+
+        private static Schema binarySearch(Object[] a, byte[] payload, int off, int len) {
+            int low = 0;
+            int high = a.length - 1;
+            int end = off + len;
+            while (low <= high) {
+                int mid = (low + high) >>> 1;
+                Canonical midVal = (Canonical) a[mid];
+                byte[] canonicalUtf8 = midVal.utf8;
+                int cmp = Arrays.compare(canonicalUtf8, 0, canonicalUtf8.length, payload, off, end);
+
+                if (cmp < 0)
+                    low = mid + 1;
+                else if (cmp > 0)
+                    high = mid - 1;
+                else
+                    return midVal.member;
+            }
+            return null;
+        }
+
+        private Schema getMemberIfSame(Object o, byte[] bytes, int off, int len) {
+            return ((Canonical) o).isSame(bytes, off, len);
+        }
+    }
 
     private final ShapeType type;
     private final ShapeId id;
@@ -77,6 +180,7 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
     final double minDoubleConstraint;
     final double maxDoubleConstraint;
     final ValidatorOfString stringValidation;
+    protected Canonicalizer canonicalizer;
 
     private final int hashCode;
 
@@ -167,6 +271,14 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
         }
 
         this.hashCode = Objects.hash(type, id, traits, memberIndex);
+    }
+
+    public Schema findMember2(byte[] payload, int off, int len) {
+        Canonicalizer c = canonicalizer;
+        if (c == null) {
+            canonicalizer = (c = Canonicalizer.from(this));
+        }
+        return c.resolve(payload, off, len);
     }
 
     /**
