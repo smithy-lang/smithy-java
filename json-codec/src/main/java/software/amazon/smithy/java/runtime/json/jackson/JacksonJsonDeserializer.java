@@ -235,21 +235,28 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         try {
+            var fieldMapper = settings.fieldMapper();
             for (var memberName = parser.nextFieldName(); memberName != null; memberName = parser.nextFieldName()) {
-                var token = parser.nextToken();
-                var member = settings.fieldMapper().fieldToMember(schema, memberName);
-                if (member == null) {
-                    if (schema.type() != ShapeType.UNION || !settings.forbidUnknownUnionMembers()) {
+                if (parser.nextToken() != VALUE_NULL) {
+                    var member = fieldMapper.fieldToMember(schema, memberName);
+                    if (member != null) {
+                        structMemberConsumer.accept(state, member, this);
+                    } else if (schema.type() == ShapeType.STRUCTURE) {
                         structMemberConsumer.unknownMember(state, memberName);
-                    } else {
+                        parser.skipChildren();
+                    } else if (memberName.equals("__type")) {
+                        // Ignore __type on unknown union members.
+                        parser.skipChildren();
+                    } else if (settings.forbidUnknownUnionMembers()) {
                         throw new SerializationException("Unknown member " + memberName + " encountered");
+                    } else {
+                        structMemberConsumer.unknownMember(state, memberName);
+                        parser.skipChildren();
                     }
-                    // Don't parse members of unknown members.
-                    parser.skipChildren();
-                } else if (token != VALUE_NULL) {
-                    structMemberConsumer.accept(state, member, this);
                 }
             }
+        } catch (SerializationException e) {
+            throw e;
         } catch (Exception e) {
             throw new SerializationException(e);
         }

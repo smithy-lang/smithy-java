@@ -425,4 +425,33 @@ public class JsonDeserializerTest {
             assertThat(e.getMessage(), equalTo("Expected a timestamp, but found Boolean value"));
         }
     }
+
+    @Test
+    public void ignoresTypeOnUnions() {
+        try (var codec = JsonCodec.builder().build()) {
+            var de = codec.createDeserializer(
+                "{\"__type\":\"foo\", \"booleanValue\":true}".getBytes(StandardCharsets.UTF_8)
+            );
+            Set<String> members = new LinkedHashSet<>();
+
+            de.readStruct(JsonTestData.UNION, members, new ShapeDeserializer.StructMemberConsumer<>() {
+                @Override
+                public void accept(Set<String> memberResult, Schema member, ShapeDeserializer deser) {
+                    memberResult.add(member.memberName());
+                    if (member.memberName().equals("booleanValue")) {
+                        assertThat(deser.readBoolean(JsonTestData.UNION.member("booleanValue")), equalTo(true));
+                    } else {
+                        throw new IllegalStateException("Unexpected member: " + member);
+                    }
+                }
+
+                @Override
+                public void unknownMember(Set<String> state, String memberName) {
+                    Assertions.fail("Should not have detected an unknown member: " + memberName);
+                }
+            });
+
+            assertThat(members, contains("booleanValue"));
+        }
+    }
 }
