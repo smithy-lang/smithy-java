@@ -58,9 +58,6 @@ public class ProtocolTests {
         skipTests = {
             // Null values are not skipped in deserialization
             "RestJsonDeserializesDenseSetMapAndSkipsNull",
-            // STATUS is not supported yet? TODO?
-            "RestJsonHttpResponseCodeWithNoPayload",
-            "RestJsonHttpResponseCode",
             // Invalid ints, bools, etc in headers
             "RestJsonInputAndOutputWithNumericHeaders",
             "RestJsonInputAndOutputWithBooleanHeaders",
