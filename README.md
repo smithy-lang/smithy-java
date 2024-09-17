@@ -11,8 +11,8 @@
 
 ## Development
 
-### Pre-commit hooks
-Pre-commit hooks are automatically added for unix users via the `addPreCommitHooks` gradle task.
+### Pre-push hooks
+Pre-push hooks are automatically added for unix users via the `addPrePushHooks` gradle task.
 **Note**: In order to successfully execute the pre-defined hooks you must have the `smithy` CLI installed. 
 See [installation instructions](https://smithy.io/2.0/guides/smithy-cli/cli_installation.html) if you do not already have the CLI installed.
 

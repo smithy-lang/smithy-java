@@ -1,12 +1,12 @@
 
 import org.apache.tools.ant.taskdefs.condition.Os
 
-task("addPreCommitHooks") {
+task("addPrePushHooks") {
     onlyIf("unix") {
         !Os.isFamily(Os.FAMILY_WINDOWS)
     }
     exec {
-        commandLine("ln", "-s", "-f", "../../git-hooks/pre-commit", ".git/hooks/pre-commit")
+        commandLine("ln", "-s", "-f", "../../git-hooks/pre-push", ".git/hooks/pre-push")
     }
-    println("Pre-commit hooks added")
+    println("Pre-push hooks added")
 }

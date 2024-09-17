@@ -9,17 +9,24 @@ changedJavaFiles=$(git diff --staged --name-only | grep '\.java' | xargs -I {} b
 if [ -n "$changedJavaFiles" ]; then
   echo "[git hook] Executing spotless formatter on staged files before commit" 
   ./gradlew spotlessApply -DspotlessFiles=$changedJavaFiles
-  # Stage updates
-  git add -u $changedJavaFiles
+  if [ -n "$(git diff --staged --name-only | head -n1)"]; then
+      echo "[git hook] Spotless formatter made changes. Commit them and re-push."
+      exit 1
+  fi
 fi 
 
 # Execute smithy formatter on any updated smithy files 
-changedSmithyFiles=$(git diff --staged --name-only | grep '\.smithy')
+changedSmithyFiles=$(git diff --name-only | grep '\.smithy')
 if [ -n "$changedSmithyFiles" ]; then
   echo "[git hook] Formatting staged smithy files before commit"
 fi
 
 for file in $changedSmithyFiles; do
   smithy format $file
-  git add -u $changedSmithyFiles
+  if [ -n "$(git diff --name-only | head -n1)"]; then
+      echo "[git hook] smithy-format made changes. Commit them and re-push."
+      exit 1
+  fi
 done
+
+
