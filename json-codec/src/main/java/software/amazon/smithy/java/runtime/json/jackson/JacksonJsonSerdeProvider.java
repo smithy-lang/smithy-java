@@ -14,7 +14,6 @@ import java.nio.ByteBuffer;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.java.runtime.json.JsonSerdeProvider;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -58,10 +57,9 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
     @Override
     public ShapeDeserializer newDeserializer(ByteBuffer source, JsonCodec.Settings settings) {
         try {
-            return new JacksonJsonDeserializer(
-                FACTORY.createParser(ByteBufferUtils.byteBufferInputStream(source)),
-                settings
-            );
+            int offset = source.arrayOffset() + source.position();
+            int length = source.remaining();
+            return new JacksonJsonDeserializer(FACTORY.createParser(source.array(), offset, length), settings);
         } catch (IOException e) {
             throw new SerializationException(e);
         }

@@ -32,11 +32,6 @@ final class ByteBufferDataStream implements DataStream {
     }
 
     @Override
-    public CompletionStage<byte[]> asBytes() {
-        return CompletableFuture.completedFuture(ByteBufferUtils.getBytes(buffer));
-    }
-
-    @Override
     public CompletionStage<InputStream> asInputStream() {
         return CompletableFuture.completedFuture(ByteBufferUtils.byteBufferInputStream(buffer));
     }

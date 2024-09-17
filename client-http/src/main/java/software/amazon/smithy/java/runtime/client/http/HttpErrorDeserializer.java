@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.client.http;
 
+import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.context.Context;
@@ -102,7 +103,7 @@ public final class HttpErrorDeserializer {
             Context context,
             Codec codec,
             SmithyHttpResponse response,
-            byte[] responsePayload,
+            ByteBuffer responsePayload,
             Document parsedDocument,
             ShapeBuilder<ModeledApiException> builder
         ) {
@@ -110,7 +111,7 @@ public final class HttpErrorDeserializer {
                 context,
                 codec,
                 // Make a new response that uses the previously read response payload.
-                response.withBody(DataStream.ofBytes(responsePayload)),
+                response.withBody(DataStream.ofByteBuffer(responsePayload)),
                 builder
             );
         }
@@ -142,7 +143,7 @@ public final class HttpErrorDeserializer {
             SmithyHttpResponse response,
             ShapeBuilder<ModeledApiException> builder
         ) {
-            return createDataStream(response).asBytes()
+            return createDataStream(response).asByteBuffer()
                 .thenApply(bytes -> codec.deserializeShape(bytes, builder))
                 .toCompletableFuture();
         }
@@ -152,7 +153,7 @@ public final class HttpErrorDeserializer {
             Context context,
             Codec codec,
             SmithyHttpResponse response,
-            byte[] responsePayload,
+            ByteBuffer responsePayload,
             Document parsedDocument,
             ShapeBuilder<ModeledApiException> builder
         ) {
@@ -264,15 +265,15 @@ public final class HttpErrorDeserializer {
     ) {
         // Read the payload into a JSON document so we can efficiently find __type and then directly
         // deserialize the document into the identified builder.
-        return content.asBytes().toCompletableFuture().thenCompose(bytes -> {
-            if (bytes.length > 0) {
+        return content.asByteBuffer().toCompletableFuture().thenCompose(buffer -> {
+            if (buffer.remaining() > 0) {
                 try {
-                    var document = codec.createDeserializer(bytes).readDocument();
+                    var document = codec.createDeserializer(buffer).readDocument();
                     var id = document.discriminator();
                     var builder = typeRegistry.createBuilder(id, ModeledApiException.class);
                     if (builder != null) {
                         return knownErrorFactory
-                            .createErrorFromDocument(context, codec, response, bytes, document, builder)
+                            .createErrorFromDocument(context, codec, response, buffer, document, builder)
                             .thenApply(e -> e);
                     }
                     // ignore parsing errors here if the service is returning garbage.

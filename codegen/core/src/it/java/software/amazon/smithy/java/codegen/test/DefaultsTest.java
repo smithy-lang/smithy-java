@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.test;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,8 +38,8 @@ public class DefaultsTest {
         assertEquals(defaults.shortMember(), (short) 1);
         assertEquals(defaults.blob(), ByteBuffer.wrap(Base64.getDecoder().decode("YmxvYg==")));
         defaults.streamingBlob()
-            .asBytes()
-            .thenAccept(b -> assertArrayEquals(b, Base64.getDecoder().decode("c3RyZWFtaW5n")));
+            .asByteBuffer()
+            .thenAccept(b -> assertEquals(b, ByteBuffer.wrap(Base64.getDecoder().decode("c3RyZWFtaW5n"))));
         assertEquals(defaults.boolDoc(), Document.createBoolean(true));
         assertEquals(defaults.stringDoc(), Document.createString("string"));
         assertEquals(defaults.numberDoc(), Document.createInteger(1));

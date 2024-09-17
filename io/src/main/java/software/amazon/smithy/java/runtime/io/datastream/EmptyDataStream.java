@@ -24,11 +24,6 @@ final class EmptyDataStream implements DataStream {
     }
 
     @Override
-    public CompletionStage<byte[]> asBytes() {
-        return CompletableFuture.completedFuture(EMPTY_BYTES);
-    }
-
-    @Override
     public CompletionStage<InputStream> asInputStream() {
         return CompletableFuture.completedFuture(InputStream.nullInputStream());
     }

@@ -117,19 +117,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the created DataStream.
      */
     static DataStream ofBytes(byte[] bytes) {
-        return new BytesDataStream(bytes, 0, bytes.length, null);
-    }
-
-    /**
-     * Create a DataStream from an in-memory byte array.
-     *
-     * @param bytes Bytes to read.
-     * @param head Starting position.
-     * @param tail Ending position.
-     * @return the created DataStream.
-     */
-    static DataStream ofBytes(byte[] bytes, int head, int tail) {
-        return new BytesDataStream(bytes, head, tail, null);
+        return ofBytes(bytes, null);
     }
 
     /**
@@ -140,20 +128,32 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the created DataStream.
      */
     static DataStream ofBytes(byte[] bytes, String contentType) {
-        return new BytesDataStream(bytes, 0, bytes.length, contentType);
+        return new ByteBufferDataStream(ByteBuffer.wrap(bytes, 0, bytes.length), contentType);
     }
 
     /**
      * Create a DataStream from an in-memory byte array.
      *
      * @param bytes Bytes to read.
-     * @param head Starting position.
-     * @param tail Ending position.
+     * @param offset Starting position.
+     * @param length Ending position.
+     * @return the created DataStream.
+     */
+    static DataStream ofBytes(byte[] bytes, int offset, int length) {
+        return ofBytes(bytes, offset, length, null);
+    }
+
+    /**
+     * Create a DataStream from an in-memory byte array.
+     *
+     * @param bytes Bytes to read.
+     * @param offset Starting position.
+     * @param length Ending position.
      * @param contentType Content-Type of the data, if known.
      * @return the created DataStream.
      */
-    static DataStream ofBytes(byte[] bytes, int head, int tail, String contentType) {
-        return new BytesDataStream(bytes, head, tail, contentType);
+    static DataStream ofBytes(byte[] bytes, int offset, int length, String contentType) {
+        return new ByteBufferDataStream(ByteBuffer.wrap(bytes, offset, length), contentType);
     }
 
     /**
@@ -267,18 +267,6 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     private <T> CompletionStage<T> transform(DataStreamSubscriber<T> subscriber) {
         subscribe(subscriber);
         return subscriber.result();
-    }
-
-    /**
-     * Read the contents of the stream into a byte array.
-     *
-     * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
-     * {@link #contentLength()} can be used to know if it is safe.
-     *
-     * @return the CompletionStage that contains the read byte array.
-     */
-    default CompletionStage<byte[]> asBytes() {
-        return transform(DataStreamSubscriber.ofByteArray());
     }
 
     /**

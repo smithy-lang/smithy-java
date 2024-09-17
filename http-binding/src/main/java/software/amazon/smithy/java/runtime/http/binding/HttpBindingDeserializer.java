@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.net.http.HttpHeaders;
+import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -122,13 +123,13 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 case PAYLOAD -> {
                     if (member.type() == ShapeType.STRUCTURE) {
                         // Read the payload into a byte buffer to deserialize a shape in the body.
-                        bodyDeserializationCf = bodyAsBytes().thenAccept(bytes -> {
+                        bodyDeserializationCf = bodyAsByteBuffer().thenAccept(bb -> {
                             LOGGER.trace(
                                 "Deserializing the payload of {} schema via {}",
                                 schema,
                                 payloadCodec.getMediaType()
                             );
-                            structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bytes));
+                            structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bb));
                         }).toCompletableFuture();
                     } else if (isEventStream(member)) {
                         structMemberConsumer.accept(state, member, new SpecificShapeDeserializer() {
@@ -160,9 +161,9 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         if (!bodyMembers.isEmpty()) {
             validateMediaType();
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
-            bodyDeserializationCf = bodyAsBytes().thenAccept(bytes -> {
+            bodyDeserializationCf = bodyAsByteBuffer().thenAccept(bb -> {
                 LOGGER.trace("Deserializing the structured body of {} via {}", schema, payloadCodec.getMediaType());
-                payloadCodec.createDeserializer(bytes).readStruct(schema, bodyMembers, (body, m, de) -> {
+                payloadCodec.createDeserializer(bb).readStruct(schema, bodyMembers, (body, m, de) -> {
                     if (body.contains(m.memberName())) {
                         body.structMemberConsumer.accept(body.state, m, de);
                     }
@@ -177,8 +178,8 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     // TODO: Should there be a configurable limit on the client/server for how much can be read in memory?
-    private CompletionStage<byte[]> bodyAsBytes() {
-        return body.asBytes();
+    private CompletionStage<ByteBuffer> bodyAsByteBuffer() {
+        return body.asByteBuffer();
     }
 
     CompletableFuture<Void> completeBodyDeserialization() {

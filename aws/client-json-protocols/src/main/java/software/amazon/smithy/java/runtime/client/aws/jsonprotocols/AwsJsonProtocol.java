@@ -99,7 +99,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
             return CompletableFuture.completedFuture(codec.deserializeShape(EMPTY_PAYLOAD, builder));
         }
 
-        return content.asBytes()
+        return content.asByteBuffer()
             .toCompletableFuture()
             .thenApply(bytes -> codec.deserializeShape(bytes, builder));
     }

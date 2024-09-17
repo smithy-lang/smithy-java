@@ -28,11 +28,6 @@ final class WrappedDataStream implements DataStream {
     }
 
     @Override
-    public CompletionStage<byte[]> asBytes() {
-        return delegate.asBytes();
-    }
-
-    @Override
     public CompletionStage<InputStream> asInputStream() {
         return delegate.asInputStream();
     }

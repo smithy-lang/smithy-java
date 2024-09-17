@@ -126,7 +126,14 @@ final class PayloadDeserializer implements ShapeDeserializer {
         }
 
         try {
-            return body.asBytes().toCompletableFuture().thenApply(b -> new String(b, StandardCharsets.UTF_8)).get();
+            return body.asByteBuffer()
+                .toCompletableFuture()
+                .thenApply(buffer -> {
+                    int pos = buffer.arrayOffset() + buffer.position();
+                    int len = buffer.remaining();
+                    return new String(buffer.array(), pos, len, StandardCharsets.UTF_8);
+                })
+                .get();
         } catch (InterruptedException | ExecutionException e) {
             throw new SerializationException("Failed to get payload bytes", e);
         }

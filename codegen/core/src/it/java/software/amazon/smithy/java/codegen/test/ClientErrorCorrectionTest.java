@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.test;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -39,7 +38,7 @@ public class ClientErrorCorrectionTest {
         assertEquals(corrected.shortMember(), (short) 0);
         assertEquals(corrected.blob(), ByteBuffer.allocate(0));
         assertEquals(corrected.streamingBlob().contentLength(), 0);
-        corrected.streamingBlob().asBytes().thenAccept(bytes -> assertArrayEquals(bytes, new byte[0]));
+        corrected.streamingBlob().asByteBuffer().thenAccept(bytes -> assertEquals(0, bytes.remaining()));
         assertNull(corrected.document());
         assertEquals(corrected.list(), List.of());
         assertEquals(corrected.map(), Map.of());
