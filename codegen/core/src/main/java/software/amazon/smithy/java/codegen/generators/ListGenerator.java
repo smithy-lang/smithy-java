@@ -68,10 +68,10 @@ public final class ListGenerator
                             @Override
                             public void accept(${shape:B} state, ${shapeDeserializer:T} deserializer) {
                                 if (deserializer.isNull()) {
-                                    ${?sparse}${?unique}if (!${/unique}state.add(deserializer.readNull())${^unique};${/unique}${?unique}) {
+                                    ${?sparse}${?unique}if (!${/unique}state.add(${/sparse}deserializer.readNull()${^sparse};${/sparse}${?sparse})${^unique};${/unique}${?unique}) {
                                         throw new ${serdeException:T}("Member must have unique values");
-                                    }${/unique}
-                                    ${/sparse}return;
+                                    }${/unique}${/sparse}
+                                    return;
                                 }
                                 ${?unique}if (!${/unique}state.add($memberDeserializer:C)${^unique};${/unique}${?unique}) {
                                     throw new ${serdeException:T}("Member must have unique values");

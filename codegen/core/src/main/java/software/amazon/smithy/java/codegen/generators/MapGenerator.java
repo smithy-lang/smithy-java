@@ -87,8 +87,8 @@ public class MapGenerator
                             @Override
                             public void accept(${shape:B} state, ${key:T} key, ${shapeDeserializer:T} deserializer) {
                                 if (deserializer.isNull()) {
-                                    ${?sparse}state.put(key, deserializer.readNull());
-                                    ${/sparse}return;
+                                    ${?sparse}state.put(key, ${/sparse}deserializer.readNull()${?sparse})${/sparse};
+                                    return;
                                 }
                                 state.put(key, $memberDeserializer:C);
                             }
