@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.runtime.http.api;
 
 import java.net.http.HttpHeaders;
-import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 
@@ -21,7 +20,7 @@ public final class SmithyHttpResponseImpl implements SmithyHttpResponse {
         this.httpVersion = Objects.requireNonNull(builder.httpVersion);
         this.statusCode = builder.statusCode;
         this.body = Objects.requireNonNullElse(builder.body, DataStream.ofEmpty());
-        this.headers = Objects.requireNonNullElseGet(builder.headers, () -> HttpHeaders.of(Map.of(), (k, v) -> true));
+        this.headers = builder.headers;
     }
 
     @Override

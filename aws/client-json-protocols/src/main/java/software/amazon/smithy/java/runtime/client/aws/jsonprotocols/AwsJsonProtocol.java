@@ -108,7 +108,6 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
             return CompletableFuture.completedFuture(codec.deserializeShape(EMPTY_PAYLOAD, builder));
         }
 
-        // TODO: make subtypes of DataStream that skip going through a publisher.
         return content.asBytes()
             .toCompletableFuture()
             .thenApply(bytes -> codec.deserializeShape(bytes, builder));

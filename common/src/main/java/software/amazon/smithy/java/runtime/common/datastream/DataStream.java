@@ -117,7 +117,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the created DataStream.
      */
     static DataStream ofBytes(byte[] bytes) {
-        return ofBytes(bytes, 0, bytes.length);
+        return new BytesDataStream(bytes, 0, bytes.length, null);
     }
 
     /**
@@ -129,7 +129,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the created DataStream.
      */
     static DataStream ofBytes(byte[] bytes, int head, int tail) {
-        return ofBytes(bytes, head, tail, null);
+        return new BytesDataStream(bytes, head, tail, null);
     }
 
     /**
@@ -140,7 +140,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the created DataStream.
      */
     static DataStream ofBytes(byte[] bytes, String contentType) {
-        return ofBytes(bytes, 0, bytes.length, contentType);
+        return new BytesDataStream(bytes, 0, bytes.length, contentType);
     }
 
     /**

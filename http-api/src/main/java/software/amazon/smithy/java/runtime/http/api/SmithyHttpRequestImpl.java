@@ -13,6 +13,8 @@ import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 
 final class SmithyHttpRequestImpl implements SmithyHttpRequest {
 
+    static final HttpHeaders EMPTY_HEADERS = HttpHeaders.of(Map.of(), (k, v) -> true);
+
     private final SmithyHttpVersion httpVersion;
     private final String method;
     private final URI uri;
@@ -24,7 +26,7 @@ final class SmithyHttpRequestImpl implements SmithyHttpRequest {
         this.method = Objects.requireNonNull(builder.method);
         this.uri = Objects.requireNonNull(builder.uri);
         this.body = Objects.requireNonNullElse(builder.body, DataStream.ofEmpty());
-        this.headers = Objects.requireNonNullElseGet(builder.headers, () -> HttpHeaders.of(Map.of(), (k, v) -> true));
+        this.headers = builder.headers;
     }
 
     @Override
@@ -93,7 +95,7 @@ final class SmithyHttpRequestImpl implements SmithyHttpRequest {
             .append(httpVersion)
             .append(System.lineSeparator());
         // Append host header if not present.
-        if (!headers.firstValue("host").isPresent()) {
+        if (headers.firstValue("host").isEmpty()) {
             String host = uri.getHost();
             if (uri.getPort() != -1) {
                 host += ":" + uri.getPort();
