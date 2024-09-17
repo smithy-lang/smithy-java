@@ -10,7 +10,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.function.BiConsumer;
-import software.amazon.smithy.java.runtime.core.ByteBufferUtils;
+import software.amazon.smithy.java.runtime.common.ByteBufferUtils;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;

@@ -9,6 +9,7 @@ import java.net.URI;
 import java.net.http.HttpHeaders;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Flow;
+import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 
 public interface SmithyHttpRequest extends SmithyHttpMessage {
 
@@ -37,7 +38,7 @@ public interface SmithyHttpRequest extends SmithyHttpMessage {
     }
 
     @Override
-    SmithyHttpRequest withBody(Flow.Publisher<ByteBuffer> stream);
+    SmithyHttpRequest withBody(DataStream stream);
 
     @Override
     default String startLine() {
@@ -52,7 +53,7 @@ public interface SmithyHttpRequest extends SmithyHttpMessage {
 
         String method;
         URI uri;
-        Flow.Publisher<ByteBuffer> body;
+        DataStream body;
         HttpHeaders headers;
         SmithyHttpVersion httpVersion = SmithyHttpVersion.HTTP_1_1;
 
@@ -74,7 +75,11 @@ public interface SmithyHttpRequest extends SmithyHttpMessage {
             return this;
         }
 
-        public Builder body(Flow.Publisher<ByteBuffer> body) {
+        public Builder body(Flow.Publisher<ByteBuffer> publisher) {
+            return body(DataStream.ofPublisher(publisher, null, -1));
+        }
+
+        public Builder body(DataStream body) {
             this.body = body;
             return this;
         }

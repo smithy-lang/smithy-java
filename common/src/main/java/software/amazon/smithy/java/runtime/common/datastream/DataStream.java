@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.core.serde;
+package software.amazon.smithy.java.runtime.common.datastream;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -14,9 +14,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
-import software.amazon.smithy.java.runtime.core.ByteBufferUtils;
 
 /**
  * Abstraction for reading streams of data.
@@ -53,7 +53,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the empty DataStream.
      */
     static DataStream ofEmpty() {
-        return ofHttpRequestPublisher(HttpRequest.BodyPublishers.noBody(), null);
+        return EmptyDataStream.INSTANCE;
     }
 
     /**
@@ -117,12 +117,47 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the created DataStream.
      */
     static DataStream ofBytes(byte[] bytes) {
-        return ofBytes(bytes, null);
+        return ofBytes(bytes, 0, bytes.length);
     }
 
+    /**
+     * Create a DataStream from an in-memory byte array.
+     *
+     * @param bytes Bytes to read.
+     * @param head Starting position.
+     * @param tail Ending position.
+     * @return the created DataStream.
+     */
+    static DataStream ofBytes(byte[] bytes, int head, int tail) {
+        return ofBytes(bytes, head, tail, null);
+    }
 
     /**
-     * Create a DataStream from an ByteBuffer.
+     * Create a DataStream from an in-memory byte array.
+     *
+     * @param bytes Bytes to read.
+     * @param contentType Content-Type of the data, if known.
+     * @return the created DataStream.
+     */
+    static DataStream ofBytes(byte[] bytes, String contentType) {
+        return ofBytes(bytes, 0, bytes.length, contentType);
+    }
+
+    /**
+     * Create a DataStream from an in-memory byte array.
+     *
+     * @param bytes Bytes to read.
+     * @param head Starting position.
+     * @param tail Ending position.
+     * @param contentType Content-Type of the data, if known.
+     * @return the created DataStream.
+     */
+    static DataStream ofBytes(byte[] bytes, int head, int tail, String contentType) {
+        return new BytesDataStream(bytes, head, tail, contentType);
+    }
+
+    /**
+     * Create a DataStream from a ByteBuffer.
      *
      * @param buffer Bytes to read.
      * @return the created DataStream.
@@ -132,22 +167,14 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     }
 
     /**
-     * Create a DataStream from an in-memory byte array.
+     * Create a DataStream from a ByteBuffer.
      *
-     * @param bytes       Bytes to read.
-     * @param contentType Content-Type of the data if known, or null.
+     * @param buffer Bytes to read.
+     * @param contentType Content-Type of the data, if known.
      * @return the created DataStream.
      */
-    static DataStream ofBytes(byte[] bytes, String contentType) {
-        return ofHttpRequestPublisher(HttpRequest.BodyPublishers.ofByteArray(bytes), contentType);
-    }
-
     static DataStream ofByteBuffer(ByteBuffer buffer, String contentType) {
-        //TODO avoid having to copy here.
-        return ofHttpRequestPublisher(
-            HttpRequest.BodyPublishers.ofByteArray(ByteBufferUtils.getBytes(buffer)),
-            contentType
-        );
+        return new ByteBufferDataStream(buffer, contentType);
     }
 
     /**
@@ -205,6 +232,13 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the created DataStream.
      */
     static DataStream ofPublisher(Flow.Publisher<ByteBuffer> publisher, String contentType, long contentLength) {
+        if (publisher instanceof DataStream ds) {
+            if (ds.contentLength() == contentLength && Objects.equals(ds.contentType(), contentType)) {
+                return ds;
+            }
+            return new WrappedDataStream(ds, contentLength, contentType);
+        }
+
         return new DataStream() {
             @Override
             public long contentLength() {
@@ -257,18 +291,6 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      */
     default CompletionStage<ByteBuffer> asByteBuffer() {
         return transform(DataStreamSubscriber.ofByteBuffer());
-    }
-
-    /**
-     * Attempts to read the contents of the stream into a UTF-8 string.
-     *
-     * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
-     * {@link #contentLength()} can be used to know if it is safe.
-     *
-     * @return the CompletionStage that contains the string.
-     */
-    default CompletionStage<String> asString() {
-        return transform(DataStreamSubscriber.ofString());
     }
 
     /**

@@ -14,8 +14,8 @@ import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
-import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.example.client.PersonDirectoryClient;
 import software.amazon.smithy.java.runtime.example.model.GetPersonImageInput;
@@ -55,8 +55,6 @@ public class GenericTest {
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
         GetPersonImageOutput output = client.getPersonImage(input);
-
-        System.out.println(output.image().asString().toCompletableFuture().join());
     }
 
     @Test
@@ -142,6 +140,5 @@ public class GenericTest {
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
         GetPersonImageOutput output = client.getPersonImage(input);
-        System.out.println(output.image().asString().toCompletableFuture().join());
     }
 }

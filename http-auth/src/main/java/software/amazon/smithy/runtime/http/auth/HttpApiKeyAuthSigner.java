@@ -13,8 +13,8 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.ApiKeyIdentity;
-import software.amazon.smithy.java.runtime.core.uri.QueryStringBuilder;
-import software.amazon.smithy.java.runtime.core.uri.URIBuilder;
+import software.amazon.smithy.java.runtime.common.uri.QueryStringBuilder;
+import software.amazon.smithy.java.runtime.common.uri.URIBuilder;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 
 final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIdentity> {
