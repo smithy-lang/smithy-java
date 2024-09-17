@@ -6,13 +6,13 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.Frame;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 /**
  * Deserializes the HTTP response of an operation that uses HTTP bindings into a builder.

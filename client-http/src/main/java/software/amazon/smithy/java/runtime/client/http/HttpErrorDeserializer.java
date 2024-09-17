@@ -8,7 +8,6 @@ package software.amazon.smithy.java.runtime.client.http;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
@@ -19,6 +18,7 @@ import software.amazon.smithy.java.runtime.core.serde.document.DiscriminatorExce
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.binding.HttpBinding;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**

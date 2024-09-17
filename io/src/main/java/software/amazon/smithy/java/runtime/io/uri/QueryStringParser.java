@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.common.uri;
+package software.amazon.smithy.java.runtime.io.uri;
 
 import java.util.ArrayList;
 import java.util.Collections;

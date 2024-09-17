@@ -26,7 +26,6 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.infra.Blackhole;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.aws.jsonprotocols.AwsJson1Protocol;
-import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.examples.dynamodb.model.AttributeValue;
 import software.amazon.smithy.java.runtime.examples.dynamodb.model.GetItem;
@@ -37,6 +36,7 @@ import software.amazon.smithy.java.runtime.examples.dynamodb.model.PutItemInput;
 import software.amazon.smithy.java.runtime.examples.dynamodb.model.PutItemOutput;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
 

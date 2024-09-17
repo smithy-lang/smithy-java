@@ -11,12 +11,12 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.concurrent.ExecutionException;
-import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 final class PayloadDeserializer implements ShapeDeserializer {
     private final Codec payloadCodec;

@@ -14,7 +14,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
-import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
@@ -23,6 +22,7 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class PayloadSerializer implements ShapeSerializer {

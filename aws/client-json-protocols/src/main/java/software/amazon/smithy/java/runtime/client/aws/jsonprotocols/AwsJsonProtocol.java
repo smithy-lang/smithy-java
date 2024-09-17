@@ -15,12 +15,12 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.http.AmznErrorHeaderExtractor;
 import software.amazon.smithy.java.runtime.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.runtime.client.http.HttpErrorDeserializer;
-import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
 

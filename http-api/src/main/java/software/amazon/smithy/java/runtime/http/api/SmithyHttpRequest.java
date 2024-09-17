@@ -10,7 +10,7 @@ import java.net.http.HttpHeaders;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.Flow;
-import software.amazon.smithy.java.runtime.common.datastream.DataStream;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 public interface SmithyHttpRequest extends SmithyHttpMessage {
 

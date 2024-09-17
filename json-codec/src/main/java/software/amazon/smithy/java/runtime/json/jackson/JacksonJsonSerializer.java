@@ -12,7 +12,6 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.function.BiConsumer;
-import software.amazon.smithy.java.runtime.common.ByteBufferUtils;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.InterceptingSerializer;
@@ -21,6 +20,7 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeType;
 

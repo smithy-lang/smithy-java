@@ -9,7 +9,7 @@ import java.net.URI;
 import java.net.http.HttpHeaders;
 import java.util.Map;
 import java.util.Objects;
-import software.amazon.smithy.java.runtime.common.datastream.DataStream;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 final class SmithyHttpRequestImpl implements SmithyHttpRequest {
 

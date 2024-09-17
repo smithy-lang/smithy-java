@@ -9,9 +9,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import software.amazon.smithy.java.runtime.common.ByteBufferOutputStream;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.runtime.io.ByteBufferOutputStream;
 
 /**
  * Generic shape serialization and deserialization.

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.common.datastream;
+package software.amazon.smithy.java.runtime.io.datastream;
 
 import java.io.InputStream;
 import java.net.http.HttpRequest;
@@ -11,7 +11,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
-import software.amazon.smithy.java.runtime.common.ByteBufferUtils;
+import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
 
 final class ByteBufferDataStream implements DataStream {
 

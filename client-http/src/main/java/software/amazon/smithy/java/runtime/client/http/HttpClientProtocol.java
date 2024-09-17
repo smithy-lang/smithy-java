@@ -7,9 +7,9 @@ package software.amazon.smithy.java.runtime.client.http;
 
 import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
-import software.amazon.smithy.java.runtime.common.uri.URIBuilder;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.io.uri.URIBuilder;
 
 /**
  * An abstract class for implementing HTTP-Based protocol.

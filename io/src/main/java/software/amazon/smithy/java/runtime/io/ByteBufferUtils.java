@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.common;
+package software.amazon.smithy.java.runtime.io;
 
 import java.io.InputStream;
 import java.nio.ByteBuffer;

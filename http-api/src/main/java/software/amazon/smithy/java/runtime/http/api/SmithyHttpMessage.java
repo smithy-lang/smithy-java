@@ -8,7 +8,7 @@ package software.amazon.smithy.java.runtime.http.api;
 import java.net.http.HttpHeaders;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import software.amazon.smithy.java.runtime.common.datastream.DataStream;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 public interface SmithyHttpMessage {
 
