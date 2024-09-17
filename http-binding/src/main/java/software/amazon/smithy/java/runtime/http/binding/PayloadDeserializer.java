@@ -8,11 +8,12 @@ package software.amazon.smithy.java.runtime.http.binding;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.concurrent.ExecutionException;
+import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
-import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -125,7 +126,7 @@ final class PayloadDeserializer implements ShapeDeserializer {
         }
 
         try {
-            return body.asString().toCompletableFuture().get();
+            return body.asBytes().toCompletableFuture().thenApply(b -> new String(b, StandardCharsets.UTF_8)).get();
         } catch (InterruptedException | ExecutionException e) {
             throw new SerializationException("Failed to get payload bytes", e);
         }

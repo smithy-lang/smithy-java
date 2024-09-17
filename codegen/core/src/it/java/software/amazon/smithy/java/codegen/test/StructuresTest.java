@@ -40,9 +40,9 @@ import software.amazon.smithy.java.codegen.test.model.StringMembersInput;
 import software.amazon.smithy.java.codegen.test.model.StructureMembersInput;
 import software.amazon.smithy.java.codegen.test.model.TimestampMembersInput;
 import software.amazon.smithy.java.codegen.test.model.UnionMembersInput;
+import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 public class StructuresTest {

@@ -7,10 +7,10 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
-import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.Frame;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
@@ -52,12 +52,7 @@ public final class RequestDeserializer {
     }
 
     private DataStream bodyDataStream(SmithyHttpRequest request) {
-        if (request.body() instanceof DataStream ds) {
-            return ds;
-        }
-        var contentType = request.headers().firstValue("content-type").orElse(null);
-        var contentLength = request.headers().firstValue("content-length").map(Long::valueOf).orElse(-1L);
-        return DataStream.ofPublisher(request.body(), contentType, contentLength);
+        return request.body();
     }
 
     /**

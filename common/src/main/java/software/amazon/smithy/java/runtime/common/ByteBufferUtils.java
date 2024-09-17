@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.core;
+package software.amazon.smithy.java.runtime.common;
 
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Base64;
 
@@ -33,7 +34,41 @@ public final class ByteBufferUtils {
         return bytes;
     }
 
+    public static InputStream byteBufferInputStream(ByteBuffer buffer) {
+        return new ByteBufferBackedInputStream(buffer);
+    }
+
     private static boolean isExact(ByteBuffer buffer) {
         return buffer.hasArray() && buffer.arrayOffset() == 0 && buffer.remaining() == buffer.array().length;
+    }
+
+    // Copied from jackson data-bind. See NOTICE.
+    private static final class ByteBufferBackedInputStream extends InputStream {
+
+        private final ByteBuffer b;
+
+        public ByteBufferBackedInputStream(ByteBuffer buf) {
+            b = buf;
+        }
+
+        @Override
+        public int available() {
+            return b.remaining();
+        }
+
+        @Override
+        public int read() {
+            return b.hasRemaining() ? (b.get() & 0xFF) : -1;
+        }
+
+        @Override
+        public int read(byte[] bytes, int off, int len) {
+            if (!b.hasRemaining()) {
+                return -1;
+            }
+            len = Math.min(len, b.remaining());
+            b.get(bytes, off, len);
+            return len;
+        }
     }
 }

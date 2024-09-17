@@ -11,6 +11,7 @@ import com.fasterxml.jackson.core.StreamReadFeature;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import software.amazon.smithy.java.runtime.common.ByteBufferUtils;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -57,7 +58,10 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
     @Override
     public ShapeDeserializer newDeserializer(ByteBuffer source, JsonCodec.Settings settings) {
         try {
-            return new JacksonJsonDeserializer(FACTORY.createParser(new ByteBufferBackedInputStream(source)), settings);
+            return new JacksonJsonDeserializer(
+                FACTORY.createParser(ByteBufferUtils.byteBufferInputStream(source)),
+                settings
+            );
         } catch (IOException e) {
             throw new SerializationException(e);
         }

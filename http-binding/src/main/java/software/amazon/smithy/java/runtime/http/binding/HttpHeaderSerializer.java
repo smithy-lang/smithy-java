@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.runtime.http.binding;
 
-import static software.amazon.smithy.java.runtime.core.ByteBufferUtils.base64Encode;
+import static software.amazon.smithy.java.runtime.common.ByteBufferUtils.base64Encode;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;

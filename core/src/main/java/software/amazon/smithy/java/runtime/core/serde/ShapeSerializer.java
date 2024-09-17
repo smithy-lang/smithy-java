@@ -12,6 +12,7 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
+import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;

@@ -12,6 +12,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.function.BiConsumer;
+import software.amazon.smithy.java.runtime.common.ByteBufferUtils;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.InterceptingSerializer;
@@ -101,7 +102,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
                 generator.writeBinary(value.array(), value.arrayOffset() + value.position(), len);
             } else {
                 // don't disturb the mark on the existing buffer
-                generator.writeBinary(new ByteBufferBackedInputStream(value.duplicate()), len);
+                generator.writeBinary(ByteBufferUtils.byteBufferInputStream(value.duplicate()), len);
             }
         } catch (Exception e) {
             throw new SerializationException(e);

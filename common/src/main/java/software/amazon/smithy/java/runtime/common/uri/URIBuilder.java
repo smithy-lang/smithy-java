@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.core.uri;
+package software.amazon.smithy.java.runtime.common.uri;
 
 import java.net.URI;
 import java.net.URISyntaxException;

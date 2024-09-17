@@ -16,9 +16,9 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.http.AmznErrorHeaderExtractor;
 import software.amazon.smithy.java.runtime.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.runtime.client.http.HttpErrorDeserializer;
+import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
@@ -101,11 +101,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
         }
 
         var builder = operation.outputBuilder();
-        var content = DataStream.ofPublisher(
-            response.body(),
-            response.contentType(contentType()),
-            response.contentLength(-1)
-        );
+        var content = response.body();
 
         // If the payload is empty, then use "{}" as the default empty payload.
         if (content.contentLength() == 0) {

@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.http.api;
 import java.net.http.HttpHeaders;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Flow;
+import software.amazon.smithy.java.runtime.common.datastream.DataStream;
 
 public interface SmithyHttpResponse extends SmithyHttpMessage {
 
@@ -37,7 +38,7 @@ public interface SmithyHttpResponse extends SmithyHttpMessage {
     }
 
     @Override
-    SmithyHttpResponse withBody(Flow.Publisher<ByteBuffer> body);
+    SmithyHttpResponse withBody(DataStream body);
 
     static Builder builder() {
         return new Builder();
@@ -46,7 +47,7 @@ public interface SmithyHttpResponse extends SmithyHttpMessage {
     final class Builder {
 
         int statusCode;
-        Flow.Publisher<ByteBuffer> body;
+        DataStream body;
         HttpHeaders headers;
         SmithyHttpVersion httpVersion = SmithyHttpVersion.HTTP_1_1;
 
@@ -63,7 +64,11 @@ public interface SmithyHttpResponse extends SmithyHttpMessage {
             return this;
         }
 
-        public Builder body(Flow.Publisher<ByteBuffer> body) {
+        public Builder body(Flow.Publisher<ByteBuffer> publisher) {
+            return body(DataStream.ofPublisher(publisher, null, -1));
+        }
+
+        public Builder body(DataStream body) {
             this.body = body;
             return this;
         }
