@@ -8,5 +8,5 @@ extra["displayName"] = "Smithy :: Java :: HTTP"
 extra["moduleName"] = "software.amazon.smithy.java.http-api"
 
 dependencies {
-    api(project(":common"))
+    api(project(":io"))
 }

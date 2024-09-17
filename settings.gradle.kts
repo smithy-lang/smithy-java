@@ -2,7 +2,7 @@ rootProject.name = "smithy-java"
 
 include("logging")
 include(":context")
-include(":common")
+include(":io")
 include(":core")
 
 // Codegen
