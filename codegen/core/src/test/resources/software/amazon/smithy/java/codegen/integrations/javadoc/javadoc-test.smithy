@@ -13,6 +13,7 @@ service TestService {
         Unstable
         Rollup
         EnumVariants
+        UnsupportedTags
     ]
 }
 
@@ -120,4 +121,22 @@ enum EnumWithDocs {
     /// General Docs
     @unstable
     ALSO_DOCUMENTED
+}
+
+operation UnsupportedTags {
+    input := {
+        /// Documentation includes html tags that are not supported by Javadoc. These unsupported blocks should be skipped.
+        /// <pre>
+        /// This should be included.
+        /// </pre>
+        /// <note>
+        /// Note is not a valid javadoc tag, so this should be skipped.
+        /// </note>
+        ///
+        /// <pre>
+        ///     <code>CodeIsSupported</code>
+        ///     <important>Important is not supported</important>
+        /// </pre>
+        value: String
+    }
 }

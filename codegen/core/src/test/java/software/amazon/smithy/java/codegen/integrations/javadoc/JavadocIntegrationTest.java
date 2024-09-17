@@ -214,4 +214,26 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
             )
         );
     }
+
+    @Test
+    void skipsUnsupportedTagBlocks() {
+        var fileContents = getFileStringForClass("UnsupportedTagsInput");
+        assertThat(
+            fileContents,
+            containsString(
+                """
+                        /**
+                         * Documentation includes html tags that are not supported by Javadoc. These unsupported blocks should
+                         * be skipped.<pre>
+                         * This should be included.
+                         * </pre>
+                         * <pre>
+                         *     <code>CodeIsSupported</code>
+                         *
+                         * </pre>
+                         */
+                    """
+            )
+        );
+    }
 }
