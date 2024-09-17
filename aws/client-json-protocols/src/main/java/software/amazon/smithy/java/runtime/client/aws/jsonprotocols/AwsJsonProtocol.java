@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.client.aws.jsonprotocols;
 
-import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.http.HttpHeaders;
 import java.nio.charset.StandardCharsets;
@@ -73,15 +72,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
             )
         );
 
-        // TODO: Use NoSyncBAOS that returns the bytes directly.
-        var sink = new ByteArrayOutputStream();
-        try (var serializer = codec.createSerializer(sink)) {
-            input.serialize(serializer);
-            serializer.flush();
-            builder.body(DataStream.ofBytes(sink.toByteArray(), contentType()));
-        }
-
-        return builder.build();
+        return builder.body(DataStream.ofByteBuffer(codec.serialize(input), contentType())).build();
     }
 
     @Override

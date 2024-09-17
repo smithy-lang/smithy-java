@@ -86,11 +86,10 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
                 HeaderValue.fromString(exceptionSchema.memberName())
             );
             headers.put(":content-type", HeaderValue.fromString(codec.getMediaType()));
-            var os = new ByteArrayOutputStream();
-            try (var serializer = codec.createSerializer(os)) {
-                me.serialize(serializer);
-            }
-            frame = new AwsEventFrame(new Message(headers, os.toByteArray()));
+            var payload = codec.serialize(me);
+            var bytes = new byte[payload.remaining()];
+            payload.get(bytes);
+            frame = new AwsEventFrame(new Message(headers, bytes));
         } else {
             EventStreamingException es = exceptionHandler.apply(exception);
             var headers = new HashMap<String, HeaderValue>();

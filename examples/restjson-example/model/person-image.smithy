@@ -3,7 +3,9 @@ $version: "2"
 namespace smithy.example
 
 resource PersonImage {
-    identifiers: { name: String }
+    identifiers: {
+        name: String
+    }
     read: GetPersonImage
     put: PutPersonImage
 }

@@ -5,18 +5,20 @@
 
 package software.amazon.smithy.java.runtime;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Fork;
+import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
@@ -30,6 +32,17 @@ import software.amazon.smithy.utils.IoUtils;
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Mode.AverageTime)
+@Warmup(
+    iterations = 2,
+    time = 3,
+    timeUnit = TimeUnit.SECONDS
+)
+@Measurement(
+    iterations = 3,
+    time = 3,
+    timeUnit = TimeUnit.SECONDS
+)
+@Fork(1)
 public class SmithyJavaTrials {
 
     private static final JsonCodec CODEC = JsonCodec.builder().build();
@@ -106,16 +119,12 @@ public class SmithyJavaTrials {
     }
 
     @Benchmark
-    public void serialize(Blackhole bh) throws IOException {
-        try (var sink = new NoSyncBAOS(); var serializer = CODEC.createSerializer(sink)) {
-            shape.serialize(serializer);
-            serializer.flush();
-            bh.consume(sink);
-        }
+    public Object serialize(Blackhole bh) {
+        return CODEC.serialize(shape);
     }
 
     @Benchmark
-    public void deserialize(Blackhole bh) {
-        bh.consume(CODEC.deserializeShape(jsonBytes, cleanBuilder));
+    public Object deserialize() {
+        return CODEC.deserializeShape(jsonBytes, cleanBuilder);
     }
 }

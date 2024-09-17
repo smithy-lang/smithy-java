@@ -9,6 +9,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import software.amazon.smithy.java.runtime.common.ByteBufferOutputStream;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 
@@ -34,6 +35,48 @@ public interface Codec extends AutoCloseable {
      * @return Returns the created serializer.
      */
     ShapeSerializer createSerializer(OutputStream sink);
+
+    /**
+     * Serialize the given shape into a ByteBuffer.
+     *
+     * <p>By default, this method is a convenience method for the serialization idiom:
+     * <pre>{@code
+     * var outputStream = new ByteArrayOutputStream();
+     * try (var serializer = codec.createSerializer(outputStream)) {
+     *     shape.serialize(serializer);
+     *     serializer.flush();
+     * }
+     * return ByteBuffer.wrap(outputStream.toByteArray());
+     * }</pre>
+     *
+     * However, individual Codec implementations may provide versions that are more efficient than
+     * their non-streaming counterparts.
+     *
+     * <p>The returned buffer may or may not {@linkplain ByteBuffer#hasArray() have an accessible backing array} and,
+     * if it does, may not {@linkplain ByteBuffer#arrayOffset() start at offset 0}. Always use this idiom for
+     * interacting with heap-based ByteBuffers:
+     *
+     * <pre>{@code
+     * if (buffer.hasArray()) {
+     *     int pos = buffer.arrayOffset() + buffer.position();
+     *     int len = buffer.remaining();
+     *     doSomethingWithBuffer(buffer.array(), pos, len);
+     * } else {
+     *     // use ByteBuffer retrieval methods
+     * }
+     * }</pre>
+     *
+     * @param shape the shape to serialize
+     * @return A ByteBuffer containing the serialized shape
+     */
+    default ByteBuffer serialize(SerializableShape shape) {
+        ByteBufferOutputStream baos = new ByteBufferOutputStream();
+        try (var serializer = createSerializer(baos)) {
+            shape.serialize(serializer);
+            serializer.flush();
+        }
+        return baos.toByteBuffer();
+    }
 
     /**
      * Create a deserializer from this Codec that deserializes a shape from the source.
