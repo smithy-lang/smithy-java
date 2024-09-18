@@ -10,12 +10,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
-import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 
 /**
@@ -238,35 +239,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
             }
             return new WrappedDataStream(ds, contentLength, contentType);
         }
-
-        return new DataStream() {
-            @Override
-            public long contentLength() {
-                return contentLength;
-            }
-
-            @Override
-            public String contentType() {
-                return contentType;
-            }
-
-            @Override
-            public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-                publisher.subscribe(subscriber);
-            }
-        };
-    }
-
-    /**
-     * Transform the stream into another value using the given {@link DataStreamSubscriber}.
-     *
-     * @param subscriber Subscriber used to transform the stream.
-     * @return the eventually transformed result.
-     * @param <T> Value to transform into.
-     */
-    private <T> CompletionStage<T> transform(DataStreamSubscriber<T> subscriber) {
-        subscribe(subscriber);
-        return subscriber.result();
+        return new PublisherDataStream(publisher, contentLength, contentType);
     }
 
     /**
@@ -275,23 +248,29 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
      * {@link #contentLength()} can be used to know if it is safe.
      *
-     * @return the CompletionStage that contains the read ByteBuffer.
+     * @return the future that contains the read ByteBuffer.
      */
-    default CompletionStage<ByteBuffer> asByteBuffer() {
-        return transform(DataStreamSubscriber.ofByteBuffer());
+    default CompletableFuture<ByteBuffer> asByteBuffer() {
+        var subscriber = HttpResponse.BodySubscribers.ofByteArray();
+        var delegate = new HttpBodySubscriberAdapter<>(subscriber);
+        subscribe(delegate);
+        return subscriber.getBody().thenApply(ByteBuffer::wrap).toCompletableFuture();
     }
 
     /**
      * Convert the stream into a blocking {@link InputStream}.
      *
-     * @apiNote To ensure that all resources associated with the corresponding exchange are properly released the
+     * @apiNote To ensure that all resources associated with the corresponding exchange are properly released, the
      * caller must ensure to either read all bytes until EOF is reached, or call {@link InputStream#close} if it is
      * unable or unwilling to do so. Calling {@code close} before exhausting the stream may cause the underlying
      * connection to be closed and prevent it from being reused for subsequent operations.
      *
-     * @return Returns the CompletionStage that contains the blocking {@code InputStream}.
+     * @return Returns the future that contains the blocking {@code InputStream}.
      */
-    default CompletionStage<InputStream> asInputStream() {
-        return transform(DataStreamSubscriber.ofInputStream());
+    default CompletableFuture<InputStream> asInputStream() {
+        var subscriber = HttpResponse.BodySubscribers.ofInputStream();
+        var delegate = new HttpBodySubscriberAdapter<>(subscriber);
+        subscribe(delegate);
+        return subscriber.getBody().toCompletableFuture();
     }
 }

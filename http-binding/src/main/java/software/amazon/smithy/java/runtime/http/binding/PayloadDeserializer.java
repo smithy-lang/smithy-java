@@ -29,7 +29,7 @@ final class PayloadDeserializer implements ShapeDeserializer {
 
     private ByteBuffer resolveBodyBytes() {
         try {
-            return body.asByteBuffer().toCompletableFuture().get();
+            return body.asByteBuffer().get();
         } catch (InterruptedException | ExecutionException e) {
             throw new SerializationException("Failed to get payload bytes", e);
         }
@@ -127,7 +127,6 @@ final class PayloadDeserializer implements ShapeDeserializer {
 
         try {
             return body.asByteBuffer()
-                .toCompletableFuture()
                 .thenApply(buffer -> {
                     int pos = buffer.arrayOffset() + buffer.position();
                     int len = buffer.remaining();

@@ -9,7 +9,6 @@ import java.io.InputStream;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
 final class EmptyDataStream implements DataStream {
@@ -19,12 +18,12 @@ final class EmptyDataStream implements DataStream {
     private static final Flow.Publisher<ByteBuffer> PUBLISHER = HttpRequest.BodyPublishers.noBody();
 
     @Override
-    public CompletionStage<ByteBuffer> asByteBuffer() {
+    public CompletableFuture<ByteBuffer> asByteBuffer() {
         return CompletableFuture.completedFuture(ByteBuffer.wrap(EMPTY_BYTES));
     }
 
     @Override
-    public CompletionStage<InputStream> asInputStream() {
+    public CompletableFuture<InputStream> asInputStream() {
         return CompletableFuture.completedFuture(InputStream.nullInputStream());
     }
 

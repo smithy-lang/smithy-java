@@ -143,8 +143,7 @@ public final class HttpErrorDeserializer {
             ShapeBuilder<ModeledApiException> builder
         ) {
             return createDataStream(response).asByteBuffer()
-                .thenApply(bytes -> codec.deserializeShape(bytes, builder))
-                .toCompletableFuture();
+                .thenApply(bytes -> codec.deserializeShape(bytes, builder));
         }
 
         @Override
@@ -251,7 +250,7 @@ public final class HttpErrorDeserializer {
     ) {
         // Read the payload into a JSON document so we can efficiently find __type and then directly
         // deserialize the document into the identified builder.
-        return content.asByteBuffer().toCompletableFuture().thenCompose(buffer -> {
+        return content.asByteBuffer().thenCompose(buffer -> {
             if (buffer.remaining() > 0) {
                 try {
                     var document = codec.createDeserializer(buffer).readDocument();

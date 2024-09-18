@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
@@ -168,7 +167,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                         body.structMemberConsumer.accept(body.state, m, de);
                     }
                 });
-            }).toCompletableFuture();
+            });
         }
     }
 
@@ -178,7 +177,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     // TODO: Should there be a configurable limit on the client/server for how much can be read in memory?
-    private CompletionStage<ByteBuffer> bodyAsByteBuffer() {
+    private CompletableFuture<ByteBuffer> bodyAsByteBuffer() {
         return body.asByteBuffer();
     }
 

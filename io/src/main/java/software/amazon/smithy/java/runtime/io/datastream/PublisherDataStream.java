@@ -5,31 +5,19 @@
 
 package software.amazon.smithy.java.runtime.io.datastream;
 
-import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 
-final class WrappedDataStream implements DataStream {
+final class PublisherDataStream implements DataStream {
 
-    private final DataStream delegate;
-    private final String contentType;
+    private final Flow.Publisher<ByteBuffer> publisher;
     private final long contentLength;
+    private final String contentType;
 
-    WrappedDataStream(DataStream delegate, long contentLength, String contentType) {
-        this.delegate = delegate;
+    PublisherDataStream(Flow.Publisher<ByteBuffer> publisher, long contentLength, String contentType) {
+        this.publisher = publisher;
         this.contentLength = contentLength;
         this.contentType = contentType;
-    }
-
-    @Override
-    public CompletableFuture<ByteBuffer> asByteBuffer() {
-        return delegate.asByteBuffer();
-    }
-
-    @Override
-    public CompletableFuture<InputStream> asInputStream() {
-        return delegate.asInputStream();
     }
 
     @Override
@@ -44,6 +32,6 @@ final class WrappedDataStream implements DataStream {
 
     @Override
     public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-        delegate.subscribe(subscriber);
+        publisher.subscribe(subscriber);
     }
 }
