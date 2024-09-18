@@ -88,6 +88,14 @@ spotless {
         // Ignore generated generated code for formatter check
         targetExclude("**/build/**/*.*")
     }
+
+    // Formatting for build.gradle.kts files
+    kotlinGradle {
+        ktlint()
+        indentWithSpaces()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
 }
 
 /*

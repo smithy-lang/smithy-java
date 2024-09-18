@@ -51,27 +51,29 @@ tasks.named<Test>("test") {
     exclude("**/*IsolatedTest*")
 }
 
+val log4j2Test =
+    tasks.register<Test>("log4j2Test") {
+        description = "Tests if InternalLogger successfully uses Log4j2 if found on classpath"
+        group = VERIFICATION_GROUP
+        include("**/*Log4j2LoggerIsolatedTest*")
+        classpath += log4j2TestConfiguration
+    }
 
-val log4j2Test = tasks.register<Test>("log4j2Test") {
-    description = "Tests if InternalLogger successfully uses Log4j2 if found on classpath"
-    group = VERIFICATION_GROUP
-    include("**/*Log4j2LoggerIsolatedTest*")
-    classpath += log4j2TestConfiguration
-}
+val slf4jTest =
+    tasks.register<Test>("slf4jTest") {
+        description = "Tests if InternalLogger successfully uses Slf4j if found on classpath"
+        group = VERIFICATION_GROUP
+        include("**/*Slf4jLoggerIsolatedTest*")
+        classpath += slf4jTestConfiguration
+    }
 
-val slf4jTest = tasks.register<Test>("slf4jTest") {
-    description = "Tests if InternalLogger successfully uses Slf4j if found on classpath"
-    group = VERIFICATION_GROUP
-    include("**/*Slf4jLoggerIsolatedTest*")
-    classpath += slf4jTestConfiguration
-}
-
-val jclTest = tasks.register<Test>("jclTest") {
-    description = "Tests if InternalLogger successfully uses JCL if found on classpath"
-    group = VERIFICATION_GROUP
-    include("**/*JclLoggerIsolatedTest*")
-    classpath += jclTestConfiguration
-}
+val jclTest =
+    tasks.register<Test>("jclTest") {
+        description = "Tests if InternalLogger successfully uses JCL if found on classpath"
+        group = VERIFICATION_GROUP
+        include("**/*JclLoggerIsolatedTest*")
+        classpath += jclTestConfiguration
+    }
 
 tasks.build {
     dependsOn(log4j2Test, slf4jTest, jclTest)

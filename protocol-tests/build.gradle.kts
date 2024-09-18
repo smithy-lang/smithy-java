@@ -21,4 +21,3 @@ dependencies {
     api(libs.junit.jupiter.params)
     api(libs.hamcrest)
 }
-
