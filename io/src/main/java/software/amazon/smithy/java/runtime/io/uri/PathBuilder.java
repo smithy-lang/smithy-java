@@ -18,7 +18,7 @@ public final class PathBuilder {
             throw new IllegalArgumentException("Cannot add an empty path segment");
         }
         builder.append('/');
-        URLEncoding.encodeUnreserved(segment, builder);
+        URLEncoding.encodeUnreserved(segment, builder, true);
         return this;
     }
 }

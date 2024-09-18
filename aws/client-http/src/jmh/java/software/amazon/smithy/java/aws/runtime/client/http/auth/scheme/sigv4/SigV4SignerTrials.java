@@ -8,7 +8,7 @@ package software.amazon.smithy.java.aws.runtime.client.http.auth.scheme.sigv4;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpHeaders;
-import java.net.http.HttpRequest;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +27,7 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.io.uri.QueryStringBuilder;
 
 @State(Scope.Benchmark)
@@ -106,14 +107,14 @@ public class SigV4SignerTrials {
         if (!queryParameters.isEmpty()) {
             var queryBuilder = new QueryStringBuilder();
             queryParameters.forEach(queryBuilder::put);
-            uriString += "?" + queryBuilder.toString();
+            uriString += "?" + queryBuilder;
         }
         return SmithyHttpRequest.builder()
             .method("POST")
             .httpVersion(SmithyHttpVersion.HTTP_1_1)
             .uri(URI.create(uriString))
             .headers(httpHeaders)
-            .body(body != null ? HttpRequest.BodyPublishers.ofString(body) : null)
+            .body(body != null ? DataStream.ofBytes(body.getBytes(StandardCharsets.UTF_8)) : null)
             .build();
     }
 }

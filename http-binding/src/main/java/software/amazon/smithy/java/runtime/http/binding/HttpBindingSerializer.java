@@ -191,10 +191,10 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             } else {
                 String labelValue = labels.get(segment.getContent());
                 if (segment.isGreedyLabel()) {
-                    String encoded = URLEncoding.encodeUnreserved(labelValue);
+                    String encoded = URLEncoding.encodeUnreserved(labelValue, false);
                     joiner.add(encoded.replace("%2F", "/"));
                 } else {
-                    joiner.add(URLEncoding.encodeUnreserved(labelValue));
+                    joiner.add(URLEncoding.encodeUnreserved(labelValue, false));
                 }
             }
         }

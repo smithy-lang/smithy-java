@@ -30,6 +30,7 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
     private final HttpClient client;
 
     static {
+        // TODO: can we set this only for our generated clients?
         // Allow clients to reset Host header.
         System.setProperty("jdk.httpclient.allowRestrictedHeaders", "Host");
     }

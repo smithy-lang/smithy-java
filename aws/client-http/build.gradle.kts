@@ -19,8 +19,8 @@ dependencies {
 jmh {
     iterations = 10
     fork = 1
-    profilers.add("async:libPath=/Users/hpm/async-profiler-3.0-macos/lib/libasyncProfiler.dylib;output=flamegraph")
-    profilers.add("gc")
+    // profilers.add("async:libPath=<PATH_TO_DYLIB>;output=flamegraph")
+    // profilers.add("gc")
 }
 
 tasks {

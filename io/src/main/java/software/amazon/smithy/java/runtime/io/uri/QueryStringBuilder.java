@@ -74,6 +74,6 @@ public final class QueryStringBuilder {
     }
 
     private void encode(String raw, StringBuilder builder) {
-        URLEncoding.encodeUnreserved(raw, builder);
+        URLEncoding.encodeUnreserved(raw, builder, false);
     }
 }

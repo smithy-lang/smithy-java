@@ -242,10 +242,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
             path = "/" + path;
         }
         // TODO: allow unencoded?
-        // TODO: Find correct sizing
-        var sink = new StringBuilder();
-        URLEncoding.encodeUnreserved(path, sink, true);
-        return sink.toString();
+        return URLEncoding.encodeUnreserved(path, true);
     }
 
     private static String getCanonicalizedQueryString(URI uri) {
@@ -262,9 +259,9 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         for (var param : params) {
             var keyVal = param.split("=");
             var key = keyVal[0];
-            var encodedKey = URLEncoding.encodeUnreserved(key);
+            var encodedKey = URLEncoding.encodeUnreserved(key, false);
             if (keyVal.length == 2) {
-                var encodedValue = URLEncoding.encodeUnreserved(keyVal[1]);
+                var encodedValue = URLEncoding.encodeUnreserved(keyVal[1], false);
                 sorted.put(encodedKey, encodedValue);
             } else {
                 sorted.put(key, "");
