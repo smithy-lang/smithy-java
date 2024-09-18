@@ -161,7 +161,6 @@ public class SigV4TestRunner {
             Signer<SmithyHttpRequest, AwsCredentialsIdentity> signer
         ) throws ExecutionException, InterruptedException {
             var signedRequest = signer.sign(request, context.identity, context.properties).get();
-            // TODO: Figure out how to test body?
             boolean isValid = signedRequest.headers().equals(expected.headers())
                 && signedRequest.uri().equals(expected.uri())
                 && signedRequest.method().equals(expected.method());

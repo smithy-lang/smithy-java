@@ -13,7 +13,7 @@ import java.util.concurrent.locks.StampedLock;
  * A bounded cache for {@link SigningKey}s that has a FIFO eviction policy when the cache is full.
  */
 final class SigningCache {
-    private final LinkedHashMap<String, SigningKey> fifoStore;
+    private final LinkedHashMap<CacheKey, SigningKey> fifoStore;
     private final StampedLock lock = new StampedLock();
 
     SigningCache(int maxSize) {
@@ -22,7 +22,7 @@ final class SigningCache {
         }
         this.fifoStore = new LinkedHashMap<>() {
             @Override
-            protected boolean removeEldestEntry(Map.Entry<String, SigningKey> eldest) {
+            protected boolean removeEldestEntry(Map.Entry<CacheKey, SigningKey> eldest) {
                 return size() > maxSize;
             }
         };
@@ -31,7 +31,7 @@ final class SigningCache {
     /**
      * Adds an entry to the cache, evicting the earliest entry if necessary.
      */
-    void put(String key, SigningKey value) {
+    void put(CacheKey key, SigningKey value) {
         long stamp = lock.writeLock();
         try {
             fifoStore.put(key, value);
@@ -43,7 +43,7 @@ final class SigningCache {
     /**
      * @return Signing key if it exists in the store, otherwise {@code null}.
      */
-    SigningKey get(String key) {
+    SigningKey get(CacheKey key) {
         long stamp = lock.readLock();
         try {
             return fifoStore.get(key);
@@ -51,4 +51,6 @@ final class SigningCache {
             lock.unlockRead(stamp);
         }
     }
+
+    record CacheKey(String secretKey, String regionName, String serviceName) {}
 }

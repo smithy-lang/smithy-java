@@ -76,7 +76,6 @@ public final class SigV4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsC
 
     @Override
     public AuthProperties getSignerProperties(Context context) {
-        // TODO: eventually the Signer should be updated to not depend on any "AWS-client" concepts.
         var builder = AuthProperties.builder()
             .put(SERVICE, signingName)
             .put(REGION, context.expect(SigV4Properties.REGION));

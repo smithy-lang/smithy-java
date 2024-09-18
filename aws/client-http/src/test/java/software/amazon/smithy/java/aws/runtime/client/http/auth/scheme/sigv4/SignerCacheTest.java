@@ -16,16 +16,19 @@ public class SignerCacheTest {
     void cacheEvictsOldestEntryAtMax() {
         var cache = new SigningCache(2);
         var value = new SigningKey("".getBytes(), Instant.EPOCH);
-        cache.put("first", value);
-        cache.put("second", value);
-        assertEquals(cache.get("first"), value);
-        assertEquals(cache.get("second"), value);
+        var first = new SigningCache.CacheKey("a", "b", "c");
+        var second = new SigningCache.CacheKey("d", "e", "f");
+        cache.put(first, value);
+        cache.put(second, value);
+        assertEquals(cache.get(first), value);
+        assertEquals(cache.get(second), value);
 
         // This should exceed cache limit and evict "first"
-        cache.put("third", value);
+        var third = new SigningCache.CacheKey("g", "h", "i");
+        cache.put(third, value);
 
-        assertEquals(cache.get("third"), value);
-        assertEquals(cache.get("second"), value);
-        assertNull(cache.get("first"));
+        assertEquals(cache.get(third), value);
+        assertEquals(cache.get(second), value);
+        assertNull(cache.get(first));
     }
 }

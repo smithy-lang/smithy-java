@@ -5,8 +5,8 @@
 
 package software.amazon.smithy.java.aws.runtime.client.http.auth.scheme.sigv4;
 
-import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
 /**
@@ -33,7 +33,6 @@ final class SigningKey {
     }
 
     private static long daysSinceEpoch(Instant instant) {
-        return Duration.ofMillis(instant.toEpochMilli()).toDays();
+        return Instant.EPOCH.until(instant, ChronoUnit.DAYS);
     }
-
 }

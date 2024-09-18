@@ -65,6 +65,8 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
 
     private static final SigningCache SIGNER_CACHE = new SigningCache(300);
 
+    private SigV4Signer() {}
+
     @Override
     public CompletableFuture<SmithyHttpRequest> sign(
         SmithyHttpRequest request,
@@ -173,7 +175,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         };
     }
 
-    private static String getSignedHeaders(Set<String> sortedHeaderKeys) {
+    private static StringBuilder getSignedHeaders(Set<String> sortedHeaderKeys) {
         // 512 matches the JavaSdkV2 settings
         var builder = new StringBuilder(512);
         for (var header : sortedHeaderKeys) {
@@ -186,21 +188,29 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
             }
             builder.append(lowerCaseHeader);
         }
-        return builder.toString();
+        return builder;
     }
 
     private static String getAuthHeader(
         String accessKeyId,
         String scope,
-        String signedHeaders,
+        StringBuilder signedHeaderBuilder,
         String signature
     ) {
-        return ALGORITHM + ' ' +
-            "Credential=" + accessKeyId + '/' + scope +
-            ", " +
-            "SignedHeaders=" + signedHeaders +
-            ", " +
-            "Signature=" + signature;
+        var builder = new StringBuilder();
+        builder.append(ALGORITHM)
+            .append(' ')
+            .append("Credential=")
+            .append(accessKeyId)
+            .append('/')
+            .append(scope)
+            .append(", ")
+            .append("SignedHeaders=")
+            .append(signedHeaderBuilder)
+            .append(", ")
+            .append("Signature=")
+            .append(signature);
+        return builder.toString();
     }
 
     private static byte[] getCanonicalRequest(
@@ -208,44 +218,42 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         URI uri,
         Map<String, List<String>> headers,
         Set<String> sortedHeaderKeys,
-        String signedHeaders,
+        StringBuilder signedHeaders,
         String payloadHash
     ) {
-        // TODO: figure out size.
-        StringBuilder builder = new StringBuilder(256)
-            .append(method)
-            .append('\n')
-            .append(getCanonicalizedResourcePath(uri))
-            .append('\n')
-            .append(getCanonicalizedQueryString(uri))
-            .append('\n')
-            .append(getCanonicalizedHeaderString(headers, sortedHeaderKeys))
-            .append('\n')
-            .append(signedHeaders)
+        var builder = new StringBuilder();
+        builder.append(method).append('\n');
+        addCanonicalizedResourcePath(uri, builder);
+        builder.append('\n');
+        addCanonicalizedQueryString(uri, builder);
+        builder.append('\n');
+        addCanonicalizedHeaderString(headers, sortedHeaderKeys, builder);
+        builder.append('\n');
+        builder.append(signedHeaders)
             .append('\n')
             .append(payloadHash);
-        LOGGER.trace("AWS SigV4 Canonical Request: '{}'", builder);
         return builder.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    private static String getCanonicalizedResourcePath(URI uri) {
+    private static void addCanonicalizedResourcePath(URI uri, StringBuilder builder) {
         String path = uri.normalize().getRawPath();
         if (path.isEmpty()) {
-            return "/";
+            builder.append('/');
+            return;
         }
         if (!path.startsWith("/")) {
             path = "/" + path;
         }
-        return URLEncoding.encodeUnreserved(path, true);
+        URLEncoding.encodeUnreserved(path, builder, true);
     }
 
-    private static String getCanonicalizedQueryString(URI uri) {
+    private static void addCanonicalizedQueryString(URI uri, StringBuilder builder) {
         SortedMap<String, String> sorted = new TreeMap<>();
 
         // Getting the raw query means the keys and values don't need to be encoded again.
         var query = uri.getRawQuery();
         if (query == null) {
-            return "";
+            return;
         }
 
         var params = query.split("&");
@@ -262,9 +270,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
             }
         }
 
-        var builder = new StringBuilder();
         var pairs = sorted.entrySet().iterator();
-
         while (pairs.hasNext()) {
             var pair = pairs.next();
             var key = pair.getKey();
@@ -276,31 +282,27 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
                 builder.append('&');
             }
         }
-
-        return builder.toString();
     }
 
-    private static String getCanonicalizedHeaderString(
+    private static void addCanonicalizedHeaderString(
         Map<String, List<String>> headers,
-        Set<String> sortedHeaderKeys
+        Set<String> sortedHeaderKeys,
+        StringBuilder builder
     ) {
-        // 2048 was determined experimentally by the JavaSdkV2 to minimize resizing.
-        var buffer = new StringBuilder(2048);
         for (var headerKey : sortedHeaderKeys) {
             var lowerCaseHeader = headerKey.toLowerCase(Locale.ENGLISH);
             if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(lowerCaseHeader)) {
                 continue;
             }
-            buffer.append(lowerCaseHeader);
-            buffer.append(':');
+            builder.append(lowerCaseHeader);
+            builder.append(':');
             for (String headerValue : headers.get(headerKey)) {
-                addAndTrim(buffer, headerValue);
-                buffer.append(',');
+                addAndTrim(builder, headerValue);
+                builder.append(',');
             }
-            buffer.setLength(buffer.length() - 1);
-            buffer.append('\n');
+            builder.setLength(builder.length() - 1);
+            builder.append('\n');
         }
-        return buffer.toString();
     }
 
     /**
@@ -371,7 +373,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         String serviceName,
         Instant instant
     ) {
-        var cacheKey = getSigningCacheKey(secretKey, regionName, serviceName);
+        var cacheKey = new SigningCache.CacheKey(secretKey, regionName, serviceName);
         SigningKey signingKey = SIGNER_CACHE.get(cacheKey);
         if (signingKey != null && signingKey.isValidFor(instant)) {
             return signingKey.signingKey();
@@ -380,10 +382,6 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         byte[] key = newSigningKey(secretKey, dateStamp, regionName, serviceName);
         SIGNER_CACHE.put(cacheKey, new SigningKey(key, instant));
         return key;
-    }
-
-    private static String getSigningCacheKey(String secretKey, String regionName, String serviceName) {
-        return secretKey + "-" + regionName + "-" + serviceName;
     }
 
     private static byte[] newSigningKey(
@@ -405,11 +403,15 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         String requestTime,
         byte[] signingKey
     ) {
-        var stringToSign = ALGORITHM + "\n" +
-            requestTime + "\n" +
-            scope + "\n" +
-            HexFormat.of().formatHex(hash(canonicalRequest));
-        return HexFormat.of().formatHex(sign(stringToSign, signingKey));
+        var builder = new StringBuilder();
+        builder.append(ALGORITHM)
+            .append('\n')
+            .append(requestTime)
+            .append('\n')
+            .append(scope)
+            .append('\n')
+            .append(HexFormat.of().formatHex(hash(canonicalRequest)));
+        return HexFormat.of().formatHex(sign(builder.toString(), signingKey));
     }
 
     private static byte[] sign(String data, byte[] key) {
