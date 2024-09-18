@@ -21,7 +21,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * @param identityPropertyOverrides The identity property overrides.
  * @param signerPropertyOverrides The signer property overrides.
  *
- * @see software.amazon.smithy.java.runtime.auth.api.scheme.AuthScheme
+ * @see AuthScheme
  */
 public record AuthSchemeOption(
     ShapeId schemeId,

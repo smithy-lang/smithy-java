@@ -10,7 +10,6 @@ import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.java.aws.runtime.client.http.auth.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
-import software.amazon.smithy.java.runtime.auth.api.AuthProperty;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeFactory;
@@ -42,18 +41,18 @@ public final class SigV4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsC
     /**
      * Region to use for signing. For example {@code us-east-2}.
      */
-    public static final AuthProperty<String> REGION = AuthProperty.of("signingRegion");
+    public static final Context.Key<String> REGION = Context.key("signingRegion");
 
     /**
      * Service name to use for signing. For example {@code lambda}.
      */
-    public static final AuthProperty<String> SERVICE = AuthProperty.of("signingName");
+    public static final Context.Key<String> SERVICE = Context.key("signingName");
 
     /**
      * Optional override of the clock to use for signing. If no override is provided, then the
      * default system UTC clock is used.
      */
-    public static final AuthProperty<Clock> CLOCK = AuthProperty.of("signingClock");
+    public static final Context.Key<Clock> CLOCK = Context.key("signingClock");
 
     public SigV4AuthScheme(String signingName) {
         this.signingName = signingName;
@@ -78,8 +77,8 @@ public final class SigV4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsC
     public AuthProperties getSignerProperties(Context context) {
         var builder = AuthProperties.builder()
             .put(SERVICE, signingName)
-            .put(REGION, context.expect(SigV4Properties.REGION));
-        var clock = context.get(SigV4Properties.CLOCK);
+            .put(REGION, context.expect(REGION));
+        var clock = context.get(CLOCK);
         if (clock != null) {
             builder.put(CLOCK, clock);
         }

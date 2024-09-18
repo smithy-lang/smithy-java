@@ -9,10 +9,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import software.amazon.smithy.java.context.Context;
 
 final class EndpointAuthSchemeImpl implements EndpointAuthScheme {
     private final String authSchemeId;
-    private final Map<EndpointProperty<?>, Object> properties;
+    private final Map<Context.Key<?>, Object> properties;
 
     EndpointAuthSchemeImpl(Builder builder) {
         this.authSchemeId = Objects.requireNonNull(builder.authSchemeId, "authSchemeId is null");
@@ -26,12 +27,12 @@ final class EndpointAuthSchemeImpl implements EndpointAuthScheme {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <T> T property(EndpointProperty<T> property) {
+    public <T> T property(Context.Key<T> property) {
         return (T) properties.get(property);
     }
 
     @Override
-    public Set<EndpointProperty<?>> properties() {
+    public Set<Context.Key<?>> properties() {
         return properties.keySet();
     }
 
@@ -54,7 +55,7 @@ final class EndpointAuthSchemeImpl implements EndpointAuthScheme {
 
     static final class Builder implements EndpointAuthScheme.Builder {
         String authSchemeId;
-        final Map<EndpointProperty<?>, Object> properties = new HashMap<>();
+        final Map<Context.Key<?>, Object> properties = new HashMap<>();
 
         @Override
         public EndpointAuthScheme.Builder authSchemeId(String authSchemeId) {
@@ -63,7 +64,7 @@ final class EndpointAuthSchemeImpl implements EndpointAuthScheme {
         }
 
         @Override
-        public <T> EndpointAuthScheme.Builder putProperty(EndpointProperty<T> property, T value) {
+        public <T> EndpointAuthScheme.Builder putProperty(Context.Key<T> property, T value) {
             properties.put(property, value);
             return this;
         }

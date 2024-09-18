@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.client.endpoint.api;
 
 import java.util.Set;
+import software.amazon.smithy.java.context.Context;
 
 /**
  * An authentication scheme supported for the endpoint.
@@ -19,19 +20,19 @@ public interface EndpointAuthScheme {
     String authSchemeId();
 
     /**
-     * Get the value of an EndpointProperty for the EndpointAuthScheme.
+     * Get the value of a property for the EndpointAuthScheme.
      *
      * @param property Endpoint property to get.
      * @return the value or null if not found.
      */
-    <T> T property(EndpointProperty<T> property);
+    <T> T property(Context.Key<T> property);
 
     /**
      * Get the properties of the EndpointAuthScheme.
      *
      * @return the properties.
      */
-    Set<EndpointProperty<?>> properties();
+    Set<Context.Key<?>> properties();
 
     /**
      * Convert the EndpointAuthScheme to a builder.
@@ -74,7 +75,7 @@ public interface EndpointAuthScheme {
          * @return the builder.
          * @param <T> Value type.
          */
-        <T> Builder putProperty(EndpointProperty<T> property, T value);
+        <T> Builder putProperty(Context.Key<T> property, T value);
 
         /**
          * Create the {@link EndpointAuthScheme}.

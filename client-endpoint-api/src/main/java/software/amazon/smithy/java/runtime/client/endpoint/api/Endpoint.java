@@ -9,6 +9,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Set;
+import software.amazon.smithy.java.context.Context;
 
 /**
  * A resolved endpoint.
@@ -22,21 +23,21 @@ public interface Endpoint {
     URI uri();
 
     /**
-     * Get the value of an EndpointProperty for the endpoint.
+     * Get the value of a property for the endpoint.
      *
      * <p>For example, in some AWS use cases, this might contain HTTP headers to add to each request.
      *
      * @param property Endpoint property to get.
      * @return the value or null if not found.
      */
-    <T> T property(EndpointProperty<T> property);
+    <T> T property(Context.Key<T> property);
 
     /**
      * Get the properties of the endpoint.
      *
      * @return the properties.
      */
-    Set<EndpointProperty<?>> properties();
+    Set<Context.Key<?>> properties();
 
     /**
      * Get the list of auth scheme overrides for the endpoint.
@@ -112,7 +113,7 @@ public interface Endpoint {
          * @return the builder.
          * @param <T> Value type.
          */
-        <T> Builder putProperty(EndpointProperty<T> property, T value);
+        <T> Builder putProperty(Context.Key<T> property, T value);
 
         /**
          * Create the endpoint.

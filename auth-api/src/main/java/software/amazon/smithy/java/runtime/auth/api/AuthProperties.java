@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import software.amazon.smithy.java.context.Context;
 
 /**
  * An immutable collection of auth-related properties used for signing, identity resolution, etc.
@@ -16,9 +17,9 @@ import java.util.Set;
 public final class AuthProperties {
 
     private static final AuthProperties EMPTY = AuthProperties.builder().build();
-    private final Map<AuthProperty<?>, ?> properties;
+    private final Map<Context.Key<?>, ?> properties;
 
-    private AuthProperties(Map<AuthProperty<?>, ?> properties) {
+    private AuthProperties(Map<Context.Key<?>, ?> properties) {
         this.properties = properties;
     }
 
@@ -47,7 +48,7 @@ public final class AuthProperties {
      * @return the value or null if not found.
      */
     @SuppressWarnings("unchecked")
-    public <T> T get(AuthProperty<T> property) {
+    public <T> T get(Context.Key<T> property) {
         return (T) properties.get(property);
     }
 
@@ -58,7 +59,7 @@ public final class AuthProperties {
      * @param defaultValue Default to return if property is not found.
      * @return the value or default if not found.
      */
-    public <T> T getOrDefault(AuthProperty<T> property, T defaultValue) {
+    public <T> T getOrDefault(Context.Key<T> property, T defaultValue) {
         T value = get(property);
         return value != null ? value : defaultValue;
     }
@@ -71,7 +72,7 @@ public final class AuthProperties {
      * @throws ExpectationNotMetException if the property is not found.
      */
     @SuppressWarnings("unchecked")
-    public <T> T expect(AuthProperty<T> property) {
+    public <T> T expect(Context.Key<T> property) {
         var value = properties.get(property);
         if (value == null) {
             throw new ExpectationNotMetException("Could not find expected property: " + property);
@@ -84,7 +85,7 @@ public final class AuthProperties {
      *
      * @return the properties.
      */
-    public Set<AuthProperty<?>> properties() {
+    public Set<Context.Key<?>> properties() {
         return properties.keySet();
     }
 
@@ -109,7 +110,7 @@ public final class AuthProperties {
         return builder.build();
     }
 
-    private static <T> void copyPropertyToBuilder(AuthProperty<T> key, AuthProperties src, Builder dst) {
+    private static <T> void copyPropertyToBuilder(Context.Key<T> key, AuthProperties src, Builder dst) {
         dst.put(key, src.get(key));
     }
 
@@ -145,7 +146,7 @@ public final class AuthProperties {
      * Creates an {@link AuthProperties}.
      */
     public static final class Builder {
-        private Map<AuthProperty<?>, Object> properties = new HashMap<>();
+        private Map<Context.Key<?>, Object> properties = new HashMap<>();
 
         private Builder() {
         }
@@ -169,7 +170,7 @@ public final class AuthProperties {
          * @return the builder.
          * @param <T> Value type.
          */
-        public <T> Builder put(AuthProperty<T> property, T value) {
+        public <T> Builder put(Context.Key<T> property, T value) {
             properties.put(property, value);
             return this;
         }

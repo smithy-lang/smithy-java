@@ -8,7 +8,6 @@ package software.amazon.smithy.runtime.http.auth;
 import java.util.Objects;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
-import software.amazon.smithy.java.runtime.auth.api.AuthProperty;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.ApiKeyIdentity;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthScheme;
@@ -21,13 +20,13 @@ import software.amazon.smithy.model.traits.HttpApiKeyAuthTrait;
  * Implements HTTP-specific authentication using an API key sent in a header or query string parameter.
  */
 public final class HttpApiKeyAuthScheme implements AuthScheme<SmithyHttpRequest, ApiKeyIdentity> {
-    static final AuthProperty<String> NAME = AuthProperty.of(
+    static final Context.Key<String> NAME = Context.key(
         "Name of the header or query parameter that contains the API key"
     );
-    static final AuthProperty<HttpApiKeyAuthTrait.Location> IN = AuthProperty.of(
+    static final Context.Key<HttpApiKeyAuthTrait.Location> IN = Context.key(
         "Defines the location of where the key is serialized."
     );
-    static final AuthProperty<String> SCHEME = AuthProperty.of(
+    static final Context.Key<String> SCHEME = Context.key(
         "Defines the IANA scheme to use on the Authorization header value."
     );
 

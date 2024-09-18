@@ -13,12 +13,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import software.amazon.smithy.java.context.Context;
 
 final class EndpointImpl implements Endpoint {
 
     private final URI uri;
     private final List<EndpointAuthScheme> authSchemes;
-    private final Map<EndpointProperty<?>, Object> properties;
+    private final Map<Context.Key<?>, Object> properties;
 
     private EndpointImpl(Builder builder) {
         this.uri = Objects.requireNonNull(builder.uri);
@@ -33,12 +34,12 @@ final class EndpointImpl implements Endpoint {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <T> T property(EndpointProperty<T> property) {
+    public <T> T property(Context.Key<T> property) {
         return (T) properties.get(property);
     }
 
     @Override
-    public Set<EndpointProperty<?>> properties() {
+    public Set<Context.Key<?>> properties() {
         return properties.keySet();
     }
 
@@ -69,7 +70,7 @@ final class EndpointImpl implements Endpoint {
 
         private URI uri;
         private final List<EndpointAuthScheme> authSchemes = new ArrayList<>();
-        final Map<EndpointProperty<?>, Object> properties = new HashMap<>();
+        final Map<Context.Key<?>, Object> properties = new HashMap<>();
 
         @Override
         public Builder uri(URI uri) {
@@ -93,7 +94,7 @@ final class EndpointImpl implements Endpoint {
         }
 
         @Override
-        public <T> Builder putProperty(EndpointProperty<T> property, T value) {
+        public <T> Builder putProperty(Context.Key<T> property, T value) {
             properties.put(property, value);
             return this;
         }

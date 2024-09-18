@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.client.http;
 
 import java.net.http.HttpHeaders;
-import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointProperty;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 
 public final class HttpEndpointProperties {
@@ -16,7 +16,7 @@ public final class HttpEndpointProperties {
     /**
      * Custom HTTP headers returned from an {@link EndpointResolver} to use with a request.
      */
-    public static final EndpointProperty<HttpHeaders> HTTP_HEADERS = EndpointProperty.of(
+    public static final Context.Key<HttpHeaders> HTTP_HEADERS = Context.key(
         "HTTP headers to use with the request"
     );
 }
