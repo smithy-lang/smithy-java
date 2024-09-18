@@ -42,7 +42,6 @@ public class IdentityResolverTest {
         assertEquals(exc.getCause(), FailingResolver.ILLEGAL_ARGUMENT_EXCEPTION);
     }
 
-
     /**
      * Always returns exceptional result with {@link IdentityNotFoundException}.
      */

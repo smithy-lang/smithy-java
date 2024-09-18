@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.auth.api;
 
-
 /**
  * Thrown by {@link AuthProperties} methods that expect a property to exist.
  */

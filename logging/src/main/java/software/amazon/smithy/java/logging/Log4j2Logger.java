@@ -11,7 +11,6 @@ import org.apache.logging.log4j.spi.ExtendedLoggerWrapper;
 
 final class Log4j2Logger extends ExtendedLoggerWrapper implements InternalLogger {
 
-
     static final class Factory implements InternalLogger.Factory {
 
         @Override

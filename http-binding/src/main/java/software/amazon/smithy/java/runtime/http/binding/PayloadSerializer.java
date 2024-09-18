@@ -55,7 +55,6 @@ final class PayloadSerializer implements ShapeSerializer {
         serializer.setEventStream(value);
     }
 
-
     private void write(byte[] bytes) {
         try {
             outputStream.write(bytes);

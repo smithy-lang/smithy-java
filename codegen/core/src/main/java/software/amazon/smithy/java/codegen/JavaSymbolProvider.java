@@ -274,7 +274,6 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
         return packageNamespace;
     }
 
-
     private Symbol getJavaClassSymbol(Shape shape) {
         String name = CodegenUtils.getDefaultName(shape, service);
         return Symbol.builder()

@@ -321,7 +321,6 @@ public final class CodegenUtils {
             .build();
     }
 
-
     /**
      * Determines if a shape is recursive and should use a schema builder when defined as a Root- or Member-Schema.
      *

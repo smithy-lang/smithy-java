@@ -9,7 +9,6 @@ import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityNotFoundException;
 
-
 /**
  * {@link AwsCredentialsResolver} implementation that loads credentials from environment variables.
  *

@@ -89,7 +89,6 @@ public final class ServiceGenerator implements
             writer.popState();
         });
 
-
     }
 
     private record PropertyGenerator(

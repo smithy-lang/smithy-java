@@ -5,9 +5,7 @@
 
 package software.amazon.smithy.java.logging;
 
-
 final class JdkSystemLogger implements InternalLogger {
-
 
     static final class Factory implements InternalLogger.Factory {
 

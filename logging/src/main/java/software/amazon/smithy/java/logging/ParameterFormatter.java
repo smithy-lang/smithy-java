@@ -785,7 +785,6 @@ final class ParameterFormatter {
             return timeClass != null && timeClass.isAssignableFrom(obj.getClass());
         }
 
-
         /**
          * Returns true if the specified section of the left CharSequence equals the specified section of the right
          * CharSequence.

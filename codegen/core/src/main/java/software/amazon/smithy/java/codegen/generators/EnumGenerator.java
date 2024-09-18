@@ -326,7 +326,6 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
         }
     }
 
-
     private static void generateSwitchCases(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) {
         writer.pushState();
         writer.putContext("string", shape.isEnumShape());

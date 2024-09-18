@@ -23,7 +23,6 @@ public interface IdentityResolvers {
      */
     <T extends Identity> IdentityResolver<T> identityResolver(Class<T> identityClass);
 
-
     /**
      * Create a new IdentityResolvers
      * @param identityResolvers The {@link IdentityResolver}s to use

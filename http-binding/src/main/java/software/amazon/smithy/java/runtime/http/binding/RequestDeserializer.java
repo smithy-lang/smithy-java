@@ -78,7 +78,6 @@ public final class RequestDeserializer {
         return this;
     }
 
-
     public RequestDeserializer pathLabelValues(Map<String, String> labelValues) {
         deserBuilder.requestPathLabels(labelValues);
         return this;

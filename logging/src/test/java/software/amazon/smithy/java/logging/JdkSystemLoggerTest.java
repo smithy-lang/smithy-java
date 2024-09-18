@@ -31,7 +31,6 @@ class JdkSystemLoggerTest {
         testLog.warnEnabled = true;
     }
 
-
     @Test
     void smokeTest() {
         InternalLogger logger = InternalLogger.getLogger(JdkSystemLoggerTest.class);
@@ -92,7 +91,6 @@ class JdkSystemLoggerTest {
             "at software.amazon.smithy.java.logging.JdkSystemLoggerTest.dynamicLevelTest(JdkSystemLoggerTest.java:"
         );
     }
-
 
     private static final class TestLogger extends java.util.logging.Logger {
         final StringWriter buffer = new StringWriter();

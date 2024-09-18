@@ -80,7 +80,6 @@ final class Assertions {
         }).collect(Collectors.joining(", "));
     }
 
-
     static void assertJsonBodyEquals(SmithyHttpMessage message, String jsonBody) {
         var body = new StringBuildingSubscriber(message.body()).getResult();
 

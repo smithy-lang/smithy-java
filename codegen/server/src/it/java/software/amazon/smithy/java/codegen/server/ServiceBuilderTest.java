@@ -25,7 +25,6 @@ import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 
-
 public class ServiceBuilderTest {
 
     private static final class EchoImpl implements EchoOperation {
@@ -44,7 +43,6 @@ public class ServiceBuilderTest {
             );
         }
     }
-
 
     private final TestService service = TestService.builder()
         .addEchoOperation(new EchoImpl())

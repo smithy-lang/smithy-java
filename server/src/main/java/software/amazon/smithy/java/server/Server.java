@@ -11,7 +11,6 @@ import software.amazon.smithy.java.logging.InternalLogger;
 
 public interface Server {
 
-
     static ServerBuilder<?> builder() {
         return findBuilder(null);
     }

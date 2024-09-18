@@ -138,7 +138,6 @@ public final class UnionGenerator
         });
     }
 
-
     private record ValueCasterGenerator(
         JavaWriter writer, UnionShape shape, SymbolProvider symbolProvider, Model model
     ) implements Runnable {

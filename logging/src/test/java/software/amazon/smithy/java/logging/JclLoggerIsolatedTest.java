@@ -132,7 +132,6 @@ public class JclLoggerIsolatedTest {
         }
     }
 
-
     static final class JclLog implements Log {
         static final StringWriter BUFFER = new StringWriter();
         static final PrintWriter WRITER = new PrintWriter(BUFFER);

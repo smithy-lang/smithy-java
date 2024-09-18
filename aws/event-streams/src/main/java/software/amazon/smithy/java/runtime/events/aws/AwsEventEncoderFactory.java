@@ -47,7 +47,6 @@ public class AwsEventEncoderFactory implements EventEncoderFactory<AwsEventFrame
         return new AwsEventEncoderFactory(operation.outputEventSchema(), codec, exceptionHandler);
     }
 
-
     @Override
     public EventEncoder<AwsEventFrame> newEventEncoder() {
         return new AwsEventShapeEncoder(schema, codec, exceptionHandler);

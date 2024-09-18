@@ -18,7 +18,6 @@ public final class Operation<I extends SerializableStruct, O extends Serializabl
     private final BiFunction<I, RequestContext, CompletableFuture<O>> asyncOperation;
     private final ApiOperation<I, O> sdkOperation;
 
-
     private Operation(
         String name,
         BiFunction<I, RequestContext, O> operation,

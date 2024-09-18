@@ -117,7 +117,6 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         }
     }
 
-
     /**
      * Implements a formatter for {@code $T} that formats Java types.
      */

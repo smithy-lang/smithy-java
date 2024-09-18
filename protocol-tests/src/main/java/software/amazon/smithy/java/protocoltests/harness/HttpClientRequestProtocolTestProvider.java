@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.protocoltests.harness;
 
-
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -64,7 +63,6 @@ final class HttpClientRequestProtocolTestProvider extends ProtocolTestProvider<H
                         var inputBuilder = operation.operationModel().inputBuilder();
                         new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
                             .deserializeInto(inputBuilder);
-
 
                         return new RequestTestInvocationContext(
                             testCase,

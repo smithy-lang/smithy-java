@@ -260,7 +260,6 @@ public class MapsTest {
         assertEquals(pojo, output);
     }
 
-
     @Test
     void nullDistinctFromEmpty() {
         var emptyInput = MapAllTypesInput.builder().stringBooleanMap(Map.of()).build();

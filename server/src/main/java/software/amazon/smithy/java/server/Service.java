@@ -16,5 +16,4 @@ public interface Service {
      */
     <I extends SerializableStruct, O extends SerializableStruct> Operation<I, O> getOperation(String operationName);
 
-
 }

@@ -12,7 +12,6 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
-
 /**
  * Generates a {@code SharedSerde} utility class that contains all unattached schemas for the model.
  */

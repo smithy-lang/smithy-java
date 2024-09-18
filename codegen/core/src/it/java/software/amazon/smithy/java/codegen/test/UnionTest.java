@@ -57,7 +57,6 @@ public class UnionTest {
         );
     }
 
-
     @ParameterizedTest
     @MethodSource("unionTypes")
     void pojoToDocumentRoundTrip(UnionType pojo) {

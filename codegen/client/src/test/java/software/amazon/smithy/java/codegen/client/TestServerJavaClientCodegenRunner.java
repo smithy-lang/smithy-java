@@ -5,14 +5,12 @@
 
 package software.amazon.smithy.java.codegen.client;
 
-
 import java.nio.file.Paths;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.ObjectNode;
-
 
 /**
  * Simple wrapper class used to execute the test Java codegen plugin for integration tests.

@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.codegen.test.model.ListMembersInput;
 import software.amazon.smithy.java.codegen.test.model.MapMembersInput;
 
-
 public class BuilderTest {
 
     @Test

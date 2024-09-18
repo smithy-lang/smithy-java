@@ -32,7 +32,6 @@ import software.amazon.smithy.java.server.core.ProtocolResolver;
 
 final class NettyServer implements Server {
 
-
     private static final InternalLogger LOG = InternalLogger.getLogger(NettyServer.class);
 
     private final ServerBootstrap bootstrap;

@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.test;
 
-
 import java.lang.reflect.InvocationTargetException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;

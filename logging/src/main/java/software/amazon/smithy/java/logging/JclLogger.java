@@ -10,7 +10,6 @@ import org.apache.commons.logging.LogFactory;
 
 final class JclLogger implements InternalLogger {
 
-
     static final class Factory implements InternalLogger.Factory {
 
         @Override
@@ -19,13 +18,11 @@ final class JclLogger implements InternalLogger {
         }
     }
 
-
     private final Log log;
 
     JclLogger(Log log) {
         this.log = log;
     }
-
 
     private void internalLog(Level level, String message, Throwable throwable) {
         switch (level) {
@@ -48,7 +45,6 @@ final class JclLogger implements InternalLogger {
             case FATAL -> log.isFatalEnabled();
         };
     }
-
 
     @Override
     public void log(Level level, String message, Object... params) {

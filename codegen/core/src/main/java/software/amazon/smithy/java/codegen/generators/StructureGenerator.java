@@ -180,7 +180,6 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 writer.pushState();
                 writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
 
-
                 writer.write(
                     "private final transient ${?isNullable}$1B${/isNullable}${^isNullable}$1N${/isNullable} $2L;",
                     symbolProvider.toSymbol(member),
@@ -478,7 +477,6 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         }
     }
 
-
     private static final class StructureBuilderGenerator extends BuilderGenerator {
 
         StructureBuilderGenerator(
@@ -544,7 +542,6 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 member
             );
         }
-
 
         private static final class ErrorCorrectionVisitor extends ShapeVisitor.Default<Void> implements Runnable {
             private final JavaWriter writer;

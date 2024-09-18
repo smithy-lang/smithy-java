@@ -27,7 +27,6 @@ import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 
-
 public class RecursionTests {
 
     static Stream<SerializableShape> recursiveTypeSource() {
@@ -77,7 +76,6 @@ public class RecursionTests {
         assertEquals(pojo.hashCode(), output.hashCode());
         assertEquals(pojo, output);
     }
-
 
     static Stream<Arguments> recursiveJsonSource() {
         return Stream.of(

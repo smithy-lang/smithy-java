@@ -28,7 +28,6 @@ import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-
 public class OperationGenerator
     implements Consumer<GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
