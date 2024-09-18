@@ -26,7 +26,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Flow;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import software.amazon.smithy.java.aws.runtime.client.http.auth.identity.AwsCredentialsIdentity;
@@ -99,10 +98,12 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
             });
     }
 
+    // TODO: allow for unsigned payloads
     private static CompletableFuture<String> getPayloadHash(DataStream dataStream) {
-        var subscriber = new HashingSubscriber();
-        dataStream.subscribe(subscriber);
-        return subscriber.result.thenApply(HexFormat.of()::formatHex);
+        return dataStream.asByteBuffer()
+            .toCompletableFuture()
+            .thenApply(SigV4Signer::hash)
+            .thenApply(HexFormat.of()::formatHex);
     }
 
     private static Map<String, List<String>> createSignedHeaders(
@@ -201,42 +202,6 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
             "SignedHeaders=" + signedHeaders +
             ", " +
             "Signature=" + signature;
-    }
-
-    /**
-     * Subscriber that computes the hash of a given byte buffer flow.
-     */
-    private static final class HashingSubscriber implements Flow.Subscriber<ByteBuffer> {
-        private final MessageDigest md;
-        private final CompletableFuture<byte[]> result = new CompletableFuture<>();
-
-        private HashingSubscriber() {
-            try {
-                md = MessageDigest.getInstance("SHA-256");
-            } catch (NoSuchAlgorithmException e) {
-                throw new RuntimeException("Could not find hashing algorithm", e);
-            }
-        }
-
-        @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-            subscription.request(Long.MAX_VALUE);
-        }
-
-        @Override
-        public void onNext(ByteBuffer item) {
-            md.update(item);
-        }
-
-        @Override
-        public void onError(Throwable throwable) {
-            result.completeExceptionally(throwable);
-        }
-
-        @Override
-        public void onComplete() {
-            result.complete(md.digest());
-        }
     }
 
     private static byte[] getCanonicalRequest(
@@ -462,6 +427,16 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
             mac.init(new SecretKeySpec(key, HMAC_SHA_256));
             return mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static byte[] hash(ByteBuffer data) {
+        try {
+            var md = MessageDigest.getInstance(SHA_256);
+            md.update(data);
+            return md.digest();
+        } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
     }
