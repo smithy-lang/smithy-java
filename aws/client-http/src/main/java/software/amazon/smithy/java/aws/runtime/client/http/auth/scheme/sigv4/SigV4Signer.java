@@ -114,9 +114,9 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         String regionName,
         String serviceName,
         Instant signingTimestamp,
-        String sanitizedAccessKeyId,
-        String sanitizedSecretAccessKey,
-        String sanitizedSessionToken,
+        String accessKeyId,
+        String secretAccessKey,
+        String sessionToken,
         boolean isStreaming
     ) {
         // TODO: Use mutable header container when available
@@ -135,8 +135,8 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         if (isStreaming) {
             headers.put("x-amz-content-sha256", List.of(payloadHash));
         }
-        if (sanitizedSessionToken != null) {
-            headers.put("X-Amz-Security-Token", List.of(sanitizedSessionToken));
+        if (sessionToken != null) {
+            headers.put("X-Amz-Security-Token", List.of(sessionToken));
         }
 
         // Determine sorted list of headers to sign
@@ -149,7 +149,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         var dateStamp = DATE_FORMATTER.format(signingTimestamp);
         var scope = dateStamp + "/" + regionName + "/" + serviceName + "/" + TERMINATOR;
         var signingKey = deriveSigningKey(
-            sanitizedSecretAccessKey,
+            secretAccessKey,
             dateStamp,
             regionName,
             serviceName,
@@ -157,7 +157,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         );
         var signature = computeSignature(canonicalRequest, scope, requestTime, signingKey);
 
-        var authorizationHeader = getAuthHeader(sanitizedAccessKeyId, scope, signedHeaders, signature);
+        var authorizationHeader = getAuthHeader(accessKeyId, scope, signedHeaders, signature);
         headers.put("Authorization", List.of(authorizationHeader));
 
         return headers;
