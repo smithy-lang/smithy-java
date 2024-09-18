@@ -192,9 +192,9 @@ public class SigV4TestRunner {
 
         private static AuthProperties getAuthProperties(ObjectNode objectNode) {
             return AuthProperties.builder()
-                .put(SigV4Properties.SERVICE, objectNode.expectStringMember("service").getValue())
-                .put(SigV4Properties.REGION, objectNode.expectStringMember("region").getValue())
-                .put(SigV4Properties.CLOCK, getStaticClock(objectNode.expectStringMember("timestamp").getValue()))
+                .put(SigV4AuthScheme.SERVICE, objectNode.expectStringMember("service").getValue())
+                .put(SigV4AuthScheme.REGION, objectNode.expectStringMember("region").getValue())
+                .put(SigV4AuthScheme.CLOCK, getStaticClock(objectNode.expectStringMember("timestamp").getValue()))
                 .build();
         }
 

@@ -71,9 +71,9 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         AwsCredentialsIdentity identity,
         AuthProperties properties
     ) {
-        var region = properties.expect(SigV4Properties.REGION);
-        var name = properties.expect(SigV4Properties.SERVICE);
-        var clock = properties.getOrDefault(SigV4Properties.CLOCK, Clock.systemUTC());
+        var region = properties.expect(SigV4AuthScheme.REGION);
+        var name = properties.expect(SigV4AuthScheme.SERVICE);
+        var clock = properties.getOrDefault(SigV4AuthScheme.CLOCK, Clock.systemUTC());
 
         // TODO: Add support for query signing?
         // TODO: Support chunk encoding

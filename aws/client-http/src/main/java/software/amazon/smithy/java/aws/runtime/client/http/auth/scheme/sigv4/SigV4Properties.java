@@ -6,27 +6,12 @@
 package software.amazon.smithy.java.aws.runtime.client.http.auth.scheme.sigv4;
 
 import java.time.Clock;
-import software.amazon.smithy.java.runtime.auth.api.AuthProperty;
+import software.amazon.smithy.java.context.Context;
 
 /**
- * Signing properties used for SigV4 signing.
+ * Configuration properties used by all AWS Service clients for configuration.
  */
 public final class SigV4Properties {
-    private SigV4Properties() {}
-
-    /**
-     * Region to use for signing. For example {@code us-east-2}.
-     */
-    public static final AuthProperty<String> REGION = AuthProperty.of("signingRegion");
-
-    /**
-     * Service name to use for signing. For example {@code lambda}.
-     */
-    public static final AuthProperty<String> SERVICE = AuthProperty.of("signingName");
-
-    /**
-     * Optional override of the clock to use for signing. If no override is provided, then the
-     * default system UTC clock is used.
-     */
-    public static final AuthProperty<Clock> CLOCK = AuthProperty.of("signingClock");
+    public static final Context.Key<String> REGION = Context.key("region");
+    public static final Context.Key<Clock> CLOCK = Context.key("clock");
 }
