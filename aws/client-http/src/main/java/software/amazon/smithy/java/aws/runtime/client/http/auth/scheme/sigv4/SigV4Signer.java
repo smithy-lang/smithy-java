@@ -102,7 +102,6 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
 
     private static CompletableFuture<String> getPayloadHash(DataStream dataStream) {
         return dataStream.asByteBuffer()
-            .toCompletableFuture()
             .thenApply(SigV4Signer::hash)
             .thenApply(HexFormat.of()::formatHex);
     }
