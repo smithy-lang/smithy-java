@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
 import software.amazon.smithy.java.codegen.client.util.EchoServer;
-import software.amazon.smithy.java.runtime.client.aws.jsonprotocols.RestJsonClientProtocol;
+import software.amazon.smithy.java.runtime.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.OutputHook;

@@ -4,7 +4,7 @@ plugins {
 }
 
 dependencies {
-    api(project(":aws:client-json-protocols"))
+    api(project(":aws:client-restjson"))
     api(libs.smithy.aws.traits)
 }
 

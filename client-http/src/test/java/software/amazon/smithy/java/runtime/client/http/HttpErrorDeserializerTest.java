@@ -131,30 +131,10 @@ public class HttpErrorDeserializerTest {
     }
 
     @Test
-    public void deserializesErrorsWithHttpBindingsToo() throws Exception {
-        var deserializer = HttpErrorDeserializer.builder()
-            .codec(CODEC)
-            .serviceId(SERVICE)
-            .useHttpBindings()
-            .build();
-        var registry = TypeRegistry.builder()
-            .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
-            .build();
-        var responseBuilder = SmithyHttpResponse.builder()
-            .statusCode(400)
-            .body(DataStream.ofString("{\"__type\": \"com.foo#Baz\"}"));
-        var response = responseBuilder.build();
-        var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
-
-        assertThat(result, instanceOf(Baz.class));
-    }
-
-    @Test
     public void usesGenericErrorWhenPayloadTypeIsUnknown() throws Exception {
         var deserializer = HttpErrorDeserializer.builder()
             .codec(CODEC)
             .serviceId(SERVICE)
-            .useHttpBindings()
             .unknownErrorFactory(
                 (fault, message, response) -> CompletableFuture.completedFuture(new ApiException("Hi!", fault))
             )
@@ -177,7 +157,6 @@ public class HttpErrorDeserializerTest {
         var deserializer = HttpErrorDeserializer.builder()
             .codec(CODEC)
             .serviceId(SERVICE)
-            .useHttpBindings()
             .headerErrorExtractor(new AmznErrorHeaderExtractor())
             .unknownErrorFactory(
                 (fault, message, response) -> CompletableFuture.completedFuture(new ApiException("Hi!", fault))

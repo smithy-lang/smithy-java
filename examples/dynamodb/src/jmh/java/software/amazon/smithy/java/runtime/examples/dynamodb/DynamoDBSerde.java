@@ -25,7 +25,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.infra.Blackhole;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.runtime.client.aws.jsonprotocols.AwsJson1Protocol;
+import software.amazon.smithy.java.runtime.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.examples.dynamodb.model.AttributeValue;
 import software.amazon.smithy.java.runtime.examples.dynamodb.model.GetItem;

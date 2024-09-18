@@ -18,7 +18,6 @@ import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.document.DiscriminatorException;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
-import software.amazon.smithy.java.runtime.http.binding.HttpBinding;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -162,19 +161,6 @@ public final class HttpErrorDeserializer {
             return CompletableFuture.completedFuture(result);
         }
     };
-
-    // The default strategy that uses HTTP bindings to deserialize errors.
-    private static final KnownErrorFactory DEFAULT_KNOWN_HTTP_BINDING_FACTORY = (
-        context,
-        codec,
-        response,
-        builder
-    ) -> HttpBinding.responseDeserializer()
-        .payloadCodec(codec)
-        .errorShapeBuilder(builder)
-        .response(response)
-        .deserialize()
-        .thenApply(ignore -> builder.errorCorrection().build());
 
     private final Codec codec;
     private final HeaderErrorExtractor headerErrorExtractor;
@@ -348,15 +334,6 @@ public final class HttpErrorDeserializer {
         public Builder headerErrorExtractor(HeaderErrorExtractor headerErrorExtractor) {
             this.headerErrorExtractor = Objects.requireNonNull(headerErrorExtractor, "headerErrorExtractor is null");
             return this;
-        }
-
-        /**
-         * Overrides the knownError factory to use a factory that uses HTTP bindings.
-         *
-         * @return the builder.
-         */
-        public Builder useHttpBindings() {
-            return knownErrorFactory(DEFAULT_KNOWN_HTTP_BINDING_FACTORY);
         }
 
         /**

@@ -14,7 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.runtime.client.aws.jsonprotocols.RestJsonClientProtocol;
+import software.amazon.smithy.java.runtime.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.ClientConfig;
 import software.amazon.smithy.java.runtime.client.core.ClientPlugin;

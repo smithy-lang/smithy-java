@@ -27,7 +27,6 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 
-
 public class GenericTest {
 
     @Test
