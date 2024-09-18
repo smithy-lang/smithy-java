@@ -16,13 +16,13 @@ import org.junit.jupiter.params.provider.MethodSource;
  *
  * <p>TODO: the following test cases are still not supported
  * <ul>
+ *     <li>all un-normalized tests - This implementation does not support un-normalized configuration.</li>
  *     <li>get-header-value-multiline</li>
  *     <li>get-header-value-order</li>
  *     <li>get-header-key-duplicate</li>
  *     <li>post-header-key-case</li>
  *     <li>post-sts-header-after</li>
  *     <li>post-x-www-form-urlencoded</li>
- *     <li>all unnormalized tests</li>
  *     <li>get-space-normalized</li>
  *     <li>get-vanilla-query-order-encoded</li>
  * </ul>

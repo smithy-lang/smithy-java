@@ -98,7 +98,6 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
             });
     }
 
-    // TODO: allow for unsigned payloads
     private static CompletableFuture<String> getPayloadHash(DataStream dataStream) {
         return dataStream.asByteBuffer()
             .toCompletableFuture()
@@ -212,9 +211,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         String signedHeaders,
         String payloadHash
     ) {
-        // TODO: allow un-normalized uri? this is the same step as:
-        //  https://github.com/aws/aws-sdk-java-v2/blob/master/core/auth/src/main/java/software/amazon/awssdk/auth/signer/internal/AbstractAws4Signer.java#L525
-        // TODO: figure out size?
+        // TODO: figure out size.
         StringBuilder builder = new StringBuilder(256)
             .append(method)
             .append('\n')
@@ -231,9 +228,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         return builder.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    // Based on: https://github.com/aws/aws-sdk-java-v2/blob/master/core/auth/src/main/java/software/amazon/awssdk/auth/signer/internal/AbstractAws4Signer.java#L525
     private static String getCanonicalizedResourcePath(URI uri) {
-        // TODO: handle unnormalized?
         String path = uri.normalize().getRawPath();
         if (path.isEmpty()) {
             return "/";
@@ -241,7 +236,6 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         if (!path.startsWith("/")) {
             path = "/" + path;
         }
-        // TODO: allow unencoded?
         return URLEncoding.encodeUnreserved(path, true);
     }
 
