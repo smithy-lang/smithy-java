@@ -16,7 +16,6 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
-import java.util.function.Supplier;
 
 /**
  * Abstraction for reading streams of data.
@@ -57,36 +56,36 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     }
 
     /**
-     * Create a DataStream from an InputStream supplier.
+     * Create a DataStream from an InputStream.
      *
-     * @param inputStreamSupplier Creates a new InputStream each time it is called.
+     * @param inputStream InputStream to wrap.
      * @return the created DataStream.
      */
-    static DataStream ofInputStream(Supplier<InputStream> inputStreamSupplier) {
-        return ofInputStream(inputStreamSupplier, null);
-    }
-
-    /**
-     * Create a DataStream from an InputStream supplier.
-     *
-     * @param inputStreamSupplier Creates a new InputStream each time it is called.
-     * @param contentType Content-Type of the stream if known, or null.
-     * @return the created DataStream.
-     */
-    static DataStream ofInputStream(Supplier<InputStream> inputStreamSupplier, String contentType) {
-        return ofInputStream(inputStreamSupplier, contentType, -1);
+    static DataStream ofInputStream(InputStream inputStream) {
+        return ofInputStream(inputStream, null);
     }
 
     /**
      * Create a DataStream from an InputStream.
      *
-     * @param inputStreamSupplier Creates a new InputStream each time it is called.
+     * @param inputStream InputStream to wrap.
+     * @param contentType Content-Type of the stream if known, or null.
+     * @return the created DataStream.
+     */
+    static DataStream ofInputStream(InputStream inputStream, String contentType) {
+        return ofInputStream(inputStream, contentType, -1);
+    }
+
+    /**
+     * Create a DataStream from an InputStream.
+     *
+     * @param inputStream InputStream to wrap.
      * @param contentType Content-Type of the stream if known, or null.
      * @param contentLength Bytes in the stream if known, or -1.
      * @return the created DataStream.
      */
-    static DataStream ofInputStream(Supplier<InputStream> inputStreamSupplier, String contentType, long contentLength) {
-        return new InputStreamDataStream(inputStreamSupplier, contentType, contentLength);
+    static DataStream ofInputStream(InputStream inputStream, String contentType, long contentLength) {
+        return new InputStreamDataStream(inputStream, contentType, contentLength);
     }
 
     /**
@@ -203,18 +202,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the created DataStream.
      */
     static DataStream ofFile(Path file, String contentType) {
-        try {
-            long size = Files.size(file);
-            return ofInputStream(() -> {
-                try {
-                    return Files.newInputStream(file);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }, contentType, size);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return new FileDataStream(file, contentType);
     }
 
     /**
