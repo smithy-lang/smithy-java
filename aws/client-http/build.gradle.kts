@@ -10,6 +10,7 @@ extra["moduleName"] = "software.amazon.smithy.java.aws.client-http"
 
 dependencies {
     implementation(project(":client-auth-api"))
+    implementation(project(":client-core"))
     implementation(project(":http-api"))
     implementation(project(":io"))
     implementation(project(":logging"))

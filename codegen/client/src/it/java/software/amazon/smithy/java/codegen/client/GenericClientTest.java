@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
+import software.amazon.smithy.java.codegen.client.settings.AbSetting;
 import software.amazon.smithy.java.codegen.client.util.EchoServer;
 import software.amazon.smithy.java.runtime.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
@@ -97,7 +98,7 @@ public class GenericClientTest {
                 assertEquals(constant, "CONSTANT");
                 var value = hook.context().get(TestClientPlugin.VALUE_KEY);
                 assertEquals(value, BigDecimal.valueOf(2L));
-                var ab = hook.context().get(TestClientPlugin.AB_KEY);
+                var ab = hook.context().get(AbSetting.AB_KEY);
                 assertEquals(ab, "ab");
                 var singleVarargs = hook.context().get(TestClientPlugin.STRING_LIST_KEY);
                 assertEquals(List.of("a", "b", "c", "d"), singleVarargs);
@@ -105,6 +106,10 @@ public class GenericClientTest {
                 assertEquals(foo, "string");
                 var multiVarargs = hook.context().get(TestClientPlugin.BAZ_KEY);
                 assertEquals(List.of("a", "b", "c"), multiVarargs);
+                var overridden = hook.context().get(TestClientPlugin.OVERRIDE_KEY);
+                assertEquals(overridden, "override works");
+                var nested = hook.context().get(TestClientPlugin.NESTED_KEY);
+                assertEquals(nested, 1);
             }
         };
         var client = TestServiceClient.builder()
@@ -115,6 +120,8 @@ public class GenericClientTest {
             .multiValue("a", "b")
             .multiVarargs("string", "a", "b", "c")
             .singleVarargs("a", "b", "c", "d")
+            .overridden("override works")
+            .nested(1)
             .build();
 
         var value = "hello world";

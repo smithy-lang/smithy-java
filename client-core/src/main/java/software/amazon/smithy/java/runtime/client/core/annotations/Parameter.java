@@ -25,25 +25,27 @@ import java.lang.annotation.Target;
  * <pre>{@code
  * @Configuration
  * public void regions(
+ *  Context context,
  *  @Parameter("regionA") String regionA,
  *  @Parameter("regionB") String regionB
  * ) {
- *     this.regionA = regionA;
- *     this.regionB = regionB;
+ *     context.put(KEY_A, regionA);
+ *     context.put(KEY_B, regionB);
  * }
  * }</pre>
  *
  * <p>Will generate the following client builder setter:
  * <pre>{@code
  * public void regions(String regionA, String regionB) {
- *     regionPlugin.regions(regionA, regionB);
+ *     regionPlugin.regions(contextBuilder().context(), regionA, regionB);
  * }
  * }</pre>
  * <p>Without the {@code @Parameter} annotation the generated
  * client builder setter would have the following method signature:
  * <pre>{@code
  * public void regions(String region, String region1) {
- *     regionPlugin.regions(region, region1);
+ *     regionPlugin.regions(contextBuilder().context(), regionA, regionB);
+ * }
  * }</pre>
  */
 @Retention(RetentionPolicy.RUNTIME)
