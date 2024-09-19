@@ -26,21 +26,21 @@ import java.lang.annotation.Target;
  * class RegionSetting implements ClientPlugin {
  *     static final Context.Key<String> REGION = Context.key("Region.");
  *
- *     private final String region;
- *
  *     // Identify this method as a setter that we want to have a
  *     // corresponding setter generated for in the client build.
  *     @Configuration
- *     public void region(String region) {
- *         this.region = region;
+ *     public void region(Context context, String region) {
+ *         // If we require that the setting conform to some constraints
+ *         // we can check that here.
+ *         Objects.nonNull(region, "Region cannot be null!");
+ *         context.put(REGION, region);
  *     }
  *
  *     @Override
  *     public void configureClient(Config.builder config) {
  *         // If we require that the region is set when this
  *         // plugin is applied then we can check it here.
- *         Objects.nonNull(region, "Region must be set");
- *         config.putConfig(REGION, region);
+ *         config.context().expect(REGION);
  *     }
  * }
  * }</pre>

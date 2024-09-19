@@ -39,8 +39,8 @@ public class SigV4SignerTrials {
         "secret-key"
     );
     private static final AuthProperties TEST_PROPERTIES = AuthProperties.builder()
-        .put(SigV4AuthScheme.SERVICE, "service")
-        .put(SigV4AuthScheme.REGION, "us-east-1")
+        .put(SigV4Settings.SIGNING_NAME, "service")
+        .put(SigV4Settings.REGION, "us-east-1")
         .build();
     private static final Map<String, SmithyHttpRequest> CASES = Map.ofEntries(
         Map.entry(

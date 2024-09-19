@@ -15,6 +15,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
+import software.amazon.smithy.java.codegen.client.settings.AbSetting;
+import software.amazon.smithy.java.codegen.client.settings.TestSettings;
 import software.amazon.smithy.java.codegen.client.util.EchoServer;
 import software.amazon.smithy.java.runtime.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
@@ -95,16 +97,18 @@ public class GenericClientTest {
             public void readBeforeExecution(InputHook<?> hook) {
                 var constant = hook.context().get(TestClientPlugin.CONSTANT_KEY);
                 assertEquals(constant, "CONSTANT");
-                var value = hook.context().get(TestClientPlugin.VALUE_KEY);
+                var value = hook.context().get(TestSettings.VALUE_KEY);
                 assertEquals(value, BigDecimal.valueOf(2L));
-                var ab = hook.context().get(TestClientPlugin.AB_KEY);
+                var ab = hook.context().get(AbSetting.AB_KEY);
                 assertEquals(ab, "ab");
-                var singleVarargs = hook.context().get(TestClientPlugin.STRING_LIST_KEY);
+                var singleVarargs = hook.context().get(TestSettings.STRING_LIST_KEY);
                 assertEquals(List.of("a", "b", "c", "d"), singleVarargs);
-                var foo = hook.context().get(TestClientPlugin.FOO_KEY);
+                var foo = hook.context().get(TestSettings.FOO_KEY);
                 assertEquals(foo, "string");
-                var multiVarargs = hook.context().get(TestClientPlugin.BAZ_KEY);
+                var multiVarargs = hook.context().get(TestSettings.BAZ_KEY);
                 assertEquals(List.of("a", "b", "c"), multiVarargs);
+                var nested = hook.context().get(TestSettings.NESTED_KEY);
+                assertEquals(nested, 1);
             }
         };
         var client = TestServiceClient.builder()
@@ -115,6 +119,7 @@ public class GenericClientTest {
             .multiValue("a", "b")
             .multiVarargs("string", "a", "b", "c")
             .singleVarargs("a", "b", "c", "d")
+            .nested(1)
             .build();
 
         var value = "hello world";

@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.client;
 import java.nio.file.Paths;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.build.PluginContext;
+import software.amazon.smithy.java.codegen.client.settings.TestSettings;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.ObjectNode;
@@ -39,6 +40,7 @@ public final class TestServerJavaClientCodegenRunner {
                             .build()
                     )
                     .withMember("defaultPlugins", ArrayNode.fromStrings(TestClientPlugin.class.getCanonicalName()))
+                    .withMember("defaultSettings", ArrayNode.fromStrings(TestSettings.class.getCanonicalName()))
                     .build()
             )
             .model(model)

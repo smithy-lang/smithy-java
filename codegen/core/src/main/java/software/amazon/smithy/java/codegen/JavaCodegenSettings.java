@@ -33,6 +33,7 @@ public final class JavaCodegenSettings {
     private static final String DEFAULT_PROTOCOL = "protocol";
     private static final String TRANSPORT = "transport";
     private static final String DEFAULT_PLUGINS = "defaultPlugins";
+    private static final String DEFAULT_SETTINGS = "defaultSettings";
 
     private final ShapeId service;
     private final String packageNamespace;
@@ -42,6 +43,7 @@ public final class JavaCodegenSettings {
     private final String transportName;
     private final ObjectNode transportSettings;
     private final List<String> defaultPlugins;
+    private final List<String> defaultSettings;
 
     JavaCodegenSettings(
         ShapeId service,
@@ -51,7 +53,8 @@ public final class JavaCodegenSettings {
         String nonNullAnnotationFullyQualifiedName,
         String defaultProtocol,
         ObjectNode transportNode,
-        List<String> defaultPlugins
+        List<String> defaultPlugins,
+        List<String> defaultSettings
     ) {
         this.service = Objects.requireNonNull(service);
         this.packageNamespace = Objects.requireNonNull(packageNamespace);
@@ -83,6 +86,7 @@ public final class JavaCodegenSettings {
             transportSettings = null;
         }
         this.defaultPlugins = Collections.unmodifiableList(defaultPlugins);
+        this.defaultSettings = Collections.unmodifiableList(defaultSettings);
     }
 
     /**
@@ -93,7 +97,16 @@ public final class JavaCodegenSettings {
      */
     public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
         settingsNode.warnIfAdditionalProperties(
-            List.of(SERVICE, NAMESPACE, HEADER_FILE, NON_NULL_ANNOTATION, DEFAULT_PROTOCOL, TRANSPORT, DEFAULT_PLUGINS)
+            List.of(
+                SERVICE,
+                NAMESPACE,
+                HEADER_FILE,
+                NON_NULL_ANNOTATION,
+                DEFAULT_PROTOCOL,
+                TRANSPORT,
+                DEFAULT_PLUGINS,
+                DEFAULT_SETTINGS
+            )
         );
         return new JavaCodegenSettings(
             settingsNode.expectStringMember(SERVICE).expectShapeId(),
@@ -104,6 +117,9 @@ public final class JavaCodegenSettings {
             settingsNode.getStringMemberOrDefault(DEFAULT_PROTOCOL, null),
             settingsNode.getObjectMember(TRANSPORT).orElse(null),
             settingsNode.getArrayMember(DEFAULT_PLUGINS)
+                .map(n -> n.getElementsAs(el -> el.expectStringNode().getValue()))
+                .orElse(Collections.emptyList()),
+            settingsNode.getArrayMember(DEFAULT_SETTINGS)
                 .map(n -> n.getElementsAs(el -> el.expectStringNode().getValue()))
                 .orElse(Collections.emptyList())
         );
@@ -139,6 +155,10 @@ public final class JavaCodegenSettings {
 
     public List<String> defaultPlugins() {
         return defaultPlugins;
+    }
+
+    public List<String> defaultSettings() {
+        return defaultSettings;
     }
 
     private static Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {

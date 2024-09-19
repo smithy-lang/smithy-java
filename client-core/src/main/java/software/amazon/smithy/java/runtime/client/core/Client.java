@@ -102,7 +102,7 @@ public abstract class Client {
      * @param <I> Client interface created by builder
      * @param <B> Implementing builder class
      */
-    public static abstract class Builder<I, B extends Builder<I, B>> {
+    public static abstract class Builder<I, B extends Builder<I, B>> implements ClientSetting<B> {
 
         private final ClientConfig.Builder configBuilder = ClientConfig.builder();
 
@@ -241,20 +241,6 @@ public abstract class Client {
         @SuppressWarnings("unchecked")
         public B identityResolvers(List<IdentityResolver<?>> identityResolvers) {
             this.configBuilder.identityResolvers(identityResolvers);
-            return (B) this;
-        }
-
-        /**
-         * Put a strongly typed configuration on the builder.
-         *
-         * @param key Configuration key.
-         * @param value Value to associate with the key.
-         * @return the builder.
-         * @param <T> Value type.
-         */
-        @SuppressWarnings("unchecked")
-        public <T> B putConfig(Context.Key<T> key, T value) {
-            this.configBuilder.putConfig(key, value);
             return (B) this;
         }
 

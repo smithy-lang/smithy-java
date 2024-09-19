@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.runtime.client.http.auth.scheme.sigv4;
 
-import java.time.Clock;
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.java.aws.runtime.client.http.auth.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.context.Context;
@@ -38,22 +37,6 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public final class SigV4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsCredentialsIdentity> {
     private final String signingName;
 
-    /**
-     * Region to use for signing. For example {@code us-east-2}.
-     */
-    public static final Context.Key<String> REGION = Context.key("signingRegion");
-
-    /**
-     * Service name to use for signing. For example {@code lambda}.
-     */
-    public static final Context.Key<String> SERVICE = Context.key("signingName");
-
-    /**
-     * Optional override of the clock to use for signing. If no override is provided, then the
-     * default system UTC clock is used.
-     */
-    public static final Context.Key<Clock> CLOCK = Context.key("signingClock");
-
     public SigV4AuthScheme(String signingName) {
         this.signingName = signingName;
     }
@@ -76,11 +59,11 @@ public final class SigV4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsC
     @Override
     public AuthProperties getSignerProperties(Context context) {
         var builder = AuthProperties.builder()
-            .put(SERVICE, signingName)
-            .put(REGION, context.expect(REGION));
-        var clock = context.get(CLOCK);
+            .put(SigV4Settings.SIGNING_NAME, signingName)
+            .put(SigV4Settings.REGION, context.expect(SigV4Settings.REGION));
+        var clock = context.get(SigV4Settings.CLOCK);
         if (clock != null) {
-            builder.put(CLOCK, clock);
+            builder.put(SigV4Settings.CLOCK, clock);
         }
         return builder.build();
     }
