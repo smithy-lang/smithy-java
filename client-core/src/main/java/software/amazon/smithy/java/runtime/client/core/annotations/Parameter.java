@@ -44,6 +44,7 @@ import java.lang.annotation.Target;
  * <pre>{@code
  * public void regions(String region, String region1) {
  *     regionPlugin.regions(region, region1);
+ * }
  * }</pre>
  */
 @Retention(RetentionPolicy.RUNTIME)
