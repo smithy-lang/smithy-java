@@ -5,11 +5,9 @@
 
 package software.amazon.smithy.java.runtime.io.datastream;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +16,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
+import java.util.function.Supplier;
 
 /**
  * Abstraction for reading streams of data.
@@ -58,36 +57,36 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     }
 
     /**
-     * Create a DataStream from an InputStream.
+     * Create a DataStream from an InputStream supplier.
      *
-     * @param inputStream InputStream to wrap.
+     * @param inputStreamSupplier Creates a new InputStream each time it is called.
      * @return the created DataStream.
      */
-    static DataStream ofInputStream(InputStream inputStream) {
-        return ofInputStream(inputStream, null);
+    static DataStream ofInputStream(Supplier<InputStream> inputStreamSupplier) {
+        return ofInputStream(inputStreamSupplier, null);
     }
 
     /**
-     * Create a DataStream from an InputStream.
+     * Create a DataStream from an InputStream supplier.
      *
-     * @param inputStream InputStream to wrap.
+     * @param inputStreamSupplier Creates a new InputStream each time it is called.
      * @param contentType Content-Type of the stream if known, or null.
      * @return the created DataStream.
      */
-    static DataStream ofInputStream(InputStream inputStream, String contentType) {
-        return ofInputStream(inputStream, contentType, -1);
+    static DataStream ofInputStream(Supplier<InputStream> inputStreamSupplier, String contentType) {
+        return ofInputStream(inputStreamSupplier, contentType, -1);
     }
 
     /**
      * Create a DataStream from an InputStream.
      *
-     * @param inputStream   InputStream to wrap.
-     * @param contentType   Content-Type of the stream if known, or null.
+     * @param inputStreamSupplier Creates a new InputStream each time it is called.
+     * @param contentType Content-Type of the stream if known, or null.
      * @param contentLength Bytes in the stream if known, or -1.
      * @return the created DataStream.
      */
-    static DataStream ofInputStream(InputStream inputStream, String contentType, long contentLength) {
-        return ofPublisher(HttpRequest.BodyPublishers.ofInputStream(() -> inputStream), contentType, contentLength);
+    static DataStream ofInputStream(Supplier<InputStream> inputStreamSupplier, String contentType, long contentLength) {
+        return new InputStreamDataStream(inputStreamSupplier, contentType, contentLength);
     }
 
     /**
@@ -189,13 +188,11 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the created DataStream.
      */
     static DataStream ofFile(Path file) {
-        String contentType;
         try {
-            contentType = Files.probeContentType(file);
+            return ofFile(file, Files.probeContentType(file));
         } catch (IOException e) {
-            contentType = null;
+            throw new UncheckedIOException(e);
         }
-        return ofFile(file, contentType);
     }
 
     /**
@@ -207,21 +204,17 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      */
     static DataStream ofFile(Path file, String contentType) {
         try {
-            return ofHttpRequestPublisher(HttpRequest.BodyPublishers.ofFile(file), contentType);
-        } catch (FileNotFoundException e) {
-            throw new UncheckedIOException("File not found: " + file, e);
+            long size = Files.size(file);
+            return ofInputStream(() -> {
+                try {
+                    return Files.newInputStream(file);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }, contentType, size);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-    }
-
-    /**
-     * Creates a DataStream that emits data from a {@link HttpRequest.BodyPublisher}.
-     *
-     * @param publisher   HTTP request body publisher to stream.
-     * @param contentType Content-Type to associate with the stream. Can be set to null.
-     * @return the created DataStream.
-     */
-    private static DataStream ofHttpRequestPublisher(HttpRequest.BodyPublisher publisher, String contentType) {
-        return ofPublisher(publisher, contentType, publisher.contentLength());
     }
 
     /**
