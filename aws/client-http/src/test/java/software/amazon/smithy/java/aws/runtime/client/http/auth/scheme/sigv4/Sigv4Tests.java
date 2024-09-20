@@ -25,6 +25,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  *     <li>post-x-www-form-urlencoded</li>
  *     <li>get-space-normalized</li>
  *     <li>get-vanilla-query-order-encoded</li>
+ *     <li> get-header-value-trim, post-header-key-sort, post-header-value-case
+ *     - These tests are not supported b/c they sign all headers rather than the minimum.
+ *     </li>
  * </ul>
  */
 public class Sigv4Tests {

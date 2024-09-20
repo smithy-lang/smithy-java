@@ -35,6 +35,7 @@ import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.io.uri.URLEncoding;
+import software.amazon.smithy.utils.StringUtils;
 
 /**
  * AWS signature version 4 signing implementation.
@@ -51,12 +52,6 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter
         .ofPattern("yyyyMMdd'T'HHmmss'Z'")
         .withZone(ZoneId.of("UTC"));
-    private static final List<String> HEADERS_TO_IGNORE_IN_LOWER_CASE = List.of(
-        "connection",
-        "x-amzn-trace-id",
-        "user-agent",
-        "expect"
-    );
 
     private static final String HMAC_SHA_256 = "HmacSHA256";
     private static final String SHA_256 = "SHA-256";
@@ -179,7 +174,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         var builder = new StringBuilder(512);
         for (var header : sortedHeaderKeys) {
             String lowerCaseHeader = header.toLowerCase(Locale.ENGLISH);
-            if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(lowerCaseHeader)) {
+            if (!headerAllowed(lowerCaseHeader)) {
                 continue;
             }
             if (!builder.isEmpty()) {
@@ -290,7 +285,8 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
     ) {
         for (var headerKey : sortedHeaderKeys) {
             var lowerCaseHeader = headerKey.toLowerCase(Locale.ENGLISH);
-            if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(lowerCaseHeader)) {
+
+            if (!headerAllowed(lowerCaseHeader)) {
                 continue;
             }
             builder.append(lowerCaseHeader);
@@ -302,6 +298,27 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
             builder.setLength(builder.length() - 1);
             builder.append('\n');
         }
+    }
+
+    /**
+     * Only a specific subset of headers should be signed by SigV4.
+     *
+     * <p>The following headers are expected in the canonical headers:
+     * <ul>
+     *     <li>HTTP "host" header</li>
+     *     <li>Content-Type</li>
+     *     <li>If the "Content-MD5" header is present in the request, it should be added to the header list.</li>
+     *     <li>Any "x-amz-*" headers that you plan to include in your request must also be added.
+     *     For example, if you are using temporary security credentials, you need to include x-amz-security-token in your request.</li>
+     * </ul>
+     *
+     * @see <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html#create-canonical-request">Canonical Headers</a>
+     */
+    private static boolean headerAllowed(String headerName) {
+        return headerName.equalsIgnoreCase("host")
+            || headerName.equalsIgnoreCase("content-type")
+            || headerName.equalsIgnoreCase("content-md5")
+            || StringUtils.startsWithIgnoreCase(headerName, "x-amz-");
     }
 
     /**
