@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.http.api;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -59,7 +60,7 @@ final class SimpleModifiableHttpHeaders implements ModifiableHttpHeaders {
     }
 
     @Override
-    public Iterable<Map.Entry<String, List<String>>> iterator() {
-        return headers.entrySet();
+    public Iterator<Map.Entry<String, List<String>>> iterator() {
+        return headers.entrySet().iterator();
     }
 }

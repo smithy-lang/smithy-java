@@ -5,11 +5,13 @@
 
 package software.amazon.smithy.java.runtime.http.api;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-public interface HttpHeaders {
+public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
 
     String getFirstHeader(String name);
 
@@ -21,13 +23,14 @@ public interface HttpHeaders {
         return size() == 0;
     }
 
-    default Iterable<Map.Entry<String, List<String>>> iterator() {
-        return toMap().entrySet();
+    @Override
+    default Iterator<Map.Entry<String, List<String>>> iterator() {
+        return Collections.unmodifiableMap(toMap()).entrySet().iterator();
     }
 
     default Map<String, List<String>> toMap() {
         Map<String, List<String>> result = new HashMap<>(size());
-        for (var entry : iterator()) {
+        for (var entry : this) {
             result.put(entry.getKey(), entry.getValue());
         }
         return result;
