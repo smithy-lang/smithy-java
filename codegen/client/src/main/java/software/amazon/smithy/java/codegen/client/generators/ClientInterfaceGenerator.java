@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -26,7 +24,6 @@ import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.integrations.core.DefaultTraitInitializer;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.client.core.Client;
@@ -35,7 +32,6 @@ import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
-import software.amazon.smithy.java.runtime.client.core.annotations.Configuration;
 import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
@@ -89,8 +85,6 @@ public final class ClientInterfaceGenerator
                                 ${?transport}configBuilder().transport(new ${transport:T}());${/transport}
                             }
 
-                            ${pluginSetters:C|}
-
                             @Override
                             public ${interface:T} build() {
                                 ${?hasDefaults}for (var plugin : defaultPlugins) {
@@ -137,7 +131,6 @@ public final class ClientInterfaceGenerator
                 var defaultPlugins = resolveDefaultPlugins(directive.settings());
                 writer.putContext("hasDefaults", !defaultPlugins.isEmpty());
                 writer.putContext("defaultPlugins", new PluginPropertyWriter(writer, defaultPlugins));
-                writer.putContext("pluginSetters", new DefaultPluginSetterGenerator(writer, defaultPlugins));
                 var settings = directive.settings()
                     .defaultSettings()
                     .stream()
@@ -362,67 +355,6 @@ public final class ClientInterfaceGenerator
 
     }
 
-    private record DefaultPluginSetterGenerator(JavaWriter writer, Map<String, Class<? extends ClientPlugin>> pluginMap)
-        implements Runnable {
-
-        @Override
-        public void run() {
-            for (var pluginEntry : pluginMap.entrySet()) {
-                for (var method : pluginEntry.getValue().getMethods()) {
-                    var configurationAnnotation = getConfigurationAnnotationFromMethod(method);
-                    if (configurationAnnotation != null) {
-                        writer.pushState();
-                        if (!method.getReturnType().equals(Void.TYPE)) {
-                            throw new CodegenException("Default plugin setters cannot return a value");
-                        }
-                        if (method.getParameters()[0].getType() != Context.class) {
-                            throw new CodegenException(
-                                "Default plugin setters must have a `Context` object as the first argument"
-                            );
-                        }
-                        var methodName = configurationAnnotation.value().isEmpty()
-                            ? method.getName()
-                            : configurationAnnotation.value();
-                        writer.putContext("pluginName", pluginEntry.getKey());
-                        writer.putContext("name", methodName);
-                        writer.putContext("args", getParamMap(method, methodName));
-                        writer.write(
-                            """
-                                public Builder ${name:L}(${#args}${value:P} ${key:L}${^key.last}, ${/key.last}${/args}) {
-                                    ${pluginName:L}.${name:L}(configBuilder().context(), ${#args}${key:L}${^key.last}, ${/key.last}${/args});
-                                    return this;
-                                }
-                                """
-                        );
-                        writer.popState();
-                    }
-                }
-            }
-        }
-
-        private static Map<String, Parameter> getParamMap(Method method, String methodName) {
-            Map<String, java.lang.reflect.Parameter> parameterMap = new LinkedHashMap<>();
-            var parameters = method.getParameters();
-            // Start at 1 b/c we skip the `Context` input.
-            for (int idx = 1; idx < parameters.length; idx++) {
-                var param = parameters[idx];
-                var paramName = methodName;
-                if (param.isAnnotationPresent(
-                    software.amazon.smithy.java.runtime.client.core.annotations.Parameter.class
-                )) {
-                    paramName = param.getAnnotation(
-                        software.amazon.smithy.java.runtime.client.core.annotations.Parameter.class
-                    )
-                        .value();
-                } else if (idx != 1) {
-                    paramName += idx;
-                }
-                parameterMap.put(paramName, param);
-            }
-            return parameterMap;
-        }
-    }
-
     private static Map<String, Class<? extends ClientPlugin>> resolveDefaultPlugins(JavaCodegenSettings settings) {
         Map<String, Class<? extends ClientPlugin>> pluginMap = new LinkedHashMap<>();
         Map<String, Integer> frequencyMap = new HashMap<>();
@@ -440,42 +372,5 @@ public final class ClientInterfaceGenerator
         }
 
         return pluginMap;
-    }
-
-    /**
-     * Gets the {@link Configuration} annotation on a method, searching interface methods as well.
-     *
-     * <p>If the annotation is present on the method then it is returned directly. If the
-     * method overrides a parent method then we recursively search the parent definitions of the method
-     * for the annotation. This effectively allows annotation inheritance on interface methods.
-     *
-     * @return Configuration annotation from method or parent method definition. Null if no annotation is found.
-     */
-    private static Configuration getConfigurationAnnotationFromMethod(Method method) {
-        var annotation = method.getAnnotation(Configuration.class);
-        if (annotation != null) {
-            return annotation;
-        }
-
-        // Search for method on interfaces of the declaring class
-        for (var inter : method.getDeclaringClass().getInterfaces()) {
-            for (var interfaceMethod : inter.getDeclaredMethods()) {
-                // Compare if method has the same signature. A direct comparison would fail b/c of the presence of
-                // differing annotations.
-                if (interfaceMethod.getName().equals(method.getName())
-                    && interfaceMethod.getParameterCount() == method.getParameterCount()
-                    && interfaceMethod.getReturnType().equals(method.getReturnType())
-                ) {
-                    // If the annotation is found on an annotation declaring the method return it.
-                    var interfaceAnnotation = interfaceMethod.getAnnotation(Configuration.class);
-                    if (interfaceAnnotation != null) {
-                        return interfaceAnnotation;
-                    }
-                    // Otherwise keep walking the tree.
-                    return getConfigurationAnnotationFromMethod(interfaceMethod);
-                }
-            }
-        }
-        return null;
     }
 }
