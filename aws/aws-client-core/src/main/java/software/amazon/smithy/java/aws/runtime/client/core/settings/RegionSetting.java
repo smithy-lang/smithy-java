@@ -9,7 +9,6 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.ClientSetting;
 
-// TODO: What package should this go under?
 /**
  * Sets the AWS Region name for a client to use.
  *

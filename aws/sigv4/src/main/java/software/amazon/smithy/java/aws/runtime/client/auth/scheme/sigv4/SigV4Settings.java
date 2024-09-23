@@ -54,10 +54,10 @@ public interface SigV4Settings<B extends Client.Builder<?, B>> extends ClockSett
      *
      * @param signingName signing name.
      */
-    default void signingName(String signingName) {
+    default B signingName(String signingName) {
         if (signingName == null || signingName.isEmpty()) {
             throw new IllegalArgumentException("signingName cannot be null or empty");
         }
-        putConfig(SIGNING_NAME, signingName);
+        return putConfig(SIGNING_NAME, signingName);
     }
 }
