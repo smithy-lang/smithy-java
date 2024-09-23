@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -29,6 +30,7 @@ import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeFact
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
+import software.amazon.smithy.java.runtime.client.core.ClientSetting;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
@@ -131,18 +133,7 @@ public final class ClientInterfaceGenerator
                 var defaultPlugins = resolveDefaultPlugins(directive.settings());
                 writer.putContext("hasDefaults", !defaultPlugins.isEmpty());
                 writer.putContext("defaultPlugins", new PluginPropertyWriter(writer, defaultPlugins));
-                var settings = directive.settings()
-                    .defaultSettings()
-                    .stream()
-                    .map(s -> {
-                        try {
-                            return Class.forName(s);
-                        } catch (ClassNotFoundException e) {
-                            throw new RuntimeException(e);
-                        }
-                    })
-                    .toList();
-                writer.putContext("settings", settings);
+                writer.putContext("settings", getBuilderSettings(directive.settings()));
                 writer.write(template);
                 writer.popState();
             });
@@ -372,5 +363,20 @@ public final class ClientInterfaceGenerator
         }
 
         return pluginMap;
+    }
+
+    private static List<Class<?>> getBuilderSettings(JavaCodegenSettings settings) {
+        var result = new ArrayList<Class<?>>();
+        for (var settingName : settings.defaultSettings()) {
+            var clazz = CodegenUtils.getClassForName(settingName);
+            if (clazz.isAssignableFrom(ClientSetting.class)) {
+                throw new CodegenException(
+                    "Settings must extend from `ClientSetting` interface. Could not"
+                        + " cast class `" + settingName + "` to `ClientSetting"
+                );
+            }
+            result.add(clazz);
+        }
+        return result;
     }
 }

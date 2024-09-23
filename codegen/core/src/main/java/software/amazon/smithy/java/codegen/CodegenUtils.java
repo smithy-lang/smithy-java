@@ -346,18 +346,31 @@ public final class CodegenUtils {
     @SuppressWarnings("unchecked")
     public static <T> Class<? extends T> getImplementationByName(Class<T> clazz, String name) {
         try {
-            var instance = Class.forName(name).getDeclaredConstructor().newInstance();
+            var instance = getClassForName(name).getDeclaredConstructor().newInstance();
             if (clazz.isAssignableFrom(instance.getClass())) {
                 return (Class<? extends T>) instance.getClass();
             } else {
                 throw new CodegenException("Class " + name + " is not a `" + clazz.getName() + "`");
             }
-        } catch (ClassNotFoundException exc) {
-            throw new CodegenException("Could not find class " + name + ". Check your dependencies.", exc);
         } catch (NoSuchMethodException exc) {
             throw new CodegenException("Could not find public no-arg constructor for " + name, exc);
         } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
             throw new CodegenException("Could not invoke constructor for " + name, e);
+        }
+    }
+
+    /**
+     * Returns the class object associated with a given name with the provided type.
+     *
+     * @param name fully qualified name of class.
+     * @return class object associated with the provided name.
+     * @throws CodegenException if a class cannot be resolved for the given name.
+     */
+    public static Class<?> getClassForName(String name) {
+        try {
+            return Class.forName(name);
+        } catch (ClassNotFoundException exc) {
+            throw new CodegenException("Could not find class " + name + ". Check your dependencies.", exc);
         }
     }
 }
