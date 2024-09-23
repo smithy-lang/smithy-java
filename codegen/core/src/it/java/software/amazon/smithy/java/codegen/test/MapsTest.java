@@ -24,6 +24,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.codegen.test.model.EnumKey;
+import software.amazon.smithy.java.codegen.test.model.EnumMapKeysInput;
 import software.amazon.smithy.java.codegen.test.model.MapAllTypesInput;
 import software.amazon.smithy.java.codegen.test.model.NestedEnum;
 import software.amazon.smithy.java.codegen.test.model.NestedIntEnum;
@@ -252,8 +254,23 @@ public class MapsTest {
         );
     }
 
+    static Stream<SerializableShape> enumMaps() {
+        return Stream.of(
+            EnumMapKeysInput.builder()
+                .mapOfEnumValue(
+                    MapUtils.of(EnumKey.A, "a")
+                )
+                .build(),
+            EnumMapKeysInput.builder()
+                .mapOfEnumValue(
+                    MapUtils.of(EnumKey.A, "a", EnumKey.B, "b", EnumKey.C, "c")
+                )
+                .build()
+        );
+    }
+
     @ParameterizedTest
-    @MethodSource({"mapTypes", "nestedMaps", "sparseMaps"})
+    @MethodSource({"mapTypes", "nestedMaps", "sparseMaps", "enumMaps"})
     void pojoToDocumentRoundTrip(SerializableStruct pojo) {
         var output = Utils.pojoToDocumentRoundTrip(pojo);
         assertEquals(pojo.hashCode(), output.hashCode());

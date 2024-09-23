@@ -53,7 +53,7 @@ public class MapGenerator
                                 for (var valueEntry : values.entrySet()) {
                                     serializer.writeEntry(
                                         ${keySchema:L},
-                                        valueEntry.getKey()${?enum}.value()${/enum},
+                                        valueEntry.getKey()${?enumKey}.value()${/enumKey},
                                         valueEntry.getValue(),
                                         ${name:U}ValueSerializer.INSTANCE
                                     );
@@ -81,16 +81,16 @@ public class MapGenerator
                             return result;
                         }
 
-                        private static final class ${name:U}ValueDeserializer implements ${shapeDeserializer:T}.MapMemberConsumer<${key:T}, ${shape:B}> {
+                        private static final class ${name:U}ValueDeserializer implements ${shapeDeserializer:T}.MapMemberConsumer<${string:T}, ${shape:B}> {
                             static final ${name:U}ValueDeserializer INSTANCE = new ${name:U}ValueDeserializer();
 
                             @Override
-                            public void accept(${shape:B} state, ${key:T} key, ${shapeDeserializer:T} deserializer) {
+                            public void accept(${shape:B} state, ${string:T} key, ${shapeDeserializer:T} deserializer) {
                                 if (deserializer.isNull()) {
-                                    ${?sparse}state.put(key, ${/sparse}deserializer.readNull()${?sparse})${/sparse};
+                                    ${?sparse}state.put(${?enumKey}${key:T}.from(${/enumKey}key${?enumKey})${/enumKey}, ${/sparse}deserializer.readNull()${?sparse})${/sparse};
                                     return;
                                 }
-                                state.put(key, $memberDeserializer:C);
+                                state.put(${?enumKey}${key:T}.from(${/enumKey}key${?enumKey})${/enumKey}, $memberDeserializer:C);
                             }
                         }
                         """;
@@ -109,7 +109,7 @@ public class MapGenerator
                     writer.putContext("mapSerializer", MapSerializer.class);
                     writer.putContext("shapeSerializer", ShapeSerializer.class);
                     writer.putContext("shapeDeserializer", ShapeDeserializer.class);
-                    writer.putContext("enum", directive.shape().isEnumShape());
+                    writer.putContext("string", String.class);
                     writer.putContext(
                         "memberSerializer",
                         new SerializerMemberGenerator(
@@ -132,6 +132,12 @@ public class MapGenerator
                             "deserializer",
                             valueSchema
                         )
+                    );
+                    writer.putContext(
+                        "enumKey",
+                        directive.model()
+                            .expectShape(directive.shape().getKey().getTarget())
+                            .isEnumShape()
                     );
                     writer.putContext("sparse", directive.shape().hasTrait(SparseTrait.class));
                     writer.write(template);
