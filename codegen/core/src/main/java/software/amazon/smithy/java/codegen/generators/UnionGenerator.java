@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -23,7 +22,6 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.UnionShape;
@@ -259,70 +257,6 @@ public final class UnionGenerator
             writer.putContext("string", String.class);
             writer.write(template);
             writer.popState();
-        }
-    }
-
-    private record HashCodeGenerator(JavaWriter writer, SymbolProvider symbolProvider, MemberShape shape) implements
-        Runnable {
-        @Override
-        public void run() {
-            writer.pushState();
-            writer.putContext("objects", Objects.class);
-            writer.write(
-                """
-                    """,
-                writer.consumer(this::generate)
-            );
-            writer.popState();
-        }
-
-        private void generate(JavaWriter writer) {
-            writer.pushState();
-            if (CodegenUtils.isJavaArray(symbolProvider.toSymbol(shape))) {
-                writer.putContext("arrays", Arrays.class);
-                writer.write("${arrays:T}.hashCode(value);");
-            } else {
-                writer.putContext("objects", Objects.class);
-                writer.write("${objects:T}.hash(value);");
-            }
-            writer.popState();
-        }
-    }
-
-    private record EqualsGenerator(JavaWriter writer, SymbolProvider symbolProvider, MemberShape shape) implements
-        Runnable {
-
-        @Override
-        public void run() {
-            writer.pushState();
-            writer.putContext("memberName", symbolProvider.toMemberName(shape));
-            writer.write(
-                """
-                    @Override
-                    public boolean equals(${object:T} other) {
-                        if (other == this) {
-                            return true;
-                        }
-                        if (other == null || getClass() != other.getClass()) {
-                            return false;
-                        }
-                        ${^unit}${memberName:U}Member that = (${memberName:U}Member) other;${/unit}
-                        return ${^unit}${C}${/unit}${?unit}true${/unit};
-                    }""",
-                writer.consumer(this::writePropertyEqualityCheck)
-            );
-            writer.popState();
-        }
-
-        private void writePropertyEqualityCheck(JavaWriter writer) {
-            var memberSymbol = symbolProvider.toSymbol(shape);
-            if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE)
-                && !memberSymbol.getProperty(SymbolProperties.IS_JAVA_ARRAY).orElse(false)) {
-                writer.writeInlineWithNoFormatting("value == that.value");
-            } else {
-                Class<?> comparator = CodegenUtils.isJavaArray(memberSymbol) ? Arrays.class : Objects.class;
-                writer.writeInline("$T.equals(value, that.value)", comparator);
-            }
         }
     }
 

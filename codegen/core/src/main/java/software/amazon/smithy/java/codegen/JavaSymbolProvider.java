@@ -235,9 +235,13 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
         return null;
     }
 
+    /**
+     * @implNote Code generators that need to create service shapes should extend the {@link JavaSymbolProvider} class
+     * and override this method.
+     */
     @Override
     public Symbol serviceShape(ServiceShape serviceShape) {
-        // TODO: implement
+        // Service shape not supported by default java symbol provider.
         return null;
     }
 
@@ -262,15 +266,11 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
         return getJavaClassSymbol(unionShape);
     }
 
-    protected Model getModel() {
-        return model;
-    }
-
-    protected ServiceShape getService() {
+    protected ServiceShape service() {
         return service;
     }
 
-    protected String getPackageNamespace() {
+    protected String packageNamespace() {
         return packageNamespace;
     }
 

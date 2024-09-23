@@ -32,14 +32,14 @@ public class ServiceJavaSymbolProvider extends JavaSymbolProvider {
         var stubSymbol = Symbol.builder()
             .name(stubName)
             .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-            .namespace(format("%s.service", getPackageNamespace()), ".")
-            .declarationFile(format("./%s/service/%s.java", getPackageNamespace().replace(".", "/"), stubName))
+            .namespace(format("%s.service", packageNamespace()), ".")
+            .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), stubName))
             .build();
         var asyncStubSymbol = Symbol.builder()
             .name(asyncStubName)
             .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-            .namespace(format("%s.service", getPackageNamespace()), ".")
-            .declarationFile(format("./%s/service/%s.java", getPackageNamespace().replace(".", "/"), asyncStubName))
+            .namespace(format("%s.service", packageNamespace()), ".")
+            .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), asyncStubName))
             .build();
         var apiOperationSymbol = super.operationShape(operationShape);
         return baseSymbol.toBuilder()
@@ -57,12 +57,12 @@ public class ServiceJavaSymbolProvider extends JavaSymbolProvider {
     }
 
     private Symbol getServerJavaClassSymbol(Shape shape) {
-        String name = CodegenUtils.getDefaultName(shape, getService());
+        String name = CodegenUtils.getDefaultName(shape, service());
         return Symbol.builder()
             .name(name)
             .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-            .namespace(format("%s.service", getPackageNamespace()), ".")
-            .declarationFile(format("./%s/service/%s.java", getPackageNamespace().replace(".", "/"), name))
+            .namespace(format("%s.service", packageNamespace()), ".")
+            .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), name))
             .build();
     }
 }

@@ -121,11 +121,11 @@ public final class JavaCodegenSettings {
         return header;
     }
 
-    public Symbol getNonNullAnnotationSymbol() {
+    public Symbol nonNullAnnotationSymbol() {
         return nonNullAnnotationSymbol;
     }
 
-    public ShapeId getDefaultProtocol() {
+    public ShapeId defaultProtocol() {
         return defaultProtocol;
     }
 

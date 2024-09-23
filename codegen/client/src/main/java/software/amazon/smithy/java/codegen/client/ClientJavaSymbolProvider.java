@@ -14,7 +14,10 @@ import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
 
-public class ClientJavaSymbolProvider extends JavaSymbolProvider {
+/**
+ * Maps Smithy types to Java Symbols for Client code generation.
+ */
+final class ClientJavaSymbolProvider extends JavaSymbolProvider {
 
     public ClientJavaSymbolProvider(Model model, ServiceShape service, String packageNamespace) {
         super(model, service, packageNamespace);
@@ -33,8 +36,8 @@ public class ClientJavaSymbolProvider extends JavaSymbolProvider {
             .name(name + "Client")
             .putProperty(SymbolProperties.IS_PRIMITIVE, false)
             .putProperty(ClientSymbolProperties.ASYNC, async)
-            .namespace(format("%s.client", getPackageNamespace()), ".")
-            .definitionFile(format("./%s/client/%sClient.java", getPackageNamespace().replace(".", "/"), name))
+            .namespace(format("%s.client", packageNamespace()), ".")
+            .definitionFile(format("./%s/client/%sClient.java", packageNamespace().replace(".", "/"), name))
             .build();
 
         return symbol.toBuilder()
@@ -43,7 +46,7 @@ public class ClientJavaSymbolProvider extends JavaSymbolProvider {
                 symbol.toBuilder()
                     .name(name + "ClientImpl")
                     .definitionFile(
-                        format("./%s/client/%sClientImpl.java", getPackageNamespace().replace(".", "/"), name)
+                        format("./%s/client/%sClientImpl.java", packageNamespace().replace(".", "/"), name)
                     )
                     .build()
             )

@@ -8,6 +8,11 @@ package software.amazon.smithy.java.codegen.client;
 import software.amazon.smithy.codegen.core.Property;
 import software.amazon.smithy.codegen.core.Symbol;
 
+/**
+ * Contains client-specific properties that may be added to symbols by smithy-java.
+ *
+ * @see software.amazon.smithy.java.codegen.SymbolProperties for other properties that may be added to symbols.
+ */
 public final class ClientSymbolProperties {
 
     /**

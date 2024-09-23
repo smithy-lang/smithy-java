@@ -20,7 +20,13 @@ import software.amazon.smithy.utils.StringUtils;
 /**
  * Writer for java code generation
  *
- * TODO: update docs
+ * <p>This writer provides the following formatters:
+ * <ul>
+ *  <li>Use the {@code $T} formatter to refer to {@link Symbol}s.</li>
+ *  <li>Use the {@code $B} formatter to use a boxed type (such as {@code Integer}) if applicable.</li>
+ *  <li>Use the {@code $N} formatter to render a {@link Symbol} with a non-null annotation added if applicable.</li>
+ *  <li>Use the {@code $U} formatter to write a string literal with the first letter capitalized.</li>
+ * </ul>
  */
 @SmithyUnstableApi
 public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportContainer> {
@@ -201,7 +207,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
     }
 
     /**
-     * Implements a formatter for {@code $N} that adds non null annotation
+     * Implements a formatter for {@code $N} that adds non-null annotation
      */
     private final class NonNullAnnotationFormatter implements BiFunction<Object, String, String> {
         private final JavaTypeFormatter javaTypeFormatter = new JavaTypeFormatter();
@@ -209,7 +215,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         @Override
         public String apply(Object type, String indent) {
 
-            Symbol nonNullAnnotationSymbol = settings.getNonNullAnnotationSymbol();
+            Symbol nonNullAnnotationSymbol = settings.nonNullAnnotationSymbol();
 
             if (nonNullAnnotationSymbol == null) {
                 return javaTypeFormatter.apply(type, indent);

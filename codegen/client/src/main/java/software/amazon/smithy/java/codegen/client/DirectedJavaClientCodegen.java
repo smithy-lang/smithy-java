@@ -23,7 +23,7 @@ import software.amazon.smithy.java.codegen.generators.UnionGenerator;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
-public class DirectedJavaClientCodegen implements
+final class DirectedJavaClientCodegen implements
     DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
 
     @Override

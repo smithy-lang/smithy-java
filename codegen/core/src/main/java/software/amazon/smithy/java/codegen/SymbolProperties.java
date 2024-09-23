@@ -8,6 +8,9 @@ package software.amazon.smithy.java.codegen;
 import software.amazon.smithy.codegen.core.Property;
 import software.amazon.smithy.codegen.core.Symbol;
 
+/**
+ * Contains properties that may be added to symbols by smithy-java.
+ */
 public final class SymbolProperties {
     /**
      * The boxed version of a primitive symbol.

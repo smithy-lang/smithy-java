@@ -224,7 +224,7 @@ public final class ClientInterfaceGenerator
     }
 
     private static Trait getDefaultProtocolTrait(Model model, JavaCodegenSettings settings) {
-        var defaultProtocol = settings.getDefaultProtocol();
+        var defaultProtocol = settings.defaultProtocol();
         if (defaultProtocol == null) {
             return null;
         }

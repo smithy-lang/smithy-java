@@ -150,18 +150,6 @@ public final class CodegenUtils {
     }
 
     /**
-     * Determines if a member targets a Map or List shape.
-     *
-     * @param model model used for code generation
-     * @param member Shape to test
-     * @return true if shape targets list or map shape
-     */
-    public static boolean targetsCollection(Model model, MemberShape member) {
-        var target = model.expectShape(member.getTarget());
-        return target.isListShape() || target.isMapShape();
-    }
-
-    /**
      * Determines the name to use for the Schema constant for a member.
      *
      * @param memberName Member shape to generate schema name from

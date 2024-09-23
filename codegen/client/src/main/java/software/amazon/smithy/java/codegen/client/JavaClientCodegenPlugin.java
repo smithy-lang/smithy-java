@@ -18,7 +18,7 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  * Plugin to execute Java client code generation.
  */
 @SmithyUnstableApi
-public class JavaClientCodegenPlugin implements SmithyBuildPlugin {
+public final class JavaClientCodegenPlugin implements SmithyBuildPlugin {
     @Override
     public String getName() {
         return "java-client-codegen";
