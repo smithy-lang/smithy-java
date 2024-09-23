@@ -47,6 +47,66 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     String contentType();
 
     /**
+     * Expects that the DataStream has a reference to a ByteBuffer.
+     *
+     * <p>Callers are expected to call {@link #hasByteBuffer()} before calling this method to ensure that a
+     * ByteBuffer is readily available. If a ByteBuffer is not readily available, or your use case has to deal
+     * with cases when it is or isn't available, use {@link #asByteBuffer()}.
+     *
+     * @return a ByteBuffer.
+     * @throws IllegalStateException if the DataStream does not have a readily available ByteBuffer.
+     */
+    default ByteBuffer expectByteBuffer() {
+        throw new IllegalStateException("No ByteBuffer is available in this DataStream");
+    }
+
+    /**
+     * Checks if the DataStream has a readily available ByteBuffer that can be returned from
+     * {@link #expectByteBuffer()}.
+     *
+     * @return true if there is a readily available ByteBuffer that can be accessed via {@link #expectByteBuffer()}.
+     */
+    default boolean hasByteBuffer() {
+        return false;
+    }
+
+    /**
+     * Read the contents of the stream into a ByteBuffer.
+     *
+     * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
+     * {@link #contentLength()} can be used to know if it is safe.
+     *
+     * @return the future that contains the read ByteBuffer.
+     */
+    default CompletableFuture<ByteBuffer> asByteBuffer() {
+        if (hasByteBuffer()) {
+            return CompletableFuture.completedFuture(expectByteBuffer());
+        }
+
+        var subscriber = HttpResponse.BodySubscribers.ofByteArray();
+        var delegate = new HttpBodySubscriberAdapter<>(subscriber);
+        subscribe(delegate);
+        return subscriber.getBody().thenApply(ByteBuffer::wrap).toCompletableFuture();
+    }
+
+    /**
+     * Convert the stream into a blocking {@link InputStream}.
+     *
+     * @apiNote To ensure that all resources associated with the corresponding exchange are properly released, the
+     * caller must ensure to either read all bytes until EOF is reached, or call {@link InputStream#close} if it is
+     * unable or unwilling to do so. Calling {@code close} before exhausting the stream may cause the underlying
+     * connection to be closed and prevent it from being reused for subsequent operations.
+     *
+     * @return Returns the future that contains the blocking {@code InputStream}.
+     */
+    default CompletableFuture<InputStream> asInputStream() {
+        var subscriber = HttpResponse.BodySubscribers.ofInputStream();
+        var delegate = new HttpBodySubscriberAdapter<>(subscriber);
+        subscribe(delegate);
+        return subscriber.getBody().toCompletableFuture();
+    }
+
+    /**
      * Create an empty DataStream.
      *
      * @return the empty DataStream.
@@ -221,37 +281,5 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
             return new WrappedDataStream(ds, contentLength, contentType);
         }
         return new PublisherDataStream(publisher, contentLength, contentType);
-    }
-
-    /**
-     * Read the contents of the stream into a ByteBuffer.
-     *
-     * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
-     * {@link #contentLength()} can be used to know if it is safe.
-     *
-     * @return the future that contains the read ByteBuffer.
-     */
-    default CompletableFuture<ByteBuffer> asByteBuffer() {
-        var subscriber = HttpResponse.BodySubscribers.ofByteArray();
-        var delegate = new HttpBodySubscriberAdapter<>(subscriber);
-        subscribe(delegate);
-        return subscriber.getBody().thenApply(ByteBuffer::wrap).toCompletableFuture();
-    }
-
-    /**
-     * Convert the stream into a blocking {@link InputStream}.
-     *
-     * @apiNote To ensure that all resources associated with the corresponding exchange are properly released, the
-     * caller must ensure to either read all bytes until EOF is reached, or call {@link InputStream#close} if it is
-     * unable or unwilling to do so. Calling {@code close} before exhausting the stream may cause the underlying
-     * connection to be closed and prevent it from being reused for subsequent operations.
-     *
-     * @return Returns the future that contains the blocking {@code InputStream}.
-     */
-    default CompletableFuture<InputStream> asInputStream() {
-        var subscriber = HttpResponse.BodySubscribers.ofInputStream();
-        var delegate = new HttpBodySubscriberAdapter<>(subscriber);
-        subscribe(delegate);
-        return subscriber.getBody().toCompletableFuture();
     }
 }

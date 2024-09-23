@@ -43,6 +43,16 @@ final class WrappedDataStream implements DataStream {
     }
 
     @Override
+    public ByteBuffer expectByteBuffer() {
+        return delegate.expectByteBuffer();
+    }
+
+    @Override
+    public boolean hasByteBuffer() {
+        return delegate.hasByteBuffer();
+    }
+
+    @Override
     public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
         delegate.subscribe(subscriber);
     }

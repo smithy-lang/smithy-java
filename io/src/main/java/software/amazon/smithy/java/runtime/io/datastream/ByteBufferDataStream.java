@@ -29,6 +29,16 @@ final class ByteBufferDataStream implements DataStream {
     }
 
     @Override
+    public boolean hasByteBuffer() {
+        return true;
+    }
+
+    @Override
+    public ByteBuffer expectByteBuffer() {
+        return buffer.duplicate();
+    }
+
+    @Override
     public CompletableFuture<ByteBuffer> asByteBuffer() {
         return CompletableFuture.completedFuture(buffer.duplicate());
     }

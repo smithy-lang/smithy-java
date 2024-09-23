@@ -28,6 +28,16 @@ final class EmptyDataStream implements DataStream {
     }
 
     @Override
+    public boolean hasByteBuffer() {
+        return true;
+    }
+
+    @Override
+    public ByteBuffer expectByteBuffer() {
+        return ByteBuffer.wrap(EMPTY_BYTES);
+    }
+
+    @Override
     public long contentLength() {
         return 0;
     }
