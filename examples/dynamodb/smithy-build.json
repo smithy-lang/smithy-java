@@ -5,6 +5,9 @@
       "service": "com.amazonaws.dynamodb#DynamoDB_20120810",
       "namespace": "software.amazon.smithy.java.runtime.examples.dynamodb",
       "protocol": "aws.protocols#awsJson1_0",
+      "defaultSettings": [
+        "software.amazon.smithy.java.aws.runtime.client.auth.scheme.sigv4.SigV4Settings"
+      ],
       "transport": {
         "http-java": {}
       }

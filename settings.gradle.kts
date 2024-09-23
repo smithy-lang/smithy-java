@@ -45,6 +45,7 @@ include(":examples:server-example")
 
 // AWS specific
 include(":aws:event-streams")
-include(":aws:client-http")
+include(":aws:aws-client-core")
+include(":aws:sigv4")
 include(":aws:client-awsjson")
 include(":aws:client-restjson")
