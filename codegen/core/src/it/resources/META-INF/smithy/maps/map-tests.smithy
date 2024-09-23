@@ -7,5 +7,6 @@ resource MapTests {
         MapAllTypes
         NestedMaps
         SparseMaps
+        EnumMapKeys
     ]
 }

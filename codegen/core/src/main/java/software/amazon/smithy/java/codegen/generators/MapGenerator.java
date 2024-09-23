@@ -53,7 +53,7 @@ public class MapGenerator
                                 for (var valueEntry : values.entrySet()) {
                                     serializer.writeEntry(
                                         ${keySchema:L},
-                                        valueEntry.getKey(),
+                                        valueEntry.getKey()${?enum}.value()${/enum},
                                         valueEntry.getValue(),
                                         ${name:U}ValueSerializer.INSTANCE
                                     );
@@ -109,6 +109,7 @@ public class MapGenerator
                     writer.putContext("mapSerializer", MapSerializer.class);
                     writer.putContext("shapeSerializer", ShapeSerializer.class);
                     writer.putContext("shapeDeserializer", ShapeDeserializer.class);
+                    writer.putContext("enum", directive.shape().isEnumShape());
                     writer.putContext(
                         "memberSerializer",
                         new SerializerMemberGenerator(

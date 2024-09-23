@@ -12,6 +12,7 @@ maps/map-all-types.smithy
 maps/map-tests.smithy
 maps/nested-maps.smithy
 maps/sparse-maps.smithy
+maps/enum-map-keys.smithy
 naming/naming-collision.smithy
 recursion/mutual-recursion-list.smithy
 recursion/mutual-recursion-map.smithy
