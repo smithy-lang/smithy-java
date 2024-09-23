@@ -23,6 +23,7 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
+import software.amazon.smithy.java.codegen.integrations.core.DefaultTraitInitializer;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -290,15 +291,16 @@ public final class ClientInterfaceGenerator
         public void run() {
             writer.pushState();
             for (var entry : authMapping.entrySet()) {
-                // TODO: figure out how to tell if trait initializer needs casting?
                 var template = """
-                    private static final ${trait:T} ${traitName:L} = (${trait:T}) ${initializer:C};
+                    private static final ${trait:T} ${traitName:L} = ${?cast}(${trait:T}) ${/cast}${initializer:C};
                     private static final ${authFactory:T}<${trait:T}> ${traitName:L}Factory = new ${?outer}${outer:T}.${authFactoryImplName:L}${/outer}${^outer}${authFactoryImpl:T}${/outer}();
                     """;
                 var trait = entry.getKey();
                 writer.putContext("trait", trait.getClass());
                 writer.putContext("traitName", getAuthTraitPropertyName(trait));
                 var initializer = context.getInitializer(entry.getKey());
+                // Traits using the default initializer need to be cast to the correct Trait output class.
+                writer.putContext("cast", initializer.getClass().equals(DefaultTraitInitializer.class));
                 writer.putContext("initializer", writer.consumer(w -> initializer.accept(w, entry.getKey())));
                 writer.putContext("authFactory", AuthSchemeFactory.class);
                 writer.putContext("authFactoryImpl", entry.getValue());

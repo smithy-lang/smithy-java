@@ -8,8 +8,10 @@ package software.amazon.smithy.java.codegen.integrations.core;
 import software.amazon.smithy.java.codegen.TraitInitializer;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.traits.DefaultTrait;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
-final class DefaultTraitInitializer implements TraitInitializer<DefaultTrait> {
+@SmithyInternalApi
+public final class DefaultTraitInitializer implements TraitInitializer<DefaultTrait> {
 
     @Override
     public Class<DefaultTrait> traitClass() {
