@@ -54,7 +54,8 @@ public final class EndpointResolverParams {
     }
 
     /**
-     * TODO: Docs
+     * Input Shape for the client call the endpoint is being resolved for.
+     *
      * @return input.
      */
     public SerializableStruct inputShape() {
@@ -126,9 +127,10 @@ public final class EndpointResolverParams {
         }
 
         /**
-         * TODO: Docs
-         * @param inputShape
-         * @return
+         * Set the input shape used by the operation that the endpoint is being resolved for.
+         *
+         * @param inputShape input shape to set.
+         * @return the builder.
          */
         public Builder inputShape(SerializableStruct inputShape) {
             this.inputShape = inputShape;
