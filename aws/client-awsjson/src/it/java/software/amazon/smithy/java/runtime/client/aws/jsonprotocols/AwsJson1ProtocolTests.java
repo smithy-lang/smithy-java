@@ -16,12 +16,6 @@ public class AwsJson1ProtocolTests {
     @HttpClientRequestTests
     @ProtocolTestFilter(
         skipTests = {
-            // TODO: Endpoint trait isn't implemented.
-            "AwsJson10EndpointTrait",
-
-            // TODO: Implement hostLabel
-            "AwsJson10EndpointTraitWithHostLabel",
-
             // TODO: implement content-encoding
             "SDKAppliedContentEncoding_awsJson1_0",
             "SDKAppendsGzipAndIgnoresHttpProvidedEncoding_awsJson1_0",

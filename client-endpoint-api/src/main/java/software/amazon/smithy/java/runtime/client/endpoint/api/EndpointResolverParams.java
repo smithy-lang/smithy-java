@@ -7,17 +7,22 @@ package software.amazon.smithy.java.runtime.client.endpoint.api;
 
 import java.util.Objects;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
  * Encapsulates endpoint resolver parameters.
  */
 public final class EndpointResolverParams {
 
-    private final String operationName;
     private final Context context;
+    private final Schema operationSchema;
+    private final SerializableStruct inputShape;
 
     private EndpointResolverParams(Builder builder) {
-        this.operationName = Objects.requireNonNull(builder.operationName, "operationName is null");
+        this.operationSchema = Objects.requireNonNull(builder.operationSchema, "operationSchema is null");
+        this.inputShape = Objects.requireNonNull(builder.inputShape, "inputShape is null");
         this.context = Objects.requireNonNullElseGet(builder.context, Context::create);
     }
 
@@ -31,12 +36,12 @@ public final class EndpointResolverParams {
     }
 
     /**
-     * Get the name of the operation to resolve the endpoint for.
+     * Get the schema of the operation to resolve the endpoint for.
      *
-     * @return the operation name.
+     * @return the operation Schema.
      */
-    public String operationName() {
-        return operationName;
+    public Schema operationSchema() {
+        return operationSchema;
     }
 
     /**
@@ -48,6 +53,14 @@ public final class EndpointResolverParams {
         return context;
     }
 
+    /**
+     * TODO: Docs
+     * @return input.
+     */
+    public SerializableStruct inputShape() {
+        return inputShape;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -57,13 +70,14 @@ public final class EndpointResolverParams {
             return false;
         }
         EndpointResolverParams params = (EndpointResolverParams) o;
-        return Objects.equals(operationName, params.operationName)
+        return Objects.equals(operationSchema, params.operationSchema)
+            && Objects.equals(inputShape, params.inputShape)
             && Objects.equals(context, params.context);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(operationName, context);
+        return Objects.hash(operationSchema, inputShape, context);
     }
 
     /**
@@ -71,8 +85,9 @@ public final class EndpointResolverParams {
      */
     public static final class Builder {
 
-        private String operationName;
         private Context context;
+        private Schema operationSchema;
+        private SerializableStruct inputShape;
 
         private Builder() {
         }
@@ -86,13 +101,16 @@ public final class EndpointResolverParams {
         }
 
         /**
-         * Set the name of the operation.
+         * Set the schema for the operation to resolve endpoint for.
          *
-         * @param operationName Name of the operation.
+         * @param operationSchema the operation schema.
          * @return the builder.
          */
-        public Builder operationName(String operationName) {
-            this.operationName = operationName;
+        public Builder operationSchema(Schema operationSchema) {
+            if (!operationSchema.type().equals(ShapeType.OPERATION)) {
+                throw new IllegalArgumentException("Operation schema must be an operation");
+            }
+            this.operationSchema = operationSchema;
             return this;
         }
 
@@ -104,6 +122,16 @@ public final class EndpointResolverParams {
          */
         public Builder context(Context context) {
             this.context = context;
+            return this;
+        }
+
+        /**
+         * TODO: Docs
+         * @param inputShape
+         * @return
+         */
+        public Builder inputShape(SerializableStruct inputShape) {
+            this.inputShape = inputShape;
             return this;
         }
     }

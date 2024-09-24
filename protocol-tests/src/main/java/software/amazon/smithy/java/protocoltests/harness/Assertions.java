@@ -19,6 +19,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpMessage;
+import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.model.node.Node;
 
 /**
@@ -51,10 +52,9 @@ final class Assertions {
         assertEquals(expected, uri.getRawPath());
     }
 
-    static void assertHostEquals(SmithyHttpMessage message, String expected) {
-        var hostValue = message.headers().allValues("Host");
-        assertEquals(hostValue.size(), 1);
-        assertEquals(hostValue.get(0), expected);
+    static void assertHostEquals(SmithyHttpRequest request, String expected) {
+        var hostValue = request.uri().getAuthority();
+        assertEquals(hostValue, expected);
     }
 
     static void assertHeadersEqual(SmithyHttpMessage message, Map<String, String> expected) {

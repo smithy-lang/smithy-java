@@ -13,9 +13,6 @@ import software.amazon.smithy.java.protocoltests.harness.ProtocolTestFilter;
 @ProtocolTest(service = "aws.protocoltests.restjson#RestJson")
 @ProtocolTestFilter(
     skipOperations = {
-        // Endpoint traits are not yet supported
-        "aws.protocoltests.restjson#EndpointWithHostLabelOperation",
-        "aws.protocoltests.restjson#EndpointOperation",
         // We dont ignore defaults on input shapes
         "aws.protocoltests.restjson#OperationWithDefaults",
         // All the Http payload tests are breaking. No idea why
@@ -29,9 +26,7 @@ import software.amazon.smithy.java.protocoltests.harness.ProtocolTestFilter;
         "aws.protocoltests.restjson#StreamingTraitsRequireLength",
         "aws.protocoltests.restjson#StreamingTraitsWithMediaType",
         // Clients do not support content-encoding yet
-        "aws.protocoltests.restjson#PutWithContentEncoding",
-        // Fails due to not being able to instantiate input object
-        "aws.protocoltests.restjson#OperationWithNestedStructure"
+        "aws.protocoltests.restjson#PutWithContentEncoding"
     }
 )
 public class RestJson1ProtocolTests {

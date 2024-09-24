@@ -29,6 +29,6 @@ public interface EndpointResolver {
      */
     static EndpointResolver staticEndpoint(Endpoint endpoint) {
         Objects.requireNonNull(endpoint);
-        return params -> CompletableFuture.completedFuture(endpoint);
+        return new StaticEndpointResolver(endpoint);
     }
 }
