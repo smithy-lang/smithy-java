@@ -48,4 +48,15 @@ public class InputStreamDataStreamTest {
 
         assertThat(ds.asInputStream().get().readAllBytes(), equalTo("Hello!".getBytes(StandardCharsets.UTF_8)));
     }
+
+    @Test
+    public void readsDataToByteBuffer() throws Exception {
+        var ds = DataStream.ofInputStream(
+            Files.newInputStream(Paths.get(getClass().getResource("test.txt").toURI())),
+            "text/plain",
+            6
+        );
+
+        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+    }
 }

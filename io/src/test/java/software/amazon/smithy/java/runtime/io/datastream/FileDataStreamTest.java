@@ -38,4 +38,11 @@ public class FileDataStreamTest {
 
         assertThat(ds.asInputStream().get().readAllBytes(), equalTo("Hello!".getBytes(StandardCharsets.UTF_8)));
     }
+
+    @Test
+    public void readsDataToByteBuffer() throws Exception {
+        var ds = DataStream.ofFile(Paths.get(getClass().getResource("test.txt").toURI()));
+
+        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+    }
 }

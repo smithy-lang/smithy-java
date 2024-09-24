@@ -33,7 +33,7 @@ final class EmptyDataStream implements DataStream {
     }
 
     @Override
-    public ByteBuffer expectByteBuffer() {
+    public ByteBuffer waitForByteBuffer() {
         return ByteBuffer.wrap(EMPTY_BYTES);
     }
 

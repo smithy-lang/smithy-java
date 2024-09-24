@@ -20,6 +20,6 @@ public class ByteBufferDataStreamTest {
         var ds = DataStream.ofBytes(bytes);
 
         assertThat(ds.hasByteBuffer(), is(true));
-        assertThat(ds.expectByteBuffer(), equalTo(ByteBuffer.wrap("foo".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("foo".getBytes(StandardCharsets.UTF_8))));
     }
 }

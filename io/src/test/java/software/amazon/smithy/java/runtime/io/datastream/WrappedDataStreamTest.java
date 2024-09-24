@@ -21,6 +21,6 @@ public class WrappedDataStreamTest {
         var wrapped = DataStream.ofPublisher(ds, "text/plain", 3);
 
         assertThat(wrapped.hasByteBuffer(), is(true));
-        assertThat(wrapped.expectByteBuffer(), equalTo(ByteBuffer.wrap("foo".getBytes(StandardCharsets.UTF_8))));
+        assertThat(wrapped.waitForByteBuffer(), equalTo(ByteBuffer.wrap("foo".getBytes(StandardCharsets.UTF_8))));
     }
 }

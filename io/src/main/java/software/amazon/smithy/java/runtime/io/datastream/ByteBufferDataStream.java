@@ -34,7 +34,7 @@ final class ByteBufferDataStream implements DataStream {
     }
 
     @Override
-    public ByteBuffer expectByteBuffer() {
+    public ByteBuffer waitForByteBuffer() {
         return buffer.duplicate();
     }
 

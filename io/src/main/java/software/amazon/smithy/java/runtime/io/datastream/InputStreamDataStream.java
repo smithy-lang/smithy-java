@@ -5,7 +5,9 @@
 
 package software.amazon.smithy.java.runtime.io.datastream;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
@@ -22,6 +24,15 @@ final class InputStreamDataStream implements DataStream {
         this.inputStream = inputStream;
         this.contentType = contentType;
         this.contentLength = contentLength;
+    }
+
+    @Override
+    public ByteBuffer waitForByteBuffer() {
+        try {
+            return ByteBuffer.wrap(inputStream.readAllBytes());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override

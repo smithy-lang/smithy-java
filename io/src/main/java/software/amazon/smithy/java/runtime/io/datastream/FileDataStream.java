@@ -34,6 +34,15 @@ final class FileDataStream implements DataStream {
     }
 
     @Override
+    public ByteBuffer waitForByteBuffer() {
+        try {
+            return ByteBuffer.wrap(Files.readAllBytes(file));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
     public CompletableFuture<InputStream> asInputStream() {
         try {
             return CompletableFuture.completedFuture(Files.newInputStream(file));

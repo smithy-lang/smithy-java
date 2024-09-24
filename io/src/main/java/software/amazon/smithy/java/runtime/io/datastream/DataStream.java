@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 
 /**
@@ -47,24 +48,26 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     String contentType();
 
     /**
-     * Expects that the DataStream has a reference to a ByteBuffer.
+     * Converts the data stream to an in-memory ByteBuffer, blocking if necessary.
      *
-     * <p>Callers are expected to call {@link #hasByteBuffer()} before calling this method to ensure that a
-     * ByteBuffer is readily available. If a ByteBuffer is not readily available, or your use case has to deal
-     * with cases when it is or isn't available, use {@link #asByteBuffer()}.
+     * <p>A value is returned immediately and no blocking occurs if {@link #hasByteBuffer()} returns true.
      *
      * @return a ByteBuffer.
-     * @throws IllegalStateException if the DataStream does not have a readily available ByteBuffer.
+     * @throws RuntimeException if an error occurs while blocking.
      */
-    default ByteBuffer expectByteBuffer() {
-        throw new IllegalStateException("No ByteBuffer is available in this DataStream");
+    default ByteBuffer waitForByteBuffer() {
+        try {
+            return asByteBuffer().get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
      * Checks if the DataStream has a readily available ByteBuffer that can be returned from
-     * {@link #expectByteBuffer()}.
+     * {@link #waitForByteBuffer()} without blocking.
      *
-     * @return true if there is a readily available ByteBuffer that can be accessed via {@link #expectByteBuffer()}.
+     * @return true if there is a readily available ByteBuffer.
      */
     default boolean hasByteBuffer() {
         return false;
@@ -80,7 +83,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      */
     default CompletableFuture<ByteBuffer> asByteBuffer() {
         if (hasByteBuffer()) {
-            return CompletableFuture.completedFuture(expectByteBuffer());
+            return CompletableFuture.completedFuture(waitForByteBuffer());
         }
 
         var subscriber = HttpResponse.BodySubscribers.ofByteArray();

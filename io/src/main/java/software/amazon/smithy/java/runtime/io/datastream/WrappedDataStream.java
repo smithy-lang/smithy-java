@@ -43,8 +43,8 @@ final class WrappedDataStream implements DataStream {
     }
 
     @Override
-    public ByteBuffer expectByteBuffer() {
-        return delegate.expectByteBuffer();
+    public ByteBuffer waitForByteBuffer() {
+        return delegate.waitForByteBuffer();
     }
 
     @Override
