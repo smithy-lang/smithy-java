@@ -55,14 +55,14 @@ public class MapGenerator
                                         ${keySchema:L},
                                         valueEntry.getKey()${?enumKey}.value()${/enumKey},
                                         valueEntry.getValue(),
-                                        ${name:U}ValueSerializer.INSTANCE
+                                        ${name:U}$$ValueSerializer.INSTANCE
                                     );
                                 }
                             }
                         }
 
-                        private static final class ${name:U}ValueSerializer implements ${biConsumer:T}<${value:B}, ${shapeSerializer:T}> {
-                            private static final ${name:U}ValueSerializer INSTANCE = new ${name:U}ValueSerializer();
+                        private static final class ${name:U}$$ValueSerializer implements ${biConsumer:T}<${value:B}, ${shapeSerializer:T}> {
+                            private static final ${name:U}$$ValueSerializer INSTANCE = new ${name:U}$$ValueSerializer();
 
                             @Override
                             public void accept(${value:B} values, ${shapeSerializer:T} serializer) {
@@ -77,12 +77,12 @@ public class MapGenerator
                         static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
                             var size = deserializer.containerSize();
                             ${shape:T} result = size == -1 ? new ${collectionImpl:T}<>() : new ${collectionImpl:T}<>(size);
-                            deserializer.readStringMap(schema, result, ${name:U}ValueDeserializer.INSTANCE);
+                            deserializer.readStringMap(schema, result, ${name:U}$$ValueDeserializer.INSTANCE);
                             return result;
                         }
 
-                        private static final class ${name:U}ValueDeserializer implements ${shapeDeserializer:T}.MapMemberConsumer<${string:T}, ${shape:B}> {
-                            static final ${name:U}ValueDeserializer INSTANCE = new ${name:U}ValueDeserializer();
+                        private static final class ${name:U}$$ValueDeserializer implements ${shapeDeserializer:T}.MapMemberConsumer<${string:T}, ${shape:B}> {
+                            static final ${name:U}$$ValueDeserializer INSTANCE = new ${name:U}$$ValueDeserializer();
 
                             @Override
                             public void accept(${shape:B} state, ${string:T} key, ${shapeDeserializer:T} deserializer) {

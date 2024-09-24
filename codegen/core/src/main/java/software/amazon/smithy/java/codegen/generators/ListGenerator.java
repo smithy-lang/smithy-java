@@ -58,12 +58,12 @@ public final class ListGenerator
                         static ${shape:T} deserialize${name:U}(${schema:T} schema, ${shapeDeserializer:T} deserializer) {
                             var size = deserializer.containerSize();
                             ${shape:T} result = size == -1 ? new ${collectionImpl:T}<>() : new ${collectionImpl:T}<>(size);
-                            deserializer.readList(schema, result, ${name:U}MemberDeserializer.INSTANCE);
+                            deserializer.readList(schema, result, ${name:U}$$MemberDeserializer.INSTANCE);
                             return result;
                         }
 
-                        private static final class ${name:U}MemberDeserializer implements ${shapeDeserializer:T}.ListMemberConsumer<${shape:B}> {
-                            static final ${name:U}MemberDeserializer INSTANCE = new ${name:U}MemberDeserializer();
+                        private static final class ${name:U}$$MemberDeserializer implements ${shapeDeserializer:T}.ListMemberConsumer<${shape:B}> {
+                            static final ${name:U}$$MemberDeserializer INSTANCE = new ${name:U}$$MemberDeserializer();
 
                             @Override
                             public void accept(${shape:B} state, ${shapeDeserializer:T} deserializer) {
