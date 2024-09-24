@@ -333,10 +333,6 @@ public final class ClientConfig {
             return this;
         }
 
-        public Context context() {
-            return context;
-        }
-
         /**
          * Creates the client configuration.
          *

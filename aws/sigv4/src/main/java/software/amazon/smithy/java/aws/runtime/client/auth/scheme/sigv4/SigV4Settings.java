@@ -5,10 +5,10 @@
 
 package software.amazon.smithy.java.aws.runtime.client.auth.scheme.sigv4;
 
-import software.amazon.smithy.java.aws.runtime.client.core.settings.ClockSetting;
 import software.amazon.smithy.java.aws.runtime.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.core.Client;
+import software.amazon.smithy.java.runtime.client.core.settings.ClockSetting;
 
 /**
  * Configuration properties used by clients for configuration related to SigV4.

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.aws.runtime.client.core.settings;
+package software.amazon.smithy.java.runtime.client.core.settings;
 
 import java.time.Clock;
 import java.util.Objects;
