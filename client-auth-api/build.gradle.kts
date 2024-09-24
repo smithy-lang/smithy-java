@@ -10,5 +10,5 @@ extra["moduleName"] = "software.amazon.smithy.smithy.java.client-auth-api"
 dependencies {
     api(project(":context"))
     api(project(":auth-api"))
-    api(libs.smithy.model)
+    api(project(":core"))
 }

@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -17,13 +18,13 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public final class AuthSchemeResolverParams {
 
     private final String protocolId;
-    private final String operationName;
+    private final Schema operationSchema;
     private final List<ShapeId> operationAuthSchemes;
     private final Context context;
 
     private AuthSchemeResolverParams(Builder builder) {
         this.protocolId = Objects.requireNonNull(builder.protocolId, "protocolId is null");
-        this.operationName = Objects.requireNonNull(builder.operationName, "operationName is null");
+        this.operationSchema = Objects.requireNonNull(builder.operationSchema, "operationName is null");
         this.context = Objects.requireNonNullElseGet(builder.context, Context::create);
         this.operationAuthSchemes = Objects.requireNonNullElse(builder.operationAuthSchemes, Collections.emptyList());
     }
@@ -47,12 +48,12 @@ public final class AuthSchemeResolverParams {
     }
 
     /**
-     * Get the name of the operation to resolve auth schemes for.
+     * Get the schema of the operation to resolve auth schemes for.
      *
-     * @return the operation name.
+     * @return the operation schema.
      */
-    public String operationName() {
-        return operationName;
+    public Schema operationName() {
+        return operationSchema;
     }
 
     /**
@@ -83,13 +84,13 @@ public final class AuthSchemeResolverParams {
         }
         AuthSchemeResolverParams params = (AuthSchemeResolverParams) o;
         return Objects.equals(protocolId, params.protocolId)
-            && Objects.equals(operationName, params.operationName)
+            && Objects.equals(operationSchema, params.operationSchema)
             && Objects.equals(context, params.context);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(protocolId, operationName, context);
+        return Objects.hash(protocolId, operationSchema, context);
     }
 
     /**
@@ -98,7 +99,7 @@ public final class AuthSchemeResolverParams {
     public static final class Builder {
 
         private String protocolId;
-        private String operationName;
+        private Schema operationSchema;
         public List<ShapeId> operationAuthSchemes;
         private Context context;
 
@@ -125,13 +126,13 @@ public final class AuthSchemeResolverParams {
         }
 
         /**
-         * Set the name of the operation.
+         * Set the schema of the operation.
          *
-         * @param operationName Name of the operation.
+         * @param operationSchema Schema of the operation.
          * @return the builder.
          */
-        public Builder operationName(String operationName) {
-            this.operationName = operationName;
+        public Builder operationSchema(Schema operationSchema) {
+            this.operationSchema = operationSchema;
             return this;
         }
 
