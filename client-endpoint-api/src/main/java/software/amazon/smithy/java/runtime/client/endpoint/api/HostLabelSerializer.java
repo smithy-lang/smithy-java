@@ -15,18 +15,41 @@ import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.model.pattern.SmithyPattern;
 import software.amazon.smithy.model.traits.HostLabelTrait;
 
-final class HostLabelSerializer extends SpecificShapeSerializer implements ShapeSerializer {
+/**
+ * Serializer that can be used to resolve the Host prefix from a template and an input shape.
+ *
+ * <p>Host prefix templates can be defined by the {@code smithy.api#endpoint} trait and can use input shape members
+ * marked with {@code smithy.api#hostLabel} trait as template parameters.
+ *
+ * @see <a href="https://smithy.io/2.0/spec/endpoint-traits.html#endpoint-trait">Endpoint Trait</a>
+ */
+public final class HostLabelSerializer extends SpecificShapeSerializer implements ShapeSerializer {
 
     private final Map<String, String> labelMap = new HashMap<>();
     private final SmithyPattern hostLabelTemplate;
     private String prefix;
 
-    HostLabelSerializer(SmithyPattern hostLabelTemplate) {
+    private HostLabelSerializer(SmithyPattern hostLabelTemplate) {
         this.hostLabelTemplate = hostLabelTemplate;
     }
 
-    String prefix() {
-        return prefix;
+    /**
+     * Resolve the host prefix template to a prefix string.
+     *
+     * @param hostLabelTemplate host prefix template to resolve.
+     * @param inputShape input shape to use to resolve template parameters.
+     * @return resolved host prefix
+     */
+    public static String resolvePrefix(SmithyPattern hostLabelTemplate, SerializableStruct inputShape) {
+        // The prefix is static and can simply be prepended to endpoint host name with no templating.
+        if (hostLabelTemplate.getLabels().isEmpty()) {
+            return hostLabelTemplate.toString();
+        } else {
+            var serializer = new HostLabelSerializer(hostLabelTemplate);
+            inputShape.serialize(serializer);
+            serializer.flush();
+            return serializer.prefix;
+        }
     }
 
     @Override

@@ -19,25 +19,16 @@ import software.amazon.smithy.model.traits.EndpointTrait;
  *
  * @param endpoint static endpoint.
  */
-record StaticEndpointResolver(Endpoint endpoint) implements EndpointResolver {
+record StaticEndpointResolver(Endpoint endpoint, boolean ignorePrefix) implements EndpointResolver {
 
     @Override
     public CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params) {
-        if (!params.operationSchema().hasTrait(EndpointTrait.class)) {
+        if (ignorePrefix || !params.operationSchema().hasTrait(EndpointTrait.class)) {
             return CompletableFuture.completedFuture(endpoint);
         }
-        var hostPrefix = params.operationSchema().expectTrait(EndpointTrait.class).getHostPrefix();
 
-        String prefix;
-        // The prefix is static and can simply be prepended to endpoint host name with no templating.
-        if (hostPrefix.getLabels().isEmpty()) {
-            prefix = hostPrefix.toString();
-        } else {
-            var serializer = new HostLabelSerializer(hostPrefix);
-            params.inputShape().serialize(serializer);
-            serializer.flush();
-            prefix = serializer.prefix();
-        }
+        var hostPrefix = params.operationSchema().expectTrait(EndpointTrait.class).getHostPrefix();
+        var prefix = HostLabelSerializer.resolvePrefix(hostPrefix, params.inputShape());
 
         URI updatedUri = null;
         try {

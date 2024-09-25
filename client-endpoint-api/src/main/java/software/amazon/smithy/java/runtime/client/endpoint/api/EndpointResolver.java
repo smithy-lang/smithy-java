@@ -25,10 +25,11 @@ public interface EndpointResolver {
      * Create an endpoint resolver that always returns the same endpoint.
      *
      * @param endpoint Endpoint to always resolve.
+     * @param ignorePrefix if endpoint prefixes from {@code @endpoint} and {@code @hostLabel} traits should be ignored.
      * @return the endpoint resolver.
      */
-    static EndpointResolver staticEndpoint(Endpoint endpoint) {
+    static EndpointResolver staticEndpoint(Endpoint endpoint, boolean ignorePrefix) {
         Objects.requireNonNull(endpoint);
-        return new StaticEndpointResolver(endpoint);
+        return new StaticEndpointResolver(endpoint, ignorePrefix);
     }
 }
