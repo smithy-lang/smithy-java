@@ -39,6 +39,11 @@ final class ByteBufferDataStream implements DataStream {
     }
 
     @Override
+    public boolean isReplayable() {
+        return true;
+    }
+
+    @Override
     public CompletableFuture<ByteBuffer> asByteBuffer() {
         return CompletableFuture.completedFuture(buffer.duplicate());
     }

@@ -43,6 +43,11 @@ final class FileDataStream implements DataStream {
     }
 
     @Override
+    public boolean isReplayable() {
+        return true;
+    }
+
+    @Override
     public CompletableFuture<InputStream> asInputStream() {
         try {
             return CompletableFuture.completedFuture(Files.newInputStream(file));

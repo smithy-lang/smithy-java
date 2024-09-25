@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.io.datastream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 
 import java.nio.ByteBuffer;
@@ -23,6 +24,7 @@ public class InputStreamDataStreamTest {
         assertThat(ds.contentLength(), equalTo(-1L));
         assertThat(ds.contentType(), nullValue());
         assertThat(ds.asByteBuffer().get(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.isReplayable(), is(false));
     }
 
     @Test

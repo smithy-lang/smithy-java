@@ -13,11 +13,18 @@ final class PublisherDataStream implements DataStream {
     private final Flow.Publisher<ByteBuffer> publisher;
     private final long contentLength;
     private final String contentType;
+    private final boolean isReplayable;
 
-    PublisherDataStream(Flow.Publisher<ByteBuffer> publisher, long contentLength, String contentType) {
+    PublisherDataStream(Flow.Publisher<ByteBuffer> publisher, long contentLength, String contentType, boolean replay) {
         this.publisher = publisher;
         this.contentLength = contentLength;
         this.contentType = contentType;
+        this.isReplayable = replay;
+    }
+
+    @Override
+    public boolean isReplayable() {
+        return isReplayable;
     }
 
     @Override

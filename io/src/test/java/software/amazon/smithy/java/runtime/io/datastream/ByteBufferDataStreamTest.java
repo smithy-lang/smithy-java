@@ -21,5 +21,6 @@ public class ByteBufferDataStreamTest {
 
         assertThat(ds.hasByteBuffer(), is(true));
         assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("foo".getBytes(StandardCharsets.UTF_8))));
+        assertThat(ds.isReplayable(), is(true));
     }
 }

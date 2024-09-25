@@ -15,11 +15,13 @@ final class WrappedDataStream implements DataStream {
     private final DataStream delegate;
     private final String contentType;
     private final long contentLength;
+    private boolean isReplayable;
 
-    WrappedDataStream(DataStream delegate, long contentLength, String contentType) {
+    WrappedDataStream(DataStream delegate, long contentLength, String contentType, boolean isReplayable) {
         this.delegate = delegate;
         this.contentLength = contentLength;
         this.contentType = contentType;
+        this.isReplayable = isReplayable;
     }
 
     @Override
@@ -50,6 +52,11 @@ final class WrappedDataStream implements DataStream {
     @Override
     public boolean hasByteBuffer() {
         return delegate.hasByteBuffer();
+    }
+
+    @Override
+    public boolean isReplayable() {
+        return isReplayable;
     }
 
     @Override

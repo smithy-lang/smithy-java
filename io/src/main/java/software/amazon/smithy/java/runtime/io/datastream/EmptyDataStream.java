@@ -38,6 +38,11 @@ final class EmptyDataStream implements DataStream {
     }
 
     @Override
+    public boolean isReplayable() {
+        return true;
+    }
+
+    @Override
     public long contentLength() {
         return 0;
     }

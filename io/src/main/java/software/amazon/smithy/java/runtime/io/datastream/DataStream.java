@@ -74,6 +74,18 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     }
 
     /**
+     * Check if the DataStream can be restarted from the beginning when new subscribers are added or when getting
+     * the data as an InputStream or ByteBuffer.
+     *
+     * <p>This information can be used to make better decisions about whether an optional process should read all the
+     * data stored in a DataStream (e.g., optionally signing the payload of a request, knowing if it's possible to
+     * retry a failed request, etc.).
+     *
+     * @return true if the data is replayable.
+     */
+    boolean isReplayable();
+
+    /**
      * Read the contents of the stream into a ByteBuffer.
      *
      * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
@@ -277,12 +289,32 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the created DataStream.
      */
     static DataStream ofPublisher(Flow.Publisher<ByteBuffer> publisher, String contentType, long contentLength) {
+        return ofPublisher(publisher, contentType, contentLength, false);
+    }
+
+    /**
+     * Creates a DataStream that emits data from a {@link Flow.Publisher}.
+     *
+     * @param publisher   Publisher to stream.
+     * @param contentType Content-Type to associate with the stream. Can be null.
+     * @param contentLength Content length of the stream. Use -1 for unknown, and 0 or greater for the byte length.
+     * @param isReplayable True if the publisher can start from the beginning when additional subscribers are added.
+     * @return the created DataStream.
+     */
+    static DataStream ofPublisher(
+        Flow.Publisher<ByteBuffer> publisher,
+        String contentType,
+        long contentLength,
+        boolean isReplayable
+    ) {
         if (publisher instanceof DataStream ds) {
-            if (ds.contentLength() == contentLength && Objects.equals(ds.contentType(), contentType)) {
+            if (ds.contentLength() == contentLength
+                && Objects.equals(ds.contentType(), contentType)
+                && ds.isReplayable() == isReplayable) {
                 return ds;
             }
-            return new WrappedDataStream(ds, contentLength, contentType);
+            return new WrappedDataStream(ds, contentLength, contentType, isReplayable);
         }
-        return new PublisherDataStream(publisher, contentLength, contentType);
+        return new PublisherDataStream(publisher, contentLength, contentType, isReplayable);
     }
 }

@@ -41,6 +41,11 @@ final class InputStreamDataStream implements DataStream {
     }
 
     @Override
+    public boolean isReplayable() {
+        return false;
+    }
+
+    @Override
     public long contentLength() {
         return contentLength;
     }
