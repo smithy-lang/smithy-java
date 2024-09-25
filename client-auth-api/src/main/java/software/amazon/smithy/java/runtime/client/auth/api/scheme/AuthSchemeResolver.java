@@ -45,9 +45,7 @@ public interface AuthSchemeResolver {
     /**
      * Default auth scheme resolver used by clients.
      *
-     * <p>This auth scheme resolver returns the list of {@link AuthSchemeResolverParams#operationAuthSchemes()} passed
-     * into the resolver as a list of auth scheme options. This list of auth schemes represents the effective
-     * auth schemes resolved for a given operation.
+     * <p>This auth scheme resolver returns a list of auth schemes matching the effective auth schemes for the operation.
      *
      * <p><strong>NOTE:</strong></string>This resolver does not override any signer or identity properties.
      *
@@ -59,7 +57,7 @@ public interface AuthSchemeResolver {
         @Override
         public List<AuthSchemeOption> resolveAuthScheme(AuthSchemeResolverParams params) {
             var result = new ArrayList<AuthSchemeOption>();
-            for (var schemeId : params.operationAuthSchemes()) {
+            for (var schemeId : params.operation().effectiveAuthSchemes()) {
                 result.add(new AuthSchemeOption(schemeId));
             }
             return result;

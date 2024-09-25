@@ -5,12 +5,9 @@
 
 package software.amazon.smithy.java.runtime.client.auth.api.scheme;
 
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.runtime.core.schema.Schema;
-import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 
 /**
  * AuthSchemeResolver parameters.
@@ -18,15 +15,13 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public final class AuthSchemeResolverParams {
 
     private final String protocolId;
-    private final Schema operationSchema;
-    private final List<ShapeId> operationAuthSchemes;
+    private final ApiOperation<?, ?> operation;
     private final Context context;
 
     private AuthSchemeResolverParams(Builder builder) {
         this.protocolId = Objects.requireNonNull(builder.protocolId, "protocolId is null");
-        this.operationSchema = Objects.requireNonNull(builder.operationSchema, "operationName is null");
+        this.operation = Objects.requireNonNull(builder.operation, "operationName is null");
         this.context = Objects.requireNonNullElseGet(builder.context, Context::create);
-        this.operationAuthSchemes = Objects.requireNonNullElse(builder.operationAuthSchemes, Collections.emptyList());
     }
 
     /**
@@ -39,7 +34,7 @@ public final class AuthSchemeResolverParams {
     }
 
     /**
-     * Protocol ID used the caller.
+     * Protocol ID used by the caller.
      *
      * @return the protocol ID.
      */
@@ -48,21 +43,12 @@ public final class AuthSchemeResolverParams {
     }
 
     /**
-     * Get the schema of the operation to resolve auth schemes for.
+     * Get model for the operation to resolve auth schemes for.
      *
-     * @return the operation schema.
+     * @return the operation.
      */
-    public Schema operationName() {
-        return operationSchema;
-    }
-
-    /**
-     * List of effective authSchemes for the operation being called.
-     *
-     * @return list of authScheme id's
-     */
-    public List<ShapeId> operationAuthSchemes() {
-        return operationAuthSchemes;
+    public ApiOperation<?, ?> operation() {
+        return operation;
     }
 
     /**
@@ -84,13 +70,13 @@ public final class AuthSchemeResolverParams {
         }
         AuthSchemeResolverParams params = (AuthSchemeResolverParams) o;
         return Objects.equals(protocolId, params.protocolId)
-            && Objects.equals(operationSchema, params.operationSchema)
+            && Objects.equals(operation, params.operation)
             && Objects.equals(context, params.context);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(protocolId, operationSchema, context);
+        return Objects.hash(protocolId, operation, context);
     }
 
     /**
@@ -99,8 +85,7 @@ public final class AuthSchemeResolverParams {
     public static final class Builder {
 
         private String protocolId;
-        private Schema operationSchema;
-        public List<ShapeId> operationAuthSchemes;
+        private ApiOperation<?, ?> operation;
         private Context context;
 
         private Builder() {
@@ -126,24 +111,13 @@ public final class AuthSchemeResolverParams {
         }
 
         /**
-         * Set the schema of the operation.
+         * Set the operation.
          *
-         * @param operationSchema Schema of the operation.
+         * @param operation operation.
          * @return the builder.
          */
-        public Builder operationSchema(Schema operationSchema) {
-            this.operationSchema = operationSchema;
-            return this;
-        }
-
-        /**
-         * Set the effective auth scheme list for the operation.
-         *
-         * @param operationAuthSchemes list of auth scheme ids.
-         * @return the builder.
-         */
-        public Builder operationAuthSchemes(List<ShapeId> operationAuthSchemes) {
-            this.operationAuthSchemes = operationAuthSchemes;
+        public Builder operation(ApiOperation<?, ?> operation) {
+            this.operation = operation;
             return this;
         }
 
