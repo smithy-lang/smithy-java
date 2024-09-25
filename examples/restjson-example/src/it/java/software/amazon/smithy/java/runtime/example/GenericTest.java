@@ -14,6 +14,7 @@ import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.example.client.PersonDirectoryClient;
@@ -33,7 +34,7 @@ public class GenericTest {
     public void putPerson() throws ExecutionException, InterruptedException {
         // Create a generated client using rest-json and a fixed endpoint.
         var client = PersonDirectoryClient.builder()
-            .endpoint("http://httpbin.org/anything")
+            .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
             .build();
 
         PutPersonInput input = PutPersonInput.builder()
@@ -49,7 +50,7 @@ public class GenericTest {
     @Test
     public void getPersonImage() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .endpoint("http://httpbin.org/anything")
+            .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
             .build();
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
@@ -59,7 +60,7 @@ public class GenericTest {
     @Test
     public void streamingRequestPayload() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .endpoint("http://httpbin.org/anything")
+            .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
             .build();
 
         PutPersonImageInput input = PutPersonImageInput.builder()
@@ -133,7 +134,7 @@ public class GenericTest {
         };
 
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .endpoint("http://httpbin.org/anything")
+            .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
             .addInterceptor(interceptor)
             .build();
 

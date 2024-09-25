@@ -21,6 +21,7 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterc
 import software.amazon.smithy.java.runtime.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.OutputHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
@@ -28,7 +29,7 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 public class GenericClientTest {
     private static final EchoServer server = new EchoServer();
     private static final int PORT = 8888;
-    private static final String ENDPOINT = "http://127.0.0.1:" + PORT;
+    private static final EndpointResolver ENDPOINT_RESOLVER = EndpointResolver.staticHost("http://127.0.0.1:" + PORT);
 
     @BeforeEach
     public void setup() {
@@ -45,7 +46,7 @@ public class GenericClientTest {
         System.out.println("DOING THINGS");
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
-            .endpoint(ENDPOINT)
+            .endpointResolver(ENDPOINT_RESOLVER)
             .value(5L)
             .build();
 
@@ -76,7 +77,7 @@ public class GenericClientTest {
 
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
-            .endpoint(ENDPOINT)
+            .endpointResolver(ENDPOINT_RESOLVER)
             .addInterceptor(interceptor)
             .value(2.2)
             .build();
@@ -109,7 +110,7 @@ public class GenericClientTest {
         };
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
-            .endpoint(ENDPOINT)
+            .endpointResolver(ENDPOINT_RESOLVER)
             .addInterceptor(interceptor)
             .value(2L)
             .multiValue("a", "b")

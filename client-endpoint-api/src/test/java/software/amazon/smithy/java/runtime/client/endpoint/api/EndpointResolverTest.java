@@ -45,15 +45,15 @@ public class EndpointResolverTest {
     public void returnsStaticEndpointWithStaticPrefix() {
         EndpointResolver resolver = EndpointResolver.staticEndpoint(TEST_ENDPOINT);
         Endpoint endpoint = resolver.resolveEndpoint(
-                EndpointResolverParams.builder()
-                        .operation(new TestOperationStaticPrefix())
-                        .inputShape(new EndpointInput("name", "bar", "baz"))
-                        .build()
+            EndpointResolverParams.builder()
+                .operation(new TestOperationStaticPrefix())
+                .inputShape(new EndpointInput("name", "bar", "baz"))
+                .build()
         ).join();
 
         MatcherAssert.assertThat(
-                endpoint.uri().toString(),
-                Matchers.equalTo("https://foo.bar.example.com")
+            endpoint.uri().toString(),
+            Matchers.equalTo("https://foo.bar.example.com")
         );
     }
 
@@ -61,27 +61,26 @@ public class EndpointResolverTest {
     public void returnsStaticEndpointWithTemplatedPrefix() {
         EndpointResolver resolver = EndpointResolver.staticEndpoint(TEST_ENDPOINT);
         Endpoint endpoint = resolver.resolveEndpoint(
-                EndpointResolverParams.builder()
-                        .operation(new TestOperationTemplatePrefix())
-                        .inputShape(new EndpointInput("name", "bar", "baz"))
-                        .build()
+            EndpointResolverParams.builder()
+                .operation(new TestOperationTemplatePrefix())
+                .inputShape(new EndpointInput("name", "bar", "baz"))
+                .build()
         ).join();
 
         MatcherAssert.assertThat(
-                endpoint.uri().toString(),
-                Matchers.equalTo("https://bar-baz.foo.example.com")
+            endpoint.uri().toString(),
+            Matchers.equalTo("https://bar-baz.foo.example.com")
         );
     }
 
-
-
     private record EndpointInput(String name, String labelA, String labelB) implements SerializableStruct {
+
         public static final ShapeId ID = ShapeId.from("smithy.example#EndpointInput");
         public static final Schema SCHEMA = Schema.structureBuilder(ID)
-                .putMember("name", PreludeSchemas.STRING)
-                .putMember("labelA", PreludeSchemas.STRING, new HostLabelTrait())
-                .putMember("labelB", PreludeSchemas.STRING, new HostLabelTrait())
-                .build();
+            .putMember("name", PreludeSchemas.STRING)
+            .putMember("labelA", PreludeSchemas.STRING, new HostLabelTrait())
+            .putMember("labelB", PreludeSchemas.STRING, new HostLabelTrait())
+            .build();
         public static final Schema SCHEMA_NAME = SCHEMA.member("name");
         public static final Schema SCHEMA_LABEL_A = SCHEMA.member("labelA");
         public static final Schema SCHEMA_LABEL_B = SCHEMA.member("labelB");
@@ -104,13 +103,14 @@ public class EndpointResolverTest {
         }
     }
 
-    private static final class TestOperationTemplatePrefix implements ApiOperation<SerializableStruct, SerializableStruct> {
+    private static final class TestOperationTemplatePrefix implements
+        ApiOperation<SerializableStruct, SerializableStruct> {
         private static final Schema SCHEMA = Schema.createOperation(
-                ShapeId.from("foo.bar#operationA"),
-                EndpointTrait.builder()
-                        .hostPrefix("{labelA}-{labelB}.foo.")
-                        .sourceLocation(SourceLocation.NONE)
-                        .build()
+            ShapeId.from("foo.bar#operationA"),
+            EndpointTrait.builder()
+                .hostPrefix("{labelA}-{labelB}.foo.")
+                .sourceLocation(SourceLocation.NONE)
+                .build()
         );
 
         @Override
@@ -149,13 +149,14 @@ public class EndpointResolverTest {
         }
     }
 
-    private static final class TestOperationStaticPrefix implements ApiOperation<SerializableStruct, SerializableStruct> {
+    private static final class TestOperationStaticPrefix implements
+        ApiOperation<SerializableStruct, SerializableStruct> {
         private static final Schema SCHEMA = Schema.createOperation(
-                ShapeId.from("foo.bar#operationA"),
-                EndpointTrait.builder()
-                        .hostPrefix("foo.bar.")
-                        .sourceLocation(SourceLocation.NONE)
-                        .build()
+            ShapeId.from("foo.bar#operationA"),
+            EndpointTrait.builder()
+                .hostPrefix("foo.bar.")
+                .sourceLocation(SourceLocation.NONE)
+                .build()
         );
 
         @Override

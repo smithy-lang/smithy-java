@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.client.core;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -15,7 +14,6 @@ import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityReso
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
 import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 
 /**
@@ -161,75 +159,6 @@ public final class RequestOverrideConfig {
         public Builder endpointResolver(EndpointResolver endpointResolver) {
             this.endpointResolver = endpointResolver;
             return this;
-        }
-
-        /**
-         * Configure the client to use a static endpoint.
-         *
-         * <p>Respects prefixes added by {@code @endpoint} and {@code hostLabel} traits.
-         *
-         * @param endpoint Endpoint to connect to.
-         * @return the builder.
-         */
-        public Builder endpoint(Endpoint endpoint) {
-            return endpoint(endpoint, false);
-        }
-
-        /**
-         * Configure the client to use a static endpoint.
-         *
-         * @param endpoint Endpoint to connect to.
-         * @param ignorePrefix true if endpoint prefixes should be ignored.
-         * @return the builder.
-         */
-        public Builder endpoint(Endpoint endpoint, boolean ignorePrefix) {
-            return endpointResolver(EndpointResolver.staticEndpoint(endpoint, ignorePrefix));
-        }
-
-        /**
-         * Configure the client to use a static endpoint.
-         *
-         * <p>Respects prefixes added by {@code @endpoint} and {@code hostLabel} traits.
-         *
-         * @param endpoint Endpoint to connect to.
-         * @return the builder.
-         */
-        public Builder endpoint(URI endpoint) {
-            return endpoint(endpoint, false);
-        }
-
-        /**
-         * Configure the client to use a static endpoint.
-         *
-         * @param endpoint Endpoint to connect to.
-         * @param ignorePrefix true if endpoint prefixes should be ignored.
-         * @return the builder.
-         */
-        public Builder endpoint(URI endpoint, boolean ignorePrefix) {
-            return endpoint(Endpoint.builder().uri(endpoint).build(), ignorePrefix);
-        }
-
-        /**
-         * Configure the client to use a static endpoint.
-         *
-         * <p>Respects prefixes added by {@code @endpoint} and {@code hostLabel} traits.
-         *
-         * @param endpoint Endpoint to connect to.
-         * @return the builder.
-         */
-        public Builder endpoint(String endpoint) {
-            return endpoint(endpoint, false);
-        }
-
-        /**
-         * Configure the client to use a static endpoint.
-         *
-         * @param endpoint Endpoint to connect to.
-         * @param ignorePrefix true if endpoint prefixes should be ignored.
-         * @return the builder.
-         */
-        public Builder endpoint(String endpoint, boolean ignorePrefix) {
-            return endpoint(Endpoint.builder().uri(endpoint).build(), ignorePrefix);
         }
 
         /**

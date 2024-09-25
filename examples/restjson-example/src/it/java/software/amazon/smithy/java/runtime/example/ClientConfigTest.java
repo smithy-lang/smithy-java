@@ -51,7 +51,7 @@ public class ClientConfigTest {
     public void vanillaClient() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
             .addInterceptor(requestCapturingInterceptor)
-            .endpoint("http://httpbin.org/anything")
+            .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
@@ -72,7 +72,7 @@ public class ClientConfigTest {
     public void clientWithDefaults_EndpointResolverOverridden() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
             .addInterceptor(requestCapturingInterceptor)
-            .endpoint("http://httpbin.org/anything")
+            .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
             .build();
         callOperation(client);
         SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();

@@ -16,6 +16,7 @@ import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.client.endpoint.api.Endpoint;
+import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
@@ -63,7 +64,7 @@ final class MockClient extends Client {
             configBuilder().protocol(new PlaceHolderProtocol());
             configBuilder().transport(new PlaceHolderTransport());
             configBuilder().authSchemeResolver(AuthSchemeResolver.NO_AUTH);
-            configBuilder().endpoint("http://example.com");
+            configBuilder().endpointResolver(EndpointResolver.staticEndpoint("http://example.com"));
             return new MockClient(this);
         }
     }

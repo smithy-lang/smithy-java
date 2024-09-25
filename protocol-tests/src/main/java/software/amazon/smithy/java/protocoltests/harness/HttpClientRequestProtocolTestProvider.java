@@ -16,6 +16,7 @@ import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeOpti
 import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
+import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
@@ -57,7 +58,9 @@ final class HttpClientRequestProtocolTestProvider extends ProtocolTestProvider<H
                             .protocol(testProtocol)
                             .authSchemeResolver(testResolver);
                         if (testCase.getHost().isPresent()) {
-                            overrideBuilder = overrideBuilder.endpoint("https://" + testCase.getHost().get());
+                            overrideBuilder.endpointResolver(
+                                EndpointResolver.staticEndpoint("https://" + testCase.getHost().get())
+                            );
                         }
 
                         var inputBuilder = operation.operationModel().inputBuilder();
