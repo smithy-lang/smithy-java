@@ -16,7 +16,7 @@ import software.amazon.smithy.model.pattern.SmithyPattern;
 import software.amazon.smithy.model.traits.HostLabelTrait;
 
 /**
- * Serializer that can be used to resolve the Host prefix from a template and an input shape.
+ * Serializer that resolves the Host prefix from a template pattern and an input shape.
  *
  * <p>Host prefix templates can be defined by the {@code smithy.api#endpoint} trait and can use input shape members
  * marked with {@code smithy.api#hostLabel} trait as template parameters.

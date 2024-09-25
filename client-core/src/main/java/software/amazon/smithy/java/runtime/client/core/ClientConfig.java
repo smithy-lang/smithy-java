@@ -210,31 +210,70 @@ public final class ClientConfig {
         /**
          * Configure the client to use a static endpoint.
          *
+         * <p>Respects prefixes added by {@code @endpoint} and {@code hostLabel} traits.
+         *
          * @param endpoint Endpoint to connect to.
          * @return the builder.
          */
         public Builder endpoint(Endpoint endpoint) {
-            return endpointResolver(EndpointResolver.staticEndpoint(endpoint));
+            return endpoint(endpoint, false);
         }
 
         /**
          * Configure the client to use a static endpoint.
+         *
+         * @param endpoint Endpoint to connect to.
+         * @param ignorePrefix true if endpoint prefixes should be ignored.
+         * @return the builder.
+         */
+        public Builder endpoint(Endpoint endpoint, boolean ignorePrefix) {
+            return endpointResolver(EndpointResolver.staticEndpoint(endpoint, ignorePrefix));
+        }
+
+        /**
+         * Configure the client to use a static endpoint.
+         *
+         * <p>Respects prefixes added by {@code @endpoint} and {@code hostLabel} traits.
          *
          * @param endpoint Endpoint to connect to.
          * @return the builder.
          */
         public Builder endpoint(URI endpoint) {
-            return endpoint(Endpoint.builder().uri(endpoint).build());
+            return endpoint(endpoint, false);
         }
 
         /**
          * Configure the client to use a static endpoint.
          *
          * @param endpoint Endpoint to connect to.
+         * @param ignorePrefix true if endpoint prefixes should be ignored.
+         * @return the builder.
+         */
+        public Builder endpoint(URI endpoint, boolean ignorePrefix) {
+            return endpoint(Endpoint.builder().uri(endpoint).build(), ignorePrefix);
+        }
+
+        /**
+         * Configure the client to use a static endpoint.
+         *
+         * <p>Respects prefixes added by {@code @endpoint} and {@code hostLabel} traits.
+         *
+         * @param endpoint Endpoint to connect to.
          * @return the builder.
          */
         public Builder endpoint(String endpoint) {
-            return endpoint(Endpoint.builder().uri(endpoint).build());
+            return endpoint(endpoint, false);
+        }
+
+        /**
+         * Configure the client to use a static endpoint.
+         *
+         * @param endpoint Endpoint to connect to.
+         * @param ignorePrefix true if endpoint prefixes should be ignored.
+         * @return the builder.
+         */
+        public Builder endpoint(String endpoint, boolean ignorePrefix) {
+            return endpoint(Endpoint.builder().uri(endpoint).build(), ignorePrefix);
         }
 
         /**

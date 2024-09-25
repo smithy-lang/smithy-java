@@ -17,7 +17,7 @@ public class EndpointResolverTest {
     @Test
     public void returnsStaticEndpoint() {
         EndpointResolver resolver = EndpointResolver
-            .staticEndpoint(Endpoint.builder().uri("https://example.com").build());
+            .staticEndpoint(Endpoint.builder().uri("https://example.com").build(), false);
 
         var testSchema = Schema.createOperation(ShapeId.from("com.example#Foo"));
         var input = new SerializableStruct() {
