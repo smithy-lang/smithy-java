@@ -466,6 +466,11 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             writer.putContext("members", shape.members().stream().map(symbolProvider::toMemberName).toList());
             writer.write(
                 """
+                    /**
+                     * Create a new builder containing all the current property values of this object.
+                     *
+                     * @return a builder for {@link ${shape:T}}.
+                     */
                     public Builder toBuilder() {
                         var builder =  new Builder();
                         ${#members}builder.${value:L}(this.${value:L});

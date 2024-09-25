@@ -44,6 +44,9 @@ abstract class BuilderGenerator implements Runnable {
             ${stageGen:C|}
 
             ${/isStaged}
+            /**
+             * @return returns a new Builder.
+             */
             public static Builder builder() {
                 return new Builder();
             }

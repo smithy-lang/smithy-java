@@ -24,6 +24,9 @@ record TypeEnumGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolPr
         writer.pushState();
         writer.putContext("variants", enumList);
         writer.write("""
+            /**
+             * Enum representing the possible variants of {@link ${shape:T}}.
+             */
             public enum Type {
                 ${#variants}${value:L}${^key.last},
                 ${/key.last}${/variants}
