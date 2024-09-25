@@ -66,7 +66,7 @@ public class OperationGenerator
 
                         ${?hasInputEventStream}
                         @Override
-                        public ${supplier:T}<${sdkShapeBuilder:T}<${inputType:T}>> inputEventBuilderSupplier() {
+                        public ${supplier:T}<${sdkShapeBuilder:T}<${inputEventType:T}>> inputEventBuilderSupplier() {
                             return () -> ${inputEventType:T}.builder();
                         }
                         ${/hasInputEventStream}
@@ -75,6 +75,13 @@ public class OperationGenerator
                         public ${sdkShapeBuilder:N}<${outputType:T}> outputBuilder() {
                             return ${outputType:T}.builder();
                         }
+
+                        ${?hasOutputEventStream}
+                        @Override
+                        public ${supplier:T}<${sdkShapeBuilder:T}<${outputEventType:T}>> outputEventBuilderSupplier() {
+                            return () -> ${outputEventType:T}.builder();
+                        }
+                        ${/hasOutputEventStream}
 
                         @Override
                         public ${sdkSchema:N} schema() {
@@ -177,6 +184,7 @@ public class OperationGenerator
                     );
                 });
                 eventStreamIndex.getOutputInfo(shape).ifPresent(info -> {
+                    writer.putContext("supplier", Supplier.class);
                     writer.putContext("hasOutputEventStream", true);
                     writer.putContext(
                         "outputEventType",

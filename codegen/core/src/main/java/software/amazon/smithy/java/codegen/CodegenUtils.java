@@ -127,6 +127,16 @@ public final class CodegenUtils {
     }
 
     /**
+     * Determines if a shape is an event stream.
+     *
+     * @param shape shape to check
+     * @return returns true if the shape is an event stream union
+     */
+    public static boolean isEventStream(Shape shape) {
+        return shape.isUnionShape() && shape.hasTrait(StreamingTrait.class);
+    }
+
+    /**
      * Checks if a symbol resolves to a Java Array type.
      *
      * @param symbol symbol to check

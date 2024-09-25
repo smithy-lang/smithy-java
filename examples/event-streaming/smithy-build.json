@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "plugins": {
+    "java-client-codegen": {
+      "service": "smithy.example.eventstreaming#MessageService",
+      "namespace": "software.amazon.smithy.java.examples.eventstreaming",
+      "protocol": "aws.protocols#restJson1",
+      "transport": {
+        "http-java": {}
+      }
+    }
+  }
+}

@@ -40,6 +40,7 @@ include("server-aws-rest-json1")
 include(":examples:restjson-example")
 include(":examples:dynamodb")
 include(":examples:server-example")
+include(":examples:event-streaming")
 
 // AWS specific
 include(":aws:event-streams")
