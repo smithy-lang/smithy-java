@@ -83,6 +83,7 @@ final class HttpRequestHandler extends ChannelDuplexHandler {
                 HttpResponseStatus.OK,
                 Unpooled.wrappedBuffer(serializedValue.asByteBuffer().get())
             );
+            response.headers().set(((NettyHttpHeaders) job.response().headers()).getNettyHeaders());
             response.headers().set("Content-Length", serializedValue.contentLength());
         } catch (Throwable e) {
             response = new DefaultFullHttpResponse(

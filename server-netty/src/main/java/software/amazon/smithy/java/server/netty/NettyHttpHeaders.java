@@ -6,6 +6,9 @@
 package software.amazon.smithy.java.server.netty;
 
 import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.HttpHeaders;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.java.runtime.http.api.ModifiableHttpHeaders;
@@ -65,4 +68,22 @@ final class NettyHttpHeaders implements ModifiableHttpHeaders {
     }
 
     //TODO implement an efficient toMap and iterator.
+
+    @Override
+    public Map<String, List<String>> toMap() {
+        var map = new HashMap<String, List<String>>();
+        for (var name : nettyHeaders.names()) {
+            map.put(name, nettyHeaders.getAll(name));
+        }
+        return map;
+    }
+
+    @Override
+    public Iterator<Map.Entry<String, List<String>>> iterator() {
+        return toMap().entrySet().iterator();
+    }
+
+    HttpHeaders getNettyHeaders() {
+        return nettyHeaders;
+    }
 }
