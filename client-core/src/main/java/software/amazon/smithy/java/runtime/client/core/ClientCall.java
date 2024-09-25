@@ -30,7 +30,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * @param <I> Input to send.
  * @param <O> Output to return.
  */
-public final class ClientCall<I extends SerializableStruct, O extends SerializableStruct> {
+final class ClientCall<I extends SerializableStruct, O extends SerializableStruct> {
 
     private final I input;
     private final EndpointResolver endpointResolver;

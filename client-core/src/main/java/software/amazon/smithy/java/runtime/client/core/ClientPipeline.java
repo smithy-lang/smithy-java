@@ -36,7 +36,7 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
  * @param <RequestT>
  * @param <ResponseT>
  */
-public final class ClientPipeline<RequestT, ResponseT> {
+final class ClientPipeline<RequestT, ResponseT> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientPipeline.class);
     private static final URI UNRESOLVED;
