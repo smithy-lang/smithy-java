@@ -43,7 +43,7 @@ public final class AuthSchemeResolverParams {
     }
 
     /**
-     * Get model for the operation to resolve auth schemes for.
+     * Get the operation to resolve auth schemes for.
      *
      * @return the operation.
      */
