@@ -23,7 +23,7 @@ import software.amazon.smithy.model.traits.HostLabelTrait;
  *
  * @see <a href="https://smithy.io/2.0/spec/endpoint-traits.html#endpoint-trait">Endpoint Trait</a>
  */
-public final class HostLabelSerializer extends SpecificShapeSerializer implements ShapeSerializer {
+final class HostLabelSerializer extends SpecificShapeSerializer implements ShapeSerializer {
 
     private final Map<String, String> labelMap = new HashMap<>();
     private final SmithyPattern hostLabelTemplate;

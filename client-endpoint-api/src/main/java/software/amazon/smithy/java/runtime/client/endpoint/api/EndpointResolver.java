@@ -22,14 +22,27 @@ public interface EndpointResolver {
     CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params);
 
     /**
-     * Create an endpoint resolver that always returns the same endpoint.
+     * Create a default endpoint resolver that always returns the same endpoint with prefixes added if relevant.
+     *
+     * <p>This endpoint resolvers will handle the {@link software.amazon.smithy.model.traits.HostLabelTrait} and
+     * {@link software.amazon.smithy.model.traits.EndpointTrait} traits automatically, adding a prefix to the endpoint
+     * host based on the resolved host prefix.
      *
      * @param endpoint Endpoint to always resolve.
-     * @param ignorePrefix if endpoint prefixes from {@code @endpoint} and {@code @hostLabel} traits should be ignored.
      * @return the endpoint resolver.
      */
-    static EndpointResolver staticEndpoint(Endpoint endpoint, boolean ignorePrefix) {
+    static EndpointResolver staticEndpoint(Endpoint endpoint) {
+        return new HostLabelEndpointResolver(staticHost(endpoint));
+    }
+
+    /**
+     * Create an endpoint resolver that always returns the same host.
+     *
+     * @param endpoint Endpoint to always resolve.
+     * @return the endpoint resolver.
+     */
+    static EndpointResolver staticHost(Endpoint endpoint) {
         Objects.requireNonNull(endpoint);
-        return new StaticEndpointResolver(endpoint, ignorePrefix);
+        return params -> CompletableFuture.completedFuture(endpoint);
     }
 }

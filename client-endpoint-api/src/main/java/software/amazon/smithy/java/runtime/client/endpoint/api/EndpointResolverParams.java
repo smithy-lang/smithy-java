@@ -7,9 +7,8 @@ package software.amazon.smithy.java.runtime.client.endpoint.api;
 
 import java.util.Objects;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
  * Encapsulates endpoint resolver parameters.
@@ -17,11 +16,11 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public final class EndpointResolverParams {
 
     private final Context context;
-    private final Schema operationSchema;
+    private final ApiOperation<?, ?> operation;
     private final SerializableStruct inputShape;
 
     private EndpointResolverParams(Builder builder) {
-        this.operationSchema = Objects.requireNonNull(builder.operationSchema, "operationSchema is null");
+        this.operation = Objects.requireNonNull(builder.operation, "operation is null");
         this.inputShape = Objects.requireNonNull(builder.inputShape, "inputShape is null");
         this.context = Objects.requireNonNullElseGet(builder.context, Context::create);
     }
@@ -36,12 +35,12 @@ public final class EndpointResolverParams {
     }
 
     /**
-     * Get the schema of the operation to resolve the endpoint for.
+     * Get the model for the operation to resolve the endpoint for.
      *
-     * @return the operation Schema.
+     * @return the operation.
      */
-    public Schema operationSchema() {
-        return operationSchema;
+    public ApiOperation<?, ?> operation() {
+        return operation;
     }
 
     /**
@@ -71,14 +70,14 @@ public final class EndpointResolverParams {
             return false;
         }
         EndpointResolverParams params = (EndpointResolverParams) o;
-        return Objects.equals(operationSchema, params.operationSchema)
+        return Objects.equals(operation, params.operation)
             && Objects.equals(inputShape, params.inputShape)
             && Objects.equals(context, params.context);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(operationSchema, inputShape, context);
+        return Objects.hash(operation, inputShape, context);
     }
 
     /**
@@ -87,7 +86,7 @@ public final class EndpointResolverParams {
     public static final class Builder {
 
         private Context context;
-        private Schema operationSchema;
+        private ApiOperation<?, ?> operation;
         private SerializableStruct inputShape;
 
         private Builder() {
@@ -102,16 +101,13 @@ public final class EndpointResolverParams {
         }
 
         /**
-         * Set the schema for the operation to resolve endpoint for.
+         * Set the operation to resolve endpoint for.
          *
-         * @param operationSchema the operation schema.
+         * @param operation the operation.
          * @return the builder.
          */
-        public Builder operationSchema(Schema operationSchema) {
-            if (!operationSchema.type().equals(ShapeType.OPERATION)) {
-                throw new IllegalArgumentException("Operation schema must be an operation");
-            }
-            this.operationSchema = operationSchema;
+        public Builder operation(ApiOperation<?, ?> operation) {
+            this.operation = operation;
             return this;
         }
 
