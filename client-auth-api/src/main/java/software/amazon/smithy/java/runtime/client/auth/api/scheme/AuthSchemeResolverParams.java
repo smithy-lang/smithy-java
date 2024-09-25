@@ -20,7 +20,7 @@ public final class AuthSchemeResolverParams {
 
     private AuthSchemeResolverParams(Builder builder) {
         this.protocolId = Objects.requireNonNull(builder.protocolId, "protocolId is null");
-        this.operation = Objects.requireNonNull(builder.operation, "operationName is null");
+        this.operation = Objects.requireNonNull(builder.operation, "operation is null");
         this.context = Objects.requireNonNullElseGet(builder.context, Context::create);
     }
 
