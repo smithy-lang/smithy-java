@@ -37,6 +37,9 @@ import software.amazon.smithy.java.codegen.sections.OperationSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.logging.InternalLogger;
+
+import software.amazon.smithy.java.runtime.client.core.pagination.AsyncPaginator;
+import software.amazon.smithy.java.runtime.client.core.pagination.Paginator;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
@@ -51,6 +54,7 @@ import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ToShapeId;
+import software.amazon.smithy.model.traits.PaginatedTrait;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
@@ -306,11 +310,15 @@ public final class ClientInterfaceGenerator
                 """;
             var templateBase = """
                 ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig);
+                ${?paginated}
+                ${paginator:T}<${output:T}> ${name:L}Paginator(${input:T} input);${/paginated}
                 """;
             writer.pushState();
-            writer.putContext("async", symbol.expectProperty(ClientSymbolProperties.ASYNC));
+            var isAsync = symbol.expectProperty(ClientSymbolProperties.ASYNC);
+            writer.putContext("async", isAsync);
             writer.putContext("overrideConfig", RequestOverrideConfig.class);
             writer.putContext("future", CompletableFuture.class);
+            writer.putContext("paginator", isAsync ? AsyncPaginator.class : Paginator.class);
 
             var opIndex = OperationIndex.of(model);
             for (var operation : TopDownIndex.of(model).getContainedOperations(service)) {
@@ -323,8 +331,8 @@ public final class ClientInterfaceGenerator
                 writer.popState();
                 writer.newLine();
                 writer.pushState(new OperationSection(operation, symbolProvider, model));
+                writer.putContext("paginated", operation.hasTrait(PaginatedTrait.class));
                 writer.write(templateBase);
-                writer.popState();
                 writer.popState();
             }
             writer.popState();
