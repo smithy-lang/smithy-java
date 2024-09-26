@@ -24,10 +24,8 @@ include(":http-auth")
 include(":json-codec")
 
 include(":client-core")
-include(":client-endpoint-api")
 include(":client-http")
 include(":client-http-binding")
-include(":client-auth-api")
 
 include(":auth-api")
 

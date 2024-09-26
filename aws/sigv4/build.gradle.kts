@@ -9,7 +9,7 @@ extra["displayName"] = "Smithy :: Java :: AWS :: Client-HTTP"
 extra["moduleName"] = "software.amazon.smithy.java.aws.client-http"
 
 dependencies {
-    implementation(project(":client-auth-api"))
+    implementation(project(":client-core"))
     api(project(":aws:aws-client-core"))
     implementation(project(":http-api"))
     implementation(project(":io"))

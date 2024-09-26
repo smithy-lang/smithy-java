@@ -10,8 +10,8 @@ import software.amazon.smithy.java.aws.runtime.client.core.identity.AwsCredentia
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
-import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthScheme;
-import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeFactory;
+import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
+import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 

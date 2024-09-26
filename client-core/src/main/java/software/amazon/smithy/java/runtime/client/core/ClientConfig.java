@@ -11,11 +11,11 @@ import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
-import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityResolver;
-import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthScheme;
-import software.amazon.smithy.java.runtime.client.auth.api.scheme.AuthSchemeResolver;
+import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResolver;
+import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
+import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeResolver;
+import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.runtime.client.endpoint.api.EndpointResolver;
 
 /**
  * An immutable representation of configurations of a {@link Client}.

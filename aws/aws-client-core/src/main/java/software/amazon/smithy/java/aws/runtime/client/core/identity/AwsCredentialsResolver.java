@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.aws.runtime.client.core.identity;
 
-import software.amazon.smithy.java.runtime.client.auth.api.identity.IdentityResolver;
+import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResolver;
 
 /**
  * An {@link IdentityResolver} that resolves a {@link AwsCredentialsIdentity} for authentication.
