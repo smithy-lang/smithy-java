@@ -469,6 +469,8 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                     /**
                      * Create a new builder containing all the current property values of this object.
                      *
+                     * <p><strong>Note:</strong> This method performs only a shallow copy of the original properties.
+                     *
                      * @return a builder for {@link ${shape:T}}.
                      */
                     public Builder toBuilder() {
