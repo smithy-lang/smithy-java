@@ -24,7 +24,7 @@ record HostLabelEndpointResolver(EndpointResolver delegate) implements EndpointR
         if (endpointTrait == null) {
             return delegate.resolveEndpoint(params);
         }
-        var prefix = HostLabelSerializer.resolvePrefix(endpointTrait.getHostPrefix(), params.inputShape());
+        var prefix = HostLabelSerializer.resolvePrefix(endpointTrait.getHostPrefix(), params.inputValue());
 
         return delegate.resolveEndpoint(params).thenApply(endpoint -> prefix(endpoint, prefix));
     }

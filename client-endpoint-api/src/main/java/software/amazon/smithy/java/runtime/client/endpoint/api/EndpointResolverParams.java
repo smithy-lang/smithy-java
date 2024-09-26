@@ -17,11 +17,11 @@ public final class EndpointResolverParams {
 
     private final Context context;
     private final ApiOperation<?, ?> operation;
-    private final SerializableStruct inputShape;
+    private final SerializableStruct inputValue;
 
     private EndpointResolverParams(Builder builder) {
         this.operation = Objects.requireNonNull(builder.operation, "operation is null");
-        this.inputShape = Objects.requireNonNull(builder.inputShape, "inputShape is null");
+        this.inputValue = Objects.requireNonNull(builder.inputValue, "inputValue is null");
         this.context = Objects.requireNonNullElseGet(builder.context, Context::create);
     }
 
@@ -53,12 +53,12 @@ public final class EndpointResolverParams {
     }
 
     /**
-     * Input Shape for the client call the endpoint is being resolved for.
+     * Input value for the client call the endpoint is being resolved for.
      *
      * @return input.
      */
-    public SerializableStruct inputShape() {
-        return inputShape;
+    public SerializableStruct inputValue() {
+        return inputValue;
     }
 
     @Override
@@ -71,13 +71,13 @@ public final class EndpointResolverParams {
         }
         EndpointResolverParams params = (EndpointResolverParams) o;
         return Objects.equals(operation, params.operation)
-            && Objects.equals(inputShape, params.inputShape)
+            && Objects.equals(inputValue, params.inputValue)
             && Objects.equals(context, params.context);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(operation, inputShape, context);
+        return Objects.hash(operation, inputValue, context);
     }
 
     /**
@@ -87,7 +87,7 @@ public final class EndpointResolverParams {
 
         private Context context;
         private ApiOperation<?, ?> operation;
-        private SerializableStruct inputShape;
+        private SerializableStruct inputValue;
 
         private Builder() {
         }
@@ -125,11 +125,11 @@ public final class EndpointResolverParams {
         /**
          * Set the input shape used by the operation that the endpoint is being resolved for.
          *
-         * @param inputShape input shape to set.
+         * @param inputValue input value to set.
          * @return the builder.
          */
-        public Builder inputShape(SerializableStruct inputShape) {
-            this.inputShape = inputShape;
+        public Builder inputValue(SerializableStruct inputValue) {
+            this.inputValue = inputValue;
             return this;
         }
     }

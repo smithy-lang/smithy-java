@@ -31,7 +31,7 @@ public class EndpointResolverTest {
         Endpoint endpoint = resolver.resolveEndpoint(
             EndpointResolverParams.builder()
                 .operation(new TestOperationTemplatePrefix())
-                .inputShape(new EndpointInput("name", "bar", "baz"))
+                .inputValue(new EndpointInput("name", "bar", "baz"))
                 .build()
         ).join();
 
@@ -47,7 +47,7 @@ public class EndpointResolverTest {
         Endpoint endpoint = resolver.resolveEndpoint(
             EndpointResolverParams.builder()
                 .operation(new TestOperationStaticPrefix())
-                .inputShape(new EndpointInput("name", "bar", "baz"))
+                .inputValue(new EndpointInput("name", "bar", "baz"))
                 .build()
         ).join();
 
@@ -63,7 +63,7 @@ public class EndpointResolverTest {
         Endpoint endpoint = resolver.resolveEndpoint(
             EndpointResolverParams.builder()
                 .operation(new TestOperationTemplatePrefix())
-                .inputShape(new EndpointInput("name", "bar", "baz"))
+                .inputValue(new EndpointInput("name", "bar", "baz"))
                 .build()
         ).join();
 

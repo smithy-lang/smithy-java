@@ -47,7 +47,7 @@ public interface EndpointResolver {
      * @return the endpoint resolver.
      */
     static EndpointResolver staticEndpoint(String endpoint) {
-        return new HostLabelEndpointResolver(staticHost(endpoint));
+        return staticEndpoint(Endpoint.builder().uri(endpoint).build());
     }
 
     /**
@@ -61,13 +61,13 @@ public interface EndpointResolver {
      * @return the endpoint resolver.
      */
     static EndpointResolver staticEndpoint(URI endpoint) {
-        return new HostLabelEndpointResolver(staticHost(endpoint));
+        return staticEndpoint(Endpoint.builder().uri(endpoint).build());
     }
 
     /*
      * Create an endpoint resolver that always returns the same host.
      *
-     * @param endpoint Endpoint to always resolve.
+     * @param endpoint to always resolve.
      * @return the endpoint resolver.
      */
     static EndpointResolver staticHost(Endpoint endpoint) {
@@ -83,7 +83,8 @@ public interface EndpointResolver {
      */
     static EndpointResolver staticHost(String endpoint) {
         Objects.requireNonNull(endpoint);
-        return params -> CompletableFuture.completedFuture(Endpoint.builder().uri(endpoint).build());
+        var ep = Endpoint.builder().uri(endpoint).build();
+        return params -> CompletableFuture.completedFuture(ep);
     }
 
     /**
@@ -94,6 +95,7 @@ public interface EndpointResolver {
      */
     static EndpointResolver staticHost(URI endpoint) {
         Objects.requireNonNull(endpoint);
-        return params -> CompletableFuture.completedFuture(Endpoint.builder().uri(endpoint).build());
+        var ep = Endpoint.builder().uri(endpoint).build();
+        return params -> CompletableFuture.completedFuture(ep);
     }
 }

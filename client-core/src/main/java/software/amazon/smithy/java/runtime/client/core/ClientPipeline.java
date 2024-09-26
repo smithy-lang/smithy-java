@@ -276,7 +276,7 @@ public final class ClientPipeline<RequestT, ResponseT> {
     ) {
         var request = EndpointResolverParams.builder()
             .operation(call.operation())
-            .inputShape(call.input())
+            .inputValue(call.input())
             .context(Context.unmodifiableView(call.context()))
             .build();
         return call.endpointResolver().resolveEndpoint(request);
