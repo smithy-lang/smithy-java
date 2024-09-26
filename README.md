@@ -4,7 +4,7 @@
 [Smithy](https://smithy.io/2.0/index.html) code generators for [Java](https://java.com/).
 
 > [!Caution]
-> This project is confidential until the repository is made public.
+> Notwithstanding any license file or headers in the repo, this repo is private and is provided to you as a Beta offering. While this repo is private, the content of this repo is AWS Content, subject to the AWS Service Terms and applicable NDAs.
 
 > [!WARNING]
 > This project is in early development and is not intended for use in production. 
