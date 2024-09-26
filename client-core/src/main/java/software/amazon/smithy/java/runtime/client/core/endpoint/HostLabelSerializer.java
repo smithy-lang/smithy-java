@@ -5,13 +5,20 @@
 
 package software.amazon.smithy.java.runtime.client.core.endpoint;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.pattern.SmithyPattern;
 import software.amazon.smithy.model.traits.HostLabelTrait;
 
@@ -75,12 +82,7 @@ final class HostLabelSerializer extends SpecificShapeSerializer implements Shape
         struct.serializeMembers(new ValueSerializer(this));
     }
 
-    private static final class ValueSerializer extends SpecificShapeSerializer {
-        private final HostLabelSerializer serializer;
-
-        private ValueSerializer(HostLabelSerializer serializer) {
-            this.serializer = serializer;
-        }
+    private record ValueSerializer(HostLabelSerializer serializer) implements ShapeSerializer {
 
         @Override
         public void writeString(Schema schema, String value) {
@@ -88,6 +90,86 @@ final class HostLabelSerializer extends SpecificShapeSerializer implements Shape
                 return;
             }
             serializer.labelMap.put(schema.memberName(), value);
+        }
+
+        @Override
+        public void writeStruct(Schema schema, SerializableStruct struct) {
+            // ignore
+        }
+
+        @Override
+        public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+            // ignore
+        }
+
+        @Override
+        public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
+            // ignore
+        }
+
+        @Override
+        public void writeBoolean(Schema schema, boolean value) {
+            // ignore
+        }
+
+        @Override
+        public void writeByte(Schema schema, byte value) {
+            // ignore
+        }
+
+        @Override
+        public void writeShort(Schema schema, short value) {
+            // ignore
+        }
+
+        @Override
+        public void writeInteger(Schema schema, int value) {
+            // ignore
+        }
+
+        @Override
+        public void writeLong(Schema schema, long value) {
+            // ignore
+        }
+
+        @Override
+        public void writeFloat(Schema schema, float value) {
+            // ignore
+        }
+
+        @Override
+        public void writeDouble(Schema schema, double value) {
+            // ignore
+        }
+
+        @Override
+        public void writeBigInteger(Schema schema, BigInteger value) {
+            // ignore
+        }
+
+        @Override
+        public void writeBigDecimal(Schema schema, BigDecimal value) {
+            // ignore
+        }
+
+        @Override
+        public void writeBlob(Schema schema, ByteBuffer value) {
+            // ignore
+        }
+
+        @Override
+        public void writeTimestamp(Schema schema, Instant value) {
+            // ignore
+        }
+
+        @Override
+        public void writeDocument(Schema schema, Document value) {
+            // ignore
+        }
+
+        @Override
+        public void writeNull(Schema schema) {
+            // ignore
         }
     }
 }

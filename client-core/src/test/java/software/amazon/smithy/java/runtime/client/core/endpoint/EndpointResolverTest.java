@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.client.core.endpoint;
 
+import java.time.Instant;
 import java.util.List;
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
@@ -80,10 +81,14 @@ public class EndpointResolverTest {
             .putMember("name", PreludeSchemas.STRING)
             .putMember("labelA", PreludeSchemas.STRING, new HostLabelTrait())
             .putMember("labelB", PreludeSchemas.STRING, new HostLabelTrait())
+            .putMember("integerVal", PreludeSchemas.INTEGER)
+            .putMember("timestampVal", PreludeSchemas.TIMESTAMP)
             .build();
         public static final Schema SCHEMA_NAME = SCHEMA.member("name");
         public static final Schema SCHEMA_LABEL_A = SCHEMA.member("labelA");
         public static final Schema SCHEMA_LABEL_B = SCHEMA.member("labelB");
+        public static final Schema SCHEMA_INTEGER_VAL = SCHEMA.member("integerVal");
+        public static final Schema SCHEMA_TIMESTAMP_VAL = SCHEMA.member("timestampVal");
 
         @Override
         public String toString() {
@@ -100,6 +105,8 @@ public class EndpointResolverTest {
             serializer.writeString(SCHEMA_NAME, name);
             serializer.writeString(SCHEMA_LABEL_A, labelA);
             serializer.writeString(SCHEMA_LABEL_B, labelB);
+            serializer.writeInteger(SCHEMA_INTEGER_VAL, 2);
+            serializer.writeTimestamp(SCHEMA_TIMESTAMP_VAL, Instant.EPOCH);
         }
     }
 
