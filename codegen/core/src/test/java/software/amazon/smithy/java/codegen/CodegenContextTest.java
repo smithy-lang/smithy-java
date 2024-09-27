@@ -30,8 +30,10 @@ import software.amazon.smithy.model.traits.IdempotencyTokenTrait;
 import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.LengthTrait;
 import software.amazon.smithy.model.traits.MediaTypeTrait;
+import software.amazon.smithy.model.traits.PaginatedTrait;
 import software.amazon.smithy.model.traits.PatternTrait;
 import software.amazon.smithy.model.traits.RangeTrait;
+import software.amazon.smithy.model.traits.RequestCompressionTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.model.traits.RequiresLengthTrait;
 import software.amazon.smithy.model.traits.RetryableTrait;
@@ -86,11 +88,9 @@ public class CodegenContextTest {
                 RangeTrait.ID,
                 RequiredTrait.ID,
                 SensitiveTrait.ID,
-                IdempotencyTokenTrait.ID,
                 SparseTrait.ID,
                 UniqueItemsTrait.ID,
                 RequiresLengthTrait.ID,
-                RetryableTrait.ID,
                 ErrorTrait.ID,
                 DefaultTrait.ID,
                 // Base Prelude Protocol traits
@@ -110,7 +110,12 @@ public class CodegenContextTest {
                 HttpTrait.ID,
                 // Auth traits
                 HttpQueryTrait.ID,
-                HttpPayloadTrait.ID
+                HttpPayloadTrait.ID,
+                // Prelude behavior traits
+                PaginatedTrait.ID,
+                IdempotencyTokenTrait.ID,
+                RetryableTrait.ID,
+                RequestCompressionTrait.ID
             )
         );
     }
@@ -144,11 +149,9 @@ public class CodegenContextTest {
                 RangeTrait.ID,
                 RequiredTrait.ID,
                 SensitiveTrait.ID,
-                IdempotencyTokenTrait.ID,
                 SparseTrait.ID,
                 UniqueItemsTrait.ID,
                 RequiresLengthTrait.ID,
-                RetryableTrait.ID,
                 ErrorTrait.ID,
                 DefaultTrait.ID,
                 // Base Prelude Protocol traits
@@ -162,7 +165,12 @@ public class CodegenContextTest {
                 EventHeaderTrait.ID,
                 EventPayloadTrait.ID,
                 HostLabelTrait.ID,
-                EndpointTrait.ID
+                EndpointTrait.ID,
+                // Prelude behavior traits
+                PaginatedTrait.ID,
+                IdempotencyTokenTrait.ID,
+                RetryableTrait.ID,
+                RequestCompressionTrait.ID
             )
         );
     }

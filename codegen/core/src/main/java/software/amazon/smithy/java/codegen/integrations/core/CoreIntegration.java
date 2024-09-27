@@ -34,6 +34,7 @@ public class CoreIntegration implements JavaCodegenIntegration {
     @Override
     public List<TraitInitializer<? extends Trait>> traitInitializers() {
         return List.of(
+            new PaginatedTraitInitializer(),
             new HttpApiKeyAuthTraitInitializer(),
             new RequestCompressionTraitInitializer(),
             new DefaultTraitInitializer(),
