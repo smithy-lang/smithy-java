@@ -36,11 +36,30 @@ public interface IdentityResolver<IdentityT extends Identity> {
     /**
      * Combines multiple identity resolvers with the same identity type into a single resolver.
      *
+     * <p>By default the chained resolver will attempt to re-use the last successful provider when resolving the identity.
+     *
      * @param resolvers Resolvers to combine.
      * @return the combined resolvers.
      */
     static <I extends Identity> IdentityResolver<I> chain(List<IdentityResolver<I>> resolvers) {
-        return new IdentityResolverChain<>(resolvers);
+        return new IdentityResolverChain<>(resolvers, true);
+    }
+
+    /**
+     * Combines multiple identity resolvers with the same identity type into a single resolver.
+     *
+     * <p>By default
+     *
+     * @param resolvers Resolvers to combine.
+     * @param reuseLastProvider if the chained resolver should attempt to re-use the last successful provider when
+     *                          resolving the identity.
+     * @return the combined resolvers.
+     */
+    static <I extends Identity> IdentityResolver<I> chain(
+        List<IdentityResolver<I>> resolvers,
+        boolean reuseLastProvider
+    ) {
+        return new IdentityResolverChain<>(resolvers, reuseLastProvider);
     }
 
     /**

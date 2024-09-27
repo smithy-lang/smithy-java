@@ -28,9 +28,48 @@ public class IdentityResolverTest {
 
     @Test
     void testIdentityResolverChainContinuesOnIdentityNotFound() throws ExecutionException, InterruptedException {
-        var resolver = IdentityResolver.chain(List.of(EmptyResolver.INSTANCE, TEST_RESOLVER));
+        var resolver = IdentityResolver.chain(
+            List.of(
+                EmptyResolver.INSTANCE,
+                EmptyResolver.INSTANCE,
+                EmptyResolver.INSTANCE,
+                TEST_RESOLVER
+            )
+        );
         var result = resolver.resolveIdentity(AuthProperties.empty()).get();
         assertEquals(result, TEST_IDENTITY);
+    }
+
+    @Test
+    void testIdentityResolverChainCachesResolver() throws ExecutionException, InterruptedException {
+        var counter = new CountingResolver();
+        var resolver = IdentityResolver.chain(List.of(counter, TEST_RESOLVER));
+        var result = resolver.resolveIdentity(AuthProperties.empty()).get();
+        assertEquals(result, TEST_IDENTITY);
+        assertEquals(counter.count, 1);
+
+        // Resolve again, expecting the chain to cache the last successful resolver.
+        var result2 = resolver.resolveIdentity(AuthProperties.empty()).get();
+        assertEquals(result, TEST_IDENTITY);
+        assertEquals(counter.count, 1);
+    }
+
+    @Test
+    void testIdentityResolverChainStopsCachingAfterFailure() throws ExecutionException, InterruptedException {
+        var counter1 = new CountingResolver();
+        final TogglableResolver toggle = new TogglableResolver();
+        var counter2 = new CountingResolver();
+        var resolver = IdentityResolver.chain(List.of(counter1, toggle, counter2, TEST_RESOLVER));
+        var result = resolver.resolveIdentity(AuthProperties.empty()).get();
+        assertEquals(result, TEST_IDENTITY);
+        assertEquals(counter1.count, 1);
+        assertEquals(counter2.count, 0);
+
+        toggle.fail = true;
+        var result2 = resolver.resolveIdentity(AuthProperties.empty()).get();
+        assertEquals(result2, TEST_IDENTITY);
+        assertEquals(counter1.count, 2);
+        assertEquals(counter2.count, 1);
     }
 
     @Test
@@ -75,6 +114,50 @@ public class IdentityResolverTest {
         @Override
         public CompletableFuture<TokenIdentity> resolveIdentity(AuthProperties requestProperties) {
             return CompletableFuture.failedFuture(ILLEGAL_ARGUMENT_EXCEPTION);
+        }
+
+        @Override
+        public Class<TokenIdentity> identityType() {
+            return TokenIdentity.class;
+        }
+    }
+
+    private static final class CountingResolver implements IdentityResolver<TokenIdentity> {
+        private int count = 0;
+
+        @Override
+        public CompletableFuture<TokenIdentity> resolveIdentity(AuthProperties requestProperties) {
+            count += 1;
+            return CompletableFuture.failedFuture(
+                new IdentityNotFoundException(
+                    "Counting has no identity",
+                    CountingResolver.class,
+                    TokenIdentity.class
+                )
+            );
+        }
+
+        @Override
+        public Class<TokenIdentity> identityType() {
+            return TokenIdentity.class;
+        }
+    }
+
+    private static final class TogglableResolver implements IdentityResolver<TokenIdentity> {
+        private boolean fail;
+
+        @Override
+        public CompletableFuture<TokenIdentity> resolveIdentity(AuthProperties requestProperties) {
+            if (fail) {
+                return CompletableFuture.failedFuture(
+                    new IdentityNotFoundException(
+                        "Toggle has no identity",
+                        CountingResolver.class,
+                        TokenIdentity.class
+                    )
+                );
+            }
+            return CompletableFuture.completedFuture(TEST_IDENTITY);
         }
 
         @Override
