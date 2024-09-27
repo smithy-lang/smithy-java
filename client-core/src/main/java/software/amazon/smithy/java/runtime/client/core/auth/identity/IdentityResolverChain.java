@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.client.core.auth.identity;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -24,22 +25,46 @@ final class IdentityResolverChain<IdentityT extends Identity> implements Identit
     }
 
     @Override
+    public Class<IdentityT> identityType() {
+        return identityClass;
+    }
+
+    @Override
     public CompletableFuture<IdentityT> resolveIdentity(AuthProperties requestProperties) {
-        CompletableFuture<IdentityT> result = resolvers.get(0).resolveIdentity(requestProperties);
-        for (var idx = 1; idx < resolvers.size(); idx++) {
-            var next = resolvers.get(idx);
-            result = result.exceptionallyComposeAsync(exc -> {
+        List<String> excMessages = new ArrayList<>();
+        return executeChain(resolvers.get(0), requestProperties, excMessages, 0);
+    }
+
+    @SuppressWarnings("unchecked")
+    private CompletableFuture<IdentityT> executeChain(
+        IdentityResolver<IdentityT> resolver,
+        AuthProperties requestProperties,
+        List<String> excMessages,
+        int idx
+    ) {
+        var result = resolver.resolveIdentity(requestProperties);
+        if (idx + 1 < resolvers.size()) {
+            var nextResolver = resolvers.get(idx + 1);
+            return result.exceptionallyCompose(exc -> {
                 if (exc instanceof IdentityNotFoundException) {
-                    return next.resolveIdentity(requestProperties);
+                    excMessages.add(exc.getMessage());
+                    return executeChain(nextResolver, requestProperties, excMessages, idx + 1);
                 }
                 return CompletableFuture.failedFuture(exc);
             });
         }
-        return result;
-    }
-
-    @Override
-    public Class<IdentityT> identityType() {
-        return identityClass;
+        return result.exceptionallyComposeAsync(exc -> {
+            if (exc instanceof IdentityNotFoundException) {
+                excMessages.add(exc.getMessage());
+                return CompletableFuture.failedFuture(
+                    new IdentityNotFoundException(
+                        "Could not resolve identity with any resolvers in the chain : " + excMessages,
+                        (Class<? extends IdentityResolver<?>>) this.getClass(),
+                        identityClass
+                    )
+                );
+            }
+            return CompletableFuture.failedFuture(exc);
+        });
     }
 }

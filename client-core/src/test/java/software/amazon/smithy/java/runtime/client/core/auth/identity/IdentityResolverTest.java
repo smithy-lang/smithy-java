@@ -7,10 +7,11 @@ package software.amazon.smithy.java.runtime.client.core.auth.identity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
@@ -20,26 +21,56 @@ public class IdentityResolverTest {
     private static final IdentityResolver<TokenIdentity> TEST_RESOLVER = IdentityResolver.of(TEST_IDENTITY);
 
     @Test
-    void testStaticIdentityReturnsExpected() throws ExecutionException, InterruptedException {
+    void testStaticIdentityReturnsExpected() {
         assertEquals(TEST_RESOLVER.identityType(), TEST_IDENTITY.getClass());
-        var resolved = TEST_RESOLVER.resolveIdentity(AuthProperties.empty()).get();
+        var resolved = TEST_RESOLVER.resolveIdentity(AuthProperties.empty()).join();
         assertEquals(TEST_IDENTITY, resolved);
     }
 
     @Test
-    void testIdentityResolverChainContinuesOnIdentityNotFound() throws ExecutionException, InterruptedException {
-        var resolver = IdentityResolver.chain(List.of(EmptyResolver.INSTANCE, TEST_RESOLVER));
-        var result = resolver.resolveIdentity(AuthProperties.empty()).get();
+    void testIdentityResolverChainContinuesOnIdentityNotFound() {
+        var resolver = IdentityResolver.chain(
+            List.of(
+                EmptyResolver.INSTANCE,
+                EmptyResolver.INSTANCE,
+                EmptyResolver.INSTANCE,
+                TEST_RESOLVER
+            )
+        );
+        var result = resolver.resolveIdentity(AuthProperties.empty()).join();
         assertEquals(result, TEST_IDENTITY);
     }
 
     @Test
-    void testIdentityResolverChainStopsOnUnexpectedFailure() throws ExecutionException, InterruptedException {
+    void testIdentityResolverFailsOutOnUnknownError() {
         var resolver = IdentityResolver.chain(
-            List.of(EmptyResolver.INSTANCE, FailingResolver.INSTANCE, TEST_RESOLVER)
+            List.of(
+                EmptyResolver.INSTANCE,
+                EmptyResolver.INSTANCE,
+                FailingResolver.INSTANCE
+            )
         );
-        var exc = assertThrows(ExecutionException.class, () -> resolver.resolveIdentity(AuthProperties.empty()).get());
-        assertEquals(exc.getCause(), FailingResolver.ILLEGAL_ARGUMENT_EXCEPTION);
+        var exc = assertThrows(
+            CompletionException.class,
+            () -> resolver.resolveIdentity(AuthProperties.empty()).join()
+        );
+        assertTrue(exc.getMessage().contains("BAD!"));
+    }
+
+    @Test
+    void testIdentityResolverAggregatesExceptions() {
+        var resolver = IdentityResolver.chain(
+            List.of(
+                EmptyResolver.INSTANCE,
+                EmptyResolver.INSTANCE,
+                EmptyResolver.INSTANCE
+            )
+        );
+        var exc = assertThrows(
+            CompletionException.class,
+            () -> resolver.resolveIdentity(AuthProperties.empty()).join()
+        );
+        assertTrue(exc.getMessage().contains("[No token. Womp Womp., No token. Womp Womp., No token. Womp Womp.]"));
     }
 
     /**
