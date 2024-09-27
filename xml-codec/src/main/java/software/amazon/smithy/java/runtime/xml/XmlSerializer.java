@@ -1,0 +1,357 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.runtime.xml;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.function.BiConsumer;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.InterceptingSerializer;
+import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
+import software.amazon.smithy.model.traits.XmlAttributeTrait;
+import software.amazon.smithy.model.traits.XmlFlattenedTrait;
+import software.amazon.smithy.model.traits.XmlNameTrait;
+import software.amazon.smithy.model.traits.XmlNamespaceTrait;
+
+final class XmlSerializer extends InterceptingSerializer {
+
+    private static final TimestampFormatTrait.Format DEFAULT_FORMAT = TimestampFormatTrait.Format.DATE_TIME;
+
+    private final XmlInfo xmlInfo;
+    private final XMLStreamWriter writer;
+    private final MemberWriter memberWriter = new MemberWriter();
+    private final ValueSerializer valueSerializer = new ValueSerializer();
+    private final StructMemberWriter structMemberWriter = new StructMemberWriter();
+    private final AttributeSerializer attributeSerializer = new AttributeSerializer();
+
+    XmlSerializer(XMLStreamWriter writer, XmlInfo xmlInfo) {
+        this.writer = writer;
+        this.xmlInfo = xmlInfo;
+    }
+
+    // Handles writing top-level shapes that are not members. The element uses xmlName or the shape name.
+    @Override
+    protected ShapeSerializer before(Schema schema) {
+        try {
+            var trait = schema.getTrait(XmlNameTrait.class);
+            var xmlName = trait != null ? trait.getValue() : schema.id().getName();
+            writer.writeStartElement(xmlName);
+
+            // Add a namespace if present.
+            var ns = schema.getTrait(XmlNamespaceTrait.class);
+            if (ns != null) {
+                writer.writeNamespace(ns.getPrefix().orElse(null), ns.getUri());
+            }
+
+            return valueSerializer;
+        } catch (XMLStreamException e) {
+            throw new SerializationException(e);
+        }
+    }
+
+    // Close the top-level shape element.
+    @Override
+    protected void after(Schema schema) {
+        try {
+            writer.writeEndElement();
+        } catch (XMLStreamException e) {
+            throw new SerializationException(e);
+        }
+    }
+
+    private static String formatTimestamp(Schema schema, Instant value) {
+        return TimestampFormatter.of(schema.getTrait(TimestampFormatTrait.class), DEFAULT_FORMAT).writeString(value);
+    }
+
+    // Write to an attribute or to an element.
+    private final class StructMemberWriter extends InterceptingSerializer {
+        @Override
+        protected ShapeSerializer before(Schema schema) {
+            if (schema.hasTrait(XmlAttributeTrait.class)) {
+                return attributeSerializer;
+            } else if (schema.hasTrait(XmlFlattenedTrait.class)) {
+                return valueSerializer;
+            } else {
+                return memberWriter;
+            }
+        }
+    }
+
+    // Writes members by writing their containing element, their value, then the closing element.
+    // Note that flattened structure members skip this writer and just use MemberValueSerializer.
+    private final class MemberWriter extends InterceptingSerializer {
+        @Override
+        protected ShapeSerializer before(Schema schema) {
+            try {
+                writer.writeStartElement(getXmlNameOrMemberName(schema));
+                return valueSerializer;
+            } catch (XMLStreamException e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        protected void after(Schema schema) {
+            try {
+                writer.writeEndElement();
+            } catch (XMLStreamException e) {
+                throw new SerializationException(e);
+            }
+        }
+    }
+
+    private static String getXmlNameOrMemberName(Schema schema) {
+        var trait = schema.getTrait(XmlNameTrait.class);
+        return trait != null ? trait.getValue() : Objects.requireNonNull(schema.memberName(), "Schema is not a member");
+    }
+
+    // Serialize member values. This does not open and close a containing element.
+    private final class ValueSerializer implements ShapeSerializer {
+        @Override
+        public void writeStruct(Schema schema, SerializableStruct struct) {
+            struct.serializeMembers(structMemberWriter);
+        }
+
+        @Override
+        public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+            var info = xmlInfo.getListInfo(schema);
+            consumer.accept(listState, new XmlListItemSerializer(info));
+        }
+
+        @Override
+        public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
+            var info = xmlInfo.getMapInfo(schema);
+            consumer.accept(mapState, new XmlMapEntrySerializer(info));
+        }
+
+        @Override
+        public void writeBoolean(Schema schema, boolean value) {
+            write(value ? "true" : "false");
+        }
+
+        @Override
+        public void writeByte(Schema schema, byte value) {
+            write(Byte.toString(value));
+        }
+
+        @Override
+        public void writeShort(Schema schema, short value) {
+            write(Short.toString(value));
+        }
+
+        @Override
+        public void writeInteger(Schema schema, int value) {
+            write(Integer.toString(value));
+        }
+
+        @Override
+        public void writeLong(Schema schema, long value) {
+            write(Long.toString(value));
+        }
+
+        @Override
+        public void writeFloat(Schema schema, float value) {
+            write(Float.toString(value));
+        }
+
+        @Override
+        public void writeDouble(Schema schema, double value) {
+            write(Double.toString(value));
+        }
+
+        @Override
+        public void writeBigInteger(Schema schema, BigInteger value) {
+            write(value.toString());
+        }
+
+        @Override
+        public void writeBigDecimal(Schema schema, BigDecimal value) {
+            write(value.toString());
+        }
+
+        @Override
+        public void writeString(Schema schema, String value) {
+            write(value);
+        }
+
+        @Override
+        public void writeBlob(Schema schema, ByteBuffer value) {
+            write(ByteBufferUtils.base64Encode(value));
+        }
+
+        @Override
+        public void writeTimestamp(Schema schema, Instant value) {
+            write(formatTimestamp(schema, value));
+        }
+
+        @Override
+        public void writeDocument(Schema schema, Document value) {
+            // do nothing
+        }
+
+        @Override
+        public void writeNull(Schema schema) {
+            // do nothing
+        }
+
+        private void write(String value) {
+            try {
+                writer.writeCharacters(value);
+            } catch (XMLStreamException e) {
+                throw new SerializationException(e);
+            }
+        }
+    }
+
+    // Serialize XML attributes of structures and unions.
+    private final class AttributeSerializer extends SpecificShapeSerializer {
+        @Override
+        public void writeBoolean(Schema schema, boolean value) {
+            write(schema, value ? "true" : "false");
+        }
+
+        @Override
+        public void writeByte(Schema schema, byte value) {
+            write(schema, Byte.toString(value));
+        }
+
+        @Override
+        public void writeShort(Schema schema, short value) {
+            write(schema, Short.toString(value));
+        }
+
+        @Override
+        public void writeInteger(Schema schema, int value) {
+            write(schema, Integer.toString(value));
+        }
+
+        @Override
+        public void writeLong(Schema schema, long value) {
+            write(schema, Long.toString(value));
+        }
+
+        @Override
+        public void writeFloat(Schema schema, float value) {
+            write(schema, Float.toString(value));
+        }
+
+        @Override
+        public void writeDouble(Schema schema, double value) {
+            write(schema, Double.toString(value));
+        }
+
+        @Override
+        public void writeBigInteger(Schema schema, BigInteger value) {
+            write(schema, value.toString());
+        }
+
+        @Override
+        public void writeBigDecimal(Schema schema, BigDecimal value) {
+            write(schema, value.toString());
+        }
+
+        @Override
+        public void writeString(Schema schema, String value) {
+            write(schema, value);
+        }
+
+        @Override
+        public void writeTimestamp(Schema schema, Instant value) {
+            write(schema, formatTimestamp(schema, value));
+        }
+
+        @Override
+        public void writeNull(Schema schema) {
+            // do nothing
+        }
+
+        private void write(Schema schema, String value) {
+            try {
+                writer.writeAttribute(getXmlNameOrMemberName(schema), value);
+            } catch (XMLStreamException e) {
+                throw new SerializationException(e);
+            }
+        }
+    }
+
+    // Wrap list member values in the "item" node.
+    private final class XmlListItemSerializer extends InterceptingSerializer {
+
+        private final XmlInfo.ListMemberInfo info;
+
+        XmlListItemSerializer(XmlInfo.ListMemberInfo info) {
+            this.info = info;
+        }
+
+        @Override
+        protected ShapeSerializer before(Schema schema) {
+            try {
+                writer.writeStartElement(info.memberName);
+                return valueSerializer;
+            } catch (XMLStreamException e) {
+                throw new SerializationException(e);
+            }
+        }
+
+        @Override
+        protected void after(Schema schema) {
+            try {
+                writer.writeEndElement();
+            } catch (XMLStreamException e) {
+                throw new SerializationException(e);
+            }
+        }
+    }
+
+    private final class XmlMapEntrySerializer implements MapSerializer {
+
+        private final XmlInfo.MapMemberInfo info;
+
+        XmlMapEntrySerializer(XmlInfo.MapMemberInfo info) {
+            this.info = info;
+        }
+
+        @Override
+        public <T> void writeEntry(
+            Schema keySchema,
+            String key,
+            T state,
+            BiConsumer<T, ShapeSerializer> valueSerializer
+        ) {
+            try {
+                // Write the "<entry>" element.
+                writer.writeStartElement(info.entryName);
+
+                // Write the "<key>" element.
+                writer.writeStartElement(info.keyName);
+                writer.writeCharacters(key);
+                writer.writeEndElement();
+
+                // Write the "<value>" element.
+                writer.writeStartElement(info.valueName);
+                valueSerializer.accept(state, memberWriter);
+                writer.writeEndElement();
+
+                writer.writeEndElement();
+            } catch (XMLStreamException e) {
+                throw new SerializationException(e);
+            }
+        }
+    }
+}

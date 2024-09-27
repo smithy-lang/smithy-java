@@ -77,7 +77,9 @@ public interface Codec extends AutoCloseable {
      * @param source Source to parse.
      * @return Returns the created deserializer.
      */
-    ShapeDeserializer createDeserializer(byte[] source);
+    default ShapeDeserializer createDeserializer(byte[] source) {
+        return createDeserializer(ByteBuffer.wrap(source));
+    }
 
     /**
      * Create a deserializer from this Codec that deserializes a shape from the source.

@@ -27,16 +27,46 @@ public interface TimestampFormatter {
      * Create a formatter from a timestamp format trait and the known prelude formats for date-time, epoch-seconds,
      * and http-date.
      *
+     * @param schema Schema to attempt to find the timestamp format trait in.
+     * @param defaultFormat The format to use if the provided trait is null.
+     * @return Returns the created formatter.
+     * @throws SerializationException for an unknown format.
+     */
+    static TimestampFormatter of(Schema schema, TimestampFormatTrait.Format defaultFormat) {
+        return of(schema.getTrait(TimestampFormatTrait.class), defaultFormat);
+    }
+
+    /**
+     * Create a formatter from a timestamp format trait and the known prelude formats for date-time, epoch-seconds,
+     * and http-date.
+     *
      * @param trait Trait to create the format from.
+     * @param defaultFormat The format to use if the provided trait is null.
+     * @return Returns the created formatter.
+     * @throws SerializationException for an unknown format.
+     */
+    static TimestampFormatter of(TimestampFormatTrait trait, TimestampFormatTrait.Format defaultFormat) {
+        return of(trait == null ? defaultFormat : trait.getFormat());
+    }
+
+    /**
+     * Create a formatter from a timestamp format trait and the known prelude formats for date-time, epoch-seconds,
+     * and http-date.
+     *
+     * @param trait Non-null trait to create the format from.
      * @return Returns the created formatter.
      * @throws SerializationException for an unknown format.
      */
     static TimestampFormatter of(TimestampFormatTrait trait) {
-        return switch (trait.getFormat()) {
+        return of(trait.getFormat());
+    }
+
+    private static TimestampFormatter of(TimestampFormatTrait.Format format) {
+        return switch (format) {
             case DATE_TIME -> Prelude.DATE_TIME;
             case EPOCH_SECONDS -> Prelude.EPOCH_SECONDS;
             case HTTP_DATE -> Prelude.HTTP_DATE;
-            default -> throw new SerializationException("Unknown timestamp format: " + trait.getFormat());
+            default -> throw new SerializationException("Unknown timestamp format: " + format);
         };
     }
 
