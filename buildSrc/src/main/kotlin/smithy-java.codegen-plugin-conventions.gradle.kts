@@ -36,3 +36,6 @@ sourceSets {
         }
     }
 }
+
+// Ensure integ tests are executed as part of test suite
+tasks["test"].finalizedBy("integ")
