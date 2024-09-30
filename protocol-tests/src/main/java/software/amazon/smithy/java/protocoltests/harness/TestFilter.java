@@ -10,7 +10,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.protocoltests.traits.AppliesTo;
 import software.amazon.smithy.protocoltests.traits.HttpMessageTestCase;
 
 /**
@@ -27,10 +26,14 @@ sealed interface TestFilter {
     /**
      * Filters test cases
      */
-    boolean skipTestCase(HttpMessageTestCase testCase, AppliesTo appliesTo);
+    boolean skipTestCase(HttpMessageTestCase testCase, TestType testType);
 
     default boolean skipTestCase(HttpMessageTestCase testCase) {
         return skipTestCase(testCase, null);
+    }
+
+    default TestFilter combine(TestFilter other) {
+        return new CombinedTestFilter(this, other);
     }
 
     static TestFilter fromAnnotation(ProtocolTestFilter filterAnnotation) {
@@ -41,10 +44,10 @@ sealed interface TestFilter {
     }
 
     final class FilterImpl implements TestFilter {
-        private static final Set<ShapeId> operations = new HashSet<>();
-        private static final Set<ShapeId> skippedOperations = new HashSet<>();
-        private static final Set<String> tests = new HashSet<>();
-        private static final Set<String> skippedTests = new HashSet<>();
+        private final Set<ShapeId> operations = new HashSet<>();
+        private final Set<ShapeId> skippedOperations = new HashSet<>();
+        private final Set<String> tests = new HashSet<>();
+        private final Set<String> skippedTests = new HashSet<>();
 
         public FilterImpl(ProtocolTestFilter filter) {
             skippedOperations.addAll(
@@ -73,12 +76,12 @@ sealed interface TestFilter {
         }
 
         @Override
-        public boolean skipTestCase(HttpMessageTestCase testCase, AppliesTo appliesTo) {
+        public boolean skipTestCase(HttpMessageTestCase testCase, TestType testType) {
             return skippedTests.contains(testCase.getId())
                 || (!tests.isEmpty() && !tests.contains(testCase.getId()))
-                || (appliesTo != null
+                || (testType != null
                     && testCase.getAppliesTo().isPresent()
-                    && !testCase.getAppliesTo().get().equals(appliesTo));
+                    && !testCase.getAppliesTo().get().equals(testType.appliesTo));
         }
     }
 
@@ -90,8 +93,29 @@ sealed interface TestFilter {
         }
 
         @Override
-        public boolean skipTestCase(HttpMessageTestCase testCase, AppliesTo appliesTo) {
+        public boolean skipTestCase(HttpMessageTestCase testCase, TestType testType) {
             return false;
+        }
+    }
+
+    final class CombinedTestFilter implements TestFilter {
+
+        private final TestFilter first;
+        private final TestFilter second;
+
+        private CombinedTestFilter(TestFilter first, TestFilter second) {
+            this.first = first;
+            this.second = second;
+        }
+
+        @Override
+        public boolean skipOperation(ShapeId operationId) {
+            return first.skipOperation(operationId) || second.skipOperation(operationId);
+        }
+
+        @Override
+        public boolean skipTestCase(HttpMessageTestCase testCase, TestType testType) {
+            return first.skipTestCase(testCase, testType) || second.skipTestCase(testCase, testType);
         }
     }
 }

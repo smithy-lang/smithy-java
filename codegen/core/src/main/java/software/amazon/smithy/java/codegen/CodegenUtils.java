@@ -54,6 +54,7 @@ public final class CodegenUtils {
     private static final String SCHEMA_STATIC_NAME = "SCHEMA";
     private static final EnumSet<ShapeType> SHAPES_WITH_INNER_SCHEMA = EnumSet.of(
         ShapeType.OPERATION,
+        ShapeType.SERVICE,
         ShapeType.ENUM,
         ShapeType.INT_ENUM,
         ShapeType.UNION,

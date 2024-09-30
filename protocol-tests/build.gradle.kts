@@ -15,6 +15,10 @@ dependencies {
     implementation(libs.smithy.protocol.test.traits)
     implementation(project(":http-api"))
     implementation(project(":codegen:core"))
+    implementation(project(":codegen:server"))
+    implementation(project(":server"))
+    implementation(project(":server-core"))
+    implementation(project(":client-http"))
 
     api(libs.junit.jupiter.api)
     api(libs.junit.jupiter.engine)

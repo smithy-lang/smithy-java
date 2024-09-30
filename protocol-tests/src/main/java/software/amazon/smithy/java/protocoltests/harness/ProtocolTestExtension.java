@@ -6,17 +6,16 @@
 package software.amazon.smithy.java.protocoltests.harness;
 
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.ServiceLoader;
+import java.net.URI;
+import java.util.*;
+import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaSymbolProvider;
+import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
+import software.amazon.smithy.java.codegen.server.ServiceJavaSymbolProvider;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
@@ -24,6 +23,8 @@ import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.server.Server;
+import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
@@ -44,7 +45,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  * <p>See the {@link ProtocolTest} annotation for usage information.
  */
 @SmithyInternalApi
-public final class ProtocolTestExtension implements BeforeAllCallback {
+public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllCallback {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ProtocolTestExtension.class);
     private static final Model BASE_MODEL = Model.assembler(ProtocolTestExtension.class.getClassLoader())
         .discoverModels(ProtocolTestExtension.class.getClassLoader())
@@ -56,67 +57,148 @@ public final class ProtocolTestExtension implements BeforeAllCallback {
     );
     private static final Map<ShapeId, ClientProtocolFactory> protocolFactories = new HashMap<>();
     private static final Map<ShapeId, AuthSchemeFactory> authSchemeFactories = new HashMap<>();
+
     static {
         ServiceLoader.load(ClientProtocolFactory.class)
             .forEach(factory -> protocolFactories.put(factory.id(), factory));
         ServiceLoader.load(AuthSchemeFactory.class)
             .forEach(factory -> authSchemeFactories.put(factory.schemeId(), factory));
     }
+
     private static final String SHARED_DATA_KEY = "protocol-test-shared-data";
+    private static final String TEST_FILTER_KEY = "protocol-test-filter";
+    private Runnable afterAll;
 
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
         var testClass = context.getRequiredTestClass();
-        var protocolTestAnnotation = testClass.getAnnotation(ProtocolTest.class);
-        if (protocolTestAnnotation == null) {
-            throw new IllegalArgumentException("`@ProtocolTest` annotation not found.");
-        }
+        var protocolTestAnnotation = Objects.requireNonNull(
+            testClass.getAnnotation(ProtocolTest.class),
+            "`@ProtocolTest` annotation not found."
+        );
         var serviceId = ShapeId.from(protocolTestAnnotation.service());
+        var testType = protocolTestAnnotation.testType();
 
         var filter = TestFilter.fromAnnotation(testClass.getAnnotation(ProtocolTestFilter.class));
-        Model filtered = getFilteredModel(filter);
-
-        // Apply basic service transforms
-        ServiceShape service = filtered.expectShape(serviceId).asServiceShape().orElseThrow();
-        Model serviceModel = applyServiceTransformations(service, filtered);
-
-        // Discover all protocols and operations applicable for the service under test.
-        var protocols = getProtocols(serviceModel, service);
-        var testOperations = getTestOperations(serviceModel, service, filter);
-
-        // instantiate a mock client for use by test runners
-        var mockClientBuilder = MockClient.builder();
-
-        // Discover all client auth scheme implementations that could be used for tests
-        // NOTE: auth schemes are not stored in test data b/c they are added to the mock client
-        var authSchemes = getAuthSchemes(serviceModel, service);
-        for (var authScheme : authSchemes.values()) {
-            mockClientBuilder.putSupportedAuthSchemes(authScheme);
-        }
-
-        // TODO: allow customization of client builder?
-
-        // Store shared data for use by tests
         context.getStore(namespace.append(context.getUniqueId()))
             .put(
-                SHARED_DATA_KEY,
-                new SharedTestData(
-                    mockClientBuilder.build(),
-                    protocols,
-                    testOperations
-                )
+                TEST_FILTER_KEY,
+                filter
             );
+
+        // Apply basic service transforms
+        ServiceShape service = BASE_MODEL.expectShape(serviceId).asServiceShape().orElseThrow();
+        Model serviceModel = applyServiceTransformations(service);
+
+        // Discover all protocols and operations applicable for the service under test.
+        List<HttpTestOperation> testOperations = getTestOperations(serviceModel, service, filter);
+        Map<ShapeId, AuthScheme<?, ?>> authSchemes = getAuthSchemes(serviceModel, service);
+        var protocols = getClientProtocols(serviceModel, service);
+
+        switch (testType.appliesTo) {
+            case CLIENT -> {
+                // instantiate a mock client for use by test runners
+                // TODO: allow customization of client builder
+                var mockClientBuilder = MockClient.builder();
+
+                // Discover all client auth scheme implementations that could be used for tests
+                // NOTE: auth schemes are not stored in test data b/c they are added to the mock client
+                for (var authScheme : authSchemes.values()) {
+                    mockClientBuilder.putSupportedAuthSchemes(authScheme);
+                }
+                // Store shared data for use by tests
+                context.getStore(namespace.append(context.getUniqueId()))
+                    .put(
+                        SHARED_DATA_KEY,
+                        new SharedClientTestData(
+                            mockClientBuilder.build(),
+                            protocols,
+                            testOperations
+                        )
+                    );
+            }
+            case SERVER -> {
+                var symbolProvider = SymbolProvider.cache(
+                    new ServiceJavaSymbolProvider(serviceModel, service, serviceId.getNamespace())
+                );
+                Map<Class<?>, MockOperation> mockOperationMap = new HashMap<>();
+                var serverTestOperations = new ArrayList<ServerTestOperation>();
+                for (var testOperation : testOperations) {
+                    var operationShape = serviceModel.expectShape(testOperation.id());
+                    var operationClassName = symbolProvider.toSymbol(operationShape)
+                        .expectProperty(ServerSymbolProperties.STUB_OPERATION)
+                        .toString();
+                    var operationClass = Class.forName(operationClassName);
+                    MockOperation mockOperation = new MockOperation(operationClass);
+                    mockOperationMap.put(operationClass, mockOperation);
+                    serverTestOperations.add(new ServerTestOperation(testOperation, mockOperation));
+                }
+                Class<?> serviceClass = Class.forName(symbolProvider.toSymbol(service).toString());
+                Object builder = serviceClass.getDeclaredMethod("builder").invoke(null);
+                Class<?> builderStageClass = serviceClass.getDeclaredMethod("builder").getReturnType();
+                while (!builderStageClass.getSimpleName().endsWith("BuildStage")) {
+                    var addMethod = Arrays.stream(builderStageClass.getDeclaredMethods())
+                        .filter(m -> m.getParameterCount() == 1)
+                        .filter(m -> mockOperationMap.containsKey(m.getParameterTypes()[0]))
+                        .findFirst()
+                        .orElseThrow();
+                    addMethod.invoke(builder, mockOperationMap.get(addMethod.getParameterTypes()[0]).getMock());
+                    builderStageClass = addMethod.getReturnType();
+                }
+
+                Service createdService = (Service) builderStageClass.getMethod("build").invoke(builder);
+
+                var endpoint = URI.create("http://localhost:8190");
+
+                context.getStore(namespace.append(context.getUniqueId()))
+                    .put(
+                        SHARED_DATA_KEY,
+                        new SharedServerTestData(
+                            serverTestOperations,
+                            protocols,
+                            endpoint
+                        )
+                    );
+
+                var server = Server.builder()
+                    .endpoints(endpoint)
+                    .addService(createdService)
+                    .build();
+                server.start();
+                afterAll = () -> {
+                    try {
+                        server.shutdown().get();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                };
+            }
+        }
     }
 
-    static SharedTestData getSharedTestData(ExtensionContext context) {
-        return context.getStore(namespace.append(context.getUniqueId())).get(SHARED_DATA_KEY, SharedTestData.class);
+    @Override
+    public void afterAll(ExtensionContext context) throws Exception {
+        if (afterAll != null) {
+            afterAll.run();
+        }
+    }
+
+    static <T> T getSharedTestData(ExtensionContext context, Class<T> clazz) {
+        return context.getStore(namespace.append(context.getUniqueId()))
+            .get(SHARED_DATA_KEY, clazz);
+    }
+
+    static TestFilter getTestFilter(ExtensionContext context) {
+        return context.getStore(namespace.append(context.getUniqueId()))
+            .get(TEST_FILTER_KEY, TestFilter.class);
     }
 
     /**
      * Wrapper class for protocol test data. Allows the retrieval of data from the extension store without casting.
+     *
      * @param mockClient
      */
-    record SharedTestData(
+    record SharedClientTestData(
         MockClient mockClient,
         Map<ShapeId, ClientProtocol<?, ?>> protocols,
         List<HttpTestOperation> operations
@@ -126,21 +208,26 @@ public final class ProtocolTestExtension implements BeforeAllCallback {
         }
     }
 
-    private static Model getFilteredModel(TestFilter filter) {
-        return transformer.removeUnreferencedShapes(
-            transformer.removeShapesIf(BASE_MODEL, s -> s.isOperationShape() && filter.skipOperation(s.getId()))
-        );
+    record SharedServerTestData(
+        List<ServerTestOperation> testOperations,
+        Map<ShapeId, ClientProtocol<?, ?>> protocols, URI endpoint
+    ) {
+
     }
 
-    private static Model applyServiceTransformations(ServiceShape service, Model filtered) {
-        Model serviceModel = transformer.copyServiceErrorsToOperations(filtered, service);
+    record ServerTestOperation(HttpTestOperation operation, MockOperation mockOperation) {
+
+    }
+
+    private static Model applyServiceTransformations(ServiceShape service) {
+        Model serviceModel = transformer.copyServiceErrorsToOperations(BASE_MODEL, service);
         serviceModel = transformer.flattenAndRemoveMixins(serviceModel);
         serviceModel = transformer.createDedicatedInputAndOutput(serviceModel, "Input", "Output");
         return serviceModel;
     }
 
     @SuppressWarnings("unchecked")
-    static Map<ShapeId, ClientProtocol<?, ?>> getProtocols(Model serviceModel, ServiceShape service) {
+    static Map<ShapeId, ClientProtocol<?, ?>> getClientProtocols(Model serviceModel, ServiceShape service) {
         var serviceIndex = ServiceIndex.of(serviceModel);
 
         var protocolTraits = serviceIndex.getProtocols(service.toShapeId());
@@ -224,6 +311,7 @@ public final class ProtocolTestExtension implements BeforeAllCallback {
                 result.add(
                     new HttpTestOperation(
                         operationId.toShapeId(),
+                        service.getId(),
                         apiOperation,
                         requestTestsCases,
                         responseTestsCases,

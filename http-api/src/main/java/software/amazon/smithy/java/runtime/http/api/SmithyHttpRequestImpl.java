@@ -22,9 +22,9 @@ final class SmithyHttpRequestImpl implements SmithyHttpRequest {
     private final HttpHeaders headers;
 
     SmithyHttpRequestImpl(SmithyHttpRequest.Builder builder) {
-        this.httpVersion = Objects.requireNonNull(builder.httpVersion);
-        this.method = Objects.requireNonNull(builder.method);
-        this.uri = Objects.requireNonNull(builder.uri);
+        this.httpVersion = Objects.requireNonNull(builder.httpVersion, "HttpVersion cannot be null");
+        this.method = Objects.requireNonNull(builder.method, "Method cannot be null");
+        this.uri = Objects.requireNonNull(builder.uri, "URI cannot be null");
         this.body = Objects.requireNonNullElse(builder.body, DataStream.ofEmpty());
         this.headers = builder.headers;
     }

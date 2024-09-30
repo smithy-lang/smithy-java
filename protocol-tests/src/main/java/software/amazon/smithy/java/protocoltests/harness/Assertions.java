@@ -9,18 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.net.URI;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpMessage;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.model.node.Node;
 
 /**
  * Provides a number of testing utilities for validating protocol test results.
@@ -78,57 +72,5 @@ final class Assertions {
             }
             return value;
         }).collect(Collectors.joining(", "));
-    }
-
-    static void assertJsonBodyEquals(SmithyHttpMessage message, String jsonBody) {
-        var body = new StringBuildingSubscriber(message.body()).getResult();
-
-        // TODO: This should be "", not "{}". Issue is in json codec.
-        String expected = "{}";
-        if (!jsonBody.isEmpty()) {
-            // Use the node parser to strip out white space.
-            expected = Node.printJson(Node.parse(jsonBody));
-        }
-        assertEquals(expected, body);
-    }
-
-    /**
-     * Subscriber that extracts the message body as a string
-     */
-    private static final class StringBuildingSubscriber implements Flow.Subscriber<ByteBuffer> {
-        private final StringBuilder builder = new StringBuilder();;
-        private final CompletableFuture<String> result = new CompletableFuture<>();
-
-        private StringBuildingSubscriber(Flow.Publisher<ByteBuffer> flow) {
-            flow.subscribe(this);
-        }
-
-        private String getResult() {
-            try {
-                return result.get();
-            } catch (ExecutionException | InterruptedException e) {
-                throw new RuntimeException("Could not read flow as string", e);
-            }
-        }
-
-        @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-            subscription.request(1);
-        }
-
-        @Override
-        public void onNext(ByteBuffer item) {
-            builder.append(StandardCharsets.UTF_8.decode(item));
-        }
-
-        @Override
-        public void onError(Throwable throwable) {
-            result.completeExceptionally(throwable);
-        }
-
-        @Override
-        public void onComplete() {
-            result.complete(builder.toString());
-        }
     }
 }

@@ -25,6 +25,8 @@ import org.junit.platform.commons.annotation.Testable;
  * <ul>
  *     <li>{@link HttpClientRequestTests}</li>
  *     <li>{@link HttpClientResponseTests}</li>
+ *     <li>{@link HttpServerRequestTests}</li>
+ *     <li>{@link HttpServerResponseTests}</li>
  * </ul>
  *
  * <p>This extension is applied to a test class and is configured for a single service shape.
@@ -37,7 +39,7 @@ import org.junit.platform.commons.annotation.Testable;
  * }</pre>
  *
  * <p>The following information is resolved by this extension and made available to Protocol Test providers
- * via the {@link ProtocolTestExtension#getSharedTestData(ExtensionContext)} method:
+ * via the {@link ProtocolTestExtension#getSharedTestData(ExtensionContext, Class)} method:
  * <dl>
  *     <dt>Protocols</dt>
  *     <dd>Initialized implementations for all possible protocols for the service.
@@ -58,4 +60,6 @@ import org.junit.platform.commons.annotation.Testable;
 @ExtendWith(ProtocolTestExtension.class)
 public @interface ProtocolTest {
     String service();
+
+    TestType testType();
 }

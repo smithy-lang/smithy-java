@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import software.amazon.smithy.java.context.Context;
@@ -25,14 +26,14 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
-import software.amazon.smithy.protocoltests.traits.AppliesTo;
 import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
 
 /**
  * Provides client test cases for {@link HttpResponseTestCase}'s. See the {@link HttpClientResponseTests} annotation for
  * usage instructions.
  */
-final class HttpClientResponseProtocolTestProvider extends ProtocolTestProvider<HttpClientResponseTests> {
+final class HttpClientResponseProtocolTestProvider extends
+    ProtocolTestProvider<HttpClientResponseTests, ProtocolTestExtension.SharedClientTestData> {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpClientRequestProtocolTestProvider.class);
 
     @Override
@@ -41,17 +42,21 @@ final class HttpClientResponseProtocolTestProvider extends ProtocolTestProvider<
     }
 
     @Override
+    protected Class<ProtocolTestExtension.SharedClientTestData> getSharedTestDataType() {
+        return ProtocolTestExtension.SharedClientTestData.class;
+    }
+
+    @Override
     protected Stream<TestTemplateInvocationContext> generateProtocolTests(
-        ProtocolTestExtension.SharedTestData store,
+        ProtocolTestExtension.SharedClientTestData store,
+        HttpClientResponseTests annotation,
         TestFilter filter
     ) {
         return store.operations()
             .stream()
-            .filter(op -> !filter.skipOperation(op.id()))
             .flatMap(
                 operation -> operation.responseTestCases()
                     .stream()
-                    .filter(testCase -> !filter.skipTestCase(testCase, AppliesTo.CLIENT))
                     .map(testCase -> {
                         // Get specific values to use for this test case's context
                         var testProtocol = store.getProtocol(testCase.getProtocol());
@@ -73,7 +78,9 @@ final class HttpClientResponseProtocolTestProvider extends ProtocolTestProvider<
                             operation.operationModel(),
                             input,
                             outputBuilder.build(),
-                            overrideBuilder.build()
+                            overrideBuilder.build(),
+                            filter.skipOperation(operation.id()) || filter.skipTestCase(testCase, TestType.CLIENT)
+
                         );
                     })
             );
@@ -85,7 +92,8 @@ final class HttpClientResponseProtocolTestProvider extends ProtocolTestProvider<
         ApiOperation apiOperation,
         SerializableStruct input,
         SerializableStruct output,
-        RequestOverrideConfig overrideConfig
+        RequestOverrideConfig overrideConfig,
+        boolean shouldSkip
     ) implements TestTemplateInvocationContext {
 
         @Override
@@ -96,6 +104,7 @@ final class HttpClientResponseProtocolTestProvider extends ProtocolTestProvider<
         @Override
         public List<Extension> getAdditionalExtensions() {
             return List.of((ProtocolTestParameterResolver) () -> {
+                Assumptions.assumeFalse(shouldSkip);
                 mockClient.clientRequest(input, apiOperation, overrideConfig);
                 // No additional assertions are needed if the request successfully completes.
             });

@@ -39,6 +39,7 @@ import software.amazon.smithy.model.shapes.StringShape;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Generates a schema constant for a given shape.
@@ -46,7 +47,8 @@ import software.amazon.smithy.model.shapes.UnionShape;
  * <p>Member schemas are always generated as {@code private} while all other
  * schema properties are generated as {@code package-private}.
  */
-final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
+@SmithyInternalApi
+public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
 
     private final JavaWriter writer;
     private final Shape shape;
@@ -307,6 +309,7 @@ final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
 
     @Override
     public Void serviceShape(ServiceShape serviceShape) {
-        throw new UnsupportedOperationException("Schema generation not supported for service Shapes");
+        writer.write("static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createService(ID${traits:C});");
+        return null;
     }
 }

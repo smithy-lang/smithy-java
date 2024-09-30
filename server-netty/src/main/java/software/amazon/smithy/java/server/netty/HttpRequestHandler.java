@@ -9,11 +9,8 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http.*;
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
@@ -29,6 +26,7 @@ final class HttpRequestHandler extends ChannelDuplexHandler {
     private final Orchestrator orchestrator;
     private final ProtocolResolver resolver;
     private HttpJob job;
+    private ByteArrayOutputStream bodyAccumulator;
 
     HttpRequestHandler(Orchestrator orchestrator, ProtocolResolver resolver) {
         this.orchestrator = orchestrator;
@@ -54,6 +52,7 @@ final class HttpRequestHandler extends ChannelDuplexHandler {
                 );
                 var response = new HttpResponse(new NettyHttpHeaders());
                 this.job = new HttpJob(resolutionResult.operation(), resolutionResult.protocol(), request, response);
+                this.bodyAccumulator = new ByteArrayOutputStream();
             } catch (UnknownOperationException e) {
                 var response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
                 ctx.writeAndFlush(response);
@@ -61,12 +60,15 @@ final class HttpRequestHandler extends ChannelDuplexHandler {
                 reset(channel);
                 return;
             }
-        } else if (msg instanceof LastHttpContent content) {
-            byte[] bytes = new byte[content.content().readableBytes()];
-            content.content().readBytes(bytes);
+        } else if (msg instanceof HttpContent content) {
+            boolean isLast = content instanceof LastHttpContent;
+            content.content().readBytes(bodyAccumulator, content.content().readableBytes());
             content.release();
-            job.request().setDataStream(DataStream.ofBytes(bytes));
-            orchestrator.enqueue(job).whenCompleteAsync((r, t) -> writeResponse(channel, job), channel.eventLoop());
+            if (isLast) {
+                job.request().setDataStream(DataStream.ofBytes(bodyAccumulator.toByteArray()));
+                orchestrator.enqueue(job).whenCompleteAsync((r, t) -> writeResponse(channel, job), channel.eventLoop());
+            }
+
         }
     }
 
@@ -80,8 +82,8 @@ final class HttpRequestHandler extends ChannelDuplexHandler {
         try {
             response = new DefaultFullHttpResponse(
                 HttpVersion.HTTP_1_1,
-                HttpResponseStatus.OK,
-                Unpooled.wrappedBuffer(serializedValue.asByteBuffer().get())
+                HttpResponseStatus.valueOf(job.response().getStatusCode()),
+                Unpooled.wrappedBuffer(serializedValue.waitForByteBuffer())
             );
             response.headers().set(((NettyHttpHeaders) job.response().headers()).getNettyHeaders());
             response.headers().set("Content-Length", serializedValue.contentLength());

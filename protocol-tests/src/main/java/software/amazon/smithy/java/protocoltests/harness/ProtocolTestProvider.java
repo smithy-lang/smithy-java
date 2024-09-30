@@ -16,7 +16,7 @@ import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
  *
  * @param <T> Annotation used to trigger and configure the test template provider.
  */
-abstract class ProtocolTestProvider<T extends Annotation> implements TestTemplateInvocationContextProvider {
+abstract class ProtocolTestProvider<T extends Annotation, D> implements TestTemplateInvocationContextProvider {
 
     @Override
     public boolean supportsTestTemplate(ExtensionContext context) {
@@ -30,7 +30,8 @@ abstract class ProtocolTestProvider<T extends Annotation> implements TestTemplat
 
         // Retrieve shared data from extension store
         var outerContext = context.getParent().orElseThrow();
-        var store = ProtocolTestExtension.getSharedTestData(outerContext);
+        var outerFilter = ProtocolTestExtension.getTestFilter(outerContext);
+        var store = ProtocolTestExtension.getSharedTestData(outerContext, getSharedTestDataType());
         if (store == null) {
             throw new IllegalStateException(
                 "Cannot execute protocol tests as no shared data store was found. Add "
@@ -38,13 +39,20 @@ abstract class ProtocolTestProvider<T extends Annotation> implements TestTemplat
             );
         }
 
-        return generateProtocolTests(store, filter);
+        return generateProtocolTests(
+            store,
+            context.getRequiredTestMethod().getAnnotation(getAnnotationType()),
+            filter.combine(outerFilter)
+        );
     }
 
     protected abstract Class<T> getAnnotationType();
 
+    protected abstract Class<D> getSharedTestDataType();
+
     protected abstract Stream<TestTemplateInvocationContext> generateProtocolTests(
-        ProtocolTestExtension.SharedTestData testData,
+        D testData,
+        T annotation,
         TestFilter filter
     );
 }

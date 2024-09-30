@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.server;
 
 import java.util.List;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 public interface Service {
@@ -18,5 +19,7 @@ public interface Service {
     <I extends SerializableStruct, O extends SerializableStruct> Operation<I, O> getOperation(String operationName);
 
     List<Operation<? extends SerializableStruct, ? extends SerializableStruct>> getAllOperations();
+
+    Schema schema();
 
 }

@@ -16,9 +16,11 @@ import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.generators.IdStringGenerator;
+import software.amazon.smithy.java.codegen.generators.SchemaGenerator;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
@@ -54,6 +56,8 @@ public final class ServiceGenerator implements
                 public final class ${service:T} implements ${serviceType:T} {
                     ${id:C|}
 
+                    ${schema:C}
+
                     ${properties:C|}
 
                     ${constructor:C|}
@@ -69,11 +73,17 @@ public final class ServiceGenerator implements
                     public ${operationList:T}<${operationHolder:T}<? extends ${serializableStruct:T}, ? extends ${serializableStruct:T}>> getAllOperations() {
                          return allOperations;
                     }
+
+                    @Override
+                    public ${schemaClass:T} schema() {
+                         return SCHEMA;
+                    }
                 }
                 """;
             writer.putContext("operationHolder", Operation.class);
             writer.putContext("serviceType", Service.class);
             writer.putContext("serializableStruct", SerializableStruct.class);
+            writer.putContext("schemaClass", Schema.class);
             writer.putContext("service", directive.symbol());
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(
@@ -91,6 +101,10 @@ public final class ServiceGenerator implements
             writer.putContext(
                 "getOperation",
                 new GetOperationGenerator(writer, shape, directive.symbolProvider(), operations)
+            );
+            writer.putContext(
+                "schema",
+                new SchemaGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.context())
             );
             writer.putContext("operationList", List.class);
             writer.write(template);

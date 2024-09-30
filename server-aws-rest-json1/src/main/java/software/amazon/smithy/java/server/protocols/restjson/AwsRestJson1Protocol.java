@@ -146,6 +146,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         ResponseSerializer serializer = HttpBinding.responseSerializer()
             .operation(job.operation().getApiOperation())
             .payloadCodec(codec)
+            .payloadMediaType("application/json")
             .shapeValue(output);
         SmithyHttpResponse response = serializer.serializeResponse();
         httpJob.response().setSerializedValue(response.body());

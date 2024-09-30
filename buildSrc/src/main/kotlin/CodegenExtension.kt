@@ -9,7 +9,12 @@ import org.gradle.kotlin.dsl.*
  * Creates a task to execute building of Java classes using an executable class.
  * Generated classes can then be used by integration tests and benchmarks
  */
-fun Project.addGenerateSrcsTask(className: String, name: String?, service: String?): TaskProvider<JavaExec> {
+fun Project.addGenerateSrcsTask(
+    className: String,
+    name: String?,
+    service: String?,
+    mode: String = "client"
+): TaskProvider<JavaExec> {
     val output = layout.buildDirectory.dir("generated-src").get()
     var taskName = "generateSources"
     if (name != null) {
@@ -18,10 +23,12 @@ fun Project.addGenerateSrcsTask(className: String, name: String?, service: Strin
     val task = tasks.register<JavaExec>(taskName) {
         delete(files(output))
         dependsOn("test")
-        classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
+        classpath =
+            sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
         mainClass = className
         environment("output", output)
         service?.let { environment("service", it) }
+        environment("mode", mode)
     }
     tasks.getByName("integ").dependsOn(task)
     tasks.getByName("compileItJava").dependsOn(task)

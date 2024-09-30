@@ -18,7 +18,7 @@ import software.amazon.smithy.model.pattern.InvalidPatternException;
 
 public final class PathPattern {
 
-    private static final String LABEL_PATTERN_REGEX = "^\\w$";
+    private static final String LABEL_PATTERN_REGEX = "\\w+";
     private static final Pattern LABEL_PATTERN = Pattern.compile(LABEL_PATTERN_REGEX);
 
     private final CharSequence pattern;

@@ -5,12 +5,23 @@
 
 package software.amazon.smithy.java.runtime.client.aws.restjson;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.protocoltests.harness.HttpClientRequestTests;
 import software.amazon.smithy.java.protocoltests.harness.HttpClientResponseTests;
 import software.amazon.smithy.java.protocoltests.harness.ProtocolTest;
 import software.amazon.smithy.java.protocoltests.harness.ProtocolTestFilter;
+import software.amazon.smithy.java.protocoltests.harness.StringBuildingSubscriber;
+import software.amazon.smithy.java.protocoltests.harness.TestType;
+import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
+import software.amazon.smithy.model.node.Node;
 
-@ProtocolTest(service = "aws.protocoltests.restjson#RestJson")
+@ProtocolTest(
+    service = "aws.protocoltests.restjson#RestJson",
+    testType = TestType.CLIENT
+)
 @ProtocolTestFilter(
     skipOperations = {
         // We dont ignore defaults on input shapes
@@ -44,8 +55,16 @@ public class RestJson1ProtocolTests {
             "RestJsonHttpWithEmptyBlobPayload"
         }
     )
-    public void requestTest(Runnable test) throws Exception {
-        test.run();
+    public void requestTest(DataStream expected, DataStream actual) {
+        String expectedJson = "{}";
+        if (expected.contentLength() != 0) {
+            // Use the node parser to strip out white space.
+            expectedJson = Node.printJson(
+                Node.parse(new String(ByteBufferUtils.getBytes(expected.waitForByteBuffer()), StandardCharsets.UTF_8))
+            );
+        }
+        assertEquals(expectedJson, new StringBuildingSubscriber(actual).getResult());
+
     }
 
     @HttpClientResponseTests
@@ -60,7 +79,7 @@ public class RestJson1ProtocolTests {
             "RestJsonIgnoreQueryParamsInResponseNoPayload"
         }
     )
-    public void responseTest(Runnable test) throws Exception {
+    public void responseTest(Runnable test) {
         test.run();
     }
 }

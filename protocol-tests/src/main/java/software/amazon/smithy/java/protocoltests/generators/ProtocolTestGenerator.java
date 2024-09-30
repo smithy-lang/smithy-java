@@ -9,18 +9,25 @@ import java.nio.file.Paths;
 import java.util.Objects;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.build.PluginContext;
+import software.amazon.smithy.build.SmithyBuildPlugin;
 import software.amazon.smithy.java.codegen.client.JavaClientCodegenPlugin;
+import software.amazon.smithy.java.codegen.server.JavaServerCodegenPlugin;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
-public final class ClientProtocolTestGenerator {
+public final class ProtocolTestGenerator {
     public static void main(String[] args) {
-        JavaClientCodegenPlugin plugin = new JavaClientCodegenPlugin();
-        Model model = Model.assembler(ClientProtocolTestGenerator.class.getClassLoader())
-            .discoverModels(ClientProtocolTestGenerator.class.getClassLoader())
+        String mode = Objects.requireNonNull(System.getenv("mode"));
+        SmithyBuildPlugin plugin = switch (mode) {
+            case "client" -> new JavaClientCodegenPlugin();
+            case "server" -> new JavaServerCodegenPlugin();
+            default -> throw new IllegalStateException("Unknown mode '" + mode + "'. Expect 'client' or 'server'.");
+        };
+        Model model = Model.assembler(ProtocolTestGenerator.class.getClassLoader())
+            .discoverModels(ProtocolTestGenerator.class.getClassLoader())
             .assemble()
             .unwrap();
         var serviceId = ShapeId.from(Objects.requireNonNull(System.getenv("service")));

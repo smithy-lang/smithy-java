@@ -238,6 +238,10 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
         return new RootSchema(ShapeType.OPERATION, id, SchemaBuilder.createTraitMap(traits));
     }
 
+    public static Schema createService(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.SERVICE, id, SchemaBuilder.createTraitMap(traits));
+    }
+
     public static SchemaBuilder structureBuilder(ShapeId id, Trait... traits) {
         return new SchemaBuilder(id, ShapeType.STRUCTURE, traits);
     }

@@ -5,12 +5,18 @@
 
 package software.amazon.smithy.java.runtime.client.aws.jsonprotocols;
 
-import software.amazon.smithy.java.protocoltests.harness.HttpClientRequestTests;
-import software.amazon.smithy.java.protocoltests.harness.HttpClientResponseTests;
-import software.amazon.smithy.java.protocoltests.harness.ProtocolTest;
-import software.amazon.smithy.java.protocoltests.harness.ProtocolTestFilter;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@ProtocolTest(service = "aws.protocoltests.json10#JsonRpc10")
+import java.nio.charset.StandardCharsets;
+import software.amazon.smithy.java.protocoltests.harness.*;
+import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
+import software.amazon.smithy.model.node.Node;
+
+@ProtocolTest(
+    service = "aws.protocoltests.json10#JsonRpc10",
+    testType = TestType.CLIENT
+)
 @ProtocolTestFilter(skipOperations = {})
 public class AwsJson1ProtocolTests {
     @HttpClientRequestTests
@@ -30,8 +36,16 @@ public class AwsJson1ProtocolTests {
             "AwsJson10ClientIgnoresNonTopLevelDefaultsOnMembersWithClientOptional",
         }
     )
-    public void requestTest(Runnable test) throws Exception {
-        test.run();
+    public void requestTest(DataStream expected, DataStream actual) {
+        String expectedJson = "{}";
+        if (expected.contentLength() != 0) {
+            // Use the node parser to strip out white space.
+            expectedJson = Node.printJson(
+                Node.parse(new String(ByteBufferUtils.getBytes(expected.waitForByteBuffer()), StandardCharsets.UTF_8))
+            );
+        }
+        assertEquals(expectedJson, new StringBuildingSubscriber(actual).getResult());
+
     }
 
     @HttpClientResponseTests

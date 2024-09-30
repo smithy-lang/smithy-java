@@ -9,8 +9,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.extension.Extension;
-import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
+import org.junit.jupiter.api.extension.*;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
@@ -21,14 +20,15 @@ import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
-import software.amazon.smithy.protocoltests.traits.AppliesTo;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 
 /**
  * Provides client test cases for {@link HttpRequestTestCase}'s. See the {@link HttpClientRequestTests} annotation for
  * usage instructions.
  */
-final class HttpClientRequestProtocolTestProvider extends ProtocolTestProvider<HttpClientRequestTests> {
+final class HttpClientRequestProtocolTestProvider extends
+    ProtocolTestProvider<HttpClientRequestTests, ProtocolTestExtension.SharedClientTestData> {
 
     @Override
     public Class<HttpClientRequestTests> getAnnotationType() {
@@ -36,17 +36,21 @@ final class HttpClientRequestProtocolTestProvider extends ProtocolTestProvider<H
     }
 
     @Override
+    protected Class<ProtocolTestExtension.SharedClientTestData> getSharedTestDataType() {
+        return ProtocolTestExtension.SharedClientTestData.class;
+    }
+
+    @Override
     protected Stream<TestTemplateInvocationContext> generateProtocolTests(
-        ProtocolTestExtension.SharedTestData store,
+        ProtocolTestExtension.SharedClientTestData store,
+        HttpClientRequestTests annotation,
         TestFilter filter
     ) {
         return store.operations()
             .stream()
-            .filter(op -> !filter.skipOperation(op.id()))
             .flatMap(
                 operation -> operation.requestTestCases()
                     .stream()
-                    .filter(testCase -> !filter.skipTestCase(testCase, AppliesTo.CLIENT))
                     .map(testCase -> {
                         var testProtocol = store.getProtocol(testCase.getProtocol());
                         var testResolver = testCase.getAuthScheme().isEmpty()
@@ -73,7 +77,8 @@ final class HttpClientRequestProtocolTestProvider extends ProtocolTestProvider<H
                             operation.operationModel(),
                             inputBuilder.build(),
                             overrideBuilder.build(),
-                            testTransport::getCapturedRequest
+                            testTransport::getCapturedRequest,
+                            filter.skipOperation(operation.id()) || filter.skipTestCase(testCase, TestType.CLIENT)
                         );
                     })
             );
@@ -85,7 +90,8 @@ final class HttpClientRequestProtocolTestProvider extends ProtocolTestProvider<H
         ApiOperation apiOperation,
         SerializableStruct input,
         RequestOverrideConfig overrideConfig,
-        Supplier<SmithyHttpRequest> requestSupplier
+        Supplier<SmithyHttpRequest> requestSupplier,
+        boolean shouldSkip
     ) implements TestTemplateInvocationContext {
 
         @Override
@@ -95,15 +101,56 @@ final class HttpClientRequestProtocolTestProvider extends ProtocolTestProvider<H
 
         @Override
         public List<Extension> getAdditionalExtensions() {
-            return List.of((ProtocolTestParameterResolver) () -> {
-                mockClient.clientRequest(input, apiOperation, overrideConfig);
-                var request = requestSupplier.get();
-                Assertions.assertUriEquals(request.uri(), testCase.getUri());
-                testCase.getResolvedHost()
-                    .ifPresent(resolvedHost -> Assertions.assertHostEquals(request, resolvedHost));
-                Assertions.assertHeadersEqual(request, testCase.getHeaders());
-                Assertions.assertJsonBodyEquals(request, testCase.getBody().orElse(""));
-            });
+            return List.of(
+                (ExecutionCondition) context -> shouldSkip
+                    ? ConditionEvaluationResult.disabled("")
+                    : ConditionEvaluationResult.enabled(""),
+                new ParameterResolver() {
+                    @Override
+                    public boolean supportsParameter(
+                        ParameterContext parameterContext,
+                        ExtensionContext extensionContext
+                    ) throws ParameterResolutionException {
+                        return DataStream.class.isAssignableFrom(parameterContext.getParameter().getType())
+                            && parameterContext.getIndex() == 0;
+                    }
+
+                    @Override
+                    public Object resolveParameter(
+                        ParameterContext parameterContext,
+                        ExtensionContext extensionContext
+                    ) throws ParameterResolutionException {
+                        if (testCase.getBody().isEmpty()) {
+                            return DataStream.ofEmpty();
+                        }
+                        return DataStream.ofString(testCase.getBody().get(), testCase.getBodyMediaType().orElse(null));
+                    }
+                },
+                new ParameterResolver() {
+                    @Override
+                    public boolean supportsParameter(
+                        ParameterContext parameterContext,
+                        ExtensionContext extensionContext
+                    ) throws ParameterResolutionException {
+                        return DataStream.class.isAssignableFrom(parameterContext.getParameter().getType())
+                            && parameterContext.getIndex() == 1;
+                    }
+
+                    @Override
+                    public Object resolveParameter(
+                        ParameterContext parameterContext,
+                        ExtensionContext extensionContext
+                    ) throws ParameterResolutionException {
+                        mockClient.clientRequest(input, apiOperation, overrideConfig);
+                        var request = requestSupplier.get();
+                        Assertions.assertUriEquals(request.uri(), testCase.getUri());
+                        testCase.getResolvedHost()
+                            .ifPresent(resolvedHost -> Assertions.assertHostEquals(request, resolvedHost));
+                        Assertions.assertHeadersEqual(request, testCase.getHeaders());
+                        return request.body();
+                    }
+                }
+            );
         }
     }
 

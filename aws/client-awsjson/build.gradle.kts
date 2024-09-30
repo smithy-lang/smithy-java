@@ -18,5 +18,5 @@ dependencies {
     testImplementation(libs.smithy.aws.protocol.tests)
 }
 
-val generator = "software.amazon.smithy.java.protocoltests.generators.ClientProtocolTestGenerator"
+val generator = "software.amazon.smithy.java.protocoltests.generators.ProtocolTestGenerator"
 addGenerateSrcsTask(generator, "awsJson1_0", "aws.protocoltests.json10#JsonRpc10")
