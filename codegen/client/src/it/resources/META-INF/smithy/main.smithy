@@ -3,9 +3,10 @@ $version: "2.0"
 namespace smithy.java.codegen.server.test
 
 use aws.protocols#restJson1
+use smithy.test.auth#testAuthScheme
 
 @restJson1
-@httpBasicAuth
+@testAuthScheme
 service TestService {
     version: "today"
     operations: [

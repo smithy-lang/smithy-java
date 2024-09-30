@@ -18,8 +18,6 @@ include("tracing-api")
 
 include(":http-api")
 include(":http-binding")
-include(":http-auth")
-
 
 include(":json-codec")
 

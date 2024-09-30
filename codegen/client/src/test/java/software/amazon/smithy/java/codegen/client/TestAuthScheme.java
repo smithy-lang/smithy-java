@@ -16,7 +16,6 @@ import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.traits.HttpBasicAuthTrait;
 
 /**
  * Test auth scheme to test discovery of auth schemes during client code generation.
@@ -30,7 +29,7 @@ public final class TestAuthScheme implements AuthScheme<SmithyHttpRequest, Ident
 
     @Override
     public ShapeId schemeId() {
-        return HttpBasicAuthTrait.ID;
+        return TestAuthSchemeTrait.ID;
     }
 
     @Override
@@ -66,15 +65,15 @@ public final class TestAuthScheme implements AuthScheme<SmithyHttpRequest, Ident
         }
     }
 
-    public static final class Factory implements AuthSchemeFactory<HttpBasicAuthTrait> {
+    public static final class Factory implements AuthSchemeFactory<TestAuthSchemeTrait> {
 
         @Override
         public ShapeId schemeId() {
-            return HttpBasicAuthTrait.ID;
+            return TestAuthSchemeTrait.ID;
         }
 
         @Override
-        public AuthScheme<SmithyHttpRequest, Identity> createAuthScheme(HttpBasicAuthTrait trait) {
+        public AuthScheme<SmithyHttpRequest, Identity> createAuthScheme(TestAuthSchemeTrait trait) {
             return new TestAuthScheme();
         }
     }

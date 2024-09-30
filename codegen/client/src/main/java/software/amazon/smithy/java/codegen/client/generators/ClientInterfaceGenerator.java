@@ -52,6 +52,13 @@ public final class ClientInterfaceGenerator
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientInterfaceGenerator.class);
 
+    private static final Map<ShapeId, Class<? extends AuthSchemeFactory>> authSchemeFactories = new HashMap<>();
+    static {
+        // Add all trait services to a map, so they can be queried for a provider class
+        ServiceLoader.load(AuthSchemeFactory.class, ClientInterfaceGenerator.class.getClassLoader())
+            .forEach((service) -> authSchemeFactories.put(service.schemeId(), service.getClass()));
+    }
+
     @Override
     public void accept(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // Write synchronous interface
@@ -252,6 +259,7 @@ public final class ClientInterfaceGenerator
         throw new CodegenException("Could not find factory for " + defaultProtocol);
     }
 
+    @SuppressWarnings("rawtypes")
     private static Map<Trait, Class<? extends AuthSchemeFactory>> getAuthFactoryMapping(
         Model model,
         ToShapeId service
@@ -259,20 +267,18 @@ public final class ClientInterfaceGenerator
         var index = ServiceIndex.of(model);
         var schemes = index.getAuthSchemes(service);
         Map<Trait, Class<? extends AuthSchemeFactory>> result = new HashMap<>();
-        for (var schemeFactory : ServiceLoader.load(
-            AuthSchemeFactory.class,
-            ClientInterfaceGenerator.class.getClassLoader()
-        )) {
-            if (schemes.containsKey(schemeFactory.schemeId())) {
-                var existing = result.put(schemes.get(schemeFactory.schemeId()), schemeFactory.getClass());
+        for (var schemeEntry : schemes.entrySet()) {
+            var schemeFactoryClass = authSchemeFactories.get(schemeEntry.getKey());
+            if (schemeFactoryClass != null) {
+                var existing = result.put(schemeEntry.getValue(), schemeFactoryClass);
                 if (existing != null) {
                     throw new CodegenException(
-                        "Multiple auth scheme factory implementations found for scheme: " + schemeFactory.schemeId()
-                            + "Found: " + schemeFactory + " and " + existing
+                        "Multiple auth scheme factory implementations found for scheme: " + schemeEntry.getKey()
+                            + "Found: " + schemeFactoryClass + " and " + existing
                     );
                 }
             } else {
-                LOGGER.warn("Could not find implementation for auth scheme {}", schemeFactory);
+                LOGGER.warn("Could not find implementation for auth scheme {}", schemeEntry.getKey());
             }
         }
         return result;

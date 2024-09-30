@@ -3,25 +3,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.runtime.http.auth;
+package software.amazon.smithy.java.runtime.client.http.auth;
 
 import software.amazon.smithy.java.runtime.auth.api.Signer;
-import software.amazon.smithy.java.runtime.auth.api.identity.LoginIdentity;
+import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.traits.HttpDigestAuthTrait;
+import software.amazon.smithy.model.traits.HttpBearerAuthTrait;
 
 /**
- * Implements the HTTP Digest Authentication Scheme as defined in
+ * Implements the HTTP Bearer Authentication Scheme as defined in
  * <a href="https://datatracker.ietf.org/doc/html/rfc2617.html">RFC 2617</a>.
  */
-public final class HttpDigestAuthAuthScheme implements AuthScheme<SmithyHttpRequest, LoginIdentity> {
-
+public final class HttpBearerAuthScheme implements AuthScheme<SmithyHttpRequest, TokenIdentity> {
     @Override
     public ShapeId schemeId() {
-        return HttpDigestAuthTrait.ID;
+        return HttpBearerAuthTrait.ID;
     }
 
     @Override
@@ -30,25 +29,25 @@ public final class HttpDigestAuthAuthScheme implements AuthScheme<SmithyHttpRequ
     }
 
     @Override
-    public Class<LoginIdentity> identityClass() {
-        return LoginIdentity.class;
+    public Class<TokenIdentity> identityClass() {
+        return TokenIdentity.class;
     }
 
     @Override
-    public Signer<SmithyHttpRequest, LoginIdentity> signer() {
-        return HttpDigestAuthSigner.INSTANCE;
+    public Signer<SmithyHttpRequest, TokenIdentity> signer() {
+        return HttpBearerAuthSigner.INSTANCE;
     }
 
-    public static final class Factory implements AuthSchemeFactory<HttpDigestAuthTrait> {
+    public static final class Factory implements AuthSchemeFactory<HttpBearerAuthTrait> {
 
         @Override
         public ShapeId schemeId() {
-            return HttpDigestAuthTrait.ID;
+            return HttpBearerAuthTrait.ID;
         }
 
         @Override
-        public AuthScheme<?, ?> createAuthScheme(HttpDigestAuthTrait trait) {
-            return new HttpDigestAuthAuthScheme();
+        public AuthScheme<?, ?> createAuthScheme(HttpBearerAuthTrait trait) {
+            return new HttpBearerAuthScheme();
         }
     }
 }
