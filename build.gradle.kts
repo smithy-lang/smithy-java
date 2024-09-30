@@ -10,3 +10,10 @@ task("addPrePushHooks") {
     }
     println("Pre-push hooks added")
 }
+
+val smithyJavaVersion = project.file("VERSION").readText().replace(System.lineSeparator(), "")
+allprojects {
+    group = "software.amazon.smithy.java"
+    version = smithyJavaVersion
+}
+println("Smithy-Java version: '${smithyJavaVersion}'")

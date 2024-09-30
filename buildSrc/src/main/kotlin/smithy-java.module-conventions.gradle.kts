@@ -2,6 +2,7 @@
 plugins {
     id("smithy-java.java-conventions")
     id("smithy-java.integ-test-conventions")
+    id("smithy-java.publishing-conventions")
     id("jacoco")
 }
 

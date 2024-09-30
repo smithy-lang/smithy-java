@@ -1,4 +1,3 @@
-import gradle.kotlin.dsl.accessors._393fb14d292c021aa4a5c68db9b29ae3.sourceSets
 import org.gradle.kotlin.dsl.project
 
 plugins {

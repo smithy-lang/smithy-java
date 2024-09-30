@@ -3,6 +3,7 @@ import org.gradle.api.Project
 plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.integ-test-conventions")
+    id("smithy-java.publishing-conventions")
 }
 
 // Workaround per: https://github.com/gradle/gradle/issues/15383
