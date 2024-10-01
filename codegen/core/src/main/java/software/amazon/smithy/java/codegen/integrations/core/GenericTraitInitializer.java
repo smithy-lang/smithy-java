@@ -13,8 +13,10 @@ import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.model.traits.TraitService;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
-final class GenericTraitInitializer implements TraitInitializer<Trait> {
+@SmithyInternalApi
+public final class GenericTraitInitializer implements TraitInitializer<Trait> {
     private static final Map<ShapeId, Class<? extends TraitService>> serviceMap = new HashMap<>();
 
     static {

@@ -22,7 +22,7 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
-import software.amazon.smithy.java.codegen.integrations.core.DefaultTraitInitializer;
+import software.amazon.smithy.java.codegen.integrations.core.GenericTraitInitializer;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -297,7 +297,7 @@ public final class ClientInterfaceGenerator
                 writer.putContext("traitName", getAuthTraitPropertyName(trait));
                 var initializer = context.getInitializer(entry.getKey());
                 // Traits using the default initializer need to be cast to the correct Trait output class.
-                writer.putContext("cast", initializer.getClass().equals(DefaultTraitInitializer.class));
+                writer.putContext("cast", initializer.getClass().equals(GenericTraitInitializer.class));
                 writer.putContext("initializer", writer.consumer(w -> initializer.accept(w, entry.getKey())));
                 writer.putContext("authFactory", AuthSchemeFactory.class);
                 writer.putContext("authFactoryImpl", entry.getValue());
