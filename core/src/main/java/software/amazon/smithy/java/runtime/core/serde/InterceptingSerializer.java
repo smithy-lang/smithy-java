@@ -9,10 +9,12 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 /**
  * Intercepts serialization before and after each write.
@@ -118,6 +120,18 @@ public abstract class InterceptingSerializer implements ShapeSerializer {
     @Override
     public final void writeBlob(Schema schema, ByteBuffer value) {
         before(schema).writeBlob(schema, value);
+        after(schema);
+    }
+
+    @Override
+    public void writeDataStream(Schema schema, DataStream value) {
+        before(schema).writeDataStream(schema, value);
+        after(schema);
+    }
+
+    @Override
+    public void writeEventStream(Schema schema, Flow.Publisher<? extends SerializableStruct> value) {
+        before(schema).writeEventStream(schema, value);
         after(schema);
     }
 

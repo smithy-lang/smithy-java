@@ -39,6 +39,7 @@ import software.amazon.smithy.model.traits.RequiresLengthTrait;
 import software.amazon.smithy.model.traits.RetryableTrait;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 import software.amazon.smithy.model.traits.SparseTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.model.traits.XmlAttributeTrait;
@@ -115,7 +116,8 @@ public class CodegenContextTest {
                 PaginatedTrait.ID,
                 IdempotencyTokenTrait.ID,
                 RetryableTrait.ID,
-                RequestCompressionTrait.ID
+                RequestCompressionTrait.ID,
+                StreamingTrait.ID
             )
         );
     }
@@ -170,7 +172,8 @@ public class CodegenContextTest {
                 PaginatedTrait.ID,
                 IdempotencyTokenTrait.ID,
                 RetryableTrait.ID,
-                RequestCompressionTrait.ID
+                RequestCompressionTrait.ID,
+                StreamingTrait.ID
             )
         );
     }

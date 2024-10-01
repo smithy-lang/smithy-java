@@ -41,6 +41,7 @@ import software.amazon.smithy.model.traits.RequiresLengthTrait;
 import software.amazon.smithy.model.traits.RetryableTrait;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 import software.amazon.smithy.model.traits.SparseTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
@@ -86,7 +87,8 @@ public class CodeGenerationContext
         PaginatedTrait.ID,
         IdempotencyTokenTrait.ID,
         RetryableTrait.ID,
-        RequestCompressionTrait.ID
+        RequestCompressionTrait.ID,
+        StreamingTrait.ID
     );
 
     private final Model model;
