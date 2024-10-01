@@ -24,6 +24,7 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.integrations.core.GenericTraitInitializer;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
+import software.amazon.smithy.java.codegen.sections.OperationSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.core.Client;
@@ -182,7 +183,7 @@ public final class ClientInterfaceGenerator
 
             var opIndex = OperationIndex.of(model);
             for (var operation : TopDownIndex.of(model).getContainedOperations(service)) {
-                writer.pushState();
+                writer.pushState(new OperationSection(operation, symbolProvider, model));
                 writer.putContext("name", StringUtils.uncapitalize(CodegenUtils.getDefaultName(operation, service)));
                 writer.putContext("input", symbolProvider.toSymbol(opIndex.expectInputShape(operation)));
                 writer.putContext("output", symbolProvider.toSymbol(opIndex.expectOutputShape(operation)));

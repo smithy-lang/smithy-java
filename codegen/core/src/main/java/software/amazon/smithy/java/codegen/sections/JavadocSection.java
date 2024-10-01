@@ -16,6 +16,7 @@ import software.amazon.smithy.utils.CodeSection;
  * comment.
  *
  * @param shape Shape that java docs are being added to.
+ * @param parent Code section that this javadoc section is attached to
  */
-public record JavadocSection(Shape shape) implements CodeSection {
+public record JavadocSection(Shape shape, CodeSection parent) implements CodeSection {
 }
