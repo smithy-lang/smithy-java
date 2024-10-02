@@ -5,98 +5,73 @@ namespace smithy.example.eventstreaming
 use aws.protocols#restJson1
 
 @restJson1
-service MessageService {
+service FizzBuzzService {
     operations: [
-        ExchangeMessages
-        PublishMessages
-        ReceiveMessages
+        FizzBuzz
     ]
 }
 
-@http(method: "POST", uri: "/exchange")
-operation ExchangeMessages {
-    input := {
-        @httpHeader("x-chat-room")
-        room: String
-
-        @httpPayload
-        stream: InputMessageStream
-    }
-
-    output := {
-        @httpPayload
-        stream: OutputMessageStream
-    }
-
-    errors: [
-        RoomNotFound
-    ]
+@http(method: "POST", uri: "/fizzBuzz", code: 200)
+operation FizzBuzz {
+    input: FizzBuzzInput
+    output: FizzBuzzOutput
 }
 
-@http(method: "POST", uri: "/publish")
-operation PublishMessages {
-    input := {
-        @httpHeader("x-chat-room")
-        room: String
-
-        @httpPayload
-        stream: InputMessageStream
-    }
-
-    errors: [
-        RoomNotFound
-    ]
+structure FizzBuzzInput {
+    @httpPayload
+    stream: ValueStream
 }
 
-@http(method: "POST", uri: "/receive")
-operation ReceiveMessages {
-    output := {
-        @httpHeader("x-chat-room")
-        room: String
-
-        @httpPayload
-        stream: OutputMessageStream
-    }
+structure FizzBuzzOutput {
+    @httpPayload
+    stream: FizzBuzzStream
 }
 
 @streaming
-union InputMessageStream {
-    message: MessageEvent
-    leave: LeaveEvent
+union ValueStream {
+    Value: Value
+}
+
+structure Value {
+    @required
+    value: Long = 0
 }
 
 @streaming
-union OutputMessageStream {
-    message: MessageEvent
-    leave: LeaveEvent
-    terminate: TerminateEvent
+union FizzBuzzStream {
+    fizz: FizzEvent
+    buzz: BuzzEvent
+    negativeNumberException: NegativeNumberException
+    malformedInputException: MalformedInputException
+    internalException: InternalException
 }
 
-structure MessageEvent {
+structure FizzEvent {
     @required
-    @eventHeader
-    timestamp: DateTime
-
-    @required
-    message: String
+    value: Long = 0
 }
 
-structure LeaveEvent {
+structure BuzzEvent {
     @required
-    @eventHeader
-    timestamp: DateTime
-}
-
-@timestampFormat("date-time")
-timestamp DateTime
-
-@error("client")
-structure TerminateEvent {
-    message: String
+    value: Long = 0
 }
 
 @error("client")
-@httpError(404)
-structure RoomNotFound {
-    message: String
+structure NegativeNumberException {
+    message: ErrorMessage
 }
+
+@error("client")
+structure MalformedInputException {
+    message: ErrorMessage
+}
+
+@error("server")
+structure InternalException {
+    message: ErrorMessage
+}
+
+string ErrorMessage
+
+@default(0)
+long Long

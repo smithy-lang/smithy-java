@@ -2,7 +2,7 @@
   "version": "1.0",
   "plugins": {
     "java-client-codegen": {
-      "service": "smithy.example.eventstreaming#MessageService",
+      "service": "smithy.example.eventstreaming#FizzBuzzService",
       "namespace": "software.amazon.smithy.java.examples.eventstreaming",
       "protocol": "aws.protocols#restJson1",
       "transport": {
