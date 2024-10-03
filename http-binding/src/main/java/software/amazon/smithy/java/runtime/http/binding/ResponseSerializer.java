@@ -20,6 +20,7 @@ import software.amazon.smithy.model.traits.HttpTrait;
  */
 public final class ResponseSerializer {
     private Codec payloadCodec;
+    private String payloadMediaType;
     private ApiOperation<?, ?> operation;
     private SerializableShape shapeValue;
     private EventEncoderFactory<?> eventEncoderFactory;
@@ -46,6 +47,17 @@ public final class ResponseSerializer {
      */
     public ResponseSerializer payloadCodec(Codec payloadCodec) {
         this.payloadCodec = payloadCodec;
+        return this;
+    }
+
+    /**
+     * Set the required media typed used in payloads serialized by the provided codec.
+     *
+     * @param payloadMediaType Media type to use in the payload.
+     * @return the serializer.
+     */
+    public ResponseSerializer payloadMediaType(String payloadMediaType) {
+        this.payloadMediaType = payloadMediaType;
         return this;
     }
 
@@ -82,9 +94,10 @@ public final class ResponseSerializer {
         Objects.requireNonNull(shapeValue, "shapeValue is not set");
         Objects.requireNonNull(operation, "operation is not set");
         Objects.requireNonNull(payloadCodec, "payloadCodec is not set");
+        Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
         var httpTrait = operation.schema().expectTrait(HttpTrait.class);
-        var serializer = new HttpBindingSerializer(httpTrait, payloadCodec, bindingMatcher);
+        var serializer = new HttpBindingSerializer(httpTrait, payloadCodec, payloadMediaType, bindingMatcher);
         shapeValue.serialize(serializer);
         serializer.flush();
 

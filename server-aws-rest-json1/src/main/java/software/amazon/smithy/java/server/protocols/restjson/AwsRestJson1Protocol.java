@@ -118,7 +118,8 @@ final class AwsRestJson1Protocol extends ServerProtocol {
                     .body(job.request().getDataStream())
                     .build()
             )
-            .payloadCodec(codec);
+            .payloadCodec(codec)
+            .payloadMediaType("application/json");
 
         try {
             deser.deserialize().get();

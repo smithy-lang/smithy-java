@@ -48,6 +48,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private final ShapeSerializer querySerializer;
     private final ShapeSerializer labelSerializer;
     private final Codec payloadCodec;
+    private final String payloadMediaType;
 
     private final Map<String, String> labels = new LinkedHashMap<>();
     private final Map<String, List<String>> headers = new LinkedHashMap<>();
@@ -66,11 +67,17 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         f -> new ArrayList<>()
     ).add(value);
 
-    HttpBindingSerializer(HttpTrait httpTrait, Codec payloadCodec, BindingMatcher bindingMatcher) {
+    HttpBindingSerializer(
+        HttpTrait httpTrait,
+        Codec payloadCodec,
+        String payloadMediaType,
+        BindingMatcher bindingMatcher
+    ) {
         uriPattern = httpTrait.getUri();
         responseStatus = httpTrait.getCode();
         this.payloadCodec = payloadCodec;
         this.bindingMatcher = bindingMatcher;
+        this.payloadMediaType = payloadMediaType;
         headerSerializer = new HttpHeaderSerializer(headerConsumer);
         querySerializer = new HttpQuerySerializer(queryStringParams::add);
         labelSerializer = new HttpLabelSerializer(labels::put);
@@ -104,7 +111,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             // Serialize only the body members to the codec.
             SerializableStruct.filteredMembers(schema, struct, this::bodyBindingPredicate)
                 .serialize(shapeBodySerializer);
-            headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
+            headers.put("Content-Type", List.of(payloadMediaType));
         }
 
         struct.serializeMembers(new BindingSerializer(this));
@@ -162,7 +169,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         if (httpPayload != null) {
             return httpPayload;
         } else if (shapeBodyOutput != null) {
-            return DataStream.ofBytes(shapeBodyOutput.toByteArray(), payloadCodec.getMediaType());
+            return DataStream.ofBytes(shapeBodyOutput.toByteArray(), payloadMediaType);
         } else {
             return DataStream.ofEmpty();
         }
@@ -215,7 +222,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     }
 
     void writePayloadContentType() {
-        setContentType(payloadCodec.getMediaType());
+        setContentType(payloadMediaType);
     }
 
     public void setContentType(String contentType) {

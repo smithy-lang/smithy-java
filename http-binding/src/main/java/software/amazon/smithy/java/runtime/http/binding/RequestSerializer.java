@@ -25,6 +25,7 @@ public final class RequestSerializer {
 
     private Codec payloadCodec;
     private ApiOperation<?, ?> operation;
+    private String payloadMediaType;
     private URI endpoint;
     private SerializableShape shapeValue;
     private EventEncoderFactory<?> eventStreamEncodingFactory;
@@ -51,6 +52,17 @@ public final class RequestSerializer {
      */
     public RequestSerializer payloadCodec(Codec payloadCodec) {
         this.payloadCodec = payloadCodec;
+        return this;
+    }
+
+    /**
+     * Set the required media typed used in payloads serialized by the provided codec.
+     *
+     * @param payloadMediaType Media type to use in the payload.
+     * @return the serializer.
+     */
+    public RequestSerializer payloadMediaType(String payloadMediaType) {
+        this.payloadMediaType = payloadMediaType;
         return this;
     }
 
@@ -98,11 +110,12 @@ public final class RequestSerializer {
         Objects.requireNonNull(shapeValue, "shapeValue is not set");
         Objects.requireNonNull(operation, "operation is not set");
         Objects.requireNonNull(payloadCodec, "payloadCodec is not set");
-        Objects.requireNonNull(payloadCodec, "endpoint is not set");
-        Objects.requireNonNull(payloadCodec, "value is not set");
+        Objects.requireNonNull(endpoint, "endpoint is not set");
+        Objects.requireNonNull(shapeValue, "value is not set");
+        Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
         var httpTrait = operation.schema().expectTrait(HttpTrait.class);
-        var serializer = new HttpBindingSerializer(httpTrait, payloadCodec, bindingMatcher);
+        var serializer = new HttpBindingSerializer(httpTrait, payloadCodec, payloadMediaType, bindingMatcher);
         shapeValue.serialize(serializer);
         serializer.flush();
 

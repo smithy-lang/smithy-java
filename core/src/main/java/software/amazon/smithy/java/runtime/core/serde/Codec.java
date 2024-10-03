@@ -22,13 +22,6 @@ public interface Codec extends AutoCloseable {
     default void close() {}
 
     /**
-     * Returns the default media type used by this codec.
-     *
-     * @return Returns the default media type.
-     */
-    String getMediaType();
-
-    /**
      * Create a serializer from this Codec that serializes a shape into the sink.
      *
      * @param sink Where to serialize a shape.

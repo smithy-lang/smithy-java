@@ -19,37 +19,42 @@ public class AwsEventEncoderFactory implements EventEncoderFactory<AwsEventFrame
 
     private final Schema schema;
     private final Codec codec;
+    private final String payloadMediaType;
     private final Function<Throwable, EventStreamingException> exceptionHandler;
 
     private AwsEventEncoderFactory(
         Schema schema,
         Codec codec,
+        String payloadMediaType,
         Function<Throwable, EventStreamingException> exceptionHandler
     ) {
         this.schema = schema;
         this.codec = codec;
+        this.payloadMediaType = payloadMediaType;
         this.exceptionHandler = exceptionHandler;
     }
 
     public static AwsEventEncoderFactory forInputStream(
         InputEventStreamingApiOperation<?, ?, ?> operation,
         Codec codec,
+        String payloadMediaType,
         Function<Throwable, EventStreamingException> exceptionHandler
     ) {
-        return new AwsEventEncoderFactory(operation.inputEventSchema(), codec, exceptionHandler);
+        return new AwsEventEncoderFactory(operation.inputEventSchema(), codec, payloadMediaType, exceptionHandler);
     }
 
     public static AwsEventEncoderFactory forOutputStream(
         OutputEventStreamingApiOperation<?, ?, ?> operation,
         Codec codec,
+        String payloadMediaType,
         Function<Throwable, EventStreamingException> exceptionHandler
     ) {
-        return new AwsEventEncoderFactory(operation.outputEventSchema(), codec, exceptionHandler);
+        return new AwsEventEncoderFactory(operation.outputEventSchema(), codec, payloadMediaType, exceptionHandler);
     }
 
     @Override
     public EventEncoder<AwsEventFrame> newEventEncoder() {
-        return new AwsEventShapeEncoder(schema, codec, exceptionHandler);
+        return new AwsEventShapeEncoder(schema, codec, payloadMediaType, exceptionHandler);
     }
 
     @Override

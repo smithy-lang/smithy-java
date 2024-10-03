@@ -37,6 +37,21 @@ public final class ResponseDeserializer {
     }
 
     /**
+     * Set the expected media type to be used when a payload is deserialized.
+     *
+     * <p>If a media type is provided, then this deserializer will validate that the media type on the wire matches
+     * the expected media type. If no media type is provided, then this deserializer will perform no validation
+     * prior to attempting to parse the response payload with the codec.
+     *
+     * @param payloadMediaType Media type of the payload.
+     * @return the deserializer.
+     */
+    public ResponseDeserializer payloadMediaType(String payloadMediaType) {
+        deserBuilder.payloadMediaType(payloadMediaType);
+        return this;
+    }
+
+    /**
      * HTTP response to deserialize.
      *
      * @param response Response to deserialize into the builder.

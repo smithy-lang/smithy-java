@@ -61,6 +61,11 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
     }
 
     @Override
+    protected String payloadMediaType() {
+        return "application/json";
+    }
+
+    @Override
     protected HttpErrorDeserializer getErrorDeserializer(Context context) {
         return errorDeserializer;
     }
@@ -73,6 +78,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
         return AwsEventEncoderFactory.forInputStream(
             inputOperation,
             codec(),
+            payloadMediaType(),
             (e) -> new EventStreamingException("InternalServerException", "Internal Server Error")
         );
     }

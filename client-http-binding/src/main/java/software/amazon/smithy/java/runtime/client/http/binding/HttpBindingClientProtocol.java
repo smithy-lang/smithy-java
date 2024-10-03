@@ -42,6 +42,8 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
 
     abstract protected Codec codec();
 
+    abstract protected String payloadMediaType();
+
     abstract protected HttpErrorDeserializer getErrorDeserializer(Context context);
 
     protected EventEncoderFactory<F> getEventEncoderFactory(InputEventStreamingApiOperation<?, ?, ?> inputOperation) {
@@ -62,6 +64,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
         RequestSerializer serializer = HttpBinding.requestSerializer()
             .operation(operation)
             .payloadCodec(codec())
+            .payloadMediaType(payloadMediaType())
             .shapeValue(input)
             .endpoint(endpoint);
 
@@ -91,6 +94,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
         var outputBuilder = operation.outputBuilder();
         ResponseDeserializer deser = HttpBinding.responseDeserializer()
             .payloadCodec(codec())
+            .payloadMediaType(payloadMediaType())
             .outputShapeBuilder(outputBuilder)
             .response(response);
 

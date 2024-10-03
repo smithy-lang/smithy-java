@@ -48,6 +48,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private final DataStream body;
     private final EventDecoderFactory<?> eventDecoderFactory;
     private CompletableFuture<Void> bodyDeserializationCf;
+    private final String payloadMediaType;
 
     private HttpBindingDeserializer(Builder builder) {
         this.payloadCodec = Objects.requireNonNull(builder.payloadCodec, "payloadSerializer not set");
@@ -58,6 +59,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         this.queryStringParameters = QueryStringParser.parse(builder.requestRawQueryString);
         this.responseStatus = builder.responseStatus;
         this.requestPathLabels = builder.requestPathLabels;
+        this.payloadMediaType = builder.payloadMediaType;
     }
 
     static Builder builder() {
@@ -123,11 +125,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                     if (member.type() == ShapeType.STRUCTURE) {
                         // Read the payload into a byte buffer to deserialize a shape in the body.
                         bodyDeserializationCf = bodyAsByteBuffer().thenAccept(bb -> {
-                            LOGGER.trace(
-                                "Deserializing the payload of {} schema via {}",
-                                schema,
-                                payloadCodec.getMediaType()
-                            );
                             structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bb));
                         }).toCompletableFuture();
                     } else if (isEventStream(member)) {
@@ -161,7 +158,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
             validateMediaType();
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
             bodyDeserializationCf = bodyAsByteBuffer().thenAccept(bb -> {
-                LOGGER.trace("Deserializing the structured body of {} via {}", schema, payloadCodec.getMediaType());
                 payloadCodec.createDeserializer(bb).readStruct(schema, bodyMembers, (body, m, de) -> {
                     if (body.contains(m.memberName())) {
                         body.structMemberConsumer.accept(body.state, m, de);
@@ -203,12 +199,14 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     private void validateMediaType() {
-        // Validate the media-type matches the codec.
-        String contentType = headers.firstValue("content-type").orElse("");
-        if (!contentType.equals(payloadCodec.getMediaType())) {
-            throw new SerializationException(
-                "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec
-            );
+        if (payloadMediaType != null) {
+            // Validate the media-type matches the codec.
+            String contentType = headers.firstValue("content-type").orElse("");
+            if (!contentType.equals(payloadMediaType)) {
+                throw new SerializationException(
+                    "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec
+                );
+            }
         }
     }
 
@@ -221,6 +219,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         private DataStream body;
         private int responseStatus;
         private EventDecoderFactory<?> eventDecoderFactory;
+        private String payloadMediaType;
 
         private Builder() {}
 
@@ -320,6 +319,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
 
         Builder eventDecoderFactory(EventDecoderFactory<?> eventDecoderFactory) {
             this.eventDecoderFactory = eventDecoderFactory;
+            return this;
+        }
+
+        Builder payloadMediaType(String payloadMediaType) {
+            this.payloadMediaType = payloadMediaType;
             return this;
         }
     }

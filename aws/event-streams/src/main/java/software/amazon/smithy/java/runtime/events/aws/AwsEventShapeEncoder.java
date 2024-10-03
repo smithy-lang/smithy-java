@@ -28,6 +28,7 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
 
     private final Schema eventSchema;
     private final Codec codec;
+    private final String payloadMediaType;
     private final Set<String> possibleTypes;
     private final Map<ShapeId, Schema> possibleExceptions;
     private final Function<Throwable, EventStreamingException> exceptionHandler;
@@ -35,10 +36,12 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
     public AwsEventShapeEncoder(
         Schema eventSchema,
         Codec codec,
+        String payloadMediaType,
         Function<Throwable, EventStreamingException> exceptionHandler
     ) {
         this.eventSchema = eventSchema;
         this.codec = codec;
+        this.payloadMediaType = payloadMediaType;
         this.possibleTypes = eventSchema.members().stream().map(Schema::memberName).collect(Collectors.toSet());
         this.possibleExceptions = eventSchema.members()
             .stream()
@@ -67,7 +70,7 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
         var headers = new HashMap<String, HeaderValue>();
         headers.put(":event-type", HeaderValue.fromString(typeHolder.get()));
         headers.put(":message-type", HeaderValue.fromString("event"));
-        headers.put(":content-type", HeaderValue.fromString(codec.getMediaType()));
+        headers.put(":content-type", HeaderValue.fromString(payloadMediaType));
 
         return new AwsEventFrame(new Message(headers, os.toByteArray()));
     }
@@ -85,7 +88,7 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
                 ":exception-type",
                 HeaderValue.fromString(exceptionSchema.memberName())
             );
-            headers.put(":content-type", HeaderValue.fromString(codec.getMediaType()));
+            headers.put(":content-type", HeaderValue.fromString(payloadMediaType));
             var payload = codec.serialize(me);
             var bytes = new byte[payload.remaining()];
             payload.get(bytes);

@@ -76,11 +76,6 @@ public final class JsonCodec implements Codec {
     }
 
     @Override
-    public String getMediaType() {
-        return "application/json";
-    }
-
-    @Override
     public ShapeSerializer createSerializer(OutputStream sink) {
         return provider.newSerializer(sink, settings);
     }
