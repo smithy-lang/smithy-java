@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-import java.util.concurrent.Flow;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -65,24 +64,8 @@ record StructureDeserializerGenerator(
             }
             writer.pushState();
             writer.putContext("memberName", symbolProvider.toMemberName(member));
-            writer.putContext(
-                "flowPublisherType",
-                CodegenUtils.fromClass(Flow.Publisher.class)
-                    .toBuilder()
-                    .addReference(symbolProvider.toSymbol(target))
-                    .build()
-            );
-            String content;
-            if (CodegenUtils.isEventStream(target)) {
-                // The DeserializerGenerator for this case would call `readEventStream` which returns
-                // `Flow.Publisher<? extends SerializableStruct>` but the builder setter expects
-                // `Flow.Publisher<target>`. Hence, the cast.
-                content = "case $L -> builder.${memberName:L}(($flowPublisherType:T) $C);";
-            } else {
-                content = "case $L -> builder.${memberName:L}($C);";
-            }
             writer.write(
-                content,
+                "case $L -> builder.${memberName:L}($C);",
                 idx,
                 new DeserializerGenerator(writer, member, symbolProvider, model, service, "de", "member")
             );
