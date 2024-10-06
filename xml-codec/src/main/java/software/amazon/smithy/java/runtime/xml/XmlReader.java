@@ -19,27 +19,101 @@ import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 
-sealed interface XmlReader extends AutoCloseable {
+sealed abstract class XmlReader implements AutoCloseable {
 
-    Location getLocation();
+    private final SmartTextReader textReader = new SmartTextReader();
+    private boolean pendingNext;
 
-    String getText() throws XMLStreamException;
+    abstract Location getLocation();
 
-    String getAttributeValue(String namespaceURI, String localName);
+    abstract String getAttributeValue(String namespaceURI, String localName);
 
-    String nextMemberElement() throws XMLStreamException;
+    abstract Deque<XMLEvent> bufferElement(String startElementName) throws XMLStreamException;
+
+    protected abstract int getEventType();
+
+    protected abstract boolean hasNext() throws XMLStreamException;
+
+    protected abstract String getReaderText() throws XMLStreamException;
+
+    protected abstract String getStartElementName() throws XMLStreamException;
+
+    protected abstract void nextElement() throws XMLStreamException;
+
+    protected final void next() throws XMLStreamException {
+        nextElement();
+        pendingNext = false;
+        textReader.reset();
+    }
+
+    protected final void nextIfNeeded() throws XMLStreamException {
+        if (pendingNext) {
+            next();
+        }
+    }
 
     // Close the current element by skipping over all contained elements.
-    void closeElement() throws XMLStreamException;
+    final void closeElement() throws XMLStreamException {
+        nextIfNeeded();
+        int depth = 1;
+        while (hasNext() && depth > 0) {
+            if (getEventType() == XMLStreamConstants.START_ELEMENT) {
+                depth++;
+            } else if (getEventType() == XMLStreamConstants.END_ELEMENT) {
+                depth--;
+            }
+            next();
+        }
+    }
 
-    Deque<XMLEvent> bufferElement(String startElementName) throws XMLStreamException;
+    final String getText() throws XMLStreamException {
+        nextIfNeeded();
+        if (textReader.isEmpty()) {
+            while (XmlReader.readNextString(getEventType())) {
+                textReader.add(getReaderText());
+                nextElement();
+            }
+        }
+        return textReader.toString();
+    }
 
-    final class StreamReader implements XmlReader {
+    private static boolean readNextString(int event) {
+        return switch (event) {
+            case XMLStreamReader.CHARACTERS, XMLStreamConstants.CDATA -> true;
+            case XMLStreamConstants.ENTITY_REFERENCE -> {
+                throw new SerializationException("Unexpected entity reference in XML");
+            }
+            default -> false;
+        };
+    }
+
+    final String nextMemberElement() throws XMLStreamException {
+        nextIfNeeded();
+        while (true) {
+            if (getEventType() == XMLStreamConstants.START_ELEMENT) {
+                // Don't go to the next node just yet since attributes may need to be deserialized.
+                pendingNext = true;
+                return getStartElementName();
+            } else if (getEventType() == XMLStreamConstants.END_ELEMENT) {
+                return null;
+            } else {
+                next();
+            }
+        }
+    }
+
+    @Override
+    public final String toString() {
+        var location = getLocation();
+        var line = location.getLineNumber();
+        var column = location.getColumnNumber();
+        return "(event: " + getEventType() + ", line: " + line + ", column: " + column + ")";
+    }
+
+    static final class StreamReader extends XmlReader {
 
         private final XMLStreamReader reader;
         private final XMLInputFactory factory;
-        private final SmartTextReader textReader = new SmartTextReader();
-        private boolean pendingNext;
 
         StreamReader(XMLStreamReader reader, XMLInputFactory factory) throws XMLStreamException {
             this.reader = reader;
@@ -50,16 +124,19 @@ sealed interface XmlReader extends AutoCloseable {
             }
         }
 
-        private void next() throws XMLStreamException {
+        @Override
+        protected void nextElement() throws XMLStreamException {
             reader.next();
-            pendingNext = false;
-            textReader.reset();
         }
 
-        private void nextIfNeeded() throws XMLStreamException {
-            if (pendingNext) {
-                next();
-            }
+        @Override
+        protected int getEventType() {
+            return reader.getEventType();
+        }
+
+        @Override
+        protected boolean hasNext() throws XMLStreamException {
+            return reader.hasNext();
         }
 
         @Override
@@ -68,50 +145,18 @@ sealed interface XmlReader extends AutoCloseable {
         }
 
         @Override
-        public String getText() throws XMLStreamException {
-            nextIfNeeded();
-            if (textReader.isEmpty()) {
-                while (XmlReader.readNextString(reader.getEventType())) {
-                    textReader.add(reader.getText());
-                    reader.next();
-                }
-            }
-            return textReader.toString();
-        }
-
-        @Override
         public String getAttributeValue(String namespaceURI, String localName) {
             return reader.getAttributeValue(namespaceURI, localName);
         }
 
         @Override
-        public String nextMemberElement() throws XMLStreamException {
-            nextIfNeeded();
-
-            while (true) {
-                if (reader.isStartElement()) {
-                    // Don't go to the next node just yet since attributes may need to be deserialized.
-                    pendingNext = true;
-                    return reader.getLocalName();
-                } else if (reader.isEndElement() || !reader.hasNext()) {
-                    return null;
-                } else {
-                    next();
-                }
-            }
+        protected String getReaderText() {
+            return reader.getText();
         }
 
-        public void closeElement() throws XMLStreamException {
-            nextIfNeeded();
-            int depth = 1;
-            while (reader.hasNext() && depth > 0) {
-                if (reader.isStartElement()) {
-                    depth++;
-                } else if (reader.isEndElement()) {
-                    depth--;
-                }
-                next();
-            }
+        @Override
+        protected String getStartElementName() {
+            return reader.getLocalName();
         }
 
         @Override
@@ -147,21 +192,14 @@ sealed interface XmlReader extends AutoCloseable {
         public void close() throws Exception {
             reader.close();
         }
-
-        @Override
-        public String toString() {
-            return XmlReader.toString(reader.getEventType(), getLocation());
-        }
     }
 
-    final class BufferedReader implements XmlReader {
+    static final class BufferedReader extends XmlReader {
 
         private final Deque<XMLEvent> eventBuffer;
-        private final SmartTextReader textReader = new SmartTextReader();
         private XMLEvent currentEvent;
-        private boolean pendingNext;
 
-        BufferedReader(Deque<XMLEvent> eventBuffer) {
+        BufferedReader(Deque<XMLEvent> eventBuffer) throws XMLStreamException {
             this.eventBuffer = eventBuffer;
             do {
                 next();
@@ -171,16 +209,19 @@ sealed interface XmlReader extends AutoCloseable {
         @Override
         public void close() {}
 
-        private void next() {
-            textReader.reset();
-            pendingNext = false;
+        @Override
+        protected void nextElement() {
             currentEvent = eventBuffer.poll();
         }
 
-        private void nextIfNeeded() {
-            if (pendingNext) {
-                next();
-            }
+        @Override
+        protected int getEventType() {
+            return currentEvent != null ? currentEvent.getEventType() : -1;
+        }
+
+        @Override
+        protected boolean hasNext() {
+            return currentEvent != null;
         }
 
         @Override
@@ -189,15 +230,13 @@ sealed interface XmlReader extends AutoCloseable {
         }
 
         @Override
-        public String getText() {
-            nextIfNeeded();
-            if (textReader.isEmpty()) {
-                while (currentEvent != null && XmlReader.readNextString(currentEvent.getEventType())) {
-                    textReader.add(currentEvent.asCharacters().getData());
-                    currentEvent = eventBuffer.poll(); // don't clear the reader.
-                }
-            }
-            return textReader.toString();
+        protected String getReaderText() {
+            return currentEvent != null ? currentEvent.asCharacters().getData() : null;
+        }
+
+        @Override
+        protected String getStartElementName() {
+            return currentEvent.asStartElement().getName().getLocalPart();
         }
 
         @Override
@@ -214,39 +253,7 @@ sealed interface XmlReader extends AutoCloseable {
         }
 
         @Override
-        public String nextMemberElement() {
-            nextIfNeeded();
-
-            while (currentEvent != null) {
-                if (currentEvent.isStartElement()) {
-                    pendingNext = true;
-                    return currentEvent.asStartElement().getName().getLocalPart();
-                } else if (currentEvent.isEndElement()) {
-                    return null;
-                } else {
-                    next();
-                }
-            }
-            return null;
-        }
-
-        @Override
-        public void closeElement() {
-            nextIfNeeded();
-
-            int depth = 1;
-            while (currentEvent != null && depth > 0) {
-                if (currentEvent.isStartElement()) {
-                    depth++;
-                } else if (currentEvent.isEndElement()) {
-                    depth--;
-                }
-                next();
-            }
-        }
-
-        @Override
-        public Deque<XMLEvent> bufferElement(String startElementName) {
+        public Deque<XMLEvent> bufferElement(String startElementName) throws XMLStreamException {
             nextIfNeeded();
             Deque<XMLEvent> bufferedEvents = new ArrayDeque<>();
 
@@ -276,19 +283,10 @@ sealed interface XmlReader extends AutoCloseable {
 
             return bufferedEvents;
         }
-
-        @Override
-        public String toString() {
-            if (currentEvent == null) {
-                return "(end of XML)";
-            } else {
-                return XmlReader.toString(currentEvent.getEventType(), getLocation());
-            }
-        }
     }
 
     // Uses a single StringBuilder to store potentially multiple CHARACTER events.
-    final class SmartTextReader {
+    private static final class SmartTextReader {
 
         private final StringBuilder builder = new StringBuilder();
         private String single = "";
@@ -328,12 +326,6 @@ sealed interface XmlReader extends AutoCloseable {
         }
     }
 
-    private static String toString(int event, Location location) {
-        var line = location.getLineNumber();
-        var column = location.getColumnNumber();
-        return "(event: " + event + ", line: " + line + ", column: " + column + ")";
-    }
-
     private static boolean canSkipEvent(int event) {
         return switch (event) {
             case XMLStreamConstants.START_DOCUMENT,
@@ -343,16 +335,6 @@ sealed interface XmlReader extends AutoCloseable {
                 XMLStreamConstants.PROCESSING_INSTRUCTION,
                 XMLStreamConstants.NOTATION_DECLARATION,
                 XMLStreamConstants.ENTITY_DECLARATION -> true;
-            default -> false;
-        };
-    }
-
-    private static boolean readNextString(int event) {
-        return switch (event) {
-            case XMLStreamReader.CHARACTERS, XMLStreamConstants.CDATA -> true;
-            case XMLStreamConstants.ENTITY_REFERENCE -> {
-                throw new SerializationException("Unexpected entity reference in XML");
-            }
             default -> false;
         };
     }
