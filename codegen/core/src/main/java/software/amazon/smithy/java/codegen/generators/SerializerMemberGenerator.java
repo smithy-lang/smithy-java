@@ -210,9 +210,12 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
             return null;
         }
         var container = model.expectShape(memberShape.getContainer());
-        var target = model.expectShape(memberShape.getTarget());
-        if (container.isListShape() || container.isMapShape()) {
-            writer.putContext("schema", CodegenUtils.getSchemaType(writer, provider, target));
+        if (container.isListShape()) {
+            var memberSchema = CodegenUtils.getSchemaType(writer, provider, container) + ".listMember()";
+            writer.putContext("schema", memberSchema);
+        } else if (container.isMapShape()) {
+            var memberSchema = CodegenUtils.getSchemaType(writer, provider, container) + ".mapValueMember()";
+            writer.putContext("schema", memberSchema);
         } else {
             writer.putContext("schema", CodegenUtils.toMemberSchemaName(memberName));
         }

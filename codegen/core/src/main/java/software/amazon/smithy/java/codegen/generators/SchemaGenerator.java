@@ -74,7 +74,7 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
     public void run() {
         writer.pushState();
         writer.putContext("schemaClass", Schema.class);
-        writer.putContext("id", shape.toShapeId());
+        writer.putContext("id", CodegenUtils.getOriginalId(shape));
         writer.putContext("shapeId", ShapeId.class);
         writer.putContext("schemaBuilder", SchemaBuilder.class);
         writer.putContext("name", CodegenUtils.toSchemaName(shape));

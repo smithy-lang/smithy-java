@@ -35,7 +35,7 @@ public final class JsonDocuments {
         var tempSchema = Schema.structureBuilder(PreludeSchemas.DOCUMENT.id())
             .putMember("key", PreludeSchemas.STRING)
             .build();
-        STRING_MAP_KEY = tempSchema.member("key");
+        STRING_MAP_KEY = tempSchema.mapKeyMember();
     }
 
     private JsonDocuments() {}

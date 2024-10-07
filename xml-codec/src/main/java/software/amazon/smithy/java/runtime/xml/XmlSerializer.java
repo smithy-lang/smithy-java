@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.Objects;
 import java.util.function.BiConsumer;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
@@ -35,9 +34,10 @@ final class XmlSerializer extends InterceptingSerializer {
 
     private final XmlInfo xmlInfo;
     private final XMLStreamWriter writer;
-    private final MemberWriter memberWriter = new MemberWriter();
+    private final NonFlattenedMemberSerializer nonFlattenedMemberSerializer = new NonFlattenedMemberSerializer();
     private final ValueSerializer valueSerializer = new ValueSerializer();
-    private final StructMemberWriter structMemberWriter = new StructMemberWriter();
+    private final StructMemberSerializer structMemberSerializer = new StructMemberSerializer();
+    private final StructAttributeSerializer structAttributeSerializer = new StructAttributeSerializer();
     private final AttributeSerializer attributeSerializer = new AttributeSerializer();
 
     XmlSerializer(XMLStreamWriter writer, XmlInfo xmlInfo) {
@@ -49,11 +49,20 @@ final class XmlSerializer extends InterceptingSerializer {
     @Override
     protected ShapeSerializer before(Schema schema) {
         try {
+            // Top-level members are things like httpPayload members. They peek-through to the target shape xmlName.
+            String xmlName;
             var trait = schema.getTrait(XmlNameTrait.class);
-            var xmlName = trait != null ? trait.getValue() : schema.id().getName();
+            if (trait != null) {
+                xmlName = trait.getValue();
+            } else if (schema.isMember()) {
+                xmlName = schema.memberTarget().id().getName();
+            } else {
+                xmlName = schema.id().getName();
+            }
+
             writer.writeStartElement(xmlName);
 
-            // Add a namespace if present.
+            // Add a namespace if present, and peek-through to the target shape for a namespace when it's a member.
             var ns = schema.getTrait(XmlNamespaceTrait.class);
             if (ns != null) {
                 writer.writeNamespace(ns.getPrefix().orElse(null), ns.getUri());
@@ -79,27 +88,40 @@ final class XmlSerializer extends InterceptingSerializer {
         return TimestampFormatter.of(schema.getTrait(TimestampFormatTrait.class), DEFAULT_FORMAT).writeString(value);
     }
 
-    // Write to an attribute or to an element.
-    private final class StructMemberWriter extends InterceptingSerializer {
+    // Write to structure elements that are _not_ attributes.
+    private final class StructMemberSerializer extends InterceptingSerializer {
+        @Override
+        protected ShapeSerializer before(Schema schema) {
+            if (schema.hasTrait(XmlAttributeTrait.class)) {
+                // Attributes have to be written before writing non-attribute members.
+                return ShapeSerializer.nullSerializer();
+            } else if (schema.hasTrait(XmlFlattenedTrait.class)) {
+                return valueSerializer;
+            } else {
+                return nonFlattenedMemberSerializer;
+            }
+        }
+    }
+
+    // Write to structure attributes.
+    private final class StructAttributeSerializer extends InterceptingSerializer {
         @Override
         protected ShapeSerializer before(Schema schema) {
             if (schema.hasTrait(XmlAttributeTrait.class)) {
                 return attributeSerializer;
-            } else if (schema.hasTrait(XmlFlattenedTrait.class)) {
-                return valueSerializer;
             } else {
-                return memberWriter;
+                return ShapeSerializer.nullSerializer();
             }
         }
     }
 
     // Writes members by writing their containing element, their value, then the closing element.
     // Note that flattened structure members skip this writer and just use MemberValueSerializer.
-    private final class MemberWriter extends InterceptingSerializer {
+    private final class NonFlattenedMemberSerializer extends InterceptingSerializer {
         @Override
         protected ShapeSerializer before(Schema schema) {
             try {
-                writer.writeStartElement(getXmlNameOrMemberName(schema));
+                writeStart(writer, getMemberXmlName(schema), schema);
                 return valueSerializer;
             } catch (XMLStreamException e) {
                 throw new SerializationException(e);
@@ -116,16 +138,38 @@ final class XmlSerializer extends InterceptingSerializer {
         }
     }
 
-    private static String getXmlNameOrMemberName(Schema schema) {
-        var trait = schema.getTrait(XmlNameTrait.class);
-        return trait != null ? trait.getValue() : Objects.requireNonNull(schema.memberName(), "Schema is not a member");
+    private static void writeStart(XMLStreamWriter writer, String xmlName, Schema schema) throws XMLStreamException {
+        writer.writeStartElement(xmlName);
+
+        // Add a namespace if present.
+        var ns = schema.getDirectTrait(XmlNamespaceTrait.class);
+        if (ns != null) {
+            writer.writeNamespace(ns.getPrefix().orElse(null), ns.getUri());
+        }
+    }
+
+    private static String getMemberXmlName(Schema schema) {
+        var trait = schema.getDirectTrait(XmlNameTrait.class);
+        if (trait != null) {
+            return trait.getValue();
+        } else if (schema.isMember()) {
+            return schema.memberName();
+        } else {
+            throw new IllegalArgumentException("Expected member schema in XML serializer, found " + schema);
+        }
     }
 
     // Serialize member values. This does not open and close a containing element.
     private final class ValueSerializer implements ShapeSerializer {
         @Override
         public void writeStruct(Schema schema, SerializableStruct struct) {
-            struct.serializeMembers(structMemberWriter);
+            var structInfo = xmlInfo.getStructInfo(schema);
+            // Serialize attributes first; they have to occur before writing siblings and closing the opening node.
+            if (!structInfo.attributes.isEmpty()) {
+                struct.serializeMembers(structAttributeSerializer);
+            }
+            // Now serialize nested elements.
+            struct.serializeMembers(structMemberSerializer);
         }
 
         @Override
@@ -283,7 +327,7 @@ final class XmlSerializer extends InterceptingSerializer {
 
         private void write(Schema schema, String value) {
             try {
-                writer.writeAttribute(getXmlNameOrMemberName(schema), value);
+                writer.writeAttribute(getMemberXmlName(schema), value);
             } catch (XMLStreamException e) {
                 throw new SerializationException(e);
             }
@@ -302,7 +346,7 @@ final class XmlSerializer extends InterceptingSerializer {
         @Override
         protected ShapeSerializer before(Schema schema) {
             try {
-                writer.writeStartElement(info.memberName);
+                writeStart(writer, info.memberName, schema);
                 return valueSerializer;
             } catch (XMLStreamException e) {
                 throw new SerializationException(e);
@@ -339,14 +383,12 @@ final class XmlSerializer extends InterceptingSerializer {
                 writer.writeStartElement(info.entryName);
 
                 // Write the "<key>" element.
-                writer.writeStartElement(info.keyName);
+                writeStart(writer, info.keyName, keySchema);
                 writer.writeCharacters(key);
                 writer.writeEndElement();
 
-                // Write the "<value>" element.
-                writer.writeStartElement(info.valueName);
-                valueSerializer.accept(state, memberWriter);
-                writer.writeEndElement();
+                // The <value> element is opened and closed by the nonFlattenedMemberSerializer.
+                valueSerializer.accept(state, nonFlattenedMemberSerializer);
 
                 writer.writeEndElement();
             } catch (XMLStreamException e) {

@@ -29,6 +29,7 @@ public final class RequestSerializer {
     private URI endpoint;
     private SerializableShape shapeValue;
     private EventEncoderFactory<?> eventStreamEncodingFactory;
+    private boolean omitEmptyPayload = false;
     private final BindingMatcher bindingMatcher = BindingMatcher.requestMatcher();
 
     RequestSerializer() {}
@@ -102,6 +103,17 @@ public final class RequestSerializer {
     }
 
     /**
+     * Set to true to not serialize any payload when no members are part of the body or bound to the payload.
+     *
+     * @param omitEmptyPayload True to omit an empty payload.
+     * @return the serializer.
+     */
+    public RequestSerializer omitEmptyPayload(boolean omitEmptyPayload) {
+        this.omitEmptyPayload = omitEmptyPayload;
+        return this;
+    }
+
+    /**
      * Finishes setting up the serializer and creates an HTTP request.
      *
      * @return Returns the created request.
@@ -115,7 +127,13 @@ public final class RequestSerializer {
         Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
         var httpTrait = operation.schema().expectTrait(HttpTrait.class);
-        var serializer = new HttpBindingSerializer(httpTrait, payloadCodec, payloadMediaType, bindingMatcher);
+        var serializer = new HttpBindingSerializer(
+            httpTrait,
+            payloadCodec,
+            payloadMediaType,
+            bindingMatcher,
+            omitEmptyPayload
+        );
         shapeValue.serialize(serializer);
         serializer.flush();
 

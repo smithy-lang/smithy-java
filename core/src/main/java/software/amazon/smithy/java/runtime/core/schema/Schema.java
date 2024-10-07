@@ -8,7 +8,6 @@ package software.amazon.smithy.java.runtime.core.schema;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
@@ -33,7 +32,7 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
     /**
      * Schema traits. This is package-private to allow MemberSchemaBuilder to eagerly merge member and target traits.
      */
-    final Map<Class<? extends Trait>, Trait> traits;
+    final TraitMap traits;
 
     private final String memberName;
 
@@ -75,10 +74,14 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
     final double maxDoubleConstraint;
     final ValidatorOfString stringValidation;
 
+    private Schema listMember;
+    private Schema mapKeyMember;
+    private Schema mapValueMember;
+
     Schema(
         ShapeType type,
         ShapeId id,
-        Map<Class<? extends Trait>, Trait> traits,
+        TraitMap traits,
         List<MemberSchemaBuilder> members,
         Set<String> stringEnumValues
     ) {
@@ -161,26 +164,26 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
     }
 
     public static Schema createBoolean(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.BOOLEAN, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.BOOLEAN, id, TraitMap.create(traits));
     }
 
     public static Schema createByte(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.BYTE, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.BYTE, id, TraitMap.create(traits));
     }
 
     public static Schema createShort(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.SHORT, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.SHORT, id, TraitMap.create(traits));
     }
 
     public static Schema createInteger(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.INTEGER, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.INTEGER, id, TraitMap.create(traits));
     }
 
     public static Schema createIntEnum(ShapeId id, Set<Integer> values, Trait... traits) {
         return new RootSchema(
             ShapeType.INT_ENUM,
             id,
-            SchemaBuilder.createTraitMap(traits),
+            TraitMap.create(traits),
             Collections.emptyList(),
             Collections.emptySet(),
             values
@@ -188,34 +191,34 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
     }
 
     public static Schema createLong(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.LONG, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.LONG, id, TraitMap.create(traits));
     }
 
     public static Schema createFloat(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.FLOAT, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.FLOAT, id, TraitMap.create(traits));
     }
 
     public static Schema createDouble(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.DOUBLE, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.DOUBLE, id, TraitMap.create(traits));
     }
 
     public static Schema createBigInteger(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.BIG_INTEGER, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.BIG_INTEGER, id, TraitMap.create(traits));
     }
 
     public static Schema createBigDecimal(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.BIG_DECIMAL, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.BIG_DECIMAL, id, TraitMap.create(traits));
     }
 
     public static Schema createString(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.STRING, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.STRING, id, TraitMap.create(traits));
     }
 
     public static Schema createEnum(ShapeId id, Set<String> values, Trait... traits) {
         return new RootSchema(
             ShapeType.ENUM,
             id,
-            SchemaBuilder.createTraitMap(traits),
+            TraitMap.create(traits),
             Collections.emptyList(),
             values,
             Collections.emptySet()
@@ -223,23 +226,23 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
     }
 
     public static Schema createBlob(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.BLOB, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.BLOB, id, TraitMap.create(traits));
     }
 
     public static Schema createDocument(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.DOCUMENT, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.DOCUMENT, id, TraitMap.create(traits));
     }
 
     public static Schema createTimestamp(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.TIMESTAMP, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.TIMESTAMP, id, TraitMap.create(traits));
     }
 
     public static Schema createOperation(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.OPERATION, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.OPERATION, id, TraitMap.create(traits));
     }
 
     public static Schema createService(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.SERVICE, id, SchemaBuilder.createTraitMap(traits));
+        return new RootSchema(ShapeType.SERVICE, id, TraitMap.create(traits));
     }
 
     public static SchemaBuilder structureBuilder(ShapeId id, Trait... traits) {
@@ -350,9 +353,8 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
      * @return Returns the trait, or null if not found.
      * @param <T> Trait type to get.
      */
-    @SuppressWarnings("unchecked")
     public final <T extends Trait> T getTrait(Class<T> trait) {
-        return (T) traits.get(trait);
+        return traits.get(trait);
     }
 
     /**
@@ -360,10 +362,9 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
      *
      * @param trait Trait to check for.
      * @return true if the trait is found.
-     * @param <T> Trait type.
      */
-    public final <T extends Trait> boolean hasTrait(Class<T> trait) {
-        return traits.containsKey(trait);
+    public final boolean hasTrait(Class<? extends Trait> trait) {
+        return traits.contains(trait);
     }
 
     /**
@@ -383,6 +384,22 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
     }
 
     /**
+     * Gets a trait, but only if it was applied directly to the shape.
+     *
+     * <p>This can be used to check if a trait was applied to a member. Almost all trait access should go through
+     * {@link #getTrait(Class)}, but that method returns traits applied to a member or to the target shape of a member.
+     * Sometimes you need to know if a trait was applied directly to a member. This method returns the result of
+     * {@link #getTrait(Class)} for non-member shapes.
+     *
+     * @param trait Trait to get.
+     * @return the trait if found, or null.
+     * @param <T> Trait to get.
+     */
+    public <T extends Trait> T getDirectTrait(Class<T> trait) {
+        return getTrait(trait);
+    }
+
+    /**
      * Gets the members of the schema.
      *
      * @return Returns the members.
@@ -399,6 +416,60 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
      */
     public Schema member(String memberName) {
         return null;
+    }
+
+    /**
+     * Get the member of a list.
+     *
+     * <p>This method eliminates any overhead associated with hashmap lookups based on member names.
+     *
+     * @return Returns the found member or null if not found.
+     */
+    public final Schema listMember() {
+        var result = listMember;
+        if (result == null) {
+            listMember = result = members().get(0);
+            if (!"member".equals(result.memberName)) {
+                throw new IllegalStateException("Expected list member, got " + result);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Get the key member of a map.
+     *
+     * <p>This method eliminates any overhead associated with hashmap lookups based on member names.
+     *
+     * @return Returns the found member or null if not found.
+     */
+    public final Schema mapKeyMember() {
+        var result = mapKeyMember;
+        if (result == null) {
+            mapKeyMember = result = members().get(0);
+            if (!"key".equals(result.memberName)) {
+                throw new IllegalStateException("Expected map key member at position 0, got " + result);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Get the value member of a map.
+     *
+     * <p>This method eliminates any overhead associated with hashmap lookups based on member names.
+     *
+     * @return Returns the found member or null if not found.
+     */
+    public final Schema mapValueMember() {
+        var result = mapValueMember;
+        if (result == null) {
+            mapValueMember = result = members().get(1);
+            if (!"value".equals(result.memberName)) {
+                throw new IllegalStateException("Expected map value member at position 1, got " + result);
+            }
+        }
+        return result;
     }
 
     /**

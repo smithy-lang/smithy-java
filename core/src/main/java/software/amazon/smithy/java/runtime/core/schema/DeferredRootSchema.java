@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.Trait;
 
 /**
  * A possibly recursive schema that may contain members, some of which aren't built yet.
@@ -27,7 +26,7 @@ final class DeferredRootSchema extends Schema {
     DeferredRootSchema(
         ShapeType type,
         ShapeId id,
-        Map<Class<? extends Trait>, Trait> traits,
+        TraitMap traits,
         List<MemberSchemaBuilder> memberBuilders,
         Set<String> stringEnumValues,
         Set<Integer> intEnumValues

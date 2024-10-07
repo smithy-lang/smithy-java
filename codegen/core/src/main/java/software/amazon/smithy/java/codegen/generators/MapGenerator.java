@@ -36,11 +36,10 @@ public class MapGenerator
                 writer -> writer.onSection("sharedSerde", t -> {
 
                     var value = directive.model().expectShape(directive.shape().getValue().getTarget());
-                    var key = directive.model().expectShape(directive.shape().getKey().getTarget());
                     var valueSymbol = directive.symbolProvider().toSymbol(value);
                     var valueSchema = CodegenUtils.getSchemaType(writer, directive.symbolProvider(), value);
                     var keySymbol = directive.symbolProvider().toSymbol(directive.shape().getKey());
-                    var keySchema = CodegenUtils.getSchemaType(writer, directive.symbolProvider(), key);
+                    var keySchema = CodegenUtils.getSchemaType(writer, directive.symbolProvider(), directive.shape());
                     var name = CodegenUtils.getDefaultName(directive.shape(), directive.service());
 
                     writer.pushState();
@@ -52,7 +51,7 @@ public class MapGenerator
                             public void accept(${shape:T} values, ${mapSerializer:T} serializer) {
                                 for (var valueEntry : values.entrySet()) {
                                     serializer.writeEntry(
-                                        ${keySchema:L},
+                                        ${keySchema:L}.mapKeyMember(),
                                         valueEntry.getKey()${?enumKey}.value()${/enumKey},
                                         valueEntry.getValue(),
                                         ${name:U}$$ValueSerializer.INSTANCE

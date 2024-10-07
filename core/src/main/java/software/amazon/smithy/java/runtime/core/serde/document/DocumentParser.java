@@ -97,7 +97,7 @@ final class DocumentParser implements ShapeSerializer {
 
     @Override
     public <T> void writeMap(Schema schema, T state, int size, BiConsumer<T, MapSerializer> consumer) {
-        var keyMember = schema.member("key");
+        var keyMember = schema.mapKeyMember();
         if (keyMember == null) {
             throw new SerializationException(
                 "Cannot create a map from a schema that does not define a map key: " + schema

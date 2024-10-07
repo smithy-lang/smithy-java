@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.runtime.core.schema;
 
 import java.util.Collections;
-import java.util.Map;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.DefaultTrait;
@@ -20,7 +19,8 @@ final class MemberSchemaBuilder {
 
     final ShapeType type;
     final ShapeId id;
-    final Map<Class<? extends Trait>, Trait> traits;
+    final TraitMap traits;
+    final TraitMap directTraits;
 
     final Schema target;
     final SchemaBuilder targetBuilder;
@@ -45,11 +45,21 @@ final class MemberSchemaBuilder {
 
         this.target = target;
         this.targetBuilder = targetBuilder;
-        this.traits = SchemaBuilder.createTraitMap(traits, target == null ? targetBuilder.traits : target.traits);
         this.id = id;
         this.type = target == null ? targetBuilder.type : target.type();
-        this.isRequiredByValidation = computeIsRequired();
+        this.directTraits = TraitMap.create(traits);
 
+        // Try to optimally combine traits.
+        var targetTraits = target != null ? target.traits : targetBuilder.traits;
+        if (directTraits.isEmpty()) {
+            this.traits = targetTraits;
+        } else if (targetTraits.isEmpty()) {
+            this.traits = directTraits;
+        } else {
+            this.traits = targetTraits.prepend(traits);
+        }
+
+        this.isRequiredByValidation = computeIsRequired();
         this.validationState = SchemaBuilder.ValidationState.of(
             type,
             this.traits,
@@ -70,10 +80,10 @@ final class MemberSchemaBuilder {
     }
 
     private boolean computeIsRequired() {
-        if (!traits.containsKey(RequiredTrait.class)) {
+        if (!traits.contains(RequiredTrait.class)) {
             return false;
         }
-        var defaultValue = (DefaultTrait) traits.get(DefaultTrait.class);
+        var defaultValue = traits.get(DefaultTrait.class);
         return defaultValue == null || defaultValue.toNode().isNullNode();
     }
 

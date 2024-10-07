@@ -229,7 +229,7 @@ final class Documents {
         @Override
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeMap(schema, members, members.size(), (members, s) -> {
-                var key = schema.member("key");
+                var key = schema.mapKeyMember();
                 for (var entry : members.entrySet()) {
                     s.writeEntry(key, entry.getKey(), entry.getValue(), Document::serialize);
                 }

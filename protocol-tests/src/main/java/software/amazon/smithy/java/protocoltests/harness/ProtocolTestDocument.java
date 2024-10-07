@@ -39,7 +39,8 @@ final class ProtocolTestDocument implements Document {
     private static final Schema STRING_MAP_KEY = Schema.structureBuilder(PreludeSchemas.DOCUMENT.id())
         .putMember("key", PreludeSchemas.STRING)
         .build()
-        .member("key");
+        .members()
+        .get(0);
     private final Node node;
     private final ShapeType type;
     private final Schema schema;

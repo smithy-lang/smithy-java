@@ -56,6 +56,11 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
     }
 
     @Override
+    protected boolean omitEmptyPayload() {
+        return true;
+    }
+
+    @Override
     protected String payloadMediaType() {
         return "application/xml";
     }

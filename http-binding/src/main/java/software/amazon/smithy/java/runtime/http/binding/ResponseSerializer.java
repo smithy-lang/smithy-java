@@ -24,6 +24,7 @@ public final class ResponseSerializer {
     private ApiOperation<?, ?> operation;
     private SerializableShape shapeValue;
     private EventEncoderFactory<?> eventEncoderFactory;
+    private boolean omitEmptyPayload = false;
     private final BindingMatcher bindingMatcher = BindingMatcher.responseMatcher();
 
     ResponseSerializer() {}
@@ -86,6 +87,17 @@ public final class ResponseSerializer {
     }
 
     /**
+     * Set to true to not serialize any payload when no members are part of the body or bound to the payload.
+     *
+     * @param omitEmptyPayload True to omit an empty payload.
+     * @return the serializer.
+     */
+    public ResponseSerializer omitEmptyPayload(boolean omitEmptyPayload) {
+        this.omitEmptyPayload = omitEmptyPayload;
+        return this;
+    }
+
+    /**
      * Finishes setting up the serializer and creates an HTTP response.
      *
      * @return Returns the created response.
@@ -97,7 +109,13 @@ public final class ResponseSerializer {
         Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
         var httpTrait = operation.schema().expectTrait(HttpTrait.class);
-        var serializer = new HttpBindingSerializer(httpTrait, payloadCodec, payloadMediaType, bindingMatcher);
+        var serializer = new HttpBindingSerializer(
+            httpTrait,
+            payloadCodec,
+            payloadMediaType,
+            bindingMatcher,
+            omitEmptyPayload
+        );
         shapeValue.serialize(serializer);
         serializer.flush();
 

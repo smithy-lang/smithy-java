@@ -46,6 +46,10 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
 
     abstract protected HttpErrorDeserializer getErrorDeserializer(Context context);
 
+    protected boolean omitEmptyPayload() {
+        return false;
+    }
+
     protected EventEncoderFactory<F> getEventEncoderFactory(InputEventStreamingApiOperation<?, ?, ?> inputOperation) {
         throw new UnsupportedOperationException("This protocol does not support event streaming");
     }
@@ -66,7 +70,8 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
             .payloadCodec(codec())
             .payloadMediaType(payloadMediaType())
             .shapeValue(input)
-            .endpoint(endpoint);
+            .endpoint(endpoint)
+            .omitEmptyPayload(omitEmptyPayload());
 
         if (operation instanceof InputEventStreamingApiOperation<?, ?, ?> i) {
             serializer.eventEncoderFactory(getEventEncoderFactory(i));

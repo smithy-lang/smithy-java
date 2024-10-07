@@ -27,10 +27,12 @@ import software.amazon.smithy.model.selector.PathFinder;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.ClientOptionalTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
+import software.amazon.smithy.model.traits.synthetic.OriginalShapeIdTrait;
 import software.amazon.smithy.utils.CaseUtils;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
@@ -158,6 +160,21 @@ public final class CodegenUtils {
     public static boolean isNullableMember(Model model, MemberShape member) {
         return member.hasTrait(ClientOptionalTrait.class)
             || NullableIndex.of(model).isMemberNullable(member, NullableIndex.CheckMode.SERVER);
+    }
+
+    /**
+     * Get the original shape ID of a shape as defined in the mode before renaming any shapes.
+     *
+     * <p>The original ID is critical for serialization in protocols like XML.
+     *
+     * @param shape Shape to get the original ID from.
+     * @return the original ID.
+     */
+    public static ShapeId getOriginalId(Shape shape) {
+        return shape
+            .getTrait(OriginalShapeIdTrait.class)
+            .map(OriginalShapeIdTrait::getOriginalId)
+            .orElse(shape.getId());
     }
 
     /**

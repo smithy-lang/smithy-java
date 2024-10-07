@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.core.schema;
 
 import java.util.List;
 import java.util.Set;
+import software.amazon.smithy.model.traits.Trait;
 
 /**
  * A member schema that targets a built shape.
@@ -14,10 +15,12 @@ import java.util.Set;
 final class MemberSchema extends Schema {
 
     private final Schema target;
+    private final TraitMap directTraits;
 
     MemberSchema(MemberSchemaBuilder builder) {
         super(builder);
         this.target = builder.target;
+        this.directTraits = builder.directTraits;
     }
 
     @Override
@@ -43,5 +46,10 @@ final class MemberSchema extends Schema {
     @Override
     public Set<Integer> intEnumValues() {
         return target.intEnumValues();
+    }
+
+    @Override
+    public <T extends Trait> T getDirectTrait(Class<T> trait) {
+        return directTraits.get(trait);
     }
 }

@@ -155,7 +155,7 @@ final class XmlInfo {
             if (flattened) {
                 this.memberName = getName(schema);
             } else {
-                var member = schema.member("member");
+                var member = schema.listMember();
                 var memberXmlName = member.getTrait(XmlNameTrait.class);
                 if (memberXmlName != null) {
                     memberName = memberXmlName.getValue();
@@ -180,8 +180,8 @@ final class XmlInfo {
             this.xmlName = getName(schema);
             this.flattened = schema.hasTrait(XmlFlattenedTrait.class);
             this.entryName = flattened ? xmlName : "entry";
-            this.keyName = getName(schema.member("key"));
-            this.valueName = getName(schema.member("value"));
+            this.keyName = getName(schema.mapKeyMember());
+            this.valueName = getName(schema.mapValueMember());
         }
     }
 }

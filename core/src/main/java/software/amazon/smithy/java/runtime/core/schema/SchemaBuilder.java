@@ -10,7 +10,6 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,14 +32,14 @@ public final class SchemaBuilder {
 
     final ShapeId id;
     final ShapeType type;
-    final Map<Class<? extends Trait>, Trait> traits;
+    final TraitMap traits;
     final List<MemberSchemaBuilder> members;
     private Schema builtShape;
 
     SchemaBuilder(ShapeId id, ShapeType type, Trait... traits) {
         this.id = id;
         this.type = type;
-        this.traits = createTraitMap(traits);
+        this.traits = TraitMap.create(traits);
 
         members = switch (type) {
             case LIST -> new ArrayList<>(1);
@@ -176,26 +175,6 @@ public final class SchemaBuilder {
         };
     }
 
-    @SuppressWarnings("unchecked")
-    static Map<Class<? extends Trait>, Trait> createTraitMap(
-        Trait[] traits,
-        Map<Class<? extends Trait>, Trait> targetTraits
-    ) {
-        if (targetTraits == null || targetTraits.isEmpty()) {
-            return createTraitMap(traits);
-        } else if (traits == null || traits.length == 0) {
-            return targetTraits;
-        } else {
-            int size = traits.length + targetTraits.size();
-            var result = new HashMap<Class<? extends Trait>, Trait>(size);
-            result.putAll(targetTraits);
-            for (Trait trait : traits) {
-                result.put(trait.getClass(), trait);
-            }
-            return Collections.unmodifiableMap(result);
-        }
-    }
-
     static int computeRequiredMemberCount(ShapeType type, Collection<MemberSchemaBuilder> members) {
         if (type != ShapeType.STRUCTURE) {
             return 0;
@@ -238,7 +217,7 @@ public final class SchemaBuilder {
         double maxDoubleConstraint,
         ValidatorOfString stringValidation
     ) {
-        static ValidationState of(ShapeType type, Map<Class<? extends Trait>, Trait> traits, Set<String> stringEnum) {
+        static ValidationState of(ShapeType type, TraitMap traits, Set<String> stringEnum) {
             long minLengthConstraint;
             long maxLengthConstraint;
             BigDecimal minRangeConstraint;
@@ -250,7 +229,7 @@ public final class SchemaBuilder {
             ValidatorOfString stringValidation;
 
             // Precompute an allowed range, setting Long.MIN and Long.MAX when missing.
-            LengthTrait lengthTrait = (LengthTrait) traits.get(LengthTrait.class);
+            LengthTrait lengthTrait = traits.get(LengthTrait.class);
             if (lengthTrait == null) {
                 minLengthConstraint = Long.MIN_VALUE;
                 maxLengthConstraint = Long.MAX_VALUE;
@@ -264,14 +243,14 @@ public final class SchemaBuilder {
                 stringValidation = createStringValidator(
                     stringEnum,
                     lengthTrait,
-                    (PatternTrait) traits.get(PatternTrait.class)
+                    traits.get(PatternTrait.class)
                 );
             } else {
                 stringValidation = ValidatorOfString.of(Collections.emptyList());
             }
 
             // Range traits use BigDecimal, so use null when missing rather than any kind of default.
-            RangeTrait rangeTrait = (RangeTrait) traits.get(RangeTrait.class);
+            RangeTrait rangeTrait = traits.get(RangeTrait.class);
             if (rangeTrait != null) {
                 minRangeConstraint = rangeTrait.getMin().orElse(null);
                 maxRangeConstraint = rangeTrait.getMax().orElse(null);

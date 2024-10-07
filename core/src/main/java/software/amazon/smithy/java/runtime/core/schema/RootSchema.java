@@ -14,7 +14,6 @@ import java.util.Set;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.EnumTrait;
-import software.amazon.smithy.model.traits.Trait;
 
 /**
  * A fully resolved, non-recursive schema that may contain members.
@@ -26,14 +25,14 @@ final class RootSchema extends Schema {
     private final Set<String> stringEnumValues;
     private final Set<Integer> intEnumValues;
 
-    RootSchema(ShapeType type, ShapeId id, Map<Class<? extends Trait>, Trait> traits) {
+    RootSchema(ShapeType type, ShapeId id, TraitMap traits) {
         this(type, id, traits, Collections.emptyList(), detectEnumTraitValues(type, traits), Collections.emptySet());
     }
 
     // String shapes might just have an enum trait, so find those and use them as enum values.
-    private static Set<String> detectEnumTraitValues(ShapeType type, Map<Class<? extends Trait>, Trait> traits) {
+    private static Set<String> detectEnumTraitValues(ShapeType type, TraitMap traits) {
         if (type == ShapeType.STRING) {
-            var enumTrait = (EnumTrait) traits.get(EnumTrait.class);
+            var enumTrait = traits.get(EnumTrait.class);
             if (enumTrait != null) {
                 return new HashSet<>(enumTrait.getEnumDefinitionValues());
             }
@@ -44,7 +43,7 @@ final class RootSchema extends Schema {
     RootSchema(
         ShapeType type,
         ShapeId id,
-        Map<Class<? extends Trait>, Trait> traits,
+        TraitMap traits,
         List<MemberSchemaBuilder> memberBuilders,
         Set<String> stringEnumValues,
         Set<Integer> intEnumValues
