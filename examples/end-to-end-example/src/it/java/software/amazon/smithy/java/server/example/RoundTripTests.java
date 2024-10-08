@@ -24,7 +24,7 @@ import software.amazon.smithy.java.client.example.model.GetOrderInput;
 import software.amazon.smithy.java.client.example.model.OrderStatus;
 import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
 
-public class GenericTest {
+public class RoundTripTests {
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     @BeforeAll
@@ -38,7 +38,7 @@ public class GenericTest {
     }
 
     public static boolean serverListening(URI uri) {
-        try (Socket sock = new Socket(uri.getHost(), uri.getPort())) {
+        try (Socket ignored = new Socket(uri.getHost(), uri.getPort())) {
             return true;
         } catch (Exception e) {
             return false;
