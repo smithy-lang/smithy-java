@@ -10,8 +10,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.client.core.pagination.models.GetFoosInput;
 import software.amazon.smithy.java.runtime.client.core.pagination.models.GetFoosOutput;
@@ -19,7 +17,6 @@ import software.amazon.smithy.java.runtime.client.core.pagination.models.ResultW
 
 final class MockClient {
     private static final List<String> tokens = List.of("first", "second", "third", "final");
-    private final Executor executor = CompletableFuture.delayedExecutor(1, TimeUnit.MILLISECONDS);
     private final Iterator<String> tokenIterator = tokens.iterator();
     private String nextToken = null;
 
@@ -40,6 +37,6 @@ final class MockClient {
         }
         nextToken = tokenIterator.hasNext() ? tokenIterator.next() : null;
         var output = new GetFoosOutput(new ResultWrapper(nextToken, foos));
-        return CompletableFuture.supplyAsync(() -> output, executor);
+        return CompletableFuture.completedFuture(output);
     }
 }

@@ -7,7 +7,6 @@ package software.amazon.smithy.java.runtime.client.core.pagination;
 
 import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
@@ -75,15 +74,11 @@ final class BlockingPaginatorAdapter<O extends SerializableStruct> implements Pa
 
         @Override
         public O next() {
-            try {
-                // Create new future to block on getting
-                next = new CompletableFuture<>();
-                // Request a new value
-                subscription.request(1);
-                return next.get();
-            } catch (ExecutionException | InterruptedException e) {
-                throw new RuntimeException("Failed to process paginator subscription", e);
-            }
+            // Create new future to block on getting
+            next = new CompletableFuture<>();
+            // Request a new value
+            subscription.request(1);
+            return next.join();
         }
     }
 }

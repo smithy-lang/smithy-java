@@ -11,7 +11,6 @@ import static org.hamcrest.Matchers.contains;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,11 +70,7 @@ public class AsyncPaginationTest {
         private final CompletableFuture<List<GetFoosOutput>> future = new CompletableFuture<>();
 
         private List<GetFoosOutput> results() {
-            try {
-                return future.get();
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException(e);
-            }
+            return future.join();
         }
 
         @Override
