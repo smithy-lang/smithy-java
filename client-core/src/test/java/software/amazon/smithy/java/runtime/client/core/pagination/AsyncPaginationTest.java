@@ -5,7 +5,8 @@
 
 package software.amazon.smithy.java.runtime.client.core.pagination;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +44,7 @@ public class AsyncPaginationTest {
         paginator.subscribe(subscriber);
         // Block and wait on results
         var results = subscriber.results();
-        assertEquals(results, BASE_EXPECTED_RESULTS);
+        assertThat(results, contains(BASE_EXPECTED_RESULTS.toArray()));
     }
 
     @Test
@@ -61,7 +62,7 @@ public class AsyncPaginationTest {
             new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))),
             new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1")))
         );
-        assertEquals(results, expectedResult);
+        assertThat(results, contains(expectedResult.toArray()));
     }
 
     private static final class PaginationTestSubscriber implements Flow.Subscriber<GetFoosOutput> {
