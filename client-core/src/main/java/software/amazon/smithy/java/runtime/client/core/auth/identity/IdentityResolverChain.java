@@ -13,17 +13,30 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 
-final class IdentityResolverChain<IdentityT extends Identity> implements IdentityResolver<IdentityT> {
+/**
+ * Chain of Identity resolvers.
+ *
+ * <p>Each identity resolver is checked in order, returning the identity resolved or attempting the next resolver in the
+ * chain if the resolver returns an {@link IdentityNotFoundException}. Exceptions from each resolver are aggregated and
+ * returned in the resulting {@link IdentityNotFoundException} if all resolvers in the chain fail.
+ *
+ * <p>This chain can optionally cache the last successful resolver when chaining resolvers, avoiding the
+ * need to go through the full chain each time an identity is resolved. If the cached resolver fails,
+ * the chaining resolver will fall back to checking the full resolution chain.
+ * 
+ * @param <IdentityT> Identity class to resolve.
+ */
+public final class IdentityResolverChain<IdentityT extends Identity> implements IdentityResolver<IdentityT> {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(IdentityResolverChain.class);
     private final Class<IdentityT> identityClass;
     private final List<IdentityResolver<IdentityT>> resolvers;
-
     private final boolean reuseLastProvider;
+
     private IdentityResolver<IdentityT> lastUsedResolver;
 
-    public IdentityResolverChain(List<IdentityResolver<IdentityT>> resolvers, boolean reuseLastProvider) {
-        this.resolvers = Objects.requireNonNull(resolvers, "resolvers cannot be null");
-        this.reuseLastProvider = reuseLastProvider;
+    private IdentityResolverChain(Builder<IdentityT> builder) {
+        this.resolvers = Objects.requireNonNull(builder.resolvers, "resolvers cannot be null");
+        this.reuseLastProvider = builder.reuseLastProvider;
         if (resolvers.isEmpty()) {
             throw new IllegalArgumentException("Cannot chain empty resolvers list.");
         }
@@ -91,5 +104,67 @@ final class IdentityResolverChain<IdentityT extends Identity> implements Identit
             }
             return CompletableFuture.failedFuture(exc);
         });
+    }
+
+    /**
+     * Create a {@link IdentityResolverChain} builder.
+     *
+     * @return Returns the created builder.
+     * @param <I> Identity type
+     */
+    public static <I extends Identity> Builder<I> builder() {
+        return new Builder<>();
+    }
+
+    /**
+     * Builder for {@link IdentityResolverChain}.
+     */
+    public static final class Builder<IdentityT extends Identity> {
+        private final List<IdentityResolver<IdentityT>> resolvers = new ArrayList<>();
+        private boolean reuseLastProvider = true;
+
+        private Builder() {
+        }
+
+        /**
+         * Add identity resolvers to the chain.
+         *
+         * <p>Note: Chained Identity resolvers are checked in the order added.
+         *
+         * @param resolvers resolvers to add to chain.
+         * @return this builder.
+         */
+        public Builder<IdentityT> addResolvers(List<IdentityResolver<IdentityT>> resolvers) {
+            this.resolvers.addAll(resolvers);
+            return this;
+        }
+
+        /**
+         * Add identity resolver to the chain.
+         *
+         * <p>Note: Chained Identity resolvers are checked in the order added.
+         *
+         * @param resolver Resolver to add to the chain.
+         * @return this builder.
+         */
+        public Builder<IdentityT> addResolver(IdentityResolver<IdentityT> resolver) {
+            resolvers.add(resolver);
+            return this;
+        }
+
+        /**
+         * Whether to cache the last successful identity provider.
+         *
+         * @param reuseLastProvider whether to cache last successful provider. Defaults to true.
+         * @return this builder.
+         */
+        public Builder<IdentityT> reuseLastProvider(boolean reuseLastProvider) {
+            this.reuseLastProvider = reuseLastProvider;
+            return this;
+        }
+
+        public IdentityResolverChain<IdentityT> build() {
+            return new IdentityResolverChain<>(this);
+        }
     }
 }

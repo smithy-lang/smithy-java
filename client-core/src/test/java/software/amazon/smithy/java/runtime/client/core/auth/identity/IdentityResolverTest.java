@@ -20,65 +20,84 @@ public class IdentityResolverTest {
     private static final IdentityResolver<TokenIdentity> TEST_RESOLVER = IdentityResolver.of(TEST_IDENTITY);
 
     @Test
-    void testStaticIdentityReturnsExpected() throws ExecutionException, InterruptedException {
+    void testStaticIdentityReturnsExpected() {
         assertEquals(TEST_RESOLVER.identityType(), TEST_IDENTITY.getClass());
-        var resolved = TEST_RESOLVER.resolveIdentity(AuthProperties.empty()).get();
+        var resolved = TEST_RESOLVER.resolveIdentity(AuthProperties.empty()).join();
         assertEquals(TEST_IDENTITY, resolved);
     }
 
     @Test
-    void testIdentityResolverChainContinuesOnIdentityNotFound() throws ExecutionException, InterruptedException {
-        var resolver = IdentityResolver.chain(
-            List.of(
-                EmptyResolver.INSTANCE,
-                EmptyResolver.INSTANCE,
-                EmptyResolver.INSTANCE,
-                TEST_RESOLVER
-            )
-        );
-        var result = resolver.resolveIdentity(AuthProperties.empty()).get();
+    void testIdentityResolverChainContinuesOnIdentityNotFound() {
+        var resolver = IdentityResolverChain.<TokenIdentity>builder()
+            .addResolver(EmptyResolver.INSTANCE)
+            .addResolver(EmptyResolver.INSTANCE)
+            .addResolver(EmptyResolver.INSTANCE)
+            .addResolver(TEST_RESOLVER)
+            .build();
+        var result = resolver.resolveIdentity(AuthProperties.empty()).join();
         assertEquals(result, TEST_IDENTITY);
     }
 
     @Test
-    void testIdentityResolverChainCachesResolver() throws ExecutionException, InterruptedException {
+    void testIdentityResolverChainCachesResolver() {
         var counter = new CountingResolver();
-        var resolver = IdentityResolver.chain(List.of(counter, TEST_RESOLVER));
-        var result = resolver.resolveIdentity(AuthProperties.empty()).get();
+        var resolver = IdentityResolverChain.<TokenIdentity>builder()
+            .addResolvers(List.of(counter, TEST_RESOLVER))
+            .build();
+        var result = resolver.resolveIdentity(AuthProperties.empty()).join();
         assertEquals(result, TEST_IDENTITY);
         assertEquals(counter.count, 1);
 
         // Resolve again, expecting the chain to cache the last successful resolver.
-        var result2 = resolver.resolveIdentity(AuthProperties.empty()).get();
-        assertEquals(result, TEST_IDENTITY);
+        var result2 = resolver.resolveIdentity(AuthProperties.empty()).join();
+        assertEquals(result2, TEST_IDENTITY);
         assertEquals(counter.count, 1);
     }
 
     @Test
-    void testIdentityResolverChainStopsCachingAfterFailure() throws ExecutionException, InterruptedException {
+    void testIdentityResolverChainStopsCachingAfterFailure() {
         var counter1 = new CountingResolver();
-        final TogglableResolver toggle = new TogglableResolver();
+        final ToggleableResolver toggle = new ToggleableResolver();
         var counter2 = new CountingResolver();
-        var resolver = IdentityResolver.chain(List.of(counter1, toggle, counter2, TEST_RESOLVER));
-        var result = resolver.resolveIdentity(AuthProperties.empty()).get();
+        var resolver = IdentityResolverChain.<TokenIdentity>builder()
+            .addResolvers(List.of(counter1, toggle, counter2, TEST_RESOLVER))
+            .build();
+        var result = resolver.resolveIdentity(AuthProperties.empty()).join();
         assertEquals(result, TEST_IDENTITY);
         assertEquals(counter1.count, 1);
         assertEquals(counter2.count, 0);
 
         toggle.fail = true;
-        var result2 = resolver.resolveIdentity(AuthProperties.empty()).get();
+        var result2 = resolver.resolveIdentity(AuthProperties.empty()).join();
         assertEquals(result2, TEST_IDENTITY);
         assertEquals(counter1.count, 2);
         assertEquals(counter2.count, 1);
     }
 
     @Test
-    void testIdentityResolverChainStopsOnUnexpectedFailure() throws ExecutionException, InterruptedException {
-        var resolver = IdentityResolver.chain(
-            List.of(EmptyResolver.INSTANCE, FailingResolver.INSTANCE, TEST_RESOLVER)
-        );
+    void testIdentityResolverChainStopsOnUnexpectedFailure() {
+        var resolver = IdentityResolverChain.<TokenIdentity>builder()
+            .addResolvers(List.of(EmptyResolver.INSTANCE, FailingResolver.INSTANCE, TEST_RESOLVER))
+            .build();
         var exc = assertThrows(ExecutionException.class, () -> resolver.resolveIdentity(AuthProperties.empty()).get());
         assertEquals(exc.getCause(), FailingResolver.ILLEGAL_ARGUMENT_EXCEPTION);
+    }
+
+    @Test
+    void testIdentityResolverChainRespectsNoCacheSetting() {
+        var counter = new CountingResolver();
+        var resolver = IdentityResolverChain.<TokenIdentity>builder()
+            .addResolvers(List.of(counter, TEST_RESOLVER))
+            .reuseLastProvider(false)
+            .build();
+        var result = resolver.resolveIdentity(AuthProperties.empty()).join();
+        assertEquals(result, TEST_IDENTITY);
+        assertEquals(counter.count, 1);
+
+        // Resolve again, expecting the chain to NOT cache the last successful resolver.
+        var result2 = resolver.resolveIdentity(AuthProperties.empty()).join();
+        assertEquals(result2, TEST_IDENTITY);
+        assertEquals(counter.count, 2);
     }
 
     /**
@@ -143,7 +162,7 @@ public class IdentityResolverTest {
         }
     }
 
-    private static final class TogglableResolver implements IdentityResolver<TokenIdentity> {
+    private static final class ToggleableResolver implements IdentityResolver<TokenIdentity> {
         private boolean fail;
 
         @Override
