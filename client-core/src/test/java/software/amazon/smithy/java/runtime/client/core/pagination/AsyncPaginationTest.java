@@ -10,8 +10,10 @@ import static org.hamcrest.Matchers.contains;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
+import java.util.concurrent.LinkedBlockingQueue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.client.core.pagination.models.GetFoosInput;
@@ -43,6 +45,7 @@ public class AsyncPaginationTest {
         paginator.subscribe(subscriber);
         // Block and wait on results
         var results = subscriber.results();
+        System.out.println("Results " + results);
         assertThat(results, contains(BASE_EXPECTED_RESULTS.toArray()));
     }
 
@@ -56,6 +59,7 @@ public class AsyncPaginationTest {
 
         // Block and wait on results
         var results = subscriber.results();
+        System.out.println("RESULTS " + results);
         var expectedResult = List.of(
             new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
             new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))),
@@ -66,7 +70,7 @@ public class AsyncPaginationTest {
 
     private static final class PaginationTestSubscriber implements Flow.Subscriber<GetFoosOutput> {
         private Flow.Subscription subscription;
-        private final List<GetFoosOutput> results = new ArrayList<>();
+        private final BlockingQueue<GetFoosOutput> results = new LinkedBlockingQueue<>();
         private final CompletableFuture<List<GetFoosOutput>> future = new CompletableFuture<>();
 
         private List<GetFoosOutput> results() {
@@ -82,7 +86,7 @@ public class AsyncPaginationTest {
 
         @Override
         public void onNext(GetFoosOutput item) {
-            this.results.add(item);
+            results.add(item);
             // request another
             subscription.request(1);
         }
@@ -94,7 +98,7 @@ public class AsyncPaginationTest {
 
         @Override
         public void onComplete() {
-            future.complete(results);
+            future.complete(results.stream().toList());
         }
     }
 }

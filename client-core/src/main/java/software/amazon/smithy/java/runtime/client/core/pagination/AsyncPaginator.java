@@ -56,7 +56,6 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 *  });
  * }</pre>
  *
- * @param <I> Input type of list operation being paginated.
  * @param <O> Output type of list operation being paginated.
  */
 public interface AsyncPaginator<O extends SerializableStruct> extends PaginatorSettings, Flow.Publisher<O> {
@@ -67,7 +66,8 @@ public interface AsyncPaginator<O extends SerializableStruct> extends PaginatorS
      * @return blocking paginator.
      */
     default Paginator<O> toBlocking() {
-        return new BlockingPaginatorAdapter<>(this);
+        // TODO: support conversion to blocking paginator
+        throw new UnsupportedOperationException("Blocking pagination is not supported yet.");
     }
 
     /**

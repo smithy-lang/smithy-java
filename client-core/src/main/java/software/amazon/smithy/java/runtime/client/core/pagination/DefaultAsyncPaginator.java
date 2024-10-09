@@ -6,6 +6,9 @@
 package software.amazon.smithy.java.runtime.client.core.pagination;
 
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
@@ -22,7 +25,7 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
     // Token members
     private final String inputTokenMember;
     private final String outputTokenPath;
-    private String nextToken = null;
+    private volatile String nextToken = null;
 
     // Page size parameters
     private final String itemsPath;
@@ -60,55 +63,75 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
     @Override
     public void subscribe(Flow.Subscriber<? super O> subscriber) {
         subscriber.onSubscribe(new Flow.Subscription() {
-            private boolean complete;
-            private int remaining = totalMaxItems;
+            private final AtomicBoolean completed = new AtomicBoolean(false);
+            private final AtomicInteger remainingItems = new AtomicInteger(totalMaxItems);
+            private final AtomicLong remainingRequests = new AtomicLong(0);
+
             private int maxItems = pageSize;
 
             @Override
             public void request(long n) {
-                for (int i = 0; i < n && !complete; i++) {
-                    // If there are fewer items allowed than we will request, reduce page size to match remaining.
-                    if (remaining > 0 && maxItems > remaining) {
-                        maxItems = remaining;
-                    }
-
-                    try {
-                        // Deserialize a new version of the original input with the new token and max value set.
-                        var deserializer = new PaginationInjectingDeserializer(
-                            inputDocument,
-                            inputTokenMember,
-                            nextToken,
-                            pageSizeMember,
-                            maxItems
-                        );
-                        var input = operation.inputBuilder().deserialize(deserializer).build();
-
-                        call.call(input, overrideConfig).thenAccept(output -> {
-                            // Use a serializer to extract relevant data from the response
-                            var serializer = new PaginationDiscoveringSerializer(outputTokenPath, itemsPath);
-                            output.serialize(serializer);
-                            serializer.flush();
-
-                            // Update based on output values
-                            nextToken = serializer.outputToken();
-                            remaining -= serializer.totalItems();
-
-                            // Next token is null or max results reached, indicating there are no more values.
-                            if (nextToken == null || (totalMaxItems != 0 && remaining == 0)) {
-                                complete = true;
-                                subscriber.onComplete();
-                            }
-                            subscriber.onNext(output);
-                        });
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
+                if (n <= 0) {
+                    subscriber.onError(new IllegalArgumentException("Requested items must be greater than 0"));
                 }
+
+                if (completed.get()) {
+                    return;
+                }
+
+                remainingRequests.addAndGet(n);
+                execute();
             }
 
             @Override
             public void cancel() {
                 // Do nothing
+            }
+
+            private void execute() {
+                // If there are fewer items allowed than we will request, reduce page size to match remaining.
+                if (remainingItems.get() > 0 && maxItems > remainingItems.get()) {
+                    maxItems = remainingItems.get();
+                }
+
+                try {
+                    // Deserialize a new version of the original input with the new token and max value set.
+                    var deserializer = new PaginationInjectingDeserializer(
+                            inputDocument,
+                            inputTokenMember,
+                            nextToken,
+                            pageSizeMember,
+                            maxItems
+                    );
+                    var input = operation.inputBuilder().deserialize(deserializer).build();
+
+                    call.call(input, overrideConfig).thenAccept(output -> {
+                        // Use a serializer to extract relevant data from the response
+                        var serializer = new PaginationDiscoveringSerializer(outputTokenPath, itemsPath);
+                        output.serialize(serializer);
+                        serializer.flush();
+
+                        // Update based on output values
+                        nextToken = serializer.outputToken();
+                        remainingItems.getAndAdd(-serializer.totalItems());
+
+                        // Provide the subscriber with the output value
+                        subscriber.onNext(output);
+
+                        // Next token is null or max results reached, indicating there are no more values.
+                        if (nextToken == null || (totalMaxItems != 0 && remainingItems.get() == 0)) {
+                            completed.set(true);
+                            subscriber.onComplete();
+                        }
+
+                        // Make any remaining requests
+                        if (remainingRequests.addAndGet(-1) > 0) {
+                            execute();
+                        }
+                    });
+                } catch (Exception exc) {
+                    subscriber.onError(exc);
+                }
             }
         });
     }
