@@ -199,9 +199,9 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     private void validateMediaType() {
-        if (payloadMediaType != null) {
+        if (payloadMediaType != null && headers.firstValue("content-type").isPresent()) {
             // Validate the media-type matches the codec.
-            String contentType = headers.firstValue("content-type").orElse("");
+            String contentType = headers.firstValue("content-type").get();
             if (!contentType.equals(payloadMediaType)) {
                 throw new SerializationException(
                     "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec

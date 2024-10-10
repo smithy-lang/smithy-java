@@ -12,6 +12,7 @@ import java.time.Instant;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeIdSyntaxException;
 
@@ -181,5 +182,10 @@ public class DocumentDeserializer implements ShapeDeserializer {
             throw new SerializationException("Attempted to read non-null value as null");
         }
         return null;
+    }
+
+    @Override
+    public DataStream readDataStream(Schema schema) {
+        return DataStream.ofByteBuffer(value.asBlob());
     }
 }

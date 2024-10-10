@@ -131,6 +131,7 @@ final class HttpClientResponseProtocolTestProvider extends
             // Add request body if present;
             testCase.getBody().ifPresent(body -> {
                 if (testCase.getBodyMediaType().isPresent()) {
+                    System.out.println(testCase.getBodyMediaType().get());
                     builder.body(DataStream.ofString(body, testCase.getBodyMediaType().get()));
                 } else {
                     builder.body(DataStream.ofString(body));

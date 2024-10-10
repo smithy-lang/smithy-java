@@ -305,7 +305,6 @@ final class ProtocolTestDocument implements Document {
 
         private final ProtocolTestDocument jsonDocument;
         private final String contentType;
-        private DataStream dataStream;
 
         ProtocolTestDocumentDeserializer(ProtocolTestDocument value, String contentType) {
             super(value);
@@ -327,13 +326,17 @@ final class ProtocolTestDocument implements Document {
             for (var member : schema.members()) {
                 var nextValue = jsonDocument.getMember(member.memberName());
                 if (nextValue != null) {
-                    if (member.memberTarget().hasTrait(StreamingTrait.class)) {
-                        dataStream = DataStream.ofByteBuffer(nextValue.asBlob(), contentType);
-                    } else {
-                        structMemberConsumer.accept(state, member, deserializer(nextValue));
-                    }
+                    structMemberConsumer.accept(state, member, deserializer(nextValue));
                 }
             }
+        }
+
+        @Override
+        public DataStream readDataStream(Schema schema) {
+            if (!schema.memberTarget().hasTrait(StreamingTrait.class)) {
+                throw new IllegalArgumentException("Cannot read datastream from non-streaming blob");
+            }
+            return DataStream.ofByteBuffer(jsonDocument.asBlob(), contentType);
         }
 
         @Override
@@ -347,10 +350,6 @@ final class ProtocolTestDocument implements Document {
                 throw new SerializationException("Attempted to read non-null value as null");
             }
             return null;
-        }
-
-        public DataStream getDataStream() {
-            return dataStream;
         }
     }
 }

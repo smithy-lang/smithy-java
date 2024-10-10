@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.client.aws.restjson;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.charset.StandardCharsets;
@@ -26,45 +27,45 @@ import software.amazon.smithy.model.node.Node;
     skipOperations = {
         // We dont ignore defaults on input shapes
         "aws.protocoltests.restjson#OperationWithDefaults",
-        // All the Http payload tests are breaking. No idea why
-        "aws.protocoltests.restjson#HttpPayloadTraits",
-        "aws.protocoltests.restjson#HttpEnumPayload",
-        "aws.protocoltests.restjson#HttpPayloadTraitsWithMediaType",
-        "aws.protocoltests.restjson#HttpStringPayload",
-        "aws.protocoltests.restjson#HttpPayloadWithUnion",
-        // We do not fully support streaming in clients yet
-        "aws.protocoltests.restjson#StreamingTraits",
-        "aws.protocoltests.restjson#StreamingTraitsRequireLength",
-        "aws.protocoltests.restjson#StreamingTraitsWithMediaType",
-        // Clients do not support content-encoding yet
+        // TODO: support content-encoding
         "aws.protocoltests.restjson#PutWithContentEncoding"
     }
 )
 public class RestJson1ProtocolTests {
+    private static final String EMPTY_BODY = "";
+
     @HttpClientRequestTests
     @ProtocolTestFilter(
         skipTests = {
-            // The order of the return values is different for some reason?
-            "RestJsonSerializesSparseNullMapValues",
-            // We do not yet support checksums in requests
+            // TODO: support checksums in requests
             "RestJsonHttpChecksumRequired",
-            // No idea. Fix
+            // Invalid ints, bools, etc in headers
             "RestJsonHttpWithHeadersButNoPayload",
             "RestJsonHttpWithEmptyStructurePayload",
             "MediaTypeHeaderInputBase64",
-            "RestJsonHttpWithEmptyBlobPayload"
         }
     )
     public void requestTest(DataStream expected, DataStream actual) {
-        String expectedJson = "{}";
-        if (expected.contentLength() != 0) {
-            // Use the node parser to strip out white space.
-            expectedJson = Node.printJson(
-                Node.parse(new String(ByteBufferUtils.getBytes(expected.waitForByteBuffer()), StandardCharsets.UTF_8))
-            );
-        }
-        assertEquals(expectedJson, new StringBuildingSubscriber(actual).getResult());
+        assertThat(expected.hasKnownLength())
+            .isTrue()
+            .isSameAs(actual.hasKnownLength());
 
+        var actualStr = new StringBuildingSubscriber(actual).getResult();
+        if (expected.contentLength() != 0) {
+            var expectedStr = new String(
+                ByteBufferUtils.getBytes(expected.waitForByteBuffer()),
+                StandardCharsets.UTF_8
+            );
+            if ("application/json".equals(expected.contentType())) {
+                var expectedNode = Node.parse(expectedStr);
+                var actualNode = Node.parse(actualStr);
+                assertEquals(expectedNode, actualNode);
+            } else {
+                assertEquals(expectedStr, actualStr);
+            }
+        } else {
+            assertEquals(EMPTY_BODY, actualStr);
+        }
     }
 
     @HttpClientResponseTests
@@ -75,8 +76,6 @@ public class RestJson1ProtocolTests {
             "RestJsonInputAndOutputWithBooleanHeaders",
             "RestJsonInputAndOutputWithTimestampHeaders",
             "RestJsonInputAndOutputWithIntEnumHeaders",
-            // "Unexpected Content-Type ''"
-            "RestJsonIgnoreQueryParamsInResponseNoPayload"
         }
     )
     public void responseTest(Runnable test) {

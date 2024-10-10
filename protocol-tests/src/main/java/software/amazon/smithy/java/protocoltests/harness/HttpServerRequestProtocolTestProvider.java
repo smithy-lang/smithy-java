@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
@@ -210,7 +211,11 @@ public class HttpServerRequestProtocolTestProvider extends
                         var inputBuilder = operationModel.inputBuilder();
                         new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
                             .deserializeInto(inputBuilder);
-                        assertEquals(inputBuilder.build(), mockOperation.getRequest());
+                        // Compare as documents so any datastream members are correctly compared.
+                        assertEquals(
+                            Document.createTyped(inputBuilder.build()),
+                            Document.createTyped(mockOperation.getRequest())
+                        );
                     }
                 }
             );

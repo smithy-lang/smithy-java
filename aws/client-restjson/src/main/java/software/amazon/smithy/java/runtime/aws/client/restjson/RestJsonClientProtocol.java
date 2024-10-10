@@ -71,6 +71,11 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
     }
 
     @Override
+    protected boolean omitEmptyPayload() {
+        return true;
+    }
+
+    @Override
     protected EventEncoderFactory<AwsEventFrame> getEventEncoderFactory(
         InputEventStreamingApiOperation<?, ?, ?> inputOperation
     ) {
