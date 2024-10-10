@@ -97,11 +97,11 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
                 try {
                     // Deserialize a new version of the original input with the new token and max value set.
                     var deserializer = new PaginationInjectingDeserializer(
-                            inputDocument,
-                            inputTokenMember,
-                            nextToken,
-                            pageSizeMember,
-                            maxItems
+                        inputDocument,
+                        inputTokenMember,
+                        nextToken,
+                        pageSizeMember,
+                        maxItems
                     );
                     var input = operation.inputBuilder().deserialize(deserializer).build();
 
