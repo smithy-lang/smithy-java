@@ -1,7 +1,6 @@
-import gradle.kotlin.dsl.accessors._6a08c79e5efb9941460fb21bc6022abc.sourceSets
 import org.gradle.api.Project
-import org.gradle.api.file.Directory
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.kotlin.dsl.*
 
@@ -20,11 +19,11 @@ fun Project.addGenerateSrcsTask(
     if (name != null) {
         taskName += name
     }
+    val sourceSets = project.the<SourceSetContainer>()
     val task = tasks.register<JavaExec>(taskName) {
         delete(files(output))
         dependsOn("test")
-        classpath =
-            sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
+        classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
         mainClass = className
         environment("output", output)
         service?.let { environment("service", it) }

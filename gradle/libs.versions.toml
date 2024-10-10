@@ -10,6 +10,7 @@ smithy-gradle = "1.1.0"
 assertj = "3.26.3"
 jackson = "2.17.2"
 netty = "4.1.113.Final"
+dep-analysis = "2.1.4"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -36,6 +37,7 @@ test-logger-plugin = { module = "com.adarshr:gradle-test-logger-plugin", version
 spotbugs = { module = "com.github.spotbugs.snom:spotbugs-gradle-plugin", version.ref = "spotbugs" }
 spotless = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
 smithy-gradle-base = { module = "software.amazon.smithy.gradle:smithy-base", version.ref = "smithy-gradle" }
+dependency-analysis = { module = "com.autonomousapps:dependency-analysis-gradle-plugin", version.ref = "dep-analysis" }
 
 [plugins]
 jmh = { id = "me.champeau.jmh", version.ref = "jmh" }

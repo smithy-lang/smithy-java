@@ -8,6 +8,7 @@ plugins {
     id("com.adarshr.test-logger")
     id("com.github.spotbugs")
     id("com.diffplug.spotless")
+    id("com.autonomousapps.dependency-analysis")
 }
 
 // Workaround per: https://github.com/gradle/gradle/issues/15383
