@@ -205,7 +205,11 @@ public final class ToStringSerializer implements ShapeSerializer {
     @Override
     public void writeDocument(Schema schema, Document value) {
         builder.append(value.type()).append('.').append("Document[");
-        value.serializeContents(this);
+        if (schema.hasTrait(SensitiveTrait.class)) {
+            builder.append(REDACTED);
+        } else {
+            value.serializeContents(this);
+        }
         builder.append(']');
     }
 
