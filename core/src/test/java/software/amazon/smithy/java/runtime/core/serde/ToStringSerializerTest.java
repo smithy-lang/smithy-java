@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 import static java.nio.ByteBuffer.wrap;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -15,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.testmodels.Bird;
@@ -92,5 +94,68 @@ public class ToStringSerializerTest {
         });
 
         assertThat(str, equalTo("Struct[foo=*REDACTED*]"));
+    }
+
+    @Test
+    public void redactsFullListIfSensitive() {
+        var mapSchema = Schema.mapBuilder(ShapeId.from("smithy.example#Map"))
+            .putMember("key", PreludeSchemas.STRING)
+            .putMember("value", PreludeSchemas.STRING)
+            .build();
+        var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
+            .putMember("foo", mapSchema, new SensitiveTrait())
+            .build();
+
+        var str = ToStringSerializer.serialize(e -> {
+            e.writeStruct(schema, SerializableStruct.create(schema, (s, ser) -> {
+                ser.writeMap(s.member("foo"), mapSchema, 2, (innerMapSchema, map) -> {
+                    map.writeEntry(innerMapSchema.member("key"), "a", innerMapSchema, (mapSchema2, ms) -> {
+                        ms.writeString(mapSchema2.member("value"), "hi");
+                    });
+                    map.writeEntry(innerMapSchema.member("key"), "b", innerMapSchema, (mapSchema2, ms) -> {
+                        ms.writeNull(mapSchema2.member("value"));
+                    });
+                });
+            }));
+        });
+    }
+
+    @Test
+    public void redactsFullMapIfSensitive() {
+        var listSchema = Schema.listBuilder(ShapeId.from("smithy.example#Map"))
+            .putMember("member", PreludeSchemas.STRING)
+            .build();
+        var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
+            .putMember("foo", listSchema, new SensitiveTrait())
+            .build();
+
+        var str = ToStringSerializer.serialize(e -> {
+            e.writeStruct(schema, SerializableStruct.create(schema, (s, ser) -> {
+                ser.writeList(s.member("foo"), listSchema, 2, (innerListSchema, ls) -> {
+                    ls.writeString(listSchema.member("member"), "a");
+                    ls.writeString(listSchema.member("member"), "b");
+                });
+            }));
+        });
+        assertEquals(str, "Struct[foo=[*REDACTED*]]");
+    }
+
+    @Test
+    public void redactsFullStructIfSensitive() {
+        var nestedStruct = Schema.structureBuilder(ShapeId.from("smithy.example#Nested"))
+            .putMember("bar", PreludeSchemas.STRING)
+            .build();
+        var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
+            .putMember("foo", nestedStruct, new SensitiveTrait())
+            .build();
+
+        var str = ToStringSerializer.serialize(e -> {
+            e.writeStruct(schema, SerializableStruct.create(schema, (s, ser) -> {
+                ser.writeStruct(s.member("foo"), SerializableStruct.create(nestedStruct, (ns, nser) -> {
+                    nser.writeString(ns.member("bar"), "baz");
+                }));
+            }));
+        });
+        assertEquals(str, "Struct[foo=Nested[*REDACTED*]]");
     }
 }

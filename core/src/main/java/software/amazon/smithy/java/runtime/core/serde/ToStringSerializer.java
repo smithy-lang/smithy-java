@@ -20,7 +20,7 @@ import software.amazon.smithy.model.traits.SensitiveTrait;
  * Implements the toString method for shapes, taking the sensitive trait into account.
  */
 public final class ToStringSerializer implements ShapeSerializer {
-
+    private static final String REDACTED = "*REDACTED*";
     private final StringBuilder builder = new StringBuilder();
 
     public static String serialize(SerializableShape shape) {
@@ -42,7 +42,7 @@ public final class ToStringSerializer implements ShapeSerializer {
 
     private void append(Schema schema, Object value) {
         if (schema.hasTrait(SensitiveTrait.class)) {
-            builder.append("*REDACTED*");
+            builder.append(REDACTED);
         } else {
             builder.append(value);
         }
@@ -50,8 +50,13 @@ public final class ToStringSerializer implements ShapeSerializer {
 
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
-        builder.append(schema.id().getName()).append('[');
-        struct.serializeMembers(new StructureWriter(this));
+        var name = schema.isMember() ? schema.memberTarget().id().getName() : schema.id().getName();
+        builder.append(name).append('[');
+        if (schema.hasTrait(SensitiveTrait.class)) {
+            builder.append(REDACTED);
+        } else {
+            struct.serializeMembers(new StructureWriter(this));
+        }
         builder.append(']');
     }
 
@@ -78,7 +83,11 @@ public final class ToStringSerializer implements ShapeSerializer {
     @Override
     public <T> void writeList(Schema schema, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
         builder.append('[');
-        consumer.accept(state, new ListSerializer(this, this::writeComma));
+        if (schema.hasTrait(SensitiveTrait.class)) {
+            builder.append(REDACTED);
+        } else {
+            consumer.accept(state, new ListSerializer(this, this::writeComma));
+        }
         builder.append(']');
     }
 
@@ -91,7 +100,11 @@ public final class ToStringSerializer implements ShapeSerializer {
     @Override
     public <T> void writeMap(Schema schema, T state, int size, BiConsumer<T, MapSerializer> consumer) {
         builder.append('{');
-        consumer.accept(state, new ToStringMapSerializer(this));
+        if (schema.hasTrait(SensitiveTrait.class)) {
+            builder.append(REDACTED);
+        } else {
+            consumer.accept(state, new ToStringMapSerializer(this));
+        }
         builder.append('}');
     }
 
