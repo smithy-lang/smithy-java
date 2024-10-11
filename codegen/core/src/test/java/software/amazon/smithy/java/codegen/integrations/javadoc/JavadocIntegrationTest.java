@@ -236,4 +236,23 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
             )
         );
     }
+
+    @Test
+    void addsBuilderSettersDocs() {
+        var fileContents = getFileStringForClass("BuilderSettersInput");
+        assertThat(
+            fileContents,
+            containsString("""
+                        /**
+                         * Member with docs
+                         *
+                         * @return this builder.
+                         */
+                        public Builder foo(String foo) {
+                            this.foo = foo;
+                            return this;
+                        }
+                """)
+        );
+    }
 }

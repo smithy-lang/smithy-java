@@ -10,6 +10,9 @@ import software.amazon.smithy.java.codegen.sections.OperationSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.utils.CodeInterceptor;
 
+/**
+ * Adds the {@code @throws} javadoc tag to operations for all modeled errors the operation might throw.
+ */
 final class OperationErrorInterceptor implements CodeInterceptor.Appender<JavadocSection, JavaWriter> {
 
     @Override

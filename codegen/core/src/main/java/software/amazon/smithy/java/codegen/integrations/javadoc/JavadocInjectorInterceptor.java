@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.integrations.javadoc;
 
+import software.amazon.smithy.java.codegen.sections.BuilderSetterSection;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.sections.EnumVariantSection;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
@@ -32,17 +33,17 @@ final class JavadocInjectorInterceptor implements CodeInterceptor.Prepender<Code
 
     @Override
     public boolean isIntercepted(CodeSection section) {
-        // Javadocs are generated for Classes, on member Getters, and on enum variants
+        // Javadocs are generated for Classes, on member Getters, and on enum variants, operations, and builder setters.
         return section instanceof ClassSection
             || section instanceof GetterSection
             || section instanceof EnumVariantSection
-            || section instanceof OperationSection;
+            || section instanceof OperationSection
+            || section instanceof BuilderSetterSection;
     }
 
     @Override
     public void prepend(JavaWriter writer, CodeSection section) {
         var shape = getShape(section);
-
         writer.injectSection(new JavadocSection(shape, section));
         if (shape.hasTrait(UnstableTrait.class)) {
             writer.write("@$T", SmithyUnstableApi.class);
@@ -64,6 +65,8 @@ final class JavadocInjectorInterceptor implements CodeInterceptor.Prepender<Code
             return gs.memberShape();
         } else if (section instanceof EnumVariantSection es) {
             return es.memberShape();
+        } else if (section instanceof BuilderSetterSection bs) {
+            return bs.memberShape();
         } else if (section instanceof OperationSection os) {
             return os.operation();
         } else {

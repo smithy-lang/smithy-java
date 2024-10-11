@@ -14,6 +14,7 @@ service TestService {
         Rollup
         EnumVariants
         UnsupportedTags
+        BuilderSetters
     ]
 }
 
@@ -138,5 +139,12 @@ operation UnsupportedTags {
         ///     <important>Important is not supported</important>
         /// </pre>
         value: String
+    }
+}
+
+operation BuilderSetters {
+    input := {
+        /// Member with docs
+        foo: String
     }
 }
