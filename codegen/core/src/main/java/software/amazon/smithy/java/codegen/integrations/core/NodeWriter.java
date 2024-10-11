@@ -45,6 +45,11 @@ record NodeWriter(JavaWriter writer, Node node) implements NodeVisitor<Void>, Ru
 
     @Override
     public Void objectNode(ObjectNode objectNode) {
+        // Just use empty object node if no members
+        if (objectNode.getMembers().isEmpty()) {
+            writer.write("${node:T}.objectNode()");
+            return null;
+        }
         writer.write("${node:T}.objectNodeBuilder()");
         writer.indent();
         var memberWriter = new MemberNodeWriter(writer);
@@ -102,6 +107,12 @@ record NodeWriter(JavaWriter writer, Node node) implements NodeVisitor<Void>, Ru
 
         @Override
         public Void objectNode(ObjectNode objectNode) {
+            // Just use empty object node if no members
+            if (objectNode.getMembers().isEmpty()) {
+                writer.write("${node:T}.objectNode()");
+                return null;
+            }
+
             writer.write("${node:T}.objectNodeBuilder()");
             writer.indent();
             for (var memberEntry : objectNode.getStringMap().entrySet()) {
