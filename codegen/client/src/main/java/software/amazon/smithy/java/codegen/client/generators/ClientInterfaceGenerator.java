@@ -90,9 +90,7 @@ public final class ClientInterfaceGenerator
                             ${?hasDefaultProtocol}${defaultProtocol:C|}
                             ${/hasDefaultProtocol}${?defaultSchemes}${defaultAuth:C|}
                             ${/defaultSchemes}private Builder() {
-                                ${?hasDefaultProtocol}configBuilder().protocol(factory.createProtocol(settings, protocolTrait));${/hasDefaultProtocol}
                                 ${?defaultSchemes}configBuilder().putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes});${/defaultSchemes}
-                                ${?transport}configBuilder().transport(new ${transport:T}());${/transport}
                             }
 
                             @Override
@@ -100,13 +98,21 @@ public final class ClientInterfaceGenerator
                                 ${?hasDefaults}for (var plugin : defaultPlugins) {
                                     plugin.configureClient(configBuilder());
                                 }
-                                ${/hasDefaults}return new ${impl:T}(this);
+                                ${/hasDefaults}${?hasDefaultProtocol}if (!configBuilder().hasProtocol()) {
+                                    configBuilder().protocol(${protocolFactory:C}.createProtocol(settings, protocolTrait));
+                                }
+                                ${/hasDefaultProtocol}${?transport}if (!configBuilder().hasTransport()) {
+                                    configBuilder().transport(new ${transport:T}());
+                                }
+                                ${/transport}
+                                return new ${impl:T}(this);
                             }
                         }
                     }
                     """;
                 var defaultProtocolTrait = getDefaultProtocolTrait(directive.model(), directive.settings());
                 writer.putContext("hasDefaultProtocol", defaultProtocolTrait != null);
+                writer.putContext("protocolFactory", new ProtocolFactoryGenerator(writer, defaultProtocolTrait));
                 writer.putContext(
                     "defaultProtocol",
                     new DefaultProtocolGenerator(
@@ -194,6 +200,21 @@ public final class ClientInterfaceGenerator
         }
     }
 
+    private record ProtocolFactoryGenerator(JavaWriter writer, Trait defaultProtocolTrait) implements Runnable {
+        @Override
+        public void run() {
+            writer.pushState();
+            var factoryClass = getFactory(defaultProtocolTrait.toShapeId());
+            if (factoryClass.isMemberClass()) {
+                writer.putContext("outer", factoryClass.getEnclosingClass());
+            }
+            writer.putContext("name", factoryClass.getSimpleName());
+            writer.putContext("type", factoryClass);
+            writer.write("new ${?outer}${outer:T}.${name:L}${/outer}${^outer}${type:T}${/outer}()");
+            writer.popState();
+        }
+    }
+
     private record DefaultProtocolGenerator(
         JavaWriter writer, ShapeId service, Trait defaultProtocolTrait, CodeGenerationContext context
     ) implements
@@ -209,21 +230,13 @@ public final class ClientInterfaceGenerator
                         .namespace(${shapeId:T}.from(${service:S}))
                         .build();
                 private static final ${trait:T} protocolTrait = ${initializer:C};
-                private static final ${clientProtocolFactory:T}<${trait:T}> factory = new ${?outer}${outer:T}.${name:L}${/outer}${^outer}${type:T}${/outer}();
                 """;
             writer.putContext("protocolSettings", ProtocolSettings.class);
-            writer.putContext("clientProtocolFactory", ClientProtocolFactory.class);
             writer.putContext("trait", defaultProtocolTrait.getClass());
             var initializer = context.getInitializer(defaultProtocolTrait);
             writer.putContext("initializer", writer.consumer(w -> initializer.accept(w, defaultProtocolTrait)));
             writer.putContext("shapeId", ShapeId.class);
             writer.putContext("service", service);
-            var factoryClass = getFactory(defaultProtocolTrait.toShapeId());
-            if (factoryClass.isMemberClass()) {
-                writer.putContext("outer", factoryClass.getEnclosingClass());
-            }
-            writer.putContext("name", factoryClass.getSimpleName());
-            writer.putContext("type", factoryClass);
             writer.write(template);
             writer.popState();
         }

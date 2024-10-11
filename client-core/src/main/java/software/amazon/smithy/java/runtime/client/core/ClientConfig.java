@@ -184,6 +184,15 @@ public final class ClientConfig {
         }
 
         /**
+         * Check if transport has been set on the builder.
+         *
+         * @return true if transport has been set
+         */
+        public boolean hasTransport() {
+            return this.transport != null;
+        }
+
+        /**
          * Set the protocol to use when sending requests.
          *
          * @param protocol Client protocol used to send requests.
@@ -192,6 +201,15 @@ public final class ClientConfig {
         public Builder protocol(ClientProtocol<?, ?> protocol) {
             this.protocol = protocol;
             return this;
+        }
+
+        /**
+         * Check if a protocol has been set on the builder.
+         *
+         * @return true if a protocol has been set
+         */
+        public boolean hasProtocol() {
+            return this.protocol != null;
         }
 
         /**
