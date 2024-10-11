@@ -2,7 +2,6 @@
   "version": "1.0",
   "plugins": {
     "java-client-codegen": {
-      "service": "com.example#CoffeeShop",
       // TODO: Make plugin aware of existing?
       "namespace": "software.amazon.smithy.java.client.example",
       "headerFile": "license.txt",
@@ -12,7 +11,6 @@
       }
     },
     "java-server-codegen": {
-      "service": "com.example#CoffeeShop",
       "namespace": "software.amazon.smithy.java.server.example",
       "headerFile": "license.txt"
     }

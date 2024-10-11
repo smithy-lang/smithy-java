@@ -28,7 +28,7 @@ public final class JavaClientCodegenPlugin implements SmithyBuildPlugin {
     public void execute(PluginContext context) {
         CodegenDirector<JavaWriter, JavaCodegenIntegration, CodeGenerationContext, JavaCodegenSettings> runner = new CodegenDirector<>();
 
-        var settings = JavaCodegenSettings.fromNode(context.getSettings());
+        var settings = JavaCodegenSettings.fromNode(context.getSettings(), context.getModel());
         runner.settings(settings);
         runner.directedCodegen(new DirectedJavaClientCodegen());
         runner.fileManifest(context.getFileManifest());

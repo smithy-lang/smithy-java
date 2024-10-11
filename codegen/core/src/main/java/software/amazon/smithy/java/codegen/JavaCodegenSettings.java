@@ -12,8 +12,10 @@ import java.util.Objects;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.node.StringNode;
+import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.IoUtils;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -92,10 +94,11 @@ public final class JavaCodegenSettings {
     /**
      * Creates a settings object from a plugin settings node
      *
-     * @param settingsNode Settings node to load
+     * @param settingsNode settings node to load
+     * @param model model to use for service discovery
      * @return Parsed settings
      */
-    public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
+    public static JavaCodegenSettings fromNode(ObjectNode settingsNode, Model model) {
         settingsNode.warnIfAdditionalProperties(
             List.of(
                 SERVICE,
@@ -109,7 +112,7 @@ public final class JavaCodegenSettings {
             )
         );
         return new JavaCodegenSettings(
-            settingsNode.expectStringMember(SERVICE).expectShapeId(),
+            settingsNode.getStringMember(SERVICE).orElseGet(() -> discoverService(model)).expectShapeId(),
             settingsNode.expectStringMember(NAMESPACE).getValue(),
             settingsNode.getStringMemberOrDefault(HEADER_FILE, null),
             settingsNode.getSourceLocation().getFilename(),
@@ -123,6 +126,22 @@ public final class JavaCodegenSettings {
                 .map(n -> n.getElementsAs(el -> el.expectStringNode().getValue()))
                 .orElse(Collections.emptyList())
         );
+    }
+
+    private static StringNode discoverService(Model model) {
+        var serviceShapes = model.getServiceShapes();
+        if (serviceShapes.size() > 1) {
+            throw new IllegalArgumentException(
+                "Multiple service shapes found: " + serviceShapes + ". "
+                    + "Specify which of these services to generate with the `service` setting."
+            );
+        }
+        return serviceShapes.stream()
+            .findFirst()
+            .map(Shape::getId)
+            .map(ShapeId::toString)
+            .map(StringNode::from)
+            .orElseThrow();
     }
 
     public ShapeId service() {

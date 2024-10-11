@@ -2,7 +2,6 @@
   "version": "1.0",
   "plugins": {
     "java-client-codegen": {
-      "service": "com.amazonaws.dynamodb#DynamoDB_20120810",
       "namespace": "software.amazon.smithy.java.runtime.examples.dynamodb",
       "protocol": "aws.protocols#awsJson1_0",
       "defaultSettings": [
