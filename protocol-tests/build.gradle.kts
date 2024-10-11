@@ -19,6 +19,7 @@ dependencies {
     implementation(project(":server"))
     implementation(project(":server-core"))
     implementation(project(":client-http"))
+    implementation(libs.assertj.core)
 
     api(libs.junit.jupiter.api)
     api(libs.junit.jupiter.engine)

@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.protocoltests.harness;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.net.URI;
@@ -13,12 +13,12 @@ import java.net.URISyntaxException;
 import java.net.http.HttpHeaders;
 import java.util.*;
 import java.util.stream.Stream;
+import org.assertj.core.api.recursive.comparison.RecursiveComparisonConfiguration;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
@@ -212,10 +212,21 @@ public class HttpServerRequestProtocolTestProvider extends
                         new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
                             .deserializeInto(inputBuilder);
                         // Compare as documents so any datastream members are correctly compared.
-                        assertEquals(
-                            Document.createTyped(inputBuilder.build()),
-                            Document.createTyped(mockOperation.getRequest())
-                        );
+                        assertThat(inputBuilder.build())
+                            // Compare objects by field
+                            .usingRecursiveComparison(
+                                RecursiveComparisonConfiguration.builder()
+                                    // Compare data streams by contained data
+                                    .withComparatorForType(
+                                        Comparator.comparing(d -> new StringBuildingSubscriber(d).getResult()),
+                                        DataStream.class
+                                    )
+                                    // Compare doubles and floats as longs so NaN's will be equatable
+                                    .withComparatorForType(Comparator.comparing(Double::longValue), Double.class)
+                                    .withComparatorForType(Comparator.comparing(Float::longValue), Float.class)
+                                    .build()
+                            )
+                            .isEqualTo(mockOperation.getRequest());
                     }
                 }
             );

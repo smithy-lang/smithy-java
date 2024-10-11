@@ -21,7 +21,6 @@ import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
@@ -185,13 +184,6 @@ final class DocumentParser implements ShapeSerializer {
     @Override
     public void writeBlob(Schema schema, ByteBuffer value) {
         setResult(new Documents.BlobDocument(schema, value));
-    }
-
-    @Override
-    public void writeDataStream(Schema schema, DataStream value) {
-        if (value.hasKnownLength()) {
-            setResult(new Documents.BlobDocument(schema, value.waitForByteBuffer()));
-        }
     }
 
     @Override

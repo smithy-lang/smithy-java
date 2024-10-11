@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.test;
 
-import static java.nio.ByteBuffer.wrap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.math.BigDecimal;
@@ -14,12 +13,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.codegen.test.model.BigDecimalMembersInput;
 import software.amazon.smithy.java.codegen.test.model.BigIntegerMembersInput;
-import software.amazon.smithy.java.codegen.test.model.BlobMembersInput;
 import software.amazon.smithy.java.codegen.test.model.BooleanMembersInput;
 import software.amazon.smithy.java.codegen.test.model.ByteMembersInput;
 import software.amazon.smithy.java.codegen.test.model.DocumentMembersInput;
@@ -43,7 +40,6 @@ import software.amazon.smithy.java.codegen.test.model.UnionMembersInput;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 public class StructuresTest {
     static Stream<SerializableShape> memberTypes() {
@@ -77,23 +73,5 @@ public class StructuresTest {
         var output = Utils.pojoToDocumentRoundTrip(pojo);
         assertEquals(pojo.hashCode(), output.hashCode());
         assertEquals(pojo, output);
-    }
-
-    @Test
-    void blobSerialization() {
-        var datastream = DataStream.ofBytes("data streeeeeeeeeeam".getBytes());
-        var builder = BlobMembersInput
-            .builder()
-            .requiredBlob(wrap("data".getBytes()))
-            .streamingBlob(datastream);
-
-        var input = builder.build();
-        var document = Document.createTyped(builder.build());
-        var outputBuilder = BlobMembersInput.builder();
-        document.deserializeInto(outputBuilder);
-        var output = builder.build();
-
-        assertEquals(input.hashCode(), output.hashCode());
-        assertEquals(input, output);
     }
 }

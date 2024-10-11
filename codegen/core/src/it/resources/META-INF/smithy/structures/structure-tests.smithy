@@ -26,5 +26,6 @@ resource StructureTests {
         IntEnumMembers
         ClientErrorCorrection
         Defaults
+        StreamingBlobMembers
     ]
 }

@@ -39,6 +39,7 @@ structures/map-members.smithy
 structures/set-members.smithy
 structures/short-members.smithy
 structures/string-members.smithy
+structures/streaming-blob-members.smithy
 structures/structure-members.smithy
 structures/structure-tests.smithy
 structures/timestamp-members.smithy
