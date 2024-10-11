@@ -8,19 +8,19 @@ package software.amazon.smithy.java.codegen.server;
 import static java.lang.String.format;
 
 import software.amazon.smithy.codegen.core.Symbol;
-import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
-import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.StringUtils;
 
 public class ServiceJavaSymbolProvider extends JavaSymbolProvider {
+    private final String serviceName;
 
-    public ServiceJavaSymbolProvider(Model model, ServiceShape service, String packageNamespace) {
+    public ServiceJavaSymbolProvider(Model model, ServiceShape service, String packageNamespace, String serviceName) {
         super(model, service, packageNamespace);
+        this.serviceName = serviceName;
     }
 
     @Override
@@ -53,16 +53,15 @@ public class ServiceJavaSymbolProvider extends JavaSymbolProvider {
 
     @Override
     public Symbol serviceShape(ServiceShape serviceShape) {
-        return getServerJavaClassSymbol(serviceShape);
+        return getServerJavaClassSymbol();
     }
 
-    private Symbol getServerJavaClassSymbol(Shape shape) {
-        String name = CodegenUtils.getDefaultName(shape, service());
+    private Symbol getServerJavaClassSymbol() {
         return Symbol.builder()
-            .name(name)
+            .name(serviceName)
             .putProperty(SymbolProperties.IS_PRIMITIVE, false)
             .namespace(format("%s.service", packageNamespace()), ".")
-            .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), name))
+            .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), serviceName))
             .build();
     }
 }

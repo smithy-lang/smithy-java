@@ -119,7 +119,7 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
             }
             case SERVER -> {
                 var symbolProvider = SymbolProvider.cache(
-                    new ServiceJavaSymbolProvider(serviceModel, service, serviceId.getNamespace())
+                    new ServiceJavaSymbolProvider(serviceModel, service, serviceId.getNamespace(), serviceId.getName())
                 );
                 Map<Class<?>, MockOperation> mockOperationMap = new HashMap<>();
                 var serverTestOperations = new ArrayList<ServerTestOperation>();

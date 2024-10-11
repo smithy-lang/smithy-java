@@ -66,6 +66,7 @@ public class CodegenContextTest {
             model,
             new JavaCodegenSettings(
                 SERVICE_ID,
+                null,
                 "ns.foo",
                 null,
                 "",
@@ -128,6 +129,7 @@ public class CodegenContextTest {
             model,
             new JavaCodegenSettings(
                 NO_PROTOCOL_SERVICE_ID,
+                null,
                 "ns.foo",
                 null,
                 "",

@@ -33,7 +33,8 @@ final class DirectedJavaClientCodegen implements
         return new ClientJavaSymbolProvider(
             directive.model(),
             directive.service(),
-            directive.settings().packageNamespace()
+            directive.settings().packageNamespace(),
+            directive.settings().name()
         );
     }
 

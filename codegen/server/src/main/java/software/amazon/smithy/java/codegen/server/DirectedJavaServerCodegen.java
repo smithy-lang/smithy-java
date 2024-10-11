@@ -44,7 +44,8 @@ public class DirectedJavaServerCodegen implements
         return new ServiceJavaSymbolProvider(
             directive.model(),
             directive.service(),
-            directive.settings().packageNamespace()
+            directive.settings().packageNamespace(),
+            directive.settings().name()
         );
     }
 

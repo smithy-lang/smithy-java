@@ -27,6 +27,7 @@ public final class JavaCodegenSettings {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaCodegenSettings.class);
 
     private static final String SERVICE = "service";
+    private static final String NAME = "name";
     private static final String NAMESPACE = "namespace";
     private static final String HEADER_FILE = "headerFile";
     private static final String NON_NULL_ANNOTATION = "nonNullAnnotation";
@@ -34,8 +35,20 @@ public final class JavaCodegenSettings {
     private static final String TRANSPORT = "transport";
     private static final String DEFAULT_PLUGINS = "defaultPlugins";
     private static final String DEFAULT_SETTINGS = "defaultSettings";
+    private static final List<String> PROPERTIES = List.of(
+        SERVICE,
+        NAME,
+        NAMESPACE,
+        HEADER_FILE,
+        NON_NULL_ANNOTATION,
+        DEFAULT_PROTOCOL,
+        TRANSPORT,
+        DEFAULT_PLUGINS,
+        DEFAULT_SETTINGS
+    );
 
     private final ShapeId service;
+    private final String name;
     private final String packageNamespace;
     private final String header;
     private final Symbol nonNullAnnotationSymbol;
@@ -47,6 +60,7 @@ public final class JavaCodegenSettings {
 
     JavaCodegenSettings(
         ShapeId service,
+        String name,
         String packageNamespace,
         String headerFile,
         String sourceLocation,
@@ -57,6 +71,7 @@ public final class JavaCodegenSettings {
         List<String> defaultSettings
     ) {
         this.service = Objects.requireNonNull(service);
+        this.name = StringUtils.capitalize(Objects.requireNonNullElse(name, service.getName()));
         this.packageNamespace = Objects.requireNonNull(packageNamespace);
         this.header = getHeader(headerFile, Objects.requireNonNull(sourceLocation));
 
@@ -96,20 +111,10 @@ public final class JavaCodegenSettings {
      * @return Parsed settings
      */
     public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
-        settingsNode.warnIfAdditionalProperties(
-            List.of(
-                SERVICE,
-                NAMESPACE,
-                HEADER_FILE,
-                NON_NULL_ANNOTATION,
-                DEFAULT_PROTOCOL,
-                TRANSPORT,
-                DEFAULT_PLUGINS,
-                DEFAULT_SETTINGS
-            )
-        );
+        settingsNode.warnIfAdditionalProperties(PROPERTIES);
         return new JavaCodegenSettings(
             settingsNode.expectStringMember(SERVICE).expectShapeId(),
+            settingsNode.getStringMemberOrDefault(NAME, null),
             settingsNode.expectStringMember(NAMESPACE).getValue(),
             settingsNode.getStringMemberOrDefault(HEADER_FILE, null),
             settingsNode.getSourceLocation().getFilename(),
@@ -127,6 +132,10 @@ public final class JavaCodegenSettings {
 
     public ShapeId service() {
         return service;
+    }
+
+    public String name() {
+        return name;
     }
 
     public String packageNamespace() {

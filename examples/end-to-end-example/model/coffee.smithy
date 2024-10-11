@@ -13,6 +13,7 @@ enum CoffeeType {
 
 /// A structure which defines a coffee item which can be ordered
 structure CoffeeItem {
+    /// A type of coffee
     @required
     type: CoffeeType
 
