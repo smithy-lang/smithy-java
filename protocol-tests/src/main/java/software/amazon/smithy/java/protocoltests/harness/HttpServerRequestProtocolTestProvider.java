@@ -222,8 +222,8 @@ public class HttpServerRequestProtocolTestProvider extends
                                         DataStream.class
                                     )
                                     // Compare doubles and floats as longs so NaN's will be equatable
-                                    .withComparatorForType(Comparator.comparing(Double::longValue), Double.class)
-                                    .withComparatorForType(Comparator.comparing(Float::longValue), Float.class)
+                                    .withComparatorForType(nanPermittingDoubleComparator(), Double.class)
+                                    .withComparatorForType(nanPermittingFloatComparator(), Float.class)
                                     .build()
                             )
                             .isEqualTo(mockOperation.getRequest());
@@ -231,6 +231,14 @@ public class HttpServerRequestProtocolTestProvider extends
                 }
             );
         }
+    }
+
+    private static Comparator<Double> nanPermittingDoubleComparator() {
+        return (d1, d2) -> (Double.isNaN(d1) && Double.isNaN(d2)) ? 0 : Double.compare(d1, d2);
+    }
+
+    private static Comparator<Float> nanPermittingFloatComparator() {
+        return (f1, f2) -> (Float.isNaN(f1) && Float.isNaN(f2)) ? 0 : Float.compare(f1, f2);
     }
 
     private static final Set<Character> HEADER_DELIMS = Set.of(
