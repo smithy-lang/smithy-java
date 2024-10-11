@@ -116,6 +116,13 @@ public class NamingTest extends AbstractCodegenFileTest {
         assertTrue(fileStr.contains("public final class ACRONYMInsideStruct implements SerializableStruct"));
     }
 
+    @Test
+    void acronymMemberName() {
+        var fileStr = getFileStringForClass("CasingInput");
+        assertTrue(fileStr.contains("private final transient String acronymMemberName"));
+        assertTrue(fileStr.contains("public String acronymMemberName() {"));
+    }
+
     static List<Arguments> enumCaseArgs() {
         return List.of(
             Arguments.of("CAMEL_CASE", "camelCase"),

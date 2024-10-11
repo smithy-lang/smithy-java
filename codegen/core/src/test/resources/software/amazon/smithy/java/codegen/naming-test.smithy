@@ -81,6 +81,7 @@ operation Casing {
         ACRONYM_Inside_Member: String
         acronymInsideStruct: ACRONYMInsideStruct
         enums: EnumCasing
+        ACRONYMMemberName: String
     }
 }
 
