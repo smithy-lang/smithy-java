@@ -36,7 +36,7 @@ public final class JavadocIntegration implements JavaCodegenIntegration {
             new SmithyGeneratedInterceptor(),
             new JavadocInjectorInterceptor(),
             new OperationErrorInterceptor(),
-            new BuilderReturnInterceptor(),
+            new BuilderSetterDocumentationInterceptor(),
             new ExternalDocumentationTraitInterceptor(),
             new SinceTraitInterceptor(),
             new DeprecatedTraitInterceptor(),

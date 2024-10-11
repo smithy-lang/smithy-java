@@ -8,15 +8,19 @@ package software.amazon.smithy.java.codegen.integrations.javadoc;
 import software.amazon.smithy.java.codegen.sections.BuilderSetterSection;
 import software.amazon.smithy.java.codegen.sections.JavadocSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.utils.CodeInterceptor;
 
 /**
- * Adds the {@code @return} tag to builder setters with a static value.
+ * Adds the {@code @return} tag and "required" hint to builder setters.
  */
-final class BuilderReturnInterceptor implements CodeInterceptor.Appender<JavadocSection, JavaWriter> {
+final class BuilderSetterDocumentationInterceptor implements CodeInterceptor.Appender<JavadocSection, JavaWriter> {
 
     @Override
     public void append(JavaWriter writer, JavadocSection section) {
+        if (section.shape().hasTrait(RequiredTrait.class)) {
+            writer.writeWithNoFormatting("<p><strong>Required</strong>");
+        }
         writer.writeWithNoFormatting("@return this builder.");
     }
 
