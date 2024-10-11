@@ -10,10 +10,7 @@ import software.amazon.smithy.java.codegen.sections.OperationSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.utils.CodeInterceptor;
 
-/**
- * TODO: Docs
- */
-public class OperationErrorInterceptor implements CodeInterceptor.Appender<JavadocSection, JavaWriter> {
+final class OperationErrorInterceptor implements CodeInterceptor.Appender<JavadocSection, JavaWriter> {
 
     @Override
     public void append(JavaWriter writer, JavadocSection section) {
