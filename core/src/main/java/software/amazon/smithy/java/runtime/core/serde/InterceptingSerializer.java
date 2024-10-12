@@ -40,7 +40,7 @@ public abstract class InterceptingSerializer implements ShapeSerializer {
     protected void after(Schema schema) {}
 
     @Override
-    public void writeStruct(Schema schema, SerializableStruct struct) {
+    public final void writeStruct(Schema schema, SerializableStruct struct) {
         before(schema).writeStruct(schema, struct);
         after(schema);
     }
