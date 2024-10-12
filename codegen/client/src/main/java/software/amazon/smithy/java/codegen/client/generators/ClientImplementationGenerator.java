@@ -14,6 +14,7 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
+import software.amazon.smithy.java.codegen.sections.ApplyDocumentation;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.client.core.Client;
@@ -43,7 +44,7 @@ public final class ClientImplementationGenerator
     ) {
         var impl = symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL);
         directive.context().writerDelegator().useFileWriter(impl.getDefinitionFile(), impl.getNamespace(), writer -> {
-            writer.pushState(new ClassSection(directive.shape()));
+            writer.pushState(new ClassSection(directive.shape(), ApplyDocumentation.NONE));
             var template = """
                 final class ${impl:T} extends ${client:T} implements ${interface:T} {
 

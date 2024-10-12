@@ -19,5 +19,4 @@ public record OperationSection(
     OperationShape operation,
     SymbolProvider symbolProvider,
     Model model
-) implements CodeSection {
-}
+) implements CodeSection, DocumentedSection {}

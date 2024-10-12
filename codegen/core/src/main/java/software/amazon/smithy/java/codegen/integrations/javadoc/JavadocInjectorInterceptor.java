@@ -5,8 +5,10 @@
 
 package software.amazon.smithy.java.codegen.integrations.javadoc;
 
+import software.amazon.smithy.java.codegen.sections.ApplyDocumentation;
 import software.amazon.smithy.java.codegen.sections.BuilderSetterSection;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
+import software.amazon.smithy.java.codegen.sections.DocumentedSection;
 import software.amazon.smithy.java.codegen.sections.EnumVariantSection;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.sections.JavadocSection;
@@ -34,11 +36,11 @@ final class JavadocInjectorInterceptor implements CodeInterceptor.Prepender<Code
     @Override
     public boolean isIntercepted(CodeSection section) {
         // Javadocs are generated for Classes, on member Getters, and on enum variants, operations, and builder setters.
-        return section instanceof ClassSection
-            || section instanceof GetterSection
-            || section instanceof EnumVariantSection
-            || section instanceof OperationSection
-            || section instanceof BuilderSetterSection;
+        if (section instanceof DocumentedSection c) {
+            return c.applyDocumentation() == ApplyDocumentation.DOCUMENT;
+        } else {
+            return false;
+        }
     }
 
     @Override
