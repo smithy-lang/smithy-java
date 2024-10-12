@@ -30,7 +30,7 @@ public final class ProtocolSettings {
 
         private Builder() {}
 
-        public Builder namespace(ShapeId service) {
+        public Builder service(ShapeId service) {
             this.service = service;
             return this;
         }

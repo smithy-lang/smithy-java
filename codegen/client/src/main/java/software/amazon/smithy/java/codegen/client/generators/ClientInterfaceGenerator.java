@@ -227,7 +227,7 @@ public final class ClientInterfaceGenerator
             writer.pushState();
             var template = """
                 private static final ${protocolSettings:T} settings = ${protocolSettings:T}.builder()
-                        .namespace(${shapeId:T}.from(${service:S}))
+                        .service(${shapeId:T}.from(${service:S}))
                         .build();
                 private static final ${trait:T} protocolTrait = ${initializer:C};
                 """;
