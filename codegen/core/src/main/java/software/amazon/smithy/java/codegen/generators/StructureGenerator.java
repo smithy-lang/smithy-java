@@ -103,9 +103,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
 
                     ${serializer:C|}
 
-                    ${builder:C|}
-
                     ${^isError}${toBuilder:C|}${/isError}
+
+                    ${builder:C|}
                 }
                 """;
             writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
