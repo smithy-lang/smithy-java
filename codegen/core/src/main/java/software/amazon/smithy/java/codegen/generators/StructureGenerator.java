@@ -13,6 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -103,7 +104,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
 
                     ${serializer:C|}
 
-                    ${^isError}${toBuilder:C|}${/isError}
+                    ${toBuilder:C|}
 
                     ${builder:C|}
                 }
@@ -459,12 +460,20 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         }
     }
 
-    private record ToBuilderGenerator(JavaWriter writer, StructureShape shape, SymbolProvider symbolProvider) implements
-        Runnable {
+    private record ToBuilderGenerator(
+        JavaWriter writer, StructureShape shape, SymbolProvider symbolProvider
+    ) implements Runnable {
         @Override
         public void run() {
+            var members = new LinkedHashSet<>(shape.members().size());
+            for (var member : shape.members()) {
+                members.add(symbolProvider.toMemberName(member));
+            }
+            var hasErrorMessage = shape.hasTrait(ErrorTrait.class) && members.remove("message");
+
             writer.pushState();
-            writer.putContext("members", shape.members().stream().map(symbolProvider::toMemberName).toList());
+            writer.putContext("hasErrorMessage", hasErrorMessage);
+            writer.putContext("members", members);
             writer.write(
                 """
                     /**
@@ -475,8 +484,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                      * @return a builder for {@link ${shape:T}}.
                      */
                     public Builder toBuilder() {
-                        var builder =  new Builder();
-                        ${#members}builder.${value:L}(this.${value:L});
+                        var builder = new Builder();
+                        ${?hasErrorMessage}builder.message(getMessage());
+                        ${/hasErrorMessage}${#members}builder.${value:L}(this.${value:L});
                         ${/members}return builder;
                     }
                     """
