@@ -9,8 +9,7 @@
         "gradlew",
         "gradlew.bat",
         "gradle.properties",
-        ".gitignore",
-        ".gitattributes"
+        ".gitignore"
       ]
     }
   }
