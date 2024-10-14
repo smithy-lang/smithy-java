@@ -1,0 +1,17 @@
+{
+  "name": "smithy-java",
+  "templates": {
+    "quickstart": {
+      "documentation": "Smithy-Java quickstart example with client and server.",
+      "path": "custom-trait-examples/custom-trait",
+      "include": [
+        "gradle/wrapper",
+        "gradlew",
+        "gradlew.bat",
+        "gradle.properties",
+        ".gitignore",
+        ".gitattributes"
+      ]
+    }
+  }
+}

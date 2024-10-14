@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "plugins": {
+    "java-client-codegen": {
+      "service": "com.example#CoffeeShop",
+      "namespace": "software.amazon.smithy.java.client.example",
+      "headerFile": "../license.txt",
+      "protocol": "aws.protocols#restJson1",
+      "defaultPlugins": ["software.amazon.smithy.java.example.plugins.ExamplePlugin"],
+      "transport": {
+        "http-java": {}
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 plugins {
-    id("smithy-java.codegen-plugin-conventions")
+    id("smithy-java.module-conventions")
 }
 
 description = "Netty based Smithy Java Server implementation"
@@ -9,6 +9,7 @@ extra["moduleName"] = "software.amazon.smithy.java.server.netty"
 
 dependencies {
     implementation(project(":server-core"))
+    implementation(project(":core"))
     implementation(project(":logging"))
     implementation(project(":http-api"))
     implementation(project(":context"))

@@ -23,6 +23,8 @@ publishing {
     publications {
         afterEvaluate {
             create<MavenPublication>("mavenJava") {
+                from(components["java"])
+
                 val displayName: String by extra
                 pom {
                     name.set(displayName)
