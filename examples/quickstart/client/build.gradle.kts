@@ -45,6 +45,9 @@ tasks.register<Test>("integ") {
     useJUnitPlatform()
     testClassesDirs = sourceSets["it"].output.classesDirs
     classpath = sourceSets["it"].runtimeClasspath
+    testLogging {
+        showStandardStreams = true
+    }
 }
 
 // Junit test dependencies

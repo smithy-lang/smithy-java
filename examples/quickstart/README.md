@@ -15,6 +15,9 @@ Then, to create a new project from this template, use the [Smithy CLI](https://s
 smithy init -t quickstart --url git@github.com:smithy-lang/smithy-java.git
 ```
 
+Generate a Gradle wrapper for the template by running `gradle wrapper` from the root of
+the generated project.
+
 ### Running and testing server
 To run and test the server, run `./gradlew run` from the root of a project created from this
 template. That will start the server running on port 8888. 

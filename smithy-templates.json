@@ -5,9 +5,6 @@
       "documentation": "Smithy-Java quickstart example with client and server.",
       "path": "examples/quickstart",
       "include": [
-        "gradle/wrapper",
-        "gradlew",
-        "gradlew.bat",
         "gradle.properties",
         ".gitignore"
       ]
