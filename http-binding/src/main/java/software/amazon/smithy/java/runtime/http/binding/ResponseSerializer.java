@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.http.binding;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventEncoderFactory;
@@ -24,8 +25,8 @@ public final class ResponseSerializer {
     private ApiOperation<?, ?> operation;
     private SerializableShape shapeValue;
     private EventEncoderFactory<?> eventEncoderFactory;
+    private Schema errorSchema;
     private boolean omitEmptyPayload = false;
-    private final BindingMatcher bindingMatcher = BindingMatcher.responseMatcher();
 
     ResponseSerializer() {}
 
@@ -98,6 +99,17 @@ public final class ResponseSerializer {
     }
 
     /**
+     * Used to serialize an error instead of the response.
+     *
+     * @param errorSchema Schema of the error to serialize.
+     * @return the serializer.
+     */
+    public ResponseSerializer errorSchema(Schema errorSchema) {
+        this.errorSchema = errorSchema;
+        return this;
+    }
+
+    /**
      * Finishes setting up the serializer and creates an HTTP response.
      *
      * @return Returns the created response.
@@ -108,12 +120,17 @@ public final class ResponseSerializer {
         Objects.requireNonNull(payloadCodec, "payloadCodec is not set");
         Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
+        // TODO: Implement error serialization.
+        if (errorSchema != null) {
+            throw new UnsupportedOperationException("error serialization not yet implemented");
+        }
+
         var httpTrait = operation.schema().expectTrait(HttpTrait.class);
         var serializer = new HttpBindingSerializer(
             httpTrait,
             payloadCodec,
             payloadMediaType,
-            bindingMatcher,
+            BindingMatcher.responseMatcher(operation.outputSchema()),
             omitEmptyPayload
         );
         shapeValue.serialize(serializer);

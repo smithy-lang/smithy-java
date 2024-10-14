@@ -30,7 +30,6 @@ public final class RequestSerializer {
     private SerializableShape shapeValue;
     private EventEncoderFactory<?> eventStreamEncodingFactory;
     private boolean omitEmptyPayload = false;
-    private final BindingMatcher bindingMatcher = BindingMatcher.requestMatcher();
 
     RequestSerializer() {}
 
@@ -131,7 +130,7 @@ public final class RequestSerializer {
             httpTrait,
             payloadCodec,
             payloadMediaType,
-            bindingMatcher,
+            BindingMatcher.requestMatcher(operation.inputSchema()),
             omitEmptyPayload
         );
         shapeValue.serialize(serializer);

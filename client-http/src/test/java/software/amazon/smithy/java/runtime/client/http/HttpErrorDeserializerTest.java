@@ -212,6 +212,11 @@ public class HttpErrorDeserializerTest {
                 return new Baz(message == null ? "" : message);
             }
 
+            @Override
+            public Schema schema() {
+                return SCHEMA;
+            }
+
             public Builder message(String message) {
                 this.message = message;
                 return this;

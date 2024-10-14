@@ -39,4 +39,11 @@ public interface ShapeBuilder<T extends SerializableShape> {
     default ShapeBuilder<T> errorCorrection() {
         return this;
     }
+
+    /**
+     * Get the schema definition of the shape this builder creates.
+     *
+     * @return the schema of the shape.
+     */
+    Schema schema();
 }

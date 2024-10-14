@@ -48,6 +48,11 @@ public final class Unit implements SerializableStruct {
     public static final class Builder implements ShapeBuilder<Unit> {
 
         @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
+        @Override
         public ShapeBuilder<Unit> deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, this, (b, m, d) -> {});
             return this;

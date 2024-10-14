@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
@@ -160,6 +161,12 @@ public class AmznErrorHeaderExtractorTest {
     }
 
     private static final class ApiExceptionBuilder implements ShapeBuilder<ModeledApiException> {
+
+        @Override
+        public Schema schema() {
+            throw new UnsupportedOperationException();
+        }
+
         @Override
         public ModeledApiException build() {
             throw new UnsupportedOperationException();

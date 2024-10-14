@@ -110,7 +110,11 @@ public final class ResponseDeserializer {
      * Finish setting up and deserialize the response into the builder.
      */
     public CompletableFuture<Void> deserialize() {
-        if (errorShapeBuilder == null && outputShapeBuilder == null) {
+        if (outputShapeBuilder != null) {
+            deserBuilder.bindingMatcher(BindingMatcher.responseMatcher(outputShapeBuilder.schema()));
+        } else if (errorShapeBuilder != null) {
+            deserBuilder.bindingMatcher(BindingMatcher.responseMatcher(errorShapeBuilder.schema()));
+        } else {
             throw new IllegalStateException("Either errorShapeBuilder or outputShapeBuilder must be set");
         }
 

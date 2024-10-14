@@ -137,6 +137,11 @@ public class XmlCodecTest {
             private final List<Integer> numbers = new ArrayList<>();
 
             @Override
+            public Schema schema() {
+                return SCHEMA;
+            }
+
+            @Override
             public Builder deserialize(ShapeDeserializer decoder) {
                 decoder.readStruct(SCHEMA, this, (pojo, member, deser) -> {
                     switch (member.memberName()) {

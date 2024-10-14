@@ -29,6 +29,7 @@ import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.ErrorTrait;
 import software.amazon.smithy.model.traits.HttpErrorTrait;
+import software.amazon.smithy.model.traits.HttpPrefixHeadersTrait;
 import software.amazon.smithy.model.traits.HttpTrait;
 import software.amazon.smithy.model.traits.MediaTypeTrait;
 
@@ -248,7 +249,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                 case LABEL -> serializer.labelSerializer;
                 case STATUS -> new ResponseStatusSerializer(i -> serializer.responseStatus = i);
                 case PREFIX_HEADERS -> new HttpPrefixHeadersSerializer(
-                    serializer.bindingMatcher.prefixHeaders(),
+                    schema.expectTrait(HttpPrefixHeadersTrait.class).getValue(),
                     serializer.headerConsumer
                 );
                 case QUERY_PARAMS -> new HttpQueryParamsSerializer(serializer.queryStringParams::add);

@@ -164,6 +164,11 @@ public final class Person implements SerializableStruct {
             return new Person(this);
         }
 
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
         public Builder age(int age) {
             this.age = age;
             return this;

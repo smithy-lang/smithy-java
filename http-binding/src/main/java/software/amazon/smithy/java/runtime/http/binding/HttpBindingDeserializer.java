@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
-import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
@@ -25,6 +24,7 @@ import software.amazon.smithy.java.runtime.core.serde.event.EventStreamFrameDeco
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.io.uri.QueryStringParser;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.HttpHeaderTrait;
 import software.amazon.smithy.model.traits.HttpQueryTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.utils.SmithyBuilder;
@@ -38,7 +38,6 @@ import software.amazon.smithy.utils.SmithyBuilder;
  */
 final class HttpBindingDeserializer extends SpecificShapeDeserializer implements ShapeDeserializer {
 
-    private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpBindingDeserializer.class);
     private final Codec payloadCodec;
     private final HttpHeaders headers;
     private final Map<String, List<String>> queryStringParameters;
@@ -53,7 +52,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private HttpBindingDeserializer(Builder builder) {
         this.payloadCodec = Objects.requireNonNull(builder.payloadCodec, "payloadSerializer not set");
         this.headers = Objects.requireNonNull(builder.headers, "headers not set");
-        this.bindingMatcher = builder.isRequest ? BindingMatcher.requestMatcher() : BindingMatcher.responseMatcher();
+        this.bindingMatcher = Objects.requireNonNull(builder.bindingMatcher, "bindingMatcher not set");
         this.eventDecoderFactory = builder.eventDecoderFactory;
         this.body = builder.body == null ? DataStream.ofEmpty() : builder.body;
         this.queryStringParameters = QueryStringParser.parse(builder.requestRawQueryString);
@@ -102,13 +101,14 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 case QUERY_PARAMS ->
                     structMemberConsumer.accept(state, member, new HttpQueryParamsDeserializer(queryStringParameters));
                 case HEADER -> {
+                    var header = member.expectTrait(HttpHeaderTrait.class).getValue();
                     if (member.type() == ShapeType.LIST) {
-                        var allValues = headers.allValues(bindingMatcher.header());
+                        var allValues = headers.allValues(header);
                         if (!allValues.isEmpty()) {
                             structMemberConsumer.accept(state, member, new HttpHeaderListDeserializer(allValues));
                         }
                     } else {
-                        headers.firstValue(bindingMatcher.header())
+                        headers.firstValue(header)
                             .ifPresent(
                                 headerValue -> structMemberConsumer.accept(
                                     state,
@@ -213,13 +213,13 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     static final class Builder implements SmithyBuilder<HttpBindingDeserializer> {
         private Map<String, String> requestPathLabels;
         private Codec payloadCodec;
-        private boolean isRequest;
         private HttpHeaders headers;
         private String requestRawQueryString;
         private DataStream body;
         private int responseStatus;
         private EventDecoderFactory<?> eventDecoderFactory;
         private String payloadMediaType;
+        private BindingMatcher bindingMatcher;
 
         private Builder() {}
 
@@ -274,9 +274,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @return Returns the builder.
          */
         Builder requestRawQueryString(String requestRawQueryString) {
-            if (!isRequest) {
-                throw new IllegalStateException("Cannot set rawQueryString for a response");
-            }
             this.requestRawQueryString = requestRawQueryString;
             return this;
         }
@@ -299,21 +296,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @return Returns the builder.
          */
         Builder responseStatus(int responseStatus) {
-            if (isRequest) {
-                throw new IllegalStateException("Cannot set status for a request");
-            }
             this.responseStatus = responseStatus;
-            return this;
-        }
-
-        /**
-         * Set to true to honor request bindings.
-         *
-         * @param isRequest Set to true to use request bindings.
-         * @return Returns the builder.
-         */
-        Builder request(boolean isRequest) {
-            this.isRequest = isRequest;
             return this;
         }
 
@@ -324,6 +307,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
 
         Builder payloadMediaType(String payloadMediaType) {
             this.payloadMediaType = payloadMediaType;
+            return this;
+        }
+
+        Builder bindingMatcher(BindingMatcher bindingMatcher) {
+            this.bindingMatcher = bindingMatcher;
             return this;
         }
     }

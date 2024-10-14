@@ -100,6 +100,11 @@ public final class ValidatedPojo implements SerializableStruct {
             return new ValidatedPojo(this);
         }
 
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
         public Builder string(String string) {
             this.string = string;
             return this;

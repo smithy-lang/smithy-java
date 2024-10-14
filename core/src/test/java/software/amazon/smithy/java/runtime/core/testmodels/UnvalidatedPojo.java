@@ -89,6 +89,11 @@ public final class UnvalidatedPojo implements SerializableStruct {
             return new UnvalidatedPojo(this);
         }
 
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
         public Builder string(String string) {
             this.string = string;
             return this;

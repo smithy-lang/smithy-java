@@ -10,7 +10,8 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.*;
+import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.Shape;
 
 /**
  * Generates a static nested {@code Builder} class for a Java class.
@@ -58,6 +59,11 @@ abstract class BuilderGenerator implements Runnable {
                 ${builderProperties:C|}
 
                 private Builder() {}
+
+                @Override
+                public Schema schema() {
+                    return SCHEMA;
+                }
 
                 ${builderSetters:C|}
 

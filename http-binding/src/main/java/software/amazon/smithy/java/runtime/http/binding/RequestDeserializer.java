@@ -7,7 +7,6 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
@@ -20,9 +19,8 @@ import software.amazon.smithy.java.runtime.io.datastream.DataStream;
  */
 public final class RequestDeserializer {
 
-    private final HttpBindingDeserializer.Builder deserBuilder = HttpBindingDeserializer.builder().request(true);
+    private final HttpBindingDeserializer.Builder deserBuilder = HttpBindingDeserializer.builder();
     private ShapeBuilder<?> inputShapeBuilder;
-    private ShapeBuilder<? extends ModeledApiException> errorShapeBuilder;
 
     RequestDeserializer() {}
 
@@ -59,15 +57,11 @@ public final class RequestDeserializer {
      * @return Returns the deserializer.
      */
     public RequestDeserializer request(SmithyHttpRequest request) {
-        DataStream bodyDataStream = bodyDataStream(request);
+        DataStream bodyDataStream = request.body();
         deserBuilder.headers(request.headers())
             .requestRawQueryString(request.uri().getRawQuery())
             .body(bodyDataStream);
         return this;
-    }
-
-    private DataStream bodyDataStream(SmithyHttpRequest request) {
-        return request.body();
     }
 
     /**
@@ -78,7 +72,6 @@ public final class RequestDeserializer {
      */
     public RequestDeserializer inputShapeBuilder(ShapeBuilder<?> inputShapeBuilder) {
         this.inputShapeBuilder = inputShapeBuilder;
-        errorShapeBuilder = null;
         return this;
     }
 
@@ -99,33 +92,17 @@ public final class RequestDeserializer {
     }
 
     /**
-     * Error shape builder to populate from the request.
-     *
-     * @param errorShapeBuilder Error shape builder.
-     * @return Returns the deserializer.
-     */
-    public RequestDeserializer errorShapeBuilder(ShapeBuilder<? extends ModeledApiException> errorShapeBuilder) {
-        this.errorShapeBuilder = errorShapeBuilder;
-        inputShapeBuilder = null;
-        return this;
-    }
-
-    /**
      * Finish setting up and deserialize the response into the builder.
      */
     public CompletableFuture<Void> deserialize() {
-        if (errorShapeBuilder == null && inputShapeBuilder == null) {
-            throw new IllegalStateException("Either errorShapeBuilder or outputShapeBuilder must be set");
+        if (inputShapeBuilder == null) {
+            throw new IllegalStateException("inputShapeBuilder must be set");
         }
 
+        deserBuilder.bindingMatcher(BindingMatcher.requestMatcher(inputShapeBuilder.schema()));
         HttpBindingDeserializer deserializer = deserBuilder.build();
 
-        if (inputShapeBuilder != null) {
-            inputShapeBuilder.deserialize(deserializer);
-        } else {
-            errorShapeBuilder.deserialize(deserializer);
-        }
-
+        inputShapeBuilder.deserialize(deserializer);
         return deserializer.completeBodyDeserialization();
     }
 }

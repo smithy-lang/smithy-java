@@ -62,6 +62,11 @@ public final class Bird implements SerializableStruct {
             return new Bird(this);
         }
 
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
         public Builder name(String name) {
             this.name = name;
             return this;

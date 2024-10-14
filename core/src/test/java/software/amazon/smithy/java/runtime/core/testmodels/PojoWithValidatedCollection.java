@@ -114,6 +114,11 @@ public final class PojoWithValidatedCollection implements SerializableStruct {
             return new PojoWithValidatedCollection(this);
         }
 
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
         public Builder map(Map<String, ValidatedPojo> map) {
             this.map = map;
             return this;
