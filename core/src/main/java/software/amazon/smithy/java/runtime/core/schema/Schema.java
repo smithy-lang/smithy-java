@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Set;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -78,6 +77,8 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
     private Schema mapKeyMember;
     private Schema mapValueMember;
 
+    private final int hash;
+
     Schema(
         ShapeType type,
         ShapeId id,
@@ -123,6 +124,8 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
             members,
             m -> m.requiredByValidationBitmask
         );
+
+        this.hash = computeHash(this);
     }
 
     Schema(MemberSchemaBuilder builder) {
@@ -161,6 +164,17 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
                 m -> m.requiredByValidationBitmask
             );
         }
+
+        this.hash = computeHash(this);
+    }
+
+    private static int computeHash(Schema schema) {
+        int result = 1;
+        result = 17 * result + schema.type.hashCode();
+        result = 31 * result + schema.id.hashCode();
+        result = 31 * result + schema.traits.hashCode();
+        result = 31 * result + schema.memberIndex;
+        return result;
     }
 
     public static Schema createBoolean(ShapeId id, Trait... traits) {
@@ -283,7 +297,7 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
 
     @Override
     public final int hashCode() {
-        return Objects.hash(type, id, traits, memberIndex);
+        return hash;
     }
 
     /**
