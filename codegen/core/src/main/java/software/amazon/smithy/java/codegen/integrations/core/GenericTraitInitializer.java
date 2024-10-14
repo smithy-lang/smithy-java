@@ -36,7 +36,6 @@ public final class GenericTraitInitializer implements TraitInitializer<Trait> {
         if (traitProviderClass == null) {
             throw new UnsupportedOperationException("Could not find trait provider for " + trait);
         }
-        writer.pushState();
         var template = """
             new ${?enclosing}${enclosing:T}.${name:L}${/enclosing}${^enclosing}${type:T}${/enclosing}().createTrait(
                 ${shapeId:T}.from(${id:S}),
@@ -51,6 +50,5 @@ public final class GenericTraitInitializer implements TraitInitializer<Trait> {
         }
         writer.putContext("nodeInitializer", new NodeWriter(writer, trait.toNode()));
         writer.writeInline(template);
-        writer.popState();
     }
 }

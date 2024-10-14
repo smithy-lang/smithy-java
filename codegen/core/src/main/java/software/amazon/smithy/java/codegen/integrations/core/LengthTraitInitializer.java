@@ -18,11 +18,9 @@ final class LengthTraitInitializer implements TraitInitializer<LengthTrait> {
 
     @Override
     public void accept(JavaWriter writer, LengthTrait lengthTrait) {
-        writer.pushState();
         writer.putContext("min", lengthTrait.getMin());
         writer.putContext("max", lengthTrait.getMax());
         writer.putContext("length", LengthTrait.class);
         writer.writeInline("${length:T}.builder()${?min}.min(${min:L}L)${/min}${?max}.max(${max:L}L)${/max}.build()");
-        writer.popState();
     }
 }

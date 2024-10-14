@@ -18,7 +18,6 @@ final class RangeTraitInitializer implements TraitInitializer<RangeTrait> {
 
     @Override
     public void accept(JavaWriter writer, RangeTrait rangeTrait) {
-        writer.pushState();
         writer.putContext("min", rangeTrait.getMin());
         writer.putContext("max", rangeTrait.getMax());
         writer.putContext("range", RangeTrait.class);
@@ -27,6 +26,5 @@ final class RangeTraitInitializer implements TraitInitializer<RangeTrait> {
             "${range:T}.builder()${?min}.min(new ${bigDecimal:T}(${min:S}))${/min}"
                 + "${?max}.max(new ${bigDecimal:T}(${max:S}))${/max}.build()"
         );
-        writer.popState();
     }
 }

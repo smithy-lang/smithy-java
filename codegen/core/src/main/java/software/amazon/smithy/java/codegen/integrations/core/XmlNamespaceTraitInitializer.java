@@ -17,11 +17,9 @@ final class XmlNamespaceTraitInitializer implements TraitInitializer<XmlNamespac
 
     @Override
     public void accept(JavaWriter writer, XmlNamespaceTrait xmlNamespaceTrait) {
-        writer.pushState();
         writer.putContext("xmlNamespace", XmlNamespaceTrait.class);
         writer.putContext("uri", xmlNamespaceTrait.getUri());
         writer.putContext("prefix", xmlNamespaceTrait.getPrefix());
         writer.writeInline("${xmlNamespace:T}.builder().uri(${uri:S})${?prefix}.prefix(${prefix:S})${/prefix}.build()");
-        writer.popState();
     }
 }

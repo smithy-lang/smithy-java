@@ -18,10 +18,8 @@ final class DefaultTraitInitializer implements TraitInitializer<DefaultTrait> {
 
     @Override
     public void accept(JavaWriter writer, DefaultTrait defaultTrait) {
-        writer.pushState();
         writer.putContext("default", DefaultTrait.class);
         writer.putContext("nodeInitializer", new NodeWriter(writer, defaultTrait.toNode()));
         writer.writeInline("new ${default:T}(${nodeInitializer:C})");
-        writer.popState();
     }
 }

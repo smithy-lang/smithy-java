@@ -18,7 +18,6 @@ final class HttpTraitInitializer implements TraitInitializer<HttpTrait> {
 
     @Override
     public void accept(JavaWriter writer, HttpTrait httpTrait) {
-        writer.pushState();
         writer.putContext("http", HttpTrait.class);
         writer.putContext("method", httpTrait.getMethod());
         writer.putContext("code", httpTrait.getCode());
@@ -27,6 +26,5 @@ final class HttpTraitInitializer implements TraitInitializer<HttpTrait> {
         writer.writeInline(
             "${http:T}.builder().method(${method:S}).code(${code:L}).uri(${uriPattern:T}.parse(${uri:S})).build()"
         );
-        writer.popState();
     }
 }

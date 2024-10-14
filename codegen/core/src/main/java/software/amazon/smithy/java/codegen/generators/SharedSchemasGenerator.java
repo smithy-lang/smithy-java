@@ -61,6 +61,7 @@ public final class SharedSchemasGenerator
                             ${/builders}${#schemas}
                             ${value:C|}
                             ${/schemas}
+
                             private SharedSchemas() {}
                         }
                         """;

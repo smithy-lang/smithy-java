@@ -32,11 +32,11 @@ record StructureDeserializerGenerator(
                 private static final InnerDeserializer INSTANCE = new InnerDeserializer();
 
                 @Override
-                public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {
-                    ${?hasMembers}switch (member.memberIndex()) {
+                public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {${?hasMembers}
+                    switch (member.memberIndex()) {
                         ${cases:C|}
-                    }${/hasMembers}
-                }${?union}
+                    }
+                ${/hasMembers}}${?union}
 
                 @Override
                 public void unknownMember(Builder builder, ${string:T} memberName) {

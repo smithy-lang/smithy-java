@@ -68,8 +68,8 @@ public class MapGenerator
                                 ${?sparse}if (values == null) {
                                     serializer.writeNull(${valueSchema:L});
                                     return;
-                                }${/sparse}
-                                ${memberSerializer:C|};
+                                }
+                                ${/sparse}${memberSerializer:C|};
                             }
                         }
 

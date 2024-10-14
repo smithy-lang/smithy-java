@@ -18,10 +18,8 @@ final class EndpointTraitInitializer implements TraitInitializer<EndpointTrait> 
 
     @Override
     public void accept(JavaWriter writer, EndpointTrait endpointTrait) {
-        writer.pushState();
         writer.putContext("endpoint", EndpointTrait.class);
         writer.putContext("hostPrefix", endpointTrait.getHostPrefix());
         writer.writeInline("${endpoint:T}.builder().hostPrefix(${hostPrefix:S}).build()");
-        writer.popState();
     }
 }

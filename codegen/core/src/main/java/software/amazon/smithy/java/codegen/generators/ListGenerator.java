@@ -49,8 +49,8 @@ public final class ListGenerator
                                     ${?sparse}if (value == null) {
                                         serializer.writeNull(${valueSchema:L});
                                         continue;
-                                    }${/sparse}
-                                    ${memberSerializer:C|};
+                                    }
+                                    ${/sparse}${memberSerializer:C|};
                                 }
                             }
                         }

@@ -21,16 +21,17 @@ record TraitInitializerGenerator(JavaWriter writer, Shape shape, CodeGenerationC
             return;
         }
         writer.write(",");
-        writer.indent();
+        writer.indent().indent();
         var iter = traitsToAdd.iterator();
         while (iter.hasNext()) {
             var trait = shape.getAllTraits().get(iter.next());
+            writer.pushState();
             context.getInitializer(trait).accept(writer, trait);
             if (iter.hasNext()) {
-                writer.write(",");
+                writer.writeInline(",\n");
             }
+            writer.popState();
         }
-        writer.newLine();
-        writer.dedent();
+        writer.dedent().dedent();
     }
 }

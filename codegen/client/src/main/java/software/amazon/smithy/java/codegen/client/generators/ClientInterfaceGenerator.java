@@ -86,12 +86,11 @@ public final class ClientInterfaceGenerator
                         }
 
                         final class Builder extends ${client:T}.Builder<${interface:T}, Builder>${?settings} implements ${#settings}${value:T}<Builder>${^key.last}, ${/key.last}${/settings}${/settings} {
-                            ${defaultPlugins:C|}
-                            ${?hasDefaultProtocol}${defaultProtocol:C|}
+                            ${defaultPlugins:C|}${?hasDefaultProtocol}${defaultProtocol:C|}
                             ${/hasDefaultProtocol}${?defaultSchemes}${defaultAuth:C|}
-                            ${/defaultSchemes}private Builder() {
-                                ${?defaultSchemes}configBuilder().putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes});${/defaultSchemes}
-                            }
+                            ${/defaultSchemes}private Builder() {${?defaultSchemes}
+                                configBuilder().putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes});
+                            ${/defaultSchemes}}
 
                             @Override
                             public ${interface:T} build() {

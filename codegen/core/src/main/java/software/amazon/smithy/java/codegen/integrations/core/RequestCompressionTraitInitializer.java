@@ -18,13 +18,11 @@ final class RequestCompressionTraitInitializer implements TraitInitializer<Reque
 
     @Override
     public void accept(JavaWriter writer, RequestCompressionTrait requestCompressionTrait) {
-        writer.pushState();
         writer.putContext("enc", requestCompressionTrait.getEncodings());
         writer.putContext("requestComp", RequestCompressionTrait.class);
         writer.putContext("list", List.class);
         writer.writeInline(
             "${requestComp:T}.builder().encodings(${list:T}.of(${#enc}${enc:S}${^key.last}, ${/key.last}${/enc})).build()"
         );
-        writer.popState();
     }
 }

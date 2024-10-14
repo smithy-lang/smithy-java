@@ -17,10 +17,8 @@ final class RetryableTraitInitializer implements TraitInitializer<RetryableTrait
 
     @Override
     public void accept(JavaWriter writer, RetryableTrait retryableTrait) {
-        writer.pushState();
         writer.putContext("retryable", RetryableTrait.class);
         writer.putContext("throttling", retryableTrait.getThrottling());
         writer.writeInline("${retryable:T}.builder().throttling(${throttling:L}).build()");
-        writer.popState();
     }
 }

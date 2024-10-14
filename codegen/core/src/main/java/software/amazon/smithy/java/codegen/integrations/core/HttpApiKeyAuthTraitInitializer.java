@@ -17,7 +17,6 @@ final class HttpApiKeyAuthTraitInitializer implements TraitInitializer<HttpApiKe
 
     @Override
     public void accept(JavaWriter writer, HttpApiKeyAuthTrait httpApiKeyAuthTrait) {
-        writer.pushState();
         writer.putContext("auth", HttpApiKeyAuthTrait.class);
         writer.putContext("name", httpApiKeyAuthTrait.getName());
         writer.putContext("in", httpApiKeyAuthTrait.getIn());
@@ -28,6 +27,5 @@ final class HttpApiKeyAuthTraitInitializer implements TraitInitializer<HttpApiKe
                 .in(${auth:T}.Location.from(${in:S})${?scheme}
                 .scheme(${scheme:S})${/scheme}
                 .build()""");
-        writer.popState();
     }
 }

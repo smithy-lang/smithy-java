@@ -62,7 +62,6 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         return format(
             """
                 £L
-
                 package £L;
 
                 £L

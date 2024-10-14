@@ -17,7 +17,6 @@ final class PaginatedTraitInitializer implements TraitInitializer<PaginatedTrait
 
     @Override
     public void accept(JavaWriter writer, PaginatedTrait paginatedTrait) {
-        writer.pushState();
         writer.putContext("input", paginatedTrait.getInputToken());
         writer.putContext("output", paginatedTrait.getOutputToken());
         writer.putContext("pageSize", paginatedTrait.getPageSize());
@@ -31,6 +30,5 @@ final class PaginatedTraitInitializer implements TraitInitializer<PaginatedTrait
                 + "${?pageSize}.pageSize(${pageSize:S})${/pageSize}"
                 + ".build()"
         );
-        writer.popState();
     }
 }
