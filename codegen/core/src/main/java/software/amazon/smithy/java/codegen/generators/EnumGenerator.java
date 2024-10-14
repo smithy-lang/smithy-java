@@ -163,14 +163,25 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
         public void run() {
             writer.pushState();
             var template = """
+                /**
+                 * Value contained by this Enum.
+                 */
                 public ${value:N} value() {
                     return value;
                 }
 
+                /**
+                 * Type of this Enum variant.
+                 */
                 public ${type:N} type() {
                     return type;
                 }
 
+                /**
+                 * Create an Enum of an {@link Type#$$UNKNOWN} type containing a value.
+                 *
+                 * @param value value contained by unknown Enum.
+                 */
                 public static ${shape:T} unknown(${value:T} value) {
                     return new ${shape:T}(Type.$$UNKNOWN, value);
                 }
@@ -208,6 +219,12 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.pushState();
             writer.putContext("illegalArg", IllegalArgumentException.class);
             writer.write("""
+                /**
+                 * Returns a {@link ${shape:T}} constant with the specified value.
+                 *
+                 * @param value value to create {@code ${shape:T}} from.
+                 * @throws ${illegalArg:T} if value does not match a known value.
+                 */
                 public static ${shape:T} from(${value:T} value) {
                     return switch (value) {
                         ${C|}

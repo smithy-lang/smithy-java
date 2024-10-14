@@ -34,6 +34,7 @@ public interface ShapeBuilder<T extends SerializableShape> {
      * member to zero to allow the shape to build.
      *
      * @return Returns the builder.
+     * @see <a href="https://smithy.io/2.0/spec/aggregate-types.html#client-error-correction">Client Error Correction</a>
      */
     default ShapeBuilder<T> errorCorrection() {
         return this;
