@@ -174,25 +174,32 @@ public final class ClientInterfaceGenerator
 
         @Override
         public void run() {
-            writer.pushState();
-            var template = """
+            var templateDefault = """
                 default ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input) {
                     return ${name:L}(input, null);
                 }
-
+                """;
+            var templateBase = """
                 ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig);
                 """;
+            writer.pushState();
             writer.putContext("async", symbol.expectProperty(ClientSymbolProperties.ASYNC));
             writer.putContext("overrideConfig", RequestOverrideConfig.class);
             writer.putContext("future", CompletableFuture.class);
 
             var opIndex = OperationIndex.of(model);
             for (var operation : TopDownIndex.of(model).getContainedOperations(service)) {
-                writer.pushState(new OperationSection(operation, symbolProvider, model));
+                writer.pushState();
                 writer.putContext("name", StringUtils.uncapitalize(CodegenUtils.getDefaultName(operation, service)));
                 writer.putContext("input", symbolProvider.toSymbol(opIndex.expectInputShape(operation)));
                 writer.putContext("output", symbolProvider.toSymbol(opIndex.expectOutputShape(operation)));
-                writer.write(template);
+                writer.pushState(new OperationSection(operation, symbolProvider, model));
+                writer.write(templateDefault);
+                writer.popState();
+                writer.newLine();
+                writer.pushState(new OperationSection(operation, symbolProvider, model));
+                writer.write(templateBase);
+                writer.popState();
                 writer.popState();
             }
             writer.popState();
