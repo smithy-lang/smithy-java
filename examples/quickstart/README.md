@@ -12,7 +12,7 @@ From the root of the repo to build  and publish the project modules to the local
 Then, to create a new project from this template, use the [Smithy CLI](https://smithy.io/2.0/guides/smithy-cli/index.html) 
 `init` command as follows: 
 ```console
-smithy init -t quickstart --url https://github.com/smithy-lang/smithy-java
+smithy init -t quickstart --url git@github.com:smithy-lang/smithy-java.git
 ```
 
 ### Running and testing server

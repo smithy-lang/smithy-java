@@ -3,7 +3,7 @@
   "templates": {
     "quickstart": {
       "documentation": "Smithy-Java quickstart example with client and server.",
-      "path": "custom-trait-examples/custom-trait",
+      "path": "examples/quickstart",
       "include": [
         "gradle/wrapper",
         "gradlew",
