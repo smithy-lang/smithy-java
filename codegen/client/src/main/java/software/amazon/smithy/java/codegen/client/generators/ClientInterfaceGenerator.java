@@ -85,10 +85,12 @@ public final class ClientInterfaceGenerator
                             return new Builder();
                         }
 
-                        final class Builder extends ${client:T}.Builder<${interface:T}, Builder>${?settings} implements ${#settings}${value:T}<Builder>${^key.last}, ${/key.last}${/settings}${/settings} {
-                            ${defaultPlugins:C|}${?hasDefaultProtocol}${defaultProtocol:C|}
+                        final class Builder extends ${client:T}.Builder<${interface:T}, Builder>${?settings} implements ${#settings}${value:T}<Builder>${^key.last}, ${/key.last}${/settings}${/settings} {${?hasDefaults}
+                            ${defaultPlugins:C|}
+                            ${/hasDefaults}${?hasDefaultProtocol}${defaultProtocol:C|}
                             ${/hasDefaultProtocol}${?defaultSchemes}${defaultAuth:C|}
-                            ${/defaultSchemes}private Builder() {${?defaultSchemes}
+                            ${/defaultSchemes}
+                            private Builder() {${?defaultSchemes}
                                 configBuilder().putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes});
                             ${/defaultSchemes}}
 
