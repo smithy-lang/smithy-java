@@ -22,8 +22,15 @@ import software.amazon.smithy.java.runtime.io.uri.URLEncoding;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
-import software.amazon.smithy.java.server.core.*;
-import software.amazon.smithy.java.server.protocols.restjson.router.*;
+import software.amazon.smithy.java.server.core.HttpJob;
+import software.amazon.smithy.java.server.core.Job;
+import software.amazon.smithy.java.server.core.ServerProtocol;
+import software.amazon.smithy.java.server.core.ServiceProtocolResolutionRequest;
+import software.amazon.smithy.java.server.core.ServiceProtocolResolutionResult;
+import software.amazon.smithy.java.server.protocols.restjson.router.UriMatcherMap;
+import software.amazon.smithy.java.server.protocols.restjson.router.UriPattern;
+import software.amazon.smithy.java.server.protocols.restjson.router.UriTreeMatcherMap;
+import software.amazon.smithy.java.server.protocols.restjson.router.ValuedMatch;
 import software.amazon.smithy.model.pattern.SmithyPattern;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpTrait;
@@ -35,6 +42,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
 
     private final Codec codec;
     private final UriMatcherMap<Operation<?, ?>> matcher;
+    private final HttpBinding httpBinding = new HttpBinding();
 
     AwsRestJson1Protocol(List<Service> services) {
         super(services);
@@ -106,7 +114,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         }
         HttpHeaders headers = httpJob.request().headers();
         var inputShapeBuilder = job.operation().getApiOperation().inputBuilder();
-        var deser = HttpBinding
+        var deser = httpBinding
             .requestDeserializer()
             .inputShapeBuilder(inputShapeBuilder)
             .pathLabelValues(labelValues)
@@ -143,7 +151,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         HttpJob httpJob = (HttpJob) job; //We already check in the deserializeInput method.
         //TODO add error serialization.
         SerializableStruct output = job.response().getValue();
-        ResponseSerializer serializer = HttpBinding.responseSerializer()
+        ResponseSerializer serializer = httpBinding.responseSerializer()
             .operation(job.operation().getApiOperation())
             .payloadCodec(codec)
             .payloadMediaType("application/json")

@@ -35,6 +35,7 @@ import software.amazon.smithy.java.runtime.http.binding.ResponseDeserializer;
 public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientProtocol {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpBindingClientProtocol.class);
+    private final HttpBinding httpBinding = new HttpBinding();
 
     public HttpBindingClientProtocol(String id) {
         super(id);
@@ -48,6 +49,10 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
 
     protected boolean omitEmptyPayload() {
         return false;
+    }
+
+    protected final HttpBinding httpBinding() {
+        return httpBinding;
     }
 
     protected EventEncoderFactory<F> getEventEncoderFactory(InputEventStreamingApiOperation<?, ?, ?> inputOperation) {
@@ -65,7 +70,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
         Context context,
         URI endpoint
     ) {
-        RequestSerializer serializer = HttpBinding.requestSerializer()
+        RequestSerializer serializer = httpBinding.requestSerializer()
             .operation(operation)
             .payloadCodec(codec())
             .payloadMediaType(payloadMediaType())
@@ -97,7 +102,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
         LOGGER.trace("Deserializing successful response with {}", getClass().getName());
 
         var outputBuilder = operation.outputBuilder();
-        ResponseDeserializer deser = HttpBinding.responseDeserializer()
+        ResponseDeserializer deser = httpBinding.responseDeserializer()
             .payloadCodec(codec())
             .payloadMediaType(payloadMediaType())
             .outputShapeBuilder(outputBuilder)

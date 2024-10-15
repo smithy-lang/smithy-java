@@ -45,7 +45,7 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
         this.errorDeserializer = HttpErrorDeserializer.builder()
             .codec(codec)
             .serviceId(service)
-            .knownErrorFactory(new HttpBindingErrorFactory())
+            .knownErrorFactory(new HttpBindingErrorFactory(httpBinding()))
             .headerErrorExtractor(new AmznErrorHeaderExtractor())
             .build();
     }

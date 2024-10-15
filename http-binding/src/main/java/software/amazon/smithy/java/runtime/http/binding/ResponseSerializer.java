@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.Objects;
+import java.util.concurrent.ConcurrentMap;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
@@ -27,8 +28,11 @@ public final class ResponseSerializer {
     private EventEncoderFactory<?> eventEncoderFactory;
     private Schema errorSchema;
     private boolean omitEmptyPayload = false;
+    private final ConcurrentMap<Schema, BindingMatcher> bindingCache;
 
-    ResponseSerializer() {}
+    ResponseSerializer(ConcurrentMap<Schema, BindingMatcher> bindingCache) {
+        this.bindingCache = bindingCache;
+    }
 
     /**
      * Schema of the operation response to serialize.
@@ -130,7 +134,7 @@ public final class ResponseSerializer {
             httpTrait,
             payloadCodec,
             payloadMediaType,
-            BindingMatcher.responseMatcher(operation.outputSchema()),
+            bindingCache.computeIfAbsent(operation.outputSchema(), BindingMatcher::responseMatcher),
             omitEmptyPayload
         );
         shapeValue.serialize(serializer);

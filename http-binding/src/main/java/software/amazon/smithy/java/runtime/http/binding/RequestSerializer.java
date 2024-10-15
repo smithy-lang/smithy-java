@@ -7,8 +7,10 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.net.URI;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentMap;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventEncoderFactory;
@@ -30,8 +32,11 @@ public final class RequestSerializer {
     private SerializableShape shapeValue;
     private EventEncoderFactory<?> eventStreamEncodingFactory;
     private boolean omitEmptyPayload = false;
+    private final ConcurrentMap<Schema, BindingMatcher> bindingCache;
 
-    RequestSerializer() {}
+    RequestSerializer(ConcurrentMap<Schema, BindingMatcher> bindingCache) {
+        this.bindingCache = bindingCache;
+    }
 
     /**
      * Schema of the operation to serialize.
@@ -125,12 +130,13 @@ public final class RequestSerializer {
         Objects.requireNonNull(shapeValue, "value is not set");
         Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
+        var matcher = bindingCache.computeIfAbsent(operation.inputSchema(), BindingMatcher::requestMatcher);
         var httpTrait = operation.schema().expectTrait(HttpTrait.class);
         var serializer = new HttpBindingSerializer(
             httpTrait,
             payloadCodec,
             payloadMediaType,
-            BindingMatcher.requestMatcher(operation.inputSchema()),
+            matcher,
             omitEmptyPayload
         );
         shapeValue.serialize(serializer);

@@ -18,6 +18,20 @@ import software.amazon.smithy.java.runtime.http.binding.HttpBinding;
  * The default strategy that uses HTTP bindings to deserialize errors.
  */
 public final class HttpBindingErrorFactory implements HttpErrorDeserializer.KnownErrorFactory {
+
+    private final HttpBinding httpBinding;
+
+    public HttpBindingErrorFactory() {
+        this(new HttpBinding());
+    }
+
+    /**
+     * @param httpBinding The HTTP binding cache to use for serde.
+     */
+    public HttpBindingErrorFactory(HttpBinding httpBinding) {
+        this.httpBinding = httpBinding;
+    }
+
     @Override
     public CompletableFuture<ModeledApiException> createError(
         Context context,
@@ -25,7 +39,7 @@ public final class HttpBindingErrorFactory implements HttpErrorDeserializer.Know
         SmithyHttpResponse response,
         ShapeBuilder<ModeledApiException> builder
     ) {
-        return HttpBinding.responseDeserializer()
+        return httpBinding.responseDeserializer()
             .payloadCodec(codec)
             .errorShapeBuilder(builder)
             .response(response)

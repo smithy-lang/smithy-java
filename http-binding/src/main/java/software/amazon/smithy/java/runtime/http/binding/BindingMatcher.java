@@ -31,6 +31,9 @@ abstract sealed class BindingMatcher {
 
     private BindingMatcher(Schema struct) {
         this.bindings = new Binding[struct.members().size()];
+        for (var member : struct.members()) {
+            bindings[member.memberIndex()] = doMatch(member);
+        }
     }
 
     static BindingMatcher requestMatcher(Schema input) {
@@ -42,12 +45,7 @@ abstract sealed class BindingMatcher {
     }
 
     final Binding match(Schema member) {
-        var index = member.memberIndex();
-        var result = bindings[index];
-        if (result == null) {
-            result = bindings[index] = doMatch(member);
-        }
-        return result;
+        return bindings[member.memberIndex()];
     }
 
     protected abstract Binding doMatch(Schema member);

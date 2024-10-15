@@ -7,6 +7,8 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentMap;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
@@ -21,8 +23,11 @@ public final class RequestDeserializer {
 
     private final HttpBindingDeserializer.Builder deserBuilder = HttpBindingDeserializer.builder();
     private ShapeBuilder<?> inputShapeBuilder;
+    private final ConcurrentMap<Schema, BindingMatcher> bindingCache;
 
-    RequestDeserializer() {}
+    RequestDeserializer(ConcurrentMap<Schema, BindingMatcher> bindingCache) {
+        this.bindingCache = bindingCache;
+    }
 
     /**
      * Codec to use in the payload of requests.
@@ -99,7 +104,8 @@ public final class RequestDeserializer {
             throw new IllegalStateException("inputShapeBuilder must be set");
         }
 
-        deserBuilder.bindingMatcher(BindingMatcher.requestMatcher(inputShapeBuilder.schema()));
+        var matcher = bindingCache.computeIfAbsent(inputShapeBuilder.schema(), BindingMatcher::requestMatcher);
+        deserBuilder.bindingMatcher(matcher);
         HttpBindingDeserializer deserializer = deserBuilder.build();
 
         inputShapeBuilder.deserialize(deserializer);

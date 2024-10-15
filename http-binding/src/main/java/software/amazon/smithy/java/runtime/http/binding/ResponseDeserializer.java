@@ -6,7 +6,9 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentMap;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
@@ -22,8 +24,11 @@ public final class ResponseDeserializer {
     private final HttpBindingDeserializer.Builder deserBuilder = HttpBindingDeserializer.builder();
     private ShapeBuilder<?> outputShapeBuilder;
     private ShapeBuilder<? extends ModeledApiException> errorShapeBuilder;
+    private final ConcurrentMap<Schema, BindingMatcher> bindingCache;
 
-    ResponseDeserializer() {}
+    ResponseDeserializer(ConcurrentMap<Schema, BindingMatcher> bindingCache) {
+        this.bindingCache = bindingCache;
+    }
 
     /**
      * Codec to use in the payload of responses.
@@ -110,13 +115,17 @@ public final class ResponseDeserializer {
      * Finish setting up and deserialize the response into the builder.
      */
     public CompletableFuture<Void> deserialize() {
+        Schema schema;
         if (outputShapeBuilder != null) {
-            deserBuilder.bindingMatcher(BindingMatcher.responseMatcher(outputShapeBuilder.schema()));
+            schema = outputShapeBuilder.schema();
         } else if (errorShapeBuilder != null) {
-            deserBuilder.bindingMatcher(BindingMatcher.responseMatcher(errorShapeBuilder.schema()));
+            schema = errorShapeBuilder.schema();
         } else {
             throw new IllegalStateException("Either errorShapeBuilder or outputShapeBuilder must be set");
         }
+
+        var matcher = bindingCache.computeIfAbsent(schema, BindingMatcher::responseMatcher);
+        deserBuilder.bindingMatcher(matcher);
 
         HttpBindingDeserializer deserializer = deserBuilder.build();
 

@@ -5,20 +5,27 @@
 
 package software.amazon.smithy.java.runtime.http.binding;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
+
 /**
  * Entry point for handling HTTP bindings.
  */
 public final class HttpBinding {
 
-    private HttpBinding() {}
+    private final ConcurrentMap<Schema, BindingMatcher> REQUEST_CACHE = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Schema, BindingMatcher> RESPONSE_CACHE = new ConcurrentHashMap<>();
+
+    public HttpBinding() {}
 
     /**
      * Create an HTTP binding request serializer.
      *
      * @return Returns the serializer.
      */
-    public static RequestSerializer requestSerializer() {
-        return new RequestSerializer();
+    public RequestSerializer requestSerializer() {
+        return new RequestSerializer(REQUEST_CACHE);
     }
 
     /**
@@ -26,8 +33,8 @@ public final class HttpBinding {
      *
      * @return Returns the serializer.
      */
-    public static ResponseSerializer responseSerializer() {
-        return new ResponseSerializer();
+    public ResponseSerializer responseSerializer() {
+        return new ResponseSerializer(RESPONSE_CACHE);
     }
 
     /**
@@ -35,8 +42,8 @@ public final class HttpBinding {
      *
      * @return Returns the request deserializer.
      */
-    public static RequestDeserializer requestDeserializer() {
-        return new RequestDeserializer();
+    public RequestDeserializer requestDeserializer() {
+        return new RequestDeserializer(REQUEST_CACHE);
     }
 
     /**
@@ -44,7 +51,7 @@ public final class HttpBinding {
      *
      * @return Returns the response deserializer.
      */
-    public static ResponseDeserializer responseDeserializer() {
-        return new ResponseDeserializer();
+    public ResponseDeserializer responseDeserializer() {
+        return new ResponseDeserializer(RESPONSE_CACHE);
     }
 }
