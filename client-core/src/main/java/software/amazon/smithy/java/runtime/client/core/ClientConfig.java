@@ -170,7 +170,38 @@ public final class ClientConfig {
         private final List<IdentityResolver<?>> identityResolvers = new ArrayList<>();
         private final Context context = Context.create();
 
-        // TODO: Add getters for each, so that a ClientPlugin can read the existing values.
+        // TODO: Docs
+        public ClientTransport<?, ?> transport() {
+            return transport;
+        }
+
+        public ClientProtocol<?, ?> protocol() {
+            return protocol;
+        }
+
+        public EndpointResolver endpointResolver() {
+            return endpointResolver;
+        }
+
+        public List<ClientInterceptor> interceptors() {
+            return interceptors;
+        }
+
+        public AuthSchemeResolver authSchemeResolver() {
+            return authSchemeResolver;
+        }
+
+        public List<AuthScheme<?, ?>> supportedAuthSchemes() {
+            return supportedAuthSchemes;
+        }
+
+        public List<IdentityResolver<?>> identityResolvers() {
+            return identityResolvers;
+        }
+
+        public Context context() {
+            return context;
+        }
 
         /**
          * Set the transport used to send requests.
@@ -184,15 +215,6 @@ public final class ClientConfig {
         }
 
         /**
-         * Check if transport has been set on the builder.
-         *
-         * @return true if transport has been set
-         */
-        public boolean hasTransport() {
-            return this.transport != null;
-        }
-
-        /**
          * Set the protocol to use when sending requests.
          *
          * @param protocol Client protocol used to send requests.
@@ -201,15 +223,6 @@ public final class ClientConfig {
         public Builder protocol(ClientProtocol<?, ?> protocol) {
             this.protocol = protocol;
             return this;
-        }
-
-        /**
-         * Check if a protocol has been set on the builder.
-         *
-         * @return true if a protocol has been set
-         */
-        public boolean hasProtocol() {
-            return this.protocol != null;
         }
 
         /**

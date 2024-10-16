@@ -35,7 +35,7 @@ public interface ClockSetting<B extends Client.Builder<?, B>> extends ClientSett
      *
      * @param clock clock to override default with.
      */
-    default void clock(Clock clock) {
-        putConfig(CLOCK, Objects.requireNonNull(clock, "clock cannot be null"));
+    default B clock(Clock clock) {
+        return putConfig(CLOCK, Objects.requireNonNull(clock, "clock cannot be null"));
     }
 }

@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.client.core;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -19,6 +20,7 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterc
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 public abstract class Client {
 
@@ -29,8 +31,8 @@ public abstract class Client {
     private final IdentityResolvers identityResolvers;
 
     protected Client(Builder<?, ?> builder) {
-        ClientConfig.Builder configBuilder = builder.configBuilder;
-        for (ClientPlugin plugin : builder.plugins) {
+        ClientConfig.Builder configBuilder = builder.configBuilder();
+        for (ClientPlugin plugin : builder.plugins()) {
             plugin.configureClient(configBuilder);
         }
         this.config = configBuilder.build();
@@ -95,15 +97,18 @@ public abstract class Client {
     }
 
     /**
-     * Static builder for Clients.
+     * Builder for Clients and request overrides.
+     *
+     * <p><strong>Note:</strong> this class is implemented by code generated builders, but should not
+     * be used outside of code generated classes.
      *
      * @param <I> Client interface created by builder
      * @param <B> Implementing builder class
      */
-    public static abstract class Builder<I, B extends Builder<I, B>> implements ClientSetting<B> {
+    @SmithyInternalApi
+    public abstract static class Builder<I, B extends Builder<I, B>> implements ClientSetting<B> {
 
         private final ClientConfig.Builder configBuilder = ClientConfig.builder();
-
         private final List<ClientPlugin> plugins = new ArrayList<>();
 
         /**
@@ -112,6 +117,10 @@ public abstract class Client {
          */
         protected ClientConfig.Builder configBuilder() {
             return configBuilder;
+        }
+
+        List<ClientPlugin> plugins() {
+            return Collections.unmodifiableList(plugins);
         }
 
         /**
@@ -209,20 +218,6 @@ public abstract class Client {
         @SuppressWarnings("unchecked")
         public B identityResolvers(List<IdentityResolver<?>> identityResolvers) {
             this.configBuilder.identityResolvers(identityResolvers);
-            return (B) this;
-        }
-
-        /**
-         * Put a strongly typed configuration on the builder, if not already present.
-         *
-         * @param key Configuration key.
-         * @param value Value to associate with the key.
-         * @return the builder.
-         * @param <T> Value type.
-         */
-        @SuppressWarnings("unchecked")
-        public <T> B putConfigIfAbsent(Context.Key<T> key, T value) {
-            this.configBuilder.putConfigIfAbsent(key, value);
             return (B) this;
         }
 

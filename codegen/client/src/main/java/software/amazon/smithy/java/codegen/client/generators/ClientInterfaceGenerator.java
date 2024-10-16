@@ -81,12 +81,23 @@ public final class ClientInterfaceGenerator
 
                         ${operations:C|}
 
+                        /**
+                         * Create a Builder for {@link ${interface:T}}.
+                         */
                         static Builder builder() {
                             return new Builder();
                         }
 
-                        final class Builder extends ${client:T}.Builder<${interface:T}, Builder>${?settings} implements ${#settings}${value:T}<Builder>${^key.last}, ${/key.last}${/settings}${/settings} {${?hasDefaults}
-                            ${defaultPlugins:C|}
+                        /**
+                         * Create a {@link ${requestOverride:T}} builder for this client.
+                         */
+                        static OverrideBuilder overrideBuilder() {
+                            return new OverrideBuilder();
+                        }
+
+                        final class Builder extends ${client:T}.Builder<${interface:T}, Builder>${?settings}
+                            implements ${#settings}${value:T}<Builder>${^key.last}, ${/key.last}${/settings}${/settings} {
+                            ${?hasDefaults}${defaultPlugins:C|}
                             ${/hasDefaults}${?hasDefaultProtocol}${defaultProtocol:C|}
                             ${/hasDefaultProtocol}${?defaultSchemes}${defaultAuth:C|}
                             ${/defaultSchemes}
@@ -99,16 +110,19 @@ public final class ClientInterfaceGenerator
                                 ${?hasDefaults}for (var plugin : defaultPlugins) {
                                     plugin.configureClient(configBuilder());
                                 }
-                                ${/hasDefaults}${?hasDefaultProtocol}if (!configBuilder().hasProtocol()) {
+                                ${/hasDefaults}${?hasDefaultProtocol}if (configBuilder().protocol() == null) {
                                     configBuilder().protocol(${protocolFactory:C}.createProtocol(settings, protocolTrait));
                                 }
-                                ${/hasDefaultProtocol}${?transport}if (!configBuilder().hasTransport()) {
+                                ${/hasDefaultProtocol}${?transport}if (configBuilder().transport() == null) {
                                     configBuilder().transport(new ${transport:T}());
                                 }
                                 ${/transport}
                                 return new ${impl:T}(this);
                             }
                         }
+
+                        final class OverrideBuilder extends ${requestOverride:T}.OverrideBuilder<OverrideBuilder>${?settings}
+                            implements ${#settings}${value:T}<OverrideBuilder>${^key.last}, ${/key.last}${/settings}${/settings} {}
                     }
                     """;
                 var defaultProtocolTrait = getDefaultProtocolTrait(directive.model(), directive.settings());
@@ -125,6 +139,7 @@ public final class ClientInterfaceGenerator
                 );
                 writer.putContext("clientPlugin", ClientPlugin.class);
                 writer.putContext("client", Client.class);
+                writer.putContext("requestOverride", RequestOverrideConfig.class);
                 writer.putContext("interface", symbol);
                 writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
                 writer.putContext("transport", getTransportClass(directive.settings()));

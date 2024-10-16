@@ -90,6 +90,49 @@ public class GenericClientTest {
         assertEquals(echoedString, output.string());
     }
 
+    @Test
+    public void customerOverrideWorksCorrectly() {
+        var interceptor = new ClientInterceptor() {
+            @Override
+            public void readBeforeExecution(InputHook<?> hook) {
+                var constant = hook.context().get(TestClientPlugin.CONSTANT_KEY);
+                assertEquals(constant, "CONSTANT");
+                var value = hook.context().get(TestSettings.VALUE_KEY);
+                assertEquals(value, BigDecimal.valueOf(4L));
+                var ab = hook.context().get(AbSetting.AB_KEY);
+                assertEquals(ab, "override1override2");
+                var singleVarargs = hook.context().get(TestSettings.STRING_LIST_KEY);
+                assertEquals(List.of("e", "f", "g", "h"), singleVarargs);
+                var foo = hook.context().get(TestSettings.FOO_KEY);
+                assertEquals(foo, "stringOverride");
+                var multiVarargs = hook.context().get(TestSettings.BAZ_KEY);
+                assertEquals(List.of("aOverride", "bOverride"), multiVarargs);
+                var nested = hook.context().get(TestSettings.NESTED_KEY);
+                assertEquals(nested, 2);
+            }
+        };
+        var client = TestServiceClient.builder()
+            .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
+            .endpointResolver(ENDPOINT_RESOLVER)
+            .addInterceptor(interceptor)
+            .value(2L)
+            .multiValue("a", "b")
+            .multiVarargs("string", "a", "b", "c")
+            .singleVarargs("a", "b", "c", "d")
+            .nested(1)
+            .build();
+        var override = TestServiceClient.overrideBuilder()
+            .value(4L)
+            .multiValue("override1", "override2")
+            .multiVarargs("stringOverride", "aOverride", "bOverride")
+            .singleVarargs("e", "f", "g", "h")
+            .nested(2)
+            .build();
+        var value = "hello world";
+        var input = EchoInput.builder().string(value).build();
+        client.echo(input, override);
+    }
+
     // TODO: Update to use context directly once we have a method that returns that
     @Test
     public void correctlyAppliesDefaultPlugins() {
