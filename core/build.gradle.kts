@@ -13,11 +13,7 @@ dependencies {
     api(libs.smithy.model)
 }
 
-jmh {
-    iterations = 10
-    fork = 1
-    // profilers = ['async:output=flamegraph', 'gc']
-}
+jmh {}
 
 // Run all tests with a different locale to ensure we are not doing anything locale specific.
 val localeTest =

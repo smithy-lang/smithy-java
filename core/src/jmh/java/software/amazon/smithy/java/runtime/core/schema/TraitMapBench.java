@@ -6,14 +6,17 @@
 package software.amazon.smithy.java.runtime.core.schema;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Deque;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
-import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
@@ -35,57 +38,45 @@ import software.amazon.smithy.model.traits.Trait;
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Warmup(
     iterations = 2,
-    time = 1
+    time = 3
 )
 @Measurement(
     iterations = 3,
-    time = 1
+    time = 3
 )
 @BenchmarkMode(Mode.AverageTime)
+@Fork(2)
 public class TraitMapBench {
-
     @Benchmark
-    public void getTrait(TraitState s, Blackhole bh) {
-        bh.consume(s.traitMap.get(SensitiveTrait.class));
+    @SuppressWarnings("rawtypes")
+    public void getTrait(Blackhole bh, TraitState s) {
+        Class[] t = s.traitClasses;
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        TraitMap[] maps = s.defaultMaps;
+        int ti = random.nextInt(maps.length);
+        int idx = random.nextInt(t.length);
+        bh.consume(maps[ti].get(t[idx]));
     }
 
     @State(Scope.Benchmark)
     public static class TraitState {
-        // <Size>-<Position of trait to find>
-        @Param(
-            {
-                "1-0",
-                "2-0",
-                "2-1",
-                "3-0",
-                "3-1",
-                "3-2",
-                "4-0",
-                "4-1",
-                "4-2",
-                "4-3",
-                "5-0",
-                "5-1",
-                "5-2",
-                "5-3",
-                "5-4",
-                "6-0",
-                "6-1",
-                "6-2",
-                "6-3",
-                "6-4",
-                "6-5"
-            }
-        )
-        private String config;
+        TraitMap[] defaultMaps;
+        Trait[] allTraits;
 
-        @Param({"default", "map"})
-        private String traitMapType;
-
-        TraitMap traitMap;
+        @SuppressWarnings("rawtypes")
+        Class[] traitClasses;
 
         @Setup
-        public void setup() throws Exception {
+        public void setup() {
+            var configs = List.of("1-0", "4-2", "5-4", "3-1", "2-0", "6-2", "6-5");
+            defaultMaps = new TraitMap[configs.size()];
+
+            for (int i = 0; i < configs.size(); i++) {
+                setupConfig(configs.get(i), i);
+            }
+        }
+
+        private void setupConfig(String config, int i) {
             String[] split = config.split("-");
             int size = Integer.parseInt(split[0]);
             int position = Integer.parseInt(split[1]);
@@ -103,20 +94,25 @@ public class TraitMapBench {
             remaining.add(new HttpChecksumRequiredTrait());
 
             if (size > 1) {
-                for (int i = 0; i < size; i++) {
-                    if (i != position) {
-                        traits[i] = remaining.pop();
+                for (int j = 0; j < size; j++) {
+                    if (j != position) {
+                        traits[j] = remaining.pop();
                     }
                 }
             }
 
-            if (traitMapType.equals("map")) {
-                var ctor = TraitMap.MapBasedTraitMap.class.getDeclaredConstructors()[0];
-                ctor.setAccessible(true);
-                this.traitMap = (TraitMap) ctor.newInstance((Object) traits);
-            } else {
-                this.traitMap = TraitMap.create(traits);
+            allTraits = Arrays.copyOf(traits, traits.length + remaining.size());
+            int rem = remaining.size();
+            for (int j = 0; j < rem; j++) {
+                allTraits[allTraits.length - j - 1] = remaining.pop();
             }
+
+            traitClasses = new Class[allTraits.length];
+            for (var j = 0; j < allTraits.length; j++) {
+                traitClasses[j] = allTraits[j].getClass();
+            }
+
+            this.defaultMaps[i] = TraitMap.create(traits);
         }
     }
 }
