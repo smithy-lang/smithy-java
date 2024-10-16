@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -35,6 +36,9 @@ public final class JavaCodegenSettings {
     private static final String TRANSPORT = "transport";
     private static final String DEFAULT_PLUGINS = "defaultPlugins";
     private static final String DEFAULT_SETTINGS = "defaultSettings";
+    private static final String RELATIVE_DATE = "relativeDate";
+    private static final String RELATIVE_VERSION = "relativeVersion";
+
     private static final List<String> PROPERTIES = List.of(
         SERVICE,
         NAME,
@@ -44,7 +48,9 @@ public final class JavaCodegenSettings {
         DEFAULT_PROTOCOL,
         TRANSPORT,
         DEFAULT_PLUGINS,
-        DEFAULT_SETTINGS
+        DEFAULT_SETTINGS,
+        RELATIVE_DATE,
+        RELATIVE_VERSION
     );
 
     private final ShapeId service;
@@ -57,51 +63,22 @@ public final class JavaCodegenSettings {
     private final ObjectNode transportSettings;
     private final List<String> defaultPlugins;
     private final List<String> defaultSettings;
+    private final String relativeDate;
+    private final String relativeVersion;
 
-    JavaCodegenSettings(
-        ShapeId service,
-        String name,
-        String packageNamespace,
-        String headerFile,
-        String sourceLocation,
-        String nonNullAnnotationFullyQualifiedName,
-        String defaultProtocol,
-        ObjectNode transportNode,
-        List<String> defaultPlugins,
-        List<String> defaultSettings
-    ) {
-        this.service = Objects.requireNonNull(service);
-        this.name = StringUtils.capitalize(Objects.requireNonNullElse(name, service.getName()));
-        this.packageNamespace = Objects.requireNonNull(packageNamespace);
-        this.header = getHeader(headerFile, Objects.requireNonNull(sourceLocation));
-
-        if (!StringUtils.isEmpty(nonNullAnnotationFullyQualifiedName)) {
-            nonNullAnnotationSymbol = buildSymbolFromFullyQualifiedName(nonNullAnnotationFullyQualifiedName);
-        } else {
-            nonNullAnnotationSymbol = null;
-        }
-        this.defaultProtocol = defaultProtocol != null ? ShapeId.from(defaultProtocol) : null;
-
-        if (transportNode != null) {
-            if (transportNode.getMembers().size() > 1) {
-                throw new CodegenException(
-                    "Only a single transport can be configured at a time. Found "
-                        + transportNode.getMembers().keySet()
-                );
-            }
-            transportName = transportNode.getMembers()
-                .keySet()
-                .stream()
-                .findFirst()
-                .map(StringNode::getValue)
-                .orElse(null);
-            transportSettings = transportNode.expectObjectMember(transportName);
-        } else {
-            transportName = null;
-            transportSettings = null;
-        }
-        this.defaultPlugins = Collections.unmodifiableList(defaultPlugins);
-        this.defaultSettings = Collections.unmodifiableList(defaultSettings);
+    private JavaCodegenSettings(Builder builder) {
+        this.service = Objects.requireNonNull(builder.service);
+        this.name = StringUtils.capitalize(Objects.requireNonNullElse(builder.name, service.getName()));
+        this.packageNamespace = Objects.requireNonNull(builder.packageNamespace);
+        this.header = getHeader(builder.headerFilePath, builder.sourceLocation);
+        this.nonNullAnnotationSymbol = buildSymbolFromFullyQualifiedName(builder.nonNullAnnotationFullyQualifiedName);
+        this.defaultProtocol = builder.defaultProtocol;
+        this.transportName = builder.transportName;
+        this.transportSettings = builder.transportSettings;
+        this.defaultPlugins = Collections.unmodifiableList(builder.defaultPlugins);
+        this.defaultSettings = Collections.unmodifiableList(builder.defaultSettings);
+        this.relativeDate = builder.relativeDate;
+        this.relativeVersion = builder.relativeVersion;
     }
 
     /**
@@ -111,23 +88,23 @@ public final class JavaCodegenSettings {
      * @return Parsed settings
      */
     public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
-        settingsNode.warnIfAdditionalProperties(PROPERTIES);
-        return new JavaCodegenSettings(
-            settingsNode.expectStringMember(SERVICE).expectShapeId(),
-            settingsNode.getStringMemberOrDefault(NAME, null),
-            settingsNode.expectStringMember(NAMESPACE).getValue(),
-            settingsNode.getStringMemberOrDefault(HEADER_FILE, null),
-            settingsNode.getSourceLocation().getFilename(),
-            settingsNode.getStringMemberOrDefault(NON_NULL_ANNOTATION, ""),
-            settingsNode.getStringMemberOrDefault(DEFAULT_PROTOCOL, null),
-            settingsNode.getObjectMember(TRANSPORT).orElse(null),
-            settingsNode.getArrayMember(DEFAULT_PLUGINS)
-                .map(n -> n.getElementsAs(el -> el.expectStringNode().getValue()))
-                .orElse(Collections.emptyList()),
-            settingsNode.getArrayMember(DEFAULT_SETTINGS)
-                .map(n -> n.getElementsAs(el -> el.expectStringNode().getValue()))
-                .orElse(Collections.emptyList())
-        );
+        var builder = new Builder();
+        settingsNode.warnIfAdditionalProperties(PROPERTIES)
+            .expectStringMember(SERVICE, builder::service)
+            .getStringMember(NAME, builder::name)
+            .expectStringMember(NAMESPACE, builder::packageNamespace)
+            .getStringMember(HEADER_FILE, builder::headerFilePath)
+            .getStringMember(NON_NULL_ANNOTATION, builder::nonNullAnnotation)
+            .getStringMember(DEFAULT_PROTOCOL, builder::defaultProtocol)
+            .getObjectMember(TRANSPORT, builder::transportNode)
+            .getArrayMember(DEFAULT_PLUGINS, n -> n.expectStringNode().getValue(), builder::defaultPlugins)
+            .getArrayMember(DEFAULT_SETTINGS, n -> n.expectStringNode().getValue(), builder::defaultSettings)
+            .getStringMember(RELATIVE_DATE, builder::relativeDate)
+            .getStringMember(RELATIVE_VERSION, builder::relativeVersion);
+
+        builder.sourceLocation(settingsNode.getSourceLocation().getFilename());
+
+        return builder.build();
     }
 
     public ShapeId service() {
@@ -170,7 +147,18 @@ public final class JavaCodegenSettings {
         return defaultSettings;
     }
 
+    public String relativeDate() {
+        return relativeDate;
+    }
+
+    public String relativeVersion() {
+        return relativeVersion;
+    }
+
     private static Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {
+        if (fullyQualifiedName == null || StringUtils.isEmpty(fullyQualifiedName)) {
+            return null;
+        }
         String[] parts = fullyQualifiedName.split("\\.");
         String name = parts[parts.length - 1];
         String namespace = fullyQualifiedName.substring(0, fullyQualifiedName.length() - name.length() - 1);
@@ -191,5 +179,115 @@ public final class JavaCodegenSettings {
         }
         LOGGER.trace("Reading header file: {}" + file.getAbsolutePath());
         return IoUtils.readUtf8File(file.getAbsolutePath());
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static final class Builder {
+        private ShapeId service;
+        private String name;
+        private String packageNamespace;
+        private String headerFilePath;
+        private String sourceLocation;
+        private String nonNullAnnotationFullyQualifiedName;
+        private ShapeId defaultProtocol;
+        private String transportName;
+        private ObjectNode transportSettings;
+        private List<String> defaultPlugins = new ArrayList<>();
+        private List<String> defaultSettings = new ArrayList<>();
+        private String relativeDate;
+        private String relativeVersion;
+
+        public Builder service(String string) {
+            this.service = ShapeId.from(string);
+            return this;
+        }
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public Builder packageNamespace(String packageNamespace) {
+            this.packageNamespace = packageNamespace;
+            return this;
+        }
+
+        public Builder defaultProtocol(String protocol) {
+            this.defaultProtocol = ShapeId.from(protocol);
+            return this;
+        }
+
+        public Builder transportNode(ObjectNode transportNode) {
+            if (transportNode.getMembers().size() > 1) {
+                throw new CodegenException(
+                    "Only a single transport can be configured at a time. Found "
+                        + transportNode.getMembers().keySet()
+                );
+            }
+            transportName = transportNode.getMembers()
+                .keySet()
+                .stream()
+                .findFirst()
+                .map(StringNode::getValue)
+                .orElse(null);
+            transportSettings = transportNode.expectObjectMember(transportName);
+            return this;
+        }
+
+        public Builder headerFilePath(String headerFilePath) {
+            this.headerFilePath = headerFilePath;
+            return this;
+        }
+
+        public Builder sourceLocation(String sourceLocation) {
+            this.sourceLocation = sourceLocation;
+            return this;
+        }
+
+        public Builder nonNullAnnotation(String fullyQualifiedName) {
+            this.nonNullAnnotationFullyQualifiedName = fullyQualifiedName;
+            return this;
+        }
+
+        public Builder defaultPlugins(List<String> strings) {
+            this.defaultPlugins.addAll(strings);
+            return this;
+        }
+
+        public Builder defaultSettings(List<String> nodes) {
+            this.defaultSettings.addAll(nodes);
+            return this;
+        }
+
+        public Builder relativeDate(String relativeDate) {
+            if (!CodegenUtils.isISO8601Date(relativeDate)) {
+                throw new IllegalArgumentException(
+                    "Provided relativeDate: `"
+                        + relativeDate
+                        + "` does not match semver format."
+                );
+            }
+            this.relativeDate = relativeDate;
+            return this;
+        }
+
+        public Builder relativeVersion(String relativeVersion) {
+            if (!CodegenUtils.isSemVer(relativeVersion)) {
+                throw new IllegalArgumentException(
+                    "Provided relativeVersion: `"
+                        + relativeVersion
+                        + "` does not match semver format."
+                );
+            }
+            this.relativeVersion = relativeVersion;
+            return this;
+        }
+
+        public JavaCodegenSettings build() {
+            return new JavaCodegenSettings(this);
+        }
     }
 }

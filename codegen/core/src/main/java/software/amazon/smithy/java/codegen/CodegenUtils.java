@@ -11,6 +11,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.ReservedWords;
@@ -61,6 +62,15 @@ public final class CodegenUtils {
         ShapeType.INT_ENUM,
         ShapeType.UNION,
         ShapeType.STRUCTURE
+    );
+    // Semver regex from spec.
+    // See: https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
+    private static final Pattern SEMVER_REGEX = Pattern.compile(
+        "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+    );
+    // YYYY-MM-DD calendar date with optional hyphens.
+    private static final Pattern ISO_8601_DATE_REGEX = Pattern.compile(
+        "^([0-9]{4})-?(1[0-2]|0[1-9])-?(3[01]|0[1-9]|[12][0-9])$"
     );
 
     private CodegenUtils() {
@@ -400,5 +410,23 @@ public final class CodegenUtils {
         } catch (ClassNotFoundException exc) {
             throw new CodegenException("Could not find class " + name + ". Check your dependencies.", exc);
         }
+    }
+
+    /**
+     * Checks if a given string is a valid Semantic Version (SemVer) string.
+     *
+     * @see <a href="https://semver.org/">SemVer</a>
+     */
+    public static boolean isSemVer(String string) {
+        return SEMVER_REGEX.matcher(string).matches();
+    }
+
+    /**
+     * Checks if a given string is a valid ISO 8601 Calendar Date.
+     *
+     * @see <a href="https://www.iso.org/iso-8601-date-and-time-format.html">ISO 8601</a>
+     */
+    public static boolean isISO8601Date(String string) {
+        return ISO_8601_DATE_REGEX.matcher(string).matches();
     }
 }
