@@ -18,7 +18,6 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.SparseTrait;
 
 /**
  * Validates shapes.
@@ -33,8 +32,6 @@ import software.amazon.smithy.model.traits.SparseTrait;
  * <p>Validator is thread safe.
  */
 public final class Validator {
-
-    private static final TraitKey<SparseTrait> SPARSE_TRAIT = TraitKey.get(SparseTrait.class);
 
     private final int maxDepth;
     private final int maxAllowedErrors;
@@ -426,7 +423,7 @@ public final class Validator {
             // Note that union and structure member validation is handled in other classes (e.g., ValidatorOfUnion).
             if (currentSchema != null) {
                 if (currentSchema.type() == ShapeType.MAP || currentSchema.type() == ShapeType.LIST) {
-                    if (!currentSchema.hasTrait(SPARSE_TRAIT)) {
+                    if (!currentSchema.hasTrait(TraitKey.SPARSE_TRAIT)) {
                         addError(new ValidationError.SparseValidationFailure(createPath(), currentSchema));
                     }
                 }

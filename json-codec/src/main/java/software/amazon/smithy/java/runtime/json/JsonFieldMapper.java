@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.TraitKey;
-import software.amazon.smithy.model.traits.JsonNameTrait;
 
 /**
  * Provides a mapping to and from members and JSON field names.
@@ -62,7 +61,6 @@ public sealed interface JsonFieldMapper {
      */
     final class UseJsonNameTrait implements JsonFieldMapper {
 
-        private static final TraitKey<JsonNameTrait> JSON_NAME = TraitKey.get(JsonNameTrait.class);
         private final Map<Schema, Map<String, Schema>> jsonNameCache = new ConcurrentHashMap<>();
 
         @Override
@@ -72,7 +70,7 @@ public sealed interface JsonFieldMapper {
             if (members == null) {
                 Map<String, Schema> fresh = new HashMap<>(container.members().size());
                 for (Schema m : container.members()) {
-                    var jsonName = m.getTrait(JSON_NAME);
+                    var jsonName = m.getTrait(TraitKey.JSON_NAME_TRAIT);
                     fresh.put(jsonName != null ? jsonName.getValue() : m.memberName(), m);
                 }
                 var previous = jsonNameCache.putIfAbsent(container, fresh);
@@ -84,7 +82,7 @@ public sealed interface JsonFieldMapper {
 
         @Override
         public String memberToField(Schema member) {
-            var jsonName = member.getTrait(JSON_NAME);
+            var jsonName = member.getTrait(TraitKey.JSON_NAME_TRAIT);
             return jsonName == null ? member.memberName() : jsonName.getValue();
         }
 

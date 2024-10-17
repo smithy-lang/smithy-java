@@ -17,11 +17,8 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.model.traits.MediaTypeTrait;
 
 abstract class BasicStringValueDeserializer implements ShapeDeserializer {
-
-    private static final TraitKey<MediaTypeTrait> MEDIA_TYPE = TraitKey.get(MediaTypeTrait.class);
 
     private final String value;
     private final String location;
@@ -123,7 +120,7 @@ abstract class BasicStringValueDeserializer implements ShapeDeserializer {
 
     @Override
     public String readString(Schema schema) {
-        if (schema.hasTrait(MEDIA_TYPE)) {
+        if (schema.hasTrait(TraitKey.MEDIA_TYPE_TRAIT)) {
             return new String(Base64.getDecoder().decode(value), StandardCharsets.UTF_8);
         }
         return value;
@@ -138,7 +135,7 @@ abstract class BasicStringValueDeserializer implements ShapeDeserializer {
 
     @Override
     public Instant readTimestamp(Schema schema) {
-        var trait = schema.getTrait(TimestampFormatter.TIMESTAMP_FORMAT_TRAIT);
+        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
         TimestampFormatter formatter = trait != null
             ? TimestampFormatter.of(trait)
             : defaultTimestampFormatter();

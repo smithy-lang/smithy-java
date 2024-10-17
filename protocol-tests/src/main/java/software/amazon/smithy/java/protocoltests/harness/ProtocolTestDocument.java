@@ -31,14 +31,12 @@ import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.NumberNode;
 import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.StreamingTrait;
 
 /**
  * This is a document format used in smithy protocol tests to model expected modeled values.
  */
 final class ProtocolTestDocument implements Document {
 
-    private static final TraitKey<StreamingTrait> STREAMING_TRAIT = TraitKey.get(StreamingTrait.class);
     private static final Schema STRING_MAP_KEY = Schema.structureBuilder(PreludeSchemas.DOCUMENT.id())
         .putMember("key", PreludeSchemas.STRING)
         .build()
@@ -336,7 +334,7 @@ final class ProtocolTestDocument implements Document {
 
         @Override
         public DataStream readDataStream(Schema schema) {
-            if (!schema.memberTarget().hasTrait(STREAMING_TRAIT)) {
+            if (!schema.memberTarget().hasTrait(TraitKey.STREAMING_TRAIT)) {
                 throw new IllegalArgumentException("Cannot read datastream from non-streaming blob");
             }
             return DataStream.ofByteBuffer(jsonDocument.asBlob(), contentType);

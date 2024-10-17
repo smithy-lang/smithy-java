@@ -21,7 +21,6 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.pattern.SmithyPattern;
-import software.amazon.smithy.model.traits.HostLabelTrait;
 
 /**
  * Serializer that resolves the Host prefix from a template pattern and an input shape.
@@ -32,8 +31,6 @@ import software.amazon.smithy.model.traits.HostLabelTrait;
  * @see <a href="https://smithy.io/2.0/spec/endpoint-traits.html#endpoint-trait">Endpoint Trait</a>
  */
 final class HostLabelSerializer extends SpecificShapeSerializer implements ShapeSerializer {
-
-    private static final TraitKey<HostLabelTrait> HOST_LABEL = TraitKey.get(HostLabelTrait.class);
 
     private final Map<String, String> labelMap = new HashMap<>();
     private final SmithyPattern hostLabelTemplate;
@@ -89,7 +86,7 @@ final class HostLabelSerializer extends SpecificShapeSerializer implements Shape
 
         @Override
         public void writeString(Schema schema, String value) {
-            if (!schema.hasTrait(HOST_LABEL)) {
+            if (!schema.hasTrait(TraitKey.HOST_LABEL_TRAIT)) {
                 return;
             }
             serializer.labelMap.put(schema.memberName(), value);

@@ -16,6 +16,7 @@ import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
@@ -65,7 +66,7 @@ final class PayloadSerializer implements ShapeSerializer {
     @Override
     public void writeTimestamp(Schema schema, Instant value) {
         TimestampFormatter formatter;
-        var trait = schema.getTrait(TimestampFormatter.TIMESTAMP_FORMAT_TRAIT);
+        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
         if (trait != null) {
             formatter = TimestampFormatter.of(trait);
         } else {

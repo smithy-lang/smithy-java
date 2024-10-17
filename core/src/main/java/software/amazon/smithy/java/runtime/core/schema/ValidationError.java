@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.runtime.core.schema;
 
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.PatternTrait;
 
 /**
  * A validation error.
@@ -51,14 +50,11 @@ public interface ValidationError {
 
     record PatternValidationFailure(String path, String message, String value, Schema schema) implements
         ValidationError {
-
-        private static final TraitKey<PatternTrait> PATTERN_TRAIT = TraitKey.get(PatternTrait.class);
-
         public PatternValidationFailure(String path, String value, Schema schema) {
             this(
                 path,
                 "Value must satisfy regular expression pattern: "
-                    + schema.expectTrait(PATTERN_TRAIT).getPattern(),
+                    + schema.expectTrait(TraitKey.PATTERN_TRAIT).getPattern(),
                 value,
                 schema
             );

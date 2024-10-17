@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 
@@ -91,7 +92,7 @@ public sealed interface TimestampResolver {
         public TimestampFormatter resolve(Schema schema) {
             var result = cache.get(schema);
             if (result == null) {
-                var trait = schema.getTrait(TimestampFormatter.TIMESTAMP_FORMAT_TRAIT);
+                var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
                 var fresh = trait != null ? TimestampFormatter.of(trait) : defaultFormat;
                 var previous = cache.putIfAbsent(schema, fresh);
                 result = previous == null ? fresh : previous;

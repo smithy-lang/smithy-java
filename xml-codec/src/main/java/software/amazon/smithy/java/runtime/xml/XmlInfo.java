@@ -17,9 +17,6 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.XmlAttributeTrait;
-import software.amazon.smithy.model.traits.XmlFlattenedTrait;
-import software.amazon.smithy.model.traits.XmlNameTrait;
 import software.amazon.smithy.model.traits.XmlNamespaceTrait;
 
 /**
@@ -30,11 +27,6 @@ final class XmlInfo {
     private final ConcurrentMap<Schema, StructInfo> structInfo = new ConcurrentHashMap<>();
     private final ConcurrentMap<Schema, ListMemberInfo> listInfo = new ConcurrentHashMap<>();
     private final ConcurrentMap<Schema, MapMemberInfo> mapInfo = new ConcurrentHashMap<>();
-
-    private static final TraitKey<XmlAttributeTrait> XML_ATTRIBUTE = TraitKey.get(XmlAttributeTrait.class);
-    private static final TraitKey<XmlFlattenedTrait> XML_FLATTENED = TraitKey.get(XmlFlattenedTrait.class);
-    private static final TraitKey<XmlNameTrait> XML_NAME = TraitKey.get(XmlNameTrait.class);
-    private static final TraitKey<XmlNamespaceTrait> XML_NAMESPACE = TraitKey.get(XmlNamespaceTrait.class);
 
     StructInfo getStructInfo(Schema schema) {
         return structInfo.computeIfAbsent(schema, StructInfo::new);
@@ -49,7 +41,7 @@ final class XmlInfo {
     }
 
     private static String getName(Schema schema) {
-        var xmlName = schema.getTrait(XML_NAME);
+        var xmlName = schema.getTrait(TraitKey.XML_NAME_TRAIT);
         if (xmlName != null) {
             return xmlName.getValue();
         } else if (schema.isMember()) {
@@ -73,7 +65,7 @@ final class XmlInfo {
             }
 
             this.schema = schema;
-            this.xmlNamespace = schema.getTrait(XML_NAMESPACE);
+            this.xmlNamespace = schema.getTrait(TraitKey.XML_NAMESPACE_TRAIT);
             this.xmlName = getName(schema);
 
             Map<String, Schema> attributes = null;
@@ -82,7 +74,7 @@ final class XmlInfo {
 
             for (var member : schema.members()) {
                 var name = getName(member);
-                if (member.hasTrait(XML_ATTRIBUTE)) {
+                if (member.hasTrait(TraitKey.XML_ATTRIBUTE_TRAIT)) {
                     if (attributes == null) {
                         attributes = new HashMap<>();
                     }
@@ -92,7 +84,7 @@ final class XmlInfo {
                         elements = new HashMap<>();
                     }
                     elements.put(name, member);
-                    if (member.hasTrait(XML_FLATTENED)) {
+                    if (member.hasTrait(TraitKey.XML_FLATTENED_TRAIT)) {
                         hasFlattened = true;
                     }
                 }
@@ -117,7 +109,7 @@ final class XmlInfo {
             String elementName,
             Schema member
         ) throws XMLStreamException {
-            if (!hasFlattened || !member.hasTrait(XML_FLATTENED)) {
+            if (!hasFlattened || !member.hasTrait(TraitKey.XML_FLATTENED_TRAIT)) {
                 consumer.accept(state, member, deserializer);
             } else {
                 // Events for flattened members need to be buffered to ensure that all flattened members are
@@ -157,12 +149,12 @@ final class XmlInfo {
             }
 
             this.xmlName = getName(schema);
-            this.flattened = schema.hasTrait(XML_FLATTENED);
+            this.flattened = schema.hasTrait(TraitKey.XML_FLATTENED_TRAIT);
             if (flattened) {
                 this.memberName = getName(schema);
             } else {
                 var member = schema.listMember();
-                var memberXmlName = member.getTrait(XML_NAME);
+                var memberXmlName = member.getTrait(TraitKey.XML_NAME_TRAIT);
                 if (memberXmlName != null) {
                     memberName = memberXmlName.getValue();
                 } else {
@@ -184,7 +176,7 @@ final class XmlInfo {
                 throw new IllegalArgumentException("Expected a map schema but found " + schema);
             }
             this.xmlName = getName(schema);
-            this.flattened = schema.hasTrait(XML_FLATTENED);
+            this.flattened = schema.hasTrait(TraitKey.XML_FLATTENED_TRAIT);
             this.entryName = flattened ? xmlName : "entry";
             this.keyName = getName(schema.mapKeyMember());
             this.valueName = getName(schema.mapValueMember());

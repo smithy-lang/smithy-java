@@ -20,11 +20,8 @@ import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
-import software.amazon.smithy.model.traits.XmlNameTrait;
 
 final class XmlDeserializer implements ShapeDeserializer {
-
-    private static final TraitKey<XmlNameTrait> XML_NAME = TraitKey.get(XmlNameTrait.class);
 
     private final XmlInfo xmlInfo;
     private final XmlReader reader;
@@ -50,7 +47,7 @@ final class XmlDeserializer implements ShapeDeserializer {
     private void enter(Schema schema) {
         try {
             var name = reader.nextMemberElement();
-            var trait = schema.getTrait(XML_NAME);
+            var trait = schema.getTrait(TraitKey.XML_NAME_TRAIT);
             var expected = trait != null ? trait.getValue() : schema.id().getName();
             if (!expected.equals(name)) {
                 // throw new SerializationException("Expected XML element named '" + expected + "', found " + name);

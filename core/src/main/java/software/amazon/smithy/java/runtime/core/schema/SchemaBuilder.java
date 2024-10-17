@@ -30,10 +30,6 @@ import software.amazon.smithy.model.traits.Trait;
  */
 public final class SchemaBuilder {
 
-    private static final TraitKey<LengthTrait> LENGTH_TRAIT = TraitKey.get(LengthTrait.class);
-    private static final TraitKey<RangeTrait> RANGE_TRAIT = TraitKey.get(RangeTrait.class);
-    private static final TraitKey<PatternTrait> PATTERN_TRAIT = TraitKey.get(PatternTrait.class);
-
     final ShapeId id;
     final ShapeType type;
     final TraitMap traits;
@@ -233,7 +229,7 @@ public final class SchemaBuilder {
             ValidatorOfString stringValidation;
 
             // Precompute an allowed range, setting Long.MIN and Long.MAX when missing.
-            LengthTrait lengthTrait = traits.get(LENGTH_TRAIT);
+            LengthTrait lengthTrait = traits.get(TraitKey.LENGTH_TRAIT);
             if (lengthTrait == null) {
                 minLengthConstraint = Long.MIN_VALUE;
                 maxLengthConstraint = Long.MAX_VALUE;
@@ -247,14 +243,14 @@ public final class SchemaBuilder {
                 stringValidation = createStringValidator(
                     stringEnum,
                     lengthTrait,
-                    traits.get(PATTERN_TRAIT)
+                    traits.get(TraitKey.PATTERN_TRAIT)
                 );
             } else {
                 stringValidation = ValidatorOfString.of(Collections.emptyList());
             }
 
             // Range traits use BigDecimal, so use null when missing rather than any kind of default.
-            RangeTrait rangeTrait = traits.get(RANGE_TRAIT);
+            RangeTrait rangeTrait = traits.get(TraitKey.RANGE_TRAIT);
             if (rangeTrait != null) {
                 minRangeConstraint = rangeTrait.getMin().orElse(null);
                 maxRangeConstraint = rangeTrait.getMax().orElse(null);

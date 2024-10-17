@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 
@@ -74,7 +75,7 @@ final class HttpLabelSerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeTimestamp(Schema schema, Instant value) {
-        var trait = schema.getTrait(TimestampFormatter.TIMESTAMP_FORMAT_TRAIT);
+        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
         TimestampFormatter formatter = trait != null
             ? TimestampFormatter.of(trait)
             : TimestampFormatter.Prelude.DATE_TIME;

@@ -23,11 +23,8 @@ import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.event.EventEncoder;
 import software.amazon.smithy.java.runtime.core.serde.event.EventStreamingException;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.traits.ErrorTrait;
 
 public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
-
-    private static final TraitKey<ErrorTrait> ERROR_TRAIT_KEY = TraitKey.get(ErrorTrait.class);
 
     private final Schema eventSchema;
     private final Codec codec;
@@ -48,7 +45,7 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
         this.possibleTypes = eventSchema.members().stream().map(Schema::memberName).collect(Collectors.toSet());
         this.possibleExceptions = eventSchema.members()
             .stream()
-            .filter(s -> s.hasTrait(ERROR_TRAIT_KEY))
+            .filter(s -> s.hasTrait(TraitKey.ERROR_TRAIT))
             .collect(Collectors.toMap(s -> s.memberTarget().id(), Function.identity()));
         this.exceptionHandler = exceptionHandler;
     }

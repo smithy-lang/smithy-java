@@ -16,14 +16,11 @@ import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.EventStreamFrameEncodingProcessor;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
-import software.amazon.smithy.model.traits.HttpTrait;
 
 /**
  * Serializes HTTP responses.
  */
 public final class ResponseSerializer {
-
-    private static final TraitKey<HttpTrait> HTTP_TRAIT = TraitKey.get(HttpTrait.class);
 
     private Codec payloadCodec;
     private String payloadMediaType;
@@ -133,7 +130,7 @@ public final class ResponseSerializer {
             throw new UnsupportedOperationException("error serialization not yet implemented");
         }
 
-        var httpTrait = operation.schema().expectTrait(HTTP_TRAIT);
+        var httpTrait = operation.schema().expectTrait(TraitKey.HTTP_TRAIT);
         var serializer = new HttpBindingSerializer(
             httpTrait,
             payloadCodec,

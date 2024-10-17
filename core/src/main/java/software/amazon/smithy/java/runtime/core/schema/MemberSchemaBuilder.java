@@ -8,17 +8,12 @@ package software.amazon.smithy.java.runtime.core.schema;
 import java.util.Collections;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.DefaultTrait;
-import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.model.traits.Trait;
 
 /**
  * A builder used to create member schemas.
  */
 final class MemberSchemaBuilder {
-
-    private static final TraitKey<RequiredTrait> REQUIRED_TRAIT = TraitKey.get(RequiredTrait.class);
-    private static final TraitKey<DefaultTrait> DEFAULT_TRAIT = TraitKey.get(DefaultTrait.class);
 
     final ShapeType type;
     final ShapeId id;
@@ -83,10 +78,10 @@ final class MemberSchemaBuilder {
     }
 
     private boolean computeIsRequired() {
-        if (!traits.contains(REQUIRED_TRAIT)) {
+        if (!traits.contains(TraitKey.REQUIRED_TRAIT)) {
             return false;
         }
-        var defaultValue = traits.get(DEFAULT_TRAIT);
+        var defaultValue = traits.get(TraitKey.DEFAULT_TRAIT);
         return defaultValue == null || defaultValue.toNode().isNullNode();
     }
 

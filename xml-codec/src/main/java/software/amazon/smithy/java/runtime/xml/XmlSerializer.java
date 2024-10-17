@@ -24,18 +24,10 @@ import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
-import software.amazon.smithy.model.traits.XmlAttributeTrait;
-import software.amazon.smithy.model.traits.XmlFlattenedTrait;
-import software.amazon.smithy.model.traits.XmlNameTrait;
-import software.amazon.smithy.model.traits.XmlNamespaceTrait;
 
 final class XmlSerializer extends InterceptingSerializer {
 
     private static final TimestampFormatTrait.Format DEFAULT_FORMAT = TimestampFormatTrait.Format.DATE_TIME;
-    private static final TraitKey<XmlAttributeTrait> XML_ATTRIBUTE_KEY = TraitKey.get(XmlAttributeTrait.class);
-    private static final TraitKey<XmlFlattenedTrait> XML_FLATTENED_KEY = TraitKey.get(XmlFlattenedTrait.class);
-    private static final TraitKey<XmlNameTrait> XML_NAME_KEY = TraitKey.get(XmlNameTrait.class);
-    private static final TraitKey<XmlNamespaceTrait> XML_NAMESPACE_KEY = TraitKey.get(XmlNamespaceTrait.class);
 
     private final XmlInfo xmlInfo;
     private final XMLStreamWriter writer;
@@ -56,7 +48,7 @@ final class XmlSerializer extends InterceptingSerializer {
         try {
             // Top-level members are things like httpPayload members. They peek-through to the target shape xmlName.
             String xmlName;
-            var trait = schema.getTrait(XML_NAME_KEY);
+            var trait = schema.getTrait(TraitKey.XML_NAME_TRAIT);
             if (trait != null) {
                 xmlName = trait.getValue();
             } else if (schema.isMember()) {
@@ -68,7 +60,7 @@ final class XmlSerializer extends InterceptingSerializer {
             writer.writeStartElement(xmlName);
 
             // Add a namespace if present, and peek-through to the target shape for a namespace when it's a member.
-            var ns = schema.getTrait(XML_NAMESPACE_KEY);
+            var ns = schema.getTrait(TraitKey.XML_NAMESPACE_TRAIT);
             if (ns != null) {
                 writer.writeNamespace(ns.getPrefix().orElse(null), ns.getUri());
             }
@@ -91,7 +83,7 @@ final class XmlSerializer extends InterceptingSerializer {
 
     private static String formatTimestamp(Schema schema, Instant value) {
         return TimestampFormatter.of(
-            schema.getTrait(TimestampFormatter.TIMESTAMP_FORMAT_TRAIT),
+            schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT),
             DEFAULT_FORMAT
         ).writeString(value);
     }
@@ -100,10 +92,10 @@ final class XmlSerializer extends InterceptingSerializer {
     private final class StructMemberSerializer extends InterceptingSerializer {
         @Override
         protected ShapeSerializer before(Schema schema) {
-            if (schema.hasTrait(XML_ATTRIBUTE_KEY)) {
+            if (schema.hasTrait(TraitKey.XML_ATTRIBUTE_TRAIT)) {
                 // Attributes have to be written before writing non-attribute members.
                 return ShapeSerializer.nullSerializer();
-            } else if (schema.hasTrait(XML_FLATTENED_KEY)) {
+            } else if (schema.hasTrait(TraitKey.XML_FLATTENED_TRAIT)) {
                 return valueSerializer;
             } else {
                 return nonFlattenedMemberSerializer;
@@ -115,7 +107,7 @@ final class XmlSerializer extends InterceptingSerializer {
     private final class StructAttributeSerializer extends InterceptingSerializer {
         @Override
         protected ShapeSerializer before(Schema schema) {
-            if (schema.hasTrait(XML_ATTRIBUTE_KEY)) {
+            if (schema.hasTrait(TraitKey.XML_ATTRIBUTE_TRAIT)) {
                 return attributeSerializer;
             } else {
                 return ShapeSerializer.nullSerializer();
@@ -150,14 +142,14 @@ final class XmlSerializer extends InterceptingSerializer {
         writer.writeStartElement(xmlName);
 
         // Add a namespace if present.
-        var ns = schema.getDirectTrait(XML_NAMESPACE_KEY);
+        var ns = schema.getDirectTrait(TraitKey.XML_NAMESPACE_TRAIT);
         if (ns != null) {
             writer.writeNamespace(ns.getPrefix().orElse(null), ns.getUri());
         }
     }
 
     private static String getMemberXmlName(Schema schema) {
-        var trait = schema.getDirectTrait(XML_NAME_KEY);
+        var trait = schema.getDirectTrait(TraitKey.XML_NAME_TRAIT);
         if (trait != null) {
             return trait.getValue();
         } else if (schema.isMember()) {

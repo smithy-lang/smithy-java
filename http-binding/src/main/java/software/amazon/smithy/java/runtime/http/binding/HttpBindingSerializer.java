@@ -28,11 +28,7 @@ import software.amazon.smithy.java.runtime.io.uri.URLEncoding;
 import software.amazon.smithy.model.pattern.SmithyPattern;
 import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.ErrorTrait;
-import software.amazon.smithy.model.traits.HttpErrorTrait;
-import software.amazon.smithy.model.traits.HttpPrefixHeadersTrait;
 import software.amazon.smithy.model.traits.HttpTrait;
-import software.amazon.smithy.model.traits.MediaTypeTrait;
 
 /**
  * Generic HTTP binding serializer that delegates to another ShapeSerializer when members are encountered that form
@@ -45,12 +41,6 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     private static final String DEFAULT_BLOB_CONTENT_TYPE = "application/octet-stream";
     private static final String DEFAULT_STRING_CONTENT_TYPE = "text/plain";
-    private static final TraitKey<HttpErrorTrait> HTTP_ERROR = TraitKey.get(HttpErrorTrait.class);
-    private static final TraitKey<ErrorTrait> ERROR_TRAIT = TraitKey.get(ErrorTrait.class);
-    private static final TraitKey<MediaTypeTrait> MEDIA_TYPE = TraitKey.get(MediaTypeTrait.class);
-    private static final TraitKey<HttpPrefixHeadersTrait> HTTP_PREFIX_HEADERS = TraitKey.get(
-        HttpPrefixHeadersTrait.class
-    );
 
     private final ShapeSerializer headerSerializer;
     private final ShapeSerializer querySerializer;
@@ -96,10 +86,10 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
-        if (schema.hasTrait(HTTP_ERROR)) {
-            responseStatus = schema.expectTrait(HTTP_ERROR).getCode();
-        } else if (schema.hasTrait(ERROR_TRAIT)) {
-            responseStatus = schema.expectTrait(ERROR_TRAIT).getDefaultHttpStatusCode();
+        if (schema.hasTrait(TraitKey.HTTP_ERROR_TRAIT)) {
+            responseStatus = schema.expectTrait(TraitKey.HTTP_ERROR_TRAIT).getCode();
+        } else if (schema.hasTrait(TraitKey.ERROR_TRAIT)) {
+            responseStatus = schema.expectTrait(TraitKey.ERROR_TRAIT).getDefaultHttpStatusCode();
         }
 
         boolean foundBody = false;
@@ -146,7 +136,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         }
 
         String contentType;
-        var mediaType = schema.getTrait(MEDIA_TYPE);
+        var mediaType = schema.getTrait(TraitKey.MEDIA_TYPE_TRAIT);
         if (mediaType != null) {
             contentType = mediaType.getValue();
         } else {
@@ -256,7 +246,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                 case LABEL -> serializer.labelSerializer;
                 case STATUS -> new ResponseStatusSerializer(i -> serializer.responseStatus = i);
                 case PREFIX_HEADERS -> new HttpPrefixHeadersSerializer(
-                    schema.expectTrait(HTTP_PREFIX_HEADERS).getValue(),
+                    schema.expectTrait(TraitKey.HTTP_PREFIX_HEADERS_TRAIT).getValue(),
                     serializer.headerConsumer
                 );
                 case QUERY_PARAMS -> new HttpQueryParamsSerializer(serializer.queryStringParams::add);

@@ -14,10 +14,6 @@ import software.amazon.smithy.model.traits.HttpPrefixHeadersTrait;
 
 final class HttpPrefixHeadersDeserializer extends SpecificShapeDeserializer {
 
-    private static final TraitKey<HttpPrefixHeadersTrait> HTTP_PREFIX_HEADERS = TraitKey.get(
-        HttpPrefixHeadersTrait.class
-    );
-
     private final HttpHeaders headers;
 
     public HttpPrefixHeadersDeserializer(HttpHeaders headers) {
@@ -31,7 +27,7 @@ final class HttpPrefixHeadersDeserializer extends SpecificShapeDeserializer {
 
     @Override
     public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer) {
-        HttpPrefixHeadersTrait trait = schema.expectTrait(HTTP_PREFIX_HEADERS);
+        HttpPrefixHeadersTrait trait = schema.expectTrait(TraitKey.HTTP_PREFIX_HEADERS_TRAIT);
         var prefix = trait.getValue();
         var headersMap = headers.map();
         for (String headerName : headersMap.keySet()) {

@@ -13,14 +13,11 @@ import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.traits.EnumTrait;
 
 /**
  * A fully resolved, non-recursive schema that may contain members.
  */
 final class RootSchema extends Schema {
-
-    private static final TraitKey<EnumTrait> ENUM_TRAIT = TraitKey.get(EnumTrait.class);
 
     private final Map<String, Schema> members;
     private final List<Schema> memberList;
@@ -34,7 +31,7 @@ final class RootSchema extends Schema {
     // String shapes might just have an enum trait, so find those and use them as enum values.
     private static Set<String> detectEnumTraitValues(ShapeType type, TraitMap traits) {
         if (type == ShapeType.STRING) {
-            var enumTrait = traits.get(ENUM_TRAIT);
+            var enumTrait = traits.get(TraitKey.ENUM_TRAIT);
             if (enumTrait != null) {
                 return new HashSet<>(enumTrait.getEnumDefinitionValues());
             }

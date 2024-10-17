@@ -23,9 +23,6 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
  * interface. This interface currently requires that the value given to a format is either a string or a number.
  */
 public interface TimestampFormatter {
-
-    TraitKey<TimestampFormatTrait> TIMESTAMP_FORMAT_TRAIT = TraitKey.get(TimestampFormatTrait.class);
-
     /**
      * Create a formatter from a timestamp format trait and the known prelude formats for date-time, epoch-seconds,
      * and http-date.
@@ -36,7 +33,7 @@ public interface TimestampFormatter {
      * @throws SerializationException for an unknown format.
      */
     static TimestampFormatter of(Schema schema, TimestampFormatTrait.Format defaultFormat) {
-        return of(schema.getTrait(TIMESTAMP_FORMAT_TRAIT), defaultFormat);
+        return of(schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT), defaultFormat);
     }
 
     /**

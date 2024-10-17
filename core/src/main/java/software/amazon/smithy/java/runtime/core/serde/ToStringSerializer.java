@@ -15,14 +15,12 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.model.traits.SensitiveTrait;
 
 /**
  * Implements the toString method for shapes, taking the sensitive trait into account.
  */
 public final class ToStringSerializer implements ShapeSerializer {
 
-    private static final TraitKey<SensitiveTrait> SENSITIVE_TRAIT_KEY = TraitKey.get(SensitiveTrait.class);
     private static final String REDACTED = "*REDACTED*";
 
     private final StringBuilder builder = new StringBuilder();
@@ -45,7 +43,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     private void append(Schema schema, Object value) {
-        if (schema.hasTrait(SENSITIVE_TRAIT_KEY)) {
+        if (schema.hasTrait(TraitKey.SENSITIVE_TRAIT)) {
             builder.append(REDACTED);
         } else {
             builder.append(value);
@@ -56,7 +54,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     public void writeStruct(Schema schema, SerializableStruct struct) {
         var name = schema.isMember() ? schema.memberTarget().id().getName() : schema.id().getName();
         builder.append(name).append('[');
-        if (schema.hasTrait(SENSITIVE_TRAIT_KEY)) {
+        if (schema.hasTrait(TraitKey.SENSITIVE_TRAIT)) {
             builder.append(REDACTED);
         } else {
             struct.serializeMembers(new StructureWriter(this));
@@ -87,7 +85,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     @Override
     public <T> void writeList(Schema schema, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
         builder.append('[');
-        if (schema.hasTrait(SENSITIVE_TRAIT_KEY)) {
+        if (schema.hasTrait(TraitKey.SENSITIVE_TRAIT)) {
             builder.append(REDACTED);
         } else {
             consumer.accept(state, new ListSerializer(this, this::writeComma));
@@ -104,7 +102,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     @Override
     public <T> void writeMap(Schema schema, T state, int size, BiConsumer<T, MapSerializer> consumer) {
         builder.append('{');
-        if (schema.hasTrait(SENSITIVE_TRAIT_KEY)) {
+        if (schema.hasTrait(TraitKey.SENSITIVE_TRAIT)) {
             builder.append(REDACTED);
         } else {
             consumer.accept(state, new ToStringMapSerializer(this));
@@ -190,7 +188,7 @@ public final class ToStringSerializer implements ShapeSerializer {
 
     @Override
     public void writeBlob(Schema schema, ByteBuffer value) {
-        if (schema.hasTrait(SENSITIVE_TRAIT_KEY)) {
+        if (schema.hasTrait(TraitKey.SENSITIVE_TRAIT)) {
             append(schema, value);
         } else {
             value.mark();
@@ -209,7 +207,7 @@ public final class ToStringSerializer implements ShapeSerializer {
     @Override
     public void writeDocument(Schema schema, Document value) {
         builder.append(value.type()).append('.').append("Document[");
-        if (schema.hasTrait(SENSITIVE_TRAIT_KEY)) {
+        if (schema.hasTrait(TraitKey.SENSITIVE_TRAIT)) {
             builder.append(REDACTED);
         } else {
             value.serializeContents(this);
