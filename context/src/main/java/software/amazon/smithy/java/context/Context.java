@@ -12,7 +12,7 @@ import java.util.function.Function;
 /**
  * A typed context map.
  */
-public sealed interface Context permits ContextImpl, UnmodifiableContext {
+public sealed interface Context permits ArrayStorageContext, MapStorageContext, UnmodifiableContext {
 
     /**
      * A {@code Key} provides an identity-based, immutable token.
@@ -24,6 +24,14 @@ public sealed interface Context permits ContextImpl, UnmodifiableContext {
      * Context.
      */
     final class Key<T> {
+
+        static final int MAX_ARRAY_KEY_SPACE = 64;
+
+        // Hold onto keys because they're needed when putting the contents of an array context into a map context.
+        // This could happen if the array context was created before the keyspace grew beyond MAX_ARRAY_KEY_SIZE,
+        // but a map context was created after.
+        @SuppressWarnings("rawtypes")
+        static final Key[] KEYS = new Key[MAX_ARRAY_KEY_SPACE];
 
         // Each created key will get an assigned ID used to index into an array of possible keys.
         static final AtomicInteger COUNTER = new AtomicInteger();
@@ -53,7 +61,11 @@ public sealed interface Context permits ContextImpl, UnmodifiableContext {
      * @param <T> Value type associated with the key.
      */
     static <T> Key<T> key(String name) {
-        return new Key<>(name);
+        Key<T> key = new Key<>(name);
+        if (key.id < Key.MAX_ARRAY_KEY_SPACE) {
+            Key.KEYS[key.id] = key;
+        }
+        return key;
     }
 
     /**
@@ -72,7 +84,11 @@ public sealed interface Context permits ContextImpl, UnmodifiableContext {
      * @param value Value to set.
      * @param <T>   Value type.
      */
-    <T> void putIfAbsent(Key<T> key, T value);
+    default <T> void putIfAbsent(Key<T> key, T value) {
+        if (get(key) == null) {
+            put(key, value);
+        }
+    }
 
     /**
      * Get a property.
@@ -109,14 +125,21 @@ public sealed interface Context permits ContextImpl, UnmodifiableContext {
      * @return the value assigned to the key.
      * @param <T> Value type.
      */
-    <T> T computeIfAbsent(Key<T> key, Function<Key<T>, ? extends T> mappingFunction);
+    default <T> T computeIfAbsent(Key<T> key, Function<Key<T>, ? extends T> mappingFunction) {
+        var result = get(key);
+        if (result == null) {
+            result = mappingFunction.apply(key);
+            put(key, result);
+        }
+        return result;
+    }
 
     /**
-     * Set all the properties from the given Context in. If it was already present, it is overridden.
+     * Copy this context into the target context, overwriting any existing keys.
      *
-     * @param context Context containing all the properties to put.
+     * @param target Context to copy to.
      */
-    void putAll(Context context);
+    void copyTo(Context target);
 
     /**
      * Creates an empty Context.
@@ -124,7 +147,11 @@ public sealed interface Context permits ContextImpl, UnmodifiableContext {
      * @return the created context.
      */
     static Context create() {
-        return new ContextImpl();
+        if (Key.COUNTER.get() >= Key.MAX_ARRAY_KEY_SPACE) {
+            return new MapStorageContext();
+        } else {
+            return new ArrayStorageContext();
+        }
     }
 
     /**
@@ -134,7 +161,7 @@ public sealed interface Context permits ContextImpl, UnmodifiableContext {
      */
     static Context modifiableCopy(Context context) {
         Context copy = Context.create();
-        copy.putAll(context);
+        context.copyTo(copy);
         return copy;
     }
 
@@ -155,11 +182,8 @@ public sealed interface Context permits ContextImpl, UnmodifiableContext {
     static Context unmodifiableView(Context context) {
         if (context instanceof UnmodifiableContext) {
             return context;
-        }
-        if (context instanceof ContextImpl impl) {
-            return new UnmodifiableContext(impl);
         } else {
-            throw new IllegalArgumentException("Unsupported context type: " + context.getClass().getName());
+            return new UnmodifiableContext(context);
         }
     }
 }

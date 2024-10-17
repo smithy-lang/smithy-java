@@ -315,7 +315,7 @@ public final class ClientConfig {
          * @return the builder.
          */
         private Builder putAllConfig(Context context) {
-            this.context.putAll(context);
+            context.copyTo(this.context);
             return this;
         }
 

@@ -9,14 +9,10 @@ import java.util.function.Function;
 
 final class UnmodifiableContext implements Context {
 
-    private final ContextImpl delegate;
+    private final Context delegate;
 
-    UnmodifiableContext(ContextImpl delegate) {
+    UnmodifiableContext(Context delegate) {
         this.delegate = delegate;
-    }
-
-    ContextImpl delegate() {
-        return delegate;
     }
 
     @Override
@@ -40,7 +36,7 @@ final class UnmodifiableContext implements Context {
     }
 
     @Override
-    public void putAll(Context context) {
-        throw new UnsupportedOperationException();
+    public void copyTo(Context target) {
+        delegate.copyTo(target);
     }
 }

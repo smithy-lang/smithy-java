@@ -7,23 +7,28 @@ package software.amazon.smithy.java.context;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.lessThan;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 public class ContextTest {
 
-    private static final Context.Key<String> FOO = Context.key("Foo");
-    private static final Context.Key<Integer> BAR = Context.key("Foo");
-    private static final Context.Key<Boolean> BAZ = Context.key("Foo");
+    static final Context.Key<String> FOO = Context.key("Foo");
+    static final Context.Key<Integer> BAR = Context.key("Foo");
+    static final Context.Key<Boolean> BAZ = Context.key("Foo");
 
     @Test
     public void getTypedValue() {
-        var context = Context.create();
+        // Force the use of an array storage here to test it out.
+        var context = new ArrayStorageContext();
         context.put(FOO, "Hi");
         context.put(BAR, 1);
 
@@ -70,7 +75,11 @@ public class ContextTest {
         assertThrows(UnsupportedOperationException.class, () -> unmodifiableView.put(FOO, "bye"));
         assertThrows(UnsupportedOperationException.class, () -> unmodifiableView.putIfAbsent(FOO, "bye"));
         assertThrows(UnsupportedOperationException.class, () -> unmodifiableView.computeIfAbsent(FOO, key -> "bye"));
-        assertThrows(UnsupportedOperationException.class, () -> unmodifiableView.putAll(Context.create()));
+        assertThrows(UnsupportedOperationException.class, () -> {
+            var ctx = Context.create();
+            ctx.put(FOO, "bye");
+            ctx.copyTo(unmodifiableView);
+        });
 
         Context unmodifiableView2 = Context.unmodifiableView(unmodifiableView);
         assertThat(unmodifiableView2, sameInstance(unmodifiableView));
@@ -96,7 +105,11 @@ public class ContextTest {
         assertThrows(UnsupportedOperationException.class, () -> unmodifiableCopy.put(FOO, "bye"));
         assertThrows(UnsupportedOperationException.class, () -> unmodifiableCopy.putIfAbsent(FOO, "bye"));
         assertThrows(UnsupportedOperationException.class, () -> unmodifiableCopy.computeIfAbsent(FOO, key -> "bye"));
-        assertThrows(UnsupportedOperationException.class, () -> unmodifiableCopy.putAll(Context.create()));
+        assertThrows(UnsupportedOperationException.class, () -> {
+            var ctx = Context.create();
+            ctx.put(FOO, "bye");
+            ctx.copyTo(unmodifiableCopy);
+        });
 
         Context unmodifiableCopy2 = Context.unmodifiableCopy(unmodifiableCopy);
         assertThat(unmodifiableCopy2, not(sameInstance(unmodifiableCopy)));
@@ -144,7 +157,7 @@ public class ContextTest {
         context.put(FOO, "bye");
         context.put(BAZ, true);
 
-        context.putAll(overrides);
+        overrides.copyTo(context);
 
         assertThat(context.get(FOO), equalTo("bye"));
         assertThat(context.get(BAR), is(1));
@@ -162,10 +175,66 @@ public class ContextTest {
         context.put(BAZ, true);
 
         var unmodifiableOverrides = Context.unmodifiableView(overrides);
-        context.putAll(unmodifiableOverrides);
+        unmodifiableOverrides.copyTo(context);
 
         assertThat(context.get(FOO), equalTo("bye"));
         assertThat(context.get(BAR), is(1));
         assertThat(context.get(BAZ), equalTo(true));
+    }
+
+    @Test
+    public void resizingCopiesOldItems() {
+        var context = Context.create();
+        context.put(FOO, "hi");
+
+        // Create a new key.
+        Context.Key<Integer> key = Context.key("foo");
+        context.put(key, 10);
+
+        assertThat(context.get(FOO), equalTo("hi"));
+        assertThat(context.get(key), equalTo(10));
+    }
+
+    @Test
+    public void putIfAbsent() {
+        var ctx = Context.create();
+
+        ctx.putIfAbsent(FOO, "hi");
+        assertThat(ctx.get(FOO), equalTo("hi"));
+
+        ctx.putIfAbsent(FOO, "hi2");
+        assertThat(ctx.get(FOO), equalTo("hi"));
+    }
+
+    @Test
+    public void migratesToMapStorage() {
+        // Doing the thing you should never do in real code.
+        var current = Context.Key.COUNTER.get();
+        assertThat(current, lessThan(Context.Key.MAX_ARRAY_KEY_SPACE));
+
+        var arrayContext = Context.create();
+        // Put a key that is in the array key space.
+        arrayContext.put(FOO, "hi");
+        assertThat(arrayContext, instanceOf(ArrayStorageContext.class));
+
+        List<Context.Key<Integer>> keys = new ArrayList<>();
+        for (var i = current; i < Context.Key.MAX_ARRAY_KEY_SPACE + 1; i++) {
+            Context.Key<Integer> key = Context.key("foo " + i);
+            arrayContext.put(key, i);
+            keys.add(key);
+        }
+
+        var mapContext = Context.create();
+        assertThat(mapContext, instanceOf(MapStorageContext.class));
+
+        arrayContext.copyTo(mapContext);
+
+        // Array keyspace keys were copied.
+        assertThat(mapContext.get(FOO), equalTo("hi"));
+
+        for (var k : keys) {
+            // Keys outside the array keyspace were copied.
+            assertThat(mapContext.get(k), not(nullValue()));
+        }
     }
 }
