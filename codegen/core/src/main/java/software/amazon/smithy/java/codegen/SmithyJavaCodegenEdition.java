@@ -16,6 +16,6 @@ package software.amazon.smithy.java.codegen;
  * @see <a href="https://smithy.io/2.0/guides/building-codegen/configuring-the-generator.html#edition">Smithy code generator editions</a>
  */
 public enum SmithyJavaCodegenEdition {
-    V_2024,
+    V2024,
     LATEST;
 }
