@@ -16,6 +16,7 @@ import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
@@ -44,6 +45,12 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     private static final String DEFAULT_BLOB_CONTENT_TYPE = "application/octet-stream";
     private static final String DEFAULT_STRING_CONTENT_TYPE = "text/plain";
+    private static final TraitKey<HttpErrorTrait> HTTP_ERROR = TraitKey.get(HttpErrorTrait.class);
+    private static final TraitKey<ErrorTrait> ERROR_TRAIT = TraitKey.get(ErrorTrait.class);
+    private static final TraitKey<MediaTypeTrait> MEDIA_TYPE = TraitKey.get(MediaTypeTrait.class);
+    private static final TraitKey<HttpPrefixHeadersTrait> HTTP_PREFIX_HEADERS = TraitKey.get(
+        HttpPrefixHeadersTrait.class
+    );
 
     private final ShapeSerializer headerSerializer;
     private final ShapeSerializer querySerializer;
@@ -89,10 +96,10 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
-        if (schema.hasTrait(HttpErrorTrait.class)) {
-            responseStatus = schema.expectTrait(HttpErrorTrait.class).getCode();
-        } else if (schema.hasTrait(ErrorTrait.class)) {
-            responseStatus = schema.expectTrait(ErrorTrait.class).getDefaultHttpStatusCode();
+        if (schema.hasTrait(HTTP_ERROR)) {
+            responseStatus = schema.expectTrait(HTTP_ERROR).getCode();
+        } else if (schema.hasTrait(ERROR_TRAIT)) {
+            responseStatus = schema.expectTrait(ERROR_TRAIT).getDefaultHttpStatusCode();
         }
 
         boolean foundBody = false;
@@ -139,7 +146,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         }
 
         String contentType;
-        var mediaType = schema.getTrait(MediaTypeTrait.class);
+        var mediaType = schema.getTrait(MEDIA_TYPE);
         if (mediaType != null) {
             contentType = mediaType.getValue();
         } else {
@@ -249,7 +256,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                 case LABEL -> serializer.labelSerializer;
                 case STATUS -> new ResponseStatusSerializer(i -> serializer.responseStatus = i);
                 case PREFIX_HEADERS -> new HttpPrefixHeadersSerializer(
-                    schema.expectTrait(HttpPrefixHeadersTrait.class).getValue(),
+                    schema.expectTrait(HTTP_PREFIX_HEADERS).getValue(),
                     serializer.headerConsumer
                 );
                 case QUERY_PARAMS -> new HttpQueryParamsSerializer(serializer.queryStringParams::add);

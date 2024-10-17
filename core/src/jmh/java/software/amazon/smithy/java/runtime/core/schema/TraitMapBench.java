@@ -55,7 +55,18 @@ public class TraitMapBench {
         TraitMap[] maps = s.defaultMaps;
         int ti = random.nextInt(maps.length);
         int idx = random.nextInt(t.length);
-        bh.consume(maps[ti].get(t[idx]));
+        bh.consume(maps[ti].get(TraitKey.get(t[idx])));
+    }
+
+    @Benchmark
+    @SuppressWarnings("rawtypes")
+    public void getTraitWithKey(Blackhole bh, TraitState s) {
+        TraitKey[] keys = s.traitKeys;
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        TraitMap[] maps = s.defaultMaps;
+        int ti = random.nextInt(maps.length);
+        int idx = random.nextInt(keys.length);
+        bh.consume(maps[ti].get(keys[idx]));
     }
 
     @State(Scope.Benchmark)
@@ -65,6 +76,9 @@ public class TraitMapBench {
 
         @SuppressWarnings("rawtypes")
         Class[] traitClasses;
+
+        @SuppressWarnings("rawtypes")
+        TraitKey[] traitKeys;
 
         @Setup
         public void setup() {
@@ -108,8 +122,10 @@ public class TraitMapBench {
             }
 
             traitClasses = new Class[allTraits.length];
+            traitKeys = new TraitKey[allTraits.length];
             for (var j = 0; j < allTraits.length; j++) {
                 traitClasses[j] = allTraits[j].getClass();
+                traitKeys[j] = TraitKey.get(traitClasses[j]);
             }
 
             this.defaultMaps[i] = TraitMap.create(traits);

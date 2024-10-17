@@ -11,14 +11,16 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
 import software.amazon.smithy.model.traits.HttpQueryTrait;
-import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class HttpQuerySerializer extends SpecificShapeSerializer {
+
+    private static final TraitKey<HttpQueryTrait> HTTP_QUERY = TraitKey.get(HttpQueryTrait.class);
 
     private final BiConsumer<String, String> queryWriter;
 
@@ -37,7 +39,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeBoolean(Schema schema, boolean value) {
-        var queryTrait = schema.getTrait(HttpQueryTrait.class);
+        var queryTrait = schema.getTrait(HTTP_QUERY);
         if (queryTrait != null) {
             writeQuery(queryTrait, Boolean.toString(value));
         }
@@ -45,7 +47,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeShort(Schema schema, short value) {
-        var queryTrait = schema.getTrait(HttpQueryTrait.class);
+        var queryTrait = schema.getTrait(HTTP_QUERY);
         if (queryTrait != null) {
             writeQuery(queryTrait, Short.toString(value));
         }
@@ -53,7 +55,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeByte(Schema schema, byte value) {
-        var queryTrait = schema.getTrait(HttpQueryTrait.class);
+        var queryTrait = schema.getTrait(HTTP_QUERY);
         if (queryTrait != null) {
             writeQuery(queryTrait, Byte.toString(value));
         }
@@ -61,7 +63,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeInteger(Schema schema, int value) {
-        var queryTrait = schema.getTrait(HttpQueryTrait.class);
+        var queryTrait = schema.getTrait(HTTP_QUERY);
         if (queryTrait != null) {
             writeQuery(queryTrait, Integer.toString(value));
         }
@@ -69,7 +71,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeLong(Schema schema, long value) {
-        var queryTrait = schema.getTrait(HttpQueryTrait.class);
+        var queryTrait = schema.getTrait(HTTP_QUERY);
         if (queryTrait != null) {
             writeQuery(queryTrait, Long.toString(value));
         }
@@ -77,7 +79,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeFloat(Schema schema, float value) {
-        var queryTrait = schema.getTrait(HttpQueryTrait.class);
+        var queryTrait = schema.getTrait(HTTP_QUERY);
         if (queryTrait != null) {
             writeQuery(queryTrait, Float.toString(value));
         }
@@ -85,7 +87,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeDouble(Schema schema, double value) {
-        var queryTrait = schema.getTrait(HttpQueryTrait.class);
+        var queryTrait = schema.getTrait(HTTP_QUERY);
         if (queryTrait != null) {
             writeQuery(queryTrait, Double.toString(value));
         }
@@ -93,7 +95,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeBigInteger(Schema schema, BigInteger value) {
-        var queryTrait = schema.getTrait(HttpQueryTrait.class);
+        var queryTrait = schema.getTrait(HTTP_QUERY);
         if (queryTrait != null) {
             writeQuery(queryTrait, value.toString());
         }
@@ -101,7 +103,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeBigDecimal(Schema schema, BigDecimal value) {
-        var queryTrait = schema.getTrait(HttpQueryTrait.class);
+        var queryTrait = schema.getTrait(HTTP_QUERY);
         if (queryTrait != null) {
             writeQuery(queryTrait, value.toString());
         }
@@ -109,7 +111,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeString(Schema schema, String value) {
-        var queryTrait = schema.getTrait(HttpQueryTrait.class);
+        var queryTrait = schema.getTrait(HTTP_QUERY);
         if (queryTrait != null) {
             writeQuery(queryTrait, value);
         }
@@ -117,7 +119,7 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeBlob(Schema schema, ByteBuffer value) {
-        var queryTrait = schema.getTrait(HttpQueryTrait.class);
+        var queryTrait = schema.getTrait(HTTP_QUERY);
         if (queryTrait != null) {
             writeQuery(queryTrait, ByteBufferUtils.base64Encode(value));
         }
@@ -125,9 +127,9 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeTimestamp(Schema schema, Instant value) {
-        var queryTrait = schema.getTrait(HttpQueryTrait.class);
+        var queryTrait = schema.getTrait(HTTP_QUERY);
         if (queryTrait != null) {
-            var trait = schema.getTrait(TimestampFormatTrait.class);
+            var trait = schema.getTrait(TimestampFormatter.TIMESTAMP_FORMAT_TRAIT);
             TimestampFormatter formatter = trait != null
                 ? TimestampFormatter.of(trait)
                 : TimestampFormatter.Prelude.DATE_TIME;

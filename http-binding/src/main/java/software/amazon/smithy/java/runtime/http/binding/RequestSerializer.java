@@ -12,6 +12,7 @@ import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.EventStreamFrameEncodingProcessor;
@@ -24,6 +25,8 @@ import software.amazon.smithy.model.traits.HttpTrait;
  * Serializes an HTTP request from an input shape that uses HTTP binding traits.
  */
 public final class RequestSerializer {
+
+    private static final TraitKey<HttpTrait> HTTP_TRAIT = TraitKey.get(HttpTrait.class);
 
     private Codec payloadCodec;
     private ApiOperation<?, ?> operation;
@@ -131,7 +134,7 @@ public final class RequestSerializer {
         Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
         var matcher = bindingCache.computeIfAbsent(operation.inputSchema(), BindingMatcher::requestMatcher);
-        var httpTrait = operation.schema().expectTrait(HttpTrait.class);
+        var httpTrait = operation.schema().expectTrait(HTTP_TRAIT);
         var serializer = new HttpBindingSerializer(
             httpTrait,
             payloadCodec,

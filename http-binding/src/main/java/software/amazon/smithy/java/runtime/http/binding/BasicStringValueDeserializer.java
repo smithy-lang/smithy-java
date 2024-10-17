@@ -12,14 +12,16 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.traits.MediaTypeTrait;
-import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 abstract class BasicStringValueDeserializer implements ShapeDeserializer {
+
+    private static final TraitKey<MediaTypeTrait> MEDIA_TYPE = TraitKey.get(MediaTypeTrait.class);
 
     private final String value;
     private final String location;
@@ -121,7 +123,7 @@ abstract class BasicStringValueDeserializer implements ShapeDeserializer {
 
     @Override
     public String readString(Schema schema) {
-        if (schema.hasTrait(MediaTypeTrait.class)) {
+        if (schema.hasTrait(MEDIA_TYPE)) {
             return new String(Base64.getDecoder().decode(value), StandardCharsets.UTF_8);
         }
         return value;
@@ -136,7 +138,7 @@ abstract class BasicStringValueDeserializer implements ShapeDeserializer {
 
     @Override
     public Instant readTimestamp(Schema schema) {
-        var trait = schema.getTrait(TimestampFormatTrait.class);
+        var trait = schema.getTrait(TimestampFormatter.TIMESTAMP_FORMAT_TRAIT);
         TimestampFormatter formatter = trait != null
             ? TimestampFormatter.of(trait)
             : defaultTimestampFormatter();

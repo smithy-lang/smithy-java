@@ -51,11 +51,14 @@ public interface ValidationError {
 
     record PatternValidationFailure(String path, String message, String value, Schema schema) implements
         ValidationError {
+
+        private static final TraitKey<PatternTrait> PATTERN_TRAIT = TraitKey.get(PatternTrait.class);
+
         public PatternValidationFailure(String path, String value, Schema schema) {
             this(
                 path,
                 "Value must satisfy regular expression pattern: "
-                    + schema.expectTrait(PatternTrait.class).getPattern(),
+                    + schema.expectTrait(PATTERN_TRAIT).getPattern(),
                 value,
                 schema
             );

@@ -12,6 +12,7 @@ import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.aws.traits.protocols.RestJson1Trait;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
@@ -37,6 +38,7 @@ import software.amazon.smithy.model.traits.HttpTrait;
 
 final class AwsRestJson1Protocol extends ServerProtocol {
 
+    private static final TraitKey<HttpTrait> HTTP_TRAIT = TraitKey.get(HttpTrait.class);
     private static final Context.Key<ValuedMatch<Operation<? extends SerializableStruct, ? extends SerializableStruct>>> MATCH_KEY = Context
         .key("Aws Rest Json1 Valued Match");
 
@@ -49,7 +51,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         var matcherBuilder = UriTreeMatcherMap.<Operation<?, ?>>builder();
         for (Service service : services) {
             for (var operation : service.getAllOperations()) {
-                String pattern = operation.getApiOperation().schema().expectTrait(HttpTrait.class).getUri().toString();
+                String pattern = operation.getApiOperation().schema().expectTrait(HTTP_TRAIT).getUri().toString();
                 matcherBuilder.add(UriPattern.forSpecificityRouting(pattern), operation);
             }
         }
@@ -104,7 +106,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         for (SmithyPattern.Segment label : job.operation()
             .getApiOperation()
             .schema()
-            .expectTrait(HttpTrait.class)
+            .expectTrait(HTTP_TRAIT)
             .getUri()
             .getLabels()) {
             var values = selectedOperation.getLabelValues(label.getContent());

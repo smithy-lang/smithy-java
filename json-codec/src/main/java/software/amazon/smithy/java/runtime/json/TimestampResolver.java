@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
-import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 /**
  * Resolves the timestamp format to use for a shape.
@@ -92,7 +91,7 @@ public sealed interface TimestampResolver {
         public TimestampFormatter resolve(Schema schema) {
             var result = cache.get(schema);
             if (result == null) {
-                var trait = schema.getTrait(TimestampFormatTrait.class);
+                var trait = schema.getTrait(TimestampFormatter.TIMESTAMP_FORMAT_TRAIT);
                 var fresh = trait != null ? TimestampFormatter.of(trait) : defaultFormat;
                 var previous = cache.putIfAbsent(schema, fresh);
                 result = previous == null ? fresh : previous;

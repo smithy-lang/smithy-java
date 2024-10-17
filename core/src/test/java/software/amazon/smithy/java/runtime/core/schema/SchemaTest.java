@@ -46,7 +46,7 @@ public class SchemaTest {
 
         assertThat(directlyRecursiveSchema.members(), hasSize(1));
         assertThat(directlyRecursiveSchema.member("foo").memberTarget(), is(directlyRecursiveSchema));
-        assertThat(directlyRecursiveSchema.member("foo").hasTrait(SensitiveTrait.class), is(true));
+        assertThat(directlyRecursiveSchema.member("foo").hasTrait(TraitKey.get(SensitiveTrait.class)), is(true));
         assertThat(directlyRecursiveSchema.member("foo").type(), is(ShapeType.STRUCTURE));
     }
 
@@ -75,7 +75,7 @@ public class SchemaTest {
             .build();
 
         assertThat(
-            structWithMember.member("member").expectTrait(DocumentationTrait.class).getValue(),
+            structWithMember.member("member").expectTrait(TraitKey.get(DocumentationTrait.class)).getValue(),
             equalTo("Member")
         );
     }

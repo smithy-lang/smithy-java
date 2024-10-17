@@ -12,6 +12,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 /**
@@ -23,6 +24,8 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
  */
 public interface TimestampFormatter {
 
+    TraitKey<TimestampFormatTrait> TIMESTAMP_FORMAT_TRAIT = TraitKey.get(TimestampFormatTrait.class);
+
     /**
      * Create a formatter from a timestamp format trait and the known prelude formats for date-time, epoch-seconds,
      * and http-date.
@@ -33,7 +36,7 @@ public interface TimestampFormatter {
      * @throws SerializationException for an unknown format.
      */
     static TimestampFormatter of(Schema schema, TimestampFormatTrait.Format defaultFormat) {
-        return of(schema.getTrait(TimestampFormatTrait.class), defaultFormat);
+        return of(schema.getTrait(TIMESTAMP_FORMAT_TRAIT), defaultFormat);
     }
 
     /**

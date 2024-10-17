@@ -19,6 +19,7 @@ import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -36,6 +37,8 @@ import software.amazon.smithy.model.traits.StreamingTrait;
  * This is a document format used in smithy protocol tests to model expected modeled values.
  */
 final class ProtocolTestDocument implements Document {
+
+    private static final TraitKey<StreamingTrait> STREAMING_TRAIT = TraitKey.get(StreamingTrait.class);
     private static final Schema STRING_MAP_KEY = Schema.structureBuilder(PreludeSchemas.DOCUMENT.id())
         .putMember("key", PreludeSchemas.STRING)
         .build()
@@ -333,7 +336,7 @@ final class ProtocolTestDocument implements Document {
 
         @Override
         public DataStream readDataStream(Schema schema) {
-            if (!schema.memberTarget().hasTrait(StreamingTrait.class)) {
+            if (!schema.memberTarget().hasTrait(STREAMING_TRAIT)) {
                 throw new IllegalArgumentException("Cannot read datastream from non-streaming blob");
             }
             return DataStream.ofByteBuffer(jsonDocument.asBlob(), contentType);

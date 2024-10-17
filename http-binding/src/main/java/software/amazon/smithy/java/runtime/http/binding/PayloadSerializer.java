@@ -23,7 +23,6 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
-import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class PayloadSerializer implements ShapeSerializer {
     private static final byte[] NULL_BYTES = "null".getBytes(StandardCharsets.UTF_8);
@@ -66,8 +65,9 @@ final class PayloadSerializer implements ShapeSerializer {
     @Override
     public void writeTimestamp(Schema schema, Instant value) {
         TimestampFormatter formatter;
-        if (schema.hasTrait(TimestampFormatTrait.class)) {
-            formatter = TimestampFormatter.of(schema.getTrait(TimestampFormatTrait.class));
+        var trait = schema.getTrait(TimestampFormatter.TIMESTAMP_FORMAT_TRAIT);
+        if (trait != null) {
+            formatter = TimestampFormatter.of(trait);
         } else {
             formatter = TimestampFormatter.Prelude.EPOCH_SECONDS;
         }

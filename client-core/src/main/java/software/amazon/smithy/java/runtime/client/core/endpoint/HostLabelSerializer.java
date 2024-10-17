@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -31,6 +32,8 @@ import software.amazon.smithy.model.traits.HostLabelTrait;
  * @see <a href="https://smithy.io/2.0/spec/endpoint-traits.html#endpoint-trait">Endpoint Trait</a>
  */
 final class HostLabelSerializer extends SpecificShapeSerializer implements ShapeSerializer {
+
+    private static final TraitKey<HostLabelTrait> HOST_LABEL = TraitKey.get(HostLabelTrait.class);
 
     private final Map<String, String> labelMap = new HashMap<>();
     private final SmithyPattern hostLabelTemplate;
@@ -86,7 +89,7 @@ final class HostLabelSerializer extends SpecificShapeSerializer implements Shape
 
         @Override
         public void writeString(Schema schema, String value) {
-            if (!schema.hasTrait(HostLabelTrait.class)) {
+            if (!schema.hasTrait(HOST_LABEL)) {
                 return;
             }
             serializer.labelMap.put(schema.memberName(), value);

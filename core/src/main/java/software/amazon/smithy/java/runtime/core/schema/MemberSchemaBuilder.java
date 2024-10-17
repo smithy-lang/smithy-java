@@ -17,6 +17,9 @@ import software.amazon.smithy.model.traits.Trait;
  */
 final class MemberSchemaBuilder {
 
+    private static final TraitKey<RequiredTrait> REQUIRED_TRAIT = TraitKey.get(RequiredTrait.class);
+    private static final TraitKey<DefaultTrait> DEFAULT_TRAIT = TraitKey.get(DefaultTrait.class);
+
     final ShapeType type;
     final ShapeId id;
     final TraitMap traits;
@@ -80,10 +83,10 @@ final class MemberSchemaBuilder {
     }
 
     private boolean computeIsRequired() {
-        if (!traits.contains(RequiredTrait.class)) {
+        if (!traits.contains(REQUIRED_TRAIT)) {
             return false;
         }
-        var defaultValue = traits.get(DefaultTrait.class);
+        var defaultValue = traits.get(DEFAULT_TRAIT);
         return defaultValue == null || defaultValue.toNode().isNullNode();
     }
 

@@ -38,7 +38,7 @@ final class DeferredMemberSchema extends Schema {
     }
 
     @Override
-    public <T extends Trait> T getDirectTrait(Class<T> trait) {
+    public <T extends Trait> T getDirectTrait(TraitKey<T> trait) {
         return directTraits.get(trait);
     }
 }

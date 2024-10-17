@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.model.traits.HttpHeaderTrait;
 import software.amazon.smithy.model.traits.HttpLabelTrait;
 import software.amazon.smithy.model.traits.HttpPayloadTrait;
@@ -26,6 +27,16 @@ abstract sealed class BindingMatcher {
         PREFIX_HEADERS,
         QUERY_PARAMS
     }
+
+    private static final TraitKey<HttpHeaderTrait> HTTP_HEADER = TraitKey.get(HttpHeaderTrait.class);
+    private static final TraitKey<HttpLabelTrait> HTTP_LABEL = TraitKey.get(HttpLabelTrait.class);
+    private static final TraitKey<HttpQueryTrait> HTTP_QUERY = TraitKey.get(HttpQueryTrait.class);
+    private static final TraitKey<HttpQueryParamsTrait> HTTP_QUERY_PARAMS = TraitKey.get(HttpQueryParamsTrait.class);
+    private static final TraitKey<HttpPrefixHeadersTrait> HTTP_PREFIX_HEADERS = TraitKey.get(
+        HttpPrefixHeadersTrait.class
+    );
+    private static final TraitKey<HttpPayloadTrait> HTTP_PAYLOAD = TraitKey.get(HttpPayloadTrait.class);
+    private static final TraitKey<HttpResponseCodeTrait> HTTP_RESPONSE_CODE = TraitKey.get(HttpResponseCodeTrait.class);
 
     private final Binding[] bindings;
 
@@ -56,27 +67,27 @@ abstract sealed class BindingMatcher {
         }
 
         protected Binding doMatch(Schema member) {
-            if (member.hasTrait(HttpLabelTrait.class)) {
+            if (member.hasTrait(HTTP_LABEL)) {
                 return Binding.LABEL;
             }
 
-            if (member.hasTrait(HttpQueryTrait.class)) {
+            if (member.hasTrait(HTTP_QUERY)) {
                 return Binding.QUERY;
             }
 
-            if (member.hasTrait(HttpQueryParamsTrait.class)) {
+            if (member.hasTrait(HTTP_QUERY_PARAMS)) {
                 return Binding.QUERY_PARAMS;
             }
 
-            if (member.hasTrait(HttpHeaderTrait.class)) {
+            if (member.hasTrait(HTTP_HEADER)) {
                 return Binding.HEADER;
             }
 
-            if (member.hasTrait(HttpPrefixHeadersTrait.class)) {
+            if (member.hasTrait(HTTP_PREFIX_HEADERS)) {
                 return Binding.PREFIX_HEADERS;
             }
 
-            if (member.hasTrait(HttpPayloadTrait.class)) {
+            if (member.hasTrait(HTTP_PAYLOAD)) {
                 return Binding.PAYLOAD;
             }
 
@@ -91,19 +102,19 @@ abstract sealed class BindingMatcher {
 
         @Override
         protected Binding doMatch(Schema member) {
-            if (member.hasTrait(HttpResponseCodeTrait.class)) {
+            if (member.hasTrait(HTTP_RESPONSE_CODE)) {
                 return Binding.STATUS;
             }
 
-            if (member.hasTrait(HttpHeaderTrait.class)) {
+            if (member.hasTrait(HTTP_HEADER)) {
                 return Binding.HEADER;
             }
 
-            if (member.hasTrait(HttpPrefixHeadersTrait.class)) {
+            if (member.hasTrait(HTTP_PREFIX_HEADERS)) {
                 return Binding.PREFIX_HEADERS;
             }
 
-            if (member.hasTrait(HttpPayloadTrait.class)) {
+            if (member.hasTrait(HTTP_PAYLOAD)) {
                 return Binding.PAYLOAD;
             }
 

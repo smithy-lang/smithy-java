@@ -34,6 +34,8 @@ import software.amazon.smithy.model.traits.SparseTrait;
  */
 public final class Validator {
 
+    private static final TraitKey<SparseTrait> SPARSE_TRAIT = TraitKey.get(SparseTrait.class);
+
     private final int maxDepth;
     private final int maxAllowedErrors;
 
@@ -424,7 +426,7 @@ public final class Validator {
             // Note that union and structure member validation is handled in other classes (e.g., ValidatorOfUnion).
             if (currentSchema != null) {
                 if (currentSchema.type() == ShapeType.MAP || currentSchema.type() == ShapeType.LIST) {
-                    if (!currentSchema.hasTrait(SparseTrait.class)) {
+                    if (!currentSchema.hasTrait(SPARSE_TRAIT)) {
                         addError(new ValidationError.SparseValidationFailure(createPath(), currentSchema));
                     }
                 }

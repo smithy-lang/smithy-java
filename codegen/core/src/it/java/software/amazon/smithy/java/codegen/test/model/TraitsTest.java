@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.traits.DefaultTrait;
 import software.amazon.smithy.model.traits.LengthTrait;
@@ -40,13 +41,13 @@ public class TraitsTest {
     @MethodSource("memberSchemaSource")
     void testStructureMemberSchemaTraitsSet(String memberName, Class<? extends Trait> traitClass, Trait expected) {
         var memberSchema = TraitsInput.SCHEMA.member(memberName);
-        var traitValue = memberSchema.expectTrait(traitClass);
+        var traitValue = memberSchema.expectTrait(TraitKey.get(traitClass));
         assertEquals(traitValue, expected);
     }
 
     @Test
     void testErrorTraitsSet() {
-        var retryableTrait = RetryableError.SCHEMA.expectTrait(RetryableTrait.class);
+        var retryableTrait = RetryableError.SCHEMA.expectTrait(TraitKey.get(RetryableTrait.class));
         assertEquals(retryableTrait, RetryableTrait.builder().build());
     }
 }

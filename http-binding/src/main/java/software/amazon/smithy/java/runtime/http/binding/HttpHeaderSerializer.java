@@ -13,14 +13,16 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.model.traits.HttpHeaderTrait;
-import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class HttpHeaderSerializer extends SpecificShapeSerializer {
+
+    private static final TraitKey<HttpHeaderTrait> HTTP_HEADER = TraitKey.get(HttpHeaderTrait.class);
 
     private final BiConsumer<String, String> headerWriter;
 
@@ -46,7 +48,7 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
 
     private void writeHeader(Schema schema, String value) {
         if (value != null) {
-            var headerTrait = schema.getTrait(HttpHeaderTrait.class);
+            var headerTrait = schema.getTrait(HTTP_HEADER);
             var field = headerTrait != null ? headerTrait.getValue() : schema.memberName();
             headerWriter.accept(field, value);
         }
@@ -109,7 +111,7 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeTimestamp(Schema schema, Instant value) {
-        var trait = schema.getTrait(TimestampFormatTrait.class);
+        var trait = schema.getTrait(TimestampFormatter.TIMESTAMP_FORMAT_TRAIT);
         TimestampFormatter formatter = trait != null
             ? TimestampFormatter.of(trait)
             : TimestampFormatter.Prelude.HTTP_DATE;

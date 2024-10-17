@@ -9,6 +9,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.model.traits.EndpointTrait;
 
 /**
@@ -18,9 +19,11 @@ import software.amazon.smithy.model.traits.EndpointTrait;
  */
 record HostLabelEndpointResolver(EndpointResolver delegate) implements EndpointResolver {
 
+    private static final TraitKey<EndpointTrait> ENDPOINT_TRAIT = TraitKey.get(EndpointTrait.class);
+
     @Override
     public CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params) {
-        var endpointTrait = params.operation().schema().getTrait(EndpointTrait.class);
+        var endpointTrait = params.operation().schema().getTrait(ENDPOINT_TRAIT);
         if (endpointTrait == null) {
             return delegate.resolveEndpoint(params);
         }

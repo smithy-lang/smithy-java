@@ -11,6 +11,7 @@ import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.EventStreamFrameEncodingProcessor;
@@ -21,6 +22,9 @@ import software.amazon.smithy.model.traits.HttpTrait;
  * Serializes HTTP responses.
  */
 public final class ResponseSerializer {
+
+    private static final TraitKey<HttpTrait> HTTP_TRAIT = TraitKey.get(HttpTrait.class);
+
     private Codec payloadCodec;
     private String payloadMediaType;
     private ApiOperation<?, ?> operation;
@@ -129,7 +133,7 @@ public final class ResponseSerializer {
             throw new UnsupportedOperationException("error serialization not yet implemented");
         }
 
-        var httpTrait = operation.schema().expectTrait(HttpTrait.class);
+        var httpTrait = operation.schema().expectTrait(HTTP_TRAIT);
         var serializer = new HttpBindingSerializer(
             httpTrait,
             payloadCodec,

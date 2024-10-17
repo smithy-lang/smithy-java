@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.Base64;
 import javax.xml.stream.XMLStreamException;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
@@ -22,6 +23,8 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.model.traits.XmlNameTrait;
 
 final class XmlDeserializer implements ShapeDeserializer {
+
+    private static final TraitKey<XmlNameTrait> XML_NAME = TraitKey.get(XmlNameTrait.class);
 
     private final XmlInfo xmlInfo;
     private final XmlReader reader;
@@ -47,7 +50,7 @@ final class XmlDeserializer implements ShapeDeserializer {
     private void enter(Schema schema) {
         try {
             var name = reader.nextMemberElement();
-            var trait = schema.getTrait(XmlNameTrait.class);
+            var trait = schema.getTrait(XML_NAME);
             var expected = trait != null ? trait.getValue() : schema.id().getName();
             if (!expected.equals(name)) {
                 // throw new SerializationException("Expected XML element named '" + expected + "', found " + name);

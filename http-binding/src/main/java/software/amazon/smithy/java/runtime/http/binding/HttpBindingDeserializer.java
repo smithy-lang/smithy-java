@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
@@ -37,6 +38,10 @@ import software.amazon.smithy.utils.SmithyBuilder;
  * UnsupportedOperationException if any other kind of shape is first read from it.
  */
 final class HttpBindingDeserializer extends SpecificShapeDeserializer implements ShapeDeserializer {
+
+    private static final TraitKey<StreamingTrait> STREAMING_TRAIT = TraitKey.get(StreamingTrait.class);
+    private static final TraitKey<HttpHeaderTrait> HTTP_HEADER = TraitKey.get(HttpHeaderTrait.class);
+    private static final TraitKey<HttpQueryTrait> HTTP_QUERY = TraitKey.get(HttpQueryTrait.class);
 
     private final Codec payloadCodec;
     private final HttpHeaders headers;
@@ -93,7 +98,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                     );
                 }
                 case QUERY -> {
-                    var paramValue = queryStringParameters.get(member.expectTrait(HttpQueryTrait.class).getValue());
+                    var paramValue = queryStringParameters.get(member.expectTrait(HTTP_QUERY).getValue());
                     if (paramValue != null) {
                         structMemberConsumer.accept(state, member, new HttpQueryStringDeserializer(paramValue));
                     }
@@ -101,7 +106,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 case QUERY_PARAMS ->
                     structMemberConsumer.accept(state, member, new HttpQueryParamsDeserializer(queryStringParameters));
                 case HEADER -> {
-                    var header = member.expectTrait(HttpHeaderTrait.class).getValue();
+                    var header = member.expectTrait(HTTP_HEADER).getValue();
                     if (member.type() == ShapeType.LIST) {
                         var allValues = headers.allValues(header);
                         if (!allValues.isEmpty()) {
@@ -134,7 +139,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                                 return EventStreamFrameDecodingProcessor.create(body, eventDecoderFactory);
                             }
                         });
-                    } else if (member.hasTrait(StreamingTrait.class)) {
+                    } else if (member.hasTrait(STREAMING_TRAIT)) {
                         // Set the payload on shape builder directly. This will fail for misconfigured shapes.
                         structMemberConsumer.accept(state, member, new SpecificShapeDeserializer() {
                             @Override
@@ -168,8 +173,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     private static boolean isEventStream(Schema member) {
-        return member.type() == ShapeType.UNION
-            && member.hasTrait(StreamingTrait.class);
+        return member.type() == ShapeType.UNION && member.hasTrait(STREAMING_TRAIT);
     }
 
     // TODO: Should there be a configurable limit on the client/server for how much can be read in memory?

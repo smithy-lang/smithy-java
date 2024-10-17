@@ -367,7 +367,7 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
      * @return Returns the trait, or null if not found.
      * @param <T> Trait type to get.
      */
-    public final <T extends Trait> T getTrait(Class<T> trait) {
+    public final <T extends Trait> T getTrait(TraitKey<T> trait) {
         return traits.get(trait);
     }
 
@@ -377,7 +377,7 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
      * @param trait Trait to check for.
      * @return true if the trait is found.
      */
-    public final boolean hasTrait(Class<? extends Trait> trait) {
+    public final boolean hasTrait(TraitKey<? extends Trait> trait) {
         return traits.contains(trait);
     }
 
@@ -389,10 +389,10 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
      * @param <T> Trait to get.
      * @throws NoSuchElementException if the value does not exist.
      */
-    public final <T extends Trait> T expectTrait(Class<T> trait) {
+    public final <T extends Trait> T expectTrait(TraitKey<T> trait) {
         var t = getTrait(trait);
         if (t == null) {
-            throw new NoSuchElementException("Expected trait not found: " + trait.getName());
+            throw new NoSuchElementException("Expected trait not found: " + trait.getClass().getName());
         }
         return t;
     }
@@ -401,15 +401,15 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
      * Gets a trait, but only if it was applied directly to the shape.
      *
      * <p>This can be used to check if a trait was applied to a member. Almost all trait access should go through
-     * {@link #getTrait(Class)}, but that method returns traits applied to a member or to the target shape of a member.
+     * {@link #getTrait}, but that method returns traits applied to a member or to the target shape of a member.
      * Sometimes you need to know if a trait was applied directly to a member. This method returns the result of
-     * {@link #getTrait(Class)} for non-member shapes.
+     * {@link #getTrait} for non-member shapes.
      *
      * @param trait Trait to get.
      * @return the trait if found, or null.
      * @param <T> Trait to get.
      */
-    public <T extends Trait> T getDirectTrait(Class<T> trait) {
+    public <T extends Trait> T getDirectTrait(TraitKey<T> trait) {
         return getTrait(trait);
     }
 

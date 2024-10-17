@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.model.traits.JsonNameTrait;
 
 /**
@@ -61,6 +62,7 @@ public sealed interface JsonFieldMapper {
      */
     final class UseJsonNameTrait implements JsonFieldMapper {
 
+        private static final TraitKey<JsonNameTrait> JSON_NAME = TraitKey.get(JsonNameTrait.class);
         private final Map<Schema, Map<String, Schema>> jsonNameCache = new ConcurrentHashMap<>();
 
         @Override
@@ -70,7 +72,7 @@ public sealed interface JsonFieldMapper {
             if (members == null) {
                 Map<String, Schema> fresh = new HashMap<>(container.members().size());
                 for (Schema m : container.members()) {
-                    var jsonName = m.getTrait(JsonNameTrait.class);
+                    var jsonName = m.getTrait(JSON_NAME);
                     fresh.put(jsonName != null ? jsonName.getValue() : m.memberName(), m);
                 }
                 var previous = jsonNameCache.putIfAbsent(container, fresh);
@@ -82,7 +84,7 @@ public sealed interface JsonFieldMapper {
 
         @Override
         public String memberToField(Schema member) {
-            var jsonName = member.getTrait(JsonNameTrait.class);
+            var jsonName = member.getTrait(JSON_NAME);
             return jsonName == null ? member.memberName() : jsonName.getValue();
         }
 

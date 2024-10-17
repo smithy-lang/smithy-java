@@ -1117,8 +1117,8 @@ public class ValidatorTest {
 
         var error = (ValidationError.RangeValidationFailure) first;
         assertThat(error.value().doubleValue(), closeTo(1.3f, 0.01f));
-        assertThat(error.schema().getTrait(RangeTrait.class).getMin().get(), is(new BigDecimal("1.1")));
-        assertThat(error.schema().getTrait(RangeTrait.class).getMax().get(), is(new BigDecimal("1.2")));
+        assertThat(error.schema().getTrait(TraitKey.get(RangeTrait.class)).getMin().get(), is(new BigDecimal("1.1")));
+        assertThat(error.schema().getTrait(TraitKey.get(RangeTrait.class)).getMax().get(), is(new BigDecimal("1.2")));
         assertThat(error.path(), is("/"));
         assertThat(error.message(), is("Value must be between 1.1 and 1.2, inclusive"));
     }
@@ -1176,8 +1176,8 @@ public class ValidatorTest {
 
         var error = (ValidationError.LengthValidationFailure) first;
         assertThat(error.length(), is(3L));
-        assertThat(error.schema().getTrait(LengthTrait.class).getMin().get(), is(1L));
-        assertThat(error.schema().getTrait(LengthTrait.class).getMax().get(), is(2L));
+        assertThat(error.schema().getTrait(TraitKey.get(LengthTrait.class)).getMin().get(), is(1L));
+        assertThat(error.schema().getTrait(TraitKey.get(LengthTrait.class)).getMax().get(), is(2L));
         assertThat(error.path(), is("/"));
         assertThat(error.message(), is("Value with length 3 must have length between 1 and 2, inclusive"));
     }
