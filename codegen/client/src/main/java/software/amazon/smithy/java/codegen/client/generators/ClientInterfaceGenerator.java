@@ -91,8 +91,8 @@ public final class ClientInterfaceGenerator
                         /**
                          * Create a {@link ${requestOverride:T}} builder for this client.
                          */
-                        static OverrideBuilder overrideBuilder() {
-                            return new OverrideBuilder();
+                        static RequestOverrideBuilder overrideBuilder() {
+                            return new RequestOverrideBuilder();
                         }
 
                         final class Builder extends ${client:T}.Builder<${interface:T}, Builder>${?settings}
@@ -121,8 +121,8 @@ public final class ClientInterfaceGenerator
                             }
                         }
 
-                        final class OverrideBuilder extends ${requestOverride:T}.OverrideBuilder<OverrideBuilder>${?settings}
-                            implements ${#settings}${value:T}<OverrideBuilder>${^key.last}, ${/key.last}${/settings}${/settings} {}
+                        final class RequestOverrideBuilder extends ${requestOverride:T}.OverrideBuilder<RequestOverrideBuilder>${?settings}
+                            implements ${#settings}${value:T}<RequestOverrideBuilder>${^key.last}, ${/key.last}${/settings}${/settings} {}
                     }
                     """;
                 var defaultProtocolTrait = getDefaultProtocolTrait(directive.model(), directive.settings());
