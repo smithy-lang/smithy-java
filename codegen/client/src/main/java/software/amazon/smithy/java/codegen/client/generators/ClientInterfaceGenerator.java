@@ -91,7 +91,7 @@ public final class ClientInterfaceGenerator
                         /**
                          * Create a {@link ${requestOverride:T}} builder for this client.
                          */
-                        static RequestOverrideBuilder overrideBuilder() {
+                        static RequestOverrideBuilder requestOverrideBuilder() {
                             return new RequestOverrideBuilder();
                         }
 

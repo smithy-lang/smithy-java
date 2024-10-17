@@ -121,7 +121,7 @@ public class GenericClientTest {
             .singleVarargs("a", "b", "c", "d")
             .nested(1)
             .build();
-        var override = TestServiceClient.overrideBuilder()
+        var override = TestServiceClient.requestOverrideBuilder()
             .value(4L)
             .multiValue("override1", "override2")
             .multiVarargs("stringOverride", "aOverride", "bOverride")
