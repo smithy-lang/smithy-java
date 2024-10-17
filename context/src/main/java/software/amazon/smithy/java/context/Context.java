@@ -6,25 +6,37 @@
 package software.amazon.smithy.java.context;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 /**
  * A typed context map.
  */
 public sealed interface Context permits ContextImpl, UnmodifiableContext {
+
     /**
      * A {@code Key} provides an identity-based, immutable token.
      *
      * <p>The token also contains a name used to describe the value.
+     *
+     * <p>Create dedicated keys that are stored in static final class properties.
+     * <em>Do not</em> create ephemeral keys on demand as this will continually increase the size of every created
+     * Context.
      */
     final class Key<T> {
+
+        // Each created key will get an assigned ID used to index into an array of possible keys.
+        static final AtomicInteger COUNTER = new AtomicInteger();
+
         private final String name;
+        final int id;
 
         /**
          * @param name Name of the value.
          */
         private Key(String name) {
             this.name = Objects.requireNonNull(name);
+            this.id = COUNTER.getAndIncrement();
         }
 
         @Override
