@@ -38,6 +38,7 @@ public final class JavaCodegenSettings {
     private static final String DEFAULT_SETTINGS = "defaultSettings";
     private static final String RELATIVE_DATE = "relativeDate";
     private static final String RELATIVE_VERSION = "relativeVersion";
+    private static final String EDITION = "edition";
 
     private static final List<String> PROPERTIES = List.of(
         SERVICE,
@@ -50,7 +51,8 @@ public final class JavaCodegenSettings {
         DEFAULT_PLUGINS,
         DEFAULT_SETTINGS,
         RELATIVE_DATE,
-        RELATIVE_VERSION
+        RELATIVE_VERSION,
+        EDITION
     );
 
     private final ShapeId service;
