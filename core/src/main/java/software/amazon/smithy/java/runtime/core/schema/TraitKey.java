@@ -107,20 +107,6 @@ public final class TraitKey<T extends Trait> {
         return (TraitKey<T>) KEY_POOL.get(traitClass);
     }
 
-    /**
-     * Give an array of traits, ensures each has an assigned key and finds the largest trait index from each trait.
-     *
-     * @param traits Traits to check.
-     * @return the largest required index.
-     */
-    public static int getLargestTraitId(Trait[] traits) {
-        int largestId = 0;
-        for (Trait trait : traits) {
-            largestId = Math.max(largestId, get(trait.getClass()).id());
-        }
-        return largestId;
-    }
-
     private TraitKey(Class<T> traitClass, int id) {
         this.traitClass = traitClass;
         this.id = id;

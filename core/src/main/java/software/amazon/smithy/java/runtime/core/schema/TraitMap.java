@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.core.schema;
 
-import java.util.Arrays;
 import software.amazon.smithy.model.traits.Trait;
 
 /**
@@ -13,36 +12,56 @@ import software.amazon.smithy.model.traits.Trait;
  */
 final class TraitMap {
 
-    private static final Trait[] NO_TRAITS = new Trait[0];
-    private final Trait[] values;
+    private static final TraitMap EMPTY = new TraitMap(new Trait[0], Integer.MAX_VALUE, Integer.MIN_VALUE);
 
-    private TraitMap(Trait[] traits, boolean initialized) {
-        if (initialized) {
-            // The `traits` array is an already allocated index-based trait array.
-            this.values = traits;
-        } else if (traits == null || traits.length == 0) {
-            this.values = NO_TRAITS;
-        } else {
-            // The `traits` array is just an array of Traits. We need to ensure an ID is assigned to each trait.
-            // Since we're already doing a pass over the traits, we can also allocate exact-sized storage.
-            this.values = new Trait[TraitKey.getLargestTraitId(traits) + 1];
-            for (Trait trait : traits) {
-                values[TraitKey.get(trait.getClass()).id()] = trait;
-            }
+    private final Trait[] values;
+    private final int minIndex;
+    private final int maxIndex;
+
+    private TraitMap(Trait[] values, int minIndex, int maxIndex) {
+        this.values = values;
+        this.minIndex = minIndex;
+        this.maxIndex = maxIndex;
+    }
+
+    private TraitMap(Trait[] traits) {
+        assert traits.length > 0;
+
+        // The `traits` array is just an array of Traits. We need to ensure an ID is assigned to each trait.
+        // Since we're already doing a pass over the traits, we can also allocate exact-sized storage.
+        int smallestId = Integer.MAX_VALUE;
+        int largestId = Integer.MIN_VALUE;
+        for (Trait trait : traits) {
+            var id = TraitKey.get(trait.getClass()).id();
+            smallestId = Math.min(smallestId, id);
+            largestId = Math.max(largestId, id);
+        }
+
+        this.minIndex = smallestId;
+        this.maxIndex = largestId;
+        this.values = new Trait[(largestId - smallestId) + 1];
+
+        for (Trait trait : traits) {
+            var key = TraitKey.get(trait.getClass());
+            values[key.id() - minIndex] = trait;
         }
     }
 
     static TraitMap create(Trait[] traits) {
-        return new TraitMap(traits, false);
+        if (traits == null || traits.length == 0) {
+            return EMPTY;
+        } else {
+            return new TraitMap(traits);
+        }
     }
 
     @SuppressWarnings("unchecked")
     <T extends Trait> T get(TraitKey<T> key) {
         int idx = key.id();
-        if (idx >= values.length) {
+        if (idx < minIndex || idx > maxIndex) {
             return null;
         }
-        return (T) values[idx];
+        return (T) values[idx - minIndex];
     }
 
     boolean isEmpty() {
@@ -50,21 +69,35 @@ final class TraitMap {
     }
 
     boolean contains(TraitKey<? extends Trait> trait) {
-        int idx = trait.id();
-        return idx < values.length && values[idx] != null;
+        return get(trait) != null;
     }
 
     TraitMap prepend(Trait[] traits) {
-        // Allocate only enough storage required to hold the current traits and given traits.
-        int largestId = Math.max(values.length - 1, TraitKey.getLargestTraitId(traits));
-
-        var values = Arrays.copyOf(this.values, largestId + 1);
-
-        // Overwrite the current values with passed in traits.
-        for (Trait trait : traits) {
-            values[TraitKey.get(trait.getClass()).id()] = trait;
+        if (traits == null || traits.length == 0) {
+            return this;
+        } else if (this.values.length == 0) {
+            return new TraitMap(traits);
         }
 
-        return new TraitMap(values, true);
+        int smallestId = this.minIndex;
+        int largestId = this.maxIndex;
+        for (Trait trait : traits) {
+            var id = TraitKey.get(trait.getClass()).id();
+            smallestId = Math.min(smallestId, id);
+            largestId = Math.max(largestId, id);
+        }
+
+        // Allocate new storage based on the expanded bounds.
+        var newValues = new Trait[(largestId - smallestId) + 1];
+
+        // Copy existing values from the current map, adjusting for the new bounds.
+        System.arraycopy(this.values, 0, newValues, Math.max(0, this.minIndex - smallestId), this.values.length);
+
+        // Overwrite the current values with the new traits.
+        for (Trait trait : traits) {
+            newValues[TraitKey.get(trait.getClass()).id() - smallestId] = trait;
+        }
+
+        return new TraitMap(newValues, smallestId, largestId);
     }
 }
