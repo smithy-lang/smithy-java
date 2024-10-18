@@ -26,10 +26,20 @@ final class XmlDeserializer implements ShapeDeserializer {
     private final XmlInfo xmlInfo;
     private final XmlReader reader;
     private final InnerDeserializer innerDeserializer;
+    private final boolean isTopLevel;
 
-    XmlDeserializer(XmlInfo xmlInfo, XmlReader reader) throws XMLStreamException {
+    static XmlDeserializer topLevel(XmlInfo xmlInfo, XmlReader reader) throws XMLStreamException {
+        return new XmlDeserializer(xmlInfo, reader, true);
+    }
+
+    static XmlDeserializer flattened(XmlInfo xmlInfo, XmlReader reader) throws XMLStreamException {
+        return new XmlDeserializer(xmlInfo, reader, false);
+    }
+
+    private XmlDeserializer(XmlInfo xmlInfo, XmlReader reader, boolean isTopLevel) throws XMLStreamException {
         this.xmlInfo = xmlInfo;
         this.reader = reader;
+        this.isTopLevel = isTopLevel;
         this.innerDeserializer = new InnerDeserializer();
     }
 
@@ -46,12 +56,26 @@ final class XmlDeserializer implements ShapeDeserializer {
     // The inner deserializer deserializes members and doesn't have this expectation.
     private void enter(Schema schema) {
         try {
+            // Always go to the next member element, even if deserializing a nested element.
             var name = reader.nextMemberElement();
+
+            if (!isTopLevel) {
+                // List and map members are validated in those deserializers, not here.
+                return;
+            }
+
+            String expected;
             var trait = schema.getTrait(TraitKey.XML_NAME_TRAIT);
-            var expected = trait != null ? trait.getValue() : schema.id().getName();
+            if (trait != null) {
+                expected = trait.getValue();
+            } else if (schema.isMember()) {
+                expected = schema.memberTarget().id().getName();
+            } else {
+                expected = schema.id().getName();
+            }
+
             if (!expected.equals(name)) {
-                // throw new SerializationException("Expected XML element named '" + expected + "', found " + name);
-                // TODO: Fix generation of these IDs to honor $operationInputSuffix and $operationOutputSuffix.
+                throw new SerializationException("Expected XML element named '" + expected + "', found " + name);
             }
         } catch (XMLStreamException e) {
             throw new SerializationException(e);

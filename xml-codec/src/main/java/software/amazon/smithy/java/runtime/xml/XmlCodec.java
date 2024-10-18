@@ -57,7 +57,7 @@ public final class XmlCodec implements Codec {
     public ShapeDeserializer createDeserializer(ByteBuffer source) {
         try {
             var reader = xmlInputFactory.createXMLStreamReader(ByteBufferUtils.byteBufferInputStream(source));
-            return new XmlDeserializer(xmlInfo, new XmlReader.StreamReader(reader, xmlInputFactory));
+            return XmlDeserializer.topLevel(xmlInfo, new XmlReader.StreamReader(reader, xmlInputFactory));
         } catch (XMLStreamException e) {
             throw new RuntimeException(e);
         }

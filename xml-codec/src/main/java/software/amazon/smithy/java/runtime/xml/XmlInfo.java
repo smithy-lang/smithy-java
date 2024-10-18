@@ -133,7 +133,12 @@ final class XmlInfo {
             for (var entry : flatState.entrySet()) {
                 var schema = entry.getKey();
                 var events = entry.getValue();
-                consumer.accept(state, schema, new XmlDeserializer(decoders, new XmlReader.BufferedReader(events)));
+                consumer.accept(
+                    state,
+                    schema,
+                    // Use a special flattened deserializer that delegates validation of the encountered element.
+                    XmlDeserializer.flattened(decoders, new XmlReader.BufferedReader(events))
+                );
             }
         }
     }

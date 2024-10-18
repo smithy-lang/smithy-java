@@ -28,6 +28,19 @@ public interface ShapeBuilder<T extends SerializableShape> {
     ShapeBuilder<T> deserialize(ShapeDeserializer decoder);
 
     /**
+     * Deserializes data from the given decoder into the state of the builder.
+     *
+     * <p>This method allows for passing in a member schema that may contain additional traits not on the actual
+     * target shape.
+     *
+     * @param decoder Decoder used to deserialize the shape.
+     * @param schema Schema to use when deserializing.
+     */
+    default ShapeBuilder<T> deserialize(ShapeDeserializer decoder, Schema schema) {
+        return deserialize(decoder);
+    }
+
+    /**
      * Performs any necessary error correction before the shape can be built.
      *
      * <p>For example, a shape might be missing a required number member, and error correction would set the
