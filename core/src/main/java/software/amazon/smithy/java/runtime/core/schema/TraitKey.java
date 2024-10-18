@@ -93,7 +93,7 @@ public final class TraitKey<T extends Trait> {
     public static final TraitKey<XmlNamespaceTrait> XML_NAMESPACE_TRAIT = TraitKey.get(XmlNamespaceTrait.class);
 
     private final Class<T> traitClass;
-    private final int id;
+    final int id;
 
     /**
      * Gets the key for a trait for use with methods like {@link Schema#getTrait}.
@@ -119,9 +119,5 @@ public final class TraitKey<T extends Trait> {
      */
     public Class<T> traitClass() {
         return traitClass;
-    }
-
-    int id() {
-        return id;
     }
 }

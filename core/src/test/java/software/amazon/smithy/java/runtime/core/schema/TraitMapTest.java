@@ -17,20 +17,20 @@ import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.traits.DefaultTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.model.traits.SensitiveTrait;
-import software.amazon.smithy.model.traits.Trait;
+import software.amazon.smithy.model.traits.XmlNameTrait;
 
 public class TraitMapTest {
     @Test
     public void emptyTraitMap() {
-        var tm = TraitMap.create(null);
+        var tm = TraitMap.create();
 
         assertThat(tm.get(TraitKey.REQUIRED_TRAIT), is(nullValue()));
     }
 
     @Test
     public void emptyTraitMapPrepend() {
-        var tm = TraitMap.create(null);
-        var tm2 = tm.prepend(new Trait[]{new SensitiveTrait()});
+        var tm = TraitMap.create();
+        var tm2 = tm.prepend(new SensitiveTrait());
 
         assertThat(tm.get(TraitKey.SENSITIVE_TRAIT), is(nullValue()));
         assertThat(tm2.get(TraitKey.SENSITIVE_TRAIT), instanceOf(SensitiveTrait.class));
@@ -38,8 +38,8 @@ public class TraitMapTest {
 
     @Test
     public void emptyGivenTraitMapPrepend() {
-        var tm = TraitMap.create(new Trait[]{new SensitiveTrait()});
-        var tm2 = tm.prepend(new Trait[0]);
+        var tm = TraitMap.create(new SensitiveTrait());
+        var tm2 = tm.prepend();
 
         assertThat(tm.get(TraitKey.SENSITIVE_TRAIT), not(nullValue()));
         assertThat(tm, sameInstance(tm2));
@@ -47,8 +47,8 @@ public class TraitMapTest {
 
     @Test
     public void prependWithSmallerMin() {
-        var tm = TraitMap.create(new Trait[]{new DefaultTrait(Node.from(1))});
-        var tm2 = tm.prepend(new Trait[]{new RequiredTrait()});
+        var tm = TraitMap.create(new DefaultTrait(Node.from(1)));
+        var tm2 = tm.prepend(new RequiredTrait());
 
         assertThat(tm2.get(TraitKey.REQUIRED_TRAIT), instanceOf(RequiredTrait.class));
         assertThat(tm2.get(TraitKey.DEFAULT_TRAIT), instanceOf(DefaultTrait.class));
@@ -56,10 +56,19 @@ public class TraitMapTest {
 
     @Test
     public void prependWithLargerMax() {
-        var tm = TraitMap.create(new Trait[]{new RequiredTrait()});
-        var tm2 = tm.prepend(new Trait[]{new DefaultTrait(Node.from(1))});
+        var tm = TraitMap.create(new RequiredTrait());
+        var tm2 = tm.prepend(new DefaultTrait(Node.from(1)));
 
         assertThat(tm2.get(TraitKey.REQUIRED_TRAIT), instanceOf(RequiredTrait.class));
+        assertThat(tm2.get(TraitKey.DEFAULT_TRAIT), instanceOf(DefaultTrait.class));
+    }
+
+    @Test
+    public void prependWithMuchSmallerIndex() {
+        var tm = TraitMap.create(new XmlNameTrait("hi"));
+        var tm2 = tm.prepend(new DefaultTrait(Node.from(1)));
+
+        assertThat(tm2.get(TraitKey.XML_NAME_TRAIT), instanceOf(XmlNameTrait.class));
         assertThat(tm2.get(TraitKey.DEFAULT_TRAIT), instanceOf(DefaultTrait.class));
     }
 }
