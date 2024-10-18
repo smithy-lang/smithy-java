@@ -127,29 +127,26 @@ final class ClientPipeline<RequestT, ResponseT> {
 
         var resolvedAuthScheme = resolveAuthScheme(call, request);
 
-        resolvedAuthScheme.identity().whenComplete((identity, e) -> {
-            // TODO: Handle if e is not null
+        var preparedRequest = request;
+        return resolvedAuthScheme.identity().thenCompose(identity -> {
             context.put(CallContext.IDENTITY, identity);
+            // TODO: what to do with supportedAuthSchemes of an endpoint?
+            return resolveEndpoint(call)
+                .thenApply(endpoint -> protocol.setServiceEndpoint(preparedRequest, endpoint))
+                .thenCompose(resolvedAuthScheme::sign)
+                .thenApply(req -> {
+                    var reqHook = finalRequestHook.withRequest(req);
+                    interceptor.readAfterSigning(reqHook);
+                    req = interceptor.modifyBeforeTransmit(reqHook);
+                    interceptor.readBeforeTransmit(reqHook.withRequest(req));
+                    return req;
+                })
+                .thenCompose(finalRequest -> {
+                    return transport.send(context, finalRequest).thenCompose(response -> {
+                        return deserialize(call, finalRequest, response, call.interceptor());
+                    });
+                });
         });
-
-        // TODO: what to do with supportedAuthSchemes of an endpoint?
-        RequestT reqBeforeEndpointResolution = request;
-        return resolveEndpoint(call)
-            .thenApply(endpoint -> protocol.setServiceEndpoint(reqBeforeEndpointResolution, endpoint))
-            .thenCompose(resolvedAuthScheme::sign)
-            .thenApply(req -> {
-                var reqHook = finalRequestHook.withRequest(req);
-                interceptor.readAfterSigning(reqHook);
-                req = interceptor.modifyBeforeTransmit(reqHook);
-                interceptor.readBeforeTransmit(reqHook.withRequest(req));
-                return req;
-            })
-            .thenCompose(
-                finalRequest -> transport.send(context, finalRequest)
-                    .thenCompose(
-                        response -> deserialize(call, finalRequest, response, call.interceptor())
-                    )
-            );
     }
 
     @SuppressWarnings("unchecked")
