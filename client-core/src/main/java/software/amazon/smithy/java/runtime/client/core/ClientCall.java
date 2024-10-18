@@ -52,7 +52,6 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
         interceptor = Objects.requireNonNull(builder.interceptor, "interceptor is null");
         authSchemeResolver = Objects.requireNonNull(builder.authSchemeResolver, "authSchemeResolver is null");
         identityResolvers = Objects.requireNonNull(builder.identityResolvers, "identityResolvers is null");
-        // TODO: figure out why there is duplication here from protocol tests
         supportedAuthSchemes = builder.supportedAuthSchemes.stream()
             .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity(), (key1, key2) -> key1));
         //TODO fix this to not use a cached thread pool.
