@@ -218,9 +218,6 @@ public final class Person implements SerializableStruct {
                         });
                         builder.queryParams(result);
                     }
-                    default -> {
-                        // TODO: Log periodically
-                    }
                 }
             });
             return this;

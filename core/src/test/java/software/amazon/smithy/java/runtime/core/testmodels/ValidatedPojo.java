@@ -127,9 +127,6 @@ public final class ValidatedPojo implements SerializableStruct {
                     case 0 -> builder.string(de.readString(member));
                     case 1 -> builder.boxedInteger(de.readInteger(member));
                     case 2 -> builder.integer(de.readInteger(member));
-                    default -> {
-                        // TODO: Log periodically
-                    }
                 }
             });
             return this;
