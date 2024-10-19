@@ -360,7 +360,7 @@ public class JsonDeserializerTest {
         TimestampFormatter defaultFormat,
         String json
     ) {
-        Trait[] traits = trait == null ? null : new Trait[]{trait};
+        Trait[] traits = trait == null ? new Trait[0] : new Trait[]{trait};
         var schema = Schema.createTimestamp(ShapeId.from("smithy.foo#Time"), traits);
 
         var codecBuilder = JsonCodec.builder().useTimestampFormat(useTrait);

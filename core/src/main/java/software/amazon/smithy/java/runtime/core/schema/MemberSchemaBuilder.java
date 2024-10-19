@@ -49,13 +49,7 @@ final class MemberSchemaBuilder {
 
         // Try to optimally combine traits.
         var targetTraits = target != null ? target.traits : targetBuilder.traits;
-        if (directTraits.isEmpty()) {
-            this.traits = targetTraits;
-        } else if (targetTraits.isEmpty()) {
-            this.traits = directTraits;
-        } else {
-            this.traits = targetTraits.prepend(traits);
-        }
+        this.traits = targetTraits.withMemberTraits(directTraits);
 
         this.isRequiredByValidation = computeIsRequired();
         this.validationState = SchemaBuilder.ValidationState.of(

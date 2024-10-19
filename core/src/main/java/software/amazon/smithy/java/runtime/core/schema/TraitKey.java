@@ -93,7 +93,7 @@ public final class TraitKey<T extends Trait> {
     public static final TraitKey<XmlNamespaceTrait> XML_NAMESPACE_TRAIT = TraitKey.get(XmlNamespaceTrait.class);
 
     private final Class<T> traitClass;
-    private final int id;
+    final int id;
 
     /**
      * Gets the key for a trait for use with methods like {@link Schema#getTrait}.
@@ -105,20 +105,6 @@ public final class TraitKey<T extends Trait> {
     @SuppressWarnings("unchecked")
     public static <T extends Trait> TraitKey<T> get(Class<T> traitClass) {
         return (TraitKey<T>) KEY_POOL.get(traitClass);
-    }
-
-    /**
-     * Give an array of traits, ensures each has an assigned key and finds the largest trait index from each trait.
-     *
-     * @param traits Traits to check.
-     * @return the largest required index.
-     */
-    public static int getLargestTraitId(Trait[] traits) {
-        int largestId = 0;
-        for (Trait trait : traits) {
-            largestId = Math.max(largestId, get(trait.getClass()).id());
-        }
-        return largestId;
     }
 
     private TraitKey(Class<T> traitClass, int id) {
@@ -133,9 +119,5 @@ public final class TraitKey<T extends Trait> {
      */
     public Class<T> traitClass() {
         return traitClass;
-    }
-
-    int id() {
-        return id;
     }
 }
