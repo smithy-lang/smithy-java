@@ -10,7 +10,9 @@ import static software.amazon.smithy.java.runtime.io.ByteBufferUtils.base64Encod
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.TraitKey;
@@ -98,7 +100,11 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeString(Schema schema, String value) {
-        writeHeader(schema, value);
+        if (schema.hasTrait(TraitKey.MEDIA_TYPE_TRAIT)) {
+            writeHeader(schema, Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8)));
+        } else {
+            writeHeader(schema, value);
+        }
     }
 
     @Override

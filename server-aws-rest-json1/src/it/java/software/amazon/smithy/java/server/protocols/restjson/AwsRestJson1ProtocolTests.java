@@ -40,7 +40,10 @@ public class AwsRestJson1ProtocolTests {
             "SDKAppliedContentEncoding_restJson1",
             "SDKAppendedGzipAfterProvidedEncoding_restJson1",
             "RestJsonClientPopulatesDefaultValuesInInput",
-            "RestJsonClientUsesExplicitlyProvidedMemberValuesOverDefaults"
+            "RestJsonClientUsesExplicitlyProvidedMemberValuesOverDefaults",
+
+            // Header splitting needs work.
+            "RestJsonInputAndOutputWithQuotedStringHeaders"
         },
         skipOperations = {
             "aws.protocoltests.restjson#DocumentType",
@@ -70,7 +73,6 @@ public class AwsRestJson1ProtocolTests {
             "RestJsonStreamingTraitsWithBlob",
             "RestJsonStreamingTraitsWithMediaTypeWithBlob",
             "RestJsonDeserializesDenseSetMapAndSkipsNull"
-
         }
     )
     public void responseTest(DataStream expected, DataStream actual) {

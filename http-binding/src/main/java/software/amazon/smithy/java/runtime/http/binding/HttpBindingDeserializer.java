@@ -103,9 +103,9 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 case HEADER -> {
                     var header = member.expectTrait(TraitKey.HTTP_HEADER_TRAIT).getValue();
                     if (member.type() == ShapeType.LIST) {
-                        var allValues = headers.allValues(header);
-                        if (!allValues.isEmpty()) {
-                            structMemberConsumer.accept(state, member, new HttpHeaderListDeserializer(allValues));
+                        var values = headers.allValues(header);
+                        if (!values.isEmpty()) {
+                            structMemberConsumer.accept(state, member, new HttpHeaderListDeserializer(member, values));
                         }
                     } else {
                         headers.firstValue(header)

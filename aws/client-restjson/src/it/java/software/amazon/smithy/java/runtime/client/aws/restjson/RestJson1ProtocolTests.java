@@ -39,10 +39,9 @@ public class RestJson1ProtocolTests {
         skipTests = {
             // TODO: support checksums in requests
             "RestJsonHttpChecksumRequired",
-            // Invalid ints, bools, etc in headers
+            // TODO: These tests require a payload even when the httpPayload member is null. Should it?
             "RestJsonHttpWithHeadersButNoPayload",
-            "RestJsonHttpWithEmptyStructurePayload",
-            "MediaTypeHeaderInputBase64",
+            "RestJsonHttpWithEmptyStructurePayload"
         }
     )
     public void requestTest(DataStream expected, DataStream actual) {
@@ -69,15 +68,6 @@ public class RestJson1ProtocolTests {
     }
 
     @HttpClientResponseTests
-    @ProtocolTestFilter(
-        skipTests = {
-            // Invalid ints, bools, etc in headers
-            "RestJsonInputAndOutputWithNumericHeaders",
-            "RestJsonInputAndOutputWithBooleanHeaders",
-            "RestJsonInputAndOutputWithTimestampHeaders",
-            "RestJsonInputAndOutputWithIntEnumHeaders",
-        }
-    )
     public void responseTest(Runnable test) {
         test.run();
     }

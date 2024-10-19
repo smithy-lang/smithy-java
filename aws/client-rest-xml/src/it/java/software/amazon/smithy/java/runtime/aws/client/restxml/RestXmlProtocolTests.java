@@ -64,14 +64,6 @@ public class RestXmlProtocolTests {
     }
 
     @HttpClientResponseTests
-    @ProtocolTestFilter(
-        skipTests = {
-            // TODO: Need to split based on comma
-            "InputAndOutputWithNumericHeaders",
-            "InputAndOutputWithBooleanHeaders",
-            "InputAndOutputWithTimestampHeaders"
-        }
-    )
     public void responseTest(Runnable test) {
         test.run();
     }
