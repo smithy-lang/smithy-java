@@ -24,12 +24,13 @@ record StructureDeserializerGenerator(
         var template = """
             @Override
             public Builder deserialize(${shapeDeserializer:N} decoder) {
-                return deserialize(decoder, SCHEMA);
+                decoder.readStruct(SCHEMA, this, InnerDeserializer.INSTANCE);
+                return this;
             }
 
             @Override
-            public Builder deserialize(${shapeDeserializer:N} decoder, ${sdkSchema:N} schema) {
-                decoder.readStruct(schema, this, InnerDeserializer.INSTANCE);
+            public Builder deserializeMember(${shapeDeserializer:N} decoder, ${sdkSchema:N} schema) {
+                decoder.readStruct(schema.assertMemberTargetIs(SCHEMA), this, InnerDeserializer.INSTANCE);
                 return this;
             }
 

@@ -59,6 +59,12 @@ public final class Unit implements SerializableStruct {
         }
 
         @Override
+        public ShapeBuilder<Unit> deserializeMember(ShapeDeserializer decoder, Schema member) {
+            decoder.readStruct(member.assertMemberTargetIs(SCHEMA), this, (b, m, d) -> {});
+            return this;
+        }
+
+        @Override
         public Unit build() {
             return INSTANCE;
         }

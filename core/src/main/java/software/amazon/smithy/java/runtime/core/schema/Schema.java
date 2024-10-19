@@ -361,6 +361,22 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
     }
 
     /**
+     * Ensures that this Schema is a member that targets the given schema.
+     *
+     * <p>This is mostly used during shape deserialization in {@link ShapeBuilder#deserializeMember}.
+     *
+     * @param target Schema that this Schema must target.
+     * @return the current Schema.
+     */
+    public Schema assertMemberTargetIs(Schema target) {
+        var memberTarget = memberTarget();
+        if (target == memberTarget) {
+            return this;
+        }
+        throw new IllegalStateException("Expected a member schema that targets " + target.id + ", found " + this);
+    }
+
+    /**
      * Get a trait if present.
      *
      * @param trait Trait to get.

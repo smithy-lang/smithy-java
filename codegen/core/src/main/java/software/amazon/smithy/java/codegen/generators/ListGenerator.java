@@ -37,7 +37,10 @@ public final class ListGenerator
                 writer -> writer.onSection("sharedSerde", t -> {
                     var name = CodegenUtils.getDefaultName(directive.shape(), directive.service());
                     var target = directive.model().expectShape(directive.shape().getMember().getTarget());
-                    var valueSchema = CodegenUtils.getSchemaType(writer, directive.symbolProvider(), target);
+                    var valueSchema = writer.format(
+                        "SharedSchemas.$L.listMember()",
+                        CodegenUtils.toSchemaName(directive.shape())
+                    );
                     writer.pushState();
                     var template = """
                         static final class ${name:U}Serializer implements ${biConsumer:T}<${shape:B}, ${shapeSerializer:T}> {

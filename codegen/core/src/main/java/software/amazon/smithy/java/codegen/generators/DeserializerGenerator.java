@@ -211,7 +211,7 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
 
     private void delegateDeser() {
         writer.write(
-            "$T.builder().deserialize(${deserializer:L}, ${schemaName:L}).build()",
+            "$T.builder().deserializeMember(${deserializer:L}, ${schemaName:L}).build()",
             symbolProvider.toSymbol(shape)
         );
     }
