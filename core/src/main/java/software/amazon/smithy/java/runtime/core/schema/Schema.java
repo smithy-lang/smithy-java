@@ -22,8 +22,8 @@ import software.amazon.smithy.model.traits.Trait;
  *
  * <p>Note: when creating a structure schema, all required members must come before optional members.
  */
-public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRootSchema,
-    DeferredMemberSchema {
+public abstract sealed class Schema implements MemberLookup
+    permits RootSchema, MemberSchema, DeferredRootSchema, DeferredMemberSchema {
 
     private final ShapeType type;
     private final ShapeId id;
@@ -422,12 +422,7 @@ public abstract sealed class Schema permits RootSchema, MemberSchema, DeferredRo
         return Collections.emptyList();
     }
 
-    /**
-     * Get a member by name or return a default value.
-     *
-     * @param memberName Member by name to get.
-     * @return Returns the found member or null if not found.
-     */
+    @Override
     public Schema member(String memberName) {
         return null;
     }

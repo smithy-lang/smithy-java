@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.json;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import software.amazon.smithy.java.runtime.core.schema.MemberLookup;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 
@@ -16,13 +17,12 @@ import software.amazon.smithy.java.runtime.core.schema.TraitKey;
  */
 public sealed interface JsonFieldMapper {
     /**
-     * Determines the schema of a member inside a container based on a JSON field name.
+     * Returns a member container used to resolve serialized field names into members within a schema.
      *
      * @param container Container that contains members.
-     * @param field     JSON object field name.
-     * @return the resolved member schema or null if not found.
+     * @return the member container that can be used to get members by name.
      */
-    Schema fieldToMember(Schema container, String field);
+    MemberLookup fieldToMember(Schema container);
 
     /**
      * Converts a member schema a JSON object field name.
@@ -41,8 +41,8 @@ public sealed interface JsonFieldMapper {
         private UseMemberName() {}
 
         @Override
-        public Schema fieldToMember(Schema container, String field) {
-            return container.member(field);
+        public MemberLookup fieldToMember(Schema container) {
+            return container;
         }
 
         @Override
@@ -61,23 +61,18 @@ public sealed interface JsonFieldMapper {
      */
     final class UseJsonNameTrait implements JsonFieldMapper {
 
-        private final Map<Schema, Map<String, Schema>> jsonNameCache = new ConcurrentHashMap<>();
+        private final Map<Schema, MemberLookup> jsonNameCache = new ConcurrentHashMap<>();
 
         @Override
-        public Schema fieldToMember(Schema container, String field) {
-            var members = jsonNameCache.get(container);
-
-            if (members == null) {
-                Map<String, Schema> fresh = new HashMap<>(container.members().size());
-                for (Schema m : container.members()) {
+        public MemberLookup fieldToMember(Schema container) {
+            return jsonNameCache.computeIfAbsent(container, c -> {
+                Map<String, Schema> map = new HashMap<>(c.members().size());
+                for (Schema m : c.members()) {
                     var jsonName = m.getTrait(TraitKey.JSON_NAME_TRAIT);
-                    fresh.put(jsonName != null ? jsonName.getValue() : m.memberName(), m);
+                    map.put(jsonName != null ? jsonName.getValue() : m.memberName(), m);
                 }
-                var previous = jsonNameCache.putIfAbsent(container, fresh);
-                members = previous == null ? fresh : previous;
-            }
-
-            return members.get(field);
+                return map::get;
+            });
         }
 
         @Override
