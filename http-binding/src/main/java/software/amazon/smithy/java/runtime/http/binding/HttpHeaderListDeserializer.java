@@ -22,7 +22,7 @@ final class HttpHeaderListDeserializer extends SpecificShapeDeserializer {
         var listMember = schema.memberTarget().listMember();
         switch (listMember.type()) {
             case STRING, ENUM, INT_ENUM, BOOLEAN,
-                 BYTE, SHORT, INTEGER, LONG, FLOAT, DOUBLE, BIG_INTEGER, BIG_DECIMAL -> {
+                BYTE, SHORT, INTEGER, LONG, FLOAT, DOUBLE, BIG_INTEGER, BIG_DECIMAL -> {
                 splitString(values, actualValues);
             }
             case TIMESTAMP -> {
@@ -43,17 +43,28 @@ final class HttpHeaderListDeserializer extends SpecificShapeDeserializer {
     }
 
     private static void splitString(List<String> values, List<String> accumulator) {
+        outer:
         for (var v : values) {
-            if (v.indexOf(',') == -1) {
-                // Fast path for single value headers.
-                accumulator.add(v);
-            } else if (v.indexOf('"') == -1) {
-                // Fast path for CSV headers: most headers won't have quotes.
+            boolean hasComma = false;
+            // Do a single pass over the string to check if quotes need to be processed or commas.
+            for (var i = 0; i < v.length(); i++) {
+                var c = v.charAt(i);
+                if (c == ',') {
+                    // We need to keep scanning when a comma is found in case a quote is found later.
+                    hasComma = true;
+                } else if (c == '"') {
+                    // No need to keep scanning when a quote is found: process it and go to the next value.
+                    parseHeader(v, accumulator);
+                    continue outer;
+                }
+            }
+            // No quotes at this point, but only split and trim based on comma if a comma was found.
+            if (hasComma) {
                 for (var split : v.split(",")) {
                     accumulator.add(split.trim());
                 }
             } else {
-                parseHeader(v, accumulator);
+                accumulator.add(v);
             }
         }
     }
