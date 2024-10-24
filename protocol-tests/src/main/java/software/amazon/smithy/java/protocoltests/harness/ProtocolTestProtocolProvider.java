@@ -65,12 +65,12 @@ public class ProtocolTestProtocolProvider implements ServerProtocolProvider {
             ServiceProtocolResolutionRequest request,
             List<Service> candidates
         ) {
-            String protocolIdHeader = request.headers().getFirstHeader("x-protocol-test-protocol-id");
+            String protocolIdHeader = request.headers().firstValue("x-protocol-test-protocol-id");
             if (protocolIdHeader != null) {
                 ServerProtocol protocol = delegateProtocols.get(ShapeId.from(protocolIdHeader));
                 request.requestContext().put(PROTOCOL_TO_TEST, protocol);
-                ShapeId serviceId = ShapeId.from(request.headers().getFirstHeader("x-protocol-test-service"));
-                ShapeId operationId = ShapeId.from(request.headers().getFirstHeader("x-protocol-test-operation"));
+                ShapeId serviceId = ShapeId.from(request.headers().firstValue("x-protocol-test-service"));
+                ShapeId operationId = ShapeId.from(request.headers().firstValue("x-protocol-test-operation"));
                 for (var service : candidates) {
                     if (service.schema().id().equals(serviceId)) {
                         for (var operation : service.getAllOperations()) {

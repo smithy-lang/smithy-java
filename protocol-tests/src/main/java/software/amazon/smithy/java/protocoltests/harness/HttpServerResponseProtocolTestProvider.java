@@ -7,15 +7,22 @@ package software.amazon.smithy.java.protocoltests.harness;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.net.http.HttpHeaders;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.extension.*;
+import org.junit.jupiter.api.extension.ConditionEvaluationResult;
+import org.junit.jupiter.api.extension.ExecutionCondition;
+import org.junit.jupiter.api.extension.Extension;
+import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.ParameterContext;
+import org.junit.jupiter.api.extension.ParameterResolutionException;
+import org.junit.jupiter.api.extension.ParameterResolver;
+import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
@@ -55,14 +62,14 @@ public class HttpServerResponseProtocolTestProvider extends
                 headers.put("x-protocol-test-protocol-id", List.of(testCase.getProtocol().toString()));
                 headers.put("x-protocol-test-service", List.of(testOperation.serviceId().toString()));
                 headers.put("x-protocol-test-operation", List.of(testOperation.id().toString()));
-                headers.put("Content-Length", List.of("0"));
-                headers.put("Content-Type", List.of("application/json"));
+                headers.put("content-length", List.of("0"));
+                headers.put("content-type", List.of("application/json"));
 
                 var request = SmithyHttpRequest.builder()
                     .httpVersion(SmithyHttpVersion.HTTP_1_1)
                     .body(DataStream.ofBytes(new byte[0]))
                     .uri(testData.endpoint())
-                    .headers(HttpHeaders.of(headers, (k, v) -> true))
+                    .headers(HttpHeaders.of(headers))
                     .method("POST")
                     .build();
                 invocationContexts.add(

@@ -6,14 +6,10 @@
 package software.amazon.smithy.java.runtime.http.api;
 
 import java.net.URI;
-import java.net.http.HttpHeaders;
-import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 final class SmithyHttpRequestImpl implements SmithyHttpRequest {
-
-    static final HttpHeaders EMPTY_HEADERS = HttpHeaders.of(Map.of(), (k, v) -> true);
 
     private final SmithyHttpVersion httpVersion;
     private final String method;
@@ -66,7 +62,11 @@ final class SmithyHttpRequestImpl implements SmithyHttpRequest {
 
     @Override
     public SmithyHttpRequest withHeaders(HttpHeaders headers) {
-        return SmithyHttpRequest.builder().with(this).headers(headers).build();
+        if (headers == this.headers) {
+            return this;
+        } else {
+            return SmithyHttpRequest.builder().with(this).headers(headers).build();
+        }
     }
 
     @Override
@@ -95,12 +95,12 @@ final class SmithyHttpRequestImpl implements SmithyHttpRequest {
             .append(httpVersion)
             .append(System.lineSeparator());
         // Append host header if not present.
-        if (headers.firstValue("host").isEmpty()) {
+        if (headers.firstValue("host") == null) {
             String host = uri.getHost();
             if (uri.getPort() != -1) {
                 host += ":" + uri.getPort();
             }
-            result.append("Host: ").append(host).append(System.lineSeparator());
+            result.append("host: ").append(host).append(System.lineSeparator());
         }
         // Add other headers.
         headers.map().forEach((field, values) -> values.forEach(value -> {

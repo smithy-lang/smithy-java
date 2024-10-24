@@ -10,7 +10,6 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 
-import java.net.http.HttpHeaders;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -27,6 +26,7 @@ import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
@@ -52,10 +52,7 @@ public class HttpErrorDeserializerTest {
         if (payload != null) {
             responseBuilder.body(DataStream.ofString(payload));
             responseBuilder.headers(
-                HttpHeaders.of(
-                    Map.of("Content-Length", List.of(Integer.toString(payload.length()))),
-                    (k, v) -> true
-                )
+                HttpHeaders.of(Map.of("content-length", List.of(Integer.toString(payload.length()))))
             );
         }
         var response = responseBuilder.build();
@@ -96,12 +93,11 @@ public class HttpErrorDeserializerTest {
             .headers(
                 HttpHeaders.of(
                     Map.of(
-                        "Content-Length",
+                        "content-length",
                         List.of("2"),
                         "x-amzn-errortype",
                         List.of(Baz.SCHEMA.id().toString())
-                    ),
-                    (k, v) -> true
+                    )
                 )
             )
             .body(DataStream.ofString("{}"));
@@ -170,12 +166,11 @@ public class HttpErrorDeserializerTest {
             .headers(
                 HttpHeaders.of(
                     Map.of(
-                        "Content-Length",
+                        "content-length",
                         List.of("2"),
                         "x-amzn-errortype",
                         List.of("com.foo#SomeUnknownError")
-                    ),
-                    (k, v) -> true
+                    )
                 )
             )
             .body(DataStream.ofString("{}"));

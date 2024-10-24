@@ -34,9 +34,8 @@ public class HttpApiKeyAuthSignerTest {
             .build();
 
         var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties).get();
-        var authHeader = signedRequest.headers().map().get("x-api-key");
-        assertNotNull(authHeader);
-        assertEquals(authHeader.get(0), API_KEY);
+        var authHeader = signedRequest.headers().firstValue("x-api-key");
+        assertEquals(authHeader, API_KEY);
     }
 
     @Test
@@ -48,9 +47,8 @@ public class HttpApiKeyAuthSignerTest {
             .build();
 
         var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(TEST_REQUEST, TEST_IDENTITY, authProperties).get();
-        var authHeader = signedRequest.headers().map().get("x-api-key");
-        assertNotNull(authHeader);
-        assertEquals(authHeader.get(0), "SCHEME " + API_KEY);
+        var authHeader = signedRequest.headers().firstValue("x-api-key");
+        assertEquals(authHeader, "SCHEME " + API_KEY);
     }
 
     @Test
@@ -62,9 +60,8 @@ public class HttpApiKeyAuthSignerTest {
             .build();
         var updateRequest = TEST_REQUEST.withAddedHeaders("x-api-key", "foo");
         var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updateRequest, TEST_IDENTITY, authProperties).get();
-        var authHeader = signedRequest.headers().map().get("x-api-key");
-        assertNotNull(authHeader);
-        assertEquals(authHeader.get(0), "SCHEME " + API_KEY);
+        var authHeader = signedRequest.headers().firstValue("x-api-key");
+        assertEquals(authHeader, "SCHEME " + API_KEY);
     }
 
     @Test

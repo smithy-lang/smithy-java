@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.http.binding;
 
-import java.net.http.HttpHeaders;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.List;
@@ -22,6 +21,7 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.EventStreamFrameDecodingProcessor;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.io.uri.QueryStringParser;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -108,14 +108,10 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                             structMemberConsumer.accept(state, member, new HttpHeaderListDeserializer(member, values));
                         }
                     } else {
-                        headers.firstValue(header)
-                            .ifPresent(
-                                headerValue -> structMemberConsumer.accept(
-                                    state,
-                                    member,
-                                    new HttpHeaderDeserializer(headerValue)
-                                )
-                            );
+                        var headerValue = headers.firstValue(header);
+                        if (headerValue != null) {
+                            structMemberConsumer.accept(state, member, new HttpHeaderDeserializer(headerValue));
+                        }
                     }
                 }
                 case PREFIX_HEADERS ->
@@ -198,9 +194,9 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     }
 
     private void validateMediaType() {
-        if (payloadMediaType != null && headers.firstValue("content-type").isPresent()) {
+        var contentType = headers.contentType();
+        if (payloadMediaType != null && contentType != null) {
             // Validate the media-type matches the codec.
-            String contentType = headers.firstValue("content-type").get();
             if (!contentType.equals(payloadMediaType)) {
                 throw new SerializationException(
                     "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec

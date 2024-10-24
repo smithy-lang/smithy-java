@@ -6,12 +6,12 @@
 package software.amazon.smithy.java.runtime.http.binding;
 
 import java.io.ByteArrayOutputStream;
-import java.net.http.HttpHeaders;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.util.TreeMap;
 import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
@@ -22,6 +22,7 @@ import software.amazon.smithy.java.runtime.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.io.uri.QueryStringBuilder;
 import software.amazon.smithy.java.runtime.io.uri.URLEncoding;
@@ -50,7 +51,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private final boolean omitEmptyPayload;
 
     private final Map<String, String> labels = new LinkedHashMap<>();
-    private final Map<String, List<String>> headers = new LinkedHashMap<>();
+    private final Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     private final QueryStringBuilder queryStringParams = new QueryStringBuilder();
 
     private ShapeSerializer shapeBodySerializer;
@@ -112,7 +113,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             // Serialize only the body members to the codec.
             SerializableStruct.filteredMembers(schema, struct, this::bodyBindingPredicate)
                 .serialize(shapeBodySerializer);
-            headers.put("Content-Type", List.of(payloadMediaType));
+            headers.put("content-type", List.of(payloadMediaType));
         }
 
         struct.serializeMembers(new BindingSerializer(this));
@@ -131,7 +132,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     void setHttpPayload(Schema schema, DataStream value) {
         httpPayload = value;
-        if (headers.containsKey("Content-Type")) {
+        if (headers.containsKey("content-type")) {
             return;
         }
 
@@ -147,11 +148,11 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                     : DEFAULT_STRING_CONTENT_TYPE;
             }
         }
-        headers.put("Content-Type", List.of(contentType));
+        headers.put("content-type", List.of(contentType));
     }
 
     HttpHeaders getHeaders() {
-        return HttpHeaders.of(headers, (k, v) -> true);
+        return HttpHeaders.of(headers);
     }
 
     String getQueryString() {
@@ -227,7 +228,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     }
 
     public void setContentType(String contentType) {
-        headers.put("Content-Type", List.of(contentType));
+        headers.put("content-type", List.of(contentType));
     }
 
     private static final class BindingSerializer extends InterceptingSerializer {

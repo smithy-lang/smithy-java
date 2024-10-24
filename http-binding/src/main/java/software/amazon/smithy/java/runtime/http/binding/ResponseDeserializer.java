@@ -71,9 +71,9 @@ public final class ResponseDeserializer {
     }
 
     private DataStream bodyDataStream(SmithyHttpResponse response) {
-        var contentType = response.headers().firstValue("content-type").orElse(null);
-        var contentLength = response.headers().firstValue("content-length").map(Long::valueOf).orElse(-1L);
-        return DataStream.ofPublisher(response.body(), contentType, contentLength);
+        var contentType = response.headers().contentType();
+        var contentLength = response.headers().contentLength();
+        return DataStream.ofPublisher(response.body(), contentType, contentLength == null ? -1 : contentLength);
     }
 
     /**

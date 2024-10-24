@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.client.http.auth;
 
-import java.net.http.HttpHeaders;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -13,6 +12,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.ApiKeyIdentity;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.io.uri.QueryStringBuilder;
 import software.amazon.smithy.java.runtime.io.uri.URIBuilder;
@@ -43,7 +43,7 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
                 if (existing != null) {
                     LOGGER.debug("Replaced header value for {}", name);
                 }
-                yield CompletableFuture.completedFuture(request.withHeaders(HttpHeaders.of(updated, (k, v) -> true)));
+                yield CompletableFuture.completedFuture(request.withHeaders(HttpHeaders.of(updated)));
             }
             case QUERY -> {
                 var uriBuilder = URIBuilder.of(request.uri());

@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.codegen.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -45,8 +44,7 @@ public class AuthSchemeTest {
             public void readBeforeTransmit(RequestHook<?, ?> hook) {
                 var request = (SmithyHttpRequest) hook.request();
                 var signatureValue = request.headers().firstValue(TestAuthScheme.SIGNATURE_HEADER);
-                assertTrue(signatureValue.isPresent());
-                assertEquals("smithy-test-signature", signatureValue.get());
+                assertEquals("smithy-test-signature", signatureValue);
             }
         };
         var client = TestServiceClient.builder()

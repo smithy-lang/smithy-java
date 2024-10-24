@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.aws.runtime.client.auth.scheme.sigv4;
 
 import java.net.URI;
-import java.net.http.HttpHeaders;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
@@ -32,6 +31,7 @@ import software.amazon.smithy.java.aws.runtime.client.core.identity.AwsCredentia
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.io.uri.URLEncoding;
@@ -96,7 +96,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
                     identity.sessionToken().orElse(null),
                     !request.body().hasKnownLength()
                 );
-                return request.withHeaders(HttpHeaders.of(signedHeaders, (a, b) -> true));
+                return request.withHeaders(HttpHeaders.of(signedHeaders));
             });
     }
 
@@ -109,7 +109,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
     private static Map<String, List<String>> createSignedHeaders(
         String method,
         URI uri,
-        HttpHeaders HttpHeaders,
+        HttpHeaders httpHeaders,
         String payloadHash,
         String regionName,
         String serviceName,
@@ -119,24 +119,23 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         String sessionToken,
         boolean isStreaming
     ) {
-        // TODO: Use mutable header container when available
-        var headers = new HashMap<>(HttpHeaders.map());
+        var headers = new HashMap<>(httpHeaders.map());
 
-        // AWS4 requires a number of headers to be set before signing including 'HOST' and 'X-Amz-Date'
+        // AWS4 requires a number of headers to be set before signing including 'Host' and 'X-Amz-Date'
         var hostHeader = uri.getHost();
         if (uriUsingNonStandardPort(uri)) {
             hostHeader += ":" + uri.getPort();
         }
-        headers.put("Host", List.of(hostHeader));
+        headers.put("host", List.of(hostHeader));
 
         var requestTime = TIME_FORMATTER.format(signingTimestamp);
-        headers.put("X-Amz-Date", List.of(requestTime));
+        headers.put("x-amz-date", List.of(requestTime));
 
         if (isStreaming) {
             headers.put("x-amz-content-sha256", List.of(payloadHash));
         }
         if (sessionToken != null) {
-            headers.put("X-Amz-Security-Token", List.of(sessionToken));
+            headers.put("x-amz-security-token", List.of(sessionToken));
         }
 
         // Determine sorted list of headers to sign
@@ -158,7 +157,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
         var signature = computeSignature(canonicalRequest, scope, requestTime, signingKey);
 
         var authorizationHeader = getAuthHeader(accessKeyId, scope, signedHeaders, signature);
-        headers.put("Authorization", List.of(authorizationHeader));
+        headers.put("authorization", List.of(authorizationHeader));
 
         return headers;
     }

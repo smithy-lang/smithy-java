@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.client.http.auth;
 
-import java.net.http.HttpHeaders;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -15,12 +14,13 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.LoginIdentity;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 
 final class HttpBasicAuthSigner implements Signer<SmithyHttpRequest, LoginIdentity> {
     static final HttpBasicAuthSigner INSTANCE = new HttpBasicAuthSigner();
     private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpBasicAuthSigner.class);
-    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String AUTHORIZATION_HEADER = "authorization";
     private static final String SCHEME = "Basic";
 
     private HttpBasicAuthSigner() {}
@@ -38,6 +38,6 @@ final class HttpBasicAuthSigner implements Signer<SmithyHttpRequest, LoginIdenti
         if (existing != null) {
             LOGGER.debug("Replaced existing Authorization header value.");
         }
-        return CompletableFuture.completedFuture(request.withHeaders(HttpHeaders.of(headers, (k, v) -> true)));
+        return CompletableFuture.completedFuture(request.withHeaders(HttpHeaders.of(headers)));
     }
 }

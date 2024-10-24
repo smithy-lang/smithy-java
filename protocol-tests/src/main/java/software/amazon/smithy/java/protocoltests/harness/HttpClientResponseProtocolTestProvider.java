@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.protocoltests.harness;
 
-import java.net.http.HttpHeaders;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +20,7 @@ import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeOpt
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
@@ -123,8 +123,8 @@ final class HttpClientResponseProtocolTestProvider extends
             for (var headerEntry : testCase.getHeaders().entrySet()) {
                 headerMap.put(headerEntry.getKey(), List.of(headerEntry.getValue()));
             }
-            testCase.getBodyMediaType().ifPresent(mediaType -> headerMap.put("Content-Type", List.of(mediaType)));
-            builder.headers(HttpHeaders.of(headerMap, (k, v) -> true));
+            testCase.getBodyMediaType().ifPresent(mediaType -> headerMap.put("content-type", List.of(mediaType)));
+            builder.headers(HttpHeaders.of(headerMap));
 
             // Add request body if present;
             testCase.getBody().ifPresent(body -> {

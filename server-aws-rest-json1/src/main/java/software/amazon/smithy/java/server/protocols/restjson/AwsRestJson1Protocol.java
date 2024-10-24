@@ -124,7 +124,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
             .pathLabelValues(labelValues)
             .request(
                 SmithyHttpRequest.builder()
-                    .headers(convert(headers))
+                    .headers(headers)
                     .uri(httpJob.request().uri())
                     .method(httpJob.request().method())
                     .body(job.request().getDataStream())
@@ -145,11 +145,6 @@ final class AwsRestJson1Protocol extends ServerProtocol {
 
     }
 
-    //TODO remove this when we have migrated Smithy to use HttpHeader's everywhere.
-    private java.net.http.HttpHeaders convert(HttpHeaders headers) {
-        return java.net.http.HttpHeaders.of(headers.toMap(), (k, v) -> true);
-    }
-
     @Override
     public CompletableFuture<Void> serializeOutput(Job job) {
         HttpJob httpJob = (HttpJob) job; //We already check in the deserializeInput method.
@@ -163,7 +158,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         SmithyHttpResponse response = serializer.serializeResponse();
         httpJob.response().setSerializedValue(response.body());
         httpJob.response().setStatusCode(response.statusCode());
-        httpJob.response().headers().putHeader(response.headers().map());
+        httpJob.response().headers().putHeaders(response.headers().map());
         return CompletableFuture.completedFuture(null);
     }
 }

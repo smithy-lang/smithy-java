@@ -26,25 +26,18 @@ final class NettyHttpHeaders implements ModifiableHttpHeaders {
     }
 
     @Override
-    public String getFirstHeader(String name) {
+    public String firstValue(String name) {
         return nettyHeaders.get(name);
     }
 
     @Override
-    public List<String> getHeader(String name) {
+    public List<String> allValues(String name) {
         return nettyHeaders.getAll(name);
     }
 
     @Override
     public void putHeader(String name, String value) {
         nettyHeaders.add(name, value);
-    }
-
-    @Override
-    public void putHeader(Map<String, List<String>> headers) {
-        for (var entry : headers.entrySet()) {
-            nettyHeaders.add(entry.getKey(), entry.getValue());
-        }
     }
 
     @Override
@@ -70,7 +63,7 @@ final class NettyHttpHeaders implements ModifiableHttpHeaders {
     //TODO implement an efficient toMap and iterator.
 
     @Override
-    public Map<String, List<String>> toMap() {
+    public Map<String, List<String>> map() {
         var map = new HashMap<String, List<String>>();
         for (var name : nettyHeaders.names()) {
             map.put(name, nettyHeaders.getAll(name));
@@ -80,7 +73,7 @@ final class NettyHttpHeaders implements ModifiableHttpHeaders {
 
     @Override
     public Iterator<Map.Entry<String, List<String>>> iterator() {
-        return toMap().entrySet().iterator();
+        return map().entrySet().iterator();
     }
 
     HttpHeaders getNettyHeaders() {

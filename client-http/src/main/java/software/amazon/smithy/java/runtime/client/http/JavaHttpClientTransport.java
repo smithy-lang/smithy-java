@@ -16,6 +16,7 @@ import java.util.concurrent.Flow;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
@@ -94,7 +95,7 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
         return SmithyHttpResponse.builder()
             .httpVersion(javaToSmithyVersion(response.version()))
             .statusCode(response.statusCode())
-            .headers(response.headers())
+            .headers(HttpHeaders.of(response.headers().map()))
             .body(new ListByteBufferToByteBuffer(response.body())) // Flatten the List<ByteBuffer> to ByteBuffer.
             .build();
     }

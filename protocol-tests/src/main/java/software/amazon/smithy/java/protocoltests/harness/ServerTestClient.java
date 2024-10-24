@@ -11,6 +11,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.concurrent.ConcurrentHashMap;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
@@ -42,9 +43,9 @@ final class ServerTestClient {
             .method(request.method(), bodyPublisher)
             .uri(request.uri());
 
-        for (var entry : request.headers().map().entrySet()) {
+        for (var entry : request.headers()) {
             for (var value : entry.getValue()) {
-                if (!entry.getKey().equals("Content-Length")) {
+                if (!entry.getKey().equals("content-length")) {
                     httpRequestBuilder.header(entry.getKey(), value);
                 }
             }
@@ -55,7 +56,7 @@ final class ServerTestClient {
             return SmithyHttpResponse.builder()
                 .statusCode(response.statusCode())
                 .body(DataStream.ofBytes(response.body()))
-                .headers(response.headers())
+                .headers(HttpHeaders.of(response.headers().map()))
                 .build();
 
         } catch (InterruptedException | IOException e) {

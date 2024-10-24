@@ -7,7 +7,6 @@ package software.amazon.smithy.java.aws.runtime.client.auth.scheme.sigv4;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpHeaders;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
@@ -25,6 +24,7 @@ import org.openjdk.jmh.annotations.State;
 import software.amazon.smithy.java.aws.runtime.client.core.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
@@ -102,7 +102,7 @@ public class SigV4SignerTrials {
         Map<String, List<String>> headers,
         String body
     ) {
-        var httpHeaders = HttpHeaders.of(headers, (k, v) -> true);
+        var httpHeaders = HttpHeaders.of(headers);
         var uriString = "http://example.com";
         if (!queryParameters.isEmpty()) {
             var queryBuilder = new QueryStringBuilder();

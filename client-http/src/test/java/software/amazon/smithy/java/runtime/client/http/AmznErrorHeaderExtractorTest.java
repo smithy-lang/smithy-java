@@ -10,7 +10,6 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 
-import java.net.http.HttpHeaders;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -19,6 +18,7 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -28,7 +28,7 @@ public class AmznErrorHeaderExtractorTest {
         var extractor = new AmznErrorHeaderExtractor();
 
         var response1 = SmithyHttpResponse.builder()
-            .headers(HttpHeaders.of(Map.of("x-amzn-errortype", List.of("foo")), (k, v) -> true))
+            .headers(HttpHeaders.of(Map.of("x-amzn-errortype", List.of("foo"))))
             .build();
         var response2 = SmithyHttpResponse.builder().build();
 
@@ -48,7 +48,7 @@ public class AmznErrorHeaderExtractorTest {
     public void resolvesAbsoluteShapeIds() {
         var extractor = new AmznErrorHeaderExtractor();
         var response = SmithyHttpResponse.builder()
-            .headers(HttpHeaders.of(Map.of("x-amzn-errortype", List.of("baz#Bam")), (k, v) -> true))
+            .headers(HttpHeaders.of(Map.of("x-amzn-errortype", List.of("baz#Bam"))))
             .build();
         var registry = TypeRegistry.builder()
             .putType(ShapeId.from("baz#Bam"), ModeledApiException.class, ApiExceptionBuilder::new)
@@ -66,8 +66,7 @@ public class AmznErrorHeaderExtractorTest {
                     Map.of(
                         "x-amzn-errortype",
                         List.of("baz#Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/")
-                    ),
-                    (k, v) -> true
+                    )
                 )
             )
             .build();
@@ -87,8 +86,7 @@ public class AmznErrorHeaderExtractorTest {
                     Map.of(
                         "x-amzn-errortype",
                         List.of("Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/")
-                    ),
-                    (k, v) -> true
+                    )
                 )
             )
             .build();
@@ -108,8 +106,7 @@ public class AmznErrorHeaderExtractorTest {
                     Map.of(
                         "x-amzn-errortype",
                         List.of("baz#Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/")
-                    ),
-                    (k, v) -> true
+                    )
                 )
             )
             .build();
@@ -129,8 +126,7 @@ public class AmznErrorHeaderExtractorTest {
                     Map.of(
                         "x-amzn-errortype",
                         List.of("other#Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/")
-                    ),
-                    (k, v) -> true
+                    )
                 )
             )
             .build();
@@ -150,8 +146,7 @@ public class AmznErrorHeaderExtractorTest {
                     Map.of(
                         "x-amzn-errortype",
                         List.of("other#Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/")
-                    ),
-                    (k, v) -> true
+                    )
                 )
             )
             .build();

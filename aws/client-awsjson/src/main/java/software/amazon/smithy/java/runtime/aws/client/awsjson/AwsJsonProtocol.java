@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.runtime.aws.client.awsjson;
 
 import java.net.URI;
-import java.net.http.HttpHeaders;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +17,7 @@ import software.amazon.smithy.java.runtime.client.http.HttpErrorDeserializer;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
@@ -63,12 +63,11 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
         builder.headers(
             HttpHeaders.of(
                 Map.of(
-                    "X-Amz-Target",
+                    "x-amz-target",
                     List.of(target),
-                    "Content-Type",
+                    "content-type",
                     List.of(contentType())
-                ),
-                (k, v) -> true
+                )
             )
         );
 

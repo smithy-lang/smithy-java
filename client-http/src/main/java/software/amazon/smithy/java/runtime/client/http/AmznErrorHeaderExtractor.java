@@ -19,12 +19,12 @@ public final class AmznErrorHeaderExtractor implements HttpErrorDeserializer.Hea
 
     @Override
     public boolean hasHeader(SmithyHttpResponse response) {
-        return response.headers().firstValue(ERROR_HEADER).isPresent();
+        return response.headers().firstValue(ERROR_HEADER) != null;
     }
 
     @Override
     public ShapeId resolveId(SmithyHttpResponse response, String serviceNamespace, TypeRegistry registry) {
-        var header = response.headers().firstValue(ERROR_HEADER).orElse(null);
+        var header = response.headers().firstValue(ERROR_HEADER);
         return header == null ? null : toShapeId(header, serviceNamespace, registry);
     }
 

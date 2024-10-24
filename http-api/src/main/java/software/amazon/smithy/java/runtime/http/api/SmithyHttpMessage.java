@@ -5,9 +5,8 @@
 
 package software.amazon.smithy.java.runtime.http.api;
 
-import java.net.http.HttpHeaders;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 public interface SmithyHttpMessage {
@@ -23,11 +22,12 @@ public interface SmithyHttpMessage {
     }
 
     default String contentType(String defaultValue) {
-        return headers().firstValue("content-type").orElse(defaultValue);
+        var result = headers().contentType();
+        return result != null ? result : defaultValue;
     }
 
     default Long contentLength() {
-        return headers().firstValue("content-length").map(Long::parseLong).orElse(null);
+        return headers().contentLength();
     }
 
     default long contentLength(long defaultValue) {
@@ -52,13 +52,12 @@ public interface SmithyHttpMessage {
      * @return the updated message.
      */
     default SmithyHttpMessage withAddedHeaders(HttpHeaders headers) {
-        var current = headers.map();
-
-        if (current.isEmpty()) {
+        if (headers().isEmpty()) {
             return withHeaders(headers);
         }
 
-        var updated = new LinkedHashMap<>(current);
+        var current = headers.map();
+        var updated = new HashMap<>(current);
         for (var entry : headers.map().entrySet()) {
             var field = entry.getKey();
             for (var value : entry.getValue()) {
@@ -66,7 +65,7 @@ public interface SmithyHttpMessage {
             }
         }
 
-        return withHeaders(HttpHeaders.of(updated, (k, v) -> true));
+        return withHeaders(HttpHeaders.of(updated));
     }
 
     /**
@@ -83,13 +82,14 @@ public interface SmithyHttpMessage {
         } else if (fieldAndValues.length % 2 != 0) {
             throw new IllegalArgumentException("Uneven number of header keys and fields: " + fieldAndValues.length);
         }
-        var current = new LinkedHashMap<>(headers().map());
+        var current = new HashMap<>(headers().map());
         for (int i = 0; i < fieldAndValues.length - 1; i += 2) {
             String field = fieldAndValues[i];
             String value = fieldAndValues[i + 1];
             current.computeIfAbsent(field, f -> new ArrayList<>()).add(value);
         }
-        return withHeaders(HttpHeaders.of(current, (k, v) -> true));
+        // Note that header implementations themselves handle normalizing header names to lowercase.
+        return withHeaders(HttpHeaders.of(current));
     }
 
     DataStream body();

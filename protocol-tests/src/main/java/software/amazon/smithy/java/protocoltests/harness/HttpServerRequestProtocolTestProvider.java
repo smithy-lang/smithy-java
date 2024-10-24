@@ -10,8 +10,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.http.HttpHeaders;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.assertj.core.api.recursive.comparison.RecursiveComparisonConfiguration;
 import org.junit.jupiter.api.Assumptions;
@@ -19,6 +23,7 @@ import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
@@ -171,7 +176,7 @@ public class HttpServerRequestProtocolTestProvider extends
             }
             headerMap.put(key, retVal);
         }
-        return HttpHeaders.of(headerMap, (k, v) -> true);
+        return HttpHeaders.of(headerMap);
     }
 
     private record ServerRequestInvocationContext(

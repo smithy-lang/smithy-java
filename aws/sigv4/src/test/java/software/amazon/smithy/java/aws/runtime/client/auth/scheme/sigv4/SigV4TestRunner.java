@@ -8,7 +8,6 @@ package software.amazon.smithy.java.aws.runtime.client.auth.scheme.sigv4;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.http.HttpHeaders;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Clock;
@@ -26,6 +25,7 @@ import java.util.stream.Stream;
 import software.amazon.smithy.java.aws.runtime.client.core.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
@@ -133,7 +133,7 @@ public class SigV4TestRunner {
                 }
                 if (!inBody) {
                     var splitLine = line.split(":");
-                    if (splitLine[0].equals("Host")) {
+                    if (splitLine[0].equalsIgnoreCase("host")) {
                         hostValue = splitLine[1];
                     }
                     headers.put(splitLine[0], List.of(splitLine[1]));
@@ -147,12 +147,11 @@ public class SigV4TestRunner {
                 }
             }
 
-            var httpHeaders = HttpHeaders.of(headers, (k, v) -> true);
             return SmithyHttpRequest.builder()
                 .method(method)
                 .httpVersion(SmithyHttpVersion.HTTP_1_1)
                 .uri(URI.create("http://" + Objects.requireNonNull(hostValue) + path))
-                .headers(httpHeaders)
+                .headers(HttpHeaders.of(headers))
                 .body(body != null ? DataStream.ofBytes(body.toString().getBytes()) : null)
                 .build();
         }

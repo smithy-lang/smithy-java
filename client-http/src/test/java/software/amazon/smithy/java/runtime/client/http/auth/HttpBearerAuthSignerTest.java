@@ -6,16 +6,15 @@
 package software.amazon.smithy.java.runtime.client.http.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.net.URI;
-import java.net.http.HttpHeaders;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
 
@@ -30,9 +29,8 @@ public class HttpBearerAuthSignerTest {
             .build();
 
         var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, AuthProperties.empty()).get();
-        var authHeader = signedRequest.headers().map().get("Authorization");
-        assertNotNull(authHeader);
-        assertEquals(authHeader.get(0), "Bearer token");
+        var authHeader = signedRequest.headers().firstValue("authorization");
+        assertEquals(authHeader, "Bearer token");
     }
 
     @Test
@@ -41,13 +39,12 @@ public class HttpBearerAuthSignerTest {
         var request = SmithyHttpRequest.builder()
             .httpVersion(SmithyHttpVersion.HTTP_1_1)
             .method("PUT")
-            .headers(HttpHeaders.of(Map.of("Authorization", List.of("FOO", "BAR")), (k, v) -> true))
+            .headers(HttpHeaders.of(Map.of("Authorization", List.of("FOO", "BAR"))))
             .uri(URI.create("https://www.example.com"))
             .build();
 
         var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, AuthProperties.empty()).get();
-        var authHeader = signedRequest.headers().map().get("Authorization");
-        assertNotNull(authHeader);
-        assertEquals(authHeader.get(0), "Bearer token");
+        var authHeader = signedRequest.headers().firstValue("authorization");
+        assertEquals(authHeader, "Bearer token");
     }
 }

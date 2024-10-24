@@ -5,11 +5,12 @@
 
 package software.amazon.smithy.java.runtime.http.binding;
 
-import java.net.http.HttpHeaders;
+import java.util.Locale;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.model.traits.HttpPrefixHeadersTrait;
 
 final class HttpPrefixHeadersDeserializer extends SpecificShapeDeserializer {
@@ -28,14 +29,13 @@ final class HttpPrefixHeadersDeserializer extends SpecificShapeDeserializer {
     @Override
     public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer) {
         HttpPrefixHeadersTrait trait = schema.expectTrait(TraitKey.HTTP_PREFIX_HEADERS_TRAIT);
-        var prefix = trait.getValue();
-        var headersMap = headers.map();
-        for (String headerName : headersMap.keySet()) {
-            if (PrefixConstants.OMITTED_HEADER_NAMES.contains(headerName)
-                || !headerName.startsWith(prefix)) {
+        var prefix = trait.getValue().toLowerCase(Locale.ENGLISH);
+        for (var entry : headers) {
+            var name = entry.getKey();
+            if (PrefixConstants.OMITTED_HEADER_NAMES.contains(name) || !name.startsWith(prefix)) {
                 continue;
             }
-            consumer.accept(state, headerName.substring(prefix.length()), new HeaderValueDeserializer(headerName));
+            consumer.accept(state, name.substring(prefix.length()), new HeaderValueDeserializer(name));
         }
     }
 
@@ -53,7 +53,8 @@ final class HttpPrefixHeadersDeserializer extends SpecificShapeDeserializer {
 
         @Override
         public String readString(Schema schema) {
-            return headers.firstValue(headerName).orElse("");
+            var value = headers.firstValue(headerName);
+            return value == null ? "" : value;
         }
 
         @Override

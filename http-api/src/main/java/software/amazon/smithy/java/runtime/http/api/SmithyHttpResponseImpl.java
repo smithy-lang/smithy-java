@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.http.api;
 
-import java.net.http.HttpHeaders;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 

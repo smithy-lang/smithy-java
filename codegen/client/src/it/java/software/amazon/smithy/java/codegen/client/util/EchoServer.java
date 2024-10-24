@@ -51,11 +51,11 @@ public final class EchoServer {
 
     private static class EchoHandler implements HttpHandler {
         private static final Set<String> STANDARD_HEADERS = Set.of(
-            "User-agent",
-            "Content-Type",
-            "Content-Length",
-            "Accept",
-            "Host"
+            "user-agent",
+            "content-type",
+            "content-length",
+            "accept",
+            "host"
         );
 
         @Override
@@ -67,7 +67,7 @@ public final class EchoServer {
                     responseHeaders.set(reqHeader.getKey(), String.valueOf(reqHeader.getValue()));
                 }
             }
-            responseHeaders.set("Content-Type", "application/json");
+            responseHeaders.set("content-type", "application/json");
 
             try (
                 var bos = new ByteArrayOutputStream(); var writer = new BufferedWriter(

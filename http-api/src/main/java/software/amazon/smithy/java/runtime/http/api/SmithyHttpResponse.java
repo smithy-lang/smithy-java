@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.http.api;
 
-import java.net.http.HttpHeaders;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.Flow;
@@ -49,7 +48,7 @@ public interface SmithyHttpResponse extends SmithyHttpMessage {
 
         int statusCode;
         DataStream body;
-        HttpHeaders headers = SmithyHttpRequestImpl.EMPTY_HEADERS;
+        HttpHeaders headers = SimpleUnmodifiableHttpHeaders.EMPTY;
         SmithyHttpVersion httpVersion = SmithyHttpVersion.HTTP_1_1;
 
         private Builder() {
