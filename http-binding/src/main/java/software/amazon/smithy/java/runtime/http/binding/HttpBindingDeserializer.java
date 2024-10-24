@@ -7,7 +7,6 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.net.http.HttpHeaders;
 import java.nio.ByteBuffer;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -70,8 +69,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
 
     @Override
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
-        BodyMembersList<T> bodyMembers = new BodyMembersList<>(state, structMemberConsumer);
-
         // First parse members in the framing.
         for (Schema member : schema.members()) {
             BindingMatcher.Binding bindingLoc = bindingMatcher.match(member);
@@ -120,7 +117,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 }
                 case PREFIX_HEADERS ->
                     structMemberConsumer.accept(state, member, new HttpPrefixHeadersDeserializer(headers));
-                case BODY -> bodyMembers.add(member.memberName());
+                case BODY -> {} // handled below
                 case PAYLOAD -> {
                     if (member.type() == ShapeType.STRUCTURE) {
                         // Read the payload into a byte buffer to deserialize a shape in the body.
@@ -154,13 +151,13 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         }
 
         // Now parse members in the payload of body.
-        if (!bodyMembers.isEmpty()) {
+        if (bindingMatcher.hasBody()) {
             validateMediaType();
             // Need to read the entire payload into a byte buffer to deserialize via a codec.
             bodyDeserializationCf = bodyAsByteBuffer().thenAccept(bb -> {
-                payloadCodec.createDeserializer(bb).readStruct(schema, bodyMembers, (body, m, de) -> {
-                    if (body.contains(m.memberName())) {
-                        body.structMemberConsumer.accept(body.state, m, de);
+                payloadCodec.createDeserializer(bb).readStruct(schema, bindingMatcher, (body, m, de) -> {
+                    if (bindingMatcher.match(m) == BindingMatcher.Binding.BODY) {
+                        structMemberConsumer.accept(state, m, de);
                     }
                 });
             });
@@ -181,20 +178,6 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
             return CompletableFuture.completedFuture(null);
         }
         return bodyDeserializationCf;
-    }
-
-    /**
-     * Data class that contains the set of members that need to be serialized in the body, and the delegated
-     * deserializer and state to invoke when found.
-     */
-    private static final class BodyMembersList<T> extends HashSet<String> {
-        private final StructMemberConsumer<T> structMemberConsumer;
-        private final T state;
-
-        BodyMembersList(T state, StructMemberConsumer<T> structMemberConsumer) {
-            this.state = state;
-            this.structMemberConsumer = structMemberConsumer;
-        }
     }
 
     private void validateMediaType() {

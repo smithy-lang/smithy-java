@@ -22,12 +22,24 @@ abstract sealed class BindingMatcher {
     }
 
     private final Binding[] bindings;
+    private final int responseStatus;
+    private final boolean hasBody;
+    private final boolean hasPayload;
 
-    private BindingMatcher(Schema struct) {
+    private BindingMatcher(Schema struct, int responseStatus) {
+        this.responseStatus = responseStatus;
+        boolean foundBody = false;
+        boolean foundPayload = false;
         this.bindings = new Binding[struct.members().size()];
         for (var member : struct.members()) {
-            bindings[member.memberIndex()] = doMatch(member);
+            var binding = doMatch(member);
+            bindings[member.memberIndex()] = binding;
+            foundBody = foundBody || binding == Binding.BODY;
+            foundPayload = foundPayload || binding == Binding.PAYLOAD;
         }
+
+        this.hasBody = foundBody;
+        this.hasPayload = foundPayload;
     }
 
     static BindingMatcher requestMatcher(Schema input) {
@@ -42,11 +54,27 @@ abstract sealed class BindingMatcher {
         return bindings[member.memberIndex()];
     }
 
+    final int responseStatus() {
+        return responseStatus;
+    }
+
+    final boolean hasBody() {
+        return hasBody;
+    }
+
+    final boolean hasPayload() {
+        return hasPayload;
+    }
+
+    final boolean writeBody(boolean omitEmptyPayload) {
+        return hasBody || (!omitEmptyPayload && !hasPayload);
+    }
+
     protected abstract Binding doMatch(Schema member);
 
     static final class RequestMatcher extends BindingMatcher {
         RequestMatcher(Schema input) {
-            super(input);
+            super(input, -1);
         }
 
         protected Binding doMatch(Schema member) {
@@ -80,7 +108,17 @@ abstract sealed class BindingMatcher {
 
     static final class ResponseMatcher extends BindingMatcher {
         ResponseMatcher(Schema output) {
-            super(output);
+            super(output, computeResponseStatus(output));
+        }
+
+        private static int computeResponseStatus(Schema struct) {
+            if (struct.hasTrait(TraitKey.HTTP_ERROR_TRAIT)) {
+                return struct.expectTrait(TraitKey.HTTP_ERROR_TRAIT).getCode();
+            } else if (struct.hasTrait(TraitKey.ERROR_TRAIT)) {
+                return struct.expectTrait(TraitKey.ERROR_TRAIT).getDefaultHttpStatusCode();
+            } else {
+                return -1;
+            }
         }
 
         @Override

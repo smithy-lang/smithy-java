@@ -86,27 +86,11 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
-        if (schema.hasTrait(TraitKey.HTTP_ERROR_TRAIT)) {
-            responseStatus = schema.expectTrait(TraitKey.HTTP_ERROR_TRAIT).getCode();
-        } else if (schema.hasTrait(TraitKey.ERROR_TRAIT)) {
-            responseStatus = schema.expectTrait(TraitKey.ERROR_TRAIT).getDefaultHttpStatusCode();
+        if (bindingMatcher.responseStatus() != -1) {
+            responseStatus = bindingMatcher.responseStatus();
         }
 
-        boolean foundBody = false;
-        boolean foundPayload = false;
-        for (var member : schema.members()) {
-            var bindingLoc = bindingMatcher.match(member);
-            if (bindingLoc == BindingMatcher.Binding.BODY) {
-                foundBody = true;
-                break;
-            }
-            if (bindingLoc == BindingMatcher.Binding.PAYLOAD) {
-                foundPayload = true;
-                break;
-            }
-        }
-
-        if (foundBody || (!omitEmptyPayload && !foundPayload)) {
+        if (bindingMatcher.writeBody(omitEmptyPayload)) {
             shapeBodyOutput = new ByteArrayOutputStream();
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
             // Serialize only the body members to the codec.
@@ -173,16 +157,6 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             return DataStream.ofBytes(shapeBodyOutput.toByteArray(), payloadMediaType);
         } else {
             return DataStream.ofEmpty();
-        }
-    }
-
-    long getBodyLength() {
-        if (shapeBodyOutput != null) {
-            return shapeBodyOutput.size();
-        } else if (httpPayload != null) {
-            return -1;
-        } else {
-            return 0;
         }
     }
 
