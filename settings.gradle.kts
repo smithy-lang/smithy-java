@@ -26,6 +26,8 @@ include(":client-core")
 include(":client-http")
 include(":client-http-binding")
 
+include(":dynamic-client")
+
 include(":auth-api")
 include(":retries-api")
 include(":retries-sdk-adapter")

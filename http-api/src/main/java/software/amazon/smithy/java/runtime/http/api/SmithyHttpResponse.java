@@ -87,6 +87,9 @@ public interface SmithyHttpResponse extends SmithyHttpMessage {
         }
 
         public SmithyHttpResponse build() {
+            if (statusCode == 0) {
+                throw new IllegalStateException("No status code was set on response");
+            }
             return new SmithyHttpResponseImpl(this);
         }
     }

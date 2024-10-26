@@ -34,4 +34,14 @@
         <Source name="~.*build.*.java"/>
         <Bug pattern="IC_INIT_CIRCULARITY"/>
     </Match>
+
+    <Match>
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
+        <Class name="software.amazon.smithy.java.runtime.dynamicclient.SchemaGuidedDocumentBuilder$SchemaList"/>
+    </Match>
+
+    <Match>
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
+        <Class name="software.amazon.smithy.java.runtime.dynamicclient.SchemaGuidedDocumentBuilder$SchemaMap"/>
+    </Match>
 </FindBugsFilter>
