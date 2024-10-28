@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.TraitKey;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 
@@ -70,6 +71,9 @@ final class HttpLabelSerializer extends SpecificShapeSerializer {
 
     @Override
     public void writeString(Schema schema, String value) {
+        if (value.isEmpty()) {
+            throw new SerializationException("HTTP label for `" + schema.id() + "` cannot be empty");
+        }
         labelReceiver.accept(schema.memberName(), value);
     }
 
