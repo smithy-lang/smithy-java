@@ -89,6 +89,11 @@ public final class GetFoosInput implements SerializableStruct {
             return this;
         }
 
+        @Override
+        public Schema schema() {
+            return SCHEMA;
+        }
+
         private static final class InnerDeserializer implements ShapeDeserializer.StructMemberConsumer<Builder> {
             private static final InnerDeserializer INSTANCE = new InnerDeserializer();
 
