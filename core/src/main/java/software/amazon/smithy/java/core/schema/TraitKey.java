@@ -25,6 +25,7 @@ import software.amazon.smithy.model.traits.IdempotentTrait;
 import software.amazon.smithy.model.traits.JsonNameTrait;
 import software.amazon.smithy.model.traits.LengthTrait;
 import software.amazon.smithy.model.traits.MediaTypeTrait;
+import software.amazon.smithy.model.traits.PaginatedTrait;
 import software.amazon.smithy.model.traits.PatternTrait;
 import software.amazon.smithy.model.traits.RangeTrait;
 import software.amazon.smithy.model.traits.ReadonlyTrait;
@@ -69,6 +70,7 @@ public final class TraitKey<T extends Trait> {
     public static final TraitKey<LengthTrait> LENGTH_TRAIT = TraitKey.get(LengthTrait.class);
     public static final TraitKey<RangeTrait> RANGE_TRAIT = TraitKey.get(RangeTrait.class);
     public static final TraitKey<PatternTrait> PATTERN_TRAIT = TraitKey.get(PatternTrait.class);
+    public static final TraitKey<PaginatedTrait> PAGINATED_TRAIT = TraitKey.get(PaginatedTrait.class);
     public static final TraitKey<ErrorTrait> ERROR_TRAIT = get(ErrorTrait.class);
     public static final TraitKey<ReadonlyTrait> READ_ONLY_TRAIT = get(ReadonlyTrait.class);
     public static final TraitKey<IdempotentTrait> IDEMPOTENT_TRAIT = get(IdempotentTrait.class);

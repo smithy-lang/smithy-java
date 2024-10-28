@@ -311,7 +311,8 @@ public final class ClientInterfaceGenerator
             var templateBase = """
                 ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig);
                 ${?paginated}
-                ${paginator:T}<${output:T}> ${name:L}Paginator(${input:T} input);${/paginated}
+                ${paginator:T}<${output:T}> ${name:L}Paginator(${input:T} input);
+                ${/paginated}
                 """;
             writer.pushState();
             var isAsync = symbol.expectProperty(ClientSymbolProperties.ASYNC);
@@ -326,13 +327,17 @@ public final class ClientInterfaceGenerator
                 writer.putContext("name", StringUtils.uncapitalize(CodegenUtils.getDefaultName(operation, service)));
                 writer.putContext("input", symbolProvider.toSymbol(opIndex.expectInputShape(operation)));
                 writer.putContext("output", symbolProvider.toSymbol(opIndex.expectOutputShape(operation)));
+
                 writer.pushState(new OperationSection(operation, symbolProvider, model));
                 writer.write(templateDefault);
                 writer.popState();
                 writer.newLine();
+
                 writer.pushState(new OperationSection(operation, symbolProvider, model));
                 writer.putContext("paginated", operation.hasTrait(PaginatedTrait.class));
                 writer.write(templateBase);
+                writer.popState();
+
                 writer.popState();
             }
             writer.popState();

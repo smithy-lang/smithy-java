@@ -12,8 +12,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.model.traits.PaginatedTrait;
 
 final class DefaultAsyncPaginator<I extends SerializableStruct, O extends SerializableStruct> implements
     AsyncPaginator<O> {
@@ -40,7 +40,7 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
         this.inputDocument = Document.createTyped(input);
         this.call = call;
         this.operation = operation;
-        var trait = operation.schema().expectTrait(PaginatedTrait.class);
+        var trait = operation.schema().expectTrait(TraitKey.PAGINATED_TRAIT);
         this.inputTokenMember = trait.getInputToken().orElseThrow();
         this.outputTokenPath = trait.getOutputToken().orElseThrow();
         this.itemsPath = trait.getItems().orElse(null);
