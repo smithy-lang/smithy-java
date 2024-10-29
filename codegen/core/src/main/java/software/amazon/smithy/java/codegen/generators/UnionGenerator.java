@@ -59,7 +59,7 @@ public final class UnionGenerator
 
                     @Override
                     public void serialize(${shapeSerializer:N} serializer) {
-                        serializer.writeStruct(SCHEMA, this);
+                        serializer.writeStruct($$SCHEMA, this);
                     }
 
                     ${valueCasters:C|}

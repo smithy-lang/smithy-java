@@ -66,7 +66,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     public void run() {
         writer.pushState();
         writer.putContext("state", state);
-        writer.putContext("schema", "SCHEMA");
+        writer.putContext("schema", "$SCHEMA");
         shape.accept(this);
         writer.popState();
     }

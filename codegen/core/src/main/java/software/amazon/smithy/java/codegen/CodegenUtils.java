@@ -54,7 +54,7 @@ public final class CodegenUtils {
         .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Member")
         .build();
 
-    private static final String SCHEMA_STATIC_NAME = "SCHEMA";
+    private static final String SCHEMA_STATIC_NAME = "$SCHEMA";
     private static final EnumSet<ShapeType> SHAPES_WITH_INNER_SCHEMA = EnumSet.of(
         ShapeType.OPERATION,
         ShapeType.SERVICE,
@@ -229,7 +229,11 @@ public final class CodegenUtils {
             return writer.format("$T.$L", PreludeSchemas.class, shape.getType().name());
         } else if (SHAPES_WITH_INNER_SCHEMA.contains(shape.getType())) {
             // Shapes that generate a class have their schemas as static properties on that class
-            return writer.format("$T.SCHEMA", provider.toSymbol(shape));
+            return writer.format(
+                "$T.$L",
+                provider.toSymbol(shape),
+                shape.hasTrait(UnitTypeTrait.class) ? "SCHEMA" : "$SCHEMA"
+            );
         }
         return writer.format("SharedSchemas.$L", toSchemaName(shape));
     }

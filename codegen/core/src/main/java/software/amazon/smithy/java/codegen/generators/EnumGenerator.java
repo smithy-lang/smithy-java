@@ -296,7 +296,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                 """
                     @Override
                     public Builder deserialize(${shapeDeserializer:N} de) {
-                        return value(de.${?string}readString${/string}${^string}readInteger${/string}(SCHEMA));
+                        return value(de.${?string}readString${/string}${^string}readInteger${/string}($$SCHEMA));
                     }"""
             );
             writer.popState();

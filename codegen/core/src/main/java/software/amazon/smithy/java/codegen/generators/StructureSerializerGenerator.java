@@ -33,7 +33,7 @@ record StructureSerializerGenerator(
         var template = """
             @Override
             public void serialize(${shapeSerializer:N} serializer) {
-                serializer.writeStruct(SCHEMA, this);
+                serializer.writeStruct($$SCHEMA, this);
             }
 
             @Override

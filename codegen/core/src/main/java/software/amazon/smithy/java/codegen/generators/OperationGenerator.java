@@ -85,31 +85,31 @@ public class OperationGenerator
 
                         @Override
                         public ${sdkSchema:N} schema() {
-                            return SCHEMA;
+                            return $$SCHEMA;
                         }
 
                         @Override
                         public ${sdkSchema:N} inputSchema() {
-                            return ${inputType:T}.SCHEMA;
+                            return ${inputType:T}.$$SCHEMA;
                         }
 
                         ${?hasInputEventStream}
                         @Override
                         public ${sdkSchema:T} inputEventSchema() {
-                            return ${inputEventType:T}.SCHEMA;
+                            return ${inputEventType:T}.$$SCHEMA;
                         }
                         ${/hasInputEventStream}
 
                         ${?hasOutputEventStream}
                         @Override
                         public ${sdkSchema:T} outputEventSchema() {
-                            return ${outputEventType:T}.SCHEMA;
+                            return ${outputEventType:T}.$$SCHEMA;
                         }
                         ${/hasOutputEventStream}
 
                         @Override
                         public ${sdkSchema:N} outputSchema() {
-                            return ${outputType:T}.SCHEMA;
+                            return ${outputType:T}.$$SCHEMA;
                         }
 
                         @Override

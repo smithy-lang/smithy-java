@@ -40,14 +40,14 @@ public class TraitsTest {
     @ParameterizedTest
     @MethodSource("memberSchemaSource")
     void testStructureMemberSchemaTraitsSet(String memberName, Class<? extends Trait> traitClass, Trait expected) {
-        var memberSchema = TraitsInput.SCHEMA.member(memberName);
+        var memberSchema = TraitsInput.$SCHEMA.member(memberName);
         var traitValue = memberSchema.expectTrait(TraitKey.get(traitClass));
         assertEquals(traitValue, expected);
     }
 
     @Test
     void testErrorTraitsSet() {
-        var retryableTrait = RetryableError.SCHEMA.expectTrait(TraitKey.get(RetryableTrait.class));
+        var retryableTrait = RetryableError.$SCHEMA.expectTrait(TraitKey.get(RetryableTrait.class));
         assertEquals(retryableTrait, RetryableTrait.builder().build());
     }
 }

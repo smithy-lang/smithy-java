@@ -62,7 +62,7 @@ abstract class BuilderGenerator implements Runnable {
 
                 @Override
                 public Schema schema() {
-                    return SCHEMA;
+                    return $$SCHEMA;
                 }
 
                 ${builderSetters:C|}

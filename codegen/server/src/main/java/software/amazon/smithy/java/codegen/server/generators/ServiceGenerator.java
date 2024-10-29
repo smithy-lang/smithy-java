@@ -76,7 +76,7 @@ public final class ServiceGenerator implements
 
                     @Override
                     public ${schemaClass:T} schema() {
-                         return SCHEMA;
+                         return $$SCHEMA;
                     }
                 }
                 """;
