@@ -211,7 +211,7 @@ public class OperationGenerator
             writer.indent();
             for (var errorId : shape.getErrors(service)) {
                 var errorShape = model.expectShape(errorId);
-                writer.write(".putType($1T.ID, $1T.class, $1T::builder)", symbolProvider.toSymbol(errorShape));
+                writer.write(".putType($1T.$$ID, $1T.class, $1T::builder)", symbolProvider.toSymbol(errorShape));
             }
             writer.writeWithNoFormatting(".build();");
             writer.dedent();

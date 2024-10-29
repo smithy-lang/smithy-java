@@ -199,7 +199,6 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
             fileContents,
             containsString(
                 """
-                        public static final ShapeId ID = ShapeId.from("smithy.java.codegen#EnumWithDocs");
                         /**
                          * @deprecated As of the past.
                          */

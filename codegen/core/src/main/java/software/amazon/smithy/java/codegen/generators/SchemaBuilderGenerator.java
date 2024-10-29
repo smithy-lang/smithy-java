@@ -79,7 +79,7 @@ final class SchemaBuilderGenerator extends ShapeVisitor.Default<Void> implements
     @Override
     public Void structureShape(StructureShape shape) {
         writer.write(
-            "static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.structureBuilder(ID${traits:C});"
+            "static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.structureBuilder($$ID${traits:C});"
         );
         return null;
     }
@@ -87,7 +87,7 @@ final class SchemaBuilderGenerator extends ShapeVisitor.Default<Void> implements
     @Override
     public Void unionShape(UnionShape shape) {
         writer.write(
-            "static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.structureBuilder(ID${traits:C});"
+            "static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.structureBuilder($$ID${traits:C});"
         );
         return null;
     }

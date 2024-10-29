@@ -157,7 +157,7 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
         writer.putContext("variants", shape.members().stream().map(symbolProvider::toMemberName).toList());
         writer.putContext("set", Set.class);
         writer.write("""
-            static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createIntEnum(ID,
+            static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createIntEnum($$ID,
                 ${set:T}.of(${#variants}${value:L}.value${^key.last}, ${/key.last}${/variants})${traits:C}
             );
             """);
@@ -217,7 +217,7 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
         writer.putContext("variants", shape.members().stream().map(symbolProvider::toMemberName).toList());
         writer.putContext("set", Set.class);
         writer.write("""
-            static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createEnum(ID,
+            static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createEnum($$ID,
                 ${set:T}.of(${#variants}${value:L}.value${^key.last}, ${/key.last}${/variants})${traits:C}
             );
             """);
@@ -243,7 +243,7 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
         writer.write(
             """
                 ${?recursive}${C}
-                ${/recursive}static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.${builderMethod:L}(ID${traits:C})${/recursive}${?hasMembers}
+                ${/recursive}static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.${builderMethod:L}($$ID${traits:C})${/recursive}${?hasMembers}
                     ${C|}
                     ${/hasMembers}.build();
                 """,
@@ -298,7 +298,7 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
 
     @Override
     public Void operationShape(OperationShape shape) {
-        writer.write("static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createOperation(ID${traits:C});");
+        writer.write("static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createOperation($$ID${traits:C});");
         return null;
     }
 
@@ -309,7 +309,7 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
 
     @Override
     public Void serviceShape(ServiceShape serviceShape) {
-        writer.write("static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createService(ID${traits:C});");
+        writer.write("static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createService($$ID${traits:C});");
         return null;
     }
 }
