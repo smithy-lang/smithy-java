@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.codegen.core.CodegenContext;
@@ -16,6 +17,7 @@ import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.WriterDelegator;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
@@ -57,6 +59,8 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 @SmithyUnstableApi
 public class CodeGenerationContext
     implements CodegenContext<JavaCodegenSettings, JavaWriter, JavaCodegenIntegration> {
+
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(CodeGenerationContext.class);
 
     private static final List<ShapeId> PRELUDE_RUNTIME_TRAITS = List.of(
         // Validation Traits
@@ -179,7 +183,12 @@ public class CodeGenerationContext
         // Add all default runtime traits from the prelude
         Set<ShapeId> traits = new HashSet<>(PRELUDE_RUNTIME_TRAITS);
         for (var entry : shape.getAllTraits().entrySet()) {
-            Shape traitShape = model.expectShape(entry.getKey());
+            Optional<Shape> traitShapeOptional = model.getShape(entry.getKey());
+            if (traitShapeOptional.isEmpty()) {
+                LOGGER.debug("Skipping unknown trait: {}", entry.getKey());
+                continue;
+            }
+            var traitShape = traitShapeOptional.get();
             // Add all traits supported by a protocol the service supports
             if (traitShape.hasTrait(ProtocolDefinitionTrait.class)) {
                 var protocolDef = traitShape.expectTrait(ProtocolDefinitionTrait.class);
