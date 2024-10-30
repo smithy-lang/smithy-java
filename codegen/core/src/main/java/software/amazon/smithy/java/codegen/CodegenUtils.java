@@ -252,9 +252,9 @@ public final class CodegenUtils {
                     if (isRequiredWithNoDefault(a) && !isRequiredWithNoDefault(b)) {
                         return -1;
                     } else if (isRequiredWithNoDefault(a)) {
-                        return 0;
-                    } else {
                         return 1;
+                    } else {
+                        return 0;
                     }
                 }
             )
