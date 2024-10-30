@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.integrations.javadoc;
 
+import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -102,6 +103,8 @@ final class JavadocFormatterInterceptor implements CodeInterceptor<JavadocSectio
         "WBR",
         "VAR"
     );
+    // Convert problematic characters to their HTML escape codes.
+    private static final Map<String, String> REPLACEMENTS = Map.of("*", "&#42;");
 
     @Override
     public Class<JavadocSection> sectionType() {
@@ -153,6 +156,12 @@ final class JavadocFormatterInterceptor implements CodeInterceptor<JavadocSectio
             var str = nestingLevel == 0
                 ? StringUtils.wrap(s, MAX_LINE_LENGTH, writer.getNewline() + " * ", false)
                 : s;
+
+            // Sanitize string
+            for (var entry: REPLACEMENTS.entrySet()) {
+                str = str.replace(entry.getKey(), entry.getValue());
+            }
+
             writer.writeInlineWithNoFormatting(str);
 
             if (it.hasNextLine()) {
