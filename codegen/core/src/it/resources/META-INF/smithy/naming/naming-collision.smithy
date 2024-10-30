@@ -15,6 +15,9 @@ operation Naming {
 
         type: Type
     }
+    errors: [
+        IllegalArgumentException
+    ]
 }
 
 @private
@@ -25,3 +28,9 @@ structure InnerDeserializer {}
 
 @private
 structure Type {}
+
+/// This will clash with built in `java.lang` exception used a number
+/// of places such as in enums and unions
+@private
+@error("client")
+structure IllegalArgumentException {}

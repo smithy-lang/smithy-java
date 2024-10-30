@@ -6,8 +6,8 @@ service TestService {
     version: "today"
     operations: [
         DocStringWrapping
-        SmithyGenerated
-        Deprecated
+        SmithyGeneratedAnnotation
+        DeprecatedAnnotation
         Since
         ExternalDocumentation
         Unstable
@@ -37,11 +37,11 @@ operation DocStringWrapping {
     }
 }
 
-operation SmithyGenerated {
+operation SmithyGeneratedAnnotation {
     input := {}
 }
 
-operation Deprecated {
+operation DeprecatedAnnotation {
     input: DeprecatedInput
 }
 

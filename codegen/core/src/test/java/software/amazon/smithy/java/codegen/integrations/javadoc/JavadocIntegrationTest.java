@@ -59,7 +59,7 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
 
     @Test
     void addsDeprecated() {
-        var fileContents = getFileStringForClass("DeprecatedInput");
+        var fileContents = getFileStringForClass("DeprecatedAnnotationInput");
 
         // Check that class header is added
         assertThat(fileContents, containsString("""
@@ -68,7 +68,7 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
              */
             @Deprecated(since = "1.3")
             @SmithyGenerated
-            public final class DeprecatedInput implements SerializableStruct {
+            public final class DeprecatedAnnotationInput implements SerializableStruct {
             """));
 
         // Check that member headers match expected
@@ -102,10 +102,10 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
 
     @Test
     void hasGeneratedAnnotationIfNoOtherDocs() {
-        var fileContents = getFileStringForClass("SmithyGeneratedInput");
+        var fileContents = getFileStringForClass("SmithyGeneratedAnnotationInput");
         assertThat(fileContents, containsString("""
             @SmithyGenerated
-            public final class SmithyGeneratedInput implements SerializableStruct {
+            public final class SmithyGeneratedAnnotationInput implements SerializableStruct {
             """));
     }
 

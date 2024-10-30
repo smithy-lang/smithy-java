@@ -8,9 +8,13 @@ package software.amazon.smithy.java.codegen;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -18,6 +22,7 @@ import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.IoUtils;
+import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 import software.amazon.smithy.utils.StringUtils;
 
@@ -40,7 +45,6 @@ public final class JavaCodegenSettings {
     private static final String RELATIVE_DATE = "relativeDate";
     private static final String RELATIVE_VERSION = "relativeVersion";
     private static final String EDITION = "edition";
-
     private static final List<String> PROPERTIES = List.of(
         SERVICE,
         NAME,
@@ -69,6 +73,7 @@ public final class JavaCodegenSettings {
     private final String relativeDate;
     private final String relativeVersion;
     private final SmithyJavaCodegenEdition edition;
+    private final Map<String, Set<Symbol>> generatedSymbols = new HashMap<>();
 
     private JavaCodegenSettings(Builder builder) {
         this.service = Objects.requireNonNull(builder.service);
@@ -163,6 +168,17 @@ public final class JavaCodegenSettings {
 
     public SmithyJavaCodegenEdition edition() {
         return edition;
+    }
+
+    @SmithyInternalApi
+    public void addSymbol(Symbol symbol) {
+        var symbols = generatedSymbols.computeIfAbsent(symbol.getNamespace(), k -> new HashSet<>());
+        symbols.add(symbol);
+    }
+
+    @SmithyInternalApi
+    public Set<Symbol> getGeneratedSymbolsPackage(String packageNamespace) {
+        return generatedSymbols.get(packageNamespace);
     }
 
     private static Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {
