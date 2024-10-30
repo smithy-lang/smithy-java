@@ -152,15 +152,16 @@ final class JavadocFormatterInterceptor implements CodeInterceptor<JavadocSectio
     private void writeDocstringLine(JavaWriter writer, String string, int nestingLevel) {
         for (Scanner it = new Scanner(string); it.hasNextLine();) {
             var s = it.nextLine();
-            // If we are outs of an HTML tag, wrap the string. Otherwise, ignore wrapping.
-            var str = nestingLevel == 0
-                ? StringUtils.wrap(s, MAX_LINE_LENGTH, writer.getNewline() + " * ", false)
-                : s;
 
             // Sanitize string
             for (var entry : REPLACEMENTS.entrySet()) {
-                str = str.replace(entry.getKey(), entry.getValue());
+                s = s.replace(entry.getKey(), entry.getValue());
             }
+
+            // If we are out of an HTML tag, wrap the string. Otherwise, ignore wrapping.
+            var str = nestingLevel == 0
+                ? StringUtils.wrap(s, MAX_LINE_LENGTH, writer.getNewline() + " * ", false)
+                : s;
 
             writer.writeInlineWithNoFormatting(str);
 
