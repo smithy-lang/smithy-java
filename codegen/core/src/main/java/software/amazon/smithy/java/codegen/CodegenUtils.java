@@ -46,12 +46,16 @@ public final class CodegenUtils {
     private static final URL RESERVED_WORDS_FILE = Objects.requireNonNull(
         CodegenUtils.class.getResource("reserved-words.txt")
     );
+    private static final URL OBJECT_RESERVED_MEMBERS_FILE = Objects.requireNonNull(
+        CodegenUtils.class.getResource("object-reserved-members.txt")
+    );
 
     public static final ReservedWords SHAPE_ESCAPER = new ReservedWordsBuilder()
         .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Shape")
         .build();
     public static final ReservedWords MEMBER_ESCAPER = new ReservedWordsBuilder()
         .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Member")
+        .loadCaseInsensitiveWords(OBJECT_RESERVED_MEMBERS_FILE, word -> word + "Member")
         .build();
 
     private static final String SCHEMA_STATIC_NAME = "$SCHEMA";
