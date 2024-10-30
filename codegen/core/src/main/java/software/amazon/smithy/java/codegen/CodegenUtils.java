@@ -249,13 +249,9 @@ public final class CodegenUtils {
             .stream()
             .sorted(
                 (a, b) -> {
-                    if (isRequiredWithNoDefault(a) && !isRequiredWithNoDefault(b)) {
-                        return -1;
-                    } else if (isRequiredWithNoDefault(a)) {
-                        return 1;
-                    } else {
-                        return 0;
-                    }
+                    int aRequiredWithNoDefault = isRequiredWithNoDefault(a) ? 1 : 0;
+                    int bRequiredWithNoDefault = isRequiredWithNoDefault(b) ? 1 : 0;
+                    return bRequiredWithNoDefault - aRequiredWithNoDefault;
                 }
             )
             .collect(Collectors.toList());
