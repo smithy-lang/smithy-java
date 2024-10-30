@@ -158,7 +158,7 @@ final class JavadocFormatterInterceptor implements CodeInterceptor<JavadocSectio
                 : s;
 
             // Sanitize string
-            for (var entry: REPLACEMENTS.entrySet()) {
+            for (var entry : REPLACEMENTS.entrySet()) {
                 str = str.replace(entry.getKey(), entry.getValue());
             }
 
