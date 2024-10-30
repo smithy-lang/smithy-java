@@ -79,6 +79,9 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
     }
 
     private void putNameContext() {
+        // Add any implicit usages from classes in the same package
+        var packageSymbols = settings.getGeneratedSymbolsPackage(packageNamespace);
+        packageSymbols.forEach(this::addToSymbolTable);
         for (final Set<Symbol> duplicates : symbolTable.values()) {
             // If the duplicates list has more than one entry
             // then duplicates are present, and we need to de-duplicate the names

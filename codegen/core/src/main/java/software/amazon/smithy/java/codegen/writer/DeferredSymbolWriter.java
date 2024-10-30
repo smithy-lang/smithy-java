@@ -36,7 +36,6 @@ public abstract class DeferredSymbolWriter<W extends SymbolWriter<W, I>, I exten
      */
     protected void addToSymbolTable(Symbol symbol) {
         Set<Symbol> nameSet = symbolTable.computeIfAbsent(symbol.getName(), n -> new HashSet<>());
-
         nameSet.add(symbol);
     }
 
