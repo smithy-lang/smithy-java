@@ -56,6 +56,7 @@ public final class CodegenUtils {
     public static final ReservedWords MEMBER_ESCAPER = new ReservedWordsBuilder()
         .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Member")
         .loadCaseInsensitiveWords(OBJECT_RESERVED_MEMBERS_FILE, word -> word + "Member")
+        .put("serializer", "serializerMember")
         .build();
 
     private static final String SCHEMA_STATIC_NAME = "$SCHEMA";
@@ -253,13 +254,9 @@ public final class CodegenUtils {
             .stream()
             .sorted(
                 (a, b) -> {
-                    if (isRequiredWithNoDefault(a) && !isRequiredWithNoDefault(b)) {
-                        return -1;
-                    } else if (isRequiredWithNoDefault(a)) {
-                        return 0;
-                    } else {
-                        return 1;
-                    }
+                    int aRequiredWithNoDefault = isRequiredWithNoDefault(a) ? 1 : 0;
+                    int bRequiredWithNoDefault = isRequiredWithNoDefault(b) ? 1 : 0;
+                    return bRequiredWithNoDefault - aRequiredWithNoDefault;
                 }
             )
             .collect(Collectors.toList());

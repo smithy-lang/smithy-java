@@ -16,6 +16,9 @@ operation Naming {
         type: Type
 
         object: Object
+        
+        // Collides with `serializer` input to serializeMembers
+        serializer: String
     }
 }
 

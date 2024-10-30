@@ -34,6 +34,7 @@ public final class JavaClientCodegenPlugin implements SmithyBuildPlugin {
         runner.directedCodegen(new DirectedJavaClientCodegen());
         runner.fileManifest(context.getFileManifest());
         runner.service(settings.service());
+        runner.changeStringEnumsToEnumShapes(true);
         // Filter out any deprecated shapes
         var model = RemoveDeprecatedShapesTransformer.transform(context.getModel(), settings);
         runner.model(model);
