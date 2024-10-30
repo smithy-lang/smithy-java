@@ -14,6 +14,9 @@ operation Naming {
         inner: InnerDeserializer
 
         type: Type
+
+        // Collides with `serializer` input to serializeMembers
+        serializer: String
     }
 }
 

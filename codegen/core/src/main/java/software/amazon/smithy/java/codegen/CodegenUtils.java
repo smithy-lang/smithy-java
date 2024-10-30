@@ -52,6 +52,7 @@ public final class CodegenUtils {
         .build();
     public static final ReservedWords MEMBER_ESCAPER = new ReservedWordsBuilder()
         .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Member")
+        .put("serializer", "serializerMember")
         .build();
 
     private static final String SCHEMA_STATIC_NAME = "$SCHEMA";
