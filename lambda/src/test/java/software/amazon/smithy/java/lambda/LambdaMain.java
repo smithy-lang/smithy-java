@@ -9,7 +9,6 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Service;
@@ -49,21 +48,22 @@ public final class LambdaMain implements RequestHandler<ProxyRequest, ProxyRespo
         return endpoint.handleRequest(apiGatewayProxyRequestEvent, context);
     }
 
-    private static final Map<Long, Beer> FRIDGE = new HashMap<>() {
-        {
-            put(1L, Beer.builder().name("Munich Helles").quantity(1).build());
-        }
-    };
+    private static final Map<Long, Beer> FRIDGE = new HashMap<>(
+        Map.of(
+            1L,
+            Beer.builder().name("Munich Helles").quantity(1).build()
+        )
+    );
 
-    private static final AtomicInteger ID_GEN = new AtomicInteger(1);
+    private static Long ID_GEN = 1L;
 
     private static final class AddBeerImpl implements AddBeerOperation {
         @Override
         public AddBeerOutput addBeer(AddBeerInput input, RequestContext context) {
             LOGGER.info("AddBeer - ", input);
-            long id = ID_GEN.incrementAndGet();
-            FRIDGE.put(id, input.beer());
-            return AddBeerOutput.builder().id(id).build();
+            ID_GEN += 1;
+            FRIDGE.put(ID_GEN, input.beer());
+            return AddBeerOutput.builder().id(ID_GEN).build();
         }
     }
 
