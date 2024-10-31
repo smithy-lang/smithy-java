@@ -50,6 +50,6 @@ public final class SystemPropertiesIdentityResolver implements AwsCredentialsRes
             );
         }
 
-        return CompletableFuture.completedFuture(IdentityResult.ofError(ERROR_MESSAGE));
+        return CompletableFuture.completedFuture(IdentityResult.ofError(getClass(), ERROR_MESSAGE));
     }
 }

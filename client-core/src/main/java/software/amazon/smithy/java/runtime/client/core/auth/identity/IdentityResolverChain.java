@@ -31,15 +31,14 @@ final class IdentityResolverChain<IdentityT extends Identity> implements Identit
 
     @Override
     public CompletableFuture<IdentityResult<IdentityT>> resolveIdentity(AuthProperties requestProperties) {
-        List<String> excMessages = new ArrayList<>();
-        return executeChain(resolvers.get(0), requestProperties, excMessages, 0);
+        List<IdentityResult<?>> errors = new ArrayList<>();
+        return executeChain(resolvers.get(0), requestProperties, errors, 0);
     }
 
-    @SuppressWarnings("unchecked")
     private CompletableFuture<IdentityResult<IdentityT>> executeChain(
         IdentityResolver<IdentityT> resolver,
         AuthProperties requestProperties,
-        List<String> excMessages,
+        List<IdentityResult<?>> errors,
         int idx
     ) {
         var result = resolver.resolveIdentity(requestProperties);
@@ -47,8 +46,8 @@ final class IdentityResolverChain<IdentityT extends Identity> implements Identit
             var nextResolver = resolvers.get(idx + 1);
             return result.thenCompose(ir -> {
                 if (ir.error() != null) {
-                    excMessages.add(ir.error());
-                    return executeChain(nextResolver, requestProperties, excMessages, idx + 1);
+                    errors.add(ir);
+                    return executeChain(nextResolver, requestProperties, errors, idx + 1);
                 }
                 return CompletableFuture.completedFuture(ir);
             });
@@ -56,8 +55,8 @@ final class IdentityResolverChain<IdentityT extends Identity> implements Identit
 
         return result.thenApply(ir -> {
             if (ir.error() != null) {
-                excMessages.add(ir.error());
-                return IdentityResult.ofError(excMessages.toString());
+                errors.add(ir);
+                return IdentityResult.ofError(IdentityResolverChain.class, "Attempted resolvers: " + errors);
             }
             return ir;
         });

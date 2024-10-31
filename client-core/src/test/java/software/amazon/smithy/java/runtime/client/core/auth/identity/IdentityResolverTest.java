@@ -67,7 +67,19 @@ public class IdentityResolverTest {
             )
         );
         var result = resolver.resolveIdentity(AuthProperties.empty()).join();
-        assertTrue(result.error().contains("[No token. Womp Womp., No token. Womp Womp., No token. Womp Womp.]"));
+
+        assertTrue(
+            result.error()
+                .contains(
+                    "[IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResolverTest$EmptyResolver], "
+                        + "IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResolverTest$EmptyResolver], "
+                        + "IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResolverTest$EmptyResolver]]"
+                )
+        );
+
+        var e = assertThrows(IdentityNotFoundException.class, result::unwrap);
+
+        assertTrue(e.getMessage().startsWith("Unable to resolve an identity: Attempted resolvers: "));
     }
 
     /**
@@ -78,7 +90,7 @@ public class IdentityResolverTest {
 
         @Override
         public CompletableFuture<IdentityResult<TokenIdentity>> resolveIdentity(AuthProperties requestProperties) {
-            return CompletableFuture.completedFuture(IdentityResult.ofError("No token. Womp Womp."));
+            return CompletableFuture.completedFuture(IdentityResult.ofError(getClass(), "No token. Womp Womp."));
         }
 
         @Override

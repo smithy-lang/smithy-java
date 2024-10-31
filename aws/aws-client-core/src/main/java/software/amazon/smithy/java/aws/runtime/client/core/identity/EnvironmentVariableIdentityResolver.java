@@ -37,7 +37,7 @@ public final class EnvironmentVariableIdentityResolver implements AwsCredentials
         String sessionToken = System.getenv(SESSION_TOKEN_PROPERTY);
 
         if (accessKey == null || secretKey == null) {
-            return CompletableFuture.completedFuture(IdentityResult.ofError(ERROR_MESSAGE));
+            return CompletableFuture.completedFuture(IdentityResult.ofError(getClass(), ERROR_MESSAGE));
         }
 
         return CompletableFuture.completedFuture(
