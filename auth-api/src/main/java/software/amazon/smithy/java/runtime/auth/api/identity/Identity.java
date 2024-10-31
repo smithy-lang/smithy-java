@@ -6,17 +6,18 @@
 package software.amazon.smithy.java.runtime.auth.api.identity;
 
 import java.time.Instant;
-import java.util.Optional;
 
 /**
  * Interface to represent the identity of the caller, used for authentication.
  */
 public interface Identity {
     /**
-     * The time after which this identity will no longer be valid. If this is empty, an expiration time is not known
+     * The time after which this identity will no longer be valid. If this is null, an expiration time is not known
      * (but the identity may still expire at some time in the future).
+     *
+     * @return the expiration time, if known, or null.
      */
-    default Optional<Instant> expirationTime() {
-        return Optional.empty();
+    default Instant expirationTime() {
+        return null;
     }
 }

@@ -5,8 +5,8 @@
 
 package software.amazon.smithy.java.aws.runtime.client.core.identity;
 
+import java.time.Instant;
 import java.util.Objects;
-import java.util.Optional;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 
 /**
@@ -33,12 +33,12 @@ public interface AwsCredentialsIdentity extends Identity {
     String secretAccessKey();
 
     /**
-     * Retrieve the AWS session token. This token is retrieved from an AWS token service, and is used for authenticating that this
-     * user has received temporary permission to access some resource.
+     * Retrieve the AWS session token. This token is retrieved from an AWS token service, and is used for
+     * authenticating that this user has received temporary permission to access some resource.
      *
-     * @return the optional session token.
+     * @return the session token, or null if there is no session token.
      */
-    Optional<String> sessionToken();
+    String sessionToken();
 
     /**
      * Constructs a new credentials object, with the specified AWS access key and secret key.
@@ -60,10 +60,29 @@ public interface AwsCredentialsIdentity extends Identity {
      * @return the created identity.
      */
     static AwsCredentialsIdentity create(String accessKeyId, String secretAccessKey, String sessionToken) {
+        return create(accessKeyId, secretAccessKey, sessionToken, null);
+    }
+
+    /**
+     * Constructs a new credentials object, with the specified AWS access key, secret key, and session token.
+     *
+     * @param accessKeyId The AWS access key, used to identify the user interacting with services.
+     * @param secretAccessKey The AWS secret access key, used to authenticate the user interacting with services.
+     * @param sessionToken The AWS session token, used for authenticating temporary access some resource.
+     * @param expirationTime When the credentials expire, or null if no expiration or unknown.
+     * @return the created identity.
+     */
+    static AwsCredentialsIdentity create(
+        String accessKeyId,
+        String secretAccessKey,
+        String sessionToken,
+        Instant expirationTime
+    ) {
         return new AwsCredentialsIdentityRecord(
             Objects.requireNonNull(accessKeyId, "accessKeyId is null"),
             Objects.requireNonNull(secretAccessKey, "secretAccessKey is null"),
-            Optional.ofNullable(sessionToken)
+            sessionToken,
+            expirationTime
         );
     }
 }
