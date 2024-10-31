@@ -12,6 +12,7 @@ import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
 import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResolvers;
+import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResult;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -57,12 +58,13 @@ final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
     }
 
     private static class NullIdentityResolver implements IdentityResolver<Identity> {
-        public static final CompletableFuture<Identity> NULL_IDENTITY = CompletableFuture.completedFuture(
-            new Identity() {}
-        );
+        public static final CompletableFuture<IdentityResult<Identity>> NULL_IDENTITY = CompletableFuture
+            .completedFuture(
+                IdentityResult.of(new Identity() {})
+            );
 
         @Override
-        public CompletableFuture<Identity> resolveIdentity(AuthProperties requestProperties) {
+        public CompletableFuture<IdentityResult<Identity>> resolveIdentity(AuthProperties requestProperties) {
             return NULL_IDENTITY;
         }
 

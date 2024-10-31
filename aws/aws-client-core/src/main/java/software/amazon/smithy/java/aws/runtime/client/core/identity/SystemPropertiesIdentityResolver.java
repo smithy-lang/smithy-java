@@ -7,7 +7,7 @@ package software.amazon.smithy.java.aws.runtime.client.core.identity;
 
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
-import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityNotFoundException;
+import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResult;
 
 /**
  * {@link AwsCredentialsResolver} implementation that loads credentials from Java system properties.
@@ -29,28 +29,27 @@ public final class SystemPropertiesIdentityResolver implements AwsCredentialsRes
     private static final String ACCESS_KEY_PROPERTY = "aws.accessKeyId";
     private static final String SECRET_KEY_PROPERTY = "aws.secretAccessKey";
     private static final String SESSION_TOKEN_PROPERTY = "aws.sessionToken";
+    private static final String ERROR_MESSAGE = "Could not resolve AWS identity from the aws.accessKeyId and "
+        + "aws.secretAccessKey system properties";
 
     @Override
-    public CompletableFuture<AwsCredentialsIdentity> resolveIdentity(AuthProperties requestProperties) {
+    public CompletableFuture<IdentityResult<AwsCredentialsIdentity>> resolveIdentity(AuthProperties requestProperties) {
         String accessKey = System.getProperty(ACCESS_KEY_PROPERTY);
         String secretKey = System.getProperty(SECRET_KEY_PROPERTY);
         String sessionToken = System.getProperty(SESSION_TOKEN_PROPERTY);
 
-        if (accessKey == null || secretKey == null) {
-            return CompletableFuture.failedFuture(
-                new IdentityNotFoundException(
-                    "Could not find access and secret key system properties",
-                    SystemPropertiesIdentityResolver.class,
-                    AwsCredentialsIdentity.class
+        if (accessKey != null && secretKey != null) {
+            return CompletableFuture.completedFuture(
+                IdentityResult.of(
+                    AwsCredentialsIdentity.create(
+                        accessKey,
+                        secretKey,
+                        sessionToken
+                    )
                 )
             );
         }
-        return CompletableFuture.completedFuture(
-            AwsCredentialsIdentity.create(
-                accessKey,
-                secretKey,
-                sessionToken
-            )
-        );
+
+        return CompletableFuture.completedFuture(IdentityResult.ofError(ERROR_MESSAGE));
     }
 }

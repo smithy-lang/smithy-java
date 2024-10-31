@@ -21,6 +21,7 @@ public class SystemPropertiesIdentityResolverTest {
             "property_secret_key",
             "property_token"
         );
-        assertEquals(expected, value);
+
+        assertEquals(expected, value.unwrap());
     }
 }

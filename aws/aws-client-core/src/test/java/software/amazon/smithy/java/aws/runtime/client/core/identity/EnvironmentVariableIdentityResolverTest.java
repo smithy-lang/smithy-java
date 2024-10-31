@@ -22,6 +22,7 @@ public class EnvironmentVariableIdentityResolverTest {
             "env_secret_key",
             "env_token"
         );
-        assertEquals(expected, value);
+
+        assertEquals(expected, value.unwrap());
     }
 }

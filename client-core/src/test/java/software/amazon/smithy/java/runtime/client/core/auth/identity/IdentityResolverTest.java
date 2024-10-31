@@ -24,7 +24,7 @@ public class IdentityResolverTest {
     void testStaticIdentityReturnsExpected() {
         assertEquals(TEST_RESOLVER.identityType(), TEST_IDENTITY.getClass());
         var resolved = TEST_RESOLVER.resolveIdentity(AuthProperties.empty()).join();
-        assertEquals(TEST_IDENTITY, resolved);
+        assertEquals(IdentityResult.of(TEST_IDENTITY), resolved);
     }
 
     @Test
@@ -38,7 +38,7 @@ public class IdentityResolverTest {
             )
         );
         var result = resolver.resolveIdentity(AuthProperties.empty()).join();
-        assertEquals(result, TEST_IDENTITY);
+        assertEquals(result, IdentityResult.of(TEST_IDENTITY));
     }
 
     @Test
@@ -66,11 +66,8 @@ public class IdentityResolverTest {
                 EmptyResolver.INSTANCE
             )
         );
-        var exc = assertThrows(
-            CompletionException.class,
-            () -> resolver.resolveIdentity(AuthProperties.empty()).join()
-        );
-        assertTrue(exc.getMessage().contains("[No token. Womp Womp., No token. Womp Womp., No token. Womp Womp.]"));
+        var result = resolver.resolveIdentity(AuthProperties.empty()).join();
+        assertTrue(result.error().contains("[No token. Womp Womp., No token. Womp Womp., No token. Womp Womp.]"));
     }
 
     /**
@@ -80,14 +77,8 @@ public class IdentityResolverTest {
         private static final EmptyResolver INSTANCE = new EmptyResolver();
 
         @Override
-        public CompletableFuture<TokenIdentity> resolveIdentity(AuthProperties requestProperties) {
-            return CompletableFuture.failedFuture(
-                new IdentityNotFoundException(
-                    "No token. Womp Womp.",
-                    EmptyResolver.class,
-                    TokenIdentity.class
-                )
-            );
+        public CompletableFuture<IdentityResult<TokenIdentity>> resolveIdentity(AuthProperties requestProperties) {
+            return CompletableFuture.completedFuture(IdentityResult.ofError("No token. Womp Womp."));
         }
 
         @Override
@@ -104,7 +95,7 @@ public class IdentityResolverTest {
         private static final IllegalArgumentException ILLEGAL_ARGUMENT_EXCEPTION = new IllegalArgumentException("BAD!");
 
         @Override
-        public CompletableFuture<TokenIdentity> resolveIdentity(AuthProperties requestProperties) {
+        public CompletableFuture<IdentityResult<TokenIdentity>> resolveIdentity(AuthProperties requestProperties) {
             return CompletableFuture.failedFuture(ILLEGAL_ARGUMENT_EXCEPTION);
         }
 
