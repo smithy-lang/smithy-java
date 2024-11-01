@@ -28,6 +28,7 @@ include(":client-http-binding")
 
 include(":auth-api")
 include(":retries-api")
+include(":retries-sdk-adapter")
 
 // server
 include("server-core")
