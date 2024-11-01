@@ -41,6 +41,7 @@ record StructureDeserializerGenerator(
                 public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {${?hasMembers}
                     switch (member.memberIndex()) {
                         ${cases:C|}
+                        default -> throw new ${illegalArg:T}("Unexpected member: " + member.memberName());
                     }
                 ${/hasMembers}}${?union}
 
@@ -55,6 +56,7 @@ record StructureDeserializerGenerator(
         writer.putContext("hasMembers", !shape.members().isEmpty());
         writer.putContext("cases", writer.consumer(this::generateMemberSwitchCases));
         writer.putContext("union", shape.isUnionShape());
+        writer.putContext("illegalArg", IllegalArgumentException.class);
         writer.write(template);
         writer.popState();
     }

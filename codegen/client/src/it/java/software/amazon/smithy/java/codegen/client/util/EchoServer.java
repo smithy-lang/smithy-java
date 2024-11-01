@@ -14,6 +14,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -71,7 +72,7 @@ public final class EchoServer {
 
             try (
                 var bos = new ByteArrayOutputStream(); var writer = new BufferedWriter(
-                    new OutputStreamWriter(bos)
+                    new OutputStreamWriter(bos, StandardCharsets.UTF_8)
                 ); var responseBody = httpExchange.getResponseBody()
             ) {
                 var body = httpExchange.getRequestBody().readAllBytes();

@@ -21,8 +21,4 @@ tasks {
     spotbugsMain {
         enabled = false
     }
-
-    spotbugsIt {
-        enabled = false
-    }
 }

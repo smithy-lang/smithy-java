@@ -28,4 +28,10 @@
     <Match>
         <Bug pattern="CT_CONSTRUCTOR_THROW"/>
     </Match>
+
+    <!-- Generated Recursive shapes will trigger this, although they will correctly instantiate -->
+    <Match>
+        <Source name="~.*\/build\/.*"/>
+        <Bug pattern="IC_INIT_CIRCULARITY"/>
+    </Match>
 </FindBugsFilter>
