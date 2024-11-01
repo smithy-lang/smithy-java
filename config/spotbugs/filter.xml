@@ -31,7 +31,7 @@
 
     <!-- Generated Recursive shapes will trigger this, although they will correctly instantiate -->
     <Match>
-        <Source name="~.*\/build\/.*"/>
+        <Source name="~.*build.*.java"/>
         <Bug pattern="IC_INIT_CIRCULARITY"/>
     </Match>
 </FindBugsFilter>
