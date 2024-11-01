@@ -28,6 +28,7 @@ import software.amazon.smithy.java.codegen.sections.OperationSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.core.Client;
+import software.amazon.smithy.java.runtime.client.core.ClientConfig;
 import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.runtime.client.core.ClientSetting;
@@ -80,6 +81,11 @@ public final class ClientInterfaceGenerator
                     public interface ${interface:T} {
 
                         ${operations:C|}
+
+                        /**
+                         * @return Configuration in use by client.
+                         */
+                         ${clientConfig:T} config();
 
                         /**
                          * Create a Builder for {@link ${interface:T}}.
@@ -140,6 +146,7 @@ public final class ClientInterfaceGenerator
                 writer.putContext("clientPlugin", ClientPlugin.class);
                 writer.putContext("client", Client.class);
                 writer.putContext("requestOverride", RequestOverrideConfig.class);
+                writer.putContext("clientConfig", ClientConfig.class);
                 writer.putContext("interface", symbol);
                 writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
                 writer.putContext("transport", getTransportClass(directive.settings()));

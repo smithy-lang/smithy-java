@@ -58,36 +58,59 @@ public final class ClientConfig {
         this.context = Context.unmodifiableCopy(builder.context);
     }
 
-    // Note: Making all the accessors package-private for now as they are only needed by Client, but could be public.
-    ClientTransport<?, ?> transport() {
+    /**
+     * @return Transport for client to use to send data to an endpoint.
+     */
+    public ClientTransport<?, ?> transport() {
         return transport;
     }
 
-    ClientProtocol<?, ?> protocol() {
+    /**
+     * @return Protocol for client to use for request and response serialization and deserialization.
+     */
+    public ClientProtocol<?, ?> protocol() {
         return protocol;
     }
 
-    EndpointResolver endpointResolver() {
+    /**
+     * @return EndpointResolver to use to resolve an endpoint for an operation.
+     */
+    public EndpointResolver endpointResolver() {
         return endpointResolver;
     }
 
-    List<ClientInterceptor> interceptors() {
+    /**
+     * @return Interceptors configured to hook into the client's request execution pipeline.
+     */
+    public List<ClientInterceptor> interceptors() {
         return interceptors;
     }
 
-    List<AuthScheme<?, ?>> supportedAuthSchemes() {
+    /**
+     * @return Authentication schemes supported by the client.
+     */
+    public List<AuthScheme<?, ?>> supportedAuthSchemes() {
         return supportedAuthSchemes;
     }
 
-    AuthSchemeResolver authSchemeResolver() {
+    /**
+     * @return Resolver to use to resolve the authentication scheme that should be used to sign a request.
+     */
+    public AuthSchemeResolver authSchemeResolver() {
         return authSchemeResolver;
     }
 
-    List<IdentityResolver<?>> identityResolvers() {
+    /**
+     * @return Resolvers to use to resolve an identity for authentication.
+     */
+    public List<IdentityResolver<?>> identityResolvers() {
         return identityResolvers;
     }
 
-    Context context() {
+    /**
+     * @return Context to use
+     */
+    public Context context() {
         return context;
     }
 
@@ -325,7 +348,7 @@ public final class ClientConfig {
          * @param context Context containing all the configuration to put.
          * @return the builder.
          */
-        private Builder putAllConfig(Context context) {
+        Builder putAllConfig(Context context) {
             context.copyTo(this.context);
             return this;
         }

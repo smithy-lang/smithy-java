@@ -30,8 +30,6 @@ public final class PojoWithValidatedCollection implements SerializableStruct {
         .putMember("value", ValidatedPojo.SCHEMA)
         .build();
     private static final Schema MAP_OF_VALIDATED_POJO_KEY = MAP_OF_VALIDATED_POJO.member("key");
-    // TODO: why is this unused.
-    private static final Schema MAP_OF_VALIDATED_POJO_VALUE = MAP_OF_VALIDATED_POJO.member("value");
     private static final Schema LIST_OF_VALIDATED_POJO = Schema
         .listBuilder(ShapeId.from("smithy.example#ListOfValidatedPojo"))
         .putMember("member", ValidatedPojo.SCHEMA)

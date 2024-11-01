@@ -61,7 +61,6 @@ final class Assertions {
     }
 
     private static String convertHeaderToString(String key, List<String> values) {
-        // TODO: Is this needed for all protocol tests?
         if (!key.equalsIgnoreCase("x-stringlist")) {
             return String.join(", ", values);
         }
