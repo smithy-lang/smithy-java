@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.client.core.auth.scheme;
 
-import java.util.Optional;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
@@ -63,10 +62,10 @@ public interface AuthScheme<RequestT, IdentityT extends Identity> {
      * provided {@link IdentityResolvers}.
      *
      * @param resolvers Resolver repository.
-     * @return the optionally located identity resolver.
+     * @return the located identity resolver, or null if no resolver is found.
      */
-    default Optional<IdentityResolver<IdentityT>> identityResolver(IdentityResolvers resolvers) {
-        return Optional.ofNullable(resolvers.identityResolver(identityClass()));
+    default IdentityResolver<IdentityT> identityResolver(IdentityResolvers resolvers) {
+        return resolvers.identityResolver(identityClass());
     }
 
     /**

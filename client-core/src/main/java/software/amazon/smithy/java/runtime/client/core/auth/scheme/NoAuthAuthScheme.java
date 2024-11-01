@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.runtime.client.core.auth.scheme;
 
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
@@ -44,12 +43,11 @@ final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
      * Retrieve an identity resolver associated with this authentication scheme, that unconditionally returns an empty
      * {@link Identity}, independent of what resolvers are provided.
      *
-     * @param resolvers Resolver repository.
-     * @return An identity resolver that unconditionally returns an empty identity.
+     * <p>{@inheritDoc}
      */
     @Override
-    public Optional<IdentityResolver<Identity>> identityResolver(IdentityResolvers resolvers) {
-        return Optional.of(NULL_IDENTITY_RESOLVER);
+    public IdentityResolver<Identity> identityResolver(IdentityResolvers resolvers) {
+        return NULL_IDENTITY_RESOLVER;
     }
 
     @Override

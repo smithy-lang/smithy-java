@@ -8,7 +8,7 @@ package software.amazon.smithy.java.runtime.client.core;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -175,19 +175,26 @@ final class ClientPipeline<RequestT, ResponseT> {
                     call.context(),
                     castAuthScheme,
                     authSchemeOption
-                )
-                    .orElse(null);
+                );
                 if (resolved != null) {
                     return resolved;
                 }
             }
         }
 
-        // TODO: Build more useful error message (to log also) indicating why some schemes were not used.
-        throw new ApiException("No auth scheme could be resolved for " + call.operation().schema().id());
+        var options = new StringJoiner(", ", "[", "]");
+        for (var authSchemeOption : authSchemeOptions) {
+            options.add(authSchemeOption.schemeId().toString());
+        }
+        throw new ApiException(
+            "No auth scheme could be resolved for operation " + call.operation().schema().id()
+                + "; protocol=" + protocol.id()
+                + "; requestClass=" + request.getClass()
+                + "; auth scheme options=" + options
+        );
     }
 
-    private <IdentityT extends Identity> Optional<ResolvedScheme<IdentityT, RequestT>> createResolvedSchema(
+    private <IdentityT extends Identity> ResolvedScheme<IdentityT, RequestT> createResolvedSchema(
         IdentityResolvers identityResolvers,
         Context context,
         AuthScheme<RequestT, IdentityT> authScheme,
@@ -195,10 +202,11 @@ final class ClientPipeline<RequestT, ResponseT> {
     ) {
         var identityProperties = authScheme.getIdentityProperties(context).merge(option.identityPropertyOverrides());
         var signerProperties = authScheme.getSignerProperties(context).merge(option.signerPropertyOverrides());
-        return authScheme.identityResolver(identityResolvers).map(identityResolver -> {
-            CompletableFuture<IdentityResult<IdentityT>> result = identityResolver.resolveIdentity(identityProperties);
-            return new ResolvedScheme<>(signerProperties, authScheme, result);
-        });
+        var identityResolver = authScheme.identityResolver(identityResolvers);
+        if (identityResolver == null) {
+            return null;
+        }
+        return new ResolvedScheme<>(signerProperties, authScheme, identityResolver.resolveIdentity(identityProperties));
     }
 
     private record ResolvedScheme<IdentityT extends Identity, RequestT>(

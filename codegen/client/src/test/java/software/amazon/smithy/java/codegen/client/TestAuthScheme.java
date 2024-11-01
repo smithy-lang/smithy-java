@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.client;
 
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
@@ -43,7 +42,7 @@ public final class TestAuthScheme implements AuthScheme<SmithyHttpRequest, Ident
     }
 
     @Override
-    public Optional<IdentityResolver<Identity>> identityResolver(IdentityResolvers resolvers) {
+    public IdentityResolver<Identity> identityResolver(IdentityResolvers resolvers) {
         return AuthScheme.noAuthAuthScheme().identityResolver(resolvers);
     }
 
