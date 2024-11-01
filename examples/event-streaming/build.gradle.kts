@@ -16,9 +16,4 @@ tasks {
     spotbugsIt {
         enabled = false
     }
-
-    // TODO: enable it when issue with CI running it is resolved
-    integ {
-        enabled = false
-    }
 }
