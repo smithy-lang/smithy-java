@@ -152,8 +152,6 @@ public final class ClientConfig {
             overrideConfig.identityResolvers().forEach(builder::addIdentityResolver);
         }
 
-        // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
-        //       We just merge the client's Context with the Context of the operation's call.
         builder.putAllConfig(overrideConfig.context());
     }
 
