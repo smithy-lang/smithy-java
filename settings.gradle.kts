@@ -27,6 +27,7 @@ include(":client-http")
 include(":client-http-binding")
 
 include(":auth-api")
+include(":retries-api")
 
 // server
 include("server-core")
@@ -48,4 +49,4 @@ include(":aws:aws-client-core")
 include(":aws:sigv4")
 include(":aws:client-awsjson")
 include(":aws:client-restjson")
-include("aws:client-rest-xml")
+include(":aws:client-rest-xml")
