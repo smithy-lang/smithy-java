@@ -13,7 +13,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 
 public final class InternalServerError extends ModeledApiException {
 
-    public static final ShapeId ID = ShapeId.from(
+    private static final ShapeId ID = ShapeId.from(
         "software.amazon.smithy.exceptions#InternalServerError"
     );
 

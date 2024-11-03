@@ -59,4 +59,13 @@ public interface RetryStrategy {
      * @return the maximum numbers attempts that this retry strategy will allow.
      */
     int maxAttempts();
+
+    /**
+     * Create a RetryStrategy that only allows the first request, but does not allow retries.
+     *
+     * @return the created strategy.
+     */
+    static RetryStrategy noRetries() {
+        return NoRetryImpl.INSTANCE;
+    }
 }

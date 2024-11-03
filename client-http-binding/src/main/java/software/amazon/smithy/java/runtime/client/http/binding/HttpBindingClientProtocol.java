@@ -11,6 +11,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.runtime.client.http.HttpErrorDeserializer;
+import software.amazon.smithy.java.runtime.client.http.HttpRetryErrorClassifier;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOperation;
@@ -29,6 +30,9 @@ import software.amazon.smithy.java.runtime.http.binding.ResponseDeserializer;
 
 /**
  * An HTTP-based protocol that uses HTTP binding traits.
+ *
+ * <p>When deserializing exceptions, {@link HttpRetryErrorClassifier} is automatically applied to determine if it's
+ * safe to retry and to extract retry-after headers.
  *
  * @param <F> the framing type for event streams.
  */
@@ -95,6 +99,8 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
     ) {
         if (!isSuccess(operation, context, response)) {
             return createError(operation, context, typeRegistry, request, response).thenApply(e -> {
+                // Apply HTTP error classification by default.
+                HttpRetryErrorClassifier.applyRetryInfo(operation, response, e, context);
                 throw e;
             });
         }

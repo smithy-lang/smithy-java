@@ -21,8 +21,12 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterc
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
+import software.amazon.smithy.java.runtime.retries.api.RetryStrategy;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
+/**
+ * Base Smithy client class.
+ */
 public abstract class Client {
 
     private final ClientConfig config;
@@ -30,6 +34,7 @@ public abstract class Client {
     private final TypeRegistry typeRegistry;
     private final ClientInterceptor interceptor;
     private final IdentityResolvers identityResolvers;
+    private final RetryStrategy retryStrategy;
 
     protected Client(Builder<?, ?> builder) {
         ClientConfig.Builder configBuilder = builder.configBuilder();
@@ -46,6 +51,13 @@ public abstract class Client {
         this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
 
         this.typeRegistry = TypeRegistry.builder().build();
+
+        if (config.retryStrategy() != null) {
+            this.retryStrategy = config.retryStrategy();
+        } else {
+            // TODO: Pick a better default retry strategy.
+            this.retryStrategy = RetryStrategy.noRetries();
+        }
     }
 
     /**
@@ -82,19 +94,20 @@ public abstract class Client {
             callIdentityResolvers = IdentityResolvers.of(config.identityResolvers());
         }
 
-        var call = ClientCall.<I, O>builder()
-            .input(input)
-            .operation(operation)
-            .endpointResolver(callConfig.endpointResolver())
-            .context(Context.modifiableCopy(callConfig.context()))
-            .interceptor(callInterceptor)
-            .supportedAuthSchemes(callConfig.supportedAuthSchemes())
-            .authSchemeResolver(callConfig.authSchemeResolver())
-            .identityResolvers(callIdentityResolvers)
-            .typeRegistry(operationRegistry)
-            .build();
+        var callBuilder = ClientCall.<I, O>builder();
+        callBuilder.input = input;
+        callBuilder.operation = operation;
+        callBuilder.endpointResolver = callConfig.endpointResolver();
+        callBuilder.context = Context.modifiableCopy(callConfig.context());
+        callBuilder.interceptor = callInterceptor;
+        callBuilder.supportedAuthSchemes.addAll(callConfig.supportedAuthSchemes());
+        callBuilder.authSchemeResolver = callConfig.authSchemeResolver();
+        callBuilder.identityResolvers = callIdentityResolvers;
+        callBuilder.typeRegistry = operationRegistry;
+        callBuilder.retryStrategy = retryStrategy;
+        callBuilder.retryScope = callConfig.retryScope();
 
-        return callPipeline.send(call);
+        return callPipeline.send(callBuilder.build());
     }
 
     /**
@@ -257,6 +270,32 @@ public abstract class Client {
         @SuppressWarnings("unchecked")
         public B addPlugin(ClientPlugin plugin) {
             plugins.add(Objects.requireNonNull(plugin, "plugin cannot be null"));
+            return (B) this;
+        }
+
+        /**
+         * Set the retry strategy to use with the client.
+         *
+         * <p>This should only be used to override the default retry strategy.
+         *
+         * @param retryStrategy Retry strategy to use.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B retryStrategy(RetryStrategy retryStrategy) {
+            this.configBuilder.retryStrategy(retryStrategy);
+            return (B) this;
+        }
+
+        /**
+         * Set a custom retry scope to use with requests.
+         *
+         * @param retryScope Retry scope to set.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B retryScope(String retryScope) {
+            this.configBuilder.retryScope(retryScope);
             return (B) this;
         }
 

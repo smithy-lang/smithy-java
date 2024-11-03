@@ -31,7 +31,7 @@ public class SdkRetryStrategyTest {
     @Test
     public void acquiresToken() {
         var adapted = new SdkRetryStrategy(DefaultRetryStrategy.doNotRetry());
-        var attempt = AcquireInitialTokenRequest.create("foo");
+        var attempt = new AcquireInitialTokenRequest("foo");
         var result = adapted.acquireInitialToken(attempt);
 
         assertThat(result.delay(), equalTo(Duration.ZERO));
@@ -41,9 +41,8 @@ public class SdkRetryStrategyTest {
     @Test
     public void refreshesToken() {
         var adapted = new SdkRetryStrategy(DefaultRetryStrategy.doNotRetry());
-        var acquire = adapted.acquireInitialToken(AcquireInitialTokenRequest.create("foo"));
-
-        var refresh = RefreshRetryTokenRequest.create(acquire.token(), new RuntimeException("hi"));
+        var acquire = adapted.acquireInitialToken(new AcquireInitialTokenRequest("foo"));
+        var refresh = new RefreshRetryTokenRequest(acquire.token(), new RuntimeException("hi"), null);
 
         // Throws when the exception isn't retryable.
         Assertions.assertThrows(TokenAcquisitionFailedException.class, () -> {
@@ -54,9 +53,9 @@ public class SdkRetryStrategyTest {
     @Test
     public void returnsTokens() {
         var adapted = new SdkRetryStrategy(DefaultRetryStrategy.doNotRetry());
-        var acquire = adapted.acquireInitialToken(AcquireInitialTokenRequest.create("foo"));
+        var acquire = adapted.acquireInitialToken(new AcquireInitialTokenRequest("foo"));
 
-        var result = adapted.recordSuccess(RecordSuccessRequest.create(acquire.token()));
+        var result = adapted.recordSuccess(new RecordSuccessRequest(acquire.token()));
 
         assertThat(result.token(), instanceOf(SdkRetryToken.class));
     }

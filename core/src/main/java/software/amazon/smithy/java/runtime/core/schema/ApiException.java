@@ -5,7 +5,10 @@
 
 package software.amazon.smithy.java.runtime.core.schema;
 
+import java.time.Duration;
 import java.util.Objects;
+import software.amazon.smithy.java.runtime.retries.api.RetryInfo;
+import software.amazon.smithy.java.runtime.retries.api.RetrySafety;
 
 /**
  * The top-level exception that should be used to throw application-level errors from clients and servers.
@@ -14,7 +17,7 @@ import java.util.Objects;
  * errors, and shape validation errors. It should not be used for illegal arguments, null argument validation,
  * or other kinds of logic errors sufficiently covered by the Java standard library.
  */
-public class ApiException extends RuntimeException {
+public class ApiException extends RuntimeException implements RetryInfo {
 
     /**
      * The party that is at fault for the error, if any.
@@ -58,6 +61,11 @@ public class ApiException extends RuntimeException {
 
     private final Fault errorType;
 
+    // Mutable retryInfo
+    private RetrySafety isRetrySafe = RetrySafety.MAYBE;
+    private boolean isThrottle = false;
+    private Duration retryAfter = null;
+
     public ApiException(String message) {
         this(message, Fault.OTHER);
     }
@@ -83,5 +91,51 @@ public class ApiException extends RuntimeException {
      */
     public Fault getFault() {
         return errorType;
+    }
+
+    @Override
+    public boolean isThrottle() {
+        return isThrottle;
+    }
+
+    /**
+     * Set whether the error is a throttling exception.
+     *
+     * @param isThrottle Set to true if it's a throttle.
+     */
+    public void isThrottle(boolean isThrottle) {
+        this.isThrottle = isThrottle;
+    }
+
+    @Override
+    public Duration retryAfter() {
+        return retryAfter;
+    }
+
+    /**
+     * Set a suggested time to wait before retrying.
+     *
+     * @param retryAfter Retry after time to set, or null to clear.
+     */
+    public void retryAfter(Duration retryAfter) {
+        this.retryAfter = retryAfter;
+    }
+
+    @Override
+    public RetrySafety isRetrySafe() {
+        return isRetrySafe;
+    }
+
+    /**
+     * Set whether it's safe to retry.
+     *
+     * @param isRetrySafe Set if it's safe to retry.
+     */
+    public void isRetrySafe(RetrySafety isRetrySafe) {
+        this.isRetrySafe = isRetrySafe;
+        if (isRetrySafe == RetrySafety.NO) {
+            retryAfter = null;
+            isThrottle = false;
+        }
     }
 }

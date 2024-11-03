@@ -9,23 +9,9 @@ import java.time.Duration;
 
 /**
  * Response from the {@link RetryStrategy} after calling {@link RetryStrategy#refreshRetryToken(RefreshRetryTokenRequest)}.
+ *
+ * @param token A {@link RetryToken} acquired by this invocation, used in subsequent
+ *              {@link RetryStrategy#refreshRetryToken} or {@link RetryStrategy#recordSuccess} calls.
+ * @param delay The amount of time to wait before performing the next attempt.
  */
-public interface RefreshRetryTokenResponse {
-    /**
-     * A {@link RetryToken} acquired by this invocation, used in subsequent {@link RetryStrategy#refreshRetryToken} or
-     * {@link RetryStrategy#recordSuccess} calls.
-     */
-    RetryToken token();
-
-    /**
-     * The amount of time to wait before performing the next attempt.
-     */
-    Duration delay();
-
-    /**
-     * Creates a new {@link RefreshRetryTokenResponse} with the given token and delay.
-     */
-    static RefreshRetryTokenResponse create(RetryToken token, Duration delay) {
-        return new RefreshRetryTokenResponseImpl(token, delay);
-    }
-}
+public record RefreshRetryTokenResponse(RetryToken token, Duration delay) {}

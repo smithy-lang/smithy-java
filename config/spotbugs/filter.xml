@@ -57,4 +57,13 @@
             </Method>
         </Class>
     </Match>
+
+    <Match>
+        <Class name="software.amazon.smithy.java.runtime.client.core.ClientCall$Builder">
+            <Field name="executor">
+                <Bug pattern="UWF_UNWRITTEN_FIELD"/>
+            </Field>
+        </Class>
+    </Match>
+
 </FindBugsFilter>

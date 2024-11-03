@@ -13,7 +13,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 
 public class UnknownOperationException extends ModeledApiException {
 
-    public static final ShapeId ID = ShapeId.from(
+    static final ShapeId ID = ShapeId.from(
         "software.amazon.smithy.exceptions#UnknownOperationException"
     );
 

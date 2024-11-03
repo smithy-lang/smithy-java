@@ -8,18 +8,8 @@ package software.amazon.smithy.java.runtime.retries.api;
 /**
  * Request that the calling code makes to the {@link RetryStrategy} using
  * {@link RetryStrategy#recordSuccess(RecordSuccessRequest)} to notify that the attempted execution succeeded.
+ *
+ * @param token A {@link RetryToken} acquired a previous {@link RetryStrategy#acquireInitialToken} or
+ *              {@link RetryStrategy#refreshRetryToken} call.
  */
-public interface RecordSuccessRequest {
-    /**
-     * A {@link RetryToken} acquired a previous {@link RetryStrategy#acquireInitialToken} or
-     * {@link RetryStrategy#refreshRetryToken} call.
-     */
-    RetryToken token();
-
-    /**
-     * Creates a new {@link RecordSuccessRequest} instance with the given token.
-     */
-    static RecordSuccessRequest create(RetryToken token) {
-        return new RecordSuccessRequestImpl(token);
-    }
-}
+public record RecordSuccessRequest(RetryToken token) {}

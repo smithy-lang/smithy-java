@@ -8,18 +8,8 @@ package software.amazon.smithy.java.runtime.retries.api;
 /**
  * Response given to the calling code by the {@link RetryStrategy} after calling
  * {@link RetryStrategy#recordSuccess(RecordSuccessRequest)}.
+ *
+ * @param token A {@link RetryToken} acquired a previous {@link RetryStrategy#acquireInitialToken} or
+ *              {@link RetryStrategy#refreshRetryToken} call.
  */
-public interface RecordSuccessResponse {
-    /**
-     * A {@link RetryToken} acquired a previous {@link RetryStrategy#acquireInitialToken} or
-     * {@link RetryStrategy#refreshRetryToken} call.
-     */
-    RetryToken token();
-
-    /**
-     * Creates a new {@link RecordSuccessResponseImpl} with the given token.
-     */
-    static RecordSuccessResponse create(RetryToken token) {
-        return new RecordSuccessResponseImpl(token);
-    }
-}
+public record RecordSuccessResponse(RetryToken token) {}

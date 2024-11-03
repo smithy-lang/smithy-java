@@ -7,9 +7,14 @@ package software.amazon.smithy.java.runtime.client.core;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
@@ -28,6 +33,11 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ResponseHook;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.retries.api.AcquireInitialTokenRequest;
+import software.amazon.smithy.java.runtime.retries.api.RecordSuccessRequest;
+import software.amazon.smithy.java.runtime.retries.api.RefreshRetryTokenRequest;
+import software.amazon.smithy.java.runtime.retries.api.RetryToken;
+import software.amazon.smithy.java.runtime.retries.api.TokenAcquisitionFailedException;
 
 /**
  * Handles sending a {@link ClientCall} using a {@link ClientProtocol} and {@link ClientTransport}.
@@ -39,6 +49,7 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
  */
 final class ClientPipeline<RequestT, ResponseT> {
 
+    private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor();
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientPipeline.class);
     private static final URI UNRESOLVED;
 
@@ -99,32 +110,57 @@ final class ClientPipeline<RequestT, ResponseT> {
     public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> send(
         ClientCall<I, O> call
     ) {
-        var context = call.context();
-        var input = call.input();
-        var interceptor = call.interceptor();
+        // Get a retry token before sending anything. This could potentially short circuit the request.
+        try {
+            var result = call.retryStrategy.acquireInitialToken(new AcquireInitialTokenRequest(call.retryScope));
+            call.retryToken = result.token();
+            // Delay if the initial request is pre-emptively throttled.
+            if (result.delay().compareTo(Duration.ZERO) <= 0) {
+                return sendAfterGettingToken(call);
+            } else {
+                return sendAfterDelay(result.delay(), () -> sendAfterGettingToken(call));
+            }
+        } catch (TokenAcquisitionFailedException e) {
+            // Don't send the request if the circuit breaker prevents it.
+            return CompletableFuture.failedFuture(e);
+        }
+    }
 
-        var inputHook = new InputHook<>(context, input);
-        interceptor.readBeforeExecution(inputHook);
-        input = interceptor.modifyBeforeSerialization(inputHook);
+    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> sendAfterGettingToken(
+        ClientCall<I, O> call
+    ) {
+        var input = call.input;
+
+        var inputHook = new InputHook<>(call.context, input);
+        call.interceptor.readBeforeExecution(inputHook);
+        input = call.interceptor.modifyBeforeSerialization(inputHook);
         inputHook = inputHook.withInput(input);
 
-        interceptor.readBeforeSerialization(inputHook);
+        call.interceptor.readBeforeSerialization(inputHook);
         // Use the UNRESOLVED URI of "/" for now, and resolve the actual endpoint later.
-        RequestT request = protocol.createRequest(call.operation(), input, context, UNRESOLVED);
-        var requestHook = new RequestHook<>(context, input, request);
-        interceptor.readAfterSerialization(requestHook);
+        RequestT request = protocol.createRequest(call.operation, input, call.context, UNRESOLVED);
+        var requestHook = new RequestHook<>(call.context, input, request);
+        call.interceptor.readAfterSerialization(requestHook);
 
-        request = interceptor.modifyBeforeRetryLoop(requestHook);
+        request = call.interceptor.modifyBeforeRetryLoop(requestHook);
         requestHook = requestHook.withRequest(request);
+        return doSendOrRetry(call, requestHook.withRequest(request));
+    }
+
+    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> doSendOrRetry(
+        ClientCall<I, O> call,
+        RequestHook<I, RequestT> requestHook
+    ) {
+        var request = requestHook.request();
 
         // Retry loop
-        interceptor.readBeforeAttempt(requestHook);
+        call.interceptor.readBeforeAttempt(requestHook);
 
         // 8.b. Resolve auth scheme, sign, etc.
-        request = interceptor.modifyBeforeSigning(requestHook);
+        request = call.interceptor.modifyBeforeSigning(requestHook);
         var finalRequestHook = requestHook.withRequest(request);
 
-        interceptor.readBeforeSigning(finalRequestHook);
+        call.interceptor.readBeforeSigning(finalRequestHook);
 
         var resolvedAuthScheme = resolveAuthScheme(call, request);
 
@@ -132,7 +168,7 @@ final class ClientPipeline<RequestT, ResponseT> {
         return resolvedAuthScheme.identity().thenCompose(identityResult -> {
             // This throws if no identity was found.
             var identity = identityResult.unwrap();
-            context.put(CallContext.IDENTITY, identity);
+            call.context.put(CallContext.IDENTITY, identity);
 
             // TODO: what to do with supportedAuthSchemes of an endpoint?
             return resolveEndpoint(call)
@@ -140,14 +176,14 @@ final class ClientPipeline<RequestT, ResponseT> {
                 .thenCompose(resolvedAuthScheme::sign)
                 .thenApply(req -> {
                     var reqHook = finalRequestHook.withRequest(req);
-                    interceptor.readAfterSigning(reqHook);
-                    req = interceptor.modifyBeforeTransmit(reqHook);
-                    interceptor.readBeforeTransmit(reqHook.withRequest(req));
+                    call.interceptor.readAfterSigning(reqHook);
+                    req = call.interceptor.modifyBeforeTransmit(reqHook);
+                    call.interceptor.readBeforeTransmit(reqHook.withRequest(req));
                     return req;
                 })
                 .thenCompose(finalRequest -> {
-                    return transport.send(context, finalRequest).thenCompose(response -> {
-                        return deserialize(call, finalRequest, response, call.interceptor());
+                    return transport.send(call.context, finalRequest).thenCompose(response -> {
+                        return deserialize(call, finalRequest, response, call.interceptor);
                     });
                 });
         });
@@ -160,19 +196,19 @@ final class ClientPipeline<RequestT, ResponseT> {
     ) {
         var params = AuthSchemeResolverParams.builder()
             .protocolId(protocol.id())
-            .operation(call.operation())
-            .context(Context.unmodifiableView(call.context()))
+            .operation(call.operation)
+            .context(Context.unmodifiableView(call.context))
             .build();
-        var authSchemeOptions = call.authSchemeResolver().resolveAuthScheme(params);
+        var authSchemeOptions = call.authSchemeResolver.resolveAuthScheme(params);
 
         // Determine if the auth scheme option is actually supported.
         for (var authSchemeOption : authSchemeOptions) {
-            AuthScheme<?, ?> authScheme = call.supportedAuthSchemes().get(authSchemeOption.schemeId());
+            AuthScheme<?, ?> authScheme = call.supportedAuthSchemes.get(authSchemeOption.schemeId());
             if (authScheme != null && authScheme.requestClass().isAssignableFrom(request.getClass())) {
                 AuthScheme<RequestT, ?> castAuthScheme = (AuthScheme<RequestT, ?>) authScheme;
                 var resolved = createResolvedSchema(
-                    call.identityResolvers(),
-                    call.context(),
+                    call.identityResolvers,
+                    call.context,
                     castAuthScheme,
                     authSchemeOption
                 );
@@ -187,7 +223,7 @@ final class ClientPipeline<RequestT, ResponseT> {
             options.add(authSchemeOption.schemeId().toString());
         }
         throw new ApiException(
-            "No auth scheme could be resolved for operation " + call.operation().schema().id()
+            "No auth scheme could be resolved for operation " + call.operation.schema().id()
                 + "; protocol=" + protocol.id()
                 + "; requestClass=" + request.getClass()
                 + "; auth scheme options=" + options
@@ -223,16 +259,27 @@ final class ClientPipeline<RequestT, ResponseT> {
         }
     }
 
+    private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<Endpoint> resolveEndpoint(
+        ClientCall<I, O> call
+    ) {
+        var request = EndpointResolverParams.builder()
+            .operation(call.operation)
+            .inputValue(call.input)
+            .context(Context.unmodifiableView(call.context))
+            .build();
+        return call.endpointResolver.resolveEndpoint(request);
+    }
+
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserialize(
         ClientCall<I, O> call,
         RequestT request,
         ResponseT response,
         ClientInterceptor interceptor
     ) {
-        var input = call.input();
+        var input = call.input;
         LOGGER.trace("Deserializing response with {} for {}:{}", protocol.getClass(), request, response);
 
-        Context context = call.context();
+        Context context = call.context;
         var responseHook = new ResponseHook<>(context, input, request, response);
 
         interceptor.readAfterTransmit(responseHook);
@@ -242,8 +289,8 @@ final class ClientPipeline<RequestT, ResponseT> {
 
         interceptor.readBeforeDeserialization(responseHook);
 
-        return protocol.deserializeResponse(call.operation(), context, call.typeRegistry(), request, modifiedResponse)
-            .thenApply(shape -> {
+        return protocol.deserializeResponse(call.operation, context, call.typeRegistry, request, modifiedResponse)
+            .thenCompose(shape -> {
                 var outputHook = new OutputHook<>(context, input, request, response, shape);
                 RuntimeException error = null;
 
@@ -256,39 +303,76 @@ final class ClientPipeline<RequestT, ResponseT> {
                 try {
                     shape = interceptor.modifyBeforeAttemptCompletion(outputHook, error);
                     outputHook = outputHook.withOutput(shape);
+                    // The expectation is that errors are re-thrown by hooks, or else they are disassociated.
+                    error = null;
                 } catch (RuntimeException e) {
                     error = e;
                 }
 
                 try {
                     interceptor.readAfterAttempt(outputHook, error);
+                    error = null;
                 } catch (RuntimeException e) {
-                    // TODO: If retryable, goto readBeforeAttempt, if not goto modifyBeforeCompletion.
-                    error = e;
+                    try {
+                        // If it's retryable, keep retrying.
+                        var acquireRequest = new RefreshRetryTokenRequest(call.retryToken, e, null);
+                        var acquireResult = call.retryStrategy.refreshRetryToken(acquireRequest);
+                        return retry(call, request, acquireResult.token(), acquireResult.delay());
+                    } catch (TokenAcquisitionFailedException tafe) {
+                        // Log and continue to the normal failure mode for the request.
+                        LOGGER.debug("Cannot acquire a retry token: {}", tafe);
+                        error = e;
+                    }
                 }
 
                 // End of retry loop
                 try {
+                    if (error == null) {
+                        call.retryStrategy.recordSuccess(new RecordSuccessRequest(call.retryToken));
+                    }
+                    call.retryToken = null;
                     shape = interceptor.modifyBeforeCompletion(outputHook, error);
                     outputHook = outputHook.withOutput(shape);
+                    error = null;
                 } catch (RuntimeException e) {
                     error = e;
                 }
 
                 interceptor.readAfterExecution(outputHook, error);
 
-                return outputHook.output();
+                return CompletableFuture.completedFuture(outputHook.output());
             });
     }
 
-    private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<Endpoint> resolveEndpoint(
-        ClientCall<I, O> call
+    private static <T> CompletableFuture<T> sendAfterDelay(Duration after, Supplier<CompletableFuture<T>> result) {
+        var millis = after.toMillis();
+        if (millis <= 0) {
+            throw new IllegalArgumentException("Send after delay duration is <= 0: " + after);
+        }
+        CompletableFuture<T> future = new CompletableFuture<>();
+        SCHEDULER.schedule(() -> {
+            try {
+                result.get().thenApply(future::complete);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        }, millis, TimeUnit.MILLISECONDS);
+        return future;
+    }
+
+    private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> retry(
+        ClientCall<I, O> call,
+        RequestT request,
+        RetryToken retryToken,
+        Duration after
     ) {
-        var request = EndpointResolverParams.builder()
-            .operation(call.operation())
-            .inputValue(call.input())
-            .context(Context.unmodifiableView(call.context()))
-            .build();
-        return call.endpointResolver().resolveEndpoint(request);
+        // Associate the retry token with the call.
+        call.retryToken = retryToken;
+        // Adjust the current retry count on the context (e.g., protocols can use this to add retry headers).
+        call.context.put(CallContext.RETRY_ATTEMPT, ++call.retryCount);
+        return sendAfterDelay(after, () -> {
+            var requestHook = new RequestHook<>(call.context, call.input, request);
+            return doSendOrRetry(call, requestHook);
+        });
     }
 }

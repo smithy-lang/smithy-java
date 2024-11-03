@@ -12,6 +12,7 @@ import software.amazon.smithy.java.runtime.retries.api.RecordSuccessRequest;
 import software.amazon.smithy.java.runtime.retries.api.RecordSuccessResponse;
 import software.amazon.smithy.java.runtime.retries.api.RefreshRetryTokenRequest;
 import software.amazon.smithy.java.runtime.retries.api.RefreshRetryTokenResponse;
+import software.amazon.smithy.java.runtime.retries.api.RetryInfo;
 import software.amazon.smithy.java.runtime.retries.api.RetryStrategy;
 import software.amazon.smithy.java.runtime.retries.api.RetryToken;
 import software.amazon.smithy.java.runtime.retries.api.TokenAcquisitionFailedException;
@@ -36,7 +37,7 @@ public class SdkRetryStrategy implements RetryStrategy {
             var delegateRequest = software.amazon.awssdk.retries.api.AcquireInitialTokenRequest.create(request.scope());
             var delegateResponse = delegate.acquireInitialToken(delegateRequest);
             var adaptedToken = new SdkRetryToken(delegateResponse.token());
-            return AcquireInitialTokenResponse.create(adaptedToken, delegateResponse.delay());
+            return new AcquireInitialTokenResponse(adaptedToken, delegateResponse.delay());
         } catch (software.amazon.awssdk.retries.api.TokenAcquisitionFailedException e) {
             throw new TokenAcquisitionFailedException(e.getMessage(), e);
         }
@@ -45,14 +46,18 @@ public class SdkRetryStrategy implements RetryStrategy {
     @Override
     public RefreshRetryTokenResponse refreshRetryToken(RefreshRetryTokenRequest request) {
         try {
+            var suggestedDelay = request.suggestedDelay();
+            if (suggestedDelay == null && request.failure() instanceof RetryInfo info) {
+                suggestedDelay = info.retryAfter();
+            }
             var delegateRequest = software.amazon.awssdk.retries.api.RefreshRetryTokenRequest.builder()
                 .token(getDelegatedRetryToken(request.token()))
                 .failure(request.failure())
-                .suggestedDelay(request.suggestedDelay() == null ? Duration.ZERO : request.suggestedDelay())
+                .suggestedDelay(suggestedDelay == null ? Duration.ZERO : suggestedDelay)
                 .build();
             var delegateResponse = delegate.refreshRetryToken(delegateRequest);
             var adaptedToken = new SdkRetryToken(delegateResponse.token());
-            return RefreshRetryTokenResponse.create(adaptedToken, delegateResponse.delay());
+            return new RefreshRetryTokenResponse(adaptedToken, delegateResponse.delay());
         } catch (software.amazon.awssdk.retries.api.TokenAcquisitionFailedException e) {
             throw new TokenAcquisitionFailedException(e.getMessage(), e);
         }
@@ -71,7 +76,7 @@ public class SdkRetryStrategy implements RetryStrategy {
         var token = getDelegatedRetryToken(request.token());
         var delegateRequest = software.amazon.awssdk.retries.api.RecordSuccessRequest.create(token);
         var delegateResponse = delegate.recordSuccess(delegateRequest);
-        return RecordSuccessResponse.create(new SdkRetryToken(delegateResponse.token()));
+        return new RecordSuccessResponse(new SdkRetryToken(delegateResponse.token()));
     }
 
     @Override
