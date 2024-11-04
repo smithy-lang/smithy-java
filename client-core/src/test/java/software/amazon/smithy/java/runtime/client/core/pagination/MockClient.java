@@ -22,6 +22,7 @@ final class MockClient {
     private final Executor executor = CompletableFuture.delayedExecutor(3, TimeUnit.MILLISECONDS);
     private final Iterator<String> tokenIterator = tokens.iterator();
     private String nextToken = null;
+    private boolean completed = false;
 
     public GetFoosOutput getFoosSync(GetFoosInput in, RequestOverrideConfig override) {
         return getFoosAsync(in, override).join();
@@ -30,14 +31,17 @@ final class MockClient {
     public CompletableFuture<GetFoosOutput> getFoosAsync(GetFoosInput in, RequestOverrideConfig override) {
         if (!Objects.equals(nextToken, in.nextToken())) {
             throw new IllegalArgumentException(
-                "Next token " + in.nextToken() + " does not match expected " + in.nextToken()
+                "Next token " + nextToken + " does not match expected " + in.nextToken()
             );
+        } else if (completed) {
+            throw new IllegalArgumentException("No more requests expected but got: " + in);
         }
 
         List<String> foos = new ArrayList<>();
         for (int idx = 0; idx < in.maxResults(); idx++) {
             foos.add("foo" + idx);
         }
+        completed = !tokenIterator.hasNext();
         nextToken = tokenIterator.hasNext() ? tokenIterator.next() : null;
         var output = new GetFoosOutput(new ResultWrapper(nextToken, foos));
         return CompletableFuture.supplyAsync(() -> output, executor);

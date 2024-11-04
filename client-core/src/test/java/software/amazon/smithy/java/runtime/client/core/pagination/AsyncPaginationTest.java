@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.client.core.pagination;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -44,7 +45,6 @@ public class AsyncPaginationTest {
         paginator.subscribe(subscriber);
         // Block and wait on results
         var results = subscriber.results();
-        System.out.println("Results " + results);
         assertThat(results, contains(BASE_EXPECTED_RESULTS.toArray()));
     }
 
@@ -58,11 +58,27 @@ public class AsyncPaginationTest {
 
         // Block and wait on results
         var results = subscriber.results();
-        System.out.println("RESULTS " + results);
         var expectedResult = List.of(
             new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
             new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))),
             new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1")))
+        );
+        assertThat(results, contains(expectedResult.toArray()));
+    }
+
+    @Test
+    void testForEachPagination() {
+        var input = GetFoosInput.builder().maxResults(4).build();
+        var paginator = AsyncPaginator.paginate(input, new TestOperationPaginated(), mockClient::getFoosAsync);
+        paginator.maxItems(10);
+        List<GetFoosOutput> results = new ArrayList<>();
+        // Block and wait on results
+        paginator.forEach(results::add).join();
+
+        var expectedResult = List.of(
+                new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
+                new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))),
+                new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1")))
         );
         assertThat(results, contains(expectedResult.toArray()));
     }

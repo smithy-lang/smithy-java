@@ -5,10 +5,13 @@
 
 package software.amazon.smithy.java.runtime.client.core.pagination;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
@@ -66,7 +69,6 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
             private final AtomicBoolean completed = new AtomicBoolean(false);
             private final AtomicInteger remainingItems = new AtomicInteger(totalMaxItems);
             private final AtomicLong remainingRequests = new AtomicLong(0);
-
             private int maxItems = pageSize;
 
             @Override
@@ -74,11 +76,6 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
                 if (n <= 0) {
                     subscriber.onError(new IllegalArgumentException("Requested items must be greater than 0"));
                 }
-
-                if (completed.get()) {
-                    return;
-                }
-
                 remainingRequests.addAndGet(n);
                 execute();
             }
@@ -89,7 +86,12 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
             }
 
             private void execute() {
-                // If there are fewer items allowed than we will request, reduce page size to match remaining.
+                if (completed.get()) {
+                    return;
+                }
+                remainingRequests.decrementAndGet();
+
+                // If there are fewer items remaining than we would request, reduce page size to match remaining.
                 if (remainingItems.get() > 0 && maxItems > remainingItems.get()) {
                     maxItems = remainingItems.get();
                 }
@@ -104,7 +106,6 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
                         maxItems
                     );
                     var input = operation.inputBuilder().deserialize(deserializer).build();
-
                     call.call(input, overrideConfig).thenAccept(output -> {
                         // Use a serializer to extract relevant data from the response
                         var serializer = new PaginationDiscoveringSerializer(outputTokenPath, itemsPath);
@@ -115,17 +116,17 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
                         nextToken = serializer.outputToken();
                         remainingItems.getAndAdd(-serializer.totalItems());
 
-                        // Provide the subscriber with the output value
-                        subscriber.onNext(output);
-
                         // Next token is null or max results reached, indicating there are no more values.
                         if (nextToken == null || (totalMaxItems != 0 && remainingItems.get() == 0)) {
                             completed.set(true);
+                            subscriber.onNext(output);
                             subscriber.onComplete();
+                        } else {
+                            subscriber.onNext(output);
                         }
 
-                        // Make any remaining requests
-                        if (remainingRequests.addAndGet(-1) > 0) {
+                        // Make any remaining requests if necessary
+                        if (remainingRequests.get() > 0) {
                             execute();
                         }
                     });
@@ -134,5 +135,42 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
                 }
             }
         });
+    }
+
+    @Override
+    public CompletableFuture<Void> forEach(Consumer<O> consumer) {
+        var future = new CompletableFuture<Void>();
+        subscribe(new Flow.Subscriber<>() {
+            private Flow.Subscription subscription;
+
+            @Override
+            public void onSubscribe(Flow.Subscription subscription) {
+                this.subscription = subscription;
+                subscription.request(1);
+            }
+
+            @Override
+            public void onNext(O item) {
+                try {
+                    consumer.accept(item);
+                    subscription.request(1);
+                } catch (RuntimeException exc) {
+                    // Handle the consumer throwing an exception
+                    subscription.cancel();
+                    future.completeExceptionally(exc);
+                }
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                future.completeExceptionally(throwable);
+            }
+
+            @Override
+            public void onComplete() {
+                future.complete(null);
+            }
+        });
+        return future;
     }
 }
