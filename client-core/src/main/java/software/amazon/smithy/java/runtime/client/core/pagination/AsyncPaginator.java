@@ -7,7 +7,7 @@ package software.amazon.smithy.java.runtime.client.core.pagination;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
@@ -96,8 +96,8 @@ public interface AsyncPaginator<O extends SerializableStruct> extends PaginatorS
      * <p>This consumer will be called for each event published (without backpressure). If more control or
      * backpressure is required, consider using {@link Flow.Publisher#subscribe(Flow.Subscriber)}.
      *
-     * @param consumer  Consumer to process event.
+     * @param predicate Consumer to process pages of results. Return true from predicate to keep processing next page, false to stop.
      * @return CompletableFuture that will be notified when all events have been consumed or if an error occurs.
      */
-    CompletableFuture<Void> forEach(Consumer<O> consumer);
+    CompletableFuture<Void> forEach(Predicate<O> predicate);
 }

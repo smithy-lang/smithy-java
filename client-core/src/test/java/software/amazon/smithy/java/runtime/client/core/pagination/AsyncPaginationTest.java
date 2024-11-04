@@ -83,6 +83,25 @@ public class AsyncPaginationTest {
         assertThat(results, contains(expectedResult.toArray()));
     }
 
+    @Test
+    void paginatorStopsOnFalsePredicate() {
+        var input = GetFoosInput.builder().maxResults(4).build();
+        var paginator = AsyncPaginator.paginate(input, new TestOperationPaginated(), mockClient::getFoosAsync);
+
+        List<GetFoosOutput> results = new ArrayList<>();
+        // Block and wait on results
+        paginator.forEach(r -> {
+            results.add(r);
+            return !"second".equals(r.result().nextToken());
+        }).join();
+
+        var expectedResult = List.of(
+            new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
+            new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3")))
+        );
+        assertThat(results, contains(expectedResult.toArray()));
+    }
+
     private static final class PaginationTestSubscriber implements Flow.Subscriber<GetFoosOutput> {
         private Flow.Subscription subscription;
         private final BlockingQueue<GetFoosOutput> results = new LinkedBlockingQueue<>();

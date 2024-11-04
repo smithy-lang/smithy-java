@@ -11,7 +11,7 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
@@ -144,7 +144,7 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
     }
 
     @Override
-    public CompletableFuture<Void> forEach(Consumer<O> consumer) {
+    public CompletableFuture<Void> forEach(Predicate<O> consumer) {
         var future = new CompletableFuture<Void>();
         subscribe(new Flow.Subscriber<>() {
             private Flow.Subscription subscription;
@@ -158,8 +158,12 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
             @Override
             public void onNext(O item) {
                 try {
-                    consumer.accept(item);
-                    subscription.request(1);
+                    if (consumer.test(item)) {
+                        subscription.request(1);
+                    } else {
+                        subscription.cancel();
+                        future.complete(null);
+                    }
                 } catch (RuntimeException exc) {
                     // Handle the consumer throwing an exception
                     subscription.cancel();
