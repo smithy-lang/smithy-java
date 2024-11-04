@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.dynamicclient;
 
 import java.util.List;
+import java.util.Set;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
@@ -19,6 +20,7 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
     private final Schema operationSchema;
     private final Schema inputSchema;
     private final Schema outputSchema;
+    private final Set<Schema> errorSchemas;
     private final TypeRegistry typeRegistry;
     private final List<ShapeId> effectiveAuthSchemes;
 
@@ -27,6 +29,7 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
         Schema operationSchema,
         Schema inputSchema,
         Schema outputSchema,
+        Set<Schema> errorSchemas,
         TypeRegistry typeRegistry,
         List<ShapeId> effectiveAuthSchemes
     ) {
@@ -35,6 +38,7 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
         this.operationSchema = operationSchema;
         this.inputSchema = inputSchema;
         this.outputSchema = outputSchema;
+        this.errorSchemas = errorSchemas;
         this.typeRegistry = typeRegistry;
         validateStreaming(inputSchema);
         validateStreaming(outputSchema);
@@ -81,5 +85,10 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
     @Override
     public List<ShapeId> effectiveAuthSchemes() {
         return effectiveAuthSchemes;
+    }
+
+    @Override
+    public Set<Schema> errorSchemas() {
+        return errorSchemas;
     }
 }

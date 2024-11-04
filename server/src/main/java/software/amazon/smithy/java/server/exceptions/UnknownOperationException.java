@@ -16,7 +16,7 @@ public class UnknownOperationException extends ModeledApiException {
         "software.amazon.smithy.exceptions#UnknownOperationException"
     );
 
-    static final Schema SCHEMA = Schema.structureBuilder(ID).build();
+    private static final Schema SCHEMA = Schema.structureBuilder(ID).build();
 
     public UnknownOperationException(String message) {
         super(SCHEMA, message);

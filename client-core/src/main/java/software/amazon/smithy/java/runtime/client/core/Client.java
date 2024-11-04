@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResolver;
 import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResolvers;
@@ -265,5 +266,14 @@ public abstract class Client {
          * @return the created client.
          */
         public abstract I build();
+    }
+
+    @SuppressWarnings("unchecked")
+    protected static <E extends Throwable> E unwrap(CompletionException e) throws E {
+        Throwable cause = e.getCause();
+        if (cause != null) {
+            return (E) cause;
+        }
+        return (E) e;
     }
 }

@@ -16,6 +16,9 @@ public final class ProtocolHandler implements Handler {
 
     @Override
     public CompletableFuture<Void> after(Job job) {
-        return job.chosenProtocol().serializeOutput(job);
+        if (job.isFailure()) {
+            return job.chosenProtocol().serializeError(job, job.getFailure());
+        }
+        return job.chosenProtocol().serializeOutput(job, job.response().getValue());
     }
 }

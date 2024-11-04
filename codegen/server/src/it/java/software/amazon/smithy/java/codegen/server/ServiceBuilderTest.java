@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.server;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -18,11 +19,16 @@ import smithy.java.codegen.server.test.model.EchoOutput;
 import smithy.java.codegen.server.test.model.EchoPayload;
 import smithy.java.codegen.server.test.model.GetBeerInput;
 import smithy.java.codegen.server.test.model.GetBeerOutput;
+import smithy.java.codegen.server.test.model.GetErrorInput;
+import smithy.java.codegen.server.test.model.GetErrorOutput;
 import smithy.java.codegen.server.test.service.EchoOperation;
 import smithy.java.codegen.server.test.service.GetBeerOperationAsync;
+import smithy.java.codegen.server.test.service.GetErrorOperationAsync;
 import smithy.java.codegen.server.test.service.TestService;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.RequestContext;
+import software.amazon.smithy.java.server.exceptions.InternalServerError;
 import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 
 public class ServiceBuilderTest {
@@ -44,9 +50,33 @@ public class ServiceBuilderTest {
         }
     }
 
+    private static final class GetErrorImpl implements GetErrorOperationAsync {
+        @Override
+        public CompletableFuture<GetErrorOutput> getError(GetErrorInput input, RequestContext context) {
+            Throwable exception;
+            try {
+                Class<?> clazz = Class.forName(input.exceptionClass());
+                if (ModeledApiException.class.isAssignableFrom(clazz)) {
+                    Object builderInstance = clazz.getDeclaredMethod("builder").invoke(null);
+                    builderInstance = builderInstance.getClass()
+                        .getMethod("message")
+                        .invoke(builderInstance, input.message());
+                    exception = (Throwable) builderInstance.getClass().getMethod("build").invoke(builderInstance);
+                } else {
+                    exception = (Throwable) clazz.getConstructor().newInstance(input.message());
+                }
+            } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InvocationTargetException
+                | InstantiationException e) {
+                exception = new InternalServerError("Exception class not found");
+            }
+            return CompletableFuture.failedFuture(exception);
+        }
+    }
+
     private final TestService service = TestService.builder()
         .addEchoOperation(new EchoImpl())
         .addGetBeerOperation(new GetBeerImpl())
+        .addGetErrorOperation(new GetErrorImpl())
         .build();
 
     @Test

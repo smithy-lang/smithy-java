@@ -137,7 +137,8 @@ public final class RequestSerializer {
             payloadCodec,
             payloadMediaType,
             matcher,
-            omitEmptyPayload
+            omitEmptyPayload,
+            false
         );
         shapeValue.serialize(serializer);
         serializer.flush();

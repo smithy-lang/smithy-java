@@ -10,7 +10,7 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-public class InternalServerError extends ModeledApiException {
+public final class InternalServerError extends ModeledApiException {
 
     public static final ShapeId ID = ShapeId.from(
         "software.amazon.smithy.exceptions#InternalServerError"

@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.client.generators;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
@@ -59,6 +60,7 @@ public final class ClientImplementationGenerator
             writer.putContext("interface", symbol);
             writer.putContext("impl", impl);
             writer.putContext("future", CompletableFuture.class);
+            writer.putContext("completionException", CompletionException.class);
             writer.putContext(
                 "operations",
                 new OperationMethodGenerator(
@@ -93,8 +95,12 @@ public final class ClientImplementationGenerator
                 writer.write(
                     """
                         @Override
-                        public ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig) {
-                            return call(input, new ${operation:T}(), overrideConfig)${^async}.join()${/async};
+                        public ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig) {${^async}
+                            try {
+                                ${/async}return call(input, new ${operation:T}(), overrideConfig)${^async}.join()${/async};${^async}
+                            } catch (${completionException:T} e) {
+                                throw unwrap(e);
+                            }${/async}
                         }
                         """
                 );

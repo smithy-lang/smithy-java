@@ -6,7 +6,8 @@ service TestService {
     version: "today"
     operations: [
         GetBeer
-        Echo
+        Echo,
+        GetError
     ]
 }
 
@@ -20,6 +21,16 @@ operation Echo {
     output: EchoOutput
 }
 
+operation GetError {
+    input := {
+        @required
+        exceptionClass: String,
+        @required
+        message: String
+    },
+    errors: [BeerNotFoundException, InvalidBeerIdException, BeerTooLargeException]
+}
+
 structure EchoInput {
     value: EchoPayload
 }
@@ -30,7 +41,6 @@ structure EchoOutput {
 
 structure EchoPayload {
     string: String
-
     @required
     @default(0)
     echoCount: Integer
@@ -53,4 +63,26 @@ structure GetBeerInput {
 structure GetBeerOutput {
     @required
     value: BeerList
+}
+
+@error("client")
+@httpError(403)
+structure BeerNotFoundException {
+    @required
+    message: String
+}
+
+@error("client")
+@httpError(403)
+structure InvalidBeerIdException {
+    @required
+    message: String
+}
+
+
+@error("server")
+@httpError(503)
+structure BeerTooLargeException {
+    @required
+    message: String
 }

@@ -125,9 +125,12 @@ public final class ResponseSerializer {
         Objects.requireNonNull(payloadCodec, "payloadCodec is not set");
         Objects.requireNonNull(payloadMediaType, "payloadMediaType is not set");
 
-        // TODO: Implement error serialization.
-        if (errorSchema != null) {
-            throw new UnsupportedOperationException("error serialization not yet implemented");
+        Schema schema;
+        boolean isFailure = errorSchema != null;
+        if (isFailure) {
+            schema = errorSchema;
+        } else {
+            schema = operation.outputSchema();
         }
 
         var httpTrait = operation.schema().expectTrait(TraitKey.HTTP_TRAIT);
@@ -135,8 +138,9 @@ public final class ResponseSerializer {
             httpTrait,
             payloadCodec,
             payloadMediaType,
-            bindingCache.computeIfAbsent(operation.outputSchema(), BindingMatcher::responseMatcher),
-            omitEmptyPayload
+            bindingCache.computeIfAbsent(schema, BindingMatcher::responseMatcher),
+            omitEmptyPayload,
+            isFailure
         );
         shapeValue.serialize(serializer);
         serializer.flush();

@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.core.schema;
 
 import java.util.List;
+import java.util.Set;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -64,4 +65,11 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
      * @return List of effective auth schemes
      */
     List<ShapeId> effectiveAuthSchemes();
+
+    /**
+     * Return a Set of {@link Schema} representing errors that are allowed to be returned from this Operation.
+     *
+     * @return Set of {@link Schema} for the errors throwable by this operation.
+     */
+    Set<Schema> errorSchemas();
 }

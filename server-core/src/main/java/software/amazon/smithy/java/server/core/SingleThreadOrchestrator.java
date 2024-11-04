@@ -136,7 +136,11 @@ public final class SingleThreadOrchestrator implements ObservableOrchestrator {
                         }
                     }
                     state = State.DONE;
-                    signal.complete(null);
+                    if (job.isFailure()) {
+                        signal.completeExceptionally(job.getFailure());
+                    } else {
+                        signal.complete(null);
+                    }
                 }
             } catch (Exception e) {
                 signal.completeExceptionally(e);

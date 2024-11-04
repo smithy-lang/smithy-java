@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.server.Server;
+import software.amazon.smithy.java.server.core.ErrorHandlingOrchestrator;
 import software.amazon.smithy.java.server.core.HandlerAssembler;
 import software.amazon.smithy.java.server.core.OrchestratorGroup;
 import software.amazon.smithy.java.server.core.ProtocolResolver;
@@ -49,7 +50,7 @@ final class NettyServer implements Server {
         var handlers = new HandlerAssembler().assembleHandlers(builder.serviceMatcher.getAllServices());
         orchestrator = new OrchestratorGroup(
             builder.numberOfWorkers,
-            () -> new SingleThreadOrchestrator(handlers),
+            () -> new ErrorHandlingOrchestrator(new SingleThreadOrchestrator(handlers)),
             OrchestratorGroup.Strategy.roundRobin()
         );
 

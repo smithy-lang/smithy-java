@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -17,6 +18,7 @@ import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
@@ -58,6 +60,8 @@ public class OperationGenerator
                         ${typeRegistrySection:C|}
 
                         private static final ${list:T}<${shapeId:T}> SCHEMES = ${list:T}.of(${#schemes}${shapeId:T}.from(${key:S})${^key.last}, ${/key.last}${/schemes});
+
+                        private static final ${set:T}<${sdkSchema:T}> ERROR_SCHEMAS = ${set:T}.of(${#exceptions}${value:T}.$$SCHEMA${^key.last}, ${/key.last}${/exceptions});
 
                         @Override
                         public ${sdkShapeBuilder:N}<${inputType:T}> inputBuilder() {
@@ -121,6 +125,11 @@ public class OperationGenerator
                         public ${list:T}<${shapeId:T}> effectiveAuthSchemes() {
                             return SCHEMES;
                         }
+
+                        @Override
+                        public ${set:T}<${sdkSchema:T}> errorSchemas() {
+                            return ERROR_SCHEMAS;
+                        }
                     }
                     """;
                 writer.putContext("shape", symbol);
@@ -132,6 +141,8 @@ public class OperationGenerator
                 writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
                 writer.putContext("list", List.class);
                 writer.putContext("string", String.class);
+                writer.putContext("set", Set.class);
+                writer.putContext("modeledApiException", ModeledApiException.class);
 
                 writer.putContext(
                     "operationType",
@@ -191,6 +202,13 @@ public class OperationGenerator
                         directive.symbolProvider().toSymbol(info.getEventStreamTarget())
                     );
                 });
+
+                var exceptions = shape.getErrors()
+                    .stream()
+                    .map(directive.model()::expectShape)
+                    .map(directive.symbolProvider()::toSymbol)
+                    .toList();
+                writer.putContext("exceptions", exceptions);
                 writer.write(template);
                 writer.popState();
             });

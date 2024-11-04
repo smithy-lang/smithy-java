@@ -12,6 +12,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.TraitKey;
@@ -54,6 +55,7 @@ public class DynamicOperationTest {
                 operationSchema,
                 input,
                 output,
+                Set.of(),
                 registry,
                 List.of()
             );
@@ -89,6 +91,7 @@ public class DynamicOperationTest {
             operationSchema,
             input,
             output,
+            Set.of(),
             registry,
             List.of()
         );

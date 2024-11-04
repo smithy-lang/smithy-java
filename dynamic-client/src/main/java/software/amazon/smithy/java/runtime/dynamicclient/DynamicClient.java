@@ -6,7 +6,9 @@
 package software.amazon.smithy.java.runtime.dynamicclient;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -20,6 +22,7 @@ import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.Model;
@@ -197,11 +200,13 @@ public final class DynamicClient extends Client {
             // Default to using the service registry.
             var registry = serviceErrorRegistry;
 
+            var errorSchemas = new HashSet<Schema>();
             // Create a type registry that is able to deserialize errors using schemas.
             if (!shape.getErrors().isEmpty()) {
                 var registryBuilder = TypeRegistry.builder();
                 for (var e : shape.getErrors()) {
                     registerError(e, registryBuilder);
+                    errorSchemas.add(schemaConverter.getSchema(model.expectShape(e)));
                 }
                 // Compose the operation errors with the service errors.
                 registry = TypeRegistry.compose(registryBuilder.build(), serviceErrorRegistry);
@@ -212,6 +217,7 @@ public final class DynamicClient extends Client {
                 operationSchema,
                 inputSchema,
                 outputSchema,
+                Collections.unmodifiableSet(errorSchemas),
                 registry,
                 authSchemes
             );
