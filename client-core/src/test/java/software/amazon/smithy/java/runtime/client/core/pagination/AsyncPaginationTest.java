@@ -76,9 +76,9 @@ public class AsyncPaginationTest {
         paginator.forEach(results::add).join();
 
         var expectedResult = List.of(
-                new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
-                new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))),
-                new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1")))
+            new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
+            new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))),
+            new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1")))
         );
         assertThat(results, contains(expectedResult.toArray()));
     }
