@@ -95,8 +95,8 @@ public final class ClientImplementationGenerator
                     } catch (${completionException:T} e) {
                         throw unwrap(e);
                     }${/async}
-                }
-                ${?paginated}
+                }${?paginated}
+
                 @Override
                 public ${paginator:T}<${output:T}> ${name:L}Paginator(${input:T} input) {
                     return ${paginator:T}.paginate(input, new ${operation:T}(), this::${name:L});

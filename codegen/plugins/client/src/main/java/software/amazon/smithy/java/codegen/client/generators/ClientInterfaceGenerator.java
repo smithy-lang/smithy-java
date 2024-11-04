@@ -309,10 +309,11 @@ public final class ClientInterfaceGenerator
                 }
                 """;
             var templateBase = """
-                ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig);
-                ${?paginated}
+                ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig);${?paginated}
+
                 ${paginator:T}<${output:T}> ${name:L}Paginator(${input:T} input);
                 ${/paginated}
+
                 """;
             writer.pushState();
             var isAsync = symbol.expectProperty(ClientSymbolProperties.ASYNC);
