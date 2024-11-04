@@ -57,6 +57,9 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 *  });
  * }</pre>
  *
+ * <p><strong>Note:</strong>This paginator expects fully-resolved paginated traits on any paginated operation schemas
+ * and will not automatically merge operation pagination info with a service's pagination info.
+ *
  * @param <O> Output type of list operation being paginated.
  */
 public interface AsyncPaginator<O extends SerializableStruct> extends PaginatorSettings, Flow.Publisher<O> {
