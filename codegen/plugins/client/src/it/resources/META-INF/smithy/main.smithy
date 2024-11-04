@@ -5,6 +5,10 @@ namespace smithy.java.codegen.server.test
 use aws.protocols#restJson1
 use smithy.test.auth#testAuthScheme
 
+@paginated(
+    inputToken: "inputToken",
+    pageSize: "maxItems"
+)
 @restJson1
 @testAuthScheme
 service TestService {
@@ -27,10 +31,8 @@ operation Echo {
 
 @http(method: "GET", uri: "/list", code: 200)
 @paginated(
-    inputToken: "inputToken",
     outputToken: "outputToken",
-    items: "results",
-    pageSize: "maxItems"
+    items: "results"
 )
 operation PaginatedOperation {
     input := {
