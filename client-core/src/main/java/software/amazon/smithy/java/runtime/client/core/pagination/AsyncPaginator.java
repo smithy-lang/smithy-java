@@ -62,16 +62,6 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 public interface AsyncPaginator<O extends SerializableStruct> extends PaginatorSettings, Flow.Publisher<O> {
 
     /**
-     * Converts this {@code AsyncPaginator} to a blocking {@link Paginator}.
-     *
-     * @return blocking paginator.
-     */
-    default Paginator<O> toBlocking() {
-        // TODO: support conversion to blocking paginator
-        throw new UnsupportedOperationException("Blocking pagination is not supported yet.");
-    }
-
-    /**
      * Interface representing a function that is asynchronously paginatable.
      */
     @FunctionalInterface
