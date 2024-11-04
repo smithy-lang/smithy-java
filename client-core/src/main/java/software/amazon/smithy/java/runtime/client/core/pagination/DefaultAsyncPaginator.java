@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.client.core.pagination;
 
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -110,6 +111,12 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
                         var serializer = new PaginationDiscoveringSerializer(outputTokenPath, itemsPath);
                         output.serialize(serializer);
                         serializer.flush();
+
+                        // If we see the same pagination token twice then stop pagination.
+                        if (nextToken != null && Objects.equals(nextToken, serializer.outputToken())) {
+                            completed.set(true);
+                            subscriber.onComplete();
+                        }
 
                         // Update based on output values
                         nextToken = serializer.outputToken();

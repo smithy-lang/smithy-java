@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.client.core.pagination;
 
 import java.util.Iterator;
+import java.util.Objects;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
@@ -90,6 +91,12 @@ final class DefaultSyncPaginator<I extends SerializableStruct, O extends Seriali
                 var serializer = new PaginationDiscoveringSerializer(outputTokenPath, itemsPath);
                 output.serialize(serializer);
                 serializer.flush();
+
+                // If we see the same pagination token twice then stop pagination.
+                if (nextToken != null && Objects.equals(nextToken, serializer.outputToken())) {
+                    hasNext = false;
+                    return output;
+                }
 
                 // Update based on output values
                 nextToken = serializer.outputToken();
