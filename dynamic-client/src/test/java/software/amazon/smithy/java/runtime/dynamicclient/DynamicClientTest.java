@@ -22,6 +22,7 @@ import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeRes
 import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
@@ -52,6 +53,7 @@ public class DynamicClientTest {
                     output := {
                         id: String
                     }
+                    errors: [InvalidSprocketId]
                 }
 
                 operation GetSprocket {
@@ -61,6 +63,11 @@ public class DynamicClientTest {
                     output := {
                         id: String
                     }
+                }
+
+                @error("client")
+                structure InvalidSprocketId {
+                    id: String
                 }
                 """)
             .assemble()
@@ -135,5 +142,44 @@ public class DynamicClientTest {
         var result = client.callAsync("GetSprocket", Document.createFromObject(Map.of("id", "1"))).get();
         assertThat(result.type(), is(ShapeType.STRUCTURE));
         assertThat(result.getMember("id").asString(), equalTo("1"));
+    }
+
+    @Test
+    public void errorHandling() throws Exception {
+        var client = DynamicClient.builder()
+            .service(service)
+            .model(model)
+            .protocol(new AwsJson1Protocol(service))
+            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+            .transport(new ClientTransport<SmithyHttpRequest, SmithyHttpResponse>() {
+                @Override
+                public Class<SmithyHttpRequest> requestClass() {
+                    return SmithyHttpRequest.class;
+                }
+
+                @Override
+                public Class<SmithyHttpResponse> responseClass() {
+                    return SmithyHttpResponse.class;
+                }
+
+                @Override
+                public CompletableFuture<SmithyHttpResponse> send(Context context, SmithyHttpRequest request) {
+                    return CompletableFuture.completedFuture(
+                        SmithyHttpResponse.builder()
+                            .httpVersion(SmithyHttpVersion.HTTP_1_1)
+                            .statusCode(400)
+                            .body(
+                                DataStream.ofString("{\"__type\":\"smithy.example#InvalidSprocketId\", \"id\":\"1\"}")
+                            )
+                            .build()
+                    );
+                }
+            })
+            .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
+            .build();
+
+        var e = Assertions.assertThrows(ApiException.class, () -> {
+            client.call("GetSprocket", Document.createFromObject(Map.of("id", "1")));
+        });
     }
 }

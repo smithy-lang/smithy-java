@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
 import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
+import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -40,6 +41,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * <ul>
  *     <li>No code generated types. You have to construct input and use output manually using document APIs.</li>
  *     <li>No support for streaming inputs or outputs.</li>
+ *     <li>All errors are created as an {@link ApiException}. TODO: make a dynamic version of ModeledApiException.</li>
  * </ul>
  */
 public final class DynamicClient extends Client {
