@@ -83,7 +83,7 @@ public class DynamicClientTest {
             .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
             .build();
 
-        var result = client.call("CreateSprocket").get();
+        var result = client.call("CreateSprocket");
         assertThat(result.type(), is(ShapeType.STRUCTURE));
         assertThat(result.getMember("id").asString(), equalTo("1"));
     }
@@ -132,7 +132,7 @@ public class DynamicClientTest {
             })
             .build();
 
-        var result = client.call("GetSprocket", Document.createFromObject(Map.of("id", "1"))).get();
+        var result = client.callAsync("GetSprocket", Document.createFromObject(Map.of("id", "1"))).get();
         assertThat(result.type(), is(ShapeType.STRUCTURE));
         assertThat(result.getMember("id").asString(), equalTo("1"));
     }

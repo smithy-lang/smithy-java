@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
@@ -42,6 +43,8 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * </ul>
  */
 public final class DynamicClient extends Client {
+
+    private static final TypeRegistry EMPTY_REGISTRY = TypeRegistry.builder().build();
 
     private final ServiceShape service;
     private final Model model;
@@ -76,8 +79,8 @@ public final class DynamicClient extends Client {
      * @param operation Operation name to call.
      * @return the output of the operation.
      */
-    public CompletableFuture<Document> call(String operation) {
-        return call(operation, Document.createStringMap(Map.of()), null);
+    public Document call(String operation) {
+        return call(operation, Document.createStringMap(Map.of()));
     }
 
     /**
@@ -87,7 +90,7 @@ public final class DynamicClient extends Client {
      * @param input Operation input as a document.
      * @return the output of the operation.
      */
-    public CompletableFuture<Document> call(String operation, Document input) {
+    public Document call(String operation, Document input) {
         return call(operation, input, null);
     }
 
@@ -99,7 +102,52 @@ public final class DynamicClient extends Client {
      * @param overrideConfig Override configuration for the request.
      * @return the output of the operation.
      */
-    public CompletableFuture<Document> call(String operation, Document input, RequestOverrideConfig overrideConfig) {
+    public Document call(String operation, Document input, RequestOverrideConfig overrideConfig) {
+        try {
+            return callAsync(operation, input, overrideConfig).join();
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException re) {
+                throw re;
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Call an operation, passing no input.
+     *
+     * @param operation Operation name to call.
+     * @return the output of the operation.
+     */
+    public CompletableFuture<Document> callAsync(String operation) {
+        return callAsync(operation, Document.createStringMap(Map.of()));
+    }
+
+    /**
+     * Call an operation with input.
+     *
+     * @param operation Operation name to call.
+     * @param input Operation input as a document.
+     * @return the output of the operation.
+     */
+    public CompletableFuture<Document> callAsync(String operation, Document input) {
+        return callAsync(operation, input, null);
+    }
+
+    /**
+     * Call an operation with input and custom request override configuration.
+     *
+     * @param operation Operation name to call.
+     * @param input Operation input as a document.
+     * @param overrideConfig Override configuration for the request.
+     * @return the output of the operation.
+     */
+    public CompletableFuture<Document> callAsync(
+        String operation,
+        Document input,
+        RequestOverrideConfig overrideConfig
+    ) {
         var apiOperation = getApiOperation(operation);
         var inputStruct = new WrappedDocument(apiOperation.inputSchema(), input);
         return call(inputStruct, apiOperation, overrideConfig).thenApply(Function.identity());
@@ -119,7 +167,6 @@ public final class DynamicClient extends Client {
             }
 
             var operationSchema = schemaConverter.getSchema(shape);
-            var typeRegistry = TypeRegistry.builder().build();
 
             List<ShapeId> authSchemes = new ArrayList<>();
             for (var trait : ServiceIndex.of(model).getEffectiveAuthSchemes(service).values()) {
@@ -128,7 +175,7 @@ public final class DynamicClient extends Client {
 
             var inputSchema = schemaConverter.getSchema(model.expectShape(shape.getInputShape()));
             var outputSchema = schemaConverter.getSchema(model.expectShape(shape.getOutputShape()));
-            return new DynamicOperation(operationSchema, inputSchema, outputSchema, typeRegistry, authSchemes);
+            return new DynamicOperation(operationSchema, inputSchema, outputSchema, EMPTY_REGISTRY, authSchemes);
         });
     }
 
