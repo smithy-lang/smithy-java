@@ -52,14 +52,14 @@ public class CodegenTest {
         assertFalse(manifest.getFiles().isEmpty());
         assertEquals(manifest.getFiles().size(), 6);
         assertThat(
-            manifest.getFiles().stream().map(Path::toString).toList(),
+            manifest.getFiles(),
             containsInAnyOrder(
-                "/test/smithy/codegen/types/test/model/EnumShape.java",
-                "/test/smithy/codegen/types/test/model/IntEnumShape.java",
-                "/test/smithy/codegen/types/test/model/SharedSchemas.java",
-                "/test/smithy/codegen/types/test/model/SharedSerde.java",
-                "/test/smithy/codegen/types/test/model/StructureShape.java",
-                "/test/smithy/codegen/types/test/model/UnionShape.java"
+                Path.of("/test/smithy/codegen/types/test/model/EnumShape.java"),
+                Path.of("/test/smithy/codegen/types/test/model/IntEnumShape.java"),
+                Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
+                Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
+                Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
+                Path.of("/test/smithy/codegen/types/test/model/UnionShape.java")
             )
         );
     }
@@ -74,11 +74,11 @@ public class CodegenTest {
         assertFalse(manifest.getFiles().isEmpty());
         assertEquals(manifest.getFiles().size(), 3);
         assertThat(
-            manifest.getFiles().stream().map(Path::toString).toList(),
+            manifest.getFiles(),
             containsInAnyOrder(
-                "/test/smithy/codegen/types/test/model/SharedSchemas.java",
-                "/test/smithy/codegen/types/test/model/SharedSerde.java",
-                "/test/smithy/codegen/types/test/model/StructureShape.java"
+                Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
+                Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
+                Path.of("/test/smithy/codegen/types/test/model/StructureShape.java")
             )
         );
     }
@@ -94,12 +94,12 @@ public class CodegenTest {
         assertFalse(manifest.getFiles().isEmpty());
         assertEquals(manifest.getFiles().size(), 4);
         assertThat(
-            manifest.getFiles().stream().map(Path::toString).toList(),
+            manifest.getFiles(),
             containsInAnyOrder(
-                "/test/smithy/codegen/types/test/model/SharedSchemas.java",
-                "/test/smithy/codegen/types/test/model/SharedSerde.java",
-                "/test/smithy/codegen/types/test/model/StructureShape.java",
-                "/test/smithy/codegen/types/test/model/UnionShape.java"
+                Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
+                Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
+                Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
+                Path.of("/test/smithy/codegen/types/test/model/UnionShape.java")
             )
         );
     }
