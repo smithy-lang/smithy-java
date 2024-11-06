@@ -32,12 +32,12 @@ public class InternalServerError extends ModeledApiException {
     }
 
     @Override
-    public void serializeMembers(ShapeSerializer serializer) {
-        serializer.writeString(SCHEMA_MESSAGE, getMessage());
+    public Schema schema() {
+        return SCHEMA;
     }
 
     @Override
-    public void serialize(ShapeSerializer encoder) {
-        encoder.writeStruct(SCHEMA, this);
+    public void serializeMembers(ShapeSerializer serializer) {
+        serializer.writeString(SCHEMA_MESSAGE, getMessage());
     }
 }

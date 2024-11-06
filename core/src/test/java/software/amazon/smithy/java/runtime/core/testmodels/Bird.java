@@ -37,13 +37,13 @@ public final class Bird implements SerializableStruct {
     }
 
     @Override
-    public String toString() {
-        return ToStringSerializer.serialize(this);
+    public Schema schema() {
+        return SCHEMA;
     }
 
     @Override
-    public void serialize(ShapeSerializer encoder) {
-        encoder.writeStruct(SCHEMA, this);
+    public String toString() {
+        return ToStringSerializer.serialize(this);
     }
 
     @Override

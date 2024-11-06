@@ -23,13 +23,11 @@ public class UnknownOperationException extends ModeledApiException {
     }
 
     @Override
-    public void serializeMembers(ShapeSerializer serializer) {
-
-    }
+    public void serializeMembers(ShapeSerializer serializer) {}
 
     @Override
-    public void serialize(ShapeSerializer encoder) {
-        encoder.writeStruct(SCHEMA, this);
+    public Schema schema() {
+        return SCHEMA;
     }
 
     @Override

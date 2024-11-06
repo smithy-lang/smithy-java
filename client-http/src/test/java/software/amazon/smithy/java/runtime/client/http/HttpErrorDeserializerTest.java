@@ -192,12 +192,14 @@ public class HttpErrorDeserializerTest {
         }
 
         @Override
-        public void serializeMembers(ShapeSerializer serializer) {
-            serializer.writeStruct(SCHEMA, this);
+        public Schema schema() {
+            return SCHEMA;
         }
 
         @Override
-        public void serialize(ShapeSerializer encoder) {}
+        public void serializeMembers(ShapeSerializer serializer) {
+            serializer.writeStruct(SCHEMA, this);
+        }
 
         static final class Builder implements ShapeBuilder<Baz> {
             private String message;

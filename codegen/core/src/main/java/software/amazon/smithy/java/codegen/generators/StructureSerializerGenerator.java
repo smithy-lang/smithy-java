@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.generators;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
@@ -32,8 +33,8 @@ record StructureSerializerGenerator(
         writer.pushState();
         var template = """
             @Override
-            public void serialize(${shapeSerializer:N} serializer) {
-                serializer.writeStruct($$SCHEMA, this);
+            public ${schemaClass:N} schema() {
+                return $$SCHEMA;
             }
 
             @Override
@@ -43,6 +44,7 @@ record StructureSerializerGenerator(
             """;
         writer.putContext("shapeSerializer", ShapeSerializer.class);
         writer.putContext("writeMemberSerialization", writer.consumer(this::writeMemberSerialization));
+        writer.putContext("schemaClass", Schema.class);
         writer.write(template);
         writer.popState();
     }
