@@ -133,8 +133,9 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                 writer.popState();
             }
             writer.putContext("types", types);
+            writer.putContext("list", List.class);
             writer.write(
-                "private static final ${shape:T}[] $$TYPES = { ${#types}${value:L}${^key.last}, ${/key.last}${/types} };"
+                "private static final ${list:T}<${shape:T}> $$TYPES = ${list:T}.of(${#types}${value:L}${^key.last}, ${/key.last}${/types});"
             );
             writer.popState();
         }
@@ -196,12 +197,13 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                 }
 
                 /**
-                 * Returns an array containing the constants of this enum type, in the order they're declared.
+                 * Returns an unmodifiable list containing the constants of this enum type, in the order declared.
                  */
-                public static ${shape:T}[] values() {
-                    return $$TYPES.clone();
+                public static ${list:T}<${shape:T}> values() {
+                    return $$TYPES;
                 }
                 """;
+            writer.putContext("list", List.class);
             writer.putContext("type", CodegenUtils.getInnerTypeEnumSymbol(symbolProvider.toSymbol(shape)));
             writer.write(template);
             writer.popState();
