@@ -32,11 +32,12 @@ record StructureSerializerGenerator(
     public void run() {
         writer.pushState();
         var template = """
-            @Override
+            ${^isError}@Override
             public ${schemaClass:N} schema() {
                 return $$SCHEMA;
             }
 
+            ${/isError}
             @Override
             public void serializeMembers(${shapeSerializer:N} serializer) {
                 ${writeMemberSerialization:C|}
@@ -45,6 +46,7 @@ record StructureSerializerGenerator(
         writer.putContext("shapeSerializer", ShapeSerializer.class);
         writer.putContext("writeMemberSerialization", writer.consumer(this::writeMemberSerialization));
         writer.putContext("schemaClass", Schema.class);
+        writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
         writer.write(template);
         writer.popState();
     }

@@ -203,9 +203,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 () -> {
                     if (shape.hasTrait(ErrorTrait.class)) {
                         if (shape.getMember("message").isPresent()) {
-                            writer.write("super($$ID, builder.message);");
+                            writer.write("super($$SCHEMA, builder.message);");
                         } else {
-                            writer.write("super($$ID, null);");
+                            writer.write("super($$SCHEMA, null);");
                         }
                     }
 

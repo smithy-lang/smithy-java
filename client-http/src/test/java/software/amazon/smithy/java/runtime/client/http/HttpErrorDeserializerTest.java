@@ -188,12 +188,7 @@ public class HttpErrorDeserializerTest {
             .build();
 
         public Baz(String message) {
-            super(SCHEMA.id(), message);
-        }
-
-        @Override
-        public Schema schema() {
-            return SCHEMA;
+            super(SCHEMA, message);
         }
 
         @Override

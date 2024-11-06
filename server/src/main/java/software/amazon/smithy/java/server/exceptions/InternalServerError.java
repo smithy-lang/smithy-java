@@ -20,7 +20,7 @@ public class InternalServerError extends ModeledApiException {
     private static final Schema SCHEMA_MESSAGE = SCHEMA.member("message");
 
     public InternalServerError(String message) {
-        super(ID, message);
+        super(SCHEMA, message);
     }
 
     public InternalServerError(Throwable cause) {
@@ -28,12 +28,7 @@ public class InternalServerError extends ModeledApiException {
     }
 
     public InternalServerError(String message, Throwable cause) {
-        super(ID, message, cause);
-    }
-
-    @Override
-    public Schema schema() {
-        return SCHEMA;
+        super(SCHEMA, message, cause);
     }
 
     @Override
