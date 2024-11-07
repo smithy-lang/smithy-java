@@ -43,7 +43,7 @@ public class WrappedDocumentTest {
             .build();
         var document = Document.createFromObject(Map.of("__type", "foo#Bar", "foo", "bar"));
 
-        var sd = new WrappedDocument(schema, document);
+        var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
 
         assertThat(sd.type(), is(ShapeType.STRUCTURE));
         assertThat(sd.discriminator().toString(), equalTo("foo#Bar"));
@@ -57,7 +57,7 @@ public class WrappedDocumentTest {
             .build();
         var document = Document.createFromObject(Map.of("foo", "bar"));
 
-        var sd = new WrappedDocument(schema, document);
+        var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
 
         Assertions.assertThrows(DiscriminatorException.class, sd::discriminator);
     }
@@ -69,7 +69,7 @@ public class WrappedDocumentTest {
             .build();
         var document = Document.createFromObject(Map.of("foo", "bar"));
 
-        var sd = new WrappedDocument(schema, document);
+        var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
 
         assertThat(sd.getMemberNames(), contains("foo"));
         var member = sd.getMember("foo");
@@ -79,7 +79,7 @@ public class WrappedDocumentTest {
     @ParameterizedTest
     @MethodSource("convertsToTypeProvider")
     public void convertsToType(Schema schema, Document value, Object expected, Function<Document, Object> mapper) {
-        var wrapped = new WrappedDocument(schema, value);
+        var wrapped = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, value);
 
         assertThat(wrapped.type(), equalTo(schema.type()));
         assertThat(mapper.apply(wrapped), equalTo(expected));
@@ -176,7 +176,7 @@ public class WrappedDocumentTest {
             .build();
         var document = Document.createFromObject(List.of("a", "b"));
 
-        var sd = new WrappedDocument(schema, document);
+        var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
 
         assertThat(sd.type(), is(ShapeType.LIST));
         assertThat(sd.size(), equalTo(2));
@@ -195,7 +195,7 @@ public class WrappedDocumentTest {
             .build();
         var document = Document.createFromObject(Map.of("a", "b"));
 
-        var sd = new WrappedDocument(schema, document);
+        var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
 
         assertThat(sd.type(), is(ShapeType.MAP));
         assertThat(sd.size(), equalTo(1));
@@ -213,7 +213,7 @@ public class WrappedDocumentTest {
             .build();
         var document = Document.createFromObject(Map.of("a", "a", "b", "b", "c", "c"));
 
-        var sd = new WrappedDocument(schema, document);
+        var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
 
         assertThat(sd.type(), is(ShapeType.STRUCTURE));
         assertThat(sd.getMember("a"), instanceOf(WrappedDocument.class));
@@ -232,7 +232,11 @@ public class WrappedDocumentTest {
 
     @Test
     public void serializesDocumentLikeShape() {
-        var wrapped = new WrappedDocument(PreludeSchemas.STRING, Document.createString("hi"));
+        var wrapped = new WrappedDocument(
+            ShapeId.from("smithy.example#S"),
+            PreludeSchemas.STRING,
+            Document.createString("hi")
+        );
         Schema[] set = new Schema[1];
 
         wrapped.serialize(new SpecificShapeSerializer() {
@@ -252,7 +256,7 @@ public class WrappedDocumentTest {
             .putMember("b", PreludeSchemas.STRING)
             .build();
         var document = Document.createFromObject(Map.of("a", "a", "b", "b", "c", "c"));
-        var sd = new WrappedDocument(schema, document);
+        var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
         Schema[] set = new Schema[3];
 
         sd.serialize(new SpecificShapeSerializer() {
@@ -280,7 +284,7 @@ public class WrappedDocumentTest {
             .putMember("b", PreludeSchemas.STRING)
             .build();
         var document = Document.createFromObject(Map.of("a", "a"));
-        var sd = new WrappedDocument(schema, document);
+        var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
         Schema[] set = new Schema[2];
 
         sd.serialize(new SpecificShapeSerializer() {

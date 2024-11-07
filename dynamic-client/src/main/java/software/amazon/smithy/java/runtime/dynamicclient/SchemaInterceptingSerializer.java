@@ -15,14 +15,17 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class SchemaInterceptingSerializer implements ShapeSerializer {
 
+    private final ShapeId service;
     private final Schema delegateSchema;
     private final ShapeSerializer delegateSerializer;
 
-    SchemaInterceptingSerializer(Schema delegateSchema, ShapeSerializer delegateSerializer) {
+    SchemaInterceptingSerializer(ShapeId service, Schema delegateSchema, ShapeSerializer delegateSerializer) {
+        this.service = service;
         this.delegateSchema = delegateSchema;
         this.delegateSerializer = delegateSerializer;
     }
@@ -30,13 +33,13 @@ final class SchemaInterceptingSerializer implements ShapeSerializer {
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         delegateSerializer
-            .writeStruct(delegateSchema, new WrappedDocument(schema, Document.createTyped(struct)));
+            .writeStruct(delegateSchema, new WrappedDocument(service, schema, Document.createTyped(struct)));
     }
 
     @Override
     public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
         delegateSerializer.writeList(delegateSchema, listState, size, (s, ls) -> {
-            consumer.accept(s, new SchemaInterceptingSerializer(delegateSchema.listMember(), ls));
+            consumer.accept(s, new SchemaInterceptingSerializer(service, delegateSchema.listMember(), ls));
         });
     }
 
@@ -54,7 +57,7 @@ final class SchemaInterceptingSerializer implements ShapeSerializer {
                     BiConsumer<V, ShapeSerializer> valueSerializer
                 ) {
                     ms.writeEntry(delegateKeySchema, key, state, (s, ms) -> {
-                        valueSerializer.accept(s, new SchemaInterceptingSerializer(delegateValueSchema, ms));
+                        valueSerializer.accept(s, new SchemaInterceptingSerializer(service, delegateValueSchema, ms));
                     });
                 }
             });

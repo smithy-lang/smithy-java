@@ -11,13 +11,16 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 final class SchemaGuidedDocumentBuilder implements ShapeBuilder<WrappedDocument> {
 
+    private final ShapeId service;
     private final Schema target;
     private Document result;
 
-    SchemaGuidedDocumentBuilder(Schema target) {
+    SchemaGuidedDocumentBuilder(ShapeId service, Schema target) {
+        this.service = service;
         this.target = target;
     }
 
@@ -28,7 +31,7 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<WrappedDocument>
 
     @Override
     public WrappedDocument build() {
-        return new WrappedDocument(target, result);
+        return new WrappedDocument(service, target, result);
     }
 
     @Override

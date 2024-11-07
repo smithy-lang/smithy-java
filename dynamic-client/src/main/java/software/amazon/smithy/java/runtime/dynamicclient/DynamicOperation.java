@@ -15,6 +15,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 
 final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDocument> {
 
+    private final ShapeId service;
     private final Schema operationSchema;
     private final Schema inputSchema;
     private final Schema outputSchema;
@@ -22,12 +23,14 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
     private final List<ShapeId> effectiveAuthSchemes;
 
     public DynamicOperation(
+        ShapeId service,
         Schema operationSchema,
         Schema inputSchema,
         Schema outputSchema,
         TypeRegistry typeRegistry,
         List<ShapeId> effectiveAuthSchemes
     ) {
+        this.service = service;
         this.effectiveAuthSchemes = effectiveAuthSchemes;
         this.operationSchema = operationSchema;
         this.inputSchema = inputSchema;
@@ -62,12 +65,12 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
 
     @Override
     public ShapeBuilder<WrappedDocument> inputBuilder() {
-        return new SchemaGuidedDocumentBuilder(inputSchema());
+        return new SchemaGuidedDocumentBuilder(service, inputSchema());
     }
 
     @Override
     public ShapeBuilder<WrappedDocument> outputBuilder() {
-        return new SchemaGuidedDocumentBuilder(outputSchema());
+        return new SchemaGuidedDocumentBuilder(service, outputSchema());
     }
 
     @Override

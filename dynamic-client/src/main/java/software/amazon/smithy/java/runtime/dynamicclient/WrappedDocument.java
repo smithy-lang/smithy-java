@@ -28,10 +28,11 @@ import software.amazon.smithy.model.shapes.ShapeType;
  * itself as a document, and then serializes the contents. That's because this implementation of Document is meant to
  * stand-in for a modeled value and not get serialized as a document.
  *
+ * @param service The service shape ID used to provide a default namespace for discriminators.
  * @param schema Schema to use when reading or writing.
  * @param delegate Document data to read/write.
  */
-record WrappedDocument(Schema schema, Document delegate) implements Document, SerializableStruct {
+record WrappedDocument(ShapeId service, Schema schema, Document delegate) implements Document, SerializableStruct {
     @Override
     public void serialize(ShapeSerializer serializer) {
         if (schema.type() == ShapeType.DOCUMENT) {
@@ -47,7 +48,7 @@ record WrappedDocument(Schema schema, Document delegate) implements Document, Se
     public void serializeContents(ShapeSerializer serializer) {
         switch (schema.type()) {
             case STRUCTURE, UNION -> serializer.writeStruct(schema, this);
-            default -> delegate.serializeContents(new SchemaInterceptingSerializer(schema, serializer));
+            default -> delegate.serializeContents(new SchemaInterceptingSerializer(service, schema, serializer));
         }
     }
 
@@ -58,7 +59,7 @@ record WrappedDocument(Schema schema, Document delegate) implements Document, Se
             if (value != null) {
                 var member = schema.member(name);
                 if (member != null) {
-                    value.serializeContents(new SchemaInterceptingSerializer(member, serializer));
+                    value.serializeContents(new SchemaInterceptingSerializer(service, member, serializer));
                 }
             }
         }
@@ -74,7 +75,7 @@ record WrappedDocument(Schema schema, Document delegate) implements Document, Se
         var map = delegate.asStringMap();
         var type = map.get("__type");
         if (type != null) {
-            return ShapeId.from(type.asString());
+            return ShapeId.fromOptionalNamespace(service.getNamespace(), type.asString());
         } else {
             return delegate.discriminator();
         }
@@ -156,7 +157,7 @@ record WrappedDocument(Schema schema, Document delegate) implements Document, Se
         List<Document> result = new ArrayList<>(list.size());
         var member = schema.listMember();
         for (var value : list) {
-            result.add(new WrappedDocument(member, value));
+            result.add(new WrappedDocument(service, member, value));
         }
         return result;
     }
@@ -168,13 +169,13 @@ record WrappedDocument(Schema schema, Document delegate) implements Document, Se
         if (type() == ShapeType.MAP) {
             var member = schema.mapValueMember();
             for (var entry : map.entrySet()) {
-                wrapped.put(entry.getKey(), new WrappedDocument(member, entry.getValue()));
+                wrapped.put(entry.getKey(), new WrappedDocument(service, member, entry.getValue()));
             }
         } else {
             for (var entry : map.entrySet()) {
                 var member = schema.member(entry.getKey());
                 if (member != null) {
-                    wrapped.put(entry.getKey(), new WrappedDocument(member, entry.getValue()));
+                    wrapped.put(entry.getKey(), new WrappedDocument(service, member, entry.getValue()));
                 } else {
                     wrapped.put(entry.getKey(), entry.getValue());
                 }
@@ -194,7 +195,7 @@ record WrappedDocument(Schema schema, Document delegate) implements Document, Se
         if (member == null) {
             return delegate.getMember(memberName);
         } else {
-            return new WrappedDocument(member, delegate.getMember(memberName));
+            return new WrappedDocument(service, member, delegate.getMember(memberName));
         }
     }
 

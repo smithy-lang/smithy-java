@@ -29,7 +29,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
     private static final byte[] EMPTY_PAYLOAD = "{}".getBytes(StandardCharsets.UTF_8);
 
     private final ShapeId service;
-    private final JsonCodec codec = JsonCodec.builder().build();
+    private final JsonCodec codec;
     private final HttpErrorDeserializer errorDeserializer;
 
     /**
@@ -39,6 +39,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
     public AwsJsonProtocol(ShapeId trait, ShapeId service) {
         super(trait.toString());
         this.service = service;
+        this.codec = JsonCodec.builder().defaultNamespace(service.getNamespace()).build();
 
         this.errorDeserializer = HttpErrorDeserializer.builder()
             .codec(codec)

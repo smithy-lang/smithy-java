@@ -96,7 +96,7 @@ public class SchemaInterceptingSerializerTest {
     public void interceptsWithSchema(String name, Document value) {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#" + name)));
-        var wrapped = new WrappedDocument(schema, value);
+        var wrapped = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, value);
 
         Schema[] written = new Schema[1];
 
@@ -135,6 +135,7 @@ public class SchemaInterceptingSerializerTest {
         var converter = new SchemaConverter(model);
         var listSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleList")));
         var wrapped = new WrappedDocument(
+            ShapeId.from("smithy.example#S"),
             listSchema,
             Document.createList(Arrays.asList(Document.createString("a"), null))
         );
@@ -163,7 +164,11 @@ public class SchemaInterceptingSerializerTest {
     public void interceptMaps() {
         var converter = new SchemaConverter(model);
         var mapSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleMap")));
-        var wrapped = new WrappedDocument(mapSchema, Document.createFromObject(Map.of("foo", "bar")));
+        var wrapped = new WrappedDocument(
+            ShapeId.from("smithy.example#S"),
+            mapSchema,
+            Document.createFromObject(Map.of("foo", "bar"))
+        );
 
         wrapped.serialize(new SpecificShapeSerializer() {
             @Override
@@ -198,7 +203,11 @@ public class SchemaInterceptingSerializerTest {
     public void mapsCanWriteDocuments() {
         var converter = new SchemaConverter(model);
         var mapSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#DocumentMap")));
-        var wrapped = new WrappedDocument(mapSchema, Document.createFromObject(Map.of("foo", "bar")));
+        var wrapped = new WrappedDocument(
+            ShapeId.from("smithy.example#S"),
+            mapSchema,
+            Document.createFromObject(Map.of("foo", "bar"))
+        );
 
         wrapped.serialize(new SpecificShapeSerializer() {
             @Override
@@ -234,6 +243,7 @@ public class SchemaInterceptingSerializerTest {
         var converter = new SchemaConverter(model);
         var structSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
         var wrapped = new WrappedDocument(
+            ShapeId.from("smithy.example#S"),
             structSchema,
             Document.createFromObject(
                 Map.of(

@@ -49,7 +49,14 @@ public class DynamicOperationTest {
         var output = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFooOutput")));
 
         var e = Assertions.assertThrows(UnsupportedOperationException.class, () -> {
-            DynamicOperation o = new DynamicOperation(operationSchema, input, output, registry, List.of());
+            DynamicOperation o = new DynamicOperation(
+                ShapeId.from("smithy.example#S"),
+                operationSchema,
+                input,
+                output,
+                registry,
+                List.of()
+            );
         });
 
         assertThat(e.getMessage(), containsString("does not support streaming"));
@@ -77,7 +84,14 @@ public class DynamicOperationTest {
         var input = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFooInput")));
         var output = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFooOutput")));
 
-        var o = new DynamicOperation(operationSchema, input, output, registry, List.of());
+        var o = new DynamicOperation(
+            ShapeId.from("smithy.example#S"),
+            operationSchema,
+            input,
+            output,
+            registry,
+            List.of()
+        );
 
         assertThat(o.schema().id(), equalTo(ShapeId.from("smithy.example#PutFoo")));
         assertThat(o.schema().hasTrait(TraitKey.get(DeprecatedTrait.class)), is(true));

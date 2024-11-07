@@ -19,6 +19,7 @@ import software.amazon.smithy.java.runtime.client.core.Client;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.Model;
@@ -41,12 +42,11 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * <ul>
  *     <li>No code generated types. You have to construct input and use output manually using document APIs.</li>
  *     <li>No support for streaming inputs or outputs.</li>
- *     <li>All errors are created as an {@link ApiException}. TODO: make a dynamic version of ModeledApiException.</li>
+ *     <li>All errors are created as an {@link DocumentException} if the error is modeled, allowing document access
+ *     to the modeled error contents. Other errors are deserialized as {@link ApiException}.
  * </ul>
  */
 public final class DynamicClient extends Client {
-
-    private static final TypeRegistry EMPTY_REGISTRY = TypeRegistry.builder().build();
 
     private final ServiceShape service;
     private final Model model;
@@ -151,7 +151,7 @@ public final class DynamicClient extends Client {
         RequestOverrideConfig overrideConfig
     ) {
         var apiOperation = getApiOperation(operation);
-        var inputStruct = new WrappedDocument(apiOperation.inputSchema(), input);
+        var inputStruct = new WrappedDocument(service.getId(), apiOperation.inputSchema(), input);
         return call(inputStruct, apiOperation, overrideConfig).thenApply(Function.identity());
     }
 
@@ -177,7 +177,26 @@ public final class DynamicClient extends Client {
 
             var inputSchema = schemaConverter.getSchema(model.expectShape(shape.getInputShape()));
             var outputSchema = schemaConverter.getSchema(model.expectShape(shape.getOutputShape()));
-            return new DynamicOperation(operationSchema, inputSchema, outputSchema, EMPTY_REGISTRY, authSchemes);
+
+            // Create a type registry that is able to deserialize errors using schemas.
+            var registryBuilder = TypeRegistry.builder();
+            for (var e : shape.getErrors()) {
+                var error = model.expectShape(e);
+                var errorSchema = schemaConverter.getSchema(error);
+                registryBuilder.putType(e, ModeledApiException.class, () -> {
+                    return new DocumentException.SchemaGuidedExceptionBuilder(service.getId(), errorSchema);
+                });
+            }
+            var registry = registryBuilder.build();
+
+            return new DynamicOperation(
+                service.getId(),
+                operationSchema,
+                inputSchema,
+                outputSchema,
+                registry,
+                authSchemes
+            );
         });
     }
 

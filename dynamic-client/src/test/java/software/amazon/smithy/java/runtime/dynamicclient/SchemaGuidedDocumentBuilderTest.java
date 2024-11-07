@@ -94,7 +94,7 @@ public class SchemaGuidedDocumentBuilderTest {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#" + name)));
 
-        var builder = new SchemaGuidedDocumentBuilder(schema);
+        var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
         source.deserializeInto(builder);
 
         var result = builder.build();
@@ -109,7 +109,7 @@ public class SchemaGuidedDocumentBuilderTest {
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
         var document = Document.createFromObject(Map.of("foo", "bar"));
 
-        var builder = new SchemaGuidedDocumentBuilder(schema);
+        var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
         builder.deserializeMember(new DocumentDeserializer(document), schema.member("baz"));
 
         var result = builder.build();
