@@ -25,7 +25,8 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterc
  * {@link Context.Key}.
  */
 public final class ClientConfig {
-
+    private static final List<ClientTransportFactory<?, ?>> transportFactories = ClientTransportFactory
+        .load(ClientConfig.class.getClassLoader());
     private static final AuthScheme<Object, Identity> NO_AUTH_AUTH_SCHEME = AuthScheme.noAuthAuthScheme();
 
     private final ClientTransport<?, ?> transport;
@@ -38,8 +39,9 @@ public final class ClientConfig {
     private final Context context;
 
     private ClientConfig(Builder builder) {
-        this.transport = Objects.requireNonNull(builder.transport, "transport cannot be null");
         this.protocol = Objects.requireNonNull(builder.protocol, "protocol cannot be null");
+        // If no transport is set, try to find compatible transport via SPI.
+        this.transport = Objects.requireNonNullElseGet(builder.transport, () -> discoverTransport(protocol));
         ClientPipeline.validateProtocolAndTransport(protocol, transport);
 
         this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
@@ -56,6 +58,24 @@ public final class ClientConfig {
         this.identityResolvers = List.copyOf(builder.identityResolvers);
 
         this.context = Context.unmodifiableCopy(builder.context);
+    }
+
+    /**
+     * Search for a transport service provider that is compatible with the provided protocol.
+     */
+    private ClientTransport<?, ?> discoverTransport(ClientProtocol<?, ?> protocol) {
+        for (var factory : transportFactories) {
+            // Find the first applicable transport factory
+            if (factory.requestClass() == protocol.requestClass() && factory.responseClass() == protocol
+                .responseClass()) {
+                return factory.createTransport();
+            }
+        }
+        throw new IllegalArgumentException(
+            "No compatible transport found for " + protocol + ". "
+                + "Add a compatible ClientTransportFactory Service provider + "
+                + "or add a compatible transport to the client builder."
+        );
     }
 
     /**

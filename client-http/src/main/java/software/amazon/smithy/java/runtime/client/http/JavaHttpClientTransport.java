@@ -16,6 +16,8 @@ import java.util.concurrent.Flow;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
+import software.amazon.smithy.java.runtime.client.core.ClientTransportFactory;
+import software.amazon.smithy.java.runtime.client.core.TransportSettings;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
@@ -142,6 +144,35 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
                     subscriber.onComplete();
                 }
             });
+        }
+    }
+
+    public static final class Factory implements ClientTransportFactory<SmithyHttpRequest, SmithyHttpResponse> {
+
+        @Override
+        public String name() {
+            return "http-java";
+        }
+
+        @Override
+        public JavaHttpClientTransport createTransport() {
+            return new JavaHttpClientTransport();
+        }
+
+        @Override
+        public JavaHttpClientTransport createTransport(TransportSettings node) {
+            // TODO: Add configuration
+            return new JavaHttpClientTransport();
+        }
+
+        @Override
+        public Class<SmithyHttpRequest> requestClass() {
+            return SmithyHttpRequest.class;
+        }
+
+        @Override
+        public Class<SmithyHttpResponse> responseClass() {
+            return SmithyHttpResponse.class;
         }
     }
 }

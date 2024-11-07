@@ -32,11 +32,11 @@ import software.amazon.smithy.java.runtime.client.core.ClientConfig;
 import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.runtime.client.core.ClientSetting;
-import software.amazon.smithy.java.runtime.client.core.ClientTransport;
+import software.amazon.smithy.java.runtime.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
+import software.amazon.smithy.java.runtime.client.core.TransportSettings;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
-import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
@@ -49,16 +49,22 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
 @SmithyInternalApi
+@SuppressWarnings("rawtypes")
 public final class ClientInterfaceGenerator
     implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientInterfaceGenerator.class);
 
     private static final Map<ShapeId, Class<? extends AuthSchemeFactory>> authSchemeFactories = new HashMap<>();
+    private static final Map<String, Class<? extends ClientTransportFactory>> clientTransportFactories = new HashMap<>();
+
     static {
         // Add all trait services to a map, so they can be queried for a provider class
         ServiceLoader.load(AuthSchemeFactory.class, ClientInterfaceGenerator.class.getClassLoader())
             .forEach((service) -> authSchemeFactories.put(service.schemeId(), service.getClass()));
+        // Add all transport services to a map, so they can be queried for a provider class
+        ServiceLoader.load(ClientTransportFactory.class, ClientInterfaceGenerator.class.getClassLoader())
+            .forEach((service) -> clientTransportFactories.put(service.name(), service.getClass()));
     }
 
     @Override
@@ -105,7 +111,8 @@ public final class ClientInterfaceGenerator
                             implements ${#settings}${value:T}<Builder>${^key.last}, ${/key.last}${/settings}${/settings} {
                             ${?hasDefaults}${defaultPlugins:C|}
                             ${/hasDefaults}${?hasDefaultProtocol}${defaultProtocol:C|}
-                            ${/hasDefaultProtocol}${?defaultSchemes}${defaultAuth:C|}
+                            ${/hasDefaultProtocol}${?hasDefaultTransport}${transportSettings:C|}
+                            ${/hasDefaultTransport}${?defaultSchemes}${defaultAuth:C|}
                             ${/defaultSchemes}
                             private Builder() {${?defaultSchemes}
                                 configBuilder().putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes});
@@ -117,12 +124,12 @@ public final class ClientInterfaceGenerator
                                     plugin.configureClient(configBuilder());
                                 }
                                 ${/hasDefaults}${?hasDefaultProtocol}if (configBuilder().protocol() == null) {
-                                    configBuilder().protocol(${protocolFactory:C}.createProtocol(settings, protocolTrait));
+                                    configBuilder().protocol(${protocolFactory:C}.createProtocol(protocolSettings, protocolTrait));
                                 }
-                                ${/hasDefaultProtocol}${?transport}if (configBuilder().transport() == null) {
-                                    configBuilder().transport(new ${transport:T}());
+                                ${/hasDefaultProtocol}${?hasDefaultTransport}if (configBuilder().transport() == null) {
+                                    configBuilder().transport(${transportFactory:C}.createTransport(transportSettings));
                                 }
-                                ${/transport}
+                                ${/hasDefaultTransport}
                                 return new ${impl:T}(this);
                             }
                         }
@@ -133,7 +140,7 @@ public final class ClientInterfaceGenerator
                     """;
                 var defaultProtocolTrait = getDefaultProtocolTrait(directive.model(), directive.settings());
                 writer.putContext("hasDefaultProtocol", defaultProtocolTrait != null);
-                writer.putContext("protocolFactory", new ProtocolFactoryGenerator(writer, defaultProtocolTrait));
+                writer.putContext("protocolFactory", new FactoryGenerator(writer, getFactory(defaultProtocolTrait)));
                 writer.putContext(
                     "defaultProtocol",
                     new DefaultProtocolGenerator(
@@ -149,7 +156,12 @@ public final class ClientInterfaceGenerator
                 writer.putContext("clientConfig", ClientConfig.class);
                 writer.putContext("interface", symbol);
                 writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
-                writer.putContext("transport", getTransportClass(directive.settings()));
+                writer.putContext("hasDefaultTransport", directive.settings().transport() != null);
+                writer.putContext(
+                    "transportFactory",
+                    new FactoryGenerator(writer, getTransportFactory(directive.settings()))
+                );
+                writer.putContext("transportSettings", new TransportSettingsGenerator(writer));
                 writer.putContext(
                     "operations",
                     new OperationMethodGenerator(
@@ -176,20 +188,29 @@ public final class ClientInterfaceGenerator
             });
     }
 
-    private static Class<? extends ClientTransport> getTransportClass(JavaCodegenSettings settings) {
+    private static Class<? extends ClientTransportFactory> getTransportFactory(JavaCodegenSettings settings) {
         if (settings.transport() == null) {
             return null;
         }
-        // Use one of the built-in transports
-        if (settings.transport().equals("http-java")) {
-            return JavaHttpClientTransport.class;
-        } else if (settings.transport().equals("http-netty")) {
-            // TODO: Add netty transport once supported
-            throw new CodegenException("Netty default transport not yet supported");
+        var factory = clientTransportFactories.get(settings.transport());
+        if (factory == null) {
+            throw new CodegenException(
+                "Transport " + settings.transport() + " request, but no matching factory was found."
+            );
         }
+        return factory;
+    }
 
-        // TODO: Handle custom transports
-        throw new UnsupportedOperationException("Custom default transports not yet supported");
+    // TODO: Update with actual settings once those are defined.
+    private record TransportSettingsGenerator(JavaWriter writer) implements Runnable {
+
+        @Override
+        public void run() {
+            writer.pushState();
+            writer.putContext("settings", TransportSettings.class);
+            writer.write("private static final ${settings:T} transportSettings = ${settings:T}.builder().build();");
+            writer.popState();
+        }
     }
 
     private record OperationMethodGenerator(
@@ -230,11 +251,10 @@ public final class ClientInterfaceGenerator
         }
     }
 
-    private record ProtocolFactoryGenerator(JavaWriter writer, Trait defaultProtocolTrait) implements Runnable {
+    private record FactoryGenerator(JavaWriter writer, Class<?> factoryClass) implements Runnable {
         @Override
         public void run() {
             writer.pushState();
-            var factoryClass = getFactory(defaultProtocolTrait.toShapeId());
             if (factoryClass.isMemberClass()) {
                 writer.putContext("outer", factoryClass.getEnclosingClass());
             }
@@ -256,7 +276,7 @@ public final class ClientInterfaceGenerator
             }
             writer.pushState();
             var template = """
-                private static final ${protocolSettings:T} settings = ${protocolSettings:T}.builder()
+                private static final ${protocolSettings:T} protocolSettings = ${protocolSettings:T}.builder()
                         .service(${shapeId:T}.from(${service:S}))
                         .build();
                 private static final ${trait:T} protocolTrait = ${initializer:C};
@@ -291,16 +311,19 @@ public final class ClientInterfaceGenerator
         );
     }
 
-    private static Class<? extends ClientProtocolFactory> getFactory(ShapeId defaultProtocol) {
+    private static Class<? extends ClientProtocolFactory> getFactory(Trait defaultProtocolTrait) {
+        if (defaultProtocolTrait == null) {
+            return null;
+        }
         for (var factory : ServiceLoader.load(
             ClientProtocolFactory.class,
             ClientInterfaceGenerator.class.getClassLoader()
         )) {
-            if (factory.id().equals(defaultProtocol)) {
+            if (factory.id().equals(defaultProtocolTrait.toShapeId())) {
                 return factory.getClass();
             }
         }
-        throw new CodegenException("Could not find factory for " + defaultProtocol);
+        throw new CodegenException("Could not find factory for " + defaultProtocolTrait);
     }
 
     @SuppressWarnings("rawtypes")
