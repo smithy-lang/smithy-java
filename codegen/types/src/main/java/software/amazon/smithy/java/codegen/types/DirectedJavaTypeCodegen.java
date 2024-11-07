@@ -13,11 +13,13 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.JavaDirectedCodegen;
 import software.amazon.smithy.java.codegen.JavaSymbolProvider;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
 record DirectedJavaTypeCodegen(boolean generateOperations) implements JavaDirectedCodegen {
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(DirectedJavaTypeCodegen.class);
 
     @Override
     public SymbolProvider createSymbolProvider(CreateSymbolProviderDirective<JavaCodegenSettings> directive) {
@@ -31,6 +33,7 @@ record DirectedJavaTypeCodegen(boolean generateOperations) implements JavaDirect
     @Override
     public void generateStructure(GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         if (!isSynthetic(directive.shape())) {
+            LOGGER.debug("Generating Java Class for structure: {}", directive.shape());
             JavaDirectedCodegen.super.generateStructure(directive);
         }
     }
@@ -38,6 +41,7 @@ record DirectedJavaTypeCodegen(boolean generateOperations) implements JavaDirect
     @Override
     public void generateOperation(GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         if (generateOperations && !isSynthetic(directive.shape())) {
+            LOGGER.debug("Generating Java Class for operation: {}", directive.shape());
             JavaDirectedCodegen.super.generateOperation(directive);
         }
     }

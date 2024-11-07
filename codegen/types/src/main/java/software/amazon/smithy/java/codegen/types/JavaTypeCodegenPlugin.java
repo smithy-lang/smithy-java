@@ -38,7 +38,7 @@ public final class JavaTypeCodegenPlugin implements SmithyBuildPlugin {
 
     @Override
     public void execute(PluginContext context) {
-        LOGGER.info("Generating java types from smithy model...");
+        LOGGER.info("Generating Java types from smithy model.");
         CodegenDirector<JavaWriter, JavaCodegenIntegration, CodeGenerationContext, JavaCodegenSettings> runner = new CodegenDirector<>();
 
         var settings = TypeCodegenSettings.fromNode(context.getSettings());
@@ -52,13 +52,13 @@ public final class JavaTypeCodegenPlugin implements SmithyBuildPlugin {
         // Filter out any deprecated shapes
         var model = RemoveDeprecatedShapesTransformer.transform(context.getModel(), codegenSettings);
         // Add the synthetic service to the model
-        model = SyntheticServiceTransform.transform(model, getClosure(model, settings), settings.renames());
-
+        var closure = getClosure(model, settings);
+        LOGGER.info("Found {} shapes in generation closure", closure.size());
+        model = SyntheticServiceTransform.transform(model, closure, settings.renames());
         runner.model(model);
         runner.integrationClass(JavaCodegenIntegration.class);
         runner.performDefaultCodegenTransforms();
         runner.createDedicatedInputsAndOutputs();
-        LOGGER.info("Generating Java classes...");
         runner.run();
         LOGGER.info("Successfully generated Java class files.");
     }
