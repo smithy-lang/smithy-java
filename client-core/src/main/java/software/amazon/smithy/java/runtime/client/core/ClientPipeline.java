@@ -11,10 +11,12 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
+import java.util.function.BiFunction;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
@@ -115,10 +117,10 @@ final class ClientPipeline<RequestT, ResponseT> {
             var result = call.retryStrategy.acquireInitialToken(new AcquireInitialTokenRequest(call.retryScope));
             call.retryToken = result.token();
             // Delay if the initial request is pre-emptively throttled.
-            if (result.delay().compareTo(Duration.ZERO) <= 0) {
+            if (result.delay().toMillis() == 0) {
                 return sendAfterGettingToken(call);
             } else {
-                return sendAfterDelay(result.delay(), () -> sendAfterGettingToken(call));
+                return sendAfterDelay(result.delay(), call, null, (theCall, _ignore) -> sendAfterGettingToken(theCall));
             }
         } catch (TokenAcquisitionFailedException e) {
             // Don't send the request if the circuit breaker prevents it.
@@ -270,6 +272,7 @@ final class ClientPipeline<RequestT, ResponseT> {
         return call.endpointResolver.resolveEndpoint(request);
     }
 
+    @SuppressWarnings("unchecked")
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserialize(
         ClientCall<I, O> call,
         RequestT request,
@@ -290,12 +293,23 @@ final class ClientPipeline<RequestT, ResponseT> {
         interceptor.readBeforeDeserialization(responseHook);
 
         return protocol.deserializeResponse(call.operation, context, call.typeRegistry, request, modifiedResponse)
-            .thenCompose(shape -> {
-                var outputHook = new OutputHook<>(context, input, request, response, shape);
+            .handle((shape, thrown) -> {
                 RuntimeException error = null;
+                if (thrown instanceof CompletionException ce) {
+                    thrown = ce.getCause() != null ? ce.getCause() : ce;
+                }
+                if (thrown != null) {
+                    if (!(thrown instanceof RuntimeException)) {
+                        return CompletableFuture.failedFuture(thrown);
+                    }
+                    error = (RuntimeException) thrown;
+                }
+
+                var outputHook = new OutputHook<>(context, input, request, response, shape);
 
                 try {
-                    interceptor.readAfterDeserialization(outputHook, null);
+                    interceptor.readAfterDeserialization(outputHook, error);
+                    error = null;
                 } catch (RuntimeException e) {
                     error = e;
                 }
@@ -341,23 +355,8 @@ final class ClientPipeline<RequestT, ResponseT> {
                 interceptor.readAfterExecution(outputHook, error);
 
                 return CompletableFuture.completedFuture(outputHook.output());
-            });
-    }
-
-    private static <T> CompletableFuture<T> sendAfterDelay(Duration after, Supplier<CompletableFuture<T>> result) {
-        var millis = after.toMillis();
-        if (millis <= 0) {
-            throw new IllegalArgumentException("Send after delay duration is <= 0: " + after);
-        }
-        CompletableFuture<T> future = new CompletableFuture<>();
-        SCHEDULER.schedule(() -> {
-            try {
-                result.get().thenApply(future::complete);
-            } catch (Exception e) {
-                future.completeExceptionally(e);
-            }
-        }, millis, TimeUnit.MILLISECONDS);
-        return future;
+            })
+            .thenCompose(o -> (CompletionStage<O>) o);
     }
 
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> retry(
@@ -370,9 +369,36 @@ final class ClientPipeline<RequestT, ResponseT> {
         call.retryToken = retryToken;
         // Adjust the current retry count on the context (e.g., protocols can use this to add retry headers).
         call.context.put(CallContext.RETRY_ATTEMPT, ++call.retryCount);
-        return sendAfterDelay(after, () -> {
-            var requestHook = new RequestHook<>(call.context, call.input, request);
+
+        var requestHook = new RequestHook<>(call.context, call.input, request);
+
+        if (after.toMillis() == 0) {
+            // Immediate retry.
             return doSendOrRetry(call, requestHook);
-        });
+        } else {
+            // Retry after a delay.
+            return sendAfterDelay(after, call, requestHook, this::doSendOrRetry);
+        }
+    }
+
+    private static <T, V, I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<T> sendAfterDelay(
+        Duration after,
+        ClientCall<I, O> call,
+        V value,
+        BiFunction<ClientCall<I, O>, V, CompletableFuture<T>> result
+    ) {
+        var millis = after.toMillis();
+        if (millis <= 0) {
+            throw new IllegalArgumentException("Send after delay duration is <= 0: " + after);
+        }
+        CompletableFuture<T> future = new CompletableFuture<>();
+        SCHEDULER.schedule(() -> {
+            try {
+                result.apply(call, value).thenApply(future::complete);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        }, millis, TimeUnit.MILLISECONDS);
+        return future;
     }
 }
