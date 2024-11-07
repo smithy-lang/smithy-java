@@ -41,7 +41,7 @@ public final class ClientConfig {
     private ClientConfig(Builder builder) {
         this.protocol = Objects.requireNonNull(builder.protocol, "protocol cannot be null");
         // If no transport is set, try to find compatible transport via SPI.
-        this.transport = Objects.requireNonNullElseGet(builder.transport, () -> discoverTransport(protocol));
+        this.transport = builder.transport != null ? builder.transport : discoverTransport(protocol));
         ClientPipeline.validateProtocolAndTransport(protocol, transport);
 
         this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
