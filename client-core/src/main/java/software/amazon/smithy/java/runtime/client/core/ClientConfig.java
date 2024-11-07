@@ -72,7 +72,7 @@ public final class ClientConfig {
             }
         }
         throw new IllegalArgumentException(
-            "No compatible transport found for " + protocol + ". "
+            "No compatible transport found for protocol '" + protocol + "'. "
                 + "Add a compatible ClientTransportFactory Service provider to the classpath, "
                 + "or add a compatible transport to the client builder."
         );
