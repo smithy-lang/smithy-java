@@ -323,7 +323,7 @@ public final class ClientInterfaceGenerator
                 return factory.getClass();
             }
         }
-        throw new CodegenException("Could not find factory for " + defaultProtocolTrait);
+        throw new CodegenException("Could not find factory for " + defaultProtocolTrait.toShapeId());
     }
 
     @SuppressWarnings("rawtypes")
