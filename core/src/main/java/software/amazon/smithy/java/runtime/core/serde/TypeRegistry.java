@@ -82,37 +82,39 @@ public interface TypeRegistry {
      * Compose multiple type registries together.
      *
      * @param first First type registry to check.
-     * @param more Subsequent type registries to check.
+     * @param second Subsequent type registry to check.
      * @return the composed type registry.
      */
-    static TypeRegistry compose(TypeRegistry first, TypeRegistry... more) {
+    static TypeRegistry compose(TypeRegistry first, TypeRegistry second) {
+        if (first instanceof TypeRegistry.Builder.DefaultRegistry dt) {
+            if (dt.supplierMap.isEmpty()) {
+                return second;
+            }
+        }
+
+        if (second instanceof TypeRegistry.Builder.DefaultRegistry dt) {
+            if (dt.supplierMap.isEmpty()) {
+                return first;
+            }
+        }
+
         return new TypeRegistry() {
             @Override
             public Class<? extends SerializableStruct> getShapeClass(ShapeId shapeId) {
                 var result = first.getShapeClass(shapeId);
-                if (result == null) {
-                    for (var subsequent : more) {
-                        result = subsequent.getShapeClass(shapeId);
-                        if (result != null) {
-                            break;
-                        }
-                    }
+                if (result != null) {
+                    return result;
                 }
-                return result;
+                return second.getShapeClass(shapeId);
             }
 
             @Override
             public ShapeBuilder<?> createBuilder(ShapeId shapeId) {
                 var result = first.createBuilder(shapeId);
-                if (result == null) {
-                    for (var subsequent : more) {
-                        result = subsequent.createBuilder(shapeId);
-                        if (result != null) {
-                            break;
-                        }
-                    }
+                if (result != null) {
+                    return result;
                 }
-                return result;
+                return second.createBuilder(shapeId);
             }
         };
     }

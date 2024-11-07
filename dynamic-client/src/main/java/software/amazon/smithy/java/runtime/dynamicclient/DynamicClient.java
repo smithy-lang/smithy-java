@@ -53,6 +53,7 @@ public final class DynamicClient extends Client {
     private final ConcurrentMap<String, ApiOperation<WrappedDocument, WrappedDocument>> operations = new ConcurrentHashMap<>();
     private final SchemaConverter schemaConverter;
     private final Map<String, OperationShape> operationNames = new HashMap<>();
+    private final TypeRegistry serviceErrorRegistry;
 
     private DynamicClient(Builder builder, ServiceShape shape, Model model) {
         super(builder);
@@ -64,6 +65,21 @@ public final class DynamicClient extends Client {
         for (var operation : TopDownIndex.of(model).getContainedOperations(service)) {
             operationNames.put(operation.getId().getName(), operation);
         }
+
+        // Build and register service-wide errors.
+        var registryBuilder = TypeRegistry.builder();
+        for (var e : service.getErrors()) {
+            registerError(e, registryBuilder);
+        }
+        this.serviceErrorRegistry = registryBuilder.build();
+    }
+
+    private void registerError(ShapeId e, TypeRegistry.Builder registryBuilder) {
+        var error = model.expectShape(e);
+        var errorSchema = schemaConverter.getSchema(error);
+        registryBuilder.putType(e, ModeledApiException.class, () -> {
+            return new DocumentException.SchemaGuidedExceptionBuilder(service.getId(), errorSchema);
+        });
     }
 
     /**
@@ -178,16 +194,18 @@ public final class DynamicClient extends Client {
             var inputSchema = schemaConverter.getSchema(model.expectShape(shape.getInputShape()));
             var outputSchema = schemaConverter.getSchema(model.expectShape(shape.getOutputShape()));
 
+            // Default to using the service registry.
+            var registry = serviceErrorRegistry;
+
             // Create a type registry that is able to deserialize errors using schemas.
-            var registryBuilder = TypeRegistry.builder();
-            for (var e : shape.getErrors()) {
-                var error = model.expectShape(e);
-                var errorSchema = schemaConverter.getSchema(error);
-                registryBuilder.putType(e, ModeledApiException.class, () -> {
-                    return new DocumentException.SchemaGuidedExceptionBuilder(service.getId(), errorSchema);
-                });
+            if (!shape.getErrors().isEmpty()) {
+                var registryBuilder = TypeRegistry.builder();
+                for (var e : shape.getErrors()) {
+                    registerError(e, registryBuilder);
+                }
+                // Compose the operation errors with the service errors.
+                registry = TypeRegistry.compose(registryBuilder.build(), serviceErrorRegistry);
             }
-            var registry = registryBuilder.build();
 
             return new DynamicOperation(
                 service.getId(),

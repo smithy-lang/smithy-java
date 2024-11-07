@@ -47,6 +47,7 @@ public class DynamicClientTest {
 
                 service Sprockets {
                     operations: [CreateSprocket, GetSprocket]
+                    errors: [ServiceFooError]
                 }
 
                 operation CreateSprocket {
@@ -70,6 +71,11 @@ public class DynamicClientTest {
                 @error("client")
                 structure InvalidSprocketId {
                     id: String
+                }
+
+                @error("server")
+                structure ServiceFooError {
+                    why: String
                 }
                 """)
             .assemble()
@@ -148,7 +154,7 @@ public class DynamicClientTest {
 
     @Test
     public void deserializesDynamicErrorsWithAbsoluteId() {
-        var client = createErrorClient("smithy.example#InvalidSprocketId");
+        var client = createErrorClient("{\"__type\":\"smithy.example#InvalidSprocketId\", \"id\":\"1\"}");
         var e = Assertions.assertThrows(ApiException.class, () -> {
             client.call("GetSprocket", Document.createFromObject(Map.of("id", "1")));
         });
@@ -157,6 +163,7 @@ public class DynamicClientTest {
         assertThat(e, instanceOf(DocumentException.class));
 
         var de = (DocumentException) e;
+        assertThat(de.schema().id().getName(), equalTo("InvalidSprocketId"));
         var doc = de.getContents();
         assertThat(doc.getMember("id").asString(), equalTo("1"));
         assertThat(doc.type(), equalTo(ShapeType.STRUCTURE));
@@ -164,7 +171,7 @@ public class DynamicClientTest {
 
     @Test
     public void deserializesDynamicErrorsWithRelativeId() {
-        var client = createErrorClient("InvalidSprocketId");
+        var client = createErrorClient("{\"__type\":\"InvalidSprocketId\", \"id\":\"1\"}");
         var e = Assertions.assertThrows(ApiException.class, () -> {
             client.call("GetSprocket", Document.createFromObject(Map.of("id", "1")));
         });
@@ -173,23 +180,41 @@ public class DynamicClientTest {
         assertThat(e, instanceOf(DocumentException.class));
 
         var de = (DocumentException) e;
+        assertThat(de.schema().id().getName(), equalTo("InvalidSprocketId"));
         var doc = de.getContents();
         assertThat(doc.getMember("id").asString(), equalTo("1"));
         assertThat(doc.type(), equalTo(ShapeType.STRUCTURE));
     }
 
-    private static DynamicClient createErrorClient(String shapeId) {
+    @Test
+    public void deserializesDynamicErrorsWithRelativeIdFromService() {
+        var client = createErrorClient("{\"__type\":\"ServiceFooError\", \"why\":\"IDK\"}");
+        var e = Assertions.assertThrows(ApiException.class, () -> {
+            client.call("GetSprocket", Document.createFromObject(Map.of("id", "1")));
+        });
+
+        assertThat(e, instanceOf(ModeledApiException.class));
+        assertThat(e, instanceOf(DocumentException.class));
+
+        var de = (DocumentException) e;
+        assertThat(de.schema().id().getName(), equalTo("ServiceFooError"));
+        var doc = de.getContents();
+        assertThat(doc.getMember("why").asString(), equalTo("IDK"));
+        assertThat(doc.type(), equalTo(ShapeType.STRUCTURE));
+    }
+
+    private static DynamicClient createErrorClient(String payload) {
         return DynamicClient.builder()
             .service(service)
             .model(model)
             .protocol(new AwsJson1Protocol(service))
             .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .transport(createErrorTransport(shapeId))
+            .transport(createErrorTransport(payload))
             .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
             .build();
     }
 
-    private static ClientTransport<SmithyHttpRequest, SmithyHttpResponse> createErrorTransport(String id) {
+    private static ClientTransport<SmithyHttpRequest, SmithyHttpResponse> createErrorTransport(String payload) {
         return new ClientTransport<>() {
             @Override
             public Class<SmithyHttpRequest> requestClass() {
@@ -207,9 +232,7 @@ public class DynamicClientTest {
                     SmithyHttpResponse.builder()
                         .httpVersion(SmithyHttpVersion.HTTP_1_1)
                         .statusCode(400)
-                        .body(
-                            DataStream.ofString("{\"__type\":\"" + id + "\", \"id\":\"1\"}")
-                        )
+                        .body(DataStream.ofString(payload))
                         .build()
                 );
             }
