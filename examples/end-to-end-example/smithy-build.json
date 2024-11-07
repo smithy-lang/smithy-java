@@ -8,12 +8,7 @@
       "headerFile": "license.txt",
       "protocol": "aws.protocols#restJson1",
       "transport": {
-        "http-java": {
-          "object": {
-            "a": "b"
-          },
-          "list": ["a", "b", "c"]
-        }
+        "http-java": {}
       }
     },
     "java-server-codegen": {
