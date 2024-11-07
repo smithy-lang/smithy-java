@@ -6,9 +6,11 @@
 package software.amazon.smithy.java.runtime.client.core;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.ServiceLoader;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 /**
  * Creates a {@link ClientTransport}.
@@ -42,14 +44,16 @@ public interface ClientTransportFactory<RequestT, ResponseT> {
      *
      * <p>Transports must be able to be instantiated without any arguments for use in dynamic clients.
      */
-    ClientTransport<RequestT, ResponseT> createTransport();
+    default ClientTransport<RequestT, ResponseT> createTransport() {
+        return createTransport(Document.createStringMap(Collections.emptyMap()));
+    }
 
     /**
      * Create a {@link ClientTransport} with a user-provided configuration.
      *
      * <p>Configurations are typically specified in the configuration of the client-codegen plugin.
      */
-    ClientTransport<RequestT, ResponseT> createTransport(TransportSettings settings);
+    ClientTransport<RequestT, ResponseT> createTransport(Document settings);
 
     /**
      * The request class used by transport.
@@ -65,10 +69,17 @@ public interface ClientTransportFactory<RequestT, ResponseT> {
      */
     Class<ResponseT> responseClass();
 
+    /**
+     * Loads all {@link ClientTransportFactory} implementations and sorts them by priority.
+     *
+     * @param classLoader {@link ClassLoader} to use for loading service implementations
+     * @return list of discovered {@link ClientTransportFactory} implementations, sorted by priority
+     */
     static List<ClientTransportFactory<?, ?>> load(ClassLoader classLoader) {
         List<ClientTransportFactory<?, ?>> factories = new ArrayList<>();
-        // Add all transport services to a sorted, so they can be quickly queried for a compatible class
-        ServiceLoader.load(ClientTransportFactory.class, classLoader).forEach(factories::add);
+        for (var service : ServiceLoader.load(ClientTransportFactory.class, classLoader)) {
+            factories.add(service);
+        }
         factories.sort(Comparator.comparingInt(ClientTransportFactory::priority));
         return factories;
     }

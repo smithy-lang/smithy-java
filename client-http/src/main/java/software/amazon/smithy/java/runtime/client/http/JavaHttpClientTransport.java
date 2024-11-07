@@ -17,7 +17,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.ClientTransportFactory;
-import software.amazon.smithy.java.runtime.client.core.TransportSettings;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
@@ -154,14 +154,9 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
             return "http-java";
         }
 
+        // TODO: Determine what configuration is actually needed.
         @Override
-        public JavaHttpClientTransport createTransport() {
-            return new JavaHttpClientTransport();
-        }
-
-        @Override
-        public JavaHttpClientTransport createTransport(TransportSettings node) {
-            // TODO: Add configuration
+        public JavaHttpClientTransport createTransport(Document node) {
             return new JavaHttpClientTransport();
         }
 
