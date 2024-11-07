@@ -27,7 +27,7 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 /**
  * Plugin to execute Java type code generation.
  */
-@SmithyUnstableApi
+@SmithyInternalApi
 public final class JavaTypeCodegenPlugin implements SmithyBuildPlugin {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaTypeCodegenPlugin.class);
 
