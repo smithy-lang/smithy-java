@@ -5,11 +5,14 @@ include(":context")
 include(":io")
 include(":core")
 
-// Codegen
+// Codegen Base
 include(":codegen:core")
-include(":codegen:client")
-include(":codegen:server")
-include(":codegen:types")
+include(":codegen:plugins")
+// Codegen Plugins
+include(":codegen:plugins:client")
+include(":codegen:plugins:server")
+include(":codegen:plugins:types")
+
 
 // Protocol tests
 include(":protocol-tests")
