@@ -13,6 +13,7 @@ import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.transforms.RemoveDeprecatedShapesTransformer;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
@@ -20,6 +21,8 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  */
 @SmithyUnstableApi
 public final class JavaClientCodegenPlugin implements SmithyBuildPlugin {
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaClientCodegenPlugin.class);
+
     @Override
     public String getName() {
         return "java-client-codegen";
@@ -28,8 +31,8 @@ public final class JavaClientCodegenPlugin implements SmithyBuildPlugin {
     @Override
     public void execute(PluginContext context) {
         CodegenDirector<JavaWriter, JavaCodegenIntegration, CodeGenerationContext, JavaCodegenSettings> runner = new CodegenDirector<>();
-
         var settings = JavaCodegenSettings.fromNode(context.getSettings());
+        LOGGER.info("Generating Smithy-Java client for service [{}]...", settings.service());
         runner.settings(settings);
         runner.directedCodegen(new DirectedJavaClientCodegen());
         runner.fileManifest(context.getFileManifest());
@@ -42,5 +45,6 @@ public final class JavaClientCodegenPlugin implements SmithyBuildPlugin {
         runner.performDefaultCodegenTransforms();
         runner.createDedicatedInputsAndOutputs();
         runner.run();
+        LOGGER.info("Smithy-Java client code generation complete");
     }
 }
