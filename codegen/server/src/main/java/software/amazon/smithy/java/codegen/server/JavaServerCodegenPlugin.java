@@ -19,7 +19,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  * Plugin to execute Java server code generation.
  */
 @SmithyInternalApi
-public class JavaServerCodegenPlugin implements SmithyBuildPlugin {
+public final class JavaServerCodegenPlugin implements SmithyBuildPlugin {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaServerCodegenPlugin.class);
 
     @Override

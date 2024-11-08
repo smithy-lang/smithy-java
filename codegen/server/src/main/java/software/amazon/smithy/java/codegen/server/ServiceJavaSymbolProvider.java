@@ -13,9 +13,11 @@ import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
-public class ServiceJavaSymbolProvider extends JavaSymbolProvider {
+@SmithyInternalApi
+public final class ServiceJavaSymbolProvider extends JavaSymbolProvider {
     private final String serviceName;
 
     public ServiceJavaSymbolProvider(Model model, ServiceShape service, String packageNamespace, String serviceName) {

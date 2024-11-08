@@ -32,10 +32,8 @@ import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.java.codegen.generators.UnionGenerator;
 import software.amazon.smithy.java.codegen.server.generators.OperationInterfaceGenerator;
 import software.amazon.smithy.java.codegen.server.generators.ServiceGenerator;
-import software.amazon.smithy.utils.SmithyUnstableApi;
 
-@SmithyUnstableApi
-public class DirectedJavaServerCodegen
+final class DirectedJavaServerCodegen
     implements DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
 
     @Override
