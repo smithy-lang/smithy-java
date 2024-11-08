@@ -13,12 +13,12 @@ import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.transforms.RemoveDeprecatedShapesTransformer;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.utils.SmithyUnstableApi;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Plugin to execute Java client code generation.
  */
-@SmithyUnstableApi
+@SmithyInternalApi
 public final class JavaClientCodegenPlugin implements SmithyBuildPlugin {
     @Override
     public String getName() {

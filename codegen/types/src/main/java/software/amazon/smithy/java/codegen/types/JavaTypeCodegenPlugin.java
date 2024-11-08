@@ -22,7 +22,7 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.Prelude;
 import software.amazon.smithy.model.neighbor.Walker;
 import software.amazon.smithy.model.shapes.Shape;
-import software.amazon.smithy.utils.SmithyUnstableApi;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Plugin to execute Java type code generation.
