@@ -100,8 +100,8 @@ public final class Person implements SerializableStruct {
     }
 
     @Override
-    public void serialize(ShapeSerializer encoder) {
-        encoder.writeStruct(SCHEMA, this);
+    public Schema schema() {
+        return SCHEMA;
     }
 
     @Override

@@ -98,7 +98,6 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
         switch (testType.appliesTo) {
             case CLIENT -> {
                 // instantiate a mock client for use by test runners
-                // TODO: allow customization of client builder
                 var mockClientBuilder = MockClient.builder();
 
                 // Discover all client auth scheme implementations that could be used for tests

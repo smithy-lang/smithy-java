@@ -19,18 +19,11 @@ public class UnknownOperationException extends ModeledApiException {
     static final Schema SCHEMA = Schema.structureBuilder(ID).build();
 
     public UnknownOperationException(String message) {
-        super(ID, message);
+        super(SCHEMA, message);
     }
 
     @Override
-    public void serializeMembers(ShapeSerializer serializer) {
-
-    }
-
-    @Override
-    public void serialize(ShapeSerializer encoder) {
-        encoder.writeStruct(SCHEMA, this);
-    }
+    public void serializeMembers(ShapeSerializer serializer) {}
 
     @Override
     public synchronized Throwable fillInStackTrace() {

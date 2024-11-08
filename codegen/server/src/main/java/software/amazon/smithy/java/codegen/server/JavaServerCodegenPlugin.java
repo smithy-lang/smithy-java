@@ -13,12 +13,15 @@ import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.utils.SmithyInternalApi;
+import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * Plugin to execute Java server code generation.
  */
 @SmithyInternalApi
 public class JavaServerCodegenPlugin implements SmithyBuildPlugin {
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaServerCodegenPlugin.class);
+
     @Override
     public String getName() {
         return "java-server-codegen";
@@ -29,6 +32,7 @@ public class JavaServerCodegenPlugin implements SmithyBuildPlugin {
         CodegenDirector<JavaWriter, JavaCodegenIntegration, CodeGenerationContext, JavaCodegenSettings> runner = new CodegenDirector<>();
 
         var settings = JavaCodegenSettings.fromNode(context.getSettings());
+        LOGGER.info("Generating Smithy-Java client for service [{}]...", settings.service());
         runner.settings(settings);
         runner.directedCodegen(new DirectedJavaServerCodegen());
         runner.fileManifest(context.getFileManifest());
@@ -38,5 +42,6 @@ public class JavaServerCodegenPlugin implements SmithyBuildPlugin {
         runner.performDefaultCodegenTransforms();
         runner.createDedicatedInputsAndOutputs();
         runner.run();
+        LOGGER.info("Smithy-Java server code generation complete");
     }
 }

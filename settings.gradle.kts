@@ -26,7 +26,11 @@ include(":client-core")
 include(":client-http")
 include(":client-http-binding")
 
+include(":dynamic-client")
+
 include(":auth-api")
+include(":retries-api")
+include(":retries-sdk-adapter")
 
 // server
 include("server-core")
@@ -48,4 +52,4 @@ include(":aws:aws-client-core")
 include(":aws:sigv4")
 include(":aws:client-awsjson")
 include(":aws:client-restjson")
-include("aws:client-rest-xml")
+include(":aws:client-restxml")

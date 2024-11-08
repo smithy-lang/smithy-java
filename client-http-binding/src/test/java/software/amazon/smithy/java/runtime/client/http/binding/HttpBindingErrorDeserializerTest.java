@@ -120,16 +120,13 @@ public class HttpBindingErrorDeserializerTest {
             .build();
 
         public Baz(String message) {
-            super(SCHEMA.id(), message);
+            super(SCHEMA, message);
         }
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeStruct(SCHEMA, this);
         }
-
-        @Override
-        public void serialize(ShapeSerializer encoder) {}
 
         static final class Builder implements ShapeBuilder<Baz> {
             private String message;

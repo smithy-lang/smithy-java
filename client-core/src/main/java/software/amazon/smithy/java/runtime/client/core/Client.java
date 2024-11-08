@@ -97,6 +97,13 @@ public abstract class Client {
     }
 
     /**
+     * @return the configuration in use by this client.
+     */
+    public ClientConfig config() {
+        return config;
+    }
+
+    /**
      * Builder for Clients and request overrides.
      *
      * <p><strong>Note:</strong> this class is implemented by code generated builders, but should not
@@ -121,6 +128,25 @@ public abstract class Client {
 
         List<ClientPlugin> plugins() {
             return Collections.unmodifiableList(plugins);
+        }
+
+        /**
+         * Specify overrides to the configuration that should be used for clients created by this builder.
+         *
+         * @param config Client config to use for updated values.
+         * @return Returns the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B withConfiguration(ClientConfig config) {
+            configBuilder.transport(config.transport())
+                .protocol(config.protocol())
+                .endpointResolver(config.endpointResolver())
+                .authSchemeResolver(config.authSchemeResolver())
+                .identityResolvers(config.identityResolvers());
+            config.interceptors().forEach(configBuilder::addInterceptor);
+            config.supportedAuthSchemes().forEach(configBuilder::putSupportedAuthSchemes);
+            configBuilder.putAllConfig(config.context());
+            return (B) this;
         }
 
         /**

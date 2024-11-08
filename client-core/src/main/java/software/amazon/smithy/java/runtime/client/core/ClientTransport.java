@@ -10,6 +10,9 @@ import software.amazon.smithy.java.context.Context;
 
 /**
  * Sends a serialized request and returns a response.
+ *
+ * @implNote To be discoverable by dynamic clients and client code generators,
+ * ClientTransport's should implement a {@link ClientTransportFactory} service provider.
  */
 public interface ClientTransport<RequestT, ResponseT> {
     /**

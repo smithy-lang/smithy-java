@@ -80,7 +80,7 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
         AwsEventFrame frame;
         Schema exceptionSchema;
         if (exception instanceof ModeledApiException me && (exceptionSchema = possibleExceptions.get(
-            me.getShapeId()
+            me.schema().id()
         )) != null) {
             var headers = new HashMap<String, HeaderValue>();
             headers.put(":message-type", HeaderValue.fromString("exception"));

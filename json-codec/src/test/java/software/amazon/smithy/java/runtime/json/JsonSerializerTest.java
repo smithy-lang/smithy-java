@@ -244,8 +244,8 @@ public class JsonSerializerTest {
 
     private static final class NestedStruct implements SerializableStruct {
         @Override
-        public void serialize(ShapeSerializer encoder) {
-            encoder.writeStruct(JsonTestData.NESTED, this);
+        public Schema schema() {
+            return JsonTestData.NESTED;
         }
 
         @Override
@@ -256,8 +256,8 @@ public class JsonSerializerTest {
 
     private static final class EmptyStruct implements SerializableStruct {
         @Override
-        public void serialize(ShapeSerializer encoder) {
-            encoder.writeStruct(JsonTestData.NESTED, this);
+        public Schema schema() {
+            return JsonTestData.NESTED;
         }
 
         @Override

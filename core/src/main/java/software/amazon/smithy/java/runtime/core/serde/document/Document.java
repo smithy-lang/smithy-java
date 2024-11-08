@@ -352,7 +352,11 @@ public interface Document extends SerializableShape {
                 var elements = asList();
                 List<Object> result = new ArrayList<>(elements.size());
                 for (var e : elements) {
-                    result.add(e.asObject());
+                    if (e == null) {
+                        result.add(null);
+                    } else {
+                        result.add(e.asObject());
+                    }
                 }
                 yield result;
             }
@@ -360,7 +364,12 @@ public interface Document extends SerializableShape {
                 var elements = asStringMap();
                 Map<String, Object> result = new LinkedHashMap<>(elements.size());
                 for (var e : elements.entrySet()) {
-                    result.put(e.getKey(), e.getValue().asObject());
+                    var value = e.getValue();
+                    if (value == null) {
+                        result.put(e.getKey(), null);
+                    } else {
+                        result.put(e.getKey(), value.asObject());
+                    }
                 }
                 yield result;
             }

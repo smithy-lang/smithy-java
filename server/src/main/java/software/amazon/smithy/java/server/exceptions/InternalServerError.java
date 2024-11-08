@@ -20,7 +20,7 @@ public class InternalServerError extends ModeledApiException {
     private static final Schema SCHEMA_MESSAGE = SCHEMA.member("message");
 
     public InternalServerError(String message) {
-        super(ID, message);
+        super(SCHEMA, message);
     }
 
     public InternalServerError(Throwable cause) {
@@ -28,16 +28,11 @@ public class InternalServerError extends ModeledApiException {
     }
 
     public InternalServerError(String message, Throwable cause) {
-        super(ID, message, cause);
+        super(SCHEMA, message, cause);
     }
 
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
         serializer.writeString(SCHEMA_MESSAGE, getMessage());
-    }
-
-    @Override
-    public void serialize(ShapeSerializer encoder) {
-        encoder.writeStruct(SCHEMA, this);
     }
 }

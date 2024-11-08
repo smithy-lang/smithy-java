@@ -28,18 +28,26 @@ import software.amazon.smithy.java.codegen.sections.OperationSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.client.core.Client;
+import software.amazon.smithy.java.runtime.client.core.ClientConfig;
 import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
 import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.runtime.client.core.ClientSetting;
-import software.amazon.smithy.java.runtime.client.core.ClientTransport;
+import software.amazon.smithy.java.runtime.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
-import software.amazon.smithy.java.runtime.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
+import software.amazon.smithy.model.node.ArrayNode;
+import software.amazon.smithy.model.node.BooleanNode;
+import software.amazon.smithy.model.node.NodeVisitor;
+import software.amazon.smithy.model.node.NullNode;
+import software.amazon.smithy.model.node.NumberNode;
+import software.amazon.smithy.model.node.ObjectNode;
+import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ToShapeId;
@@ -48,16 +56,22 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
 @SmithyInternalApi
+@SuppressWarnings("rawtypes")
 public final class ClientInterfaceGenerator
     implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientInterfaceGenerator.class);
 
     private static final Map<ShapeId, Class<? extends AuthSchemeFactory>> authSchemeFactories = new HashMap<>();
+    private static final Map<String, Class<? extends ClientTransportFactory>> clientTransportFactories = new HashMap<>();
+
     static {
         // Add all trait services to a map, so they can be queried for a provider class
         ServiceLoader.load(AuthSchemeFactory.class, ClientInterfaceGenerator.class.getClassLoader())
             .forEach((service) -> authSchemeFactories.put(service.schemeId(), service.getClass()));
+        // Add all transport services to a map, so they can be queried for a provider class
+        ServiceLoader.load(ClientTransportFactory.class, ClientInterfaceGenerator.class.getClassLoader())
+            .forEach((service) -> clientTransportFactories.put(service.name(), service.getClass()));
     }
 
     @Override
@@ -82,6 +96,11 @@ public final class ClientInterfaceGenerator
                         ${operations:C|}
 
                         /**
+                         * @return Configuration in use by client.
+                         */
+                         ${clientConfig:T} config();
+
+                        /**
                          * Create a Builder for {@link ${interface:T}}.
                          */
                         static Builder builder() {
@@ -99,7 +118,8 @@ public final class ClientInterfaceGenerator
                             implements ${#settings}${value:T}<Builder>${^key.last}, ${/key.last}${/settings}${/settings} {
                             ${?hasDefaults}${defaultPlugins:C|}
                             ${/hasDefaults}${?hasDefaultProtocol}${defaultProtocol:C|}
-                            ${/hasDefaultProtocol}${?defaultSchemes}${defaultAuth:C|}
+                            ${/hasDefaultProtocol}${?hasTransportSettings}${transportSettings:C|}
+                            ${/hasTransportSettings}${?defaultSchemes}${defaultAuth:C|}
                             ${/defaultSchemes}
                             private Builder() {${?defaultSchemes}
                                 configBuilder().putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes});
@@ -111,12 +131,12 @@ public final class ClientInterfaceGenerator
                                     plugin.configureClient(configBuilder());
                                 }
                                 ${/hasDefaults}${?hasDefaultProtocol}if (configBuilder().protocol() == null) {
-                                    configBuilder().protocol(${protocolFactory:C}.createProtocol(settings, protocolTrait));
+                                    configBuilder().protocol(${protocolFactory:C}.createProtocol(protocolSettings, protocolTrait));
                                 }
-                                ${/hasDefaultProtocol}${?transport}if (configBuilder().transport() == null) {
-                                    configBuilder().transport(new ${transport:T}());
+                                ${/hasDefaultProtocol}${?hasDefaultTransport}if (configBuilder().transport() == null) {
+                                    configBuilder().transport(${transportFactory:C}.createTransport(${?hasTransportSettings}transportSettings${/hasTransportSettings}));
                                 }
-                                ${/transport}
+                                ${/hasDefaultTransport}
                                 return new ${impl:T}(this);
                             }
                         }
@@ -125,14 +145,15 @@ public final class ClientInterfaceGenerator
                             implements ${#settings}${value:T}<RequestOverrideBuilder>${^key.last}, ${/key.last}${/settings}${/settings} {}
                     }
                     """;
-                var defaultProtocolTrait = getDefaultProtocolTrait(directive.model(), directive.settings());
+                var settings = directive.settings();
+                var defaultProtocolTrait = getDefaultProtocolTrait(directive.model(), settings);
                 writer.putContext("hasDefaultProtocol", defaultProtocolTrait != null);
-                writer.putContext("protocolFactory", new ProtocolFactoryGenerator(writer, defaultProtocolTrait));
+                writer.putContext("protocolFactory", new FactoryGenerator(writer, getFactory(defaultProtocolTrait)));
                 writer.putContext(
                     "defaultProtocol",
                     new DefaultProtocolGenerator(
                         writer,
-                        directive.settings().service(),
+                        settings.service(),
                         defaultProtocolTrait,
                         directive.context()
                     )
@@ -140,9 +161,21 @@ public final class ClientInterfaceGenerator
                 writer.putContext("clientPlugin", ClientPlugin.class);
                 writer.putContext("client", Client.class);
                 writer.putContext("requestOverride", RequestOverrideConfig.class);
+                writer.putContext("clientConfig", ClientConfig.class);
                 writer.putContext("interface", symbol);
                 writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
-                writer.putContext("transport", getTransportClass(directive.settings()));
+                writer.putContext("hasDefaultTransport", settings.transport() != null);
+                var hasTransportSettings = settings.transportSettings() != null && !settings.transportSettings()
+                    .isEmpty();
+                writer.putContext("hasTransportSettings", hasTransportSettings);
+                writer.putContext(
+                    "transportFactory",
+                    new FactoryGenerator(writer, getTransportFactory(directive.settings()))
+                );
+                writer.putContext(
+                    "transportSettings",
+                    new TransportSettingsGenerator(writer, settings.transportSettings())
+                );
                 writer.putContext(
                     "operations",
                     new OperationMethodGenerator(
@@ -169,20 +202,95 @@ public final class ClientInterfaceGenerator
             });
     }
 
-    private static Class<? extends ClientTransport> getTransportClass(JavaCodegenSettings settings) {
+    private static Class<? extends ClientTransportFactory> getTransportFactory(JavaCodegenSettings settings) {
         if (settings.transport() == null) {
             return null;
         }
-        // Use one of the built-in transports
-        if (settings.transport().equals("http-java")) {
-            return JavaHttpClientTransport.class;
-        } else if (settings.transport().equals("http-netty")) {
-            // TODO: Add netty transport once supported
-            throw new CodegenException("Netty default transport not yet supported");
+        var factory = clientTransportFactories.get(settings.transport());
+        if (factory == null) {
+            throw new CodegenException(
+                "Transport " + settings.transport() + " request, but no matching factory was found."
+            );
+        }
+        return factory;
+    }
+
+    private record TransportSettingsGenerator(JavaWriter writer, ObjectNode settings) implements Runnable {
+        @Override
+        public void run() {
+            writer.pushState();
+            writer.putContext("document", Document.class);
+            writer.putContext("nodeWriter", new NodeDocumentWriter(writer, settings));
+            writer.write("private static final ${document:T} transportSettings = ${nodeWriter:C};");
+            writer.popState();
+        }
+    }
+
+    private record NodeDocumentWriter(JavaWriter writer, ObjectNode node) implements NodeVisitor<Void>, Runnable {
+
+        @Override
+        public void run() {
+            node.accept(this);
         }
 
-        // TODO: Handle custom transports
-        throw new UnsupportedOperationException("Custom default transports not yet supported");
+        @Override
+        public Void arrayNode(ArrayNode arrayNode) {
+            var consumers = arrayNode.getElements().stream().map(n -> (Runnable) () -> n.accept(this)).toList();
+            writer.pushState();
+            writer.putContext("nodes", consumers);
+            writer.putContext("list", List.class);
+            writer.write(
+                "${document:T}.createList(${list:T}.of(${#nodes}${value:C}${^key.last}, ${/key.last}${/nodes}))"
+            );
+            writer.popState();
+            return null;
+        }
+
+        @Override
+        public Void objectNode(ObjectNode objectNode) {
+            writer.pushState();
+            writer.putContext("map", Map.class);
+            writer.openBlock("${document:T}.createStringMap(${map:T}.of(", "))", () -> {
+                var iter = objectNode.getMembers().entrySet().iterator();
+                while (iter.hasNext()) {
+                    var entry = iter.next();
+                    writer.writeInline(
+                        "$S, $C",
+                        entry.getKey().getValue(),
+                        (Runnable) () -> entry.getValue().accept(this)
+                    );
+                    if (iter.hasNext()) {
+                        writer.writeInline(",");
+                    }
+                    writer.newLine();
+                }
+            });
+            writer.popState();
+            return null;
+        }
+
+        @Override
+        public Void booleanNode(BooleanNode booleanNode) {
+            writer.writeInline("${document:T}.createBoolean($L)", booleanNode.getValue());
+            return null;
+        }
+
+        @Override
+        public Void numberNode(NumberNode numberNode) {
+            writer.writeInline("${document:T}.createNumber($L)", numberNode.getValue());
+            return null;
+        }
+
+        @Override
+        public Void stringNode(StringNode stringNode) {
+            writer.writeInline("${document:T}.createString($S)", stringNode.getValue());
+            return null;
+        }
+
+        @Override
+        public Void nullNode(NullNode nullNode) {
+            throw new IllegalArgumentException("Null nodes not supported in transport settings.");
+        }
     }
 
     private record OperationMethodGenerator(
@@ -223,11 +331,10 @@ public final class ClientInterfaceGenerator
         }
     }
 
-    private record ProtocolFactoryGenerator(JavaWriter writer, Trait defaultProtocolTrait) implements Runnable {
+    private record FactoryGenerator(JavaWriter writer, Class<?> factoryClass) implements Runnable {
         @Override
         public void run() {
             writer.pushState();
-            var factoryClass = getFactory(defaultProtocolTrait.toShapeId());
             if (factoryClass.isMemberClass()) {
                 writer.putContext("outer", factoryClass.getEnclosingClass());
             }
@@ -249,7 +356,7 @@ public final class ClientInterfaceGenerator
             }
             writer.pushState();
             var template = """
-                private static final ${protocolSettings:T} settings = ${protocolSettings:T}.builder()
+                private static final ${protocolSettings:T} protocolSettings = ${protocolSettings:T}.builder()
                         .service(${shapeId:T}.from(${service:S}))
                         .build();
                 private static final ${trait:T} protocolTrait = ${initializer:C};
@@ -284,16 +391,19 @@ public final class ClientInterfaceGenerator
         );
     }
 
-    private static Class<? extends ClientProtocolFactory> getFactory(ShapeId defaultProtocol) {
+    private static Class<? extends ClientProtocolFactory> getFactory(Trait defaultProtocolTrait) {
+        if (defaultProtocolTrait == null) {
+            return null;
+        }
         for (var factory : ServiceLoader.load(
             ClientProtocolFactory.class,
             ClientInterfaceGenerator.class.getClassLoader()
         )) {
-            if (factory.id().equals(defaultProtocol)) {
+            if (factory.id().equals(defaultProtocolTrait.toShapeId())) {
                 return factory.getClass();
             }
         }
-        throw new CodegenException("Could not find factory for " + defaultProtocol);
+        throw new CodegenException("Could not find factory for " + defaultProtocolTrait);
     }
 
     @SuppressWarnings("rawtypes")

@@ -45,7 +45,6 @@ public class GenericClientTest {
 
     @Test
     public void echoTest() {
-        System.out.println("DOING THINGS");
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
             .endpointResolver(ENDPOINT_RESOLVER)
@@ -133,39 +132,25 @@ public class GenericClientTest {
         client.echo(input, override);
     }
 
-    // TODO: Update to use context directly once we have a method that returns that
     @Test
     public void correctlyAppliesDefaultPlugins() {
-        var interceptor = new ClientInterceptor() {
-            @Override
-            public void readBeforeExecution(InputHook<?> hook) {
-                var constant = hook.context().get(TestClientPlugin.CONSTANT_KEY);
-                assertEquals(constant, "CONSTANT");
-                var value = hook.context().get(TestSettings.VALUE_KEY);
-                assertEquals(value, BigDecimal.valueOf(2L));
-                var ab = hook.context().get(AbSetting.AB_KEY);
-                assertEquals(ab, "ab");
-                var singleVarargs = hook.context().get(TestSettings.STRING_LIST_KEY);
-                assertEquals(List.of("a", "b", "c", "d"), singleVarargs);
-                var foo = hook.context().get(TestSettings.FOO_KEY);
-                assertEquals(foo, "string");
-                var multiVarargs = hook.context().get(TestSettings.BAZ_KEY);
-                assertEquals(List.of("a", "b", "c"), multiVarargs);
-                var nested = hook.context().get(TestSettings.NESTED_KEY);
-                assertEquals(nested, 1);
-            }
-        };
         var client = TestServiceClient.builder()
             .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
             .endpointResolver(ENDPOINT_RESOLVER)
-            .addInterceptor(interceptor)
             .value(2L)
             .multiValue("a", "b")
             .multiVarargs("string", "a", "b", "c")
             .singleVarargs("a", "b", "c", "d")
             .nested(1)
             .build();
-
+        var context = client.config().context();
+        assertEquals("CONSTANT", context.expect(TestClientPlugin.CONSTANT_KEY));
+        assertEquals(BigDecimal.valueOf(2L), context.expect(TestSettings.VALUE_KEY));
+        assertEquals("ab", context.expect(AbSetting.AB_KEY));
+        assertEquals(List.of("a", "b", "c", "d"), context.expect(TestSettings.STRING_LIST_KEY));
+        assertEquals("string", context.expect(TestSettings.FOO_KEY));
+        assertEquals(List.of("a", "b", "c"), context.expect(TestSettings.BAZ_KEY));
+        assertEquals(1, context.expect(TestSettings.NESTED_KEY));
         var value = "hello world";
         var input = EchoInput.builder().string(value).build();
         var output = client.echo(input);
