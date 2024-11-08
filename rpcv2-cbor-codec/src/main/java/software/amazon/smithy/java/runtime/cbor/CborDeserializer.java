@@ -110,9 +110,11 @@ final class CborDeserializer implements ShapeDeserializer {
                 byteBuffer.remaining()
             );
         } else {
+            int pos = byteBuffer.position();
             this.payload = new byte[byteBuffer.remaining()];
             byteBuffer.get(this.payload);
             this.parser = new CborParser(this.payload);
+            byteBuffer.position(pos);
         }
         parser.advance();
     }
