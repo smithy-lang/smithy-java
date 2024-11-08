@@ -20,7 +20,14 @@ import software.amazon.smithy.model.traits.PrivateTrait;
 import software.amazon.smithy.model.transform.ModelTransformer;
 
 /**
- * Generates a synthetic service with operation that are also
+ * Generates a synthetic service for a set of shapes. 
+ *
+ * <p>Adds a set of shapes to the closure of a synthetic service shape. Operations shapes are added directly
+ * to the service shape while all other shapes are added to the service via synthetic operations with synthetic inputs.
+ *
+ * <p>Directed codegen requires a root service shape to use for generating types. This service shape also
+ * provides renames for a set of shapes as well as the list of protocols the shapes should support. This
+ * transform creates a synthetic service that Directed codegen can use to generate the provided set of shapes.
  */
 final class SyntheticServiceTransform {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(SyntheticServiceTransform.class);
@@ -37,7 +44,7 @@ final class SyntheticServiceTransform {
         for (Shape shape : closure) {
             switch (shape.getType()) {
                 case SERVICE, RESOURCE -> {
-                    LOGGER.info("Skipping service-associated shape {} for type codegen...", shape);
+                    LOGGER.debug("Skipping service-associated shape {} for type codegen...", shape);
                 }
                 case OPERATION -> serviceBuilder.addOperation(shape.asOperationShape().orElseThrow());
                 case STRUCTURE, ENUM, INT_ENUM, UNION -> {
