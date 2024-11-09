@@ -27,7 +27,6 @@ import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
-import software.amazon.smithy.protocoltests.traits.AppliesTo;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 
 public class HttpServerRequestProtocolTestProvider extends
@@ -56,9 +55,6 @@ public class HttpServerRequestProtocolTestProvider extends
             var testOperation = serverTestOperation.operation();
             boolean shouldSkip = testFilter.skipOperation(testOperation.id());
             for (var testCase : testOperation.requestTestCases()) {
-                if (testCase.getAppliesTo().filter(t -> t == AppliesTo.SERVER).isPresent()) {
-                    continue;
-                }
                 var createUri = createUri(testData.endpoint(), testCase.getUri(), testCase.getQueryParams());
                 var headers = createHeaders(testCase.getHeaders());
                 var request = SmithyHttpRequest.builder()

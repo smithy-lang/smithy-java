@@ -26,11 +26,7 @@ sealed interface TestFilter {
     /**
      * Filters test cases
      */
-    boolean skipTestCase(HttpMessageTestCase testCase, TestType testType);
-
-    default boolean skipTestCase(HttpMessageTestCase testCase) {
-        return skipTestCase(testCase, null);
-    }
+    boolean skipTestCase(HttpMessageTestCase testCase);
 
     default TestFilter combine(TestFilter other) {
         return new CombinedTestFilter(this, other);
@@ -76,12 +72,9 @@ sealed interface TestFilter {
         }
 
         @Override
-        public boolean skipTestCase(HttpMessageTestCase testCase, TestType testType) {
+        public boolean skipTestCase(HttpMessageTestCase testCase) {
             return skippedTests.contains(testCase.getId())
-                || (!tests.isEmpty() && !tests.contains(testCase.getId()))
-                || (testType != null
-                    && testCase.getAppliesTo().isPresent()
-                    && !testCase.getAppliesTo().get().equals(testType.appliesTo));
+                || (!tests.isEmpty() && !tests.contains(testCase.getId()));
         }
     }
 
@@ -93,7 +86,7 @@ sealed interface TestFilter {
         }
 
         @Override
-        public boolean skipTestCase(HttpMessageTestCase testCase, TestType testType) {
+        public boolean skipTestCase(HttpMessageTestCase testCase) {
             return false;
         }
     }
@@ -114,8 +107,8 @@ sealed interface TestFilter {
         }
 
         @Override
-        public boolean skipTestCase(HttpMessageTestCase testCase, TestType testType) {
-            return first.skipTestCase(testCase, testType) || second.skipTestCase(testCase, testType);
+        public boolean skipTestCase(HttpMessageTestCase testCase) {
+            return first.skipTestCase(testCase) || second.skipTestCase(testCase);
         }
     }
 }

@@ -79,7 +79,7 @@ final class HttpClientRequestProtocolTestProvider extends
                             inputBuilder.build(),
                             overrideBuilder.build(),
                             testTransport::getCapturedRequest,
-                            filter.skipOperation(operation.id()) || filter.skipTestCase(testCase, TestType.CLIENT)
+                            filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)
                         );
                     })
             );

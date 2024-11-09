@@ -78,7 +78,7 @@ final class HttpClientResponseProtocolTestProvider extends
                             input,
                             outputBuilder.build(),
                             overrideBuilder.build(),
-                            filter.skipOperation(operation.id()) || filter.skipTestCase(testCase, TestType.CLIENT)
+                            filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)
 
                         );
                     })
