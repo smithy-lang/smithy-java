@@ -10,6 +10,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
@@ -24,7 +25,7 @@ final class ServerTestClient {
 
     private ServerTestClient(URI endpoint) {
         this.endpoint = endpoint;
-        this.httpClient = HttpClient.newHttpClient();
+        this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build();
     }
 
     public static ServerTestClient get(URI endpoint) {
