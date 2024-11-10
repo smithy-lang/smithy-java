@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.aws.traits.protocols.RestJson1Trait;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
@@ -147,15 +146,15 @@ final class AwsRestJson1Protocol extends ServerProtocol {
     }
 
     @Override
-    public CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output) {
+    public CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output, boolean isError) {
         HttpJob httpJob = (HttpJob) job; //We already check in the deserializeInput method.
         ResponseSerializer serializer = httpBinding.responseSerializer()
             .operation(job.operation().getApiOperation())
             .payloadCodec(codec)
             .payloadMediaType("application/json")
             .shapeValue(output);
-        if (output instanceof ModeledApiException mae) {
-            serializer = serializer.errorSchema(mae.schema());
+        if (isError) {
+            serializer.errorSchema(output.schema());
         }
         SmithyHttpResponse response = serializer.serializeResponse();
         httpJob.response().setSerializedValue(response.body());

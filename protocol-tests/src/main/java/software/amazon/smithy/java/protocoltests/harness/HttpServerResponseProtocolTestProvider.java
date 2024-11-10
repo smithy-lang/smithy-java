@@ -8,6 +8,7 @@ package software.amazon.smithy.java.protocoltests.harness;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -122,6 +123,12 @@ public class HttpServerResponseProtocolTestProvider extends
                     ) throws ParameterResolutionException {
                         if (testCase.getBody().isEmpty()) {
                             return DataStream.ofEmpty();
+                        }
+                        if (testCase.getBodyMediaType().map(ProtocolTestProvider::isBinaryMediaType).orElse(false)) {
+                            return DataStream.ofBytes(
+                                Base64.getDecoder().decode(testCase.getBody().get()),
+                                testCase.getBodyMediaType().get()
+                            );
                         }
                         return DataStream.ofString(testCase.getBody().get(), testCase.getBodyMediaType().orElse(null));
                     }

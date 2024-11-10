@@ -17,6 +17,7 @@ dependencies {
 
     // Protocol test dependencies
     testImplementation(libs.smithy.protocol.tests)
+    itImplementation(testFixtures(project(":rpcv2-cbor-codec")))
 }
 
 val generator = "software.amazon.smithy.java.protocoltests.generators.ProtocolTestGenerator"

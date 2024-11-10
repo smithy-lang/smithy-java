@@ -30,17 +30,21 @@ public abstract class ServerProtocol {
 
     public abstract CompletableFuture<Void> deserializeInput(Job job);
 
-    public abstract CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output);
+    public final CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output) {
+        return serializeOutput(job, output, false);
+    }
 
     public final CompletableFuture<Void> serializeError(Job job, Throwable error) {
         return serializeError(job, error instanceof ModeledApiException me ? me : new InternalServerError(error));
     }
 
+    protected abstract CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output, boolean isError);
+
     public final CompletableFuture<Void> serializeError(Job job, ModeledApiException error) {
         if (!job.operation().getApiOperation().errorSchemas().contains(error.schema())) {
             error = new InternalServerError(error);
         }
-        return serializeOutput(job, error);
+        return serializeOutput(job, error, true);
     }
 
 }

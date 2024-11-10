@@ -12,10 +12,10 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.ErrorTrait;
 
-public final class UnknownOperationException extends ModeledApiException {
+public final class MalformedHttpException extends ModeledApiException {
 
     public static final ShapeId ID = ShapeId.from(
-        "software.amazon.smithy.exceptions#UnknownOperationException"
+        "software.amazon.smithy.exceptions#MalformedHttpException"
     );
 
     private static final Schema SCHEMA = Schema.structureBuilder(
@@ -26,12 +26,12 @@ public final class UnknownOperationException extends ModeledApiException {
 
     private static final Schema SCHEMA_MESSAGE = SCHEMA.member("message");
 
-    public UnknownOperationException() {
-        super(SCHEMA, "Unknown Operation");
+    public MalformedHttpException() {
+        super(SCHEMA, "Malformed Http Request", Fault.CLIENT);
     }
 
-    public UnknownOperationException(String message) {
-        super(SCHEMA, message);
+    public MalformedHttpException(String message) {
+        super(SCHEMA, message, Fault.CLIENT);
     }
 
     @Override

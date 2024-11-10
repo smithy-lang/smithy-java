@@ -1,5 +1,6 @@
 plugins {
     id("smithy-java.module-conventions")
+    `java-test-fixtures`
 }
 
 description = "This module provides CBOR functionality"
@@ -9,5 +10,5 @@ extra["moduleName"] = "software.amazon.smithy.java.cbor"
 
 dependencies {
     api(project(":core"))
-    implementation(libs.jackson.core)
+    testFixturesImplementation(libs.assertj.core)
 }
