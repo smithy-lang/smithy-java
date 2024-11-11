@@ -23,14 +23,14 @@ public class SdkRetryStrategyTest {
     @Test
     public void bridgesAwsSdk() {
         RetryStrategy sdk = DefaultRetryStrategy.doNotRetry();
-        var adapted = new SdkRetryStrategy(sdk);
+        var adapted = SdkRetryStrategy.of(sdk);
 
         assertThat(adapted.maxAttempts(), equalTo(sdk.maxAttempts()));
     }
 
     @Test
     public void acquiresToken() {
-        var adapted = new SdkRetryStrategy(DefaultRetryStrategy.doNotRetry());
+        var adapted = SdkRetryStrategy.of(DefaultRetryStrategy.doNotRetry());
         var attempt = new AcquireInitialTokenRequest("foo");
         var result = adapted.acquireInitialToken(attempt);
 
@@ -40,7 +40,7 @@ public class SdkRetryStrategyTest {
 
     @Test
     public void refreshesToken() {
-        var adapted = new SdkRetryStrategy(DefaultRetryStrategy.doNotRetry());
+        var adapted = SdkRetryStrategy.of(DefaultRetryStrategy.doNotRetry());
         var acquire = adapted.acquireInitialToken(new AcquireInitialTokenRequest("foo"));
         var refresh = new RefreshRetryTokenRequest(acquire.token(), new RuntimeException("hi"), null);
 
@@ -52,7 +52,7 @@ public class SdkRetryStrategyTest {
 
     @Test
     public void returnsTokens() {
-        var adapted = new SdkRetryStrategy(DefaultRetryStrategy.doNotRetry());
+        var adapted = SdkRetryStrategy.of(DefaultRetryStrategy.doNotRetry());
         var acquire = adapted.acquireInitialToken(new AcquireInitialTokenRequest("foo"));
 
         var result = adapted.recordSuccess(new RecordSuccessRequest(acquire.token()));

@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.core.CallContext;
@@ -69,6 +70,11 @@ public class HttpRetryErrorClassifierTest {
             @Override
             public List<ShapeId> effectiveAuthSchemes() {
                 throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Set<Schema> errorSchemas() {
+                return Set.of();
             }
         };
     }

@@ -13,6 +13,7 @@ import software.amazon.smithy.java.runtime.retries.api.RecordSuccessResponse;
 import software.amazon.smithy.java.runtime.retries.api.RefreshRetryTokenRequest;
 import software.amazon.smithy.java.runtime.retries.api.RefreshRetryTokenResponse;
 import software.amazon.smithy.java.runtime.retries.api.RetryInfo;
+import software.amazon.smithy.java.runtime.retries.api.RetrySafety;
 import software.amazon.smithy.java.runtime.retries.api.RetryStrategy;
 import software.amazon.smithy.java.runtime.retries.api.RetryToken;
 import software.amazon.smithy.java.runtime.retries.api.TokenAcquisitionFailedException;
@@ -24,11 +25,52 @@ public class SdkRetryStrategy implements RetryStrategy {
 
     private final software.amazon.awssdk.retries.api.RetryStrategy delegate;
 
-    /**
-     * @param delegate The retry strategy to use from the AWS SDK.
-     */
-    public SdkRetryStrategy(software.amazon.awssdk.retries.api.RetryStrategy delegate) {
+    private SdkRetryStrategy(software.amazon.awssdk.retries.api.RetryStrategy delegate) {
         this.delegate = delegate;
+    }
+
+    /**
+     * Create a wrapper for the given SDK RetryStrategy strategy that makes it work as a Smithy RetryStrategy.
+     *
+     * <p>This method <em>does not</em> attempt to modify the given retry strategy to make it account for
+     * {@link RetryInfo} properties; it assumes you've already accounted for that somehow.
+     *
+     * @param delegate The SDK RetryStrategy to wrap.
+     * @return the created Smithy RetryStrategy.
+     */
+    public static SdkRetryStrategy ofPrepared(software.amazon.awssdk.retries.api.RetryStrategy delegate) {
+        return new SdkRetryStrategy(delegate);
+    }
+
+    /**
+     * Create a wrapped retry strategy that looks at the populated {@link RetryInfo} of Smithy exceptions and
+     * makes calls to the AWS SDK retry strategy's builder to use {@link RetryInfo#isRetrySafe()} and
+     * {@link RetryInfo#isThrottle()}.
+     *
+     * @param delegate The retry strategy to use from the AWS SDK.
+     * @return the created Smithy RetryStrategy.
+     */
+    public static SdkRetryStrategy of(software.amazon.awssdk.retries.api.RetryStrategy delegate) {
+        var builder = delegate.toBuilder();
+        builder.retryOnException(e -> {
+            var ri = getInfo(e);
+            return ri != null && ri.isRetrySafe() == RetrySafety.YES;
+        });
+        builder.treatAsThrottling(e -> {
+            var ri = getInfo(e);
+            return ri != null && ri.isThrottle();
+        });
+        return ofPrepared(builder.build());
+    }
+
+    private static RetryInfo getInfo(Throwable e) {
+        if (e instanceof RetryInfo r) {
+            return r;
+        } else if (e.getCause() != null) {
+            return getInfo(e.getCause());
+        } else {
+            return null;
+        }
     }
 
     @Override
