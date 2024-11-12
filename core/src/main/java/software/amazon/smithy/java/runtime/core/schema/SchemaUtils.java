@@ -59,13 +59,17 @@ public final class SchemaUtils {
      * @return the given {@code value}.
      */
     public static Object validateMemberInSchema(Schema parent, Schema member, Object value) {
-        var actual = parent.members().get(member.memberIndex());
-        if (actual != member) {
-            throw new IllegalArgumentException(
-                "Attempted to access an unexpected member of " + parent.id()
-                    + ": " + member.id()
-            );
-        }
-        return value;
+        try {
+            if (member == parent.members().get(member.memberIndex())) {
+                return value;
+            }
+        } catch (IndexOutOfBoundsException ignored) {}
+        throw illegalMemberAccess(parent, member);
+    }
+
+    private static RuntimeException illegalMemberAccess(Schema parent, Schema member) {
+        return new IllegalArgumentException(
+            "Attempted to access a non-existent member of " + parent.id() + ": " + member.id()
+        );
     }
 }

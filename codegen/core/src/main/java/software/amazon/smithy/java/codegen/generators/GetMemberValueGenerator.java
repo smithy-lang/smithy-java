@@ -10,7 +10,6 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SchemaUtils;
-import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.ErrorTrait;
@@ -29,12 +28,9 @@ record GetMemberValueGenerator(JavaWriter writer, SymbolProvider symbolProvider,
                 });
             }
             """;
-        writer.putContext("string", String.class);
         writer.putContext("sdkSchema", Schema.class);
         writer.putContext("schemaUtils", SchemaUtils.class);
-        writer.putContext("toStringSerializer", ToStringSerializer.class);
         writer.putContext("cases", writer.consumer(this::generateMemberSwitchCases));
-        writer.putContext("illegalArg", IllegalArgumentException.class);
         writer.write(template);
         writer.popState();
     }

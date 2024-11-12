@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SchemaUtils;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -67,10 +68,7 @@ record WrappedDocument(ShapeId service, Schema schema, Document delegate) implem
 
     @Override
     public Object getMemberValue(Schema member) {
-        if (member != schema.members().get(member.memberIndex())) {
-            throw new IllegalArgumentException("Invalid member: " + member);
-        }
-        return getMember(member.memberName());
+        return SchemaUtils.validateMemberInSchema(schema, member, getMember(member.memberName()));
     }
 
     @Override
