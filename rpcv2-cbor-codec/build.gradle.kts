@@ -10,4 +10,5 @@ extra["moduleName"] = "software.amazon.smithy.java.cbor"
 dependencies {
     api(project(":core"))
     implementation(libs.jackson.core)
+    implementation(libs.jackson.dataformat.cbor)
 }

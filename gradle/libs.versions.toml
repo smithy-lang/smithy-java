@@ -27,6 +27,7 @@ aws-sdk-retries-spi = {module = "software.amazon.awssdk:retries-spi", version.re
 aws-sdk-retries = {module = "software.amazon.awssdk:retries", version.ref = "aws-sdk"}
 
 jackson-core = {module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson"}
+jackson-dataformat-cbor = {module = "com.fasterxml.jackson.dataformat:jackson-dataformat-cbor", version.ref = "jackson"}
 
 netty-all = {module = "io.netty:netty-all", version.ref = "netty"}
 

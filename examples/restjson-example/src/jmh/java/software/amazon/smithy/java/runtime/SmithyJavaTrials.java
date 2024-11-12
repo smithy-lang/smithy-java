@@ -21,6 +21,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
+import software.amazon.smithy.java.runtime.cbor.JacksonCborCodec;
 import software.amazon.smithy.java.runtime.cbor.Rpcv2CborCodec;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
@@ -66,6 +67,7 @@ public class SmithyJavaTrials {
     public enum Protocol {
         RestJson(JsonCodec.builder().build()),
         RpcV2(Rpcv2CborCodec.builder().build()),
+        JacksonCbor(new JacksonCborCodec()),
         ;
 
         private final Codec codec;
@@ -81,7 +83,7 @@ public class SmithyJavaTrials {
 
     @Param(
         {
-            "RestJson",
+            "JacksonCbor",
             "RpcV2",
         }
     )
@@ -89,19 +91,19 @@ public class SmithyJavaTrials {
 
     @Param(
         {
-            "all_fields_optional_0",
-            "all_fields_optional_1",
-            "all_fields_optional_3",
-            "all_fields_optional_5",
-            "all_fields_optional_6",
-            "attribute_updates_1",
-            "attribute_updates_2",
-            "attribute_updates_3",
-            "struct_1",
-            "struct_2",
-            "struct_3",
+//            "all_fields_optional_0",
+//            "all_fields_optional_1",
+//            "all_fields_optional_3",
+//            "all_fields_optional_5",
+//            "all_fields_optional_6",
+//            "attribute_updates_1",
+//            "attribute_updates_2",
+//            "attribute_updates_3",
+//            "struct_1",
+//            "struct_2",
+//            "struct_3",
             "struct_4",
-            "send_message_request_1"
+//            "send_message_request_1"
         }
     )
     private String testName;
@@ -143,7 +145,7 @@ public class SmithyJavaTrials {
         cleanBuilder = builderConstructor.newInstance();
     }
 
-    @Benchmark
+//    @Benchmark
     public Object serialize() {
         return type.codec.serialize(shape);
     }
