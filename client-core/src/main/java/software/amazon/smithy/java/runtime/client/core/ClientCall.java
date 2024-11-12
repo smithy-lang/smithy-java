@@ -22,9 +22,11 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterc
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
+import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.retries.api.RetryStrategy;
 import software.amazon.smithy.java.runtime.retries.api.RetryToken;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
  * Contains the information needed to send a request from a client using a protocol.
@@ -69,6 +71,23 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
 
         //TODO fix this to not use a cached thread pool.
         executor = builder.executor == null ? Executors.newCachedThreadPool() : builder.executor;
+    }
+
+    /**
+     * Check if a retry is disallowed for this call.
+     *
+     * <p>Currently only looks at whether a non-replayable stream is used in the input.
+     *
+     * @return true if retries are disallowed.
+     */
+    boolean isRetryDisallowed() {
+        var inputStream = operation.inputStreamMember();
+        if (inputStream.type() == ShapeType.STRING || inputStream.type() == ShapeType.BLOB) {
+            // Only tell the call that retries are disallowed if the stream is not replayable.
+            var stream = (DataStream) input.getMemberValue(inputStream);
+            return !stream.isReplayable();
+        }
+        return false;
     }
 
     static <I extends SerializableStruct, O extends SerializableStruct> Builder<I, O> builder() {

@@ -22,11 +22,4 @@ public interface InputEventStreamingApiOperation<I extends SerializableStruct, O
      * @return Returns a supplier of input event shape builders.
      */
     Supplier<ShapeBuilder<IE>> inputEventBuilderSupplier();
-
-    /**
-     * Get the schema of the input events.
-     *
-     * @return Returns the input event schema, including relevant traits.
-     */
-    Schema inputEventSchema();
 }

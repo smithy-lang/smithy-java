@@ -327,15 +327,21 @@ final class ClientPipeline<RequestT, ResponseT> {
                     interceptor.readAfterAttempt(outputHook, error);
                     error = null;
                 } catch (RuntimeException e) {
-                    try {
-                        // If it's retryable, keep retrying.
-                        var acquireRequest = new RefreshRetryTokenRequest(call.retryToken, e, null);
-                        var acquireResult = call.retryStrategy.refreshRetryToken(acquireRequest);
-                        return retry(call, request, acquireResult.token(), acquireResult.delay());
-                    } catch (TokenAcquisitionFailedException tafe) {
-                        // Log and continue to the normal failure mode for the request.
-                        LOGGER.debug("Cannot acquire a retry token: {}", tafe);
+                    // Check if the request can be retried.
+                    if (call.isRetryDisallowed()) {
+                        // Don't retry: the request must have used a streaming input that is not replayable.
                         error = e;
+                    } else {
+                        try {
+                            // If it's retryable, keep retrying.
+                            var acquireRequest = new RefreshRetryTokenRequest(call.retryToken, e, null);
+                            var acquireResult = call.retryStrategy.refreshRetryToken(acquireRequest);
+                            return retry(call, request, acquireResult.token(), acquireResult.delay());
+                        } catch (TokenAcquisitionFailedException tafe) {
+                            // Log and continue to the normal failure mode for the request.
+                            LOGGER.debug("Cannot acquire a retry token: {}", tafe);
+                            error = e;
+                        }
                     }
                 }
 

@@ -54,6 +54,13 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
     Schema outputSchema();
 
     /**
+     * Return a Set of {@link Schema} representing errors that are allowed to be returned from this Operation.
+     *
+     * @return Set of {@link Schema} for the errors throwable by this operation.
+     */
+    Set<Schema> errorSchemas();
+
+    /**
      * Get a type registry for the operation used to create errors and output types.
      *
      * @return Returns the type registry.
@@ -68,11 +75,46 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
     List<ShapeId> effectiveAuthSchemes();
 
     /**
-     * Return a Set of {@link Schema} representing errors that are allowed to be returned from this Operation.
+     * Get the input schema member that serves as the idempotency token.
      *
-     * @return Set of {@link Schema} for the errors throwable by this operation.
+     * @return the idempotency token bearing input schema member, or null if no member has a token.
      */
-    Set<Schema> errorSchemas();
+    default Schema idempotencyTokenMember() {
+        for (var m : inputSchema().members()) {
+            if (m.hasTrait(TraitKey.IDEMPOTENCY_TOKEN)) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get the input schema member that contains an event stream or data stream.
+     *
+     * @return the input schema member, or null if no member has a stream.
+     */
+    default Schema inputStreamMember() {
+        for (var m : inputSchema().members()) {
+            if (m.hasTrait(TraitKey.STREAMING_TRAIT)) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get the output schema member that contains an event stream or data stream.
+     *
+     * @return the output schema member, or null if no member has a stream.
+     */
+    default Schema outputStreamMember() {
+        for (var m : outputSchema().members()) {
+            if (m.hasTrait(TraitKey.STREAMING_TRAIT)) {
+                return m;
+            }
+        }
+        return null;
+    }
 
     /**
      * A helper method to mutate the retry information of an exception based on information from the model.
