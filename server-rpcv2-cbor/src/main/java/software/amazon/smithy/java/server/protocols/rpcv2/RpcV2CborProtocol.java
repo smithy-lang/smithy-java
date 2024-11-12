@@ -92,7 +92,6 @@ final class RpcV2CborProtocol extends ServerProtocol {
         var sink = new ByteBufferOutputStream();
         try (var serializer = codec.createSerializer(sink)) {
             output.serialize(serializer);
-            serializer.flush();
         }
         job.response().setSerializedValue(DataStream.ofByteBuffer(sink.toByteBuffer(), "application/cbor"));
         var httpJob = job.asHttpJob();

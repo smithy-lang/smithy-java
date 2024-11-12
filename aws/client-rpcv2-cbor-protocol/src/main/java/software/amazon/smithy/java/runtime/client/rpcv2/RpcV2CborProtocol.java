@@ -71,7 +71,6 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
             var sink = new ByteBufferOutputStream();
             try (var serializer = CBOR_CODEC.createSerializer(sink)) {
                 input.serialize(serializer);
-                serializer.flush();
             }
             headers = Map.of(
                 "Content-Type",

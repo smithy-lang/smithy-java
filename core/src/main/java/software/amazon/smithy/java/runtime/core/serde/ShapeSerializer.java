@@ -39,7 +39,9 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
     default void flush() {}
 
     @Override
-    default void close() {}
+    default void close() {
+        flush();
+    }
 
     /**
      * Writes a structure or union using the given member schema.
