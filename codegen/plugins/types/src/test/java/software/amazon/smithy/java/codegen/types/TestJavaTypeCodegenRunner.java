@@ -14,15 +14,15 @@ import software.amazon.smithy.model.node.ObjectNode;
 /**
  * Simple wrapper class used to execute the test Java codegen plugin for integration tests.
  */
-public final class TestServerJavaTypeCodegenRunner {
-    private TestServerJavaTypeCodegenRunner() {
+public final class TestJavaTypeCodegenRunner {
+    private TestJavaTypeCodegenRunner() {
         // Utility class does not have constructor
     }
 
     public static void main(String[] args) {
         JavaTypeCodegenPlugin plugin = new JavaTypeCodegenPlugin();
-        Model model = Model.assembler(TestServerJavaTypeCodegenRunner.class.getClassLoader())
-            .discoverModels(TestServerJavaTypeCodegenRunner.class.getClassLoader())
+        Model model = Model.assembler(TestJavaTypeCodegenRunner.class.getClassLoader())
+            .discoverModels(TestJavaTypeCodegenRunner.class.getClassLoader())
             .assemble()
             .unwrap();
         PluginContext context = PluginContext.builder()

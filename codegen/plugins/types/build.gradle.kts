@@ -7,4 +7,4 @@ description = "This module provides the codegen plugin for Smithy java type code
 extra["displayName"] = "Smithy :: Java :: Codegen :: Plugins :: Types"
 extra["moduleName"] = "software.amazon.smithy.java.codegen.types"
 
-addGenerateSrcsTask("software.amazon.smithy.java.codegen.types.TestServerJavaTypeCodegenRunner")
+addGenerateSrcsTask("software.amazon.smithy.java.codegen.types.TestJavaTypeCodegenRunner")
