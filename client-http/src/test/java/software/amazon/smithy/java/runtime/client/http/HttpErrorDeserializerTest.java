@@ -196,6 +196,11 @@ public class HttpErrorDeserializerTest {
             serializer.writeStruct(SCHEMA, this);
         }
 
+        @Override
+        public Object getMemberValue(Schema member) {
+            throw new UnsupportedOperationException();
+        }
+
         static final class Builder implements ShapeBuilder<Baz> {
             private String message;
 

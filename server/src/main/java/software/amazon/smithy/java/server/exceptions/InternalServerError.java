@@ -7,6 +7,7 @@ package software.amazon.smithy.java.server.exceptions;
 
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SchemaUtils;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -34,5 +35,10 @@ public final class InternalServerError extends ModeledApiException {
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
         serializer.writeString(SCHEMA_MESSAGE, getMessage());
+    }
+
+    @Override
+    public Object getMemberValue(Schema member) {
+        return SchemaUtils.validateMemberInSchema(SCHEMA, member, null);
     }
 }

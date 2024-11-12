@@ -78,6 +78,11 @@ public final class PojoWithValidatedCollection implements SerializableStruct {
         st.writeMap(SCHEMA_MAP, map, map.size(), InnerMapSerializer.INSTANCE);
     }
 
+    @Override
+    public Object getMemberValue(Schema member) {
+        throw new UnsupportedOperationException("Member value not supported: " + member);
+    }
+
     private static final class InnerListSerializer implements BiConsumer<List<ValidatedPojo>, ShapeSerializer> {
         private static final InnerListSerializer INSTANCE = new InnerListSerializer();
 

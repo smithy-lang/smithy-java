@@ -76,6 +76,11 @@ public final class UnvalidatedPojo implements SerializableStruct {
         serializer.writeInteger(SCHEMA_INTEGER, integer);
     }
 
+    @Override
+    public Object getMemberValue(Schema member) {
+        throw new UnsupportedOperationException("Member value not supported: " + member);
+    }
+
     public static final class Builder implements ShapeBuilder<UnvalidatedPojo> {
 
         private String string;

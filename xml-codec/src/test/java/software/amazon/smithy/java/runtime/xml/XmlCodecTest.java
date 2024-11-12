@@ -125,6 +125,11 @@ public class XmlCodecTest {
         }
 
         @Override
+        public Object getMemberValue(Schema member) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public String toString() {
             return ToStringSerializer.serialize(this);
         }

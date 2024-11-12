@@ -51,6 +51,15 @@ public final class Bird implements SerializableStruct {
         serializer.writeString(SCHEMA_NAME, name);
     }
 
+    @Override
+    public Object getMemberValue(Schema member) {
+        if (member.memberName().equals("name")) {
+            return name;
+        } else {
+            throw new IllegalArgumentException("Unknown member " + member);
+        }
+    }
+
     public static final class Builder implements ShapeBuilder<Bird> {
 
         private String name;

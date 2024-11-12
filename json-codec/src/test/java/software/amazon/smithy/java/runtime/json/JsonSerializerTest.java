@@ -157,10 +157,23 @@ public class JsonSerializerTest {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeStruct(
                     JsonTestData.BIRD,
-                    SerializableStruct.create(JsonTestData.BIRD, (schema, ser) -> {
-                        ser.writeString(schema.member("name"), "Toucan");
-                        ser.writeString(schema.member("color"), "red");
-                    })
+                    new SerializableStruct() {
+                        @Override
+                        public Schema schema() {
+                            return JsonTestData.BIRD;
+                        }
+
+                        @Override
+                        public void serializeMembers(ShapeSerializer ser) {
+                            ser.writeString(schema().member("name"), "Toucan");
+                            ser.writeString(schema().member("color"), "red");
+                        }
+
+                        @Override
+                        public Object getMemberValue(Schema member) {
+                            return null;
+                        }
+                    }
                 );
             }
             var result = output.toString(StandardCharsets.UTF_8);
@@ -181,9 +194,22 @@ public class JsonSerializerTest {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeStruct(
                     JsonTestData.BIRD,
-                    SerializableStruct.create(JsonTestData.BIRD, (schema, ser) -> {
-                        ser.writeStruct(schema.member("nested"), new NestedStruct());
-                    })
+                    new SerializableStruct() {
+                        @Override
+                        public Schema schema() {
+                            return JsonTestData.BIRD;
+                        }
+
+                        @Override
+                        public void serializeMembers(ShapeSerializer ser) {
+                            ser.writeStruct(schema().member("nested"), new NestedStruct());
+                        }
+
+                        @Override
+                        public Object getMemberValue(Schema member) {
+                            return null;
+                        }
+                    }
                 );
             }
             var result = output.toString(StandardCharsets.UTF_8);
@@ -252,6 +278,11 @@ public class JsonSerializerTest {
         public void serializeMembers(ShapeSerializer serializer) {
             serializer.writeInteger(JsonTestData.NESTED.member("number"), 10);
         }
+
+        @Override
+        public Object getMemberValue(Schema member) {
+            return null;
+        }
     }
 
     private static final class EmptyStruct implements SerializableStruct {
@@ -262,5 +293,10 @@ public class JsonSerializerTest {
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {}
+
+        @Override
+        public Object getMemberValue(Schema member) {
+            return null;
+        }
     }
 }

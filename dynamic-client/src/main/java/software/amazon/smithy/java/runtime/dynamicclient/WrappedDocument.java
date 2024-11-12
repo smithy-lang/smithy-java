@@ -66,6 +66,14 @@ record WrappedDocument(ShapeId service, Schema schema, Document delegate) implem
     }
 
     @Override
+    public Object getMemberValue(Schema member) {
+        if (member != schema.members().get(member.memberIndex())) {
+            throw new IllegalArgumentException("Invalid member: " + member);
+        }
+        return getMember(member.memberName());
+    }
+
+    @Override
     public ShapeType type() {
         return schema.type();
     }

@@ -16,6 +16,7 @@ import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -29,10 +30,26 @@ public class ProtocolTestDocumentTest {
             .build();
 
         return encoder -> {
-            encoder.writeStruct(structSchema, SerializableStruct.create(structSchema, (schema, s) -> {
-                s.writeString(schema.member("a"), "1");
-                s.writeString(schema.member("b"), "2");
-            }));
+            encoder.writeStruct(
+                structSchema,
+                new SerializableStruct() {
+                    @Override
+                    public Schema schema() {
+                        return structSchema;
+                    }
+
+                    @Override
+                    public void serializeMembers(ShapeSerializer s) {
+                        s.writeString(structSchema.member("a"), "1");
+                        s.writeString(structSchema.member("b"), "2");
+                    }
+
+                    @Override
+                    public Object getMemberValue(Schema member) {
+                        return null;
+                    }
+                }
+            );
         };
     }
 

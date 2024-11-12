@@ -17,7 +17,7 @@ public class SerializableStructTest {
     @Test
     public void filtersMembers() {
         var struct = Bird.builder().name("foo").build();
-        var filtered = SerializableStruct.filteredMembers(Bird.SCHEMA, struct, member -> false);
+        var filtered = SchemaUtils.withFilteredMembers(Bird.SCHEMA, struct, member -> false);
 
         var serializer = new SpecificShapeSerializer() {
             private boolean wroteStruct;

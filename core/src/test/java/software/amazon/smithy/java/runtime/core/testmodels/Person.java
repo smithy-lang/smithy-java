@@ -105,6 +105,19 @@ public final class Person implements SerializableStruct {
     }
 
     @Override
+    public Object getMemberValue(Schema member) {
+        return switch (member.memberIndex()) {
+            case 0 -> name;
+            case 1 -> favoriteColor;
+            case 2 -> age;
+            case 3 -> birthday;
+            case 4 -> binary;
+            case 5 -> queryParams;
+            default -> throw new IllegalArgumentException("Unknown member index: " + member);
+        };
+    }
+
+    @Override
     public void serializeMembers(ShapeSerializer serializer) {
         serializer.writeString(SCHEMA_NAME, name);
         serializer.writeInteger(SCHEMA_AGE, age);

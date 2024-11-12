@@ -29,6 +29,11 @@ public final class TestStructs {
         public void serializeMembers(ShapeSerializer serializer) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public Object getMemberValue(Schema member) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     static final class Bar implements SerializableStruct {
@@ -44,6 +49,11 @@ public final class TestStructs {
 
         @Override
         public void serializeMembers(ShapeSerializer serializer) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Object getMemberValue(Schema member) {
             throw new UnsupportedOperationException();
         }
     }

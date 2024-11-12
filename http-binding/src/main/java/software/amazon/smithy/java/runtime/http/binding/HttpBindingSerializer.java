@@ -15,6 +15,7 @@ import java.util.TreeMap;
 import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SchemaUtils;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
@@ -98,7 +99,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             shapeBodyOutput = new ByteArrayOutputStream();
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
             // Serialize only the body members to the codec.
-            SerializableStruct.filteredMembers(schema, struct, this::bodyBindingPredicate)
+            SchemaUtils.withFilteredMembers(schema, struct, this::bodyBindingPredicate)
                 .serialize(shapeBodySerializer);
             headers.put("content-type", List.of(payloadMediaType));
         }

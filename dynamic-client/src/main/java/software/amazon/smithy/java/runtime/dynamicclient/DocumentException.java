@@ -35,6 +35,11 @@ public final class DocumentException extends ModeledApiException {
         document.serializeMembers(serializer);
     }
 
+    @Override
+    public Object getMemberValue(Schema member) {
+        return document.getMemberValue(member);
+    }
+
     /**
      * Get the contents of the exception as a document.
      *

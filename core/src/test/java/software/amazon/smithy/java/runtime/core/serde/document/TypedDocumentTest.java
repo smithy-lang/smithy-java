@@ -7,15 +7,18 @@ package software.amazon.smithy.java.runtime.core.serde.document;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -29,10 +32,26 @@ public class TypedDocumentTest {
             .build();
 
         return encoder -> {
-            encoder.writeStruct(structSchema, SerializableStruct.create(structSchema, (schema, s) -> {
-                s.writeString(schema.member("a"), "1");
-                s.writeString(schema.member("b"), "2");
-            }));
+            encoder.writeStruct(
+                structSchema,
+                new SerializableStruct() {
+                    @Override
+                    public Schema schema() {
+                        return structSchema;
+                    }
+
+                    @Override
+                    public void serializeMembers(ShapeSerializer s) {
+                        s.writeString(schema().member("a"), "1");
+                        s.writeString(schema().member("b"), "2");
+                    }
+
+                    @Override
+                    public Object getMemberValue(Schema member) {
+                        return null;
+                    }
+                }
+            );
         };
     }
 
@@ -83,5 +102,20 @@ public class TypedDocumentTest {
         var copy1 = result.asStringMap();
         assertThat(copy1.get("a").asString(), equalTo("1"));
         assertThat(copy1.get("b").asString(), equalTo("2"));
+    }
+
+    @Test
+    public void getsSchemaValue() {
+        var serializableShape = createSerializableShape();
+        var result = (SerializableStruct) Document.createTyped(serializableShape);
+        var schema = result.schema();
+
+        assertThat(result.getMemberValue(schema.member("a")), instanceOf(Document.class));
+        assertThat(((Document) result.getMemberValue(schema.member("a"))).asString(), equalTo("1"));
+        assertThat(result.getMemberValue(schema.member("b")), instanceOf(Document.class));
+        assertThat(((Document) result.getMemberValue(schema.member("b"))).asString(), equalTo("2"));
+
+        var bogus = Schema.createString(ShapeId.from("foo#Bar"));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> result.getMemberValue(bogus));
     }
 }

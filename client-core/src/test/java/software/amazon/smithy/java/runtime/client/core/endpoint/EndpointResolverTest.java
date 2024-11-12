@@ -109,6 +109,11 @@ public class EndpointResolverTest {
             serializer.writeInteger(SCHEMA_INTEGER_VAL, 2);
             serializer.writeTimestamp(SCHEMA_TIMESTAMP_VAL, Instant.EPOCH);
         }
+
+        @Override
+        public Object getMemberValue(Schema member) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static final class TestOperationTemplatePrefix implements

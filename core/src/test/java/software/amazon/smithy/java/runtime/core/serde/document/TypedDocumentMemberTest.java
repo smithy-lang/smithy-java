@@ -41,7 +41,22 @@ public class TypedDocumentMemberTest {
         SerializableShape serializableShape = encoder -> {
             encoder.writeStruct(
                 structSchema,
-                SerializableStruct.create(structSchema, (schema, s) -> s.writeString(schema.member("foo"), "Hi"))
+                new SerializableStruct() {
+                    @Override
+                    public Schema schema() {
+                        return structSchema;
+                    }
+
+                    @Override
+                    public void serializeMembers(ShapeSerializer s) {
+                        s.writeString(structSchema.member("foo"), "Hi");
+                    }
+
+                    @Override
+                    public Object getMemberValue(Schema member) {
+                        return null;
+                    }
+                }
             );
         };
 
@@ -70,14 +85,44 @@ public class TypedDocumentMemberTest {
         var document1 = Document.createTyped(encoder -> {
             encoder.writeStruct(
                 structSchema1,
-                SerializableStruct.create(structSchema1, (schema, s) -> s.writeString(schema.member("foo"), "Hi"))
+                new SerializableStruct() {
+                    @Override
+                    public Schema schema() {
+                        return structSchema1;
+                    }
+
+                    @Override
+                    public void serializeMembers(ShapeSerializer s) {
+                        s.writeString(structSchema1.member("foo"), "Hi");
+                    }
+
+                    @Override
+                    public Object getMemberValue(Schema member) {
+                        return null;
+                    }
+                }
             );
         });
 
         var document2 = Document.createTyped(encoder -> {
             encoder.writeStruct(
                 structSchema2,
-                SerializableStruct.create(structSchema2, (schema, s) -> s.writeInteger(schema.member("foo"), 1))
+                new SerializableStruct() {
+                    @Override
+                    public Schema schema() {
+                        return structSchema2;
+                    }
+
+                    @Override
+                    public void serializeMembers(ShapeSerializer s) {
+                        s.writeInteger(structSchema2.member("foo"), 1);
+                    }
+
+                    @Override
+                    public Object getMemberValue(Schema member) {
+                        return null;
+                    }
+                }
             );
         });
 
@@ -110,9 +155,25 @@ public class TypedDocumentMemberTest {
             .putMember("a", targetSchema)
             .build();
         var document = Document.createTyped(encoder -> {
-            encoder.writeStruct(structSchema, SerializableStruct.create(structSchema, (schema, serializer) -> {
-                writer.accept(schema.member("a"), serializer);
-            }));
+            encoder.writeStruct(
+                structSchema,
+                new SerializableStruct() {
+                    @Override
+                    public Schema schema() {
+                        return structSchema;
+                    }
+
+                    @Override
+                    public void serializeMembers(ShapeSerializer serializer) {
+                        writer.accept(structSchema.member("a"), serializer);
+                    }
+
+                    @Override
+                    public Object getMemberValue(Schema member) {
+                        return null;
+                    }
+                }
+            );
         });
 
         var actual = extractor.apply(document.getMember("a"));
@@ -607,10 +668,26 @@ public class TypedDocumentMemberTest {
                     .build(),
                 "b",
                 (BiConsumer<Schema, ShapeSerializer>) (schema, s) -> {
-                    s.writeStruct(schema, SerializableStruct.create(schema, (passedSchema, ser) -> {
-                        ser.writeString(passedSchema.member("foo"), "a");
-                        ser.writeString(passedSchema.member("bar"), "b");
-                    }));
+                    s.writeStruct(
+                        schema,
+                        new SerializableStruct() {
+                            @Override
+                            public Schema schema() {
+                                return schema;
+                            }
+
+                            @Override
+                            public void serializeMembers(ShapeSerializer ser) {
+                                ser.writeString(schema.member("foo"), "a");
+                                ser.writeString(schema.member("bar"), "b");
+                            }
+
+                            @Override
+                            public Object getMemberValue(Schema member) {
+                                return null;
+                            }
+                        }
+                    );
                 },
                 (Function<Document, Object>) d -> d.getMember("bar").asString()
             )

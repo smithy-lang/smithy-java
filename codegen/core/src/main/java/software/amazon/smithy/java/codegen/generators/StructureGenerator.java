@@ -104,6 +104,8 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
 
                     ${serializer:C|}
 
+                    ${getMemberValue:C|}
+
                     ${toBuilder:C|}
 
                     ${builder:C|}
@@ -162,6 +164,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                     directive.service()
                 )
             );
+            writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext("toBuilder", new ToBuilderGenerator(writer, shape, directive.symbolProvider()));
             writer.write(template);
             writer.popState();

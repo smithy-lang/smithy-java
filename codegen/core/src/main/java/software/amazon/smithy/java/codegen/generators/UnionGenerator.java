@@ -63,6 +63,8 @@ public final class UnionGenerator
                         return $$SCHEMA;
                     }
 
+                    ${getMemberValue:C|}
+
                     ${valueCasters:C|}
 
                     ${valueClasses:C|}
@@ -109,6 +111,7 @@ public final class UnionGenerator
             );
             writer.putContext("memberEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext("toString", new ToStringGenerator(writer));
+            writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext(
                 "valueCasters",
                 new ValueCasterGenerator(writer, shape, directive.symbolProvider(), directive.model())

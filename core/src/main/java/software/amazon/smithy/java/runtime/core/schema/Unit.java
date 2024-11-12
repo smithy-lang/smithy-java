@@ -41,6 +41,11 @@ public final class Unit implements SerializableStruct {
         // Unit types have no members
     }
 
+    @Override
+    public Object getMemberValue(Schema member) {
+        return SchemaUtils.validateMemberInSchema(SCHEMA, member, null);
+    }
+
     public static Builder builder() {
         return new Builder();
     }
