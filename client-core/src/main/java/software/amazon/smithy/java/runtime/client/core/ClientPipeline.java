@@ -70,10 +70,7 @@ final class ClientPipeline<RequestT, ResponseT> {
      * @param protocol Protocol used to serialize requests and deserialize responses.
      * @param transport Transport used to send requests and return responses.
      */
-    public ClientPipeline(
-        ClientProtocol<RequestT, ResponseT> protocol,
-        ClientTransport<RequestT, ResponseT> transport
-    ) {
+    ClientPipeline(ClientProtocol<RequestT, ResponseT> protocol, ClientTransport<RequestT, ResponseT> transport) {
         this.protocol = Objects.requireNonNull(protocol);
         this.transport = Objects.requireNonNull(transport);
     }
@@ -86,7 +83,7 @@ final class ClientPipeline<RequestT, ResponseT> {
      * @throws IllegalStateException if the protocol and transport are incompatible.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public static <RequestT, ResponseT> ClientPipeline<RequestT, ResponseT> of(
+    static <RequestT, ResponseT> ClientPipeline<RequestT, ResponseT> of(
         ClientProtocol<?, ?> protocol,
         ClientTransport<?, ?> transport
     ) {
@@ -101,7 +98,7 @@ final class ClientPipeline<RequestT, ResponseT> {
      * @param transport Transport to check.
      * @throws IllegalStateException if the protocol and transport use different request or response classes.
      */
-    public static void validateProtocolAndTransport(ClientProtocol<?, ?> protocol, ClientTransport<?, ?> transport) {
+    static void validateProtocolAndTransport(ClientProtocol<?, ?> protocol, ClientTransport<?, ?> transport) {
         if (protocol.requestClass() != transport.requestClass()) {
             throw new IllegalStateException("Protocol request != transport: " + protocol + " vs " + transport);
         } else if (protocol.responseClass() != transport.responseClass()) {
@@ -109,18 +106,49 @@ final class ClientPipeline<RequestT, ResponseT> {
         }
     }
 
-    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> send(
-        ClientCall<I, O> call
+    <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> send(ClientCall<I, O> call) {
+        var input = call.input;
+
+        // 2. Interceptors: Invoke ReadBeforeExecution.
+        var inputHook = new InputHook<>(call.context, input);
+        call.interceptor.readBeforeExecution(inputHook);
+
+        // 3. Interceptors: Invoke ModifyBeforeSerialization.
+        input = call.interceptor.modifyBeforeSerialization(inputHook);
+        inputHook = inputHook.withInput(input);
+
+        // 4. Interceptors: Invoke ReadBeforeSerialization.
+        call.interceptor.readBeforeSerialization(inputHook);
+
+        // 5. Serialize the input message into a protocol request message.
+        //    Use the UNRESOLVED URI of "/" for now, and resolve the actual endpoint later.
+        RequestT request = protocol.createRequest(call.operation, input, call.context, UNRESOLVED);
+        var requestHook = new RequestHook<>(call.context, input, request);
+
+        // 6. Interceptors: Invoke ReadAfterSerialization.
+        call.interceptor.readAfterSerialization(requestHook);
+
+        // 7. Interceptors: Invoke ModifyBeforeRetryLoop.
+        request = call.interceptor.modifyBeforeRetryLoop(requestHook);
+        requestHook = requestHook.withRequest(request);
+
+        return acquireRetryToken(call, requestHook);
+    }
+
+    private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> acquireRetryToken(
+        ClientCall<I, O> call,
+        RequestHook<I, RequestT> requestHook
     ) {
-        // Get a retry token before sending anything. This could potentially short circuit the request.
         try {
+            // 8. RetryStrategy: Invoke AcquireRetryToken.
+            //    Can potentially short-circuit the request.
             var result = call.retryStrategy.acquireInitialToken(new AcquireInitialTokenRequest(call.retryScope));
             call.retryToken = result.token();
             // Delay if the initial request is pre-emptively throttled.
             if (result.delay().toMillis() == 0) {
-                return sendAfterGettingToken(call);
+                return doSendOrRetry(call, requestHook);
             } else {
-                return sendAfterDelay(result.delay(), call, null, (theCall, _ignore) -> sendAfterGettingToken(theCall));
+                return sendAfterDelay(result.delay(), call, requestHook, this::doSendOrRetry);
             }
         } catch (TokenAcquisitionFailedException e) {
             // Don't send the request if the circuit breaker prevents it.
@@ -128,67 +156,66 @@ final class ClientPipeline<RequestT, ResponseT> {
         }
     }
 
-    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> sendAfterGettingToken(
-        ClientCall<I, O> call
-    ) {
-        var input = call.input;
-
-        var inputHook = new InputHook<>(call.context, input);
-        call.interceptor.readBeforeExecution(inputHook);
-        input = call.interceptor.modifyBeforeSerialization(inputHook);
-        inputHook = inputHook.withInput(input);
-
-        call.interceptor.readBeforeSerialization(inputHook);
-        // Use the UNRESOLVED URI of "/" for now, and resolve the actual endpoint later.
-        RequestT request = protocol.createRequest(call.operation, input, call.context, UNRESOLVED);
-        var requestHook = new RequestHook<>(call.context, input, request);
-        call.interceptor.readAfterSerialization(requestHook);
-
-        request = call.interceptor.modifyBeforeRetryLoop(requestHook);
-        requestHook = requestHook.withRequest(request);
-        return doSendOrRetry(call, requestHook.withRequest(request));
-    }
-
-    public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> doSendOrRetry(
+    private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> doSendOrRetry(
         ClientCall<I, O> call,
         RequestHook<I, RequestT> requestHook
     ) {
         var request = requestHook.request();
 
-        // Retry loop
+        // 8.a. Interceptors: Invoke ReadBeforeAttempt.
         call.interceptor.readBeforeAttempt(requestHook);
 
         // 8.b. Resolve auth scheme, sign, etc.
         request = call.interceptor.modifyBeforeSigning(requestHook);
-        var finalRequestHook = requestHook.withRequest(request);
+        var finalHook = requestHook.withRequest(request);
 
-        call.interceptor.readBeforeSigning(finalRequestHook);
+        // 8.h. Interceptors: Invoke ReadBeforeSigning.
+        call.interceptor.readBeforeSigning(finalHook);
 
         var resolvedAuthScheme = resolveAuthScheme(call, request);
+        return resolvedAuthScheme.identity()
+            .thenCompose(identityResult -> afterIdentity(call, finalHook, identityResult, resolvedAuthScheme));
+    }
 
-        var preparedRequest = request;
-        return resolvedAuthScheme.identity().thenCompose(identityResult -> {
-            // This throws if no identity was found.
-            var identity = identityResult.unwrap();
-            call.context.put(CallContext.IDENTITY, identity);
+    private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> afterIdentity(
+        ClientCall<I, O> call,
+        RequestHook<I, RequestT> requestHook,
+        IdentityResult<?> identityResult,
+        ResolvedScheme<?, RequestT> resolvedAuthScheme
+    ) {
+        // This throws if no identity was found.
+        var identity = identityResult.unwrap();
+        call.context.put(CallContext.IDENTITY, identity);
 
-            // TODO: what to do with supportedAuthSchemes of an endpoint?
-            return resolveEndpoint(call)
-                .thenApply(endpoint -> protocol.setServiceEndpoint(preparedRequest, endpoint))
-                .thenCompose(resolvedAuthScheme::sign)
-                .thenApply(req -> {
-                    var reqHook = finalRequestHook.withRequest(req);
-                    call.interceptor.readAfterSigning(reqHook);
-                    req = call.interceptor.modifyBeforeTransmit(reqHook);
-                    call.interceptor.readBeforeTransmit(reqHook.withRequest(req));
-                    return req;
-                })
-                .thenCompose(finalRequest -> {
-                    return transport.send(call.context, finalRequest).thenCompose(response -> {
-                        return deserialize(call, finalRequest, response, call.interceptor);
-                    });
-                });
-        });
+        // TODO: what to do with supportedAuthSchemes of an endpoint?
+        return resolveEndpoint(call)
+            .thenApply(endpoint -> protocol.setServiceEndpoint(requestHook.request(), endpoint))
+            .thenCompose(resolvedAuthScheme::sign)
+            .thenApply(req -> {
+                var updatedHook = requestHook.withRequest(req);
+                call.interceptor.readAfterSigning(updatedHook);
+                req = call.interceptor.modifyBeforeTransmit(updatedHook);
+                // Track the used idempotency token, if any.
+                setIdempotencyTokenContext(call, call.input);
+                call.interceptor.readBeforeTransmit(updatedHook.withRequest(req));
+                return req;
+            })
+            .thenCompose(
+                finalRequest -> transport
+                    .send(call.context, finalRequest)
+                    .thenCompose(response -> deserialize(call, finalRequest, response, call.interceptor))
+            );
+    }
+
+    // TODO: set a default token if it's missing.
+    private static void setIdempotencyTokenContext(ClientCall<?, ?> call, SerializableStruct input) {
+        var tokenMember = call.operation.idempotencyTokenMember();
+        if (tokenMember != null) {
+            var value = input.getMemberValue(tokenMember);
+            if (value != null) {
+                call.context.put(CallContext.IDEMPOTENCY_TOKEN, (String) value);
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -327,30 +354,37 @@ final class ClientPipeline<RequestT, ResponseT> {
                     interceptor.readAfterAttempt(outputHook, error);
                     error = null;
                 } catch (RuntimeException e) {
-                    // Check if the request can be retried.
-                    if (call.isRetryDisallowed()) {
-                        // Don't retry: the request must have used a streaming input that is not replayable.
-                        error = e;
-                    } else {
-                        try {
-                            // If it's retryable, keep retrying.
-                            var acquireRequest = new RefreshRetryTokenRequest(call.retryToken, e, null);
-                            var acquireResult = call.retryStrategy.refreshRetryToken(acquireRequest);
-                            return retry(call, request, acquireResult.token(), acquireResult.delay());
-                        } catch (TokenAcquisitionFailedException tafe) {
-                            // Log and continue to the normal failure mode for the request.
-                            LOGGER.debug("Cannot acquire a retry token: {}", tafe);
-                            error = e;
-                        }
+                    error = e;
+                }
+
+                // 9.a If error is a retryable failure:
+                if (error != null && !call.isRetryDisallowed()) {
+                    try {
+                        // If it's retryable, keep retrying and jump to step 8a.
+                        var acquireRequest = new RefreshRetryTokenRequest(call.retryToken, error, null);
+                        var acquireResult = call.retryStrategy.refreshRetryToken(acquireRequest);
+                        return retry(call, request, acquireResult.token(), acquireResult.delay());
+                    } catch (TokenAcquisitionFailedException tafe) {
+                        // 9.b If InterceptorContext.response() is an unretryable failure, continue to step 10.
+                        LOGGER.debug("Cannot acquire a retry token: {}", tafe);
                     }
                 }
 
-                // End of retry loop
-                try {
-                    if (error == null) {
-                        call.retryStrategy.recordSuccess(new RecordSuccessRequest(call.retryToken));
+                // Clear out the retry token.
+                var token = call.retryToken;
+                call.retryToken = null;
+
+                // 9.c.i If successful: RetryStrategy: Invoke RecordSuccess.
+                if (error == null) {
+                    try {
+                        call.retryStrategy.recordSuccess(new RecordSuccessRequest(token));
+                    } catch (RuntimeException e) {
+                        error = e;
                     }
-                    call.retryToken = null;
+                }
+
+                // 10. Interceptors: Invoke ModifyBeforeCompletion. (End of retry loop).
+                try {
                     shape = interceptor.modifyBeforeCompletion(outputHook, error);
                     outputHook = outputHook.withOutput(shape);
                     error = null;
@@ -358,6 +392,9 @@ final class ClientPipeline<RequestT, ResponseT> {
                     error = e;
                 }
 
+                // TODO: 11. TraceProbe: Invoke DispatchEvents.
+
+                // 12. Interceptors: Invoke ReadAfterExecution.
                 interceptor.readAfterExecution(outputHook, error);
 
                 return CompletableFuture.completedFuture(outputHook.output());

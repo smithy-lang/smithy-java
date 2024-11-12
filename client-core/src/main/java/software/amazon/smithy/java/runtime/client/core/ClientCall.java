@@ -82,7 +82,7 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
      */
     boolean isRetryDisallowed() {
         var inputStream = operation.inputStreamMember();
-        if (inputStream.type() == ShapeType.STRING || inputStream.type() == ShapeType.BLOB) {
+        if (inputStream != null && inputStream.type() != ShapeType.UNION) {
             // Only tell the call that retries are disallowed if the stream is not replayable.
             var stream = (DataStream) input.getMemberValue(inputStream);
             return !stream.isReplayable();

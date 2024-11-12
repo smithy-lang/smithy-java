@@ -57,6 +57,11 @@ public class ApiOperationTest {
             public void serialize(ShapeSerializer encoder) {
                 throw new UnsupportedOperationException();
             }
+
+            @Override
+            public Object getMemberValue(Schema member) {
+                throw new UnsupportedOperationException();
+            }
         };
 
         ApiOperation.applyRetryInfoFromModel(schema, e);
