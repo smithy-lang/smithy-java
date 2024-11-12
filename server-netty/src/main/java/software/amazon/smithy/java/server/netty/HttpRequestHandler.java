@@ -58,9 +58,16 @@ final class HttpRequestHandler extends ChannelDuplexHandler {
                 ctx.writeAndFlush(response);
                 channel.close();
                 reset(channel);
-                return;
             }
         } else if (msg instanceof HttpContent content) {
+            // if the job is null, we either failed to select a protocol or prepare the job. in either case,
+            // swallow the remaining request payload.
+            // TODO: set a max swallow size and just terminate the connection if there's too much to read
+            if (job == null) {
+                content.release();
+                return;
+            }
+
             boolean isLast = content instanceof LastHttpContent;
             content.content().readBytes(bodyAccumulator, content.content().readableBytes());
             content.release();
