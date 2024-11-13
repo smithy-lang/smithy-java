@@ -1,17 +1,17 @@
 [versions]
-junit5 = "5.11.0"
+junit5 = "5.11.3"
 hamcrest = "3.0"
-smithy = "1.51.0"
+smithy = "1.52.1"
 jmh = "0.7.2"
 test-logger-plugin = "4.0.0"
 spotbugs = "6.0.22"
 spotless = "6.25.0"
 smithy-gradle = "1.1.0"
 assertj = "3.26.3"
-jackson = "2.17.2"
-netty = "4.1.113.Final"
-dep-analysis = "2.1.4"
-aws-sdk = "2.29.6"
+jackson = "2.18.1"
+netty = "4.1.115.Final"
+dep-analysis = "2.4.2"
+aws-sdk = "2.29.11"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
