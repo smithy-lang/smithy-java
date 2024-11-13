@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.lambda;
+package software.amazon.smithy.java.aws.integrations.lambda;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import java.net.URI;
@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.ModifiableHttpHeaders;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.server.Route;
@@ -72,11 +73,11 @@ public final class LambdaEndpoint {
     private static HttpRequest getRequest(ProxyRequest proxyRequest) {
         String method = proxyRequest.getHttpMethod();
         String encodedUri = URLEncoder.encode(proxyRequest.getPath(), StandardCharsets.UTF_8);
-        ModifiableHttpHeaders headers = ModifiableHttpHeaders.create();
+        ModifiableHttpHeaders headers = HttpHeaders.ofModifiable();
         if (proxyRequest.getMultiValueHeaders() != null && !proxyRequest.getMultiValueHeaders().isEmpty()) {
             // TODO: handle single-value headers?
             // -- APIGW puts the actual headers in both, but only the latest header per key
-            headers.putHeader(proxyRequest.getMultiValueHeaders());
+            headers.putHeaders(proxyRequest.getMultiValueHeaders());
         }
         URI uri;
         if (proxyRequest.getMultiValueQueryStringParameters() != null && !proxyRequest
@@ -109,7 +110,7 @@ public final class LambdaEndpoint {
 
     private static HttpJob getJob(HttpRequest request, ProtocolResolver resolver) {
         ServiceProtocolResolutionResult resolutionResult = resolver.resolve(
-            new ServiceProtocolResolutionRequest(request.uri(), request.headers(), request.context())
+            new ServiceProtocolResolutionRequest(request.uri(), request.headers(), request.context(), request.method())
         );
         HttpResponse response = new HttpResponse((ModifiableHttpHeaders) request.headers());
         HttpJob job = new HttpJob(resolutionResult.operation(), resolutionResult.protocol(), request, response);
@@ -119,7 +120,7 @@ public final class LambdaEndpoint {
     private static ProxyResponse getResponse(HttpResponse httpResponse) {
         // TODO: Add response headers
         ProxyResponse.Builder builder = ProxyResponse.builder()
-            .multiValueHeaders(httpResponse.headers().toMap())
+            .multiValueHeaders(httpResponse.headers().map())
             .statusCode(httpResponse.getStatusCode());
 
         DataStream val = httpResponse.getSerializedValue();

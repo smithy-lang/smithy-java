@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.lambda;
+package software.amazon.smithy.java.aws.integrations.lambda;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

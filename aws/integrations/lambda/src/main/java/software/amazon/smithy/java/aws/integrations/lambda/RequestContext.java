@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.lambda;
+package software.amazon.smithy.java.aws.integrations.lambda;
 
-public class RequestContext {
+public final class RequestContext {
 
     private String requestId;
 

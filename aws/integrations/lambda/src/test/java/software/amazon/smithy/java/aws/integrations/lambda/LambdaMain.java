@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.lambda;
+package software.amazon.smithy.java.aws.integrations.lambda;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
@@ -19,7 +19,7 @@ import software.amazon.smithy.java.server.example.service.BeerService;
 import software.amazon.smithy.java.server.example.service.GetBeerOperation;
 
 /*
- * This is a hypothetical implementation of a Smithy Lambda Handler that uses the LambdaEndpoint with an
+ * This is a hypothetical implementation of a Smithy Lambda Handler that registers the LambdaEndpoint with an
  * implementation of the example beer service.
  */
 public final class LambdaMain implements RequestHandler<ProxyRequest, ProxyResponse> {

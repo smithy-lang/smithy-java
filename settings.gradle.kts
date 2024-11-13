@@ -59,3 +59,6 @@ include(":aws:client-restjson")
 include(":aws:client-restxml")
 include(":aws:client-rpcv2-cbor-protocol")
 include(":server-rpcv2-cbor")
+
+// AWS integrations
+include(":aws:integrations:lambda")

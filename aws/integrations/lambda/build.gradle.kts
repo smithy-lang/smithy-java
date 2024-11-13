@@ -6,8 +6,8 @@ description = """
     This module provides a basic endpoint implementation that may be used to back an AWS Lambda request handler
     """
 
-extra["displayName"] = "Smithy :: Java :: Lambda"
-extra["moduleName"] = "software.amazon.smithy.java.lambda"
+extra["displayName"] = "Smithy :: Java :: AWS :: Integrations :: Lambda"
+extra["moduleName"] = "software.amazon.smithy.java.aws.integrations.lambda"
 
 dependencies {
     implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
@@ -21,15 +21,4 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation(project(":examples:server-example"))
-}
-
-// TODO: eventually re-enable spotbugs
-tasks {
-    spotbugsMain {
-        enabled = false
-    }
-
-    spotbugsIt {
-        enabled = false
-    }
 }

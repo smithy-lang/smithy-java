@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.lambda;
+package software.amazon.smithy.java.aws.integrations.lambda;
 
 import java.util.List;
 import java.util.Map;
 
-public class ProxyRequest {
+public final class ProxyRequest {
     private Map<String, String> pathParameters;
     private Map<String, String> stageVariables;
     private String resource;

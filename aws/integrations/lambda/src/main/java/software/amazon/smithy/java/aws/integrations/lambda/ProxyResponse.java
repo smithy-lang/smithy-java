@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.lambda;
+package software.amazon.smithy.java.aws.integrations.lambda;
 
 import java.util.List;
 import java.util.Map;
 
-public class ProxyResponse {
+public final class ProxyResponse {
     private final Integer statusCode;
     private final Map<String, String> headers;
     private final Map<String, List<String>> multiValueHeaders;

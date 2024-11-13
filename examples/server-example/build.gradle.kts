@@ -10,3 +10,15 @@ dependencies {
     api(project(":core"))
     api(libs.smithy.aws.traits)
 }
+
+// TODO: eventually re-enable
+// Disable spotbugs
+tasks {
+    spotbugsMain {
+        enabled = false
+    }
+
+    spotbugsIt {
+        enabled = false
+    }
+}
