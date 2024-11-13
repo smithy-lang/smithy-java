@@ -9,7 +9,7 @@ plugins {
 
 dependencies {
     // Server code generator
-    smithyBuild(libs.smithy.server.codegen)
+    smithyBuild(libs.smithy.codegen.plugins)
     implementation(project(":lib"))
 
     // Server dependencies
