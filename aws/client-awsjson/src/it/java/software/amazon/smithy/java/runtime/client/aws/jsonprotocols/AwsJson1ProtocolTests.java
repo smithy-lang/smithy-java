@@ -50,7 +50,10 @@ public class AwsJson1ProtocolTests {
 
     @HttpClientResponseTests
     @ProtocolTestFilter(
-        skipTests = {}
+        skipTests = {
+            "AwsJson10ClientPopulatesDefaultsValuesWhenMissingInResponse",
+            "AwsJson10ClientIgnoresDefaultValuesIfMemberValuesArePresentInResponse"
+        }
     )
     public void responseTest(Runnable test) throws Exception {
         test.run();

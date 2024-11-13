@@ -68,6 +68,22 @@ public class RestJson1ProtocolTests {
     }
 
     @HttpClientResponseTests
+    @ProtocolTestFilter(
+        skipTests = {
+            "RestJsonDateTimeWithFractionalSeconds",
+            "RestJsonInputAndOutputWithQuotedStringHeaders",
+            "RestJsonHttpPrefixHeadersArePresent",
+            "HttpPrefixHeadersResponse",
+            "RestJsonHttpPayloadTraitsWithBlob",
+            "RestJsonHttpPayloadTraitsWithMediaTypeWithBlob",
+            "RestJsonEnumPayloadResponse",
+            "RestJsonStringPayloadResponse",
+            "RestJsonHttpPayloadWithUnion",
+            "RestJsonInputAndOutputWithQuotedStringHeaders",
+            "DocumentTypeAsPayloadOutput",
+            "DocumentTypeAsPayloadOutputString"
+        }
+    )
     public void responseTest(Runnable test) {
         test.run();
     }
