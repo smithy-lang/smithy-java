@@ -72,4 +72,24 @@ public final class SchemaUtils {
             "Attempted to access a non-existent member of " + parent.id() + ": " + member.id()
         );
     }
+
+    /**
+     * Validates that {@code actual} is referentially equal to {@code actual} and returns {@code value}.
+     *
+     * @param expected Expected schema.
+     * @param actual   Actual schema.
+     * @param value    Value to return if it's a match.
+     * @return the value.
+     * @param <T> Value kind.
+     * @throws IllegalArgumentException if the schemas are not the same.
+     */
+    public static <T> T validateSameMember(Schema expected, Schema actual, T value) {
+        if (expected == actual) {
+            return value;
+        }
+        throw new IllegalArgumentException(
+            "Attempted to read or write a non-existent member of " + expected.id()
+                + ": " + actual.id()
+        );
+    }
 }

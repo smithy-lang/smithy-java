@@ -7,12 +7,15 @@ package software.amazon.smithy.java.codegen.generators;
 
 import java.util.List;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SchemaUtils;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
  * Generates a static nested {@code Builder} class for a Java class.
@@ -70,6 +73,8 @@ abstract class BuilderGenerator implements Runnable {
 
                 ${buildMethod:C|}
 
+                ${setMemberValue:C|}
+
                 ${errorCorrection:C|}
 
                 ${deserializer:C|}
@@ -81,6 +86,7 @@ abstract class BuilderGenerator implements Runnable {
         writer.putContext("buildMethod", writer.consumer(this::generateBuild));
         writer.putContext("errorCorrection", writer.consumer(this::generateErrorCorrection));
         writer.putContext("deserializer", writer.consumer(this::generateDeserialization));
+        writer.putContext("setMemberValue", writer.consumer(this::generateSetMemberValue));
         boolean isStaged = !this.stageInterfaces().isEmpty();
         writer.putContext("isStaged", isStaged);
         if (isStaged) {
@@ -116,5 +122,41 @@ abstract class BuilderGenerator implements Runnable {
 
     protected List<String> stageInterfaces() {
         return List.of();
+    }
+
+    protected void generateSetMemberValue(JavaWriter writer) {
+        var template = """
+            @Override
+            public void setMemberValue(Schema member, Object value) {
+                ${?noMembersToSet}throw new UnsupportedOperationException("Unexpected member: " + member.id());
+                ${/noMembersToSet}${^noMembersToSet}switch (member.memberIndex()) {
+                    ${memberSetters:C|}
+                    default -> ${shapeBuilderClass:T}.super.setMemberValue(member, value);
+                }${/noMembersToSet}
+            }""";
+        writer.putContext("memberSetters", writer.consumer(this::generateMemberValueSetters));
+        writer.putContext(
+            "noMembersToSet",
+            shape.members().isEmpty() || (shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)
+        );
+        writer.putContext("shapeBuilderClass", ShapeBuilder.class);
+        writer.write(template);
+    }
+
+    protected void generateMemberValueSetters(JavaWriter writer) {
+        int idx = 0;
+        for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {
+            var member = iter.next();
+            writer.pushState();
+            writer.putContext("memberName", symbolProvider.toMemberName(member));
+            writer.putContext("type", symbolProvider.toSymbol(member));
+            writer.putContext("memberSchema", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
+            writer.putContext("schemaUtilsClass", SchemaUtils.class);
+            writer.write(
+                "case $L -> ${memberName:L}((${type:T}) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, value));",
+                idx
+            );
+            writer.popState();
+        }
     }
 }
