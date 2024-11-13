@@ -17,7 +17,7 @@ public class InputHookTest {
     public void usesSameInstanceIfValueUnchanged() {
         var foo = new TestStructs.Foo();
         var context = Context.create();
-        var hook = new InputHook<>(context, foo);
+        var hook = new InputHook<>(TestStructs.OPERATION, context, foo);
 
         assertThat(hook.withInput(foo), sameInstance(hook));
         assertThat(hook.withInput(new TestStructs.Foo()), not(sameInstance(hook)));
@@ -27,7 +27,7 @@ public class InputHookTest {
     public void mapsValueIfExpectedType() {
         var foo = new TestStructs.Foo();
         var context = Context.create();
-        var hook = new InputHook<>(context, foo);
+        var hook = new InputHook<>(TestStructs.OPERATION, context, foo);
 
         assertThat(hook.mapInput(TestStructs.Bar.class, bar -> bar), sameInstance(foo));
         assertThat(hook.mapInput(TestStructs.Foo.class, f -> new TestStructs.Foo()), not(sameInstance(foo)));

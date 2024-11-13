@@ -221,7 +221,7 @@ public class ClientConfigTest {
         }
 
         @Override
-        public void readBeforeTransmit(RequestHook<?, ?> hook) {
+        public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
             request = (SmithyHttpRequest) hook.request();
         }
     }

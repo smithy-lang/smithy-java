@@ -61,7 +61,7 @@ public interface ClientInterceptor {
      *
      * @param hook Hook data.
      */
-    default void readBeforeExecution(InputHook<?> hook) {}
+    default void readBeforeExecution(InputHook<?, ?> hook) {}
 
     /**
      * A hook called before the input message is serialized into a transport message.
@@ -85,7 +85,7 @@ public interface ClientInterceptor {
      * @return the updated input.
      * @param <I> Input type.
      */
-    default <I extends SerializableStruct> I modifyBeforeSerialization(InputHook<I> hook) {
+    default <I extends SerializableStruct> I modifyBeforeSerialization(InputHook<I, ?> hook) {
         return hook.input();
     }
 
@@ -103,7 +103,7 @@ public interface ClientInterceptor {
      *
      * @param hook Hook data.
      */
-    default void readBeforeSerialization(InputHook<?> hook) {}
+    default void readBeforeSerialization(InputHook<?, ?> hook) {}
 
     /**
      * A hook called after the input message is marshalled into a protocol-specific request.
@@ -120,7 +120,7 @@ public interface ClientInterceptor {
      *
      * @param hook Hook data.
      */
-    default void readAfterSerialization(RequestHook<?, ?> hook) {}
+    default void readAfterSerialization(RequestHook<?, ?, ?> hook) {}
 
     /**
      * A hook called before the retry loop is entered that can be used to modify and return a new request.
@@ -140,7 +140,7 @@ public interface ClientInterceptor {
      * @return the updated protocol-specific request entry to send.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <RequestT> RequestT modifyBeforeRetryLoop(RequestHook<?, RequestT> hook) {
+    default <RequestT> RequestT modifyBeforeRetryLoop(RequestHook<?, ?, RequestT> hook) {
         return hook.request();
     }
 
@@ -160,7 +160,7 @@ public interface ClientInterceptor {
      *
      * @param hook Hook data.
      */
-    default void readBeforeAttempt(RequestHook<?, ?> hook) {}
+    default void readBeforeAttempt(RequestHook<?, ?, ?> hook) {}
 
     /**
      * A hook called before the request is signed; this method can modify and return a new request.
@@ -182,7 +182,7 @@ public interface ClientInterceptor {
      * @return the protocol-specific request.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <RequestT> RequestT modifyBeforeSigning(RequestHook<?, RequestT> hook) {
+    default <RequestT> RequestT modifyBeforeSigning(RequestHook<?, ?, RequestT> hook) {
         return hook.request();
     }
 
@@ -200,7 +200,7 @@ public interface ClientInterceptor {
      *
      * @param hook Hook data.
      */
-    default void readBeforeSigning(RequestHook<?, ?> hook) {}
+    default void readBeforeSigning(RequestHook<?, ?, ?> hook) {}
 
     /**
      * A hook called after the transport request message is signed.
@@ -216,7 +216,7 @@ public interface ClientInterceptor {
      *
      * @param hook Hook data.
      */
-    default void readAfterSigning(RequestHook<?, ?> hook) {}
+    default void readAfterSigning(RequestHook<?, ?, ?> hook) {}
 
     /**
      * A hook called before the transport request message is sent to the service.
@@ -240,7 +240,7 @@ public interface ClientInterceptor {
      * @return the protocol-specific request.
      * @param <RequestT> Protocol-specific request type.
      */
-    default <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, RequestT> hook) {
+    default <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
         return hook.request();
     }
 
@@ -259,7 +259,7 @@ public interface ClientInterceptor {
      *
      * @param hook Hook data.
      */
-    default void readBeforeTransmit(RequestHook<?, ?> hook) {}
+    default void readBeforeTransmit(RequestHook<?, ?, ?> hook) {}
 
     /**
      * A hook called after the transport request message is sent to the service and a transport response message is
@@ -278,7 +278,7 @@ public interface ClientInterceptor {
      *
      * @param hook Hook data.
      */
-    default void readAfterTransmit(ResponseHook<?, ?, ?> hook) {}
+    default void readAfterTransmit(ResponseHook<?, ?, ?, ?> hook) {}
 
     /**
      * A hook called before the response is deserialized.
@@ -302,7 +302,7 @@ public interface ClientInterceptor {
      * @return the protocol-specific response.
      * @param <ResponseT> Protocol-specific response type.
      */
-    default <ResponseT> ResponseT modifyBeforeDeserialization(ResponseHook<?, ?, ResponseT> hook) {
+    default <ResponseT> ResponseT modifyBeforeDeserialization(ResponseHook<?, ?, ?, ResponseT> hook) {
         return hook.response();
     }
 
@@ -322,7 +322,7 @@ public interface ClientInterceptor {
      *
      * @param hook Hook data.
      */
-    default void readBeforeDeserialization(ResponseHook<?, ?, ?> hook) {}
+    default void readBeforeDeserialization(ResponseHook<?, ?, ?, ?> hook) {}
 
     /**
      * A hook called after the transport response message is deserialized.
@@ -367,7 +367,7 @@ public interface ClientInterceptor {
      * @param <O> Output type.
      */
     default <O extends SerializableStruct> O modifyBeforeAttemptCompletion(
-        OutputHook<?, ?, ?, O> hook,
+        OutputHook<?, O, ?, ?> hook,
         RuntimeException error
     ) {
         return hook.forward(error);
@@ -418,7 +418,7 @@ public interface ClientInterceptor {
      * @param <O> Output type.
      */
     default <O extends SerializableStruct> O modifyBeforeCompletion(
-        OutputHook<?, ?, ?, O> hook,
+        OutputHook<?, O, ?, ?> hook,
         RuntimeException error
     ) {
         return hook.forward(error);

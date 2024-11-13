@@ -110,7 +110,7 @@ final class ClientPipeline<RequestT, ResponseT> {
         var input = call.input;
 
         // 2. Interceptors: Invoke ReadBeforeExecution.
-        var inputHook = new InputHook<>(call.context, input);
+        var inputHook = new InputHook<>(call.operation, call.context, input);
         call.interceptor.readBeforeExecution(inputHook);
 
         // 3. Interceptors: Invoke ModifyBeforeSerialization.
@@ -123,7 +123,7 @@ final class ClientPipeline<RequestT, ResponseT> {
         // 5. Serialize the input message into a protocol request message.
         //    Use the UNRESOLVED URI of "/" for now, and resolve the actual endpoint later.
         RequestT request = protocol.createRequest(call.operation, input, call.context, UNRESOLVED);
-        var requestHook = new RequestHook<>(call.context, input, request);
+        var requestHook = new RequestHook<>(call.operation, call.context, input, request);
 
         // 6. Interceptors: Invoke ReadAfterSerialization.
         call.interceptor.readAfterSerialization(requestHook);
@@ -137,7 +137,7 @@ final class ClientPipeline<RequestT, ResponseT> {
 
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> acquireRetryToken(
         ClientCall<I, O> call,
-        RequestHook<I, RequestT> requestHook
+        RequestHook<I, O, RequestT> requestHook
     ) {
         try {
             // 8. RetryStrategy: Invoke AcquireRetryToken.
@@ -158,7 +158,7 @@ final class ClientPipeline<RequestT, ResponseT> {
 
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> doSendOrRetry(
         ClientCall<I, O> call,
-        RequestHook<I, RequestT> requestHook
+        RequestHook<I, O, RequestT> requestHook
     ) {
         var request = requestHook.request();
 
@@ -179,7 +179,7 @@ final class ClientPipeline<RequestT, ResponseT> {
 
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> afterIdentity(
         ClientCall<I, O> call,
-        RequestHook<I, RequestT> requestHook,
+        RequestHook<I, O, RequestT> requestHook,
         IdentityResult<?> identityResult,
         ResolvedScheme<?, RequestT> resolvedAuthScheme
     ) {
@@ -310,7 +310,7 @@ final class ClientPipeline<RequestT, ResponseT> {
         LOGGER.trace("Deserializing response with {} for {}:{}", protocol.getClass(), request, response);
 
         Context context = call.context;
-        var responseHook = new ResponseHook<>(context, input, request, response);
+        var responseHook = new ResponseHook<>(call.operation, context, input, request, response);
 
         interceptor.readAfterTransmit(responseHook);
 
@@ -332,7 +332,7 @@ final class ClientPipeline<RequestT, ResponseT> {
                     error = (RuntimeException) thrown;
                 }
 
-                var outputHook = new OutputHook<>(context, input, request, response, shape);
+                var outputHook = new OutputHook<>(call.operation, context, input, request, response, shape);
 
                 try {
                     interceptor.readAfterDeserialization(outputHook, error);
@@ -413,7 +413,7 @@ final class ClientPipeline<RequestT, ResponseT> {
         // Adjust the current retry count on the context (e.g., protocols can use this to add retry headers).
         call.context.put(CallContext.RETRY_ATTEMPT, ++call.retryCount);
 
-        var requestHook = new RequestHook<>(call.context, call.input, request);
+        var requestHook = new RequestHook<>(call.operation, call.context, call.input, request);
 
         if (after.toMillis() == 0) {
             // Immediate retry.

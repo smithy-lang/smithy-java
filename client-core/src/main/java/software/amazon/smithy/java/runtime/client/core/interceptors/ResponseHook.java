@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
@@ -18,13 +19,14 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
  * @param <RequestT> Protocol specific request.
  * @param <ResponseT> Protocol specific response.
  */
-public sealed class ResponseHook<I extends SerializableStruct, RequestT, ResponseT> extends RequestHook<I, RequestT>
+public sealed class ResponseHook<I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT>
+    extends RequestHook<I, O, RequestT>
     permits OutputHook {
 
     private final ResponseT response;
 
-    public ResponseHook(Context context, I input, RequestT request, ResponseT response) {
-        super(context, input, request);
+    public ResponseHook(ApiOperation<I, O> operation, Context context, I input, RequestT request, ResponseT response) {
+        super(operation, context, input, request);
         this.response = response;
     }
 
@@ -43,10 +45,10 @@ public sealed class ResponseHook<I extends SerializableStruct, RequestT, Respons
      * @param response Response to use.
      * @return the hook.
      */
-    public ResponseHook<I, RequestT, ResponseT> withResponse(ResponseT response) {
+    public ResponseHook<I, O, RequestT, ResponseT> withResponse(ResponseT response) {
         return Objects.equals(response, this.response)
             ? this
-            : new ResponseHook<>(context(), input(), request(), response);
+            : new ResponseHook<>(operation(), context(), input(), request(), response);
     }
 
     /**

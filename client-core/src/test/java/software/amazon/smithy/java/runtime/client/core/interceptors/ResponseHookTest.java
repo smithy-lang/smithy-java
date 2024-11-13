@@ -19,7 +19,7 @@ public class ResponseHookTest {
         var context = Context.create();
         var request = new MyRequest();
         var response = new MyResponse();
-        var hook = new ResponseHook<>(context, foo, request, response);
+        var hook = new ResponseHook<>(TestStructs.OPERATION, context, foo, request, response);
 
         assertThat(hook.withResponse(response), sameInstance(hook));
         assertThat(hook.withResponse(new MyResponse()), not(sameInstance(hook)));
@@ -31,7 +31,7 @@ public class ResponseHookTest {
         var context = Context.create();
         var request = new MyRequest();
         var response = new MyResponse();
-        var hook = new ResponseHook<>(context, foo, request, response);
+        var hook = new ResponseHook<>(TestStructs.OPERATION, context, foo, request, response);
 
         assertThat(hook.mapResponse(TestStructs.Bar.class, bar -> bar), sameInstance(response));
         assertThat(hook.mapResponse(MyResponse.class, f -> new MyResponse()), not(sameInstance(response)));

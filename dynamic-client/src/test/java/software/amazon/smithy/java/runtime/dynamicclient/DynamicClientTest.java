@@ -139,7 +139,7 @@ public class DynamicClientTest {
             .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
             .addInterceptor(new ClientInterceptor() {
                 @Override
-                public void readBeforeTransmit(RequestHook<?, ?> hook) {
+                public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
                     var input = hook.input();
                     assertThat(input, instanceOf(Document.class));
                     assertThat(((Document) input).getMember("id").asString(), equalTo("1"));
