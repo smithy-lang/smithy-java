@@ -24,18 +24,18 @@ record StructureDeserializerGenerator(
         var template = """
             @Override
             public Builder deserialize(${shapeDeserializer:N} decoder) {
-                decoder.readStruct($$SCHEMA, this, InnerDeserializer.INSTANCE);
+                decoder.readStruct($$SCHEMA, this, $$InnerDeserializer.INSTANCE);
                 return this;
             }
 
             @Override
             public Builder deserializeMember(${shapeDeserializer:N} decoder, ${sdkSchema:N} schema) {
-                decoder.readStruct(schema.assertMemberTargetIs($$SCHEMA), this, InnerDeserializer.INSTANCE);
+                decoder.readStruct(schema.assertMemberTargetIs($$SCHEMA), this, $$InnerDeserializer.INSTANCE);
                 return this;
             }
 
-            private static final class InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer<Builder> {
-                private static final InnerDeserializer INSTANCE = new InnerDeserializer();
+            private static final class $$InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer<Builder> {
+                private static final $$InnerDeserializer INSTANCE = new $$InnerDeserializer();
 
                 @Override
                 public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {${?hasMembers}

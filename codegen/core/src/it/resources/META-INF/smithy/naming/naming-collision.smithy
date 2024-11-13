@@ -16,9 +16,11 @@ operation Naming {
         type: Type
 
         object: Object
-        
+
         // Collides with `serializer` input to serializeMembers
         serializer: String
+
+        innerDeserializer: ShapeSerializer
     }
     errors: [
         IllegalArgumentException
@@ -46,6 +48,11 @@ structure Object {
     notifyAll: String
     wait: String
     finalize: String
+}
+
+@private
+structure ShapeSerializer {
+    schema: String
 }
 
 /// This will clash with built in `java.lang` exception used a number

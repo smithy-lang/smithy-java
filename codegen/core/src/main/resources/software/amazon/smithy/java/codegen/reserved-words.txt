@@ -33,7 +33,6 @@ goto
 if
 implements
 import
-innerDeserializer
 type
 instanceof
 int

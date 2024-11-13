@@ -1,0 +1,12 @@
+#
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Member names reserved for Smithy interfaces or fields that are generated into
+# customer-defined objects. Member getters with any of these names will attempt
+# to override APIs reserved for Smithy's use unless escaped.
+#
+# Note: Only zero-args methods are a problem here.
+innerDeserializer
+schema
+serializer

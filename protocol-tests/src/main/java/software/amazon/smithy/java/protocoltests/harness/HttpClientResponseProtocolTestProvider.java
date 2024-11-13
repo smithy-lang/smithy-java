@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.protocoltests.harness;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
@@ -90,7 +92,7 @@ final class HttpClientResponseProtocolTestProvider extends
         MockClient mockClient,
         ApiOperation apiOperation,
         SerializableStruct input,
-        SerializableStruct output,
+        SerializableStruct expectedOutput,
         RequestOverrideConfig overrideConfig,
         boolean shouldSkip
     ) implements TestTemplateInvocationContext {
@@ -104,8 +106,10 @@ final class HttpClientResponseProtocolTestProvider extends
         public List<Extension> getAdditionalExtensions() {
             return List.of((ProtocolTestParameterResolver) () -> {
                 Assumptions.assumeFalse(shouldSkip);
-                mockClient.clientRequest(input, apiOperation, overrideConfig);
-                // No additional assertions are needed if the request successfully completes.
+                var actualOutput = mockClient.clientRequest(input, apiOperation, overrideConfig);
+                assertThat(actualOutput)
+                    .usingRecursiveComparison(ComparisonUtils.getComparisonConfig())
+                    .isEqualTo(expectedOutput);
             });
         }
     }
