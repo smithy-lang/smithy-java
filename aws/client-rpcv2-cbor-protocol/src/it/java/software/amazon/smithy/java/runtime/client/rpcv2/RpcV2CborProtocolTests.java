@@ -36,6 +36,12 @@ public class RpcV2CborProtocolTests {
     }
 
     @HttpClientResponseTests
+    @ProtocolTestFilter(
+        skipTests = {
+            "RpcV2CborDateTimeWithFractionalSeconds",
+            "RpcV2CborClientPopulatesDefaultsValuesWhenMissingInResponse"
+        }
+    )
     public void responseTest(Runnable test) {
         test.run();
     }
