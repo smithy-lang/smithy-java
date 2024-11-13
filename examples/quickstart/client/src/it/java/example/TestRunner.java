@@ -37,4 +37,11 @@ public class TestRunner {
         var getResponse2 = client.getOrder(getRequest);
         System.out.println("Completed Order :" + getResponse2);
     }
+
+    @Test
+    void errorsOutIfOrderDoesNotExist() throws InterruptedException {
+        var getRequest = GetOrderInput.builder().id(UUID.randomUUID().toString()).build();
+        var orderNotFound = assertThrows(OrderNotFound.class, () -> client.getOrder(getRequest));
+        assertEquals(orderNotFound.orderId(), getRequest.id());
+    }
 }

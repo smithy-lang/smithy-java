@@ -16,8 +16,10 @@ final class GetOrder implements GetOrderOperation {
     public GetOrderOutput getOrder(GetOrderInput input, RequestContext context) {
         var order = OrderTracker.getOrderById(UUID.fromString(input.id()));
         if (order == null) {
-            System.out.println("Order not found!");
-            // TODO: Add error once error handling supported
+            throw OrderNotFound.builder()
+                    .orderId(input.id())
+                    .message("Order not found")
+                    .build();
         }
         return GetOrderOutput.builder()
             .id(input.id())

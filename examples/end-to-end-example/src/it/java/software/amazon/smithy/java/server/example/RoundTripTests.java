@@ -83,7 +83,8 @@ public class RoundTripTests {
             .build();
 
         var getRequest = GetOrderInput.builder().id(UUID.randomUUID().toString()).build();
-        assertThrows(OrderNotFound.class, () -> client.getOrder(getRequest));
+        var orderNotFound = assertThrows(OrderNotFound.class, () -> client.getOrder(getRequest));
+        assertEquals(orderNotFound.orderId(), getRequest.id());
     }
 
     @AfterAll
