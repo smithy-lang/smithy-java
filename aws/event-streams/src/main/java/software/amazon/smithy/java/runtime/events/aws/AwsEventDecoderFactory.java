@@ -30,7 +30,7 @@ public class AwsEventDecoderFactory<E extends SerializableStruct> implements Eve
         Supplier<ShapeBuilder<E>> eventBuilder,
         FrameTransformer<AwsEventFrame> transformer
     ) {
-        this.schema = schema;
+        this.schema = schema.isMember() ? schema.memberTarget() : schema;
         this.codec = codec;
         this.eventBuilder = eventBuilder;
         this.transformer = transformer;
@@ -42,7 +42,7 @@ public class AwsEventDecoderFactory<E extends SerializableStruct> implements Eve
         FrameTransformer<AwsEventFrame> transformer
     ) {
         return new AwsEventDecoderFactory<>(
-            operation.inputEventSchema(),
+            operation.inputStreamMember(),
             codec,
             operation.inputEventBuilderSupplier(),
             transformer
@@ -55,7 +55,7 @@ public class AwsEventDecoderFactory<E extends SerializableStruct> implements Eve
         FrameTransformer<AwsEventFrame> transformer
     ) {
         return new AwsEventDecoderFactory<>(
-            operation.outputEventSchema(),
+            operation.outputStreamMember(),
             codec,
             operation.outputEventBuilderSupplier(),
             transformer

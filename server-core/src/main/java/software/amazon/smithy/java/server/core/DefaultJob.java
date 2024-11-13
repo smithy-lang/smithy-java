@@ -13,6 +13,7 @@ public abstract sealed class DefaultJob implements Job permits HttpJob {
 
     private final Operation<? extends SerializableStruct, ? extends SerializableStruct> operation;
     private final ServerProtocol protocol;
+    private volatile Throwable failure;
 
     protected DefaultJob(
         Operation<? extends SerializableStruct, ? extends SerializableStruct> operation,
@@ -34,12 +35,12 @@ public abstract sealed class DefaultJob implements Job permits HttpJob {
 
     @Override
     public final Throwable getFailure() {
-        return null;
+        return failure;
     }
 
     @Override
     public final void setFailure(Throwable failure) {
-
+        this.failure = failure;
     }
 
     @Override

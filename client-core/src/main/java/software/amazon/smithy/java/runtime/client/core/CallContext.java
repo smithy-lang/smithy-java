@@ -14,7 +14,6 @@ import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver
  * Context parameters made available to underlying transports like HTTP clients.
  */
 public final class CallContext {
-
     /**
      * The total amount of time to wait for an API call to complete, including retries, and serialization.
      */
@@ -34,6 +33,27 @@ public final class CallContext {
      * The identity resolved for the request.
      */
     public static final Context.Key<Identity> IDENTITY = Context.key("Identity of the caller");
+
+    /**
+     * The current number of retry attempts the client has made for the current call.
+     *
+     * <p>This is a read-only value; modifying this value has no effect on a request.
+     */
+    public static final Context.Key<Integer> RETRY_ATTEMPT = Context.key("Retry attempt");
+
+    /**
+     * The maximum number of retries the client will issue before giving up.
+     *
+     * <p>This is a read-only value; modifying this value has no effect on a request.
+     */
+    public static final Context.Key<Integer> RETRY_MAX = Context.key("Max retries");
+
+    /**
+     * The idempotency token used with the call, if any.
+     *
+     * <p>This is a read-only value; modifying this value has no effect on a request.
+     */
+    public static final Context.Key<String> IDEMPOTENCY_TOKEN = Context.key("Idempotency token");
 
     private CallContext() {}
 }

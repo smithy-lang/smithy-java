@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.client.core.endpoint;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
@@ -96,8 +97,8 @@ public class EndpointResolverTest {
         }
 
         @Override
-        public void serialize(ShapeSerializer encoder) {
-            encoder.writeStruct(SCHEMA, this);
+        public Schema schema() {
+            return SCHEMA;
         }
 
         @Override
@@ -107,6 +108,11 @@ public class EndpointResolverTest {
             serializer.writeString(SCHEMA_LABEL_B, labelB);
             serializer.writeInteger(SCHEMA_INTEGER_VAL, 2);
             serializer.writeTimestamp(SCHEMA_TIMESTAMP_VAL, Instant.EPOCH);
+        }
+
+        @Override
+        public Object getMemberValue(Schema member) {
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -154,6 +160,11 @@ public class EndpointResolverTest {
         public List<ShapeId> effectiveAuthSchemes() {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public Set<Schema> errorSchemas() {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static final class TestOperationStaticPrefix implements
@@ -198,6 +209,11 @@ public class EndpointResolverTest {
 
         @Override
         public List<ShapeId> effectiveAuthSchemes() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Set<Schema> errorSchemas() {
             throw new UnsupportedOperationException();
         }
     }

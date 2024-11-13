@@ -22,11 +22,4 @@ public interface OutputEventStreamingApiOperation<I extends SerializableStruct, 
      * @return Returns a supplier of output event shape builders.
      */
     Supplier<ShapeBuilder<OE>> outputEventBuilderSupplier();
-
-    /**
-     * Get the schema of the output events.
-     *
-     * @return Returns the output event schema, including relevant traits.
-     */
-    Schema outputEventSchema();
 }

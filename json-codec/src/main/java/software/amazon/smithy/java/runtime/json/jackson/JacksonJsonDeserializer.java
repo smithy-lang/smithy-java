@@ -56,7 +56,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                 parser.close();
                 parser = null;
                 if (nextToken != null) {
-                    throw new SerializationException("Unexpected JSON content: " + JsonToken.valueDescFor(nextToken));
+                    throw new SerializationException("Unexpected JSON content: " + describeToken());
                 }
             } catch (SerializationException e) {
                 throw e;
@@ -116,9 +116,16 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
         try {
             return switch (parser.currentToken()) {
                 case VALUE_NUMBER_FLOAT, VALUE_NUMBER_INT -> parser.getFloatValue();
-                case VALUE_STRING -> Float.parseFloat(parser.getText().trim()); // TODO: is this right?
-                default -> throw new SerializationException("Unexpected token: " + parser.getCurrentToken());
+                case VALUE_STRING -> switch (parser.getText()) {
+                    case "Infinity" -> Float.POSITIVE_INFINITY;
+                    case "-Infinity" -> Float.NEGATIVE_INFINITY;
+                    case "NaN" -> Float.NaN;
+                    default -> throw new SerializationException("Expected float, found: " + describeToken());
+                };
+                default -> throw new SerializationException("Expected float, found: " + describeToken());
             };
+        } catch (SerializationException e) {
+            throw e;
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -129,8 +136,13 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
         try {
             return switch (parser.currentToken()) {
                 case VALUE_NUMBER_FLOAT, VALUE_NUMBER_INT -> parser.getDoubleValue();
-                case VALUE_STRING -> Double.parseDouble(parser.getText().trim()); // TODO: is this right?
-                default -> throw new SerializationException("Unexpected token: " + parser.getCurrentToken());
+                case VALUE_STRING -> switch (parser.getText()) {
+                    case "Infinity" -> Double.POSITIVE_INFINITY;
+                    case "-Infinity" -> Double.NEGATIVE_INFINITY;
+                    case "NaN" -> Double.NaN;
+                    default -> throw new SerializationException("Expected double, found: " + describeToken());
+                };
+                default -> throw new SerializationException("Expected double, found: " + describeToken());
             };
         } catch (SerializationException e) {
             throw e;
@@ -206,11 +218,15 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                     }
                     yield JsonDocuments.createMap(values, settings);
                 }
-                default -> throw new SerializationException("Unexpected token: " + parser.getCurrentToken());
+                default -> throw new SerializationException("Unexpected token: " + describeToken());
             };
         } catch (IOException e) {
             throw new SerializationException(e);
         }
+    }
+
+    private String describeToken() {
+        return JsonToken.valueDescFor(parser.currentToken());
     }
 
     @Override
@@ -223,9 +239,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
             } else if (parser.getCurrentToken() == JsonToken.VALUE_STRING) {
                 return TimestampResolver.readTimestamp(parser.getText(), format);
             } else {
-                throw new SerializationException(
-                    "Expected a timestamp, but found " + JsonToken.valueDescFor(parser.currentToken())
-                );
+                throw new SerializationException("Expected a timestamp, but found " + describeToken());
             }
         } catch (Exception e) {
             throw new SerializationException(e);

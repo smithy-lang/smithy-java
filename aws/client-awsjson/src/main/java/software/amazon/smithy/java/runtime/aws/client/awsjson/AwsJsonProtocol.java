@@ -14,6 +14,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.client.http.AmznErrorHeaderExtractor;
 import software.amazon.smithy.java.runtime.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.runtime.client.http.HttpErrorDeserializer;
+import software.amazon.smithy.java.runtime.client.http.HttpRetryErrorClassifier;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
@@ -24,12 +25,17 @@ import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
 
+/**
+ * Abstract class for RPC style JSON protocols.
+ *
+ * <p>Applies {@link HttpRetryErrorClassifier} by default to classify retries.
+ */
 abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson1Protocol, AwsJson11Protocol {
 
     private static final byte[] EMPTY_PAYLOAD = "{}".getBytes(StandardCharsets.UTF_8);
 
     private final ShapeId service;
-    private final JsonCodec codec = JsonCodec.builder().build();
+    private final JsonCodec codec;
     private final HttpErrorDeserializer errorDeserializer;
 
     /**
@@ -39,6 +45,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
     public AwsJsonProtocol(ShapeId trait, ShapeId service) {
         super(trait.toString());
         this.service = service;
+        this.codec = JsonCodec.builder().defaultNamespace(service.getNamespace()).build();
 
         this.errorDeserializer = HttpErrorDeserializer.builder()
             .codec(codec)
@@ -84,8 +91,10 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
     ) {
         // Is it an error?
         if (response.statusCode() != 200) {
-            return errorDeserializer.createError(context, operation.schema().id(), typeRegistry, response)
+            return errorDeserializer
+                .createError(context, operation.schema().id(), typeRegistry, response)
                 .thenApply(e -> {
+                    HttpRetryErrorClassifier.applyRetryInfo(operation, response, e, context);
                     throw e;
                 });
         }

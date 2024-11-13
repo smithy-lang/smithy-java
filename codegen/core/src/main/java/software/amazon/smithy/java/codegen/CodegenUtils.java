@@ -46,12 +46,20 @@ public final class CodegenUtils {
     private static final URL RESERVED_WORDS_FILE = Objects.requireNonNull(
         CodegenUtils.class.getResource("reserved-words.txt")
     );
+    private static final URL OBJECT_RESERVED_MEMBERS_FILE = Objects.requireNonNull(
+        CodegenUtils.class.getResource("object-reserved-members.txt")
+    );
+    private static final URL SMITHY_RESERVED_MEMBERS_FILE = Objects.requireNonNull(
+        CodegenUtils.class.getResource("smithy-reserved-members.txt")
+    );
 
     public static final ReservedWords SHAPE_ESCAPER = new ReservedWordsBuilder()
         .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Shape")
         .build();
     public static final ReservedWords MEMBER_ESCAPER = new ReservedWordsBuilder()
         .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Member")
+        .loadCaseInsensitiveWords(OBJECT_RESERVED_MEMBERS_FILE, word -> word + "Member")
+        .loadCaseInsensitiveWords(SMITHY_RESERVED_MEMBERS_FILE, word -> word + "Member")
         .build();
 
     private static final String SCHEMA_STATIC_NAME = "$SCHEMA";
@@ -249,13 +257,9 @@ public final class CodegenUtils {
             .stream()
             .sorted(
                 (a, b) -> {
-                    if (isRequiredWithNoDefault(a) && !isRequiredWithNoDefault(b)) {
-                        return -1;
-                    } else if (isRequiredWithNoDefault(a)) {
-                        return 0;
-                    } else {
-                        return 1;
-                    }
+                    int aRequiredWithNoDefault = isRequiredWithNoDefault(a) ? 1 : 0;
+                    int bRequiredWithNoDefault = isRequiredWithNoDefault(b) ? 1 : 0;
+                    return bRequiredWithNoDefault - aRequiredWithNoDefault;
                 }
             )
             .collect(Collectors.toList());

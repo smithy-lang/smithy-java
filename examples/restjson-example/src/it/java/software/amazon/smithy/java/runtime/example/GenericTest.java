@@ -45,6 +45,7 @@ public class GenericTest {
             .build();
 
         PutPersonOutput output = client.putPerson(input);
+        System.out.println("Output: " + output);
     }
 
     @Test
@@ -55,6 +56,7 @@ public class GenericTest {
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
         GetPersonImageOutput output = client.getPersonImage(input);
+        System.out.println("Output: " + output);
     }
 
     @Test
@@ -70,6 +72,7 @@ public class GenericTest {
             .image(DataStream.ofString("image..."))
             .build();
         PutPersonImageOutput output = client.putPersonImage(input);
+        System.out.println("Output: " + output);
     }
 
     @Test
@@ -140,5 +143,6 @@ public class GenericTest {
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
         GetPersonImageOutput output = client.getPersonImage(input);
+        System.out.println("Output: " + output);
     }
 }

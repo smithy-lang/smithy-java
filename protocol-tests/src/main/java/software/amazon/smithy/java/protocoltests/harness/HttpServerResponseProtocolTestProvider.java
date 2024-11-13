@@ -8,6 +8,7 @@ package software.amazon.smithy.java.protocoltests.harness;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +28,6 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
-import software.amazon.smithy.protocoltests.traits.AppliesTo;
 import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
 
 public class HttpServerResponseProtocolTestProvider extends
@@ -55,9 +55,6 @@ public class HttpServerResponseProtocolTestProvider extends
             var testOperation = serverTestOperation.operation();
             boolean shouldSkip = filter.skipOperation(testOperation.id());
             for (var testCase : testOperation.responseTestCases()) {
-                if (testCase.getAppliesTo().filter(t -> t == AppliesTo.SERVER).isPresent()) {
-                    continue;
-                }
                 Map<String, List<String>> headers = new HashMap<>();
                 headers.put("x-protocol-test-protocol-id", List.of(testCase.getProtocol().toString()));
                 headers.put("x-protocol-test-service", List.of(testOperation.serviceId().toString()));
@@ -126,6 +123,12 @@ public class HttpServerResponseProtocolTestProvider extends
                     ) throws ParameterResolutionException {
                         if (testCase.getBody().isEmpty()) {
                             return DataStream.ofEmpty();
+                        }
+                        if (testCase.getBodyMediaType().map(ProtocolTestProvider::isBinaryMediaType).orElse(false)) {
+                            return DataStream.ofBytes(
+                                Base64.getDecoder().decode(testCase.getBody().get()),
+                                testCase.getBodyMediaType().get()
+                            );
                         }
                         return DataStream.ofString(testCase.getBody().get(), testCase.getBodyMediaType().orElse(null));
                     }

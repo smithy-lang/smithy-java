@@ -28,4 +28,42 @@
     <Match>
         <Bug pattern="CT_CONSTRUCTOR_THROW"/>
     </Match>
+
+    <!-- Generated Recursive shapes will trigger this, although they will correctly instantiate -->
+    <Match>
+        <Source name="~.*build.*.java"/>
+        <Bug pattern="IC_INIT_CIRCULARITY"/>
+    </Match>
+
+    <!-- This warning cannot be suppressed per class for some reason, and it's also excessive. -->
+    <Match>
+        <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"/>
+    </Match>
+
+    <Match>
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
+        <Class name="software.amazon.smithy.java.runtime.dynamicclient.SchemaGuidedDocumentBuilder$SchemaList"/>
+    </Match>
+
+    <Match>
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
+        <Class name="software.amazon.smithy.java.runtime.dynamicclient.SchemaGuidedDocumentBuilder$SchemaMap"/>
+    </Match>
+
+    <Match>
+        <Class name="software.amazon.smithy.java.runtime.core.serde.document.Documents$LazyStructure">
+            <Method name="equals">
+                <Bug pattern="HE_EQUALS_USE_HASHCODE"/>
+            </Method>
+        </Class>
+    </Match>
+
+    <Match>
+        <Class name="software.amazon.smithy.java.runtime.client.core.ClientCall$Builder">
+            <Field name="executor">
+                <Bug pattern="UWF_UNWRITTEN_FIELD"/>
+            </Field>
+        </Class>
+    </Match>
+
 </FindBugsFilter>

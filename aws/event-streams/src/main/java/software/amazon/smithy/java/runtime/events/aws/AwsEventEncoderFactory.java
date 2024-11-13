@@ -28,7 +28,7 @@ public class AwsEventEncoderFactory implements EventEncoderFactory<AwsEventFrame
         String payloadMediaType,
         Function<Throwable, EventStreamingException> exceptionHandler
     ) {
-        this.schema = schema;
+        this.schema = schema.isMember() ? schema.memberTarget() : schema;
         this.codec = codec;
         this.payloadMediaType = payloadMediaType;
         this.exceptionHandler = exceptionHandler;
@@ -40,7 +40,7 @@ public class AwsEventEncoderFactory implements EventEncoderFactory<AwsEventFrame
         String payloadMediaType,
         Function<Throwable, EventStreamingException> exceptionHandler
     ) {
-        return new AwsEventEncoderFactory(operation.inputEventSchema(), codec, payloadMediaType, exceptionHandler);
+        return new AwsEventEncoderFactory(operation.inputStreamMember(), codec, payloadMediaType, exceptionHandler);
     }
 
     public static AwsEventEncoderFactory forOutputStream(
@@ -49,7 +49,7 @@ public class AwsEventEncoderFactory implements EventEncoderFactory<AwsEventFrame
         String payloadMediaType,
         Function<Throwable, EventStreamingException> exceptionHandler
     ) {
-        return new AwsEventEncoderFactory(operation.outputEventSchema(), codec, payloadMediaType, exceptionHandler);
+        return new AwsEventEncoderFactory(operation.outputStreamMember(), codec, payloadMediaType, exceptionHandler);
     }
 
     @Override

@@ -17,14 +17,13 @@ public interface IdentityResolver<IdentityT extends Identity> {
     /**
      * Resolve the identity from this identity resolver.
      *
-     * <p>If not identity can be resolved, this method MUST throw {@link IdentityNotFoundException} and never
-     * return null.
+     * <p>Expected errors like missing environment variables are expected to return a result that contains an
+     * error string. Unexpected errors like malformed input or networking errors are allowed to throw exceptions.
      *
      * @param requestProperties The request properties used to resolve an Identity.
-     * @return a CompletableFuture for the resolved identity.
-     * @throws IdentityNotFoundException when an identity cannot be resolved.
+     * @return a CompletableFuture for the resolved identity result.
      */
-    CompletableFuture<IdentityT> resolveIdentity(AuthProperties requestProperties);
+    CompletableFuture<IdentityResult<IdentityT>> resolveIdentity(AuthProperties requestProperties);
 
     /**
      * Retrieve the class of the identity resolved by this identity resolver.

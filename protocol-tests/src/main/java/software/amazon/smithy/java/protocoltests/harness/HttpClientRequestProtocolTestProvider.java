@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.protocoltests.harness;
 
+import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -78,7 +79,7 @@ final class HttpClientRequestProtocolTestProvider extends
                             inputBuilder.build(),
                             overrideBuilder.build(),
                             testTransport::getCapturedRequest,
-                            filter.skipOperation(operation.id()) || filter.skipTestCase(testCase, TestType.CLIENT)
+                            filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)
                         );
                     })
             );
@@ -122,6 +123,10 @@ final class HttpClientRequestProtocolTestProvider extends
                     ) throws ParameterResolutionException {
                         if (testCase.getBody().isEmpty()) {
                             return DataStream.ofEmpty();
+                        }
+                        // an `isBinary` property would be nice
+                        if (ProtocolTestProvider.isBinaryMediaType(testCase.getBodyMediaType())) {
+                            return DataStream.ofBytes(Base64.getDecoder().decode(testCase.getBody().get()));
                         }
                         return DataStream.ofString(testCase.getBody().get(), testCase.getBodyMediaType().orElse(null));
                     }

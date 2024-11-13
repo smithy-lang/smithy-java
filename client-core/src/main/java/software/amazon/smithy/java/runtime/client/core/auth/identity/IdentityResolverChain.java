@@ -30,41 +30,35 @@ final class IdentityResolverChain<IdentityT extends Identity> implements Identit
     }
 
     @Override
-    public CompletableFuture<IdentityT> resolveIdentity(AuthProperties requestProperties) {
-        List<String> excMessages = new ArrayList<>();
-        return executeChain(resolvers.get(0), requestProperties, excMessages, 0);
+    public CompletableFuture<IdentityResult<IdentityT>> resolveIdentity(AuthProperties requestProperties) {
+        List<IdentityResult<?>> errors = new ArrayList<>();
+        return executeChain(resolvers.get(0), requestProperties, errors, 0);
     }
 
-    @SuppressWarnings("unchecked")
-    private CompletableFuture<IdentityT> executeChain(
+    private CompletableFuture<IdentityResult<IdentityT>> executeChain(
         IdentityResolver<IdentityT> resolver,
         AuthProperties requestProperties,
-        List<String> excMessages,
+        List<IdentityResult<?>> errors,
         int idx
     ) {
         var result = resolver.resolveIdentity(requestProperties);
         if (idx + 1 < resolvers.size()) {
             var nextResolver = resolvers.get(idx + 1);
-            return result.exceptionallyCompose(exc -> {
-                if (exc instanceof IdentityNotFoundException) {
-                    excMessages.add(exc.getMessage());
-                    return executeChain(nextResolver, requestProperties, excMessages, idx + 1);
+            return result.thenCompose(ir -> {
+                if (ir.error() != null) {
+                    errors.add(ir);
+                    return executeChain(nextResolver, requestProperties, errors, idx + 1);
                 }
-                return CompletableFuture.failedFuture(exc);
+                return CompletableFuture.completedFuture(ir);
             });
         }
-        return result.exceptionallyComposeAsync(exc -> {
-            if (exc instanceof IdentityNotFoundException) {
-                excMessages.add(exc.getMessage());
-                return CompletableFuture.failedFuture(
-                    new IdentityNotFoundException(
-                        "Could not resolve identity with any resolvers in the chain : " + excMessages,
-                        (Class<? extends IdentityResolver<?>>) this.getClass(),
-                        identityClass
-                    )
-                );
+
+        return result.thenApply(ir -> {
+            if (ir.error() != null) {
+                errors.add(ir);
+                return IdentityResult.ofError(IdentityResolverChain.class, "Attempted resolvers: " + errors);
             }
-            return CompletableFuture.failedFuture(exc);
+            return ir;
         });
     }
 }

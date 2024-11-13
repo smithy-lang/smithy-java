@@ -32,13 +32,18 @@ public final class Unit implements SerializableStruct {
     }
 
     @Override
-    public void serialize(ShapeSerializer encoder) {
-        encoder.writeStruct(SCHEMA, this);
+    public Schema schema() {
+        return SCHEMA;
     }
 
     @Override
     public void serializeMembers(ShapeSerializer serializer) {
         // Unit types have no members
+    }
+
+    @Override
+    public Object getMemberValue(Schema member) {
+        return SchemaUtils.validateMemberInSchema(SCHEMA, member, null);
     }
 
     public static Builder builder() {

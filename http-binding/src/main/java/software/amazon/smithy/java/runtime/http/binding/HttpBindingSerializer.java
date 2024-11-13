@@ -15,6 +15,7 @@ import java.util.TreeMap;
 import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SchemaUtils;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
@@ -49,6 +50,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private final Codec payloadCodec;
     private final String payloadMediaType;
     private final boolean omitEmptyPayload;
+    private final boolean isFailure;
 
     private final Map<String, String> labels = new LinkedHashMap<>();
     private final Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
@@ -72,7 +74,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         Codec payloadCodec,
         String payloadMediaType,
         BindingMatcher bindingMatcher,
-        boolean omitEmptyPayload
+        boolean omitEmptyPayload,
+        boolean isFailure
     ) {
         uriPattern = httpTrait.getUri();
         responseStatus = httpTrait.getCode();
@@ -80,6 +83,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         this.bindingMatcher = bindingMatcher;
         this.payloadMediaType = payloadMediaType;
         this.omitEmptyPayload = omitEmptyPayload;
+        this.isFailure = isFailure;
         headerSerializer = new HttpHeaderSerializer(headerConsumer);
         querySerializer = new HttpQuerySerializer(queryStringParams::add);
         labelSerializer = new HttpLabelSerializer(labels::put);
@@ -95,9 +99,13 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             shapeBodyOutput = new ByteArrayOutputStream();
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
             // Serialize only the body members to the codec.
-            SerializableStruct.filteredMembers(schema, struct, this::bodyBindingPredicate)
+            SchemaUtils.withFilteredMembers(schema, struct, this::bodyBindingPredicate)
                 .serialize(shapeBodySerializer);
             headers.put("content-type", List.of(payloadMediaType));
+        }
+
+        if (isFailure) {
+            headers.put("X-Amzn-Errortype", List.of(schema.id().getName()));
         }
 
         struct.serializeMembers(new BindingSerializer(this));

@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import software.amazon.smithy.java.logging.InternalLogger;
-import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.ModifiableHttpHeaders;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.server.Route;
@@ -73,11 +72,11 @@ public final class LambdaEndpoint {
     private static HttpRequest getRequest(ProxyRequest proxyRequest) {
         String method = proxyRequest.getHttpMethod();
         String encodedUri = URLEncoder.encode(proxyRequest.getPath(), StandardCharsets.UTF_8);
-        ModifiableHttpHeaders headers = HttpHeaders.ofModifiable();
+        ModifiableHttpHeaders headers = ModifiableHttpHeaders.create();
         if (proxyRequest.getMultiValueHeaders() != null && !proxyRequest.getMultiValueHeaders().isEmpty()) {
             // TODO: handle single-value headers?
             // -- APIGW puts the actual headers in both, but only the latest header per key
-            headers.putHeaders(proxyRequest.getMultiValueHeaders());
+            headers.putHeader(proxyRequest.getMultiValueHeaders());
         }
         URI uri;
         if (proxyRequest.getMultiValueQueryStringParameters() != null && !proxyRequest
@@ -120,7 +119,7 @@ public final class LambdaEndpoint {
     private static ProxyResponse getResponse(HttpResponse httpResponse) {
         // TODO: Add response headers
         ProxyResponse.Builder builder = ProxyResponse.builder()
-            .multiValueHeaders(httpResponse.headers().map())
+            .multiValueHeaders(httpResponse.headers().toMap())
             .statusCode(httpResponse.getStatusCode());
 
         DataStream val = httpResponse.getSerializedValue();

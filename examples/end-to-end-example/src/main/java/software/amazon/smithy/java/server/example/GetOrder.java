@@ -9,6 +9,7 @@ import java.util.UUID;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.example.model.GetOrderInput;
 import software.amazon.smithy.java.server.example.model.GetOrderOutput;
+import software.amazon.smithy.java.server.example.model.OrderNotFound;
 import software.amazon.smithy.java.server.example.service.GetOrderOperation;
 
 final class GetOrder implements GetOrderOperation {
@@ -16,8 +17,10 @@ final class GetOrder implements GetOrderOperation {
     public GetOrderOutput getOrder(GetOrderInput input, RequestContext context) {
         var order = OrderTracker.getOrderById(UUID.fromString(input.id()));
         if (order == null) {
-            System.out.println("Order not found!");
-            // TODO: Add error once error handling supported
+            throw OrderNotFound.builder()
+                .orderId(input.id())
+                .message("Order not found")
+                .build();
         }
         return GetOrderOutput.builder()
             .id(input.id())

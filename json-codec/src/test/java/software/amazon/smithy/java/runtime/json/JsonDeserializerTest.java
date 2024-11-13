@@ -105,6 +105,16 @@ public class JsonDeserializerTest {
     }
 
     @Test
+    public void normalFloatsCannotBeStrings() {
+        try (var codec = JsonCodec.builder().build()) {
+            var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
+            Assertions.assertThrows(SerializationException.class, () -> {
+                de.readFloat(PreludeSchemas.FLOAT);
+            });
+        }
+    }
+
+    @Test
     public void deserializesDouble() {
         try (var codec = JsonCodec.builder().build()) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
@@ -115,6 +125,16 @@ public class JsonDeserializerTest {
             assertThat(de.readDouble(PreludeSchemas.DOUBLE), is(Double.POSITIVE_INFINITY));
             de = codec.createDeserializer("\"-Infinity\"".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readDouble(PreludeSchemas.DOUBLE), is(Double.NEGATIVE_INFINITY));
+        }
+    }
+
+    @Test
+    public void normalDoublesCannotBeStrings() {
+        try (var codec = JsonCodec.builder().build()) {
+            var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
+            Assertions.assertThrows(SerializationException.class, () -> {
+                de.readDouble(PreludeSchemas.DOUBLE);
+            });
         }
     }
 

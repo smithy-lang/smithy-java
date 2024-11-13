@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -117,16 +119,24 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
         public void run() {
             writer.pushState();
             writer.putContext("string", shape.isEnumShape());
+            List<String> types = new ArrayList<>();
             var enumValues = getEnumValues(shape);
             for (var member : shape.members()) {
                 writer.pushState(new EnumVariantSection(member));
-                writer.putContext("var", symbolProvider.toMemberName(member));
+                var name = symbolProvider.toMemberName(member);
+                types.add(name);
+                writer.putContext("var", name);
                 writer.putContext("val", enumValues.get(member.getMemberName()));
                 writer.write(
                     "public static final ${shape:T} ${var:L} = new ${shape:T}(Type.${var:L}, ${?string}${val:S}${/string}${^string}${val:L}${/string});"
                 );
                 writer.popState();
             }
+            writer.putContext("types", types);
+            writer.putContext("list", List.class);
+            writer.write(
+                "private static final ${list:T}<${shape:T}> $$TYPES = ${list:T}.of(${#types}${value:L}${^key.last}, ${/key.last}${/types});"
+            );
             writer.popState();
         }
     }
@@ -185,7 +195,15 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                 public static ${shape:T} unknown(${value:T} value) {
                     return new ${shape:T}(Type.$$UNKNOWN, value);
                 }
+
+                /**
+                 * Returns an unmodifiable list containing the constants of this enum type, in the order declared.
+                 */
+                public static ${list:T}<${shape:T}> values() {
+                    return $$TYPES;
+                }
                 """;
+            writer.putContext("list", List.class);
             writer.putContext("type", CodegenUtils.getInnerTypeEnumSymbol(symbolProvider.toSymbol(shape)));
             writer.write(template);
             writer.popState();

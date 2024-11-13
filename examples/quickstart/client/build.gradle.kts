@@ -7,7 +7,7 @@ plugins {
 }
 
 dependencies {
-    smithyBuild(libs.smithy.client.codegen)
+    smithyBuild(libs.smithy.codegen.plugins)
     implementation(project(":lib"))
     api(project(":plugins"))
     implementation(libs.smithy.java.client.restjson)

@@ -71,7 +71,7 @@ public class UnionTest {
 
     record UnknownDocument() implements Document {
 
-        private static final Map<String, Document> members = Map.of("UNKNOWN!!!", Document.createDouble(3.14));
+        private static final Map<String, Document> members = Map.of("UNKNOWN!!!", Document.createDouble(3.2));
 
         @Override
         public ShapeType type() {

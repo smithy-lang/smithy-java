@@ -1,0 +1,19 @@
+#
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Member names reserved for java Object class. Member getters with any of these
+# names will attempt to override the base Object methods unless escaped.
+#
+# Note: Only zero-args methods are a problem here.
+#
+# See Object:
+# https://docs.oracle.com/javase/6/docs/api/java/lang/Object.html
+getClass
+hashCode
+clone
+toString
+notify
+notifyAll
+wait
+finalize

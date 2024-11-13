@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.generators;
 import java.util.List;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
@@ -61,7 +62,7 @@ abstract class BuilderGenerator implements Runnable {
                 private Builder() {}
 
                 @Override
-                public Schema schema() {
+                public ${schema:T} schema() {
                     return $$SCHEMA;
                 }
 
@@ -73,6 +74,7 @@ abstract class BuilderGenerator implements Runnable {
 
                 ${deserializer:C|}
             }""";
+        writer.putContext("schema", Schema.class);
         writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
         writer.putContext("builderProperties", writer.consumer(this::generateProperties));
         writer.putContext("builderSetters", writer.consumer(this::generateSetters));

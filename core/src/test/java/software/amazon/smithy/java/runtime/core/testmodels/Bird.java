@@ -37,18 +37,27 @@ public final class Bird implements SerializableStruct {
     }
 
     @Override
+    public Schema schema() {
+        return SCHEMA;
+    }
+
+    @Override
     public String toString() {
         return ToStringSerializer.serialize(this);
     }
 
     @Override
-    public void serialize(ShapeSerializer encoder) {
-        encoder.writeStruct(SCHEMA, this);
+    public void serializeMembers(ShapeSerializer serializer) {
+        serializer.writeString(SCHEMA_NAME, name);
     }
 
     @Override
-    public void serializeMembers(ShapeSerializer serializer) {
-        serializer.writeString(SCHEMA_NAME, name);
+    public Object getMemberValue(Schema member) {
+        if (member.memberName().equals("name")) {
+            return name;
+        } else {
+            throw new IllegalArgumentException("Unknown member " + member);
+        }
     }
 
     public static final class Builder implements ShapeBuilder<Bird> {

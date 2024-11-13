@@ -11,13 +11,14 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Stream;
-import org.assertj.core.api.recursive.comparison.RecursiveComparisonConfiguration;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
@@ -27,7 +28,6 @@ import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
-import software.amazon.smithy.protocoltests.traits.AppliesTo;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 
 public class HttpServerRequestProtocolTestProvider extends
@@ -56,14 +56,17 @@ public class HttpServerRequestProtocolTestProvider extends
             var testOperation = serverTestOperation.operation();
             boolean shouldSkip = testFilter.skipOperation(testOperation.id());
             for (var testCase : testOperation.requestTestCases()) {
-                if (testCase.getAppliesTo().filter(t -> t == AppliesTo.SERVER).isPresent()) {
-                    continue;
-                }
                 var createUri = createUri(testData.endpoint(), testCase.getUri(), testCase.getQueryParams());
                 var headers = createHeaders(testCase.getHeaders());
+                Function<String, byte[]> mapper;
+                if (testCase.getBodyMediaType().map(ProtocolTestProvider::isBinaryMediaType).orElse(false)) {
+                    mapper = Base64.getDecoder()::decode;
+                } else {
+                    mapper = String::getBytes;
+                }
                 var request = SmithyHttpRequest.builder()
                     .uri(createUri)
-                    .body(DataStream.ofBytes(testCase.getBody().map(String::getBytes).orElse(new byte[0])))
+                    .body(DataStream.ofBytes(testCase.getBody().map(mapper).orElse(new byte[0])))
                     .httpVersion(SmithyHttpVersion.HTTP_1_1)
                     .method(testCase.getMethod())
                     .headers(headers)
@@ -217,33 +220,16 @@ public class HttpServerRequestProtocolTestProvider extends
                         new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
                             .deserializeInto(inputBuilder);
                         // Compare as documents so any datastream members are correctly compared.
-                        assertThat(inputBuilder.build())
+                        assertThat((Object) mockOperation.getRequest())
                             // Compare objects by field
                             .usingRecursiveComparison(
-                                RecursiveComparisonConfiguration.builder()
-                                    // Compare data streams by contained data
-                                    .withComparatorForType(
-                                        Comparator.comparing(d -> new StringBuildingSubscriber(d).getResult()),
-                                        DataStream.class
-                                    )
-                                    // Compare doubles and floats as longs so NaN's will be equatable
-                                    .withComparatorForType(nanPermittingDoubleComparator(), Double.class)
-                                    .withComparatorForType(nanPermittingFloatComparator(), Float.class)
-                                    .build()
+                                ComparisonUtils.getComparisonConfig()
                             )
-                            .isEqualTo(mockOperation.getRequest());
+                            .isEqualTo(inputBuilder.build());
                     }
                 }
             );
         }
-    }
-
-    private static Comparator<Double> nanPermittingDoubleComparator() {
-        return (d1, d2) -> (Double.isNaN(d1) && Double.isNaN(d2)) ? 0 : Double.compare(d1, d2);
-    }
-
-    private static Comparator<Float> nanPermittingFloatComparator() {
-        return (f1, f2) -> (Float.isNaN(f1) && Float.isNaN(f2)) ? 0 : Float.compare(f1, f2);
     }
 
     private static final Set<Character> HEADER_DELIMS = Set.of(

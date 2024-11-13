@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SchemaUtils;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -276,23 +277,28 @@ final class Documents {
                 entry.getValue().serialize(serializer);
             }
         }
+
+        @Override
+        public Object getMemberValue(Schema member) {
+            return SchemaUtils.validateMemberInSchema(schema, member, members.get(member.memberName()));
+        }
     }
 
     /**
      * A document that wraps a shape and a schema, lazily creating the document only if needed.
      */
-    static final class LazyStructure implements Document {
+    static final class LazyStructure implements Document, SerializableStruct {
 
         private final Schema schema;
         private final SerializableStruct struct;
-        private volatile transient Document createdDocument;
+        private volatile transient StructureDocument createdDocument;
 
         LazyStructure(Schema schema, SerializableStruct struct) {
             this.schema = schema;
             this.struct = struct;
         }
 
-        private Document getDocument() {
+        private StructureDocument getDocument() {
             var result = createdDocument;
             if (result == null) {
                 var parser = new DocumentParser.StructureParser();
@@ -354,8 +360,29 @@ final class Documents {
         }
 
         @Override
+        public void serialize(ShapeSerializer serializer) {
+            // De-conflict Document and SerializableStruct default implementations.
+            Document.super.serialize(serializer);
+        }
+
+        @Override
         public void serializeContents(ShapeSerializer serializer) {
             struct.serialize(serializer);
+        }
+
+        @Override
+        public Schema schema() {
+            return schema;
+        }
+
+        @Override
+        public void serializeMembers(ShapeSerializer serializer) {
+            getDocument().serialize(serializer);
+        }
+
+        @Override
+        public Object getMemberValue(Schema member) {
+            return getDocument().getMemberValue(member);
         }
     }
 }

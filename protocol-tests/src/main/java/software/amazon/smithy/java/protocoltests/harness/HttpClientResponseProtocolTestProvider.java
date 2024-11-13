@@ -5,6 +5,9 @@
 
 package software.amazon.smithy.java.protocoltests.harness;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +80,7 @@ final class HttpClientResponseProtocolTestProvider extends
                             input,
                             outputBuilder.build(),
                             overrideBuilder.build(),
-                            filter.skipOperation(operation.id()) || filter.skipTestCase(testCase, TestType.CLIENT)
+                            filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)
 
                         );
                     })
@@ -89,7 +92,7 @@ final class HttpClientResponseProtocolTestProvider extends
         MockClient mockClient,
         ApiOperation apiOperation,
         SerializableStruct input,
-        SerializableStruct output,
+        SerializableStruct expectedOutput,
         RequestOverrideConfig overrideConfig,
         boolean shouldSkip
     ) implements TestTemplateInvocationContext {
@@ -103,8 +106,10 @@ final class HttpClientResponseProtocolTestProvider extends
         public List<Extension> getAdditionalExtensions() {
             return List.of((ProtocolTestParameterResolver) () -> {
                 Assumptions.assumeFalse(shouldSkip);
-                mockClient.clientRequest(input, apiOperation, overrideConfig);
-                // No additional assertions are needed if the request successfully completes.
+                var actualOutput = mockClient.clientRequest(input, apiOperation, overrideConfig);
+                assertThat(actualOutput)
+                    .usingRecursiveComparison(ComparisonUtils.getComparisonConfig())
+                    .isEqualTo(expectedOutput);
             });
         }
     }
@@ -129,7 +134,12 @@ final class HttpClientResponseProtocolTestProvider extends
             // Add request body if present;
             testCase.getBody().ifPresent(body -> {
                 if (testCase.getBodyMediaType().isPresent()) {
-                    builder.body(DataStream.ofString(body, testCase.getBodyMediaType().get()));
+                    var type = testCase.getBodyMediaType().get();
+                    if (ProtocolTestProvider.isBinaryMediaType(type)) {
+                        builder.body(DataStream.ofBytes(Base64.getDecoder().decode(body), type));
+                    } else {
+                        builder.body(DataStream.ofString(body, type));
+                    }
                 } else {
                     builder.body(DataStream.ofString(body));
                 }

@@ -188,7 +188,7 @@ public class HttpErrorDeserializerTest {
             .build();
 
         public Baz(String message) {
-            super(SCHEMA.id(), message);
+            super(SCHEMA, message);
         }
 
         @Override
@@ -197,7 +197,9 @@ public class HttpErrorDeserializerTest {
         }
 
         @Override
-        public void serialize(ShapeSerializer encoder) {}
+        public Object getMemberValue(Schema member) {
+            throw new UnsupportedOperationException();
+        }
 
         static final class Builder implements ShapeBuilder<Baz> {
             private String message;

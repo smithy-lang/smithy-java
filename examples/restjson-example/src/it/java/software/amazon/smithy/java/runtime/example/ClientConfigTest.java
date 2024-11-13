@@ -208,7 +208,9 @@ public class ClientConfigTest {
 
         try {
             client.putPerson(input);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            // This exception is ignored.
+        }
     }
 
     private static class RequestCapturingInterceptor implements ClientInterceptor {

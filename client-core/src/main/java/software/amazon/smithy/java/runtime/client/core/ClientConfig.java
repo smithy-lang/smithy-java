@@ -16,6 +16,7 @@ import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.runtime.retries.api.RetryStrategy;
 
 /**
  * An immutable representation of configurations of a {@link Client}.
@@ -25,7 +26,8 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterc
  * {@link Context.Key}.
  */
 public final class ClientConfig {
-
+    private static final List<ClientTransportFactory<?, ?>> transportFactories = ClientTransportFactory
+        .load(ClientConfig.class.getClassLoader());
     private static final AuthScheme<Object, Identity> NO_AUTH_AUTH_SCHEME = AuthScheme.noAuthAuthScheme();
 
     private final ClientTransport<?, ?> transport;
@@ -37,9 +39,13 @@ public final class ClientConfig {
     private final List<IdentityResolver<?>> identityResolvers;
     private final Context context;
 
+    private final RetryStrategy retryStrategy;
+    private final String retryScope;
+
     private ClientConfig(Builder builder) {
-        this.transport = Objects.requireNonNull(builder.transport, "transport cannot be null");
         this.protocol = Objects.requireNonNull(builder.protocol, "protocol cannot be null");
+        // If no transport is set, try to find compatible transport via SPI.
+        this.transport = builder.transport != null ? builder.transport : discoverTransport(protocol);
         ClientPipeline.validateProtocolAndTransport(protocol, transport);
 
         this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
@@ -55,40 +61,93 @@ public final class ClientConfig {
         this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, AuthSchemeResolver.DEFAULT);
         this.identityResolvers = List.copyOf(builder.identityResolvers);
 
+        this.retryStrategy = builder.retryStrategy;
+        this.retryScope = builder.retryScope;
+
         this.context = Context.unmodifiableCopy(builder.context);
     }
 
-    // Note: Making all the accessors package-private for now as they are only needed by Client, but could be public.
-    ClientTransport<?, ?> transport() {
+    /**
+     * Search for a transport service provider that is compatible with the provided protocol.
+     */
+    private ClientTransport<?, ?> discoverTransport(ClientProtocol<?, ?> protocol) {
+        for (var factory : transportFactories) {
+            // Find the first applicable transport factory
+            if (factory.requestClass() == protocol.requestClass()
+                && factory.responseClass() == protocol.responseClass()
+            ) {
+                return factory.createTransport();
+            }
+        }
+        throw new IllegalArgumentException(
+            "No compatible transport found for protocol '" + protocol + "'. "
+                + "Add a compatible ClientTransportFactory Service provider to the classpath, "
+                + "or add a compatible transport to the client builder."
+        );
+    }
+
+    /**
+     * @return Transport for client to use to send data to an endpoint.
+     */
+    public ClientTransport<?, ?> transport() {
         return transport;
     }
 
-    ClientProtocol<?, ?> protocol() {
+    /**
+     * @return Protocol for client to use for request and response serialization and deserialization.
+     */
+    public ClientProtocol<?, ?> protocol() {
         return protocol;
     }
 
-    EndpointResolver endpointResolver() {
+    /**
+     * @return EndpointResolver to use to resolve an endpoint for an operation.
+     */
+    public EndpointResolver endpointResolver() {
         return endpointResolver;
     }
 
-    List<ClientInterceptor> interceptors() {
+    /**
+     * @return Interceptors configured to hook into the client's request execution pipeline.
+     */
+    public List<ClientInterceptor> interceptors() {
         return interceptors;
     }
 
-    List<AuthScheme<?, ?>> supportedAuthSchemes() {
+    /**
+     * @return Authentication schemes supported by the client.
+     */
+    public List<AuthScheme<?, ?>> supportedAuthSchemes() {
         return supportedAuthSchemes;
     }
 
-    AuthSchemeResolver authSchemeResolver() {
+    /**
+     * @return Resolver to use to resolve the authentication scheme that should be used to sign a request.
+     */
+    public AuthSchemeResolver authSchemeResolver() {
         return authSchemeResolver;
     }
 
-    List<IdentityResolver<?>> identityResolvers() {
+    /**
+     * @return Resolvers to use to resolve an identity for authentication.
+     */
+    public List<IdentityResolver<?>> identityResolvers() {
         return identityResolvers;
     }
 
-    Context context() {
+    /**
+     * @return Context to use
+     */
+    public Context context() {
         return context;
+    }
+
+    RetryStrategy retryStrategy() {
+        return retryStrategy;
+    }
+
+    String retryScope() {
+        return retryScope;
     }
 
     /**
@@ -106,7 +165,9 @@ public final class ClientConfig {
             .protocol(protocol)
             .endpointResolver(endpointResolver)
             .authSchemeResolver(authSchemeResolver)
-            .identityResolvers(identityResolvers);
+            .identityResolvers(identityResolvers)
+            .retryStrategy(retryStrategy)
+            .retryScope(retryScope);
         interceptors.forEach(builder::addInterceptor);
         supportedAuthSchemes.forEach(builder::putSupportedAuthSchemes);
         builder.putAllConfig(context);
@@ -151,9 +212,13 @@ public final class ClientConfig {
         if (overrideConfig.identityResolvers() != null) {
             overrideConfig.identityResolvers().forEach(builder::addIdentityResolver);
         }
+        if (overrideConfig.retryStrategy() != null) {
+            builder.retryStrategy(overrideConfig.retryStrategy());
+        }
+        if (overrideConfig.retryScope() != null) {
+            builder.retryScope(overrideConfig.retryScope());
+        }
 
-        // TODO: Currently there is no concept of mutable v/s immutable parts of Context.
-        //       We just merge the client's Context with the Context of the operation's call.
         builder.putAllConfig(overrideConfig.context());
     }
 
@@ -169,6 +234,8 @@ public final class ClientConfig {
         private final List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
         private final List<IdentityResolver<?>> identityResolvers = new ArrayList<>();
         private final Context context = Context.create();
+        private RetryStrategy retryStrategy;
+        private String retryScope;
 
         // TODO: Docs
         public ClientTransport<?, ?> transport() {
@@ -201,6 +268,14 @@ public final class ClientConfig {
 
         public Context context() {
             return context;
+        }
+
+        public RetryStrategy retryStrategy() {
+            return retryStrategy;
+        }
+
+        public String retryScope() {
+            return retryScope;
         }
 
         /**
@@ -327,8 +402,31 @@ public final class ClientConfig {
          * @param context Context containing all the configuration to put.
          * @return the builder.
          */
-        private Builder putAllConfig(Context context) {
+        Builder putAllConfig(Context context) {
             context.copyTo(this.context);
+            return this;
+        }
+
+        /**
+         * Set a retry strategy to use.
+         *
+         * @param retryStrategy Retry strategy to use.
+         * @return the builder.
+         * @see Client.Builder#retryStrategy(RetryStrategy)
+         */
+        public Builder retryStrategy(RetryStrategy retryStrategy) {
+            this.retryStrategy = retryStrategy;
+            return this;
+        }
+
+        /**
+         * Set a retry scope to use with retries.
+         *
+         * @param retryScope The retry scope to set (e.g., an ARN).
+         * @return the builder.
+         */
+        public Builder retryScope(String retryScope) {
+            this.retryScope = retryScope;
             return this;
         }
 

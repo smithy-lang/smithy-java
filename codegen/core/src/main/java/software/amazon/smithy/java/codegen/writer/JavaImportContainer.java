@@ -26,15 +26,10 @@ final class JavaImportContainer implements ImportContainer {
 
     @Override
     public void importSymbol(Symbol symbol, String s) {
-        // Do not import primitive types, java.lang standard library imports,
-        // or any symbols already in the same namespace.
-        if (symbol.expectProperty(SymbolProperties.IS_PRIMITIVE)
-            || symbol.getNamespace().startsWith("java.lang")
-            || symbol.getNamespace().equals(namespace)
-        ) {
+        // Do not import primitive types or java.lang standard library imports.
+        if (symbol.expectProperty(SymbolProperties.IS_PRIMITIVE) || symbol.getNamespace().startsWith("java.lang")) {
             return;
         }
-
         Set<Symbol> duplicates = imports.computeIfAbsent(symbol.getName(), sn -> new HashSet<>());
         duplicates.add(symbol);
     }
@@ -59,6 +54,7 @@ final class JavaImportContainer implements ImportContainer {
             .stream()
             .filter(s -> s.size() == 1)
             .map(s -> s.iterator().next())
+            .filter(s -> !s.getNamespace().equals(namespace))
             .map(Symbol::getFullName)
             .collect(Collectors.toCollection(TreeSet::new));
     }

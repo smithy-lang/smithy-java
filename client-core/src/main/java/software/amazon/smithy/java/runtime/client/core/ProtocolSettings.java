@@ -13,7 +13,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public final class ProtocolSettings {
     private final ShapeId service;
 
-    public ProtocolSettings(Builder builder) {
+    private ProtocolSettings(Builder builder) {
         this.service = builder.service;
     }
 
@@ -25,7 +25,7 @@ public final class ProtocolSettings {
         return new Builder();
     }
 
-    public static class Builder {
+    public static final class Builder {
         private ShapeId service;
 
         private Builder() {}

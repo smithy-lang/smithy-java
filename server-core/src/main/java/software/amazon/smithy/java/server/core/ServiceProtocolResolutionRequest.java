@@ -9,5 +9,5 @@ import java.net.URI;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 
-public record ServiceProtocolResolutionRequest(URI uri, HttpHeaders headers, Context requestContext) {
+public record ServiceProtocolResolutionRequest(URI uri, HttpHeaders headers, Context requestContext, String method) {
 }

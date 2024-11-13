@@ -7,7 +7,7 @@ package software.amazon.smithy.java.aws.runtime.client.core.identity;
 
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
-import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityNotFoundException;
+import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResult;
 
 /**
  * {@link AwsCredentialsResolver} implementation that loads credentials from environment variables.
@@ -27,28 +27,21 @@ public final class EnvironmentVariableIdentityResolver implements AwsCredentials
     private static final String ACCESS_KEY_PROPERTY = "AWS_ACCESS_KEY_ID";
     private static final String SECRET_KEY_PROPERTY = "AWS_SECRET_ACCESS_KEY";
     private static final String SESSION_TOKEN_PROPERTY = "AWS_SESSION_TOKEN";
+    private static final String ERROR_MESSAGE = "Could not resolve an AWS identity using the AWS_ACCESS_KEY_ID and "
+        + "AWS_SECRET_ACCESS_KEY environment variables";
 
     @Override
-    public CompletableFuture<AwsCredentialsIdentity> resolveIdentity(AuthProperties requestProperties) {
+    public CompletableFuture<IdentityResult<AwsCredentialsIdentity>> resolveIdentity(AuthProperties requestProperties) {
         String accessKey = System.getenv(ACCESS_KEY_PROPERTY);
         String secretKey = System.getenv(SECRET_KEY_PROPERTY);
         String sessionToken = System.getenv(SESSION_TOKEN_PROPERTY);
 
         if (accessKey == null || secretKey == null) {
-            return CompletableFuture.failedFuture(
-                new IdentityNotFoundException(
-                    "Could not find access and secret key environment variables",
-                    EnvironmentVariableIdentityResolver.class,
-                    AwsCredentialsIdentity.class
-                )
-            );
+            return CompletableFuture.completedFuture(IdentityResult.ofError(getClass(), ERROR_MESSAGE));
         }
+
         return CompletableFuture.completedFuture(
-            AwsCredentialsIdentity.create(
-                accessKey,
-                secretKey,
-                sessionToken
-            )
+            IdentityResult.of(AwsCredentialsIdentity.create(accessKey, secretKey, sessionToken))
         );
     }
 }

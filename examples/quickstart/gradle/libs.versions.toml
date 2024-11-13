@@ -11,8 +11,7 @@ smithy-aws-traits = { module = "software.amazon.smithy:smithy-aws-traits", versi
 
 # Smithy java dependencies. NOTE: Must be published to local maven cache to work.
 ## Code generators
-smithy-client-codegen = { module = "software.amazon.smithy.java.codegen:client", version.ref = "smithy-java" }
-smithy-server-codegen = { module = "software.amazon.smithy.java.codegen:server", version.ref = "smithy-java" }
+smithy-codegen-plugins = { module = "software.amazon.smithy.java.codegen:plugins", version.ref = "smithy-java" }
 
 ## Server dependencies
 server-core = { module = "software.amazon.smithy.java:server-core", version.ref = "smithy-java" }

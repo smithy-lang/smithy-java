@@ -6,10 +6,12 @@
 package software.amazon.smithy.java.server.example;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.Socket;
 import java.net.URI;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -21,6 +23,7 @@ import software.amazon.smithy.java.client.example.model.CoffeeType;
 import software.amazon.smithy.java.client.example.model.CreateOrderInput;
 import software.amazon.smithy.java.client.example.model.GetMenuInput;
 import software.amazon.smithy.java.client.example.model.GetOrderInput;
+import software.amazon.smithy.java.client.example.model.OrderNotFound;
 import software.amazon.smithy.java.client.example.model.OrderStatus;
 import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
 
@@ -71,6 +74,16 @@ public class RoundTripTests {
         var getResponse2 = client.getOrder(getRequest);
         assertEquals(getResponse2.status(), OrderStatus.COMPLETED);
         System.out.println("Completed Order :" + getResponse2);
+    }
+
+    @Test
+    void errorsOutIfOrderDoesNotExist() throws InterruptedException {
+        CoffeeShopClient client = CoffeeShopClient.builder()
+            .endpointResolver(EndpointResolver.staticEndpoint(BasicServerExample.endpoint))
+            .build();
+
+        var getRequest = GetOrderInput.builder().id(UUID.randomUUID().toString()).build();
+        assertThrows(OrderNotFound.class, () -> client.getOrder(getRequest));
     }
 
     @AfterAll

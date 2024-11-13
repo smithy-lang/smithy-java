@@ -7,12 +7,13 @@ package software.amazon.smithy.java.server.exceptions;
 
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SchemaUtils;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-public class InternalServerError extends ModeledApiException {
+public final class InternalServerError extends ModeledApiException {
 
-    public static final ShapeId ID = ShapeId.from(
+    private static final ShapeId ID = ShapeId.from(
         "software.amazon.smithy.exceptions#InternalServerError"
     );
 
@@ -20,7 +21,7 @@ public class InternalServerError extends ModeledApiException {
     private static final Schema SCHEMA_MESSAGE = SCHEMA.member("message");
 
     public InternalServerError(String message) {
-        super(ID, message);
+        super(SCHEMA, message);
     }
 
     public InternalServerError(Throwable cause) {
@@ -28,7 +29,7 @@ public class InternalServerError extends ModeledApiException {
     }
 
     public InternalServerError(String message, Throwable cause) {
-        super(ID, message, cause);
+        super(SCHEMA, message, cause);
     }
 
     @Override
@@ -37,7 +38,7 @@ public class InternalServerError extends ModeledApiException {
     }
 
     @Override
-    public void serialize(ShapeSerializer encoder) {
-        encoder.writeStruct(SCHEMA, this);
+    public Object getMemberValue(Schema member) {
+        return SchemaUtils.validateMemberInSchema(SCHEMA, member, null);
     }
 }

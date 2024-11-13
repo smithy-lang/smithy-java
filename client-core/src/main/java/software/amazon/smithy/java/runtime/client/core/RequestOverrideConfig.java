@@ -12,6 +12,7 @@ import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.runtime.retries.api.RetryStrategy;
 
 /**
  * An immutable representation of configuration overrides when invoking {@link Client#call}.
@@ -31,8 +32,10 @@ public final class RequestOverrideConfig {
     private final List<IdentityResolver<?>> identityResolvers;
     private final Context context;
     private final List<ClientPlugin> plugins;
+    private final RetryStrategy retryStrategy;
+    private final String retryScope;
 
-    protected RequestOverrideConfig(OverrideBuilder<?> builder) {
+    private RequestOverrideConfig(OverrideBuilder<?> builder) {
         var configBuilder = builder.configBuilder();
         this.transport = configBuilder.transport();
         this.protocol = configBuilder.protocol();
@@ -43,6 +46,8 @@ public final class RequestOverrideConfig {
         this.identityResolvers = List.copyOf(configBuilder.identityResolvers());
         this.context = Context.unmodifiableCopy(configBuilder.context());
         this.plugins = List.copyOf(builder.plugins());
+        this.retryStrategy = configBuilder.retryStrategy();
+        this.retryScope = configBuilder.retryScope();
     }
 
     // Note: Making all the accessors package-private for now as they are only needed by Client, but could be public.
@@ -82,6 +87,14 @@ public final class RequestOverrideConfig {
         return plugins;
     }
 
+    RetryStrategy retryStrategy() {
+        return retryStrategy;
+    }
+
+    String retryScope() {
+        return retryScope;
+    }
+
     /**
      * Create a new builder to build {@link RequestOverrideConfig}.
      *
@@ -102,7 +115,9 @@ public final class RequestOverrideConfig {
             .protocol(protocol)
             .endpointResolver(endpointResolver)
             .authSchemeResolver(authSchemeResolver)
-            .identityResolvers(identityResolvers);
+            .identityResolvers(identityResolvers)
+            .retryStrategy(retryStrategy)
+            .retryScope(retryScope);
         interceptors.forEach(builder::addInterceptor);
         supportedAuthSchemes.forEach(builder::putSupportedAuthSchemes);
         return builder;

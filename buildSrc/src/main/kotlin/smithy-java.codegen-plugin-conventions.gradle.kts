@@ -3,13 +3,12 @@ import org.gradle.api.Project
 plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.integ-test-conventions")
-    id("smithy-java.publishing-conventions")
 }
 
 // Workaround per: https://github.com/gradle/gradle/issues/15383
 val Project.libs get() = the<org.gradle.accessors.dm.LibrariesForLibs>()
 
-group = "software.amazon.smithy.java.codegen"
+group = "software.amazon.smithy.java.codegen.plugins"
 
 dependencies {
     implementation(libs.smithy.codegen)
@@ -20,11 +19,6 @@ dependencies {
     if (project.name != "core") {
         implementation(project(":codegen:core"))
     }
-}
-
-// Do not run spotbugs on integration tests
-tasks.named("spotbugsIt") {
-    enabled = false
 }
 
 val generatedSrcDir = layout.buildDirectory.dir("generated-src").get()

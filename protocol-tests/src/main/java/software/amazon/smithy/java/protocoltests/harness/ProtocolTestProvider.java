@@ -6,6 +6,9 @@
 package software.amazon.smithy.java.protocoltests.harness;
 
 import java.lang.annotation.Annotation;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
@@ -17,6 +20,15 @@ import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
  * @param <T> Annotation used to trigger and configure the test template provider.
  */
 abstract class ProtocolTestProvider<T extends Annotation, D> implements TestTemplateInvocationContextProvider {
+    private static final Set<String> BINARY_MEDIA_TYPES = Set.of("application/cbor");
+
+    protected static boolean isBinaryMediaType(Optional<String> mediaType) {
+        return mediaType.isPresent() && isBinaryMediaType(mediaType.get());
+    }
+
+    protected static boolean isBinaryMediaType(String mediaType) {
+        return BINARY_MEDIA_TYPES.contains(mediaType.toLowerCase(Locale.ROOT));
+    }
 
     @Override
     public boolean supportsTestTemplate(ExtensionContext context) {

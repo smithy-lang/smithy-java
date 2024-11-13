@@ -11,8 +11,15 @@ import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Service;
-import software.amazon.smithy.java.server.core.*;
+import software.amazon.smithy.java.server.core.Job;
+import software.amazon.smithy.java.server.core.ProtocolResolver;
+import software.amazon.smithy.java.server.core.ServerProtocol;
+import software.amazon.smithy.java.server.core.ServerProtocolProvider;
+import software.amazon.smithy.java.server.core.ServiceProtocolResolutionRequest;
+import software.amazon.smithy.java.server.core.ServiceProtocolResolutionResult;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public class ProtocolTestProtocolProvider implements ServerProtocolProvider {
@@ -96,10 +103,14 @@ public class ProtocolTestProtocolProvider implements ServerProtocolProvider {
         }
 
         @Override
-        public CompletableFuture<Void> serializeOutput(Job job) {
+        public CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output, boolean isError) {
             var protocol = job.request().context().get(PROTOCOL_TO_TEST);
             if (protocol != null) {
-                return protocol.serializeOutput(job);
+                if (isError) {
+                    return protocol.serializeError(job, (ModeledApiException) output);
+                } else {
+                    return protocol.serializeOutput(job, output);
+                }
             }
             throw new IllegalStateException("Should not be invoked if no protocol was selected");
         }

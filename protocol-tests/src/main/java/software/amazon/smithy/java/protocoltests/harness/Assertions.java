@@ -56,12 +56,15 @@ final class Assertions {
             var headerValues = message.headers().allValues(headerEntry.getKey());
             assertNotNull(headerValues);
             var converted = convertHeaderToString(headerEntry.getKey(), headerValues);
-            assertEquals(headerEntry.getValue(), converted);
+            assertEquals(
+                headerEntry.getValue(),
+                converted,
+                "Mismatch for header \"%s\"".formatted(headerEntry.getKey())
+            );
         }
     }
 
     private static String convertHeaderToString(String key, List<String> values) {
-        // TODO: Is this needed for all protocol tests?
         if (!key.equalsIgnoreCase("x-stringlist")) {
             return String.join(", ", values);
         }

@@ -93,7 +93,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
                     clock.instant(),
                     identity.accessKeyId(),
                     identity.secretAccessKey(),
-                    identity.sessionToken().orElse(null),
+                    identity.sessionToken(),
                     !request.body().hasKnownLength()
                 );
                 return request.withHeaders(HttpHeaders.of(signedHeaders));

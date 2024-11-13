@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -17,6 +18,7 @@ import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
@@ -27,7 +29,13 @@ import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.IdempotencyTokenTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
+// TODO: for streaming schemas and idempotency token schemas, can we use the member index rather than member name?
+// this would require that the symbol provider could provide the index position, which requires a pre-sort of members.
+@SmithyInternalApi
 public class OperationGenerator
     implements Consumer<GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
@@ -49,6 +57,7 @@ public class OperationGenerator
                 var output = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getOutputShape()));
                 var eventStreamIndex = EventStreamIndex.of(directive.model());
                 writer.pushState(new ClassSection(shape));
+                writer.putContext("shape", symbol);
                 var template = """
                     public final class ${shape:T} implements ${operationType:C} {
                         ${id:C|}
@@ -58,6 +67,12 @@ public class OperationGenerator
                         ${typeRegistrySection:C|}
 
                         private static final ${list:T}<${shapeId:T}> SCHEMES = ${list:T}.of(${#schemes}${shapeId:T}.from(${key:S})${^key.last}, ${/key.last}${/schemes});
+
+                        private static final ${set:T}<${sdkSchema:T}> ERROR_SCHEMAS = ${set:T}.of(${#exceptions}${value:T}.$$SCHEMA${^key.last}, ${/key.last}${/exceptions});
+
+                        ${?idempotencyTokenMember}private static final ${sdkSchema:T} IDEMPOTENCY_TOKEN_MEMBER = ${inputType:T}.$$SCHEMA.member(${idempotencyTokenMember:S});${/idempotencyTokenMember}
+                        ${?inputStreamMember}private static final ${sdkSchema:T} INPUT_STREAM_MEMBER = ${inputType:T}.$$SCHEMA.member(${inputStreamMember:S});${/inputStreamMember}
+                        ${?outputStreamMember}private static final ${sdkSchema:T} OUTPUT_STREAM_MEMBER = ${outputType:T}.$$SCHEMA.member(${outputStreamMember:S});${/outputStreamMember}
 
                         @Override
                         public ${sdkShapeBuilder:N}<${inputType:T}> inputBuilder() {
@@ -93,20 +108,6 @@ public class OperationGenerator
                             return ${inputType:T}.$$SCHEMA;
                         }
 
-                        ${?hasInputEventStream}
-                        @Override
-                        public ${sdkSchema:T} inputEventSchema() {
-                            return ${inputEventType:T}.$$SCHEMA;
-                        }
-                        ${/hasInputEventStream}
-
-                        ${?hasOutputEventStream}
-                        @Override
-                        public ${sdkSchema:T} outputEventSchema() {
-                            return ${outputEventType:T}.$$SCHEMA;
-                        }
-                        ${/hasOutputEventStream}
-
                         @Override
                         public ${sdkSchema:N} outputSchema() {
                             return ${outputType:T}.$$SCHEMA;
@@ -121,9 +122,27 @@ public class OperationGenerator
                         public ${list:T}<${shapeId:T}> effectiveAuthSchemes() {
                             return SCHEMES;
                         }
-                    }
-                    """;
-                writer.putContext("shape", symbol);
+
+                        @Override
+                        public ${set:T}<${sdkSchema:T}> errorSchemas() {
+                            return ERROR_SCHEMAS;
+                        }
+
+                        @Override
+                        public ${sdkSchema:T} inputStreamMember() {
+                            return ${?inputStreamMember}INPUT_STREAM_MEMBER${/inputStreamMember}${^inputStreamMember}null${/inputStreamMember};
+                        }
+
+                        @Override
+                        public ${sdkSchema:T} outputStreamMember() {
+                            return ${?outputStreamMember}OUTPUT_STREAM_MEMBER${/outputStreamMember}${^outputStreamMember}null${/outputStreamMember};
+                        }
+
+                        @Override
+                        public ${sdkSchema:T} idempotencyTokenMember() {
+                            return ${?idempotencyTokenMember}IDEMPOTENCY_TOKEN_MEMBER${/idempotencyTokenMember}${^idempotencyTokenMember}null${/idempotencyTokenMember};
+                        }
+                    }""";
                 writer.putContext("inputType", input);
                 writer.putContext("outputType", output);
                 writer.putContext("id", new IdStringGenerator(writer, shape));
@@ -132,6 +151,8 @@ public class OperationGenerator
                 writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
                 writer.putContext("list", List.class);
                 writer.putContext("string", String.class);
+                writer.putContext("set", Set.class);
+                writer.putContext("modeledApiException", ModeledApiException.class);
 
                 writer.putContext(
                     "operationType",
@@ -175,22 +196,55 @@ public class OperationGenerator
                         ServiceIndex.AuthSchemeMode.NO_AUTH_AWARE
                     )
                 );
-                eventStreamIndex.getInputInfo(shape).ifPresent(info -> {
+
+                eventStreamIndex.getInputInfo(shape).ifPresentOrElse(info -> {
                     writer.putContext("supplier", Supplier.class);
                     writer.putContext("hasInputEventStream", true);
+                    writer.putContext("inputStreamMember", info.getEventStreamMember().getMemberName());
                     writer.putContext(
                         "inputEventType",
                         directive.symbolProvider().toSymbol(info.getEventStreamTarget())
                     );
+                }, () -> {
+                    for (var member : shape.members()) {
+                        if (directive.model().expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
+                            writer.putContext("inputStreamMember", member.getMemberName());
+                            break;
+                        }
+                    }
                 });
-                eventStreamIndex.getOutputInfo(shape).ifPresent(info -> {
+
+                eventStreamIndex.getOutputInfo(shape).ifPresentOrElse(info -> {
                     writer.putContext("supplier", Supplier.class);
                     writer.putContext("hasOutputEventStream", true);
+                    writer.putContext("outputStreamMember", info.getEventStreamMember().getMemberName());
                     writer.putContext(
                         "outputEventType",
                         directive.symbolProvider().toSymbol(info.getEventStreamTarget())
                     );
+                }, () -> {
+                    for (var member : shape.members()) {
+                        if (directive.model().expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
+                            writer.putContext("outputStreamMember", member.getMemberName());
+                            break;
+                        }
+                    }
                 });
+
+                // Add the idempotency token member.
+                for (var member : shape.members()) {
+                    if (member.hasTrait(IdempotencyTokenTrait.class)) {
+                        writer.putContext("idempotencyTokenMember", member.getMemberName());
+                        break;
+                    }
+                }
+
+                var exceptions = shape.getErrors()
+                    .stream()
+                    .map(directive.model()::expectShape)
+                    .map(directive.symbolProvider()::toSymbol)
+                    .toList();
+                writer.putContext("exceptions", exceptions);
                 writer.write(template);
                 writer.popState();
             });
@@ -229,9 +283,9 @@ public class OperationGenerator
             var outputShape = model.expectShape(shape.getOutputShape());
             var output = symbolProvider.toSymbol(outputShape);
 
-            var inputInfo = index.getInputInfo(shape);
-            var outputInfo = index.getOutputInfo(shape);
-            inputInfo.ifPresent(
+            var inputEventStreamInfo = index.getInputInfo(shape);
+            var outputEventStreamInfo = index.getOutputInfo(shape);
+            inputEventStreamInfo.ifPresent(
                 info -> writer.writeInline(
                     "$1T<$2T, $3T, $4T>",
                     InputEventStreamingApiOperation.class,
@@ -240,8 +294,8 @@ public class OperationGenerator
                     symbolProvider.toSymbol(info.getEventStreamTarget())
                 )
             );
-            outputInfo.ifPresent(info -> {
-                if (inputInfo.isPresent()) {
+            outputEventStreamInfo.ifPresent(info -> {
+                if (inputEventStreamInfo.isPresent()) {
                     writer.writeInline(", ");
                 }
                 writer.writeInline(
@@ -253,7 +307,7 @@ public class OperationGenerator
                 );
             });
 
-            if (inputInfo.isEmpty() && outputInfo.isEmpty()) {
+            if (inputEventStreamInfo.isEmpty() && outputEventStreamInfo.isEmpty()) {
                 writer.writeInline("$1T<$2T, $3T>", ApiOperation.class, input, output);
             }
         }

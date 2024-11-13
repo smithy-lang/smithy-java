@@ -30,8 +30,6 @@ public final class PojoWithValidatedCollection implements SerializableStruct {
         .putMember("value", ValidatedPojo.SCHEMA)
         .build();
     private static final Schema MAP_OF_VALIDATED_POJO_KEY = MAP_OF_VALIDATED_POJO.member("key");
-    // TODO: why is this unused.
-    private static final Schema MAP_OF_VALIDATED_POJO_VALUE = MAP_OF_VALIDATED_POJO.member("value");
     private static final Schema LIST_OF_VALIDATED_POJO = Schema
         .listBuilder(ShapeId.from("smithy.example#ListOfValidatedPojo"))
         .putMember("member", ValidatedPojo.SCHEMA)
@@ -70,14 +68,19 @@ public final class PojoWithValidatedCollection implements SerializableStruct {
     }
 
     @Override
-    public void serialize(ShapeSerializer encoder) {
-        encoder.writeStruct(SCHEMA, this);
+    public Schema schema() {
+        return SCHEMA;
     }
 
     @Override
     public void serializeMembers(ShapeSerializer st) {
         st.writeList(SCHEMA_LIST, list, list.size(), InnerListSerializer.INSTANCE);
         st.writeMap(SCHEMA_MAP, map, map.size(), InnerMapSerializer.INSTANCE);
+    }
+
+    @Override
+    public Object getMemberValue(Schema member) {
+        throw new UnsupportedOperationException("Member value not supported: " + member);
     }
 
     private static final class InnerListSerializer implements BiConsumer<List<ValidatedPojo>, ShapeSerializer> {

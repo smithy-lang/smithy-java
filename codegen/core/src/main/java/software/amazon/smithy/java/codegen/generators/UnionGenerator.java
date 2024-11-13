@@ -17,6 +17,7 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -58,9 +59,11 @@ public final class UnionGenerator
                     ${toString:C|}
 
                     @Override
-                    public void serialize(${shapeSerializer:N} serializer) {
-                        serializer.writeStruct($$SCHEMA, this);
+                    public ${schemaClass:N} schema() {
+                        return $$SCHEMA;
                     }
+
+                    ${getMemberValue:C|}
 
                     ${valueCasters:C|}
 
@@ -91,6 +94,7 @@ public final class UnionGenerator
             writer.putContext("type", CodegenUtils.getInnerTypeEnumSymbol(directive.symbol()));
             writer.putContext("serializableStruct", SerializableStruct.class);
             writer.putContext("shapeSerializer", ShapeSerializer.class);
+            writer.putContext("schemaClass", Schema.class);
             writer.putContext("object", Object.class);
             writer.putContext("objects", Objects.class);
             writer.putContext("document", Document.class);
@@ -107,6 +111,7 @@ public final class UnionGenerator
             );
             writer.putContext("memberEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext("toString", new ToStringGenerator(writer));
+            writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext(
                 "valueCasters",
                 new ValueCasterGenerator(writer, shape, directive.symbolProvider(), directive.model())

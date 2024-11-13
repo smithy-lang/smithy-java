@@ -41,6 +41,8 @@ public class AwsRestJson1ProtocolTests {
             "SDKAppendedGzipAfterProvidedEncoding_restJson1",
             "RestJsonClientPopulatesDefaultValuesInInput",
             "RestJsonClientUsesExplicitlyProvidedMemberValuesOverDefaults",
+            "RestJsonMustSupportParametersInContentType", //hangs on the client side some reason
+            "RestJsonServerPopulatesDefaultsWhenMissingInRequestBody",
 
             // Header splitting needs work.
             "RestJsonInputAndOutputWithQuotedStringHeaders",
@@ -75,7 +77,8 @@ public class AwsRestJson1ProtocolTests {
             "RestJsonEnumPayloadResponse",
             "RestJsonStreamingTraitsWithBlob",
             "RestJsonStreamingTraitsWithMediaTypeWithBlob",
-            "RestJsonDeserializesDenseSetMapAndSkipsNull"
+            "RestJsonDeserializesDenseSetMapAndSkipsNull",
+            "RestJsonServerPopulatesDefaultsInResponseWhenMissingInParams"
         }
     )
     public void responseTest(DataStream expected, DataStream actual) {

@@ -104,6 +104,8 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
 
                     ${serializer:C|}
 
+                    ${getMemberValue:C|}
+
                     ${toBuilder:C|}
 
                     ${builder:C|}
@@ -162,6 +164,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                     directive.service()
                 )
             );
+            writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext("toBuilder", new ToBuilderGenerator(writer, shape, directive.symbolProvider()));
             writer.write(template);
             writer.popState();
@@ -203,9 +206,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 () -> {
                     if (shape.hasTrait(ErrorTrait.class)) {
                         if (shape.getMember("message").isPresent()) {
-                            writer.write("super($$ID, builder.message);");
+                            writer.write("super($$SCHEMA, builder.message);");
                         } else {
-                            writer.write("super($$ID, null);");
+                            writer.write("super($$SCHEMA, null);");
                         }
                     }
 

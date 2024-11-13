@@ -5,10 +5,11 @@
 
 package software.amazon.smithy.java.aws.runtime.client.core.identity;
 
-import java.util.Optional;
+import java.time.Instant;
 
 record AwsCredentialsIdentityRecord(
-    String accessKeyId, String secretAccessKey,
-    Optional<String> sessionToken
-) implements AwsCredentialsIdentity {
-}
+    String accessKeyId,
+    String secretAccessKey,
+    String sessionToken,
+    Instant expirationTime
+) implements AwsCredentialsIdentity {}

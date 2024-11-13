@@ -146,15 +146,16 @@ final class AwsRestJson1Protocol extends ServerProtocol {
     }
 
     @Override
-    public CompletableFuture<Void> serializeOutput(Job job) {
+    public CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output, boolean isError) {
         HttpJob httpJob = (HttpJob) job; //We already check in the deserializeInput method.
-        //TODO add error serialization.
-        SerializableStruct output = job.response().getValue();
         ResponseSerializer serializer = httpBinding.responseSerializer()
             .operation(job.operation().getApiOperation())
             .payloadCodec(codec)
             .payloadMediaType("application/json")
             .shapeValue(output);
+        if (isError) {
+            serializer.errorSchema(output.schema());
+        }
         SmithyHttpResponse response = serializer.serializeResponse();
         httpJob.response().setSerializedValue(response.body());
         httpJob.response().setStatusCode(response.statusCode());

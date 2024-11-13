@@ -18,6 +18,9 @@ final class ClientInterceptorChain implements ClientInterceptor {
     private final List<ClientInterceptor> interceptors;
 
     public ClientInterceptorChain(List<ClientInterceptor> interceptors) {
+        if (interceptors.isEmpty()) {
+            throw new IllegalArgumentException("Interceptors cannot be empty");
+        }
         this.interceptors = interceptors;
     }
 

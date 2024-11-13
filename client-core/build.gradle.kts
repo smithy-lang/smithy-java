@@ -11,5 +11,9 @@ dependencies {
     api(project(":context"))
     api(project(":core"))
     api(project(":auth-api"))
+    api(project(":retries-api"))
     implementation(project(":logging"))
+
+    testImplementation(project(":dynamic-client"))
+    testImplementation(project(":aws:client-restjson"))
 }

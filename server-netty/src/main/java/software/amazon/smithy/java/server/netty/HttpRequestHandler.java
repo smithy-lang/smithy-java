@@ -48,7 +48,7 @@ final class HttpRequestHandler extends ChannelDuplexHandler {
 
             try {
                 var resolutionResult = resolver.resolve(
-                    new ServiceProtocolResolutionRequest(uri, requestHeaders, request.context())
+                    new ServiceProtocolResolutionRequest(uri, requestHeaders, request.context(), request.method())
                 );
                 var response = new HttpResponse(new NettyHttpHeaders());
                 this.job = new HttpJob(resolutionResult.operation(), resolutionResult.protocol(), request, response);
@@ -58,14 +58,24 @@ final class HttpRequestHandler extends ChannelDuplexHandler {
                 ctx.writeAndFlush(response);
                 channel.close();
                 reset(channel);
-                return;
             }
         } else if (msg instanceof HttpContent content) {
+            // if the job is null, we either failed to select a protocol or prepare the job. in either case,
+            // swallow the remaining request payload.
+            // TODO: set a max swallow size and just terminate the connection if there's too much to read
+            if (job == null) {
+                content.release();
+                return;
+            }
+
             boolean isLast = content instanceof LastHttpContent;
             content.content().readBytes(bodyAccumulator, content.content().readableBytes());
             content.release();
             if (isLast) {
-                job.request().setDataStream(DataStream.ofBytes(bodyAccumulator.toByteArray()));
+                job.request()
+                    .setDataStream(
+                        DataStream.ofBytes(bodyAccumulator.toByteArray(), job.request().headers().contentType())
+                    );
                 orchestrator.enqueue(job).whenCompleteAsync((r, t) -> writeResponse(channel, job), channel.eventLoop());
             }
 
@@ -87,6 +97,9 @@ final class HttpRequestHandler extends ChannelDuplexHandler {
             );
             response.headers().set(((NettyHttpHeaders) job.response().headers()).getNettyHeaders());
             response.headers().set("content-length", serializedValue.contentLength());
+            if (serializedValue.contentType() != null) {
+                response.headers().set("content-type", serializedValue.contentType());
+            }
         } catch (Throwable e) {
             response = new DefaultFullHttpResponse(
                 HttpVersion.HTTP_1_1,

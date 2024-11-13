@@ -8,6 +8,7 @@ package software.amazon.smithy.java.protocoltests.harness;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
 import java.util.*;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -33,6 +34,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.transform.ModelTransformer;
 import software.amazon.smithy.protocoltests.traits.HttpMalformedRequestTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpMalformedRequestTestsTrait;
+import software.amazon.smithy.protocoltests.traits.HttpMessageTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestsTrait;
 import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
@@ -91,14 +93,13 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
         Model serviceModel = applyServiceTransformations(service);
 
         // Discover all protocols and operations applicable for the service under test.
-        List<HttpTestOperation> testOperations = getTestOperations(serviceModel, service, filter);
+        List<HttpTestOperation> testOperations = getTestOperations(serviceModel, service, testType);
         Map<ShapeId, AuthScheme<?, ?>> authSchemes = getAuthSchemes(serviceModel, service);
         var protocols = getClientProtocols(serviceModel, service);
 
         switch (testType.appliesTo) {
             case CLIENT -> {
                 // instantiate a mock client for use by test runners
-                // TODO: allow customization of client builder
                 var mockClientBuilder = MockClient.builder();
 
                 // Discover all client auth scheme implementations that could be used for tests
@@ -284,9 +285,13 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
     private static List<HttpTestOperation> getTestOperations(
         Model serviceModel,
         ServiceShape service,
-        TestFilter filter
+        TestType testType
     ) {
         List<HttpTestOperation> result = new ArrayList<>();
+
+        Predicate<HttpMessageTestCase> testTypeFiler = tc -> tc.getAppliesTo()
+            .map(ap -> ap.equals(testType.appliesTo))
+            .orElse(true);
 
         var symbolProvider = new JavaSymbolProvider(serviceModel, service, service.toShapeId().getNamespace());
         for (var operationId : service.getOperations()) {
@@ -299,11 +304,11 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                 List<HttpMalformedRequestTestCase> malformedRequestTestCases = new ArrayList<>();
                 operation.getTrait(HttpRequestTestsTrait.class)
                     .map(HttpRequestTestsTrait::getTestCases)
-                    .map(l -> l.stream().filter(tc -> !filter.skipTestCase(tc)).toList())
+                    .map(l -> l.stream().filter(testTypeFiler).toList())
                     .ifPresent(requestTestsCases::addAll);
                 operation.getTrait(HttpResponseTestsTrait.class)
                     .map(HttpResponseTestsTrait::getTestCases)
-                    .map(l -> l.stream().filter(tc -> !filter.skipTestCase(tc)).toList())
+                    .map(l -> l.stream().filter(testTypeFiler).toList())
                     .ifPresent(responseTestsCases::addAll);
                 operation.getTrait(HttpMalformedRequestTestsTrait.class)
                     .map(HttpMalformedRequestTestsTrait::getTestCases)

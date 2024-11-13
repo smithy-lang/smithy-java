@@ -5,19 +5,20 @@ plugins {
 }
 
 dependencies {
-    smithyBuild(project(":codegen:client"))
-    smithyBuild(project(":codegen:server"))
+    smithyBuild(project(":codegen:plugins"))
 }
 
 // Add generated Java sources to the main sourceset
 afterEvaluate {
     val clientPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-client-codegen")
     val serverPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-server-codegen")
+    val typesPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-type-codedgen")
     sourceSets {
         main {
             java {
                 srcDir(clientPath)
                 srcDir(serverPath)
+                srcDir(typesPath)
             }
         }
     }
