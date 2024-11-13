@@ -125,20 +125,20 @@ abstract class BuilderGenerator implements Runnable {
     }
 
     protected void generateSetMemberValue(JavaWriter writer) {
+        // Don't override the default implementation that throws if there are no members.
+        if (shape.members().isEmpty() || (shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)) {
+            return;
+        }
+
         var template = """
             @Override
             public void setMemberValue(Schema member, Object value) {
-                ${?noMembersToSet}throw new UnsupportedOperationException("Unexpected member: " + member.id());
-                ${/noMembersToSet}${^noMembersToSet}switch (member.memberIndex()) {
+                switch (member.memberIndex()) {
                     ${memberSetters:C|}
                     default -> ${shapeBuilderClass:T}.super.setMemberValue(member, value);
-                }${/noMembersToSet}
+                }
             }""";
         writer.putContext("memberSetters", writer.consumer(this::generateMemberValueSetters));
-        writer.putContext(
-            "noMembersToSet",
-            shape.members().isEmpty() || (shape.getType() == ShapeType.ENUM || shape.getType() == ShapeType.INT_ENUM)
-        );
         writer.putContext("shapeBuilderClass", ShapeBuilder.class);
         writer.write(template);
     }
