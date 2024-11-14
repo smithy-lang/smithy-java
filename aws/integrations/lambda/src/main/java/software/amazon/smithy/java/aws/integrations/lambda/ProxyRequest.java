@@ -7,7 +7,16 @@ package software.amazon.smithy.java.aws.integrations.lambda;
 
 import java.util.List;
 import java.util.Map;
+import software.amazon.smithy.utils.SmithyUnstableApi;
 
+/**
+ * Represents a Lambda proxy integration request.
+ *
+ * @see <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format">API Gateway Lambda Proxy Integration</a>
+ * <br>
+ * Note: Not all fields are currently supported.
+ */
+@SmithyUnstableApi
 public final class ProxyRequest {
     private Map<String, String> pathParameters;
     private Map<String, String> stageVariables;
@@ -18,6 +27,7 @@ public final class ProxyRequest {
     private Map<String, List<String>> multiValueQueryStringParameters;
     private RequestContext requestContext;
     private String body;
+    private boolean isBase64Encoded;
 
     private ProxyRequest(Builder builder) {
         this.pathParameters = builder.pathParameters;
@@ -29,14 +39,7 @@ public final class ProxyRequest {
         this.multiValueQueryStringParameters = builder.multiValueQueryStringParameters;
         this.requestContext = builder.requestContext;
         this.body = builder.body;
-    }
-
-    private void setRequestContext(RequestContext requestContext) {
-        this.requestContext = requestContext;
-    }
-
-    private void setBody(String body) {
-        this.body = body;
+        this.isBase64Encoded = builder.isBase64Encoded;
     }
 
     public Map<String, String> getPathParameters() {
@@ -75,6 +78,10 @@ public final class ProxyRequest {
         return body;
     }
 
+    public boolean getIsBase64Encoded() {
+        return isBase64Encoded;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -89,6 +96,7 @@ public final class ProxyRequest {
         private Map<String, List<String>> multiValueQueryStringParameters;
         private RequestContext requestContext;
         private String body;
+        private boolean isBase64Encoded;
 
         public Builder pathParameters(Map<String, String> pathParameters) {
             this.pathParameters = pathParameters;
@@ -135,6 +143,11 @@ public final class ProxyRequest {
             return this;
         }
 
+        public Builder isBase64Encoded(boolean isBase64Encoded) {
+            this.isBase64Encoded = isBase64Encoded;
+            return this;
+        }
+
         public ProxyRequest build() {
             return new ProxyRequest(this);
         }
@@ -169,5 +182,17 @@ public final class ProxyRequest {
 
     private void setMultiValueQueryStringParameters(Map<String, List<String>> multiValueQueryStringParameters) {
         this.multiValueQueryStringParameters = multiValueQueryStringParameters;
+    }
+
+    private void setRequestContext(RequestContext requestContext) {
+        this.requestContext = requestContext;
+    }
+
+    private void setBody(String body) {
+        this.body = body;
+    }
+
+    private void setIsBase64Encoded(boolean isBase64Encoded) {
+        this.isBase64Encoded = isBase64Encoded;
     }
 }

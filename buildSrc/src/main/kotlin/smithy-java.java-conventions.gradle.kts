@@ -9,6 +9,7 @@ plugins {
     id("com.github.spotbugs")
     id("com.diffplug.spotless")
     id("com.autonomousapps.dependency-analysis")
+    id("smithy-java.utilities")
 }
 
 // Workaround per: https://github.com/gradle/gradle/issues/15383

@@ -49,6 +49,7 @@ include(":examples:dynamodb")
 include(":examples:server-example")
 include(":examples:event-streaming")
 include(":examples:end-to-end-example")
+include(":examples:lambda-endpoint")
 
 // AWS specific
 include(":aws:event-streams")

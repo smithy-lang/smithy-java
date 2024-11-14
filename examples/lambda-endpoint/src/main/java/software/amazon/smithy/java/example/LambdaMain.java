@@ -3,28 +3,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.aws.integrations.lambda;
+package software.amazon.smithy.java.example;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import software.amazon.smithy.java.aws.integrations.lambda.LambdaEndpoint;
+import software.amazon.smithy.java.aws.integrations.lambda.ProxyRequest;
+import software.amazon.smithy.java.aws.integrations.lambda.ProxyResponse;
+import software.amazon.smithy.java.example.model.*;
+import software.amazon.smithy.java.example.service.AddBeerOperation;
+import software.amazon.smithy.java.example.service.BeerService;
+import software.amazon.smithy.java.example.service.GetBeerOperation;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Service;
-import software.amazon.smithy.java.server.example.model.AddBeerInput;
-import software.amazon.smithy.java.server.example.model.AddBeerOutput;
-import software.amazon.smithy.java.server.example.model.Beer;
-import software.amazon.smithy.java.server.example.model.GetBeerInput;
-import software.amazon.smithy.java.server.example.model.GetBeerOutput;
-import software.amazon.smithy.java.server.example.service.AddBeerOperation;
-import software.amazon.smithy.java.server.example.service.BeerService;
-import software.amazon.smithy.java.server.example.service.GetBeerOperation;
 
 /*
  * This is a hypothetical implementation of a Smithy Lambda Handler that registers the LambdaEndpoint with an
- * implementation of the example beer service.
+ * implementation of the example beer service which uses RpcV2Cbor.
  */
 public final class LambdaMain implements RequestHandler<ProxyRequest, ProxyResponse> {
 

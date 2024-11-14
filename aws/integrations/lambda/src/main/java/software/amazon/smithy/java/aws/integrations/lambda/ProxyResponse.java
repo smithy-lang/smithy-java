@@ -5,9 +5,19 @@
 
 package software.amazon.smithy.java.aws.integrations.lambda;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import software.amazon.smithy.utils.SmithyUnstableApi;
 
+/**
+ * Represents a Lambda proxy integration response.
+ *
+ * @see <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-output-format">API Gateway Lambda Proxy Integration</a>
+ * <br>
+ * Note: Not all fields are currently supported.
+ */
+@SmithyUnstableApi
 public final class ProxyResponse {
     private final Integer statusCode;
     private final Map<String, String> headers;
@@ -17,8 +27,8 @@ public final class ProxyResponse {
 
     private ProxyResponse(Builder builder) {
         this.statusCode = builder.statusCode;
-        this.headers = builder.headers;
-        this.multiValueHeaders = builder.multiValueHeaders;
+        this.headers = Collections.unmodifiableMap(builder.headers);
+        this.multiValueHeaders = Collections.unmodifiableMap(builder.multiValueHeaders);
         this.body = builder.body;
         this.isBase64Encoded = builder.isBase64Encoded;
     }
@@ -49,8 +59,8 @@ public final class ProxyResponse {
 
     public static class Builder {
         private Integer statusCode;
-        private Map<String, String> headers;
-        private Map<String, List<String>> multiValueHeaders;
+        private Map<String, String> headers = Collections.emptyMap();
+        private Map<String, List<String>> multiValueHeaders = Collections.emptyMap();
         private String body;
         private Boolean isBase64Encoded;
 

@@ -10,8 +10,10 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
@@ -30,7 +32,17 @@ import software.amazon.smithy.java.server.core.ServiceMatcher;
 import software.amazon.smithy.java.server.core.ServiceProtocolResolutionRequest;
 import software.amazon.smithy.java.server.core.ServiceProtocolResolutionResult;
 import software.amazon.smithy.java.server.core.SingleThreadOrchestrator;
+import software.amazon.smithy.utils.SmithyUnstableApi;
 
+/**
+ * Represents a Smithy-based AWS Lambda request handler that is constructed using a service object.
+ * <br>
+ * The endpoint is responsible for processing a request object into the form which the service expects, and then
+ * processing the output from the service into a response object.
+ * <br>
+ * It should be constructed statically, and therefore re-used across lambda invocations.
+ */
+@SmithyUnstableApi
 public final class LambdaEndpoint {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(LambdaEndpoint.class);
@@ -39,9 +51,8 @@ public final class LambdaEndpoint {
     private final Orchestrator orchestrator;
     private final ProtocolResolver resolver;
 
-    // TODO: Add some kind of configuration object
-    public LambdaEndpoint(Service service) {
-        this.service = service;
+    private LambdaEndpoint(Builder builder) {
+        this.service = Objects.requireNonNull(builder.service);
         this.orchestrator = buildOrchestrator(service);
         this.resolver = buildProtocolResolver(service);
     }
@@ -56,7 +67,7 @@ public final class LambdaEndpoint {
             // TODO: Handle modeled errors (pending error serialization?)
             LOGGER.error("Job failed: ", e);
         }
-        ProxyResponse response = getResponse(job.response());
+        ProxyResponse response = getResponse(job.response(), proxyRequest.getIsBase64Encoded());
         return response;
     }
 
@@ -103,7 +114,16 @@ public final class LambdaEndpoint {
         }
         HttpRequest request = new HttpRequest(headers, uri, method);
         if (proxyRequest.getBody() != null) {
-            request.setDataStream(DataStream.ofString(proxyRequest.getBody()));
+            // TODO: handle content-type intelligently?
+            String contentType = headers.firstValue("content-type");
+            // TODO: handle base64 encoding
+            byte[] bytes;
+            if (proxyRequest.getIsBase64Encoded()) {
+                bytes = Base64.getDecoder().decode(proxyRequest.getBody());
+            } else {
+                bytes = proxyRequest.getBody().getBytes(StandardCharsets.UTF_8);
+            }
+            request.setDataStream(DataStream.ofBytes(bytes, contentType));
         }
         return request;
     }
@@ -117,7 +137,7 @@ public final class LambdaEndpoint {
         return job;
     }
 
-    private static ProxyResponse getResponse(HttpResponse httpResponse) {
+    private static ProxyResponse getResponse(HttpResponse httpResponse, boolean shouldBase64Encode) {
         // TODO: Add response headers
         ProxyResponse.Builder builder = ProxyResponse.builder()
             .multiValueHeaders(httpResponse.headers().map())
@@ -125,13 +145,38 @@ public final class LambdaEndpoint {
 
         DataStream val = httpResponse.getSerializedValue();
         if (val != null) {
-            // TODO: handle base64 encoding
             ByteBuffer buf = val.waitForByteBuffer();
-            String body = StandardCharsets.UTF_8.decode(buf).toString();
+            String body;
+            // TODO: handle base64 encoding better
+            if (shouldBase64Encode) {
+                builder.isBase64Encoded(true);
+                // TODO: don't use array(), or determine if we can just *not* use `String` for the body
+                body = Base64.getEncoder().encodeToString(buf.array());
+            } else {
+                body = StandardCharsets.UTF_8.decode(buf).toString();
+            }
             builder.body(body);
         }
 
         ProxyResponse response = builder.build();
         return response;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    // TODO: Add some kind of configuration object
+    public static class Builder {
+        private Service service;
+
+        public Builder service(Service service) {
+            this.service = service;
+            return this;
+        }
+
+        public LambdaEndpoint build() {
+            return new LambdaEndpoint(this);
+        }
     }
 }

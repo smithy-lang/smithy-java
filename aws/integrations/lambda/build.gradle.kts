@@ -16,7 +16,6 @@ dependencies {
     implementation(project(":logging"))
     implementation(project(":core"))
     implementation(project(":server-core"))
-    implementation(project(":server-aws-rest-json1"))
     implementation(project(":json-codec"))
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")

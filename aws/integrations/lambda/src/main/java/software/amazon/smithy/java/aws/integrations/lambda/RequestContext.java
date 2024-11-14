@@ -5,11 +5,21 @@
 
 package software.amazon.smithy.java.aws.integrations.lambda;
 
+import software.amazon.smithy.utils.SmithyUnstableApi;
+
+/**
+ * Represents a Lambda proxy integration request context.
+ *
+ * @see <a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format">API Gateway Lambda Proxy Integration > Request Context</a>
+ * <br>
+ * Note: Not all fields are currently supported.
+ */
+@SmithyUnstableApi
 public final class RequestContext {
 
     private String requestId;
 
-    public RequestContext(Builder builder) {
+    private RequestContext(Builder builder) {
         this.requestId = builder.requestId;
     }
 
