@@ -12,12 +12,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
 import software.amazon.smithy.java.runtime.client.core.Client;
+import software.amazon.smithy.java.runtime.client.core.ClientProtocolFactory;
+import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
 import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
@@ -39,6 +42,9 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * Smithy data model. The format of the document must match the Smithy model and not any particular protocol
  * serialization. For example, use structure and member names defined in Smithy models rather than any particular
  * protocol representation like jsonName.
+ *
+ * <p>If an explicit protocol and transport are not provided to the builder, the builder will attempt to find
+ * protocol and transport implementations on the classpath that match the protocol traits attached to the service.
  *
  * <p>This client has the following limitations:
  *
@@ -239,7 +245,27 @@ public final class DynamicClient extends Client {
             Objects.requireNonNull(model, "model is not set");
             Objects.requireNonNull(service, "service is not set");
             ServiceShape shape = model.expectShape(service, ServiceShape.class);
+
+            if (configBuilder().protocol() == null) {
+                autoDetectProtocol();
+            }
+
             return new DynamicClient(this, shape, model);
+        }
+
+        @SuppressWarnings("unchecked")
+        private void autoDetectProtocol() {
+            ServiceIndex serviceIndex = ServiceIndex.of(model);
+            var protocols = serviceIndex.getProtocols(service);
+            if (!protocols.isEmpty()) {
+                for (var protocolImpl : ServiceLoader.load(ClientProtocolFactory.class)) {
+                    if (protocols.containsKey(protocolImpl.id())) {
+                        var settings = ProtocolSettings.builder().service(service).build();
+                        protocol(protocolImpl.createProtocol(settings, protocols.get(protocolImpl.id())));
+                        break;
+                    }
+                }
+            }
         }
 
         /**

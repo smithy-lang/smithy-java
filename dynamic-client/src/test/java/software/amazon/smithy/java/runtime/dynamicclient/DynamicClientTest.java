@@ -45,6 +45,7 @@ public class DynamicClientTest {
                 $version: "2"
                 namespace smithy.example
 
+                @aws.protocols#awsJson1_0
                 service Sprockets {
                     operations: [CreateSprocket, GetSprocket]
                     errors: [ServiceFooError]
@@ -78,6 +79,7 @@ public class DynamicClientTest {
                     why: String
                 }
                 """)
+            .discoverModels()
             .assemble()
             .unwrap();
     }
@@ -237,5 +239,18 @@ public class DynamicClientTest {
                 );
             }
         };
+    }
+
+    @Test
+    public void detectsClientProtocol() {
+        var client = DynamicClient.builder()
+            .service(service)
+            .model(model)
+            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+            .transport(createErrorTransport("{}"))
+            .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
+            .build();
+
+        assertThat(client.config().protocol(), instanceOf(AwsJson1Protocol.class));
     }
 }
