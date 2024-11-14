@@ -18,6 +18,7 @@ import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SchemaUtils;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
@@ -63,13 +64,14 @@ public final class UnionGenerator
                         return $$SCHEMA;
                     }
 
-                    ${getMemberValue:C|}
+                    @Override
+                    public Object getMemberValue(${sdkSchema:N} member) {
+                        return ${schemaUtils:N}.validateMemberInSchema($$SCHEMA, member, getValue());
+                    }
 
-                    ${valueCasters:C|}
+                    public abstract <T> T getValue();
 
                     ${valueClasses:C|}
-
-                    protected abstract ${object:T} getValue();
 
                     @Override
                     public int hashCode() {
@@ -98,6 +100,8 @@ public final class UnionGenerator
             writer.putContext("object", Object.class);
             writer.putContext("objects", Objects.class);
             writer.putContext("document", Document.class);
+            writer.putContext("sdkSchema", Schema.class);
+            writer.putContext("schemaUtils", SchemaUtils.class);
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(
                 "schemas",
@@ -111,11 +115,6 @@ public final class UnionGenerator
             );
             writer.putContext("memberEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext("toString", new ToStringGenerator(writer));
-            writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
-            writer.putContext(
-                "valueCasters",
-                new ValueCasterGenerator(writer, shape, directive.symbolProvider(), directive.model())
-            );
             writer.putContext(
                 "valueClasses",
                 new ValueClassGenerator(
@@ -139,34 +138,6 @@ public final class UnionGenerator
             writer.write(template);
             writer.popState();
         });
-    }
-
-    private record ValueCasterGenerator(
-        JavaWriter writer, UnionShape shape, SymbolProvider symbolProvider, Model model
-    ) implements Runnable {
-
-        @Override
-        public void run() {
-            writer.pushState();
-            writer.putContext("unsupported", UnsupportedOperationException.class);
-            for (var member : shape.members()) {
-                writer.pushState();
-                writer.putContext("member", symbolProvider.toSymbol(member));
-                writer.putContext("memberName", symbolProvider.toMemberName(member));
-                writer.write("""
-                    public ${member:T} ${memberName:L}() {
-                        throw new ${unsupported:T}("Member ${memberName:L} not supported for union of type: " + type);
-                    }
-                    """);
-                writer.popState();
-            }
-            writer.write("""
-                public String $$unknownMember() {
-                    throw new ${unsupported:T}("Union of type: " + type + " is not unknown.");
-                }
-                """);
-            writer.popState();
-        }
     }
 
     private record ValueClassGenerator(
@@ -195,18 +166,19 @@ public final class UnionGenerator
                             ${serializeMember:C};
                         }${^unit}
 
-                        @Override
                         public ${member:N} ${memberName:L}() {
                             return value;
                         }${/unit}
 
                         @Override
-                        protected ${object:T} getValue() {
-                            return ${^unit}value${/unit}${?unit}true${/unit};
+                        @SuppressWarnings("unchecked")
+                        public <T> T getValue() {
+                            return (T)${?hasBoxed}(${member:B})${/hasBoxed} ${^unit}value${/unit}${?unit}null${/unit};
                         }
                     }
                     """;
                 var memberSymbol = symbolProvider.toSymbol(member);
+                writer.putContext("hasBoxed", memberSymbol.getProperty(SymbolProperties.BOXED_TYPE).isPresent());
                 writer.putContext("member", memberSymbol);
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
                 writer.putContext(
@@ -239,8 +211,7 @@ public final class UnionGenerator
                         this.memberName = memberName;
                     }
 
-                    @Override
-                    public ${string:T} $$unknownMember() {
+                    public ${string:T} memberName() {
                         return memberName;
                     }
 
@@ -253,8 +224,9 @@ public final class UnionGenerator
                     public void serializeMembers(${shapeSerializer:T} serializer) {}
 
                     @Override
-                    protected ${object:T} getValue() {
-                        return memberName;
+                    @SuppressWarnings("unchecked")
+                    public <T> T getValue() {
+                        return (T) memberName;
                     }
                 }
                 """;

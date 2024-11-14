@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.codegen.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.util.List;
 import java.util.Map;
@@ -120,6 +120,6 @@ public class RecursionTests {
         var output = builder.build();
         assertEquals(recursive.hashCode(), output.hashCode());
         assertEquals(recursive, output);
-        assertThrows(UnsupportedOperationException.class, output::$unknownMember);
+        assertNotEquals(AttributeValue.Type.$UNKNOWN, output.type());
     }
 }

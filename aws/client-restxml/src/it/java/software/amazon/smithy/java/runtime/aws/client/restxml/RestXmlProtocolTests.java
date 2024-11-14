@@ -83,7 +83,7 @@ public class RestXmlProtocolTests {
             "RestXmlEnumPayloadResponse",
             "RestXmlStringPayloadResponse",
             "RestXmlHttpPayloadWithUnion",
-            "BodyWithXmlName", 
+            "BodyWithXmlName",
             "NestedXmlMapWithXmlNameDeserializes"
         }
     )

@@ -66,7 +66,6 @@ public class UnionTest {
         var output = builder.build();
         assertEquals(pojo.hashCode(), output.hashCode());
         assertEquals(pojo, output);
-        assertThrows(UnsupportedOperationException.class, output::$unknownMember);
     }
 
     record UnknownDocument() implements Document {
@@ -106,7 +105,8 @@ public class UnionTest {
         document.deserializeInto(builder);
         var output = builder.build();
 
-        assertEquals("UNKNOWN!!!", output.$unknownMember());
+        assertEquals(UnionType.Type.$UNKNOWN, output.type());
+        assertEquals("UNKNOWN!!!", output.getValue());
     }
 
     @Test

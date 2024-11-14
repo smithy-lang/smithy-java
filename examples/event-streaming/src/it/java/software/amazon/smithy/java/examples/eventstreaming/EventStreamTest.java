@@ -58,7 +58,7 @@ public class EventStreamTest {
                 long value;
                 switch (item.type()) {
                     case fizz:
-                        value = item.fizz().value();
+                        value = item.getValue();
                         System.out.println("received fizz: " + value);
                         assertEquals(0, value % 3);
                         if (value % 5 == 0) {
@@ -66,7 +66,7 @@ public class EventStreamTest {
                         }
                         break;
                     case buzz:
-                        value = item.buzz().value();
+                        value = item.getValue();
                         System.out.println("received buzz: " + value);
                         assertEquals(0, value % 5);
                         if (value % 3 == 0) {
