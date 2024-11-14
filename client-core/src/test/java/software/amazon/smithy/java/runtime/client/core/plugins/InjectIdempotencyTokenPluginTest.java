@@ -9,6 +9,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
 import java.util.List;
@@ -136,5 +137,13 @@ public class InjectIdempotencyTokenPluginTest {
         var token = callAndGetToken("CreateSprocket", Document.createFromObject(Map.of("id", "1", "token", "xyz")));
 
         assertThat(token, equalTo("xyz"));
+    }
+
+    @Test
+    public void ignoresEmptyStringToken() {
+        var token = callAndGetToken("CreateSprocket", Document.createFromObject(Map.of("id", "1", "token", "")));
+
+        assertThat(token, notNullValue());
+        assertThat(token, not(equalTo("")));
     }
 }

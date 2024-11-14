@@ -35,6 +35,12 @@ public final class InjectIdempotencyTokenPlugin implements ClientPlugin {
 
             if (tokenMember != null) {
                 var value = hook.input().getMemberValue(tokenMember);
+
+                // Treat an empty string, possibly from error correction, as not present and set a default.
+                if (value instanceof String s && s.isEmpty()) {
+                    value = null;
+                }
+
                 if (value == null) {
                     var builder = operation.inputBuilder();
                     SchemaUtils.copyShape(hook.input(), builder);

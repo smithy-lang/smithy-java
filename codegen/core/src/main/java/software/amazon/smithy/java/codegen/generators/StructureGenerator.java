@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
@@ -64,6 +65,7 @@ import software.amazon.smithy.model.shapes.StringShape;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
+import software.amazon.smithy.model.traits.ClientOptionalTrait;
 import software.amazon.smithy.model.traits.DefaultTrait;
 import software.amazon.smithy.model.traits.ErrorTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
@@ -510,6 +512,32 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             super(writer, shape, symbolProvider, model, service);
         }
 
+        // Required shapes marked with clientOptional should not be required to create the type. For these shapes,
+        // tell the tracker they're always set. Validation can detect later that they're provided.
+        @Override
+        protected void generateConstructor(JavaWriter writer) {
+            List<MemberShape> requiredClientOptional = new ArrayList<>();
+            for (var member : shape.members()) {
+                if (CodegenUtils.isRequiredWithNoDefault(member) && member.hasTrait(ClientOptionalTrait.class)) {
+                    requiredClientOptional.add(member);
+                }
+            }
+            if (requiredClientOptional.isEmpty()) {
+                // Make the default empty constructor.
+                super.generateConstructor(writer);
+            } else {
+                // Make the constructor set the tracker members.
+                writer.openBlock("private Builder() {", "}", () -> {
+                    writer.write("// Tell the tracker to assume clientOptional members are present.");
+                    for (var member : requiredClientOptional) {
+                        var memberName = symbolProvider.toMemberName(member);
+                        var schemaName = CodegenUtils.toMemberSchemaName(memberName);
+                        writer.write("tracker.setMember($L);", schemaName);
+                    }
+                });
+            }
+        }
+
         @Override
         protected void generateErrorCorrection(JavaWriter writer) {
             if (shape.members().stream().noneMatch(CodegenUtils::isRequiredWithNoDefault)) {
@@ -684,7 +712,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 }
             }
 
-            // Add presence tracker
+            // Add presence tracker if any members are required by validation.
             if (shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault)) {
                 writer.putContext("tracker", PresenceTracker.class);
                 writer.write("private final ${tracker:T} tracker = ${tracker:T}.of($$SCHEMA);");

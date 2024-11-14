@@ -62,7 +62,7 @@ abstract class BuilderGenerator implements Runnable {
             public static final class Builder implements ${sdkShapeBuilder:T}<${shape:T}>${?isStaged}, ${#stages}${value:L}${^key.last}, ${/key.last}${/stages}${/isStaged} {
                 ${builderProperties:C|}
 
-                private Builder() {}
+                ${builderConstructor:C|}
 
                 @Override
                 public ${schema:T} schema() {
@@ -82,6 +82,7 @@ abstract class BuilderGenerator implements Runnable {
         writer.putContext("schema", Schema.class);
         writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
         writer.putContext("builderProperties", writer.consumer(this::generateProperties));
+        writer.putContext("builderConstructor", writer.consumer(this::generateConstructor));
         writer.putContext("builderSetters", writer.consumer(this::generateSetters));
         writer.putContext("buildMethod", writer.consumer(this::generateBuild));
         writer.putContext("errorCorrection", writer.consumer(this::generateErrorCorrection));
@@ -111,6 +112,10 @@ abstract class BuilderGenerator implements Runnable {
     }
 
     protected abstract void generateProperties(JavaWriter writer);
+
+    protected void generateConstructor(JavaWriter writer) {
+        writer.write("private Builder() {}");
+    }
 
     protected abstract void generateSetters(JavaWriter writer);
 

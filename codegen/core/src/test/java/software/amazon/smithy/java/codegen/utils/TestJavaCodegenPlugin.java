@@ -11,7 +11,7 @@ import software.amazon.smithy.codegen.core.directed.CodegenDirector;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
-import software.amazon.smithy.java.codegen.transforms.RemoveDeprecatedShapesTransformer;
+import software.amazon.smithy.java.codegen.transforms.DefaultTransforms;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 
 public class TestJavaCodegenPlugin implements SmithyBuildPlugin {
@@ -29,8 +29,9 @@ public class TestJavaCodegenPlugin implements SmithyBuildPlugin {
         runner.directedCodegen(new TestJavaCodegen());
         runner.fileManifest(context.getFileManifest());
         runner.service(settings.service());
-        // Filter out any deprecated shapes
-        var model = RemoveDeprecatedShapesTransformer.transform(context.getModel(), settings);
+
+        var model = DefaultTransforms.transform(context.getModel(), settings);
+
         runner.model(model);
         runner.integrationClass(JavaCodegenIntegration.class);
         runner.performDefaultCodegenTransforms();
