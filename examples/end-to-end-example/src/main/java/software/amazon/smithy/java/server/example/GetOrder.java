@@ -6,11 +6,11 @@
 package software.amazon.smithy.java.server.example;
 
 import java.util.UUID;
+import software.amazon.smithy.java.example.model.GetOrderInput;
+import software.amazon.smithy.java.example.model.GetOrderOutput;
+import software.amazon.smithy.java.example.model.OrderNotFound;
+import software.amazon.smithy.java.example.service.GetOrderOperation;
 import software.amazon.smithy.java.server.RequestContext;
-import software.amazon.smithy.java.server.example.model.GetOrderInput;
-import software.amazon.smithy.java.server.example.model.GetOrderOutput;
-import software.amazon.smithy.java.server.example.model.OrderNotFound;
-import software.amazon.smithy.java.server.example.service.GetOrderOperation;
 
 final class GetOrder implements GetOrderOperation {
     @Override

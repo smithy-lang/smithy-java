@@ -18,13 +18,13 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.client.example.client.CoffeeShopClient;
-import software.amazon.smithy.java.client.example.model.CoffeeType;
-import software.amazon.smithy.java.client.example.model.CreateOrderInput;
-import software.amazon.smithy.java.client.example.model.GetMenuInput;
-import software.amazon.smithy.java.client.example.model.GetOrderInput;
-import software.amazon.smithy.java.client.example.model.OrderNotFound;
-import software.amazon.smithy.java.client.example.model.OrderStatus;
+import software.amazon.smithy.java.example.client.CoffeeShopClient;
+import software.amazon.smithy.java.example.model.CoffeeType;
+import software.amazon.smithy.java.example.model.CreateOrderInput;
+import software.amazon.smithy.java.example.model.GetMenuInput;
+import software.amazon.smithy.java.example.model.GetOrderInput;
+import software.amazon.smithy.java.example.model.OrderNotFound;
+import software.amazon.smithy.java.example.model.OrderStatus;
 import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
 
 public class RoundTripTests {
