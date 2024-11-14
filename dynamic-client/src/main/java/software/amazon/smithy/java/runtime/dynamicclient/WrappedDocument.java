@@ -68,7 +68,15 @@ record WrappedDocument(ShapeId service, Schema schema, Document delegate) implem
 
     @Override
     public Object getMemberValue(Schema member) {
-        return SchemaUtils.validateMemberInSchema(schema, member, getMember(member.memberName()));
+        // Make sure it's part of the schema.
+        var value = SchemaUtils.validateMemberInSchema(schema, member, getMember(member.memberName()));
+        // If it's a document, unwrap it.
+        // This should work for most use cases of DynamicClient, but this won't perfectly interoperate with all
+        // use-cases or be a stand-in when an actual type is expected.
+        if (value instanceof Document d) {
+            value = d.asObject();
+        }
+        return value;
     }
 
     @Override
@@ -201,7 +209,8 @@ record WrappedDocument(ShapeId service, Schema schema, Document delegate) implem
         if (member == null) {
             return delegate.getMember(memberName);
         } else {
-            return new WrappedDocument(service, member, delegate.getMember(memberName));
+            var delegatedValue = delegate.getMember(memberName);
+            return delegatedValue == null ? null : new WrappedDocument(service, member, delegate.getMember(memberName));
         }
     }
 

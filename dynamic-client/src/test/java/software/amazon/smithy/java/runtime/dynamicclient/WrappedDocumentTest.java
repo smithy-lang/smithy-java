@@ -12,6 +12,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -48,6 +49,29 @@ public class WrappedDocumentTest {
         assertThat(sd.type(), is(ShapeType.STRUCTURE));
         assertThat(sd.discriminator().toString(), equalTo("foo#Bar"));
         assertThat(sd.size(), equalTo(2));
+    }
+
+    @Test
+    public void unwrapsValuesWhenGettingMemberValue() {
+        var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
+            .putMember("foo", PreludeSchemas.STRING)
+            .build();
+        var document = Document.createFromObject(Map.of("__type", "foo#Bar", "foo", "bar"));
+        var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
+
+        assertThat(sd.getMemberValue(schema.member("foo")), equalTo("bar"));
+    }
+
+    @Test
+    public void returnsNullWhenMemberDoesNotExist() {
+        var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
+            .putMember("foo", PreludeSchemas.STRING)
+            .build();
+        var document = Document.createFromObject(Map.of());
+        var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
+
+        assertThat(sd.getMemberValue(schema.member("foo")), nullValue());
+        assertThat(sd.getMember("foo"), nullValue());
     }
 
     @Test
