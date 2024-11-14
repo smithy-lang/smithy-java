@@ -26,13 +26,10 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<WrappedDocument>
     SchemaGuidedDocumentBuilder(ShapeId service, Schema target) {
         this.service = service;
         this.target = target;
-
-        if (target.type() == ShapeType.STRUCTURE || target.type() == ShapeType.UNION || target
-            .type() == ShapeType.MAP) {
-            map = new HashMap<>();
-        } else {
-            map = null;
-        }
+        this.map = switch (target.type()) {
+            case STRUCTURE, UNION, MAP -> new HashMap<>();
+            default -> null;
+        };
     }
 
     @Override

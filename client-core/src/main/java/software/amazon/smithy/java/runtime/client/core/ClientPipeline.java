@@ -34,6 +34,7 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.OutputHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ResponseHook;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.retries.api.AcquireInitialTokenRequest;
 import software.amazon.smithy.java.runtime.retries.api.RecordSuccessRequest;
@@ -196,7 +197,7 @@ final class ClientPipeline<RequestT, ResponseT> {
                 call.interceptor.readAfterSigning(updatedHook);
                 req = call.interceptor.modifyBeforeTransmit(updatedHook);
                 // Track the used idempotency token, if any.
-                setIdempotencyTokenContext(call, call.input);
+                setIdemTokenValue(call.operation, call.context, call.input);
                 call.interceptor.readBeforeTransmit(updatedHook.withRequest(req));
                 return req;
             })
@@ -207,13 +208,12 @@ final class ClientPipeline<RequestT, ResponseT> {
             );
     }
 
-    // TODO: set a default token if it's missing.
-    private static void setIdempotencyTokenContext(ClientCall<?, ?> call, SerializableStruct input) {
-        var tokenMember = call.operation.idempotencyTokenMember();
+    private static void setIdemTokenValue(ApiOperation<?, ?> operation, Context context, SerializableStruct input) {
+        var tokenMember = operation.idempotencyTokenMember();
         if (tokenMember != null) {
             var value = input.getMemberValue(tokenMember);
             if (value != null) {
-                call.context.put(CallContext.IDEMPOTENCY_TOKEN, (String) value);
+                context.put(CallContext.IDEMPOTENCY_TOKEN, value.toString());
             }
         }
     }
