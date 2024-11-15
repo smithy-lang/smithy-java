@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
-import software.amazon.smithy.java.aws.integrations.lambda.ServiceProvider;
+import software.amazon.smithy.java.aws.integrations.lambda.SmithyServiceProvider;
 import software.amazon.smithy.java.example.model.AddBeerInput;
 import software.amazon.smithy.java.example.model.AddBeerOutput;
 import software.amazon.smithy.java.example.model.Beer;
@@ -24,11 +24,11 @@ import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Service;
 
 /*
- * This is a hypothetical implementation of an ServiceProvider for the Beer Service.
+ * This is a hypothetical implementation of an SmithyServiceProvider for the Beer Service.
  * It provides the Lambda endpoint with the service implementation, and is registered when the endpoint is created.
  */
-@AutoService(ServiceProvider.class)
-public final class BeerServiceProvider implements ServiceProvider {
+@AutoService(SmithyServiceProvider.class)
+public final class BeerServiceProvider implements SmithyServiceProvider {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(BeerServiceProvider.class);
     private static final Service SERVICE;

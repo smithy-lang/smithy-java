@@ -7,7 +7,6 @@ package software.amazon.smithy.java.aws.integrations.lambda;
 
 import java.util.List;
 import java.util.Map;
-import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
  * Represents a Lambda proxy integration request.

@@ -12,6 +12,6 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  * The interface for registering a service implementation with the Lambda endpoint.
  */
 @SmithyUnstableApi
-public interface ServiceProvider {
+public interface SmithyServiceProvider {
     Service get();
 }

@@ -47,34 +47,32 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 public final class LambdaEndpoint implements RequestHandler<ProxyRequest, ProxyResponse> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(LambdaEndpoint.class);
-    private static final ServiceLoader<ServiceProvider> loader = ServiceLoader.load(
-        ServiceProvider.class
-    );
+    private static final ServiceLoader<SmithyServiceProvider> LOADER;
+    private static final List<Service> SERVICES;
+    private static final Orchestrator ORCHESTRATOR;
+    private static final ProtocolResolver RESOLVER;
 
-    private final Orchestrator orchestrator;
-    private final ProtocolResolver resolver;
-
-    // TODO: Add some kind of configuration object
-    LambdaEndpoint(List<Service> services) {
-        if (services.isEmpty()) {
-            throw new IllegalArgumentException("At least one service must be provided.");
+    static {
+        LOADER = ServiceLoader.load(SmithyServiceProvider.class);
+        SERVICES = LOADER.stream().map(s -> s.get().get()).toList();
+        if (SERVICES.isEmpty()) {
+            throw new IllegalStateException("At least one service must be provided.");
         }
-        this.orchestrator = buildOrchestrator(services);
-        this.resolver = buildProtocolResolver(services);
+        // TODO: Actual multi-service handling (?)
+        ORCHESTRATOR = buildOrchestrator(SERVICES);
+        RESOLVER = buildProtocolResolver(SERVICES);
+        // TODO: Add some kind of configuration object
     }
 
-    public LambdaEndpoint() {
-        // TODO: Actual multi-service handling (?)
-        this(loader.stream().map(s -> s.get().get()).toList());
-    }
+    public LambdaEndpoint() {}
 
     @Override
     public ProxyResponse handleRequest(ProxyRequest proxyRequest, Context context) {
         // TODO: Improve error handling
         HttpRequest request = getRequest(proxyRequest);
-        HttpJob job = getJob(request, resolver);
+        HttpJob job = getJob(request, RESOLVER);
         try {
-            orchestrator.enqueue(job).get();
+            ORCHESTRATOR.enqueue(job).get();
         } catch (InterruptedException | ExecutionException e) {
             // TODO: Handle modeled errors (pending error serialization?)
             LOGGER.error("Job failed: ", e);
