@@ -3,6 +3,8 @@ plugins {
 }
 
 dependencies {
+    annotationProcessor("com.google.auto.service:auto-service:1.1.1")
+    compileOnly("com.google.auto.service:auto-service:1.1.1")
     implementation(libs.smithy.protocol.traits)
     implementation(libs.smithy.aws.traits)
     implementation(project(":aws:integrations:lambda"))

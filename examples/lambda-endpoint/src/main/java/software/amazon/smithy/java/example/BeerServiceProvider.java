@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.example;
 
+import com.google.auto.service.AutoService;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
@@ -26,6 +27,7 @@ import software.amazon.smithy.java.server.Service;
  * This is a hypothetical implementation of an ServiceProvider for the Beer Service.
  * It provides the Lambda endpoint with the service implementation, and is registered when the endpoint is created.
  */
+@AutoService(ServiceProvider.class)
 public final class BeerServiceProvider implements ServiceProvider {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(BeerServiceProvider.class);

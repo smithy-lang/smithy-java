@@ -63,7 +63,7 @@ public final class LambdaEndpoint implements RequestHandler<ProxyRequest, ProxyR
         this.resolver = buildProtocolResolver(services);
     }
 
-    LambdaEndpoint() {
+    public LambdaEndpoint() {
         // TODO: Actual multi-service handling (?)
         this(loader.stream().map(s -> s.get().get()).toList());
     }
