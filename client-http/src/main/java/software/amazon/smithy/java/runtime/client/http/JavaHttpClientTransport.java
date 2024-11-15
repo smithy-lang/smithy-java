@@ -50,9 +50,9 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
             char c = currentValues.charAt(i);
             // Check if "host" starts at the current position.
             if ((c == 'h' || c == 'H') && i + 3 < length
-                    && (currentValues.charAt(i + 1) == 'o')
-                    && (currentValues.charAt(i + 2) == 's')
-                    && (currentValues.charAt(i + 3) == 't')) {
+                && (currentValues.charAt(i + 1) == 'o')
+                && (currentValues.charAt(i + 2) == 's')
+                && (currentValues.charAt(i + 3) == 't')) {
                 // Ensure "t" is at the end or followed by a comma.
                 if (i + 4 == length || currentValues.charAt(i + 4) == ',') {
                     return true;

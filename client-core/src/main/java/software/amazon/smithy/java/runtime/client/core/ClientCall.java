@@ -50,7 +50,7 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
     final RetryStrategy retryStrategy;
     final String retryScope;
     RetryToken retryToken;
-    int retryCount = 0;
+    int attemptCount = 1;
 
     private ClientCall(Builder<I, O> builder) {
         input = Objects.requireNonNull(builder.input, "input is null");

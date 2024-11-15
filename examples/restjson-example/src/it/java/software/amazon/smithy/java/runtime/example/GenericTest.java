@@ -132,7 +132,7 @@ public class GenericTest {
 
             @Override
             public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
-                return hook.mapRequest(SmithyHttpRequest.class, request -> request.withAddedHeaders("X-Foo", "Bar"));
+                return hook.mapRequest(SmithyHttpRequest.class, h -> h.request().withAddedHeaders("X-Foo", "Bar"));
             }
         };
 

@@ -16,7 +16,7 @@ publishing {
     repositories {
         maven {
             name = "stagingRepository"
-            url = uri("${rootProject.buildDir}/staging")
+            url = uri("${rootProject.layout.buildDirectory}/staging")
         }
     }
     // Add license spec to all maven publications

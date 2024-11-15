@@ -29,7 +29,7 @@ public class OutputHookTest {
         var context = Context.create();
         var hook = new OutputHook<>(TestStructs.OPERATION, context, foo, null, null, foo);
 
-        assertThat(hook.mapOutput(TestStructs.Bar.class, bar -> bar), sameInstance(foo));
+        assertThat(hook.mapOutput(TestStructs.Bar.class, OutputHook::output), sameInstance(foo));
         assertThat(hook.mapOutput(TestStructs.Foo.class, f -> new TestStructs.Foo()), not(sameInstance(foo)));
     }
 }

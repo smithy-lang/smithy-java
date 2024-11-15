@@ -60,9 +60,9 @@ public sealed class ResponseHook<I extends SerializableStruct, O extends Seriali
      * @param <R> Expected response class.
      */
     @SuppressWarnings("unchecked")
-    public <R> ResponseT mapResponse(Class<R> predicateType, Function<R, R> mapper) {
+    public <R> ResponseT mapResponse(Class<R> predicateType, Function<ResponseHook<?, ?, ?, R>, R> mapper) {
         if (response.getClass() == predicateType) {
-            return (ResponseT) mapper.apply((R) response);
+            return (ResponseT) mapper.apply((ResponseHook<?, ?, ?, R>) this);
         } else {
             return response;
         }
@@ -79,9 +79,13 @@ public sealed class ResponseHook<I extends SerializableStruct, O extends Seriali
      * @param <T> State value class.
      */
     @SuppressWarnings("unchecked")
-    public <R, T> ResponseT mapResponse(Class<R> predicateType, T state, BiFunction<R, T, R> mapper) {
+    public <R, T> ResponseT mapResponse(
+        Class<R> predicateType,
+        T state,
+        BiFunction<ResponseHook<?, ?, ?, R>, T, R> mapper
+    ) {
         if (response.getClass() == predicateType) {
-            return (ResponseT) mapper.apply((R) response, state);
+            return (ResponseT) mapper.apply((ResponseHook<?, ?, ?, R>) this, state);
         } else {
             return response;
         }

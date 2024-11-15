@@ -33,7 +33,7 @@ public class ResponseHookTest {
         var response = new MyResponse();
         var hook = new ResponseHook<>(TestStructs.OPERATION, context, foo, request, response);
 
-        assertThat(hook.mapResponse(TestStructs.Bar.class, bar -> bar), sameInstance(response));
+        assertThat(hook.mapResponse(TestStructs.Bar.class, ResponseHook::response), sameInstance(response));
         assertThat(hook.mapResponse(MyResponse.class, f -> new MyResponse()), not(sameInstance(response)));
     }
 

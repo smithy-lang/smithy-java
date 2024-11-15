@@ -110,6 +110,9 @@ final class ClientPipeline<RequestT, ResponseT> {
     <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> send(ClientCall<I, O> call) {
         var input = call.input;
 
+        // Always start the attempt count at 1.
+        call.context.put(CallContext.RETRY_ATTEMPT, call.attemptCount);
+
         // 2. Interceptors: Invoke ReadBeforeExecution.
         var inputHook = new InputHook<>(call.operation, call.context, input);
         call.interceptor.readBeforeExecution(inputHook);
@@ -411,7 +414,7 @@ final class ClientPipeline<RequestT, ResponseT> {
         // Associate the retry token with the call.
         call.retryToken = retryToken;
         // Adjust the current retry count on the context (e.g., protocols can use this to add retry headers).
-        call.context.put(CallContext.RETRY_ATTEMPT, ++call.retryCount);
+        call.context.put(CallContext.RETRY_ATTEMPT, ++call.attemptCount);
 
         var requestHook = new RequestHook<>(call.operation, call.context, call.input, request);
 

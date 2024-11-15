@@ -75,9 +75,9 @@ public sealed class InputHook<I extends SerializableStruct, O extends Serializab
      * @param <R> Class to map over.
      */
     @SuppressWarnings("unchecked")
-    public <R extends SerializableStruct> I mapInput(Class<R> predicateType, Function<R, R> mapper) {
+    public <R extends SerializableStruct> I mapInput(Class<R> predicateType, Function<InputHook<R, ?>, R> mapper) {
         if (input.getClass().isAssignableFrom(predicateType)) {
-            return (I) mapper.apply((R) input);
+            return (I) mapper.apply((InputHook<R, ?>) this);
         } else {
             return input;
         }
@@ -93,9 +93,13 @@ public sealed class InputHook<I extends SerializableStruct, O extends Serializab
      * @param <R> Class to map over.
      */
     @SuppressWarnings("unchecked")
-    public <R extends SerializableStruct, T> I mapInput(Class<R> predicateType, T state, BiFunction<R, T, R> mapper) {
+    public <R extends SerializableStruct, T> I mapInput(
+        Class<R> predicateType,
+        T state,
+        BiFunction<InputHook<R, ?>, T, R> mapper
+    ) {
         if (input.getClass() == predicateType) {
-            return (I) mapper.apply((R) input, state);
+            return (I) mapper.apply((InputHook<R, ?>) this, state);
         } else {
             return input;
         }

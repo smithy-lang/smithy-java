@@ -31,7 +31,7 @@ public class RequestHookTest {
         var request = new MyRequest();
         var hook = new RequestHook<>(TestStructs.OPERATION, context, foo, request);
 
-        assertThat(hook.mapRequest(TestStructs.Bar.class, bar -> bar), sameInstance(request));
+        assertThat(hook.mapRequest(TestStructs.Bar.class, RequestHook::request), sameInstance(request));
         assertThat(hook.mapRequest(MyRequest.class, f -> new MyRequest()), not(sameInstance(request)));
     }
 

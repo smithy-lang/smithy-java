@@ -80,9 +80,12 @@ public final class OutputHook<I extends SerializableStruct, O extends Serializab
      * @param <R> Class to map over.
      */
     @SuppressWarnings("unchecked")
-    public <R> O mapOutput(Class<R> predicateType, Function<R, R> mapper) {
+    public <R extends SerializableStruct> O mapOutput(
+        Class<R> predicateType,
+        Function<OutputHook<?, R, ?, ?>, R> mapper
+    ) {
         if (output.getClass() == predicateType) {
-            return (O) mapper.apply((R) output);
+            return (O) mapper.apply((OutputHook<?, R, ?, ?>) this);
         } else {
             return output;
         }
@@ -98,9 +101,13 @@ public final class OutputHook<I extends SerializableStruct, O extends Serializab
      * @param <R> Class to map over.
      */
     @SuppressWarnings("unchecked")
-    public <R, T> O mapOutput(Class<R> predicateType, T state, BiFunction<R, T, R> mapper) {
+    public <R extends SerializableStruct, T> O mapOutput(
+        Class<R> predicateType,
+        T state,
+        BiFunction<OutputHook<?, R, ?, ?>, T, R> mapper
+    ) {
         if (output.getClass() == predicateType) {
-            return (O) mapper.apply((R) output, state);
+            return (O) mapper.apply((OutputHook<?, R, ?, ?>) this, state);
         } else {
             return output;
         }
