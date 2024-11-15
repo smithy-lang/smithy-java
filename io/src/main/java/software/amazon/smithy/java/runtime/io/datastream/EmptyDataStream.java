@@ -28,7 +28,7 @@ final class EmptyDataStream implements DataStream {
     }
 
     @Override
-    public boolean hasByteBuffer() {
+    public boolean hasBytes() {
         return true;
     }
 

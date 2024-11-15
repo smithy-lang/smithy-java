@@ -17,6 +17,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
+import software.amazon.smithy.java.runtime.io.Slice;
 
 /**
  * Abstraction for reading streams of data.
@@ -50,7 +51,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     /**
      * Converts the data stream to an in-memory ByteBuffer, blocking if necessary.
      *
-     * <p>A value is returned immediately and no blocking occurs if {@link #hasByteBuffer()} returns true.
+     * <p>A value is returned immediately and no blocking occurs if {@link #hasBytes()} returns true.
      *
      * @return a ByteBuffer.
      * @throws RuntimeException if an error occurs while blocking.
@@ -64,12 +65,28 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
     }
 
     /**
+     * Converts the data stream to an in-memory Slice, blocking if necessary.
+     *
+     * <p>A value is returned immediately and no blocking occurs if {@link #hasBytes()} returns true.
+     *
+     * @return a Slice.
+     * @throws RuntimeException if an error occurs while blocking.
+     */
+    default Slice waitForSlice() {
+        try {
+            return asSlice().get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
      * Checks if the DataStream has a readily available ByteBuffer that can be returned from
-     * {@link #waitForByteBuffer()} without blocking.
+     * {@link #waitForByteBuffer()} and {@link #waitForSlice()} without blocking.
      *
      * @return true if there is a readily available ByteBuffer.
      */
-    default boolean hasByteBuffer() {
+    default boolean hasBytes() {
         return false;
     }
 
@@ -94,14 +111,33 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the future that contains the read ByteBuffer.
      */
     default CompletableFuture<ByteBuffer> asByteBuffer() {
-        if (hasByteBuffer()) {
+        if (hasBytes()) {
             return CompletableFuture.completedFuture(waitForByteBuffer());
+        } else {
+            var subscriber = HttpResponse.BodySubscribers.ofByteArray();
+            var delegate = new HttpBodySubscriberAdapter<>(subscriber);
+            subscribe(delegate);
+            return subscriber.getBody().thenApply(ByteBuffer::wrap).toCompletableFuture();
         }
+    }
 
-        var subscriber = HttpResponse.BodySubscribers.ofByteArray();
-        var delegate = new HttpBodySubscriberAdapter<>(subscriber);
-        subscribe(delegate);
-        return subscriber.getBody().thenApply(ByteBuffer::wrap).toCompletableFuture();
+    /**
+     * Read the contents of the stream into a ByteBuffer.
+     *
+     * <p>Note: This will load the entire stream into memory. If {@link #hasKnownLength()} is true,
+     * {@link #contentLength()} can be used to know if it is safe.
+     *
+     * @return the future that contains the read Slice.
+     */
+    default CompletableFuture<Slice> asSlice() {
+        if (hasBytes()) {
+            return CompletableFuture.completedFuture(waitForSlice());
+        } else {
+            var subscriber = HttpResponse.BodySubscribers.ofByteArray();
+            var delegate = new HttpBodySubscriberAdapter<>(subscriber);
+            subscribe(delegate);
+            return subscriber.getBody().thenApply(Slice::new).toCompletableFuture();
+        }
     }
 
     /**
@@ -249,6 +285,27 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      */
     static DataStream ofByteBuffer(ByteBuffer buffer, String contentType) {
         return new ByteBufferDataStream(buffer, contentType);
+    }
+
+    /**
+     * Create a DataStream from a Slice.
+     *
+     * @param slice Slice to read.
+     * @return the created DataStream.
+     */
+    static DataStream ofSlice(Slice slice) {
+        return ofSlice(slice, null);
+    }
+
+    /**
+     * Create a DataStream from a Slice.
+     *
+     * @param slice Slice to read.
+     * @param contentType Content-Type of the data.
+     * @return the created DataStream.
+     */
+    static DataStream ofSlice(Slice slice, String contentType) {
+        return new SliceDataStream(slice, contentType);
     }
 
     /**

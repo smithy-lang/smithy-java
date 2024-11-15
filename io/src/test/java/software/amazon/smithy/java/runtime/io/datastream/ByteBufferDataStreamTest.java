@@ -19,7 +19,7 @@ public class ByteBufferDataStreamTest {
         var bytes = "foo".getBytes(StandardCharsets.UTF_8);
         var ds = DataStream.ofBytes(bytes);
 
-        assertThat(ds.hasByteBuffer(), is(true));
+        assertThat(ds.hasBytes(), is(true));
         assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("foo".getBytes(StandardCharsets.UTF_8))));
         assertThat(ds.isReplayable(), is(true));
     }

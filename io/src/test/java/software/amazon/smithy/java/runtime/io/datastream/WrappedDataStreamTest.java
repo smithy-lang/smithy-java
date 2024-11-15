@@ -20,7 +20,7 @@ public class WrappedDataStreamTest {
         var ds = DataStream.ofBytes(bytes);
         var wrapped = DataStream.ofPublisher(ds, "text/plain", 3);
 
-        assertThat(wrapped.hasByteBuffer(), is(true));
+        assertThat(wrapped.hasBytes(), is(true));
         assertThat(wrapped.waitForByteBuffer(), equalTo(ByteBuffer.wrap("foo".getBytes(StandardCharsets.UTF_8))));
     }
 }

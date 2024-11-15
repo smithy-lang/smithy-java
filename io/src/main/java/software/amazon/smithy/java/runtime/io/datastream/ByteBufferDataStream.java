@@ -29,7 +29,7 @@ final class ByteBufferDataStream implements DataStream {
     }
 
     @Override
-    public boolean hasByteBuffer() {
+    public boolean hasBytes() {
         return true;
     }
 

@@ -50,8 +50,8 @@ final class WrappedDataStream implements DataStream {
     }
 
     @Override
-    public boolean hasByteBuffer() {
-        return delegate.hasByteBuffer();
+    public boolean hasBytes() {
+        return delegate.hasBytes();
     }
 
     @Override
