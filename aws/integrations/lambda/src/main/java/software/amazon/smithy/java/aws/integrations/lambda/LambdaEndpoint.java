@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.aws.integrations.lambda;
 
 import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.ByteBuffer;
@@ -13,7 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.ServiceLoader;
 import java.util.concurrent.ExecutionException;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
@@ -40,23 +41,34 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  * The endpoint is responsible for processing a request object into the form which the service expects, and then
  * processing the output from the service into a response object.
  * <br>
- * It should be constructed statically, and therefore re-used across lambda invocations.
+ * It should not be constructed directly, except by the Lambda runtime and/or for testing purposes.
  */
 @SmithyUnstableApi
-public final class LambdaEndpoint {
+public final class LambdaEndpoint implements RequestHandler<ProxyRequest, ProxyResponse> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(LambdaEndpoint.class);
+    private static final ServiceLoader<ServiceProvider> loader = ServiceLoader.load(
+        ServiceProvider.class
+    );
 
-    private final Service service;
     private final Orchestrator orchestrator;
     private final ProtocolResolver resolver;
 
-    private LambdaEndpoint(Builder builder) {
-        this.service = Objects.requireNonNull(builder.service);
-        this.orchestrator = buildOrchestrator(service);
-        this.resolver = buildProtocolResolver(service);
+    // TODO: Add some kind of configuration object
+    LambdaEndpoint(List<Service> services) {
+        if (services.isEmpty()) {
+            throw new IllegalArgumentException("At least one service must be provided.");
+        }
+        this.orchestrator = buildOrchestrator(services);
+        this.resolver = buildProtocolResolver(services);
     }
 
+    LambdaEndpoint() {
+        // TODO: Actual multi-service handling (?)
+        this(loader.stream().map(s -> s.get().get()).toList());
+    }
+
+    @Override
     public ProxyResponse handleRequest(ProxyRequest proxyRequest, Context context) {
         // TODO: Improve error handling
         HttpRequest request = getRequest(proxyRequest);
@@ -71,13 +83,13 @@ public final class LambdaEndpoint {
         return response;
     }
 
-    private static Orchestrator buildOrchestrator(Service service) {
-        List<Handler> handlers = new HandlerAssembler().assembleHandlers(List.of(service));
+    private static Orchestrator buildOrchestrator(List<Service> services) {
+        List<Handler> handlers = new HandlerAssembler().assembleHandlers(services);
         return new SingleThreadOrchestrator(handlers);
     }
 
-    private static ProtocolResolver buildProtocolResolver(Service service) {
-        Route route = Route.builder().pathPrefix("/").services(List.of(service)).build();
+    private static ProtocolResolver buildProtocolResolver(List<Service> services) {
+        Route route = Route.builder().pathPrefix("/").services(services).build();
         return new ProtocolResolver(new ServiceMatcher(List.of(route)));
     }
 
@@ -160,23 +172,5 @@ public final class LambdaEndpoint {
 
         ProxyResponse response = builder.build();
         return response;
-    }
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    // TODO: Add some kind of configuration object
-    public static class Builder {
-        private Service service;
-
-        public Builder service(Service service) {
-            this.service = service;
-            return this;
-        }
-
-        public LambdaEndpoint build() {
-            return new LambdaEndpoint(this);
-        }
     }
 }

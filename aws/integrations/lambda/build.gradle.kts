@@ -16,8 +16,7 @@ dependencies {
     implementation(project(":logging"))
     implementation(project(":core"))
     implementation(project(":server-core"))
-    implementation(project(":json-codec"))
-    testImplementation(platform("org.junit:junit-bom:5.10.0"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testImplementation(project(":examples:server-example"))
+
+    testImplementation(project(":rpcv2-cbor-codec"))
+    testImplementation(project(":examples:lambda-endpoint"))
 }

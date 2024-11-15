@@ -16,8 +16,7 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  * <br>
  * Note: Not all fields are currently supported.
  */
-@SmithyUnstableApi
-public final class ProxyRequest {
+final class ProxyRequest {
     private Map<String, String> pathParameters;
     private Map<String, String> stageVariables;
     private String resource;

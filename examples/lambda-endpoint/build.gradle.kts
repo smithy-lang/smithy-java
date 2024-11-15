@@ -3,16 +3,13 @@ plugins {
 }
 
 dependencies {
-    implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
-
     implementation(libs.smithy.protocol.traits)
+    implementation(libs.smithy.aws.traits)
     implementation(project(":aws:integrations:lambda"))
-    implementation(project(":core"))
     implementation(project(":logging"))
-    implementation(project(":server"))
+    implementation(project(":core"))
+    implementation(project(":server-aws-rest-json1"))
     implementation(project(":server-rpcv2-cbor"))
-    implementation(project(":server-core"))
-    testImplementation(project(":rpcv2-cbor-codec"))
 }
 
 tasks {

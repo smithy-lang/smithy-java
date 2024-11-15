@@ -14,8 +14,7 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  * <br>
  * Note: Not all fields are currently supported.
  */
-@SmithyUnstableApi
-public final class RequestContext {
+final class RequestContext {
 
     private String requestId;
 

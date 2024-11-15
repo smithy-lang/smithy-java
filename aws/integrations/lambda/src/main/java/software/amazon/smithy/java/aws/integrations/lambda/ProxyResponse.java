@@ -17,8 +17,7 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  * <br>
  * Note: Not all fields are currently supported.
  */
-@SmithyUnstableApi
-public final class ProxyResponse {
+final class ProxyResponse {
     private final Integer statusCode;
     private final Map<String, String> headers;
     private final Map<String, List<String>> multiValueHeaders;
