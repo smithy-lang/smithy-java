@@ -5,14 +5,62 @@
 
 package software.amazon.smithy.java.runtime.client.core.interceptors;
 
+import java.util.List;
+import java.util.Set;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 public final class TestStructs {
 
     private TestStructs() {}
+
+    static final ApiOperation<Foo, Foo> OPERATION = new ApiOperation<>() {
+        @Override
+        public ShapeBuilder<Foo> inputBuilder() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ShapeBuilder<Foo> outputBuilder() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Schema schema() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Schema inputSchema() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Schema outputSchema() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Set<Schema> errorSchemas() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public TypeRegistry typeRegistry() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<ShapeId> effectiveAuthSchemes() {
+            return List.of();
+        }
+    };
 
     static final class Foo implements SerializableStruct {
         @Override

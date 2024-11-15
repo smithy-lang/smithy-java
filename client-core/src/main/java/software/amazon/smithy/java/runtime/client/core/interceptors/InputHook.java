@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
@@ -16,14 +17,25 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
  *
  * @param <I> Input shape.
  */
-public sealed class InputHook<I extends SerializableStruct> permits RequestHook {
+public sealed class InputHook<I extends SerializableStruct, O extends SerializableStruct> permits RequestHook {
 
     private final Context context;
     private final I input;
+    private final ApiOperation<I, O> operation;
 
-    public InputHook(Context context, I input) {
+    public InputHook(ApiOperation<I, O> operation, Context context, I input) {
+        this.operation = Objects.requireNonNull(operation);
         this.context = Objects.requireNonNull(context);
         this.input = Objects.requireNonNull(input);
+    }
+
+    /**
+     * Get the API operation being called.
+     *
+     * @return the operation being called.
+     */
+    public ApiOperation<I, O> operation() {
+        return operation;
     }
 
     /**
@@ -50,8 +62,8 @@ public sealed class InputHook<I extends SerializableStruct> permits RequestHook 
      * @param input Input to use.
      * @return the hook.
      */
-    public InputHook<I> withInput(I input) {
-        return this.input.equals(input) ? this : new InputHook<>(context, input);
+    public InputHook<I, O> withInput(I input) {
+        return this.input.equals(input) ? this : new InputHook<>(operation, context, input);
     }
 
     /**

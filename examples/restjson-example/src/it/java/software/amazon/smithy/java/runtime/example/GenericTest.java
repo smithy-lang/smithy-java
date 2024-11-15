@@ -126,12 +126,12 @@ public class GenericTest {
     public void supportsInterceptors() throws Exception {
         var interceptor = new ClientInterceptor() {
             @Override
-            public void readBeforeTransmit(RequestHook<?, ?> hook) {
+            public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
                 System.out.println("Sending request: " + hook.input());
             }
 
             @Override
-            public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, RequestT> hook) {
+            public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
                 return hook.mapRequest(SmithyHttpRequest.class, request -> request.withAddedHeaders("X-Foo", "Bar"));
             }
         };

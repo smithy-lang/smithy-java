@@ -7,21 +7,29 @@ package software.amazon.smithy.java.runtime.dynamicclient;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SchemaUtils;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 final class SchemaGuidedDocumentBuilder implements ShapeBuilder<WrappedDocument> {
 
     private final ShapeId service;
     private final Schema target;
     private Document result;
+    private final Map<String, Document> map;
 
     SchemaGuidedDocumentBuilder(ShapeId service, Schema target) {
         this.service = service;
         this.target = target;
+        this.map = switch (target.type()) {
+            case STRUCTURE, UNION, MAP -> new HashMap<>();
+            default -> null;
+        };
     }
 
     @Override
@@ -31,18 +39,45 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<WrappedDocument>
 
     @Override
     public WrappedDocument build() {
-        return new WrappedDocument(service, target, result);
+        if (map != null) {
+            if (map.isEmpty() && target.type() == ShapeType.UNION) {
+                throw new IllegalArgumentException("No value set for union document: " + schema().id());
+            }
+            return new WrappedDocument(service, target, Document.createStringMap(map));
+        } else if (result != null) {
+            return new WrappedDocument(service, target, result);
+        } else {
+            throw new IllegalArgumentException("No value was set on document builder for " + schema().id());
+        }
+    }
+
+    @Override
+    public void setMemberValue(Schema member, Object value) {
+        if (map != null) {
+            SchemaUtils.validateMemberInSchema(target, member, value);
+            map.put(member.memberName(), Document.createFromObject(value));
+        } else {
+            ShapeBuilder.super.setMemberValue(member, value);
+        }
     }
 
     @Override
     public ShapeBuilder<WrappedDocument> deserialize(ShapeDeserializer decoder) {
-        result = deserialize(decoder, target);
+        if (map != null) {
+            map.putAll(deserialize(decoder, target).asStringMap());
+        } else {
+            result = deserialize(decoder, target);
+        }
         return this;
     }
 
     @Override
     public ShapeBuilder<WrappedDocument> deserializeMember(ShapeDeserializer decoder, Schema schema) {
-        result = deserialize(decoder, schema.assertMemberTargetIs(target));
+        if (map != null) {
+            map.putAll(deserialize(decoder, schema.assertMemberTargetIs(target)).asStringMap());
+        } else {
+            result = deserialize(decoder, schema.assertMemberTargetIs(target));
+        }
         return this;
     }
 

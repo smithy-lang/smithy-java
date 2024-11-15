@@ -1,3 +1,4 @@
+idempotencytoken/idempotency-token.smithy
 enums/enum-tests.smithy
 enums/non-sequential.smithy
 enums/unsafe-value-name.smithy

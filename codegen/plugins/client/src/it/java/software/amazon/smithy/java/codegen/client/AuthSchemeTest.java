@@ -41,7 +41,7 @@ public class AuthSchemeTest {
     void defaultAuthSchemesAdded() {
         var interceptor = new ClientInterceptor() {
             @Override
-            public void readBeforeTransmit(RequestHook<?, ?> hook) {
+            public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
                 var request = (SmithyHttpRequest) hook.request();
                 var signatureValue = request.headers().firstValue(TestAuthScheme.SIGNATURE_HEADER);
                 assertEquals("smithy-test-signature", signatureValue);

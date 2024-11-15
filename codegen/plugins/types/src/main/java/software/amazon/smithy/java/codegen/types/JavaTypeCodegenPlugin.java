@@ -15,7 +15,7 @@ import software.amazon.smithy.codegen.core.directed.CodegenDirector;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
-import software.amazon.smithy.java.codegen.transforms.RemoveDeprecatedShapesTransformer;
+import software.amazon.smithy.java.codegen.transforms.DefaultTransforms;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.Model;
@@ -49,8 +49,8 @@ public final class JavaTypeCodegenPlugin implements SmithyBuildPlugin {
         runner.service(codegenSettings.service());
         runner.changeStringEnumsToEnumShapes(true);
 
-        // Filter out any deprecated shapes
-        var model = RemoveDeprecatedShapesTransformer.transform(context.getModel(), codegenSettings);
+        var model = DefaultTransforms.transform(context.getModel(), codegenSettings);
+
         // Add the synthetic service to the model
         var closure = getClosure(model, settings);
         LOGGER.info("Found {} shapes in generation closure", closure.size());

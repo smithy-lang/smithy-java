@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
@@ -19,13 +20,20 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
  * @param <ResponseT> Protocol specific response.
  * @param <O> Output shape.
  */
-public final class OutputHook<I extends SerializableStruct, RequestT, ResponseT, O extends SerializableStruct> extends
-    ResponseHook<I, RequestT, ResponseT> {
+public final class OutputHook<I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> extends
+    ResponseHook<I, O, RequestT, ResponseT> {
 
     private final O output;
 
-    public OutputHook(Context context, I input, RequestT request, ResponseT response, O output) {
-        super(context, input, request, response);
+    public OutputHook(
+        ApiOperation<I, O> operation,
+        Context context,
+        I input,
+        RequestT request,
+        ResponseT response,
+        O output
+    ) {
+        super(operation, context, input, request, response);
         this.output = output;
     }
 
@@ -44,10 +52,10 @@ public final class OutputHook<I extends SerializableStruct, RequestT, ResponseT,
      * @param output Output to use.
      * @return the hook.
      */
-    public OutputHook<I, RequestT, ResponseT, O> withOutput(O output) {
+    public OutputHook<I, O, RequestT, ResponseT> withOutput(O output) {
         return Objects.equals(output, this.output)
             ? this
-            : new OutputHook<>(context(), input(), request(), response(), output);
+            : new OutputHook<>(operation(), context(), input(), request(), response(), output);
     }
 
     /**

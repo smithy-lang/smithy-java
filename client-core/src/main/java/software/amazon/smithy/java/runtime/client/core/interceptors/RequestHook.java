@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 /**
@@ -17,12 +18,13 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
  * @param <I> Input shape.
  * @param <RequestT> Protocol specific request.
  */
-public sealed class RequestHook<I extends SerializableStruct, RequestT> extends InputHook<I> permits ResponseHook {
+public sealed class RequestHook<I extends SerializableStruct, O extends SerializableStruct, RequestT> extends
+    InputHook<I, O> permits ResponseHook {
 
     private final RequestT request;
 
-    public RequestHook(Context context, I input, RequestT request) {
-        super(context, input);
+    public RequestHook(ApiOperation<I, O> operation, Context context, I input, RequestT request) {
+        super(operation, context, input);
         this.request = request;
     }
 
@@ -41,8 +43,10 @@ public sealed class RequestHook<I extends SerializableStruct, RequestT> extends 
      * @param request Request to use.
      * @return the hook.
      */
-    public RequestHook<I, RequestT> withRequest(RequestT request) {
-        return Objects.equals(request, this.request) ? this : new RequestHook<>(context(), input(), request);
+    public RequestHook<I, O, RequestT> withRequest(RequestT request) {
+        return Objects.equals(request, this.request)
+            ? this
+            : new RequestHook<>(operation(), context(), input(), request);
     }
 
     /**

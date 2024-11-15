@@ -120,6 +120,7 @@ sealed interface Sink permits Sink.OutputStreamSink, Sink.ResizingSink, Sink.Nul
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void writeAscii(String s) {
             int len = s.length();
             ensureCapacity(len);
@@ -130,7 +131,7 @@ sealed interface Sink permits Sink.OutputStreamSink, Sink.ResizingSink, Sink.Nul
         private void copyNonArrayBB(ByteBuffer b) {
             int rem = b.remaining();
             ensureCapacity(rem);
-            b.duplicate().get(bytes);
+            b.duplicate().get(bytes, pos, rem);
             pos += rem;
         }
 

@@ -25,7 +25,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public void readBeforeExecution(InputHook<?> hook) {
+    public void readBeforeExecution(InputHook<?, ?> hook) {
         applyToEachThrowLastError(ClientInterceptor::readBeforeExecution, hook);
     }
 
@@ -49,7 +49,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public <I extends SerializableStruct> I modifyBeforeSerialization(InputHook<I> hook) {
+    public <I extends SerializableStruct> I modifyBeforeSerialization(InputHook<I, ?> hook) {
         var input = hook.input();
         for (var interceptor : interceptors) {
             input = interceptor.modifyBeforeSerialization(hook.withInput(input));
@@ -58,27 +58,27 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public void readBeforeSerialization(InputHook<?> hook) {
+    public void readBeforeSerialization(InputHook<?, ?> hook) {
         for (var interceptor : interceptors) {
             interceptor.readBeforeSerialization(hook);
         }
     }
 
     @Override
-    public void readAfterSerialization(RequestHook<?, ?> hook) {
+    public void readAfterSerialization(RequestHook<?, ?, ?> hook) {
         for (var interceptor : interceptors) {
             interceptor.readAfterSerialization(hook);
         }
     }
 
     @Override
-    public <RequestT> RequestT modifyBeforeRetryLoop(RequestHook<?, RequestT> hook) {
+    public <RequestT> RequestT modifyBeforeRetryLoop(RequestHook<?, ?, RequestT> hook) {
         return modifyRequestHook(ClientInterceptor::modifyBeforeRetryLoop, hook);
     }
 
     private <I extends SerializableStruct, RequestT> RequestT modifyRequestHook(
-        BiFunction<ClientInterceptor, RequestHook<I, RequestT>, RequestT> mapper,
-        RequestHook<I, RequestT> hook
+        BiFunction<ClientInterceptor, RequestHook<I, ?, RequestT>, RequestT> mapper,
+        RequestHook<I, ?, RequestT> hook
     ) {
         var request = hook.request();
         for (var interceptor : interceptors) {
@@ -88,50 +88,50 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public void readBeforeAttempt(RequestHook<?, ?> hook) {
+    public void readBeforeAttempt(RequestHook<?, ?, ?> hook) {
         applyToEachThrowLastError(ClientInterceptor::readBeforeAttempt, hook);
     }
 
     @Override
-    public <RequestT> RequestT modifyBeforeSigning(RequestHook<?, RequestT> hook) {
+    public <RequestT> RequestT modifyBeforeSigning(RequestHook<?, ?, RequestT> hook) {
         return modifyRequestHook(ClientInterceptor::modifyBeforeSigning, hook);
     }
 
     @Override
-    public void readBeforeSigning(RequestHook<?, ?> hook) {
+    public void readBeforeSigning(RequestHook<?, ?, ?> hook) {
         for (var interceptor : interceptors) {
             interceptor.readBeforeSigning(hook);
         }
     }
 
     @Override
-    public void readAfterSigning(RequestHook<?, ?> hook) {
+    public void readAfterSigning(RequestHook<?, ?, ?> hook) {
         for (var interceptor : interceptors) {
             interceptor.readAfterSigning(hook);
         }
     }
 
     @Override
-    public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, RequestT> hook) {
+    public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
         return modifyRequestHook(ClientInterceptor::modifyBeforeTransmit, hook);
     }
 
     @Override
-    public void readBeforeTransmit(RequestHook<?, ?> hook) {
+    public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
         for (var interceptor : interceptors) {
             interceptor.readBeforeTransmit(hook);
         }
     }
 
     @Override
-    public void readAfterTransmit(ResponseHook<?, ?, ?> hook) {
+    public void readAfterTransmit(ResponseHook<?, ?, ?, ?> hook) {
         for (var interceptor : interceptors) {
             interceptor.readAfterTransmit(hook);
         }
     }
 
     @Override
-    public <ResponseT> ResponseT modifyBeforeDeserialization(ResponseHook<?, ?, ResponseT> hook) {
+    public <ResponseT> ResponseT modifyBeforeDeserialization(ResponseHook<?, ?, ?, ResponseT> hook) {
         var response = hook.response();
         for (var interceptor : interceptors) {
             response = interceptor.modifyBeforeDeserialization(hook.withResponse(response));
@@ -140,7 +140,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     @Override
-    public void readBeforeDeserialization(ResponseHook<?, ?, ?> hook) {
+    public void readBeforeDeserialization(ResponseHook<?, ?, ?, ?> hook) {
         for (var interceptor : interceptors) {
             interceptor.readBeforeDeserialization(hook);
         }
@@ -155,7 +155,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <O extends SerializableStruct> O modifyBeforeAttemptCompletion(
-        OutputHook<?, ?, ?, O> hook,
+        OutputHook<?, O, ?, ?> hook,
         RuntimeException error
     ) {
         var output = hook.output();
@@ -193,7 +193,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <O extends SerializableStruct> O modifyBeforeCompletion(
-        OutputHook<?, ?, ?, O> hook,
+        OutputHook<?, O, ?, ?> hook,
         RuntimeException error
     ) {
         var output = hook.output();

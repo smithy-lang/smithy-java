@@ -34,6 +34,7 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.OutputHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ResponseHook;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.retries.api.AcquireInitialTokenRequest;
 import software.amazon.smithy.java.runtime.retries.api.RecordSuccessRequest;
@@ -110,7 +111,7 @@ final class ClientPipeline<RequestT, ResponseT> {
         var input = call.input;
 
         // 2. Interceptors: Invoke ReadBeforeExecution.
-        var inputHook = new InputHook<>(call.context, input);
+        var inputHook = new InputHook<>(call.operation, call.context, input);
         call.interceptor.readBeforeExecution(inputHook);
 
         // 3. Interceptors: Invoke ModifyBeforeSerialization.
@@ -123,7 +124,7 @@ final class ClientPipeline<RequestT, ResponseT> {
         // 5. Serialize the input message into a protocol request message.
         //    Use the UNRESOLVED URI of "/" for now, and resolve the actual endpoint later.
         RequestT request = protocol.createRequest(call.operation, input, call.context, UNRESOLVED);
-        var requestHook = new RequestHook<>(call.context, input, request);
+        var requestHook = new RequestHook<>(call.operation, call.context, input, request);
 
         // 6. Interceptors: Invoke ReadAfterSerialization.
         call.interceptor.readAfterSerialization(requestHook);
@@ -137,7 +138,7 @@ final class ClientPipeline<RequestT, ResponseT> {
 
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> acquireRetryToken(
         ClientCall<I, O> call,
-        RequestHook<I, RequestT> requestHook
+        RequestHook<I, O, RequestT> requestHook
     ) {
         try {
             // 8. RetryStrategy: Invoke AcquireRetryToken.
@@ -158,7 +159,7 @@ final class ClientPipeline<RequestT, ResponseT> {
 
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> doSendOrRetry(
         ClientCall<I, O> call,
-        RequestHook<I, RequestT> requestHook
+        RequestHook<I, O, RequestT> requestHook
     ) {
         var request = requestHook.request();
 
@@ -179,7 +180,7 @@ final class ClientPipeline<RequestT, ResponseT> {
 
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> afterIdentity(
         ClientCall<I, O> call,
-        RequestHook<I, RequestT> requestHook,
+        RequestHook<I, O, RequestT> requestHook,
         IdentityResult<?> identityResult,
         ResolvedScheme<?, RequestT> resolvedAuthScheme
     ) {
@@ -196,7 +197,7 @@ final class ClientPipeline<RequestT, ResponseT> {
                 call.interceptor.readAfterSigning(updatedHook);
                 req = call.interceptor.modifyBeforeTransmit(updatedHook);
                 // Track the used idempotency token, if any.
-                setIdempotencyTokenContext(call, call.input);
+                setIdemTokenValue(call.operation, call.context, call.input);
                 call.interceptor.readBeforeTransmit(updatedHook.withRequest(req));
                 return req;
             })
@@ -207,13 +208,12 @@ final class ClientPipeline<RequestT, ResponseT> {
             );
     }
 
-    // TODO: set a default token if it's missing.
-    private static void setIdempotencyTokenContext(ClientCall<?, ?> call, SerializableStruct input) {
-        var tokenMember = call.operation.idempotencyTokenMember();
+    private static void setIdemTokenValue(ApiOperation<?, ?> operation, Context context, SerializableStruct input) {
+        var tokenMember = operation.idempotencyTokenMember();
         if (tokenMember != null) {
             var value = input.getMemberValue(tokenMember);
             if (value != null) {
-                call.context.put(CallContext.IDEMPOTENCY_TOKEN, (String) value);
+                context.put(CallContext.IDEMPOTENCY_TOKEN, value.toString());
             }
         }
     }
@@ -310,7 +310,7 @@ final class ClientPipeline<RequestT, ResponseT> {
         LOGGER.trace("Deserializing response with {} for {}:{}", protocol.getClass(), request, response);
 
         Context context = call.context;
-        var responseHook = new ResponseHook<>(context, input, request, response);
+        var responseHook = new ResponseHook<>(call.operation, context, input, request, response);
 
         interceptor.readAfterTransmit(responseHook);
 
@@ -332,7 +332,7 @@ final class ClientPipeline<RequestT, ResponseT> {
                     error = (RuntimeException) thrown;
                 }
 
-                var outputHook = new OutputHook<>(context, input, request, response, shape);
+                var outputHook = new OutputHook<>(call.operation, context, input, request, response, shape);
 
                 try {
                     interceptor.readAfterDeserialization(outputHook, error);
@@ -413,7 +413,7 @@ final class ClientPipeline<RequestT, ResponseT> {
         // Adjust the current retry count on the context (e.g., protocols can use this to add retry headers).
         call.context.put(CallContext.RETRY_ATTEMPT, ++call.retryCount);
 
-        var requestHook = new RequestHook<>(call.context, call.input, request);
+        var requestHook = new RequestHook<>(call.operation, call.context, call.input, request);
 
         if (after.toMillis() == 0) {
             // Immediate retry.
