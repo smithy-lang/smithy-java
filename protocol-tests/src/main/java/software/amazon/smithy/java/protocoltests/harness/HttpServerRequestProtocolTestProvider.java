@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
@@ -55,6 +54,10 @@ public class HttpServerRequestProtocolTestProvider extends
             var testOperation = serverTestOperation.operation();
             boolean shouldSkip = testFilter.skipOperation(testOperation.id());
             for (var testCase : testOperation.requestTestCases()) {
+                if (shouldSkip || testFilter.skipTestCase(testCase)) {
+                    invocationContexts.add(new IgnoredTestCase(testCase));
+                    continue;
+                }
                 var createUri = createUri(testData.endpoint(), testCase.getUri(), testCase.getQueryParams());
                 var headers = createHeaders(testCase.getHeaders());
                 Function<String, byte[]> mapper;
@@ -76,8 +79,7 @@ public class HttpServerRequestProtocolTestProvider extends
                         (ApiOperation<SerializableStruct, SerializableStruct>) testOperation.operationModel(),
                         serverTestOperation.mockOperation(),
                         mockClient,
-                        request,
-                        shouldSkip || testFilter.skipTestCase(testCase)
+                        request
                     )
                 );
             }
@@ -186,8 +188,7 @@ public class HttpServerRequestProtocolTestProvider extends
         ApiOperation<SerializableStruct, SerializableStruct> operationModel,
         MockOperation mockOperation,
         ServerTestClient client,
-        SmithyHttpRequest request,
-        boolean shouldSkip
+        SmithyHttpRequest request
     ) implements TestTemplateInvocationContext {
 
         @Override
@@ -206,7 +207,6 @@ public class HttpServerRequestProtocolTestProvider extends
                         justification = "We need to swallow all exceptions from the client because we are only validating requests."
                     )
                     public void test() {
-                        Assumptions.assumeFalse(shouldSkip);
                         mockOperation.reset();
                         var response = operationModel.outputBuilder()
                             .errorCorrection()
