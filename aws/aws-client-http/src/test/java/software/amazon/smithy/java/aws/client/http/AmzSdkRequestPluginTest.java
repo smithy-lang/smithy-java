@@ -6,11 +6,11 @@
 package software.amazon.smithy.java.aws.client.http;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.contains;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.runtime.aws.client.awsjson.AwsJson1Protocol;
@@ -59,7 +59,7 @@ public class AmzSdkRequestPluginTest {
 
     @Test
     public void injectsHeader() {
-        AtomicReference<SmithyHttpRequest> ref = new AtomicReference<>();
+        AtomicInteger attempt = new AtomicInteger(0);
 
         var client = DynamicClient.builder()
             .service(SERVICE)
@@ -67,13 +67,6 @@ public class AmzSdkRequestPluginTest {
             .protocol(new AwsJson1Protocol(SERVICE))
             .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
             .transport(new ClientTransport<SmithyHttpRequest, SmithyHttpResponse>() {
-                @Override
-                public CompletableFuture<SmithyHttpResponse> send(Context context, SmithyHttpRequest request) {
-                    return CompletableFuture.completedFuture(
-                        SmithyHttpResponse.builder().statusCode(200).body(DataStream.ofString("{}")).build()
-                    );
-                }
-
                 @Override
                 public Class<SmithyHttpRequest> requestClass() {
                     return SmithyHttpRequest.class;
@@ -83,13 +76,40 @@ public class AmzSdkRequestPluginTest {
                 public Class<SmithyHttpResponse> responseClass() {
                     return SmithyHttpResponse.class;
                 }
+
+                @Override
+                public CompletableFuture<SmithyHttpResponse> send(Context context, SmithyHttpRequest request) {
+                    var i = attempt.incrementAndGet();
+                    if (i == 1) {
+                        return CompletableFuture.completedFuture(
+                            SmithyHttpResponse.builder()
+                                .statusCode(429)
+                                .body(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
+                                .build()
+                        );
+                    } else if (i == 2) {
+                        return CompletableFuture.completedFuture(
+                            SmithyHttpResponse.builder()
+                                .statusCode(200)
+                                .body(DataStream.ofString("{\"id\":\"1\"}"))
+                                .build()
+                        );
+                    } else {
+                        throw new IllegalStateException("Unexpected attempt " + i);
+                    }
+                }
             })
             .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
             .addPlugin(new AmzSdkRequestPlugin())
             .addInterceptor(new ClientInterceptor() {
                 @Override
                 public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
-                    ref.set(((SmithyHttpRequest) hook.request()));
+                    var request = (SmithyHttpRequest) hook.request();
+                    var i = attempt.get();
+                    assertThat(
+                        request.headers().allValues("amz-sdk-request"),
+                        contains("attempt=" + (i + 1) + "; max=3")
+                    );
                 }
             })
             .retryStrategy(new RetryStrategy() {
@@ -100,12 +120,12 @@ public class AmzSdkRequestPluginTest {
 
                 @Override
                 public RefreshRetryTokenResponse refreshRetryToken(RefreshRetryTokenRequest request) {
-                    throw new UnsupportedOperationException();
+                    return new RefreshRetryTokenResponse(new Token(), Duration.ZERO);
                 }
 
                 @Override
                 public RecordSuccessResponse recordSuccess(RecordSuccessRequest request) {
-                    return new RecordSuccessResponse(new Token());
+                    return new RecordSuccessResponse(request.token());
                 }
 
                 @Override
@@ -116,7 +136,5 @@ public class AmzSdkRequestPluginTest {
             .build();
 
         client.call("CreateSprocket");
-
-        assertThat(ref.get().headers().firstValue("amz-sdk-request"), equalTo("attempt=1; max=3"));
     }
 }

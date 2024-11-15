@@ -5,12 +5,15 @@
 
 package software.amazon.smithy.java.aws.client.http;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.function.Function;
 import software.amazon.smithy.java.runtime.client.core.CallContext;
 import software.amazon.smithy.java.runtime.client.core.ClientConfig;
 import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 
 /**
@@ -47,7 +50,11 @@ public final class AmzSdkRequestPlugin implements ClientPlugin {
                 if (max != null) {
                     value.append("; max=").append(max);
                 }
-                return hook.request().withAddedHeaders("amz-sdk-request", value.toString());
+
+                // TODO: improve header management.
+                var headers = new HashMap<>(hook.request().headers().map());
+                headers.put("amz-sdk-request", List.of(value.toString()));
+                return hook.request().withHeaders(HttpHeaders.of(headers));
             }
         }
     }
