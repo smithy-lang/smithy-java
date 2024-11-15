@@ -66,16 +66,11 @@ public class RestXmlProtocolTests {
     @HttpClientResponseTests
     @ProtocolTestFilter(
         skipTests = {
-            "XmlEnums",
-            "XmlIntEnums",
             "XmlLists",
-            "XmlMaps",
-            "XmlMapsXmlName",
             "FlatNestedXmlMapResponse",
             "FlattenedXmlMap",
             "FlattenedXmlMapWithXmlName",
             "RestXmlFlattenedXmlMapWithXmlNamespace",
-            "RestXmlXmlMapWithXmlNamespace",
             "RestXmlDateTimeWithFractionalSeconds",
             "HttpPrefixHeadersArePresent", //failing due to case mismatch in keys
             "HttpPayloadTraitsWithBlob",
@@ -84,7 +79,6 @@ public class RestXmlProtocolTests {
             "RestXmlStringPayloadResponse",
             "RestXmlHttpPayloadWithUnion",
             "BodyWithXmlName",
-            "NestedXmlMapWithXmlNameDeserializes"
         }
     )
     public void responseTest(Runnable test) {
