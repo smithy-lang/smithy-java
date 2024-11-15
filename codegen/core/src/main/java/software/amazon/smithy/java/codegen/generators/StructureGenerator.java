@@ -208,9 +208,11 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 () -> {
                     if (shape.hasTrait(ErrorTrait.class)) {
                         if (shape.getMember("message").isPresent()) {
-                            writer.write("super($$SCHEMA, builder.message);");
+                            writer.write(
+                                "super($$SCHEMA, builder.message, builder.$$cause, builder.$$captureStackTrace);"
+                            );
                         } else {
-                            writer.write("super($$SCHEMA, null);");
+                            writer.write("super($$SCHEMA, null, builder.$$cause, builder.$$captureStackTrace);");
                         }
                     }
 
@@ -738,6 +740,10 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 );
                 writer.popState();
             }
+            if (shape.hasTrait(ErrorTrait.class)) {
+                writer.write("private $T $$cause;", Throwable.class);
+                writer.write("private $T $$captureStackTrace;", Boolean.class);
+            }
             writer.popState();
         }
 
@@ -745,6 +751,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         protected void generateSetters(JavaWriter writer) {
             writer.pushState();
             writer.putContext("objects", Objects.class);
+            writer.putContext("throwable", Throwable.class);
             for (var member : shape.members()) {
                 writer.pushState(new BuilderSetterSection(member));
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
@@ -763,6 +770,24 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                         """
                 );
                 writer.popState();
+            }
+            if (shape.hasTrait(ErrorTrait.class)) {
+                writer.write("""
+                    public Builder withStackTrace() {
+                        this.$$captureStackTrace = true;
+                        return this;
+                    }
+
+                    public Builder withoutStackTrace() {
+                        this.$$captureStackTrace = false;
+                        return this;
+                    }
+
+                    public Builder withCause(${throwable:T} cause) {
+                        this.$$cause = cause;
+                        return this;
+                    }
+                    """);
             }
             writer.popState();
         }

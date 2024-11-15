@@ -19,6 +19,10 @@ import software.amazon.smithy.java.runtime.retries.api.RetrySafety;
  */
 public class ApiException extends RuntimeException implements RetryInfo {
 
+    private static final boolean GLOBAL_CAPTURE_STACK_TRACE_ENABLED = Boolean.getBoolean(
+        "smithy.java.captureExceptionStackTraces"
+    );
+
     /**
      * The party that is at fault for the error, if any.
      *
@@ -67,20 +71,52 @@ public class ApiException extends RuntimeException implements RetryInfo {
     private Duration retryAfter = null;
 
     public ApiException(String message) {
-        this(message, Fault.OTHER);
+        this(message, Fault.OTHER, null);
+    }
+
+    public ApiException(String message, boolean captureStackTrace) {
+        this(message, Fault.OTHER, captureStackTrace);
     }
 
     public ApiException(String message, Fault errorType) {
-        super(message);
-        this.errorType = Objects.requireNonNull(errorType);
+        this(message, errorType, null);
+    }
+
+    public ApiException(String message, Fault errorType, boolean captureStackTrace) {
+        this(message, null, errorType, captureStackTrace);
+    }
+
+    protected ApiException(String message, Fault errorType, Boolean captureStackTrace) {
+        this(message, null, errorType, captureStackTrace);
     }
 
     public ApiException(String message, Throwable cause) {
-        this(message, cause, Fault.OTHER);
+        this(message, cause, (Boolean) null);
+    }
+
+    public ApiException(String message, Throwable cause, boolean captureStackTrace) {
+        this(message, cause, Fault.OTHER, captureStackTrace);
+    }
+
+    protected ApiException(String message, Throwable cause, Boolean captureStackTrace) {
+        this(message, cause, Fault.OTHER, captureStackTrace);
     }
 
     public ApiException(String message, Throwable cause, Fault errorType) {
-        super(message, cause);
+        this(message, cause, errorType, false);
+    }
+
+    public ApiException(String message, Throwable cause, Fault errorType, boolean captureStackTrace) {
+        this(message, cause, errorType, (Boolean) captureStackTrace);
+    }
+
+    protected ApiException(String message, Throwable cause, Fault errorType, Boolean captureStackTrace) {
+        super(
+            message,
+            cause,
+            false,
+            captureStackTrace != null ? captureStackTrace : GLOBAL_CAPTURE_STACK_TRACE_ENABLED
+        );
         this.errorType = Objects.requireNonNull(errorType);
     }
 

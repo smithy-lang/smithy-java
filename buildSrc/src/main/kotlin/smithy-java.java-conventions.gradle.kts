@@ -41,6 +41,7 @@ dependencies {
     testImplementation(libs.hamcrest)
     testImplementation(libs.assertj.core)
     compileOnly("com.github.spotbugs:spotbugs-annotations:${spotbugs.toolVersion.get()}")
+    testCompileOnly("com.github.spotbugs:spotbugs-annotations:${spotbugs.toolVersion.get()}")
 }
 
 tasks.withType<Test> {
