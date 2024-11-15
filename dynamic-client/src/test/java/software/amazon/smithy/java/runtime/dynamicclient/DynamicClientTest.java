@@ -247,7 +247,6 @@ public class DynamicClientTest {
             .service(service)
             .model(model)
             .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .transport(createErrorTransport("{}"))
             .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
             .build();
 

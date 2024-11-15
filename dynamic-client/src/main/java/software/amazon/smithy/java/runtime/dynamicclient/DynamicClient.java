@@ -257,15 +257,27 @@ public final class DynamicClient extends Client {
         private void autoDetectProtocol() {
             ServiceIndex serviceIndex = ServiceIndex.of(model);
             var protocols = serviceIndex.getProtocols(service);
-            if (!protocols.isEmpty()) {
-                for (var protocolImpl : ServiceLoader.load(ClientProtocolFactory.class)) {
-                    if (protocols.containsKey(protocolImpl.id())) {
-                        var settings = ProtocolSettings.builder().service(service).build();
-                        protocol(protocolImpl.createProtocol(settings, protocols.get(protocolImpl.id())));
-                        break;
-                    }
+
+            if (protocols.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "No protocol() was provided, and not protocol definition traits "
+                        + "were found on service " + service
+                );
+            }
+
+            for (var protocolImpl : ServiceLoader.load(ClientProtocolFactory.class)) {
+                if (protocols.containsKey(protocolImpl.id())) {
+                    var settings = ProtocolSettings.builder().service(service).build();
+                    protocol(protocolImpl.createProtocol(settings, protocols.get(protocolImpl.id())));
+                    return;
                 }
             }
+
+            throw new IllegalArgumentException(
+                "Could not find any matching protocol implementations for the "
+                    + "following protocol traits attached to service " + service
+                    + ": " + protocols.keySet()
+            );
         }
 
         /**
