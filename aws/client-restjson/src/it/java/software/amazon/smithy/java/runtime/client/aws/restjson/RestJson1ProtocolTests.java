@@ -58,7 +58,7 @@ public class RestJson1ProtocolTests {
             if ("application/json".equals(expected.contentType())) {
                 var expectedNode = Node.parse(expectedStr);
                 var actualNode = Node.parse(actualStr);
-                assertEquals(expectedNode, actualNode);
+                Node.assertEquals(actualNode, expectedNode);
             } else {
                 assertEquals(expectedStr, actualStr);
             }
