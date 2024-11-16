@@ -43,7 +43,7 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
                 if (existing != null) {
                     LOGGER.debug("Replaced header value for {}", name);
                 }
-                yield CompletableFuture.completedFuture(request.withHeaders(HttpHeaders.of(updated)));
+                yield CompletableFuture.completedFuture(request.toBuilder().headers(HttpHeaders.of(updated)).build());
             }
             case QUERY -> {
                 var uriBuilder = URIBuilder.of(request.uri());
@@ -54,7 +54,7 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
                 addExistingQueryParams(stringBuilder, existingQuery, name);
                 queryBuilder.write(stringBuilder);
                 yield CompletableFuture.completedFuture(
-                    request.withUri(uriBuilder.query(stringBuilder.toString()).build())
+                    request.toBuilder().uri(uriBuilder.query(stringBuilder.toString()).build()).build()
                 );
             }
         };

@@ -6,10 +6,14 @@
 package software.amazon.smithy.java.runtime.http.api;
 
 import java.nio.ByteBuffer;
-import java.util.Objects;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
+/**
+ * HTTP response.
+ */
 public interface SmithyHttpResponse extends SmithyHttpMessage {
 
     @Override
@@ -17,80 +21,111 @@ public interface SmithyHttpResponse extends SmithyHttpMessage {
         return httpVersion() + " " + statusCode();
     }
 
+    /**
+     * Get the status code of the response.
+     *
+     * @return the status code.
+     */
     int statusCode();
 
-    SmithyHttpResponse withStatusCode(int statusCode);
-
-    @Override
-    SmithyHttpResponse withHttpVersion(SmithyHttpVersion version);
-
-    @Override
-    SmithyHttpResponse withHeaders(HttpHeaders headers);
-
-    @Override
-    default SmithyHttpResponse withAddedHeaders(HttpHeaders headers) {
-        return (SmithyHttpResponse) SmithyHttpMessage.super.withAddedHeaders(headers);
+    /**
+     * Create a builder configured with the values of the response.
+     *
+     * @return the created builder.
+     */
+    default Builder toBuilder() {
+        return builder()
+            .httpVersion(httpVersion())
+            .statusCode(statusCode())
+            .headers(headers())
+            .body(body());
     }
 
-    @Override
-    default SmithyHttpResponse withAddedHeaders(String... fieldAndValues) {
-        return (SmithyHttpResponse) SmithyHttpMessage.super.withAddedHeaders(fieldAndValues);
-    }
-
-    @Override
-    SmithyHttpResponse withBody(DataStream body);
-
+    /**
+     * Create a builder.
+     *
+     * @return the created builder.
+     */
     static Builder builder() {
-        return new Builder();
+        return new SmithyHttpResponseImpl.Builder();
     }
 
-    final class Builder {
+    /**
+     * HTTP response message builder.
+     */
+    interface Builder {
+        /**
+         * Create the response.
+         *
+         * @return the created response.
+         * @throws NullPointerException if status code is missing.
+         */
+        SmithyHttpResponse build();
 
-        int statusCode;
-        DataStream body;
-        HttpHeaders headers = SimpleUnmodifiableHttpHeaders.EMPTY;
-        SmithyHttpVersion httpVersion = SmithyHttpVersion.HTTP_1_1;
+        /**
+         * Set the HTTP version.
+         *
+         * @param httpVersion HTTP version of the message.
+         * @return the builder.
+         */
+        Builder httpVersion(SmithyHttpVersion httpVersion);
 
-        private Builder() {
-        }
-
-        public Builder httpVersion(SmithyHttpVersion httpVersion) {
-            this.httpVersion = httpVersion;
-            return this;
-        }
-
-        public Builder statusCode(int statusCode) {
-            this.statusCode = statusCode;
-            return this;
-        }
-
-        public Builder body(Flow.Publisher<ByteBuffer> publisher) {
+        /**
+         * Set the body of the message.
+         *
+         * @param publisher Body to set.
+         * @return the builder.
+         */
+        default Builder body(Flow.Publisher<ByteBuffer> publisher) {
             return body(DataStream.ofPublisher(publisher, null, -1));
         }
 
-        public Builder body(DataStream body) {
-            this.body = body;
-            return this;
-        }
+        /**
+         * Set the body of the message.
+         *
+         * @param body Body to set.
+         * @return the builder.
+         */
+        Builder body(DataStream body);
 
-        public Builder headers(HttpHeaders headers) {
-            this.headers = Objects.requireNonNull(headers);
-            return this;
-        }
+        /**
+         * Set the headers of the message, replacing any previously set headers.
+         *
+         * @param headers Headers to set.
+         * @return the builder.
+         */
+        Builder headers(HttpHeaders headers);
 
-        public Builder with(SmithyHttpResponse response) {
-            this.httpVersion = response.httpVersion();
-            this.headers = response.headers();
-            this.body = response.body();
-            this.statusCode = response.statusCode();
-            return this;
-        }
+        /**
+         * Set the status code of the response.
+         *
+         * @param statusCode Response status code.
+         * @return the builder.
+         */
+        Builder statusCode(int statusCode);
 
-        public SmithyHttpResponse build() {
-            if (statusCode == 0) {
-                throw new IllegalStateException("No status code was set on response");
-            }
-            return new SmithyHttpResponseImpl(this);
-        }
+        /**
+         * Add and merge in the given headers to the message.
+         *
+         * @param headers Headers to add and merge in.
+         * @return the builder.
+         */
+        Builder withAddedHeaders(String... headers);
+
+        /**
+         * Add and merge in the given headers to the message.
+         *
+         * @param headers Headers to add and merge in.
+         * @return the builder.
+         */
+        Builder withAddedHeaders(HttpHeaders headers);
+
+        /**
+         * Put the given headers onto the message, replacing any existing headers with the same names.
+         *
+         * @param headers Headers to put.
+         * @return the builder.
+         */
+        Builder withReplacedHeaders(Map<String, List<String>> headers);
     }
 }

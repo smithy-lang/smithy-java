@@ -58,7 +58,7 @@ public class HttpApiKeyAuthSignerTest {
             .put(HttpApiKeyAuthScheme.NAME, "x-api-key")
             .put(HttpApiKeyAuthScheme.SCHEME, "SCHEME")
             .build();
-        var updateRequest = TEST_REQUEST.withAddedHeaders("x-api-key", "foo");
+        var updateRequest = TEST_REQUEST.toBuilder().withAddedHeaders("x-api-key", "foo").build();
         var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updateRequest, TEST_IDENTITY, authProperties).get();
         var authHeader = signedRequest.headers().firstValue("x-api-key");
         assertEquals(authHeader, "SCHEME " + API_KEY);
@@ -97,7 +97,7 @@ public class HttpApiKeyAuthSignerTest {
             .put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY)
             .put(HttpApiKeyAuthScheme.NAME, "apiKey")
             .build();
-        var updatedRequest = TEST_REQUEST.withUri(URI.create("https://www.example.com?x=1"));
+        var updatedRequest = TEST_REQUEST.toBuilder().uri(URI.create("https://www.example.com?x=1")).build();
 
         var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties).get();
         var queryParam = signedRequest.uri().getQuery();
@@ -111,7 +111,7 @@ public class HttpApiKeyAuthSignerTest {
             .put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY)
             .put(HttpApiKeyAuthScheme.NAME, "apiKey")
             .build();
-        var updatedRequest = TEST_REQUEST.withUri(URI.create("https://www.example.com?x=1&apiKey=foo"));
+        var updatedRequest = TEST_REQUEST.toBuilder().uri(URI.create("https://www.example.com?x=1&apiKey=foo")).build();
 
         var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties).get();
         var queryParam = signedRequest.uri().getQuery();

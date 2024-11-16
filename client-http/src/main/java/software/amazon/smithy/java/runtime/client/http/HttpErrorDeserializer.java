@@ -110,7 +110,7 @@ public final class HttpErrorDeserializer {
                 context,
                 codec,
                 // Make a new response that uses the previously read response payload.
-                response.withBody(DataStream.ofByteBuffer(responsePayload)),
+                response.toBuilder().body(DataStream.ofByteBuffer(responsePayload)).build(),
                 builder
             );
         }

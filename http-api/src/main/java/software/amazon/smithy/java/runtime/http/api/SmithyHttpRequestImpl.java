@@ -6,78 +6,20 @@
 package software.amazon.smithy.java.runtime.http.api;
 
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
-final class SmithyHttpRequestImpl implements SmithyHttpRequest {
-
-    private final SmithyHttpVersion httpVersion;
-    private final String method;
-    private final URI uri;
-    private final DataStream body;
-    private final HttpHeaders headers;
-
-    SmithyHttpRequestImpl(SmithyHttpRequest.Builder builder) {
-        this.httpVersion = Objects.requireNonNull(builder.httpVersion, "HttpVersion cannot be null");
-        this.method = Objects.requireNonNull(builder.method, "Method cannot be null");
-        this.uri = Objects.requireNonNull(builder.uri, "URI cannot be null");
-        this.body = Objects.requireNonNullElse(builder.body, DataStream.ofEmpty());
-        this.headers = builder.headers;
-    }
-
-    @Override
-    public String method() {
-        return method;
-    }
-
-    @Override
-    public SmithyHttpRequest withMethod(String method) {
-        return SmithyHttpRequest.builder().with(this).method(method).build();
-    }
-
-    @Override
-    public URI uri() {
-        return uri;
-    }
-
-    @Override
-    public SmithyHttpRequest withUri(URI uri) {
-        return SmithyHttpRequest.builder().with(this).uri(uri).build();
-    }
-
-    @Override
-    public SmithyHttpVersion httpVersion() {
-        return httpVersion;
-    }
-
-    @Override
-    public SmithyHttpRequest withHttpVersion(SmithyHttpVersion httpVersion) {
-        return SmithyHttpRequest.builder().with(this).httpVersion(httpVersion).build();
-    }
-
-    @Override
-    public HttpHeaders headers() {
-        return headers;
-    }
-
-    @Override
-    public SmithyHttpRequest withHeaders(HttpHeaders headers) {
-        if (headers == this.headers) {
-            return this;
-        } else {
-            return SmithyHttpRequest.builder().with(this).headers(headers).build();
-        }
-    }
-
-    @Override
-    public DataStream body() {
-        return body;
-    }
-
-    @Override
-    public SmithyHttpRequest withBody(DataStream body) {
-        return SmithyHttpRequest.builder().with(this).body(body).build();
-    }
+record SmithyHttpRequestImpl(
+    SmithyHttpVersion httpVersion,
+    String method,
+    URI uri,
+    HttpHeaders headers,
+    DataStream body
+) implements SmithyHttpRequest {
 
     @Override
     public String toString() {
@@ -111,21 +53,74 @@ final class SmithyHttpRequestImpl implements SmithyHttpRequest {
         return result.toString();
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        SmithyHttpRequestImpl that = (SmithyHttpRequestImpl) o;
-        return httpVersion == that.httpVersion && method.equals(that.method) && uri.equals(that.uri)
-            && body.equals(that.body) && headers.equals(that.headers);
-    }
+    static final class Builder implements SmithyHttpRequest.Builder {
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(httpVersion, method, uri, body, headers);
+        String method;
+        URI uri;
+        DataStream body;
+        HttpHeaders headers = SimpleUnmodifiableHttpHeaders.EMPTY;
+        SmithyHttpVersion httpVersion = SmithyHttpVersion.HTTP_1_1;
+        private Map<String, List<String>> mutatedHeaders;
+
+        Builder() {}
+
+        public Builder httpVersion(SmithyHttpVersion httpVersion) {
+            this.httpVersion = httpVersion;
+            return this;
+        }
+
+        public Builder method(String method) {
+            this.method = method;
+            return this;
+        }
+
+        public Builder uri(URI uri) {
+            this.uri = uri;
+            return this;
+        }
+
+        public Builder body(Flow.Publisher<ByteBuffer> publisher) {
+            return body(DataStream.ofPublisher(publisher, null, -1));
+        }
+
+        public Builder body(DataStream body) {
+            this.body = body;
+            return this;
+        }
+
+        public Builder headers(HttpHeaders headers) {
+            this.headers = Objects.requireNonNull(headers);
+            mutatedHeaders = null;
+            return this;
+        }
+
+        @Override
+        public Builder withAddedHeaders(String... headers) {
+            mutatedHeaders = SimpleUnmodifiableHttpHeaders.addHeaders(this.headers, mutatedHeaders, headers);
+            return this;
+        }
+
+        @Override
+        public Builder withAddedHeaders(HttpHeaders headers) {
+            mutatedHeaders = SimpleUnmodifiableHttpHeaders.addHeaders(this.headers, mutatedHeaders, headers);
+            return this;
+        }
+
+        @Override
+        public Builder withReplacedHeaders(Map<String, List<String>> headers) {
+            mutatedHeaders = SimpleUnmodifiableHttpHeaders.replaceHeaders(this.headers, mutatedHeaders, headers);
+            return this;
+        }
+
+        public SmithyHttpRequest build() {
+            if (mutatedHeaders != null) {
+                headers = new SimpleUnmodifiableHttpHeaders(mutatedHeaders, false);
+            }
+            Objects.requireNonNull(httpVersion, "HttpVersion cannot be null");
+            Objects.requireNonNull(method, "Method cannot be null");
+            Objects.requireNonNull(uri, "URI cannot be null");
+            body = Objects.requireNonNullElse(body, DataStream.ofEmpty());
+            return new SmithyHttpRequestImpl(httpVersion, method, uri, headers, body);
+        }
     }
 }

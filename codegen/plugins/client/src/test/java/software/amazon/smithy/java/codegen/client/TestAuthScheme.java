@@ -59,7 +59,7 @@ public final class TestAuthScheme implements AuthScheme<SmithyHttpRequest, Ident
             AuthProperties properties
         ) {
             return CompletableFuture.completedFuture(
-                request.withAddedHeaders(SIGNATURE_HEADER, "smithy-test-signature")
+                request.toBuilder().withAddedHeaders(SIGNATURE_HEADER, "smithy-test-signature").build()
             );
         }
     }

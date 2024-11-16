@@ -60,11 +60,13 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
             builder.concatPath(request.uri().getPath());
         }
 
+        var requestBuilder = request.toBuilder();
+
         // Merge in any HTTP headers found on the endpoint.
         if (endpoint.property(HttpContext.ENDPOINT_RESOLVER_HTTP_HEADERS) != null) {
-            request = request.withAddedHeaders(endpoint.property(HttpContext.ENDPOINT_RESOLVER_HTTP_HEADERS));
+            requestBuilder.withAddedHeaders(endpoint.property(HttpContext.ENDPOINT_RESOLVER_HTTP_HEADERS));
         }
 
-        return request.withUri(builder.build());
+        return requestBuilder.uri(builder.build()).build();
     }
 }

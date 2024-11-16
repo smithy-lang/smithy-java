@@ -54,7 +54,7 @@ public final class AmzSdkRequestPlugin implements ClientPlugin {
                 // TODO: improve header management.
                 var headers = new HashMap<>(hook.request().headers().map());
                 headers.put("amz-sdk-request", List.of(value.toString()));
-                return hook.request().withHeaders(HttpHeaders.of(headers));
+                return hook.request().toBuilder().headers(HttpHeaders.of(headers)).build();
             }
         }
     }

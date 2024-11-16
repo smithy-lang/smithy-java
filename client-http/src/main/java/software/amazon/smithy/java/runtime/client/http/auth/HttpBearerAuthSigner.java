@@ -34,6 +34,6 @@ final class HttpBearerAuthSigner implements Signer<SmithyHttpRequest, TokenIdent
         if (existing != null) {
             LOGGER.debug("Replaced existing Authorization header value.");
         }
-        return CompletableFuture.completedFuture(request.withHeaders(HttpHeaders.of(headers)));
+        return CompletableFuture.completedFuture(request.toBuilder().headers(HttpHeaders.of(headers)).build());
     }
 }

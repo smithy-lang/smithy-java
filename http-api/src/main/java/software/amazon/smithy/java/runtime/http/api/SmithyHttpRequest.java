@@ -7,99 +7,141 @@ package software.amazon.smithy.java.runtime.http.api;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
-import java.util.Objects;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
+/**
+ * HTTP request.
+ */
 public interface SmithyHttpRequest extends SmithyHttpMessage {
-
+    /**
+     * Get the method of the request.
+     *
+     * @return the method.
+     */
     String method();
 
-    SmithyHttpRequest withMethod(String method);
-
+    /**
+     * Get the URI of the request.
+     *
+     * @return the request URI.
+     */
     URI uri();
-
-    SmithyHttpRequest withUri(URI uri);
-
-    @Override
-    SmithyHttpRequest withHttpVersion(SmithyHttpVersion version);
-
-    @Override
-    SmithyHttpRequest withHeaders(HttpHeaders headers);
-
-    @Override
-    default SmithyHttpRequest withAddedHeaders(HttpHeaders headers) {
-        return (SmithyHttpRequest) SmithyHttpMessage.super.withAddedHeaders(headers);
-    }
-
-    @Override
-    default SmithyHttpRequest withAddedHeaders(String... fieldAndValues) {
-        return (SmithyHttpRequest) SmithyHttpMessage.super.withAddedHeaders(fieldAndValues);
-    }
-
-    @Override
-    SmithyHttpRequest withBody(DataStream stream);
 
     @Override
     default String startLine() {
         return method() + " " + uri().getHost() + " " + httpVersion();
     }
 
-    static Builder builder() {
-        return new Builder();
+    /**
+     * Create a builder configured with the values of the request.
+     *
+     * @return the created builder.
+     */
+    default Builder toBuilder() {
+        return builder()
+            .method(method())
+            .uri(uri())
+            .headers(headers())
+            .body(body())
+            .httpVersion(httpVersion());
     }
 
-    final class Builder {
+    /**
+     * Create a builder.
+     *
+     * @return the created builder.
+     */
+    static Builder builder() {
+        return new SmithyHttpRequestImpl.Builder();
+    }
 
-        String method;
-        URI uri;
-        DataStream body;
-        HttpHeaders headers = SimpleUnmodifiableHttpHeaders.EMPTY;
-        SmithyHttpVersion httpVersion = SmithyHttpVersion.HTTP_1_1;
+    /**
+     * HTTP request message builder.
+     */
+    interface Builder {
+        /**
+         * Create the request.
+         *
+         * @return the created request.
+         * @throws NullPointerException if method or uri are missing.
+         */
+        SmithyHttpRequest build();
 
-        private Builder() {
-        }
+        /**
+         * Set the HTTP method.
+         *
+         * @param method Method to set.
+         * @return the builder.
+         */
+        Builder method(String method);
 
-        public Builder httpVersion(SmithyHttpVersion httpVersion) {
-            this.httpVersion = httpVersion;
-            return this;
-        }
+        /**
+         * Set the URI of the message.
+         *
+         * @param uri URI to set.
+         * @return the builder.
+         */
+        Builder uri(URI uri);
 
-        public Builder method(String method) {
-            this.method = method;
-            return this;
-        }
+        /**
+         * Set the HTTP version.
+         *
+         * @param httpVersion HTTP version of the message.
+         * @return the builder.
+         */
+        Builder httpVersion(SmithyHttpVersion httpVersion);
 
-        public Builder uri(URI uri) {
-            this.uri = uri;
-            return this;
-        }
-
-        public Builder body(Flow.Publisher<ByteBuffer> publisher) {
+        /**
+         * Set the body of the message.
+         *
+         * @param publisher Body to set.
+         * @return the builder.
+         */
+        default Builder body(Flow.Publisher<ByteBuffer> publisher) {
             return body(DataStream.ofPublisher(publisher, null, -1));
         }
 
-        public Builder body(DataStream body) {
-            this.body = body;
-            return this;
-        }
+        /**
+         * Set the body of the message.
+         *
+         * @param body Body to set.
+         * @return the builder.
+         */
+        Builder body(DataStream body);
 
-        public Builder headers(HttpHeaders headers) {
-            this.headers = Objects.requireNonNull(headers);
-            return this;
-        }
+        /**
+         * Set the headers of the message, replacing any previously set headers.
+         *
+         * @param headers Headers to set.
+         * @return the builder.
+         */
+        Builder headers(HttpHeaders headers);
 
-        public Builder with(SmithyHttpRequest request) {
-            this.httpVersion = request.httpVersion();
-            this.headers = request.headers();
-            this.body = request.body();
-            this.method = request.method();
-            this.uri = request.uri();
-            return this;
-        }
+        /**
+         * Add and merge in the given headers to the message.
+         *
+         * @param headers Headers to add and merge in.
+         * @return the builder.
+         */
+        Builder withAddedHeaders(String... headers);
 
-        public SmithyHttpRequest build() {
-            return new SmithyHttpRequestImpl(this);
-        }
+        /**
+         * Add and merge in the given headers to the message.
+         *
+         * @param headers Headers to add and merge in.
+         * @return the builder.
+         */
+        Builder withAddedHeaders(HttpHeaders headers);
+
+        /**
+         * Put the given headers onto the message, replacing any existing headers with the same names.
+         *
+         * @param headers Headers to put.
+         * @return the builder.
+         */
+        Builder withReplacedHeaders(Map<String, List<String>> headers);
     }
 }

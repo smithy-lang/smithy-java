@@ -63,7 +63,10 @@ public class GenericClientTest {
         var interceptor = new ClientInterceptor() {
             @Override
             public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
-                return hook.mapRequest(SmithyHttpRequest.class, h -> h.request().withAddedHeaders("X-Foo", "Bar"));
+                return hook.mapRequest(
+                    SmithyHttpRequest.class,
+                    h -> h.request().toBuilder().withAddedHeaders("X-Foo", "Bar").build()
+                );
             }
 
             @Override

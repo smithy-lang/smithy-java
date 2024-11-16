@@ -5,22 +5,17 @@
 
 package software.amazon.smithy.java.runtime.http.api;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
-public final class SmithyHttpResponseImpl implements SmithyHttpResponse {
-
-    private final SmithyHttpVersion httpVersion;
-    private final int statusCode;
-    private final DataStream body;
-    private final HttpHeaders headers;
-
-    SmithyHttpResponseImpl(SmithyHttpResponse.Builder builder) {
-        this.httpVersion = Objects.requireNonNull(builder.httpVersion);
-        this.statusCode = builder.statusCode;
-        this.body = Objects.requireNonNullElse(builder.body, DataStream.ofEmpty());
-        this.headers = builder.headers;
-    }
+record SmithyHttpResponseImpl(
+    SmithyHttpVersion httpVersion,
+    int statusCode,
+    HttpHeaders headers,
+    DataStream body
+) implements SmithyHttpResponse {
 
     @Override
     public String toString() {
@@ -33,61 +28,71 @@ public final class SmithyHttpResponseImpl implements SmithyHttpResponse {
         return result.toString();
     }
 
-    @Override
-    public int statusCode() {
-        return statusCode;
-    }
+    static final class Builder implements SmithyHttpResponse.Builder {
+        int statusCode;
+        DataStream body;
+        HttpHeaders headers = SimpleUnmodifiableHttpHeaders.EMPTY;
+        SmithyHttpVersion httpVersion = SmithyHttpVersion.HTTP_1_1;
+        private Map<String, List<String>> mutatedHeaders;
 
-    @Override
-    public SmithyHttpResponse withStatusCode(int statusCode) {
-        return SmithyHttpResponse.builder().with(this).statusCode(statusCode).build();
-    }
+        Builder() {}
 
-    @Override
-    public SmithyHttpVersion httpVersion() {
-        return httpVersion;
-    }
-
-    @Override
-    public SmithyHttpResponse withHttpVersion(SmithyHttpVersion httpVersion) {
-        return SmithyHttpResponse.builder().with(this).httpVersion(httpVersion).build();
-    }
-
-    @Override
-    public HttpHeaders headers() {
-        return headers;
-    }
-
-    @Override
-    public SmithyHttpResponse withHeaders(HttpHeaders headers) {
-        return SmithyHttpResponse.builder().with(this).headers(headers).build();
-    }
-
-    @Override
-    public DataStream body() {
-        return body;
-    }
-
-    @Override
-    public SmithyHttpResponse withBody(DataStream body) {
-        return SmithyHttpResponse.builder().with(this).body(body).build();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
+        @Override
+        public Builder httpVersion(SmithyHttpVersion httpVersion) {
+            this.httpVersion = httpVersion;
+            return this;
         }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        SmithyHttpResponseImpl that = (SmithyHttpResponseImpl) o;
-        return statusCode == that.statusCode && httpVersion == that.httpVersion && Objects.equals(body, that.body)
-            && Objects.equals(headers, that.headers);
-    }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(httpVersion, statusCode, body, headers);
+        @Override
+        public Builder statusCode(int statusCode) {
+            this.statusCode = statusCode;
+            return this;
+        }
+
+        @Override
+        public Builder body(DataStream body) {
+            this.body = body;
+            return this;
+        }
+
+        @Override
+        public Builder headers(HttpHeaders headers) {
+            this.headers = Objects.requireNonNull(headers);
+            mutatedHeaders = null;
+            return this;
+        }
+
+        @Override
+        public Builder withAddedHeaders(String... headers) {
+            mutatedHeaders = SimpleUnmodifiableHttpHeaders.addHeaders(this.headers, mutatedHeaders, headers);
+            return this;
+        }
+
+        @Override
+        public Builder withAddedHeaders(HttpHeaders headers) {
+            mutatedHeaders = SimpleUnmodifiableHttpHeaders.addHeaders(this.headers, mutatedHeaders, headers);
+            return this;
+        }
+
+        @Override
+        public Builder withReplacedHeaders(Map<String, List<String>> headers) {
+            mutatedHeaders = SimpleUnmodifiableHttpHeaders.replaceHeaders(this.headers, mutatedHeaders, headers);
+            return this;
+        }
+
+        public SmithyHttpResponse build() {
+            if (statusCode == 0) {
+                throw new IllegalStateException("No status code was set on response");
+            }
+            if (mutatedHeaders != null) {
+                headers = new SimpleUnmodifiableHttpHeaders(mutatedHeaders, false);
+            }
+            return new SmithyHttpResponseImpl(
+                Objects.requireNonNull(httpVersion),
+                statusCode,
+                headers,
+                Objects.requireNonNullElse(body, DataStream.ofEmpty())
+            );
+        }
     }
 }
