@@ -74,6 +74,17 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
     }
 
     @Override
+    public ModifiableHttpHeaders toModifiable() {
+        var mod = new SimpleModifiableHttpHeaders();
+        Map<String, List<String>> copy = new HashMap<>(headers.size());
+        for (var entry : headers.entrySet()) {
+            copy.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+        mod.putHeaders(copy);
+        return mod;
+    }
+
+    @Override
     public boolean equals(Object obj) {
         if (obj == this) {
             return true;

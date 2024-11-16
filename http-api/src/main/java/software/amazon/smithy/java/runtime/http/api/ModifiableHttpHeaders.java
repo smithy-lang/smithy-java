@@ -50,4 +50,9 @@ public interface ModifiableHttpHeaders extends HttpHeaders {
      * @param name Case-insensitive name of the header to remove.
      */
     void removeHeader(String name);
+
+    @Override
+    default ModifiableHttpHeaders toModifiable() {
+        return this;
+    }
 }
