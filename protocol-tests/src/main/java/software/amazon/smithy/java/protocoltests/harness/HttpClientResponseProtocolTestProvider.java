@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.protocoltests.harness;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Fail.fail;
 
 import java.util.Base64;
 import java.util.HashMap;
@@ -21,6 +22,7 @@ import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
@@ -57,10 +59,12 @@ final class HttpClientResponseProtocolTestProvider extends
             .flatMap(
                 operation -> operation.responseTestCases()
                     .stream()
-                    .map(testCase -> {
+                    .map(protocolTestCase -> {
+                        var testCase = protocolTestCase.responseTestCase();
                         if (filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)) {
                             return new IgnoredTestCase(testCase);
                         }
+                        boolean isErrorTestCase = protocolTestCase.isErrorTest();
                         // Get specific values to use for this test case's context
                         var testProtocol = store.getProtocol(testCase.getProtocol());
                         var testResolver = testCase.getAuthScheme().isEmpty()
@@ -72,7 +76,7 @@ final class HttpClientResponseProtocolTestProvider extends
                             .protocol(testProtocol)
                             .authSchemeResolver(testResolver);
                         var input = operation.operationModel().inputBuilder().errorCorrection().build();
-                        var outputBuilder = operation.operationModel().outputBuilder();
+                        var outputBuilder = protocolTestCase.outputBuilder().get();
                         new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
                             .deserializeInto(outputBuilder);
                         return new ResponseTestInvocationContext(
@@ -81,7 +85,8 @@ final class HttpClientResponseProtocolTestProvider extends
                             operation.operationModel(),
                             input,
                             outputBuilder.build(),
-                            overrideBuilder.build()
+                            overrideBuilder.build(),
+                            isErrorTestCase
                         );
                     })
             );
@@ -93,7 +98,8 @@ final class HttpClientResponseProtocolTestProvider extends
         ApiOperation apiOperation,
         SerializableStruct input,
         SerializableStruct expectedOutput,
-        RequestOverrideConfig overrideConfig
+        RequestOverrideConfig overrideConfig,
+        boolean isErrorTestCase
     ) implements TestTemplateInvocationContext {
 
         @Override
@@ -104,7 +110,19 @@ final class HttpClientResponseProtocolTestProvider extends
         @Override
         public List<Extension> getAdditionalExtensions() {
             return List.of((ProtocolTestParameterResolver) () -> {
-                var actualOutput = mockClient.clientRequest(input, apiOperation, overrideConfig);
+                SerializableStruct actualOutput;
+                try {
+                    actualOutput = mockClient.clientRequest(input, apiOperation, overrideConfig);
+                    if (isErrorTestCase) {
+                        fail("Expected an exception but got a successful response %s", actualOutput);
+                    }
+                } catch (Exception e) {
+                    if (isErrorTestCase && e instanceof ModeledApiException mae) {
+                        actualOutput = mae;
+                    } else {
+                        throw e;
+                    }
+                }
                 assertThat(actualOutput)
                     .usingRecursiveComparison(ComparisonUtils.getComparisonConfig())
                     .isEqualTo(expectedOutput);

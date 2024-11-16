@@ -10,7 +10,6 @@ import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.protocoltests.traits.HttpMalformedRequestTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
-import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
 
 /**
  * Data class holding information needed to execute a protocol test for a given operation.
@@ -27,6 +26,6 @@ record HttpTestOperation(
     ShapeId serviceId,
     ApiOperation<?, ?> operationModel,
     List<HttpRequestTestCase> requestTestCases,
-    List<HttpResponseTestCase> responseTestCases,
+    List<HttpResponseProtocolTestCase> responseTestCases,
     List<HttpMalformedRequestTestCase> malformedRequestTestCases
 ) {}

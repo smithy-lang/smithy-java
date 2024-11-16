@@ -53,7 +53,11 @@ public class AwsJson1ProtocolTests {
     @ProtocolTestFilter(
         skipTests = {
             "AwsJson10ClientPopulatesDefaultsValuesWhenMissingInResponse",
-            "AwsJson10ClientIgnoresDefaultValuesIfMemberValuesArePresentInResponse"
+            "AwsJson10ClientIgnoresDefaultValuesIfMemberValuesArePresentInResponse",
+            "AwsJson10FooErrorUsingCode",
+            "AwsJson10FooErrorUsingCodeAndNamespace",
+            "AwsJson10FooErrorUsingCodeUriAndNamespace",
+            "AwsJson10FooErrorWithDunderTypeUriAndNamespace"
         },
         skipOperations = "aws.protocoltests.json10#OperationWithRequiredMembersWithDefaults"
     )

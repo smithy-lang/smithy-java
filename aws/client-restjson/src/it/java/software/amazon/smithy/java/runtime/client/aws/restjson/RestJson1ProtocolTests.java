@@ -81,7 +81,11 @@ public class RestJson1ProtocolTests {
             "RestJsonHttpPayloadWithUnion",
             "RestJsonInputAndOutputWithQuotedStringHeaders",
             "DocumentTypeAsPayloadOutput",
-            "DocumentTypeAsPayloadOutputString"
+            "DocumentTypeAsPayloadOutputString",
+            "RestJsonFooErrorUsingCode",
+            "RestJsonFooErrorUsingCodeAndNamespace",
+            "RestJsonFooErrorUsingCodeUriAndNamespace",
+            "RestJsonFooErrorWithDunderTypeUriAndNamespace"
         }
     )
     public void responseTest(Runnable test) {

@@ -11,6 +11,7 @@ import java.net.ServerSocket;
 import java.net.URI;
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -26,6 +27,9 @@ import software.amazon.smithy.java.runtime.client.core.ProtocolSettings;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.Model;
@@ -39,7 +43,6 @@ import software.amazon.smithy.protocoltests.traits.HttpMalformedRequestTestsTrai
 import software.amazon.smithy.protocoltests.traits.HttpMessageTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestsTrait;
-import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpResponseTestsTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
@@ -298,20 +301,45 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
         var symbolProvider = new JavaSymbolProvider(serviceModel, service, service.toShapeId().getNamespace());
         for (var operationId : service.getOperations()) {
             var operationShape = serviceModel.getShape(operationId);
-            if (operationShape.isPresent()) {
-                var operation = operationShape.get();
+            if (operationShape.isPresent() && operationShape.get().isOperationShape()) {
+                var operation = operationShape.get().asOperationShape().get();
                 var apiOperation = getApiOperation(symbolProvider, operation);
                 List<HttpRequestTestCase> requestTestsCases = new ArrayList<>();
-                List<HttpResponseTestCase> responseTestsCases = new ArrayList<>();
+                List<HttpResponseProtocolTestCase> responseTestsCases = new ArrayList<>();
                 List<HttpMalformedRequestTestCase> malformedRequestTestCases = new ArrayList<>();
                 operation.getTrait(HttpRequestTestsTrait.class)
                     .map(HttpRequestTestsTrait::getTestCases)
                     .map(l -> l.stream().filter(testTypeFiler).toList())
                     .ifPresent(requestTestsCases::addAll);
-                operation.getTrait(HttpResponseTestsTrait.class)
-                    .map(HttpResponseTestsTrait::getTestCases)
-                    .map(l -> l.stream().filter(testTypeFiler).toList())
-                    .ifPresent(responseTestsCases::addAll);
+                operation.getTrait(HttpResponseTestsTrait.class).ifPresent(httpResponseTestsTrait -> {
+                    for (var testCase : httpResponseTestsTrait.getTestCases()) {
+                        if (testTypeFiler.test(testCase)) {
+                            responseTestsCases.add(
+                                new HttpResponseProtocolTestCase(testCase, false, apiOperation::outputBuilder)
+                            );
+                        }
+                    }
+                });
+                for (var errorId : operation.getErrors()) {
+                    var error = serviceModel.getShape(errorId);
+                    if (error.map(Shape::isStructureShape).orElse(false)) {
+                        continue;
+                    }
+                    var errorShape = error.get().asStructureShape().get();
+                    errorShape.getTrait(HttpResponseTestsTrait.class).ifPresent(httpResponseTestsTrait -> {
+                        for (var testCase : httpResponseTestsTrait.getTestCases()) {
+                            if (testTypeFiler.test(testCase)) {
+                                responseTestsCases.add(
+                                    new HttpResponseProtocolTestCase(
+                                        testCase,
+                                        true,
+                                        getApiExceptionBuilder(symbolProvider, errorShape)
+                                    )
+                                );
+                            }
+                        }
+                    });
+                }
                 operation.getTrait(HttpMalformedRequestTestsTrait.class)
                     .map(HttpMalformedRequestTestsTrait::getTestCases)
                     .ifPresent(malformedRequestTestCases::addAll);
@@ -340,6 +368,25 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
             var fqn = provider.toSymbol(shape).getFullName();
             return CodegenUtils.getImplementationByName(ApiOperation.class, fqn).getDeclaredConstructor().newInstance();
         } catch (InvocationTargetException | InstantiationException | IllegalAccessException
+            | NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static Supplier<ShapeBuilder<? extends SerializableStruct>> getApiExceptionBuilder(
+        SymbolProvider provider,
+        Shape shape
+    ) {
+        try {
+            var fqn = provider.toSymbol(shape).getFullName();
+            var exceptionClazz = CodegenUtils.getClassForName(fqn);
+            if (ModeledApiException.class.isAssignableFrom(exceptionClazz)) {
+                var builder = exceptionClazz.getDeclaredMethod("builder").invoke(null);
+                return () -> (ShapeBuilder<? extends ModeledApiException>) builder;
+            } else {
+                throw new IllegalArgumentException(exceptionClazz + "is not a ModeledApiException");
+            }
+        } catch (InvocationTargetException | IllegalAccessException
             | NoSuchMethodException e) {
             throw new RuntimeException(e);
         }

@@ -19,8 +19,8 @@ import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.ParameterResolver;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
-import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
@@ -52,7 +52,8 @@ public class HttpServerResponseProtocolTestProvider extends
         for (var serverTestOperation : testData.testOperations()) {
             var testOperation = serverTestOperation.operation();
             boolean shouldSkip = filter.skipOperation(testOperation.id());
-            for (var testCase : testOperation.responseTestCases()) {
+            for (var protocolTestCase : testOperation.responseTestCases()) {
+                var testCase = protocolTestCase.responseTestCase();
                 if (shouldSkip || filter.skipTestCase(testCase)) {
                     invocationContexts.add(new IgnoredTestCase(testCase));
                     continue;
@@ -74,10 +75,11 @@ public class HttpServerResponseProtocolTestProvider extends
                 invocationContexts.add(
                     new ServerResponseInvocationContext(
                         testCase,
-                        (ApiOperation<SerializableStruct, SerializableStruct>) testOperation.operationModel(),
                         serverTestOperation.mockOperation(),
                         mockClient,
-                        request
+                        request,
+                        protocolTestCase.outputBuilder().get(),
+                        protocolTestCase.isErrorTest()
                     )
                 );
             }
@@ -88,10 +90,11 @@ public class HttpServerResponseProtocolTestProvider extends
 
     private record ServerResponseInvocationContext(
         HttpResponseTestCase testCase,
-        ApiOperation<SerializableStruct, SerializableStruct> operationModel,
         MockOperation mockOperation,
         ServerTestClient client,
-        SmithyHttpRequest request
+        SmithyHttpRequest request,
+        ShapeBuilder<? extends SerializableStruct> outputBuilder,
+        boolean isErrorTestCase
     ) implements TestTemplateInvocationContext {
 
         @Override
@@ -146,11 +149,13 @@ public class HttpServerResponseProtocolTestProvider extends
                         ParameterContext parameterContext,
                         ExtensionContext extensionContext
                     ) throws ParameterResolutionException {
-                        System.out.println(testCase.getId());
-                        var outputBuilder = operationModel.outputBuilder();
                         new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
                             .deserializeInto(outputBuilder);
-                        mockOperation.setResponse(outputBuilder.build());
+                        if (isErrorTestCase) {
+                            mockOperation.setError((Throwable) outputBuilder.build());
+                        } else {
+                            mockOperation.setResponse(outputBuilder.build());
+                        }
                         SmithyHttpResponse response = client.sendRequest(request);
                         Assertions.assertHeadersEqual(response, testCase.getHeaders());
                         assertEquals(testCase.getCode(), response.statusCode());
