@@ -24,7 +24,7 @@ import software.amazon.smithy.java.runtime.example.model.PutPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonOutput;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 
@@ -133,7 +133,7 @@ public class GenericTest {
             @Override
             public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
                 return hook.mapRequest(
-                    SmithyHttpRequest.class,
+                    HttpRequest.class,
                     h -> h.request().toBuilder().withAddedHeaders("X-Foo", "Bar").build()
                 );
             }

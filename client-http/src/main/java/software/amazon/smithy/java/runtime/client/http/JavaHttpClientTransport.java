@@ -6,8 +6,6 @@
 package software.amazon.smithy.java.runtime.client.http;
 
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
@@ -19,15 +17,15 @@ import software.amazon.smithy.java.runtime.client.core.ClientTransport;
 import software.amazon.smithy.java.runtime.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpVersion;
 
 /**
- * A client transport that uses Java's built-in {@link HttpClient} to send {@link SmithyHttpRequest} and return
- * {@link SmithyHttpResponse}.
+ * A client transport that uses Java's built-in {@link HttpClient} to send {@link HttpRequest} and return
+ * {@link HttpResponse}.
  */
-public class JavaHttpClientTransport implements ClientTransport<SmithyHttpRequest, SmithyHttpResponse> {
+public class JavaHttpClientTransport implements ClientTransport<HttpRequest, HttpResponse> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;
@@ -74,24 +72,24 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
     }
 
     @Override
-    public Class<SmithyHttpRequest> requestClass() {
-        return SmithyHttpRequest.class;
+    public Class<HttpRequest> requestClass() {
+        return HttpRequest.class;
     }
 
     @Override
-    public Class<SmithyHttpResponse> responseClass() {
-        return SmithyHttpResponse.class;
+    public Class<HttpResponse> responseClass() {
+        return HttpResponse.class;
     }
 
     @Override
-    public CompletableFuture<SmithyHttpResponse> send(Context context, SmithyHttpRequest request) {
+    public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
         return sendRequest(createJavaRequest(context, request));
     }
 
-    private HttpRequest createJavaRequest(Context context, SmithyHttpRequest request) {
-        var bodyPublisher = HttpRequest.BodyPublishers.fromPublisher(request.body());
+    private java.net.http.HttpRequest createJavaRequest(Context context, HttpRequest request) {
+        var bodyPublisher = java.net.http.HttpRequest.BodyPublishers.fromPublisher(request.body());
 
-        HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder()
+        java.net.http.HttpRequest.Builder httpRequestBuilder = java.net.http.HttpRequest.newBuilder()
             .version(smithyToHttpVersion(request.httpVersion()))
             .method(request.method(), bodyPublisher)
             .uri(request.uri());
@@ -111,14 +109,14 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
         return httpRequestBuilder.build();
     }
 
-    private CompletableFuture<SmithyHttpResponse> sendRequest(HttpRequest request) {
-        return client.sendAsync(request, HttpResponse.BodyHandlers.ofPublisher())
+    private CompletableFuture<HttpResponse> sendRequest(java.net.http.HttpRequest request) {
+        return client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofPublisher())
             .thenApply(this::createSmithyResponse);
     }
 
-    private SmithyHttpResponse createSmithyResponse(HttpResponse<Flow.Publisher<List<ByteBuffer>>> response) {
+    private HttpResponse createSmithyResponse(java.net.http.HttpResponse<Flow.Publisher<List<ByteBuffer>>> response) {
         LOGGER.trace("Got response: {}; headers: {}", response, response.headers().map());
-        return SmithyHttpResponse.builder()
+        return HttpResponse.builder()
             .httpVersion(javaToSmithyVersion(response.version()))
             .statusCode(response.statusCode())
             .headers(HttpHeaders.of(response.headers().map()))
@@ -126,7 +124,7 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
             .build();
     }
 
-    private static HttpClient.Version smithyToHttpVersion(SmithyHttpVersion version) {
+    private static HttpClient.Version smithyToHttpVersion(HttpVersion version) {
         return switch (version) {
             case HTTP_1_1 -> HttpClient.Version.HTTP_1_1;
             case HTTP_2 -> HttpClient.Version.HTTP_2;
@@ -134,10 +132,10 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
         };
     }
 
-    private static SmithyHttpVersion javaToSmithyVersion(HttpClient.Version version) {
+    private static HttpVersion javaToSmithyVersion(HttpClient.Version version) {
         return switch (version) {
-            case HTTP_1_1 -> SmithyHttpVersion.HTTP_1_1;
-            case HTTP_2 -> SmithyHttpVersion.HTTP_2;
+            case HTTP_1_1 -> HttpVersion.HTTP_1_1;
+            case HTTP_2 -> HttpVersion.HTTP_2;
             default -> throw new UnsupportedOperationException("Unsupported HTTP version: " + version);
         };
     }
@@ -171,7 +169,7 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
         }
     }
 
-    public static final class Factory implements ClientTransportFactory<SmithyHttpRequest, SmithyHttpResponse> {
+    public static final class Factory implements ClientTransportFactory<HttpRequest, HttpResponse> {
 
         @Override
         public String name() {
@@ -185,13 +183,13 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
         }
 
         @Override
-        public Class<SmithyHttpRequest> requestClass() {
-            return SmithyHttpRequest.class;
+        public Class<HttpRequest> requestClass() {
+            return HttpRequest.class;
         }
 
         @Override
-        public Class<SmithyHttpResponse> responseClass() {
-            return SmithyHttpResponse.class;
+        public Class<HttpResponse> responseClass() {
+            return HttpResponse.class;
         }
     }
 }

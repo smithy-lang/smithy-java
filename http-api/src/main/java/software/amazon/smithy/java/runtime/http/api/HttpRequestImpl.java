@@ -13,17 +13,17 @@ import java.util.Objects;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
-record SmithyHttpRequestImpl(
-    SmithyHttpVersion httpVersion,
+record HttpRequestImpl(
+    HttpVersion httpVersion,
     String method,
     URI uri,
     HttpHeaders headers,
     DataStream body
-) implements SmithyHttpRequest {
+) implements HttpRequest {
 
     @Override
-    public SmithyModifiableHttpRequest toModifiable() {
-        var mod = new SmithyModifiableHttpRequestImpl();
+    public ModifiableHttpRequest toModifiable() {
+        var mod = new ModifiableHttpRequestImpl();
         mod.setHttpVersion(httpVersion);
         mod.setMethod(method);
         mod.setUri(uri);
@@ -32,18 +32,18 @@ record SmithyHttpRequestImpl(
         return mod;
     }
 
-    static final class Builder implements SmithyHttpRequest.Builder {
+    static final class Builder implements HttpRequest.Builder {
 
         String method;
         URI uri;
         DataStream body;
         HttpHeaders headers = SimpleUnmodifiableHttpHeaders.EMPTY;
-        SmithyHttpVersion httpVersion = SmithyHttpVersion.HTTP_1_1;
+        HttpVersion httpVersion = HttpVersion.HTTP_1_1;
         private Map<String, List<String>> mutatedHeaders;
 
         Builder() {}
 
-        public Builder httpVersion(SmithyHttpVersion httpVersion) {
+        public Builder httpVersion(HttpVersion httpVersion) {
             this.httpVersion = httpVersion;
             return this;
         }
@@ -102,15 +102,15 @@ record SmithyHttpRequestImpl(
         }
 
         @Override
-        public SmithyHttpRequest build() {
+        public HttpRequest build() {
             beforeBuild();
-            return new SmithyHttpRequestImpl(httpVersion, method, uri, headers, body);
+            return new HttpRequestImpl(httpVersion, method, uri, headers, body);
         }
 
         @Override
-        public SmithyModifiableHttpRequest buildModifiable() {
+        public ModifiableHttpRequest buildModifiable() {
             beforeBuild();
-            var mod = new SmithyModifiableHttpRequestImpl();
+            var mod = new ModifiableHttpRequestImpl();
             mod.setHttpVersion(httpVersion);
             mod.setMethod(method);
             mod.setUri(uri);

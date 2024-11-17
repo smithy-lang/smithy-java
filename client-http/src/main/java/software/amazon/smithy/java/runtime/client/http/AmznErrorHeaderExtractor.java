@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.runtime.client.http;
 
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeIdSyntaxException;
 
@@ -18,12 +18,12 @@ public final class AmznErrorHeaderExtractor implements HttpErrorDeserializer.Hea
     private static final String ERROR_HEADER = "x-amzn-errortype";
 
     @Override
-    public boolean hasHeader(SmithyHttpResponse response) {
+    public boolean hasHeader(HttpResponse response) {
         return response.headers().firstValue(ERROR_HEADER) != null;
     }
 
     @Override
-    public ShapeId resolveId(SmithyHttpResponse response, String serviceNamespace, TypeRegistry registry) {
+    public ShapeId resolveId(HttpResponse response, String serviceNamespace, TypeRegistry registry) {
         var header = response.headers().firstValue(ERROR_HEADER);
         return header == null ? null : toShapeId(header, serviceNamespace, registry);
     }

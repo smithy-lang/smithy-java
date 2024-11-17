@@ -28,7 +28,7 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.retries.api.RetrySafety;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.ReadonlyTrait;
@@ -83,7 +83,7 @@ public class HttpRetryErrorClassifierTest {
     public void appliesModelInformation() {
         var schema = Schema.createOperation(ShapeId.from("com#Foo"), new ReadonlyTrait());
         var operation = createOperation(schema);
-        var response = SmithyHttpResponse.builder().statusCode(400).build();
+        var response = HttpResponse.builder().statusCode(400).build();
         var e = new ApiException("err");
         var context = Context.create();
 
@@ -97,7 +97,7 @@ public class HttpRetryErrorClassifierTest {
     public void appliesRetryAfterHeader() {
         var schema = Schema.createOperation(ShapeId.from("com#Foo"));
         var operation = createOperation(schema);
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(500)
             .headers(HttpHeaders.of(Map.of("retry-after", List.of("10"))))
             .build();
@@ -116,7 +116,7 @@ public class HttpRetryErrorClassifierTest {
     public void appliesRetryAfterHeaderDate() {
         var schema = Schema.createOperation(ShapeId.from("com#Foo"));
         var operation = createOperation(schema);
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(500)
             .headers(HttpHeaders.of(Map.of("retry-after", List.of("Wed, 21 Oct 2015 07:28:00 GMT"))))
             .build();
@@ -136,7 +136,7 @@ public class HttpRetryErrorClassifierTest {
     public void appliesThrottlingStatusCode503() {
         var schema = Schema.createOperation(ShapeId.from("com#Foo"));
         var operation = createOperation(schema);
-        var response = SmithyHttpResponse.builder().statusCode(503).build();
+        var response = HttpResponse.builder().statusCode(503).build();
         var e = new ApiException("err");
         var context = Context.create();
 
@@ -152,7 +152,7 @@ public class HttpRetryErrorClassifierTest {
     public void appliesThrottlingStatusCode429() {
         var schema = Schema.createOperation(ShapeId.from("com#Foo"));
         var operation = createOperation(schema);
-        var response = SmithyHttpResponse.builder().statusCode(429).build();
+        var response = HttpResponse.builder().statusCode(429).build();
         var e = new ApiException("err");
         var context = Context.create();
 
@@ -168,7 +168,7 @@ public class HttpRetryErrorClassifierTest {
     public void retriesSafe5xx() {
         var schema = Schema.createOperation(ShapeId.from("com#Foo"));
         var operation = createOperation(schema);
-        var response = SmithyHttpResponse.builder().statusCode(500).build();
+        var response = HttpResponse.builder().statusCode(500).build();
         var e = new ApiException("err");
         var context = Context.create();
         context.put(CallContext.IDEMPOTENCY_TOKEN, "foo");
@@ -185,7 +185,7 @@ public class HttpRetryErrorClassifierTest {
     public void doesNotRetryUnsafe5xx() {
         var schema = Schema.createOperation(ShapeId.from("com#Foo"));
         var operation = createOperation(schema);
-        var response = SmithyHttpResponse.builder().statusCode(500).build();
+        var response = HttpResponse.builder().statusCode(500).build();
         var e = new ApiException("err");
         var context = Context.create();
 
@@ -201,7 +201,7 @@ public class HttpRetryErrorClassifierTest {
     public void doesNotRetryNormal4xx() {
         var schema = Schema.createOperation(ShapeId.from("com#Foo"));
         var operation = createOperation(schema);
-        var response = SmithyHttpResponse.builder().statusCode(400).build();
+        var response = HttpResponse.builder().statusCode(400).build();
         var e = new ApiException("err");
         var context = Context.create();
 

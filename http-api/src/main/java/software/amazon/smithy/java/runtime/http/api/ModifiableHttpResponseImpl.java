@@ -5,45 +5,33 @@
 
 package software.amazon.smithy.java.runtime.http.api;
 
-import java.net.URI;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
-final class SmithyModifiableHttpRequestImpl implements SmithyModifiableHttpRequest {
+final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
 
-    private URI uri;
-    private String method;
-    private SmithyHttpVersion httpVersion = SmithyHttpVersion.HTTP_1_1;
+    private int statusCode = 200;
+    private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
     private HttpHeaders headers = new SimpleModifiableHttpHeaders();
     private DataStream body = DataStream.ofEmpty();
 
     @Override
-    public String method() {
-        return method;
+    public void setStatusCode(int statusCode) {
+        this.statusCode = statusCode;
     }
 
     @Override
-    public void setMethod(String method) {
-        this.method = Objects.requireNonNull(method);
+    public int statusCode() {
+        return statusCode;
     }
 
     @Override
-    public URI uri() {
-        return uri;
-    }
-
-    @Override
-    public void setUri(URI uri) {
-        this.uri = Objects.requireNonNull(uri);
-    }
-
-    @Override
-    public SmithyHttpVersion httpVersion() {
+    public HttpVersion httpVersion() {
         return httpVersion;
     }
 
     @Override
-    public void setHttpVersion(SmithyHttpVersion httpVersion) {
+    public void setHttpVersion(HttpVersion httpVersion) {
         this.httpVersion = Objects.requireNonNull(httpVersion);
     }
 
@@ -69,12 +57,11 @@ final class SmithyModifiableHttpRequestImpl implements SmithyModifiableHttpReque
 
     @Override
     public String toString() {
-        return "SmithyModifiableHttpRequestImpl{"
-            + "uri=" + uri
-            + ", method='" + method + '\''
+        return "SmithyModifiableHttpResponseImpl{"
+            + "body=" + body
+            + ", statusCode=" + statusCode
             + ", httpVersion=" + httpVersion
-            + ", headers=" + headers
-            + ", body=" + body + '}';
+            + ", headers=" + headers + '}';
     }
 
     @Override
@@ -85,9 +72,8 @@ final class SmithyModifiableHttpRequestImpl implements SmithyModifiableHttpReque
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        SmithyModifiableHttpRequestImpl that = (SmithyModifiableHttpRequestImpl) o;
-        return uri.equals(that.uri)
-            && method.equals(that.method)
+        ModifiableHttpResponseImpl that = (ModifiableHttpResponseImpl) o;
+        return statusCode == that.statusCode
             && httpVersion == that.httpVersion
             && headers.equals(that.headers)
             && body.equals(that.body);
@@ -95,6 +81,6 @@ final class SmithyModifiableHttpRequestImpl implements SmithyModifiableHttpReque
 
     @Override
     public int hashCode() {
-        return Objects.hash(uri, method, httpVersion, headers, body);
+        return Objects.hash(httpVersion, statusCode, headers, body);
     }
 }

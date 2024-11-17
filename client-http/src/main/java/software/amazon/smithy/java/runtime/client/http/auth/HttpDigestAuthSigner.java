@@ -9,19 +9,19 @@ import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.LoginIdentity;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 
 /**
  * TODO: Fully implement
  */
-final class HttpDigestAuthSigner implements Signer<SmithyHttpRequest, LoginIdentity> {
+final class HttpDigestAuthSigner implements Signer<HttpRequest, LoginIdentity> {
     static final HttpDigestAuthSigner INSTANCE = new HttpDigestAuthSigner();
 
     private HttpDigestAuthSigner() {}
 
     @Override
-    public CompletableFuture<SmithyHttpRequest> sign(
-        SmithyHttpRequest request,
+    public CompletableFuture<HttpRequest> sign(
+        HttpRequest request,
         LoginIdentity identity,
         AuthProperties properties
     ) {

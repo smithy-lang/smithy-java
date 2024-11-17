@@ -15,7 +15,7 @@ import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.EventStreamFrameEncodingProcessor;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 
 /**
  * Serializes HTTP responses.
@@ -119,7 +119,7 @@ public final class ResponseSerializer {
      *
      * @return Returns the created response.
      */
-    public SmithyHttpResponse serializeResponse() {
+    public HttpResponse serializeResponse() {
         Objects.requireNonNull(shapeValue, "shapeValue is not set");
         Objects.requireNonNull(operation, "operation is not set");
         Objects.requireNonNull(payloadCodec, "payloadCodec is not set");
@@ -145,7 +145,7 @@ public final class ResponseSerializer {
         shapeValue.serialize(serializer);
         serializer.flush();
 
-        var builder = SmithyHttpResponse.builder()
+        var builder = HttpResponse.builder()
             .statusCode(serializer.getResponseStatus());
 
         var eventStream = serializer.getEventStream();

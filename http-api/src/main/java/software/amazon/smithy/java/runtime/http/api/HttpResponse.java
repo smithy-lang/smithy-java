@@ -14,7 +14,7 @@ import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 /**
  * HTTP response.
  */
-public interface SmithyHttpResponse extends SmithyHttpMessage {
+public interface HttpResponse extends HttpMessage {
     /*
      * Get the status code of the response.
      *
@@ -27,7 +27,7 @@ public interface SmithyHttpResponse extends SmithyHttpMessage {
      *
      * @return the modifiable response.
      */
-    SmithyModifiableHttpResponse toModifiable();
+    ModifiableHttpResponse toModifiable();
 
     /**
      * Create a builder configured with the values of the response.
@@ -48,7 +48,7 @@ public interface SmithyHttpResponse extends SmithyHttpMessage {
      * @return the created builder.
      */
     static Builder builder() {
-        return new SmithyHttpResponseImpl.Builder();
+        return new HttpResponseImpl.Builder();
     }
 
     /**
@@ -61,14 +61,14 @@ public interface SmithyHttpResponse extends SmithyHttpMessage {
          * @return the created response.
          * @throws NullPointerException if status code is missing.
          */
-        SmithyHttpResponse build();
+        HttpResponse build();
 
         /**
          * Build a modifiable HTTP response.
          *
          * @return the mutable HTTP response.
          */
-        SmithyModifiableHttpResponse buildModifiable();
+        ModifiableHttpResponse buildModifiable();
 
         /**
          * Set the HTTP version.
@@ -76,7 +76,7 @@ public interface SmithyHttpResponse extends SmithyHttpMessage {
          * @param httpVersion HTTP version of the message.
          * @return the builder.
          */
-        Builder httpVersion(SmithyHttpVersion httpVersion);
+        Builder httpVersion(HttpVersion httpVersion);
 
         /**
          * Set the body of the message.

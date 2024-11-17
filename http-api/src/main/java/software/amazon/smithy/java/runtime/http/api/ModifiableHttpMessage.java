@@ -10,13 +10,13 @@ import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 /**
  * A modifiable HTTP message.
  */
-public interface SmithyModifiableHttpMessage extends SmithyHttpMessage {
+public interface ModifiableHttpMessage extends HttpMessage {
     /**
      * Set the HTTP version.
      *
      * @param version Version to set.
      */
-    void setHttpVersion(SmithyHttpVersion version);
+    void setHttpVersion(HttpVersion version);
 
     /**
      * Set the HTTP headers.

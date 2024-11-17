@@ -22,8 +22,8 @@ import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.Frame;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.http.binding.HttpBinding;
 import software.amazon.smithy.java.runtime.http.binding.RequestSerializer;
 import software.amazon.smithy.java.runtime.http.binding.ResponseDeserializer;
@@ -68,7 +68,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct> SmithyHttpRequest createRequest(
+    public <I extends SerializableStruct, O extends SerializableStruct> HttpRequest createRequest(
         ApiOperation<I, O> operation,
         I input,
         Context context,
@@ -94,8 +94,8 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
         ApiOperation<I, O> operation,
         Context context,
         TypeRegistry typeRegistry,
-        SmithyHttpRequest request,
-        SmithyHttpResponse response
+        HttpRequest request,
+        HttpResponse response
     ) {
         if (!isSuccess(operation, context, response)) {
             return createError(operation, context, typeRegistry, request, response).thenApply(e -> {
@@ -136,7 +136,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
      * @param response Response to check.
      * @return true if it is a success.
      */
-    protected boolean isSuccess(ApiOperation<?, ?> operation, Context context, SmithyHttpResponse response) {
+    protected boolean isSuccess(ApiOperation<?, ?> operation, Context context, HttpResponse response) {
         return response.statusCode() >= 200 && response.statusCode() <= 299;
     }
 
@@ -156,8 +156,8 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
         ApiOperation<I, O> operation,
         Context context,
         TypeRegistry typeRegistry,
-        SmithyHttpRequest request,
-        SmithyHttpResponse response
+        HttpRequest request,
+        HttpResponse response
     ) {
         return getErrorDeserializer(context).createError(context, operation.schema().id(), typeRegistry, response);
     }

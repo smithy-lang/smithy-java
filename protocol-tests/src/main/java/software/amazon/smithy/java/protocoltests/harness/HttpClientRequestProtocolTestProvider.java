@@ -19,8 +19,8 @@ import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeRes
 import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 
@@ -93,7 +93,7 @@ final class HttpClientRequestProtocolTestProvider extends
         ApiOperation apiOperation,
         SerializableStruct input,
         RequestOverrideConfig overrideConfig,
-        Supplier<SmithyHttpRequest> requestSupplier
+        Supplier<HttpRequest> requestSupplier
     ) implements TestTemplateInvocationContext {
 
         @Override
@@ -157,31 +157,31 @@ final class HttpClientRequestProtocolTestProvider extends
         }
     }
 
-    private static final class TestTransport implements ClientTransport<SmithyHttpRequest, SmithyHttpResponse> {
-        private static final SmithyHttpResponse exceptionalResponse = SmithyHttpResponse.builder()
+    private static final class TestTransport implements ClientTransport<HttpRequest, HttpResponse> {
+        private static final HttpResponse exceptionalResponse = HttpResponse.builder()
             .statusCode(555)
             .build();
 
-        private SmithyHttpRequest capturedRequest;
+        private HttpRequest capturedRequest;
 
-        public SmithyHttpRequest getCapturedRequest() {
+        public HttpRequest getCapturedRequest() {
             return capturedRequest;
         }
 
         @Override
-        public CompletableFuture<SmithyHttpResponse> send(Context context, SmithyHttpRequest request) {
+        public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
             this.capturedRequest = request;
             return CompletableFuture.completedFuture(exceptionalResponse);
         }
 
         @Override
-        public Class<SmithyHttpRequest> requestClass() {
-            return SmithyHttpRequest.class;
+        public Class<HttpRequest> requestClass() {
+            return HttpRequest.class;
         }
 
         @Override
-        public Class<SmithyHttpResponse> responseClass() {
-            return SmithyHttpResponse.class;
+        public Class<HttpResponse> responseClass() {
+            return HttpResponse.class;
         }
     }
 }

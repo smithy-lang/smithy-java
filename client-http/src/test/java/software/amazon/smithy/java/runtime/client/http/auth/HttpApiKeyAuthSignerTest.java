@@ -13,15 +13,15 @@ import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.ApiKeyIdentity;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpVersion;
 import software.amazon.smithy.model.traits.HttpApiKeyAuthTrait;
 
 public class HttpApiKeyAuthSignerTest {
     private static final String API_KEY = "my-api-key";
     private static final ApiKeyIdentity TEST_IDENTITY = ApiKeyIdentity.create(API_KEY);
-    private static final SmithyHttpRequest TEST_REQUEST = SmithyHttpRequest.builder()
-        .httpVersion(SmithyHttpVersion.HTTP_1_1)
+    private static final HttpRequest TEST_REQUEST = HttpRequest.builder()
+        .httpVersion(HttpVersion.HTTP_1_1)
         .method("PUT")
         .uri(URI.create("https://www.example.com"))
         .build();

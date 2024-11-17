@@ -13,19 +13,19 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.ApiKeyIdentity;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 import software.amazon.smithy.java.runtime.io.uri.QueryStringBuilder;
 import software.amazon.smithy.java.runtime.io.uri.URIBuilder;
 
-final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIdentity> {
+final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> {
     static final HttpApiKeyAuthSigner INSTANCE = new HttpApiKeyAuthSigner();
     private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpApiKeyAuthScheme.class);
 
     private HttpApiKeyAuthSigner() {}
 
     @Override
-    public CompletableFuture<SmithyHttpRequest> sign(
-        SmithyHttpRequest request,
+    public CompletableFuture<HttpRequest> sign(
+        HttpRequest request,
         ApiKeyIdentity identity,
         AuthProperties properties
     ) {

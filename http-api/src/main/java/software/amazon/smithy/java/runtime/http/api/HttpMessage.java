@@ -10,13 +10,13 @@ import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 /**
  * HTTP message.
  */
-public interface SmithyHttpMessage {
+public interface HttpMessage {
     /**
      * Get the HTTP version.
      *
      * @return version.
      */
-    SmithyHttpVersion httpVersion();
+    HttpVersion httpVersion();
 
     /**
      * Get the content-type header value.

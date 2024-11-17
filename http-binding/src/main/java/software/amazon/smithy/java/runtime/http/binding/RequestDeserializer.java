@@ -13,7 +13,7 @@ import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.Frame;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 /**
@@ -61,7 +61,7 @@ public final class RequestDeserializer {
      * @param request Request to deserialize into the builder.
      * @return Returns the deserializer.
      */
-    public RequestDeserializer request(SmithyHttpRequest request) {
+    public RequestDeserializer request(HttpRequest request) {
         DataStream bodyDataStream = request.body();
         deserBuilder.headers(request.headers())
             .requestRawQueryString(request.uri().getRawQuery())

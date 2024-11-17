@@ -23,8 +23,8 @@ import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 
@@ -66,10 +66,10 @@ public class HttpServerRequestProtocolTestProvider extends
                 } else {
                     mapper = String::getBytes;
                 }
-                var request = SmithyHttpRequest.builder()
+                var request = HttpRequest.builder()
                     .uri(createUri)
                     .body(DataStream.ofBytes(testCase.getBody().map(mapper).orElse(new byte[0])))
-                    .httpVersion(SmithyHttpVersion.HTTP_1_1)
+                    .httpVersion(HttpVersion.HTTP_1_1)
                     .method(testCase.getMethod())
                     .headers(headers)
                     .build();
@@ -188,7 +188,7 @@ public class HttpServerRequestProtocolTestProvider extends
         ApiOperation<SerializableStruct, SerializableStruct> operationModel,
         MockOperation mockOperation,
         ServerTestClient client,
-        SmithyHttpRequest request
+        HttpRequest request
     ) implements TestTemplateInvocationContext {
 
         @Override

@@ -9,7 +9,7 @@ import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpBearerAuthTrait;
 
@@ -17,15 +17,15 @@ import software.amazon.smithy.model.traits.HttpBearerAuthTrait;
  * Implements the HTTP Bearer Authentication Scheme as defined in
  * <a href="https://datatracker.ietf.org/doc/html/rfc2617.html">RFC 2617</a>.
  */
-public final class HttpBearerAuthScheme implements AuthScheme<SmithyHttpRequest, TokenIdentity> {
+public final class HttpBearerAuthScheme implements AuthScheme<HttpRequest, TokenIdentity> {
     @Override
     public ShapeId schemeId() {
         return HttpBearerAuthTrait.ID;
     }
 
     @Override
-    public Class<SmithyHttpRequest> requestClass() {
-        return SmithyHttpRequest.class;
+    public Class<HttpRequest> requestClass() {
+        return HttpRequest.class;
     }
 
     @Override
@@ -34,7 +34,7 @@ public final class HttpBearerAuthScheme implements AuthScheme<SmithyHttpRequest,
     }
 
     @Override
-    public Signer<SmithyHttpRequest, TokenIdentity> signer() {
+    public Signer<HttpRequest, TokenIdentity> signer() {
         return HttpBearerAuthSigner.INSTANCE;
     }
 

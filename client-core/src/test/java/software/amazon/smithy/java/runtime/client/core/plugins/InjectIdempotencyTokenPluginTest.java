@@ -27,8 +27,8 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -88,11 +88,11 @@ public class InjectIdempotencyTokenPluginTest {
             .model(MODEL)
             .protocol(new RestJsonClientProtocol(SERVICE))
             .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .transport(new ClientTransport<SmithyHttpRequest, SmithyHttpResponse>() {
+            .transport(new ClientTransport<HttpRequest, HttpResponse>() {
                 @Override
-                public CompletableFuture<SmithyHttpResponse> send(Context context, SmithyHttpRequest request) {
+                public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
                     return CompletableFuture.completedFuture(
-                        SmithyHttpResponse.builder()
+                        HttpResponse.builder()
                             .statusCode(200)
                             .headers(HttpHeaders.of(Map.of("content-type", List.of("application/json"))))
                             .body(DataStream.ofString("{}"))
@@ -101,13 +101,13 @@ public class InjectIdempotencyTokenPluginTest {
                 }
 
                 @Override
-                public Class<SmithyHttpRequest> requestClass() {
-                    return SmithyHttpRequest.class;
+                public Class<HttpRequest> requestClass() {
+                    return HttpRequest.class;
                 }
 
                 @Override
-                public Class<SmithyHttpResponse> responseClass() {
-                    return SmithyHttpResponse.class;
+                public Class<HttpResponse> responseClass() {
+                    return HttpResponse.class;
                 }
             })
             .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
@@ -115,7 +115,7 @@ public class InjectIdempotencyTokenPluginTest {
             .addInterceptor(new ClientInterceptor() {
                 @Override
                 public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
-                    ref.set(((SmithyHttpRequest) hook.request()).headers().firstValue("x-token"));
+                    ref.set(((HttpRequest) hook.request()).headers().firstValue("x-token"));
                 }
             })
             .build();

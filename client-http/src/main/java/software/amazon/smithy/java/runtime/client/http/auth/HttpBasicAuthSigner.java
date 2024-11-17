@@ -15,9 +15,9 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.LoginIdentity;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 
-final class HttpBasicAuthSigner implements Signer<SmithyHttpRequest, LoginIdentity> {
+final class HttpBasicAuthSigner implements Signer<HttpRequest, LoginIdentity> {
     static final HttpBasicAuthSigner INSTANCE = new HttpBasicAuthSigner();
     private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpBasicAuthSigner.class);
     private static final String AUTHORIZATION_HEADER = "authorization";
@@ -26,8 +26,8 @@ final class HttpBasicAuthSigner implements Signer<SmithyHttpRequest, LoginIdenti
     private HttpBasicAuthSigner() {}
 
     @Override
-    public CompletableFuture<SmithyHttpRequest> sign(
-        SmithyHttpRequest request,
+    public CompletableFuture<HttpRequest> sign(
+        HttpRequest request,
         LoginIdentity identity,
         AuthProperties properties
     ) {

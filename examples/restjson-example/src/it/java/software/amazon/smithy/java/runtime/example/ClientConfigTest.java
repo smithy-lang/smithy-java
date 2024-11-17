@@ -36,7 +36,7 @@ import software.amazon.smithy.java.runtime.example.model.PutPersonImageInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonImageOutput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonInput;
 import software.amazon.smithy.java.runtime.example.model.PutPersonOutput;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 
 public class ClientConfigTest {
 
@@ -54,7 +54,7 @@ public class ClientConfigTest {
             .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
             .build();
         callOperation(client);
-        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
+        HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().toString()).startsWith("http://httpbin.org/anything/");
     }
 
@@ -64,7 +64,7 @@ public class ClientConfigTest {
             .addInterceptor(requestCapturingInterceptor)
             .build();
         callOperation(client);
-        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
+        HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().getHost()).isEqualTo("global.example.com");
     }
 
@@ -75,7 +75,7 @@ public class ClientConfigTest {
             .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
             .build();
         callOperation(client);
-        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
+        HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().toString()).startsWith("http://httpbin.org/anything/");
     }
 
@@ -86,7 +86,7 @@ public class ClientConfigTest {
             .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
             .build();
         callOperation(client);
-        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
+        HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
     }
 
@@ -98,7 +98,7 @@ public class ClientConfigTest {
             .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
             .build();
         callOperation(client);
-        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
+        HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
     }
 
@@ -109,7 +109,7 @@ public class ClientConfigTest {
             .addPlugin(new RegionAwareServicePlugin())
             .build();
         callOperation(client);
-        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
+        HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().getHost()).isEqualTo("global.example.com");
     }
 
@@ -121,7 +121,7 @@ public class ClientConfigTest {
             .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
             .build();
         callOperation(client);
-        SmithyHttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
+        HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
     }
 
@@ -214,15 +214,15 @@ public class ClientConfigTest {
     }
 
     private static class RequestCapturingInterceptor implements ClientInterceptor {
-        private SmithyHttpRequest request;
+        private HttpRequest request;
 
-        public SmithyHttpRequest lastCapturedRequest() {
+        public HttpRequest lastCapturedRequest() {
             return request;
         }
 
         @Override
         public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
-            request = (SmithyHttpRequest) hook.request();
+            request = (HttpRequest) hook.request();
         }
     }
 }

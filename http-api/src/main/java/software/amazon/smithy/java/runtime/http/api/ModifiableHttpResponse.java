@@ -8,7 +8,7 @@ package software.amazon.smithy.java.runtime.http.api;
 /**
  * A modifiable HTTP response.
  */
-public interface SmithyModifiableHttpResponse extends SmithyModifiableHttpMessage, SmithyHttpResponse {
+public interface ModifiableHttpResponse extends ModifiableHttpMessage, HttpResponse {
     /**
      * Set the status code.
      *
@@ -17,7 +17,7 @@ public interface SmithyModifiableHttpResponse extends SmithyModifiableHttpMessag
     void setStatusCode(int statusCode);
 
     @Override
-    default SmithyModifiableHttpResponse toModifiable() {
+    default ModifiableHttpResponse toModifiable() {
         return this;
     }
 }

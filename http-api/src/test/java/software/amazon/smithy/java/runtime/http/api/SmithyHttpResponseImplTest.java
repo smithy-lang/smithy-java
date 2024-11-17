@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 public class SmithyHttpResponseImplTest {
     @Test
     public void addHeaders() {
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(200)
             .withAddedHeaders("foo", "bar   ", "Baz", "bam", "FOO", "bar2")
             .build();
@@ -28,7 +28,7 @@ public class SmithyHttpResponseImplTest {
 
     @Test
     public void addHeadersToExistingHeaders() {
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(200)
             .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
             .withAddedHeaders("foo", "bar   ", "Baz", "bam", "FOO", "bar2")
@@ -42,7 +42,7 @@ public class SmithyHttpResponseImplTest {
 
     @Test
     public void replacesHeaders() {
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(200)
             .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
             .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
@@ -56,7 +56,7 @@ public class SmithyHttpResponseImplTest {
 
     @Test
     public void replacesHeadersOnExisting() {
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(200)
             .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
             .withAddedHeaders("a", "b")
@@ -72,7 +72,7 @@ public class SmithyHttpResponseImplTest {
 
     @Test
     public void addsHeadersToReplacements() {
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(200)
             .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
             .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))

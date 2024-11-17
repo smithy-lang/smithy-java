@@ -17,8 +17,8 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.LoginIdentity;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpVersion;
 
 public class HttpBasicAuthSignerTest {
     @Test
@@ -26,8 +26,8 @@ public class HttpBasicAuthSignerTest {
         var username = "username";
         var password = "password";
         var testIdentity = LoginIdentity.create(username, password);
-        var request = SmithyHttpRequest.builder()
-            .httpVersion(SmithyHttpVersion.HTTP_1_1)
+        var request = HttpRequest.builder()
+            .httpVersion(HttpVersion.HTTP_1_1)
             .method("PUT")
             .uri(URI.create("https://www.example.com"))
             .build();
@@ -44,8 +44,8 @@ public class HttpBasicAuthSignerTest {
         var username = "username";
         var password = "password";
         var testIdentity = LoginIdentity.create(username, password);
-        var request = SmithyHttpRequest.builder()
-            .httpVersion(SmithyHttpVersion.HTTP_1_1)
+        var request = HttpRequest.builder()
+            .httpVersion(HttpVersion.HTTP_1_1)
             .method("PUT")
             .headers(HttpHeaders.of(Map.of("Authorization", List.of("FOO", "BAR"))))
             .uri(URI.create("https://www.example.com"))

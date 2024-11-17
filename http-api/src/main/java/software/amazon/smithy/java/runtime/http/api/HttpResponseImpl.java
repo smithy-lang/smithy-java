@@ -10,16 +10,16 @@ import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
-record SmithyHttpResponseImpl(
-    SmithyHttpVersion httpVersion,
+record HttpResponseImpl(
+    HttpVersion httpVersion,
     int statusCode,
     HttpHeaders headers,
     DataStream body
-) implements SmithyHttpResponse {
+) implements HttpResponse {
 
     @Override
-    public SmithyModifiableHttpResponse toModifiable() {
-        var mod = new SmithyModifiableHttpResponseImpl();
+    public ModifiableHttpResponse toModifiable() {
+        var mod = new ModifiableHttpResponseImpl();
         mod.setHttpVersion(httpVersion);
         mod.setStatusCode(statusCode);
         mod.setHeaders(headers);
@@ -27,17 +27,17 @@ record SmithyHttpResponseImpl(
         return mod;
     }
 
-    static final class Builder implements SmithyHttpResponse.Builder {
+    static final class Builder implements HttpResponse.Builder {
         int statusCode;
         DataStream body;
         HttpHeaders headers = SimpleUnmodifiableHttpHeaders.EMPTY;
-        SmithyHttpVersion httpVersion = SmithyHttpVersion.HTTP_1_1;
+        HttpVersion httpVersion = HttpVersion.HTTP_1_1;
         private Map<String, List<String>> mutatedHeaders;
 
         Builder() {}
 
         @Override
-        public Builder httpVersion(SmithyHttpVersion httpVersion) {
+        public Builder httpVersion(HttpVersion httpVersion) {
             this.httpVersion = httpVersion;
             return this;
         }
@@ -91,15 +91,15 @@ record SmithyHttpResponseImpl(
         }
 
         @Override
-        public SmithyHttpResponse build() {
+        public HttpResponse build() {
             beforeBuild();
-            return new SmithyHttpResponseImpl(httpVersion, statusCode, headers, body);
+            return new HttpResponseImpl(httpVersion, statusCode, headers, body);
         }
 
         @Override
-        public SmithyModifiableHttpResponse buildModifiable() {
+        public ModifiableHttpResponse buildModifiable() {
             beforeBuild();
-            var mod = new SmithyModifiableHttpResponseImpl();
+            var mod = new ModifiableHttpResponseImpl();
             mod.setHttpVersion(httpVersion);
             mod.setStatusCode(statusCode);
             mod.setHeaders(headers);

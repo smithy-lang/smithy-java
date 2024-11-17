@@ -15,8 +15,8 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.TraitKey;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.http.binding.HttpBinding;
 import software.amazon.smithy.java.runtime.http.binding.ResponseSerializer;
 import software.amazon.smithy.java.runtime.io.uri.URLEncoding;
@@ -123,7 +123,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
             .inputShapeBuilder(inputShapeBuilder)
             .pathLabelValues(labelValues)
             .request(
-                SmithyHttpRequest.builder()
+                HttpRequest.builder()
                     .headers(headers)
                     .uri(httpJob.request().uri())
                     .method(httpJob.request().method())
@@ -156,7 +156,7 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         if (isError) {
             serializer.errorSchema(output.schema());
         }
-        SmithyHttpResponse response = serializer.serializeResponse();
+        HttpResponse response = serializer.serializeResponse();
         httpJob.response().setSerializedValue(response.body());
         httpJob.response().setStatusCode(response.statusCode());
         httpJob.response().headers().putHeaders(response.headers().map());

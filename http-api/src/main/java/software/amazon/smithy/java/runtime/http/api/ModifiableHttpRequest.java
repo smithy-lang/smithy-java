@@ -10,7 +10,7 @@ import java.net.URI;
 /**
  * A modifiable HTTP request.
  */
-public interface SmithyModifiableHttpRequest extends SmithyModifiableHttpMessage, SmithyHttpRequest {
+public interface ModifiableHttpRequest extends ModifiableHttpMessage, HttpRequest {
     /**
      * Set the request method.
      *
@@ -26,7 +26,7 @@ public interface SmithyModifiableHttpRequest extends SmithyModifiableHttpMessage
     void setUri(URI uri);
 
     @Override
-    default SmithyModifiableHttpRequest toModifiable() {
+    default ModifiableHttpRequest toModifiable() {
         return this;
     }
 }

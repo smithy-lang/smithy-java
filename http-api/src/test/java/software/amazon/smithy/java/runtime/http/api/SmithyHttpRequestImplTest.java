@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 public class SmithyHttpRequestImplTest {
     @Test
     public void addHeaders() throws Exception {
-        var request = SmithyHttpRequest.builder()
+        var request = HttpRequest.builder()
             .method("GET")
             .uri(new URI("https://localhost"))
             .withAddedHeaders("foo", "bar   ", "Baz", "bam", "FOO", "bar2")
@@ -30,7 +30,7 @@ public class SmithyHttpRequestImplTest {
 
     @Test
     public void addHeadersToExistingHeaders() throws Exception {
-        var request = SmithyHttpRequest.builder()
+        var request = HttpRequest.builder()
             .method("GET")
             .uri(new URI("https://localhost"))
             .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
@@ -45,7 +45,7 @@ public class SmithyHttpRequestImplTest {
 
     @Test
     public void replacesHeaders() throws Exception {
-        var request = SmithyHttpRequest.builder()
+        var request = HttpRequest.builder()
             .method("GET")
             .uri(new URI("https://localhost"))
             .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
@@ -60,7 +60,7 @@ public class SmithyHttpRequestImplTest {
 
     @Test
     public void replacesHeadersOnExisting() throws Exception {
-        var request = SmithyHttpRequest.builder()
+        var request = HttpRequest.builder()
             .method("GET")
             .uri(new URI("https://localhost"))
             .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
@@ -77,7 +77,7 @@ public class SmithyHttpRequestImplTest {
 
     @Test
     public void addsHeadersToReplacements() throws Exception {
-        var request = SmithyHttpRequest.builder()
+        var request = HttpRequest.builder()
             .method("GET")
             .uri(new URI("https://localhost"))
             .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))

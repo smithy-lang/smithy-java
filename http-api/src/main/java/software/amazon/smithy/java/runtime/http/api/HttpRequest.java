@@ -15,7 +15,7 @@ import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 /**
  * HTTP request.
  */
-public interface SmithyHttpRequest extends SmithyHttpMessage {
+public interface HttpRequest extends HttpMessage {
     /**
      * Get the method of the request.
      *
@@ -35,7 +35,7 @@ public interface SmithyHttpRequest extends SmithyHttpMessage {
      *
      * @return the modifiable request.
      */
-    SmithyModifiableHttpRequest toModifiable();
+    ModifiableHttpRequest toModifiable();
 
     /**
      * Create a builder configured with the values of the request.
@@ -57,7 +57,7 @@ public interface SmithyHttpRequest extends SmithyHttpMessage {
      * @return the created builder.
      */
     static Builder builder() {
-        return new SmithyHttpRequestImpl.Builder();
+        return new HttpRequestImpl.Builder();
     }
 
     /**
@@ -70,14 +70,14 @@ public interface SmithyHttpRequest extends SmithyHttpMessage {
          * @return the created request.
          * @throws NullPointerException if method or uri are missing.
          */
-        SmithyHttpRequest build();
+        HttpRequest build();
 
         /**
          * Build a modifiable HTTP request.
          *
          * @return the mutable HTTP request.
          */
-        SmithyModifiableHttpRequest buildModifiable();
+        ModifiableHttpRequest buildModifiable();
 
         /**
          * Set the HTTP method.
@@ -101,7 +101,7 @@ public interface SmithyHttpRequest extends SmithyHttpMessage {
          * @param httpVersion HTTP version of the message.
          * @return the builder.
          */
-        Builder httpVersion(SmithyHttpVersion httpVersion);
+        Builder httpVersion(HttpVersion httpVersion);
 
         /**
          * Set the body of the message.

@@ -12,14 +12,14 @@ import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.ApiKeyIdentity;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpApiKeyAuthTrait;
 
 /**
  * Implements HTTP-specific authentication using an API key sent in a header or query string parameter.
  */
-public final class HttpApiKeyAuthScheme implements AuthScheme<SmithyHttpRequest, ApiKeyIdentity> {
+public final class HttpApiKeyAuthScheme implements AuthScheme<HttpRequest, ApiKeyIdentity> {
     static final Context.Key<String> NAME = Context.key(
         "Name of the header or query parameter that contains the API key"
     );
@@ -46,8 +46,8 @@ public final class HttpApiKeyAuthScheme implements AuthScheme<SmithyHttpRequest,
     }
 
     @Override
-    public Class<SmithyHttpRequest> requestClass() {
-        return SmithyHttpRequest.class;
+    public Class<HttpRequest> requestClass() {
+        return HttpRequest.class;
     }
 
     @Override
@@ -67,7 +67,7 @@ public final class HttpApiKeyAuthScheme implements AuthScheme<SmithyHttpRequest,
     }
 
     @Override
-    public Signer<SmithyHttpRequest, ApiKeyIdentity> signer() {
+    public Signer<HttpRequest, ApiKeyIdentity> signer() {
         return HttpApiKeyAuthSigner.INSTANCE;
     }
 

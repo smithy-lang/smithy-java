@@ -7,14 +7,14 @@ package software.amazon.smithy.java.runtime.client.http;
 
 import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
 import software.amazon.smithy.java.runtime.client.core.endpoint.Endpoint;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.io.uri.URIBuilder;
 
 /**
  * An abstract class for implementing HTTP-Based protocol.
  */
-public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpRequest, SmithyHttpResponse> {
+public abstract class HttpClientProtocol implements ClientProtocol<HttpRequest, HttpResponse> {
 
     private final String id;
 
@@ -28,17 +28,17 @@ public abstract class HttpClientProtocol implements ClientProtocol<SmithyHttpReq
     }
 
     @Override
-    public final Class<SmithyHttpRequest> requestClass() {
-        return SmithyHttpRequest.class;
+    public final Class<HttpRequest> requestClass() {
+        return HttpRequest.class;
     }
 
     @Override
-    public final Class<SmithyHttpResponse> responseClass() {
-        return SmithyHttpResponse.class;
+    public final Class<HttpResponse> responseClass() {
+        return HttpResponse.class;
     }
 
     @Override
-    public SmithyHttpRequest setServiceEndpoint(SmithyHttpRequest request, Endpoint endpoint) {
+    public HttpRequest setServiceEndpoint(HttpRequest request, Endpoint endpoint) {
         var uri = endpoint.uri();
         URIBuilder builder = URIBuilder.of(request.uri());
 

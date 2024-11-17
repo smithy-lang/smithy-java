@@ -12,7 +12,7 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -34,7 +34,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
  *
  * @see <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-signing.html">SigV4 Request Signing</a>
  */
-public final class SigV4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsCredentialsIdentity> {
+public final class SigV4AuthScheme implements AuthScheme<HttpRequest, AwsCredentialsIdentity> {
     private final String signingName;
 
     public SigV4AuthScheme(String signingName) {
@@ -47,8 +47,8 @@ public final class SigV4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsC
     }
 
     @Override
-    public Class<SmithyHttpRequest> requestClass() {
-        return SmithyHttpRequest.class;
+    public Class<HttpRequest> requestClass() {
+        return HttpRequest.class;
     }
 
     @Override
@@ -69,7 +69,7 @@ public final class SigV4AuthScheme implements AuthScheme<SmithyHttpRequest, AwsC
     }
 
     @Override
-    public Signer<SmithyHttpRequest, AwsCredentialsIdentity> signer() {
+    public Signer<HttpRequest, AwsCredentialsIdentity> signer() {
         return SigV4Signer.INSTANCE;
     }
 
