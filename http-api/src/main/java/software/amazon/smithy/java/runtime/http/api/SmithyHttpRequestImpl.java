@@ -22,35 +22,14 @@ record SmithyHttpRequestImpl(
 ) implements SmithyHttpRequest {
 
     @Override
-    public String toString() {
-        StringBuilder result = new StringBuilder();
-        // Determine the path and possible query string.
-        String pathAndQuery = uri.getRawPath();
-        if (uri.getRawQuery() != null) {
-            pathAndQuery += "?" + uri.getRawQuery();
-        }
-        // Add the start line.
-        result.append(method)
-            .append(' ')
-            .append(pathAndQuery)
-            .append(' ')
-            .append(httpVersion)
-            .append(System.lineSeparator());
-        // Append host header if not present.
-        if (headers.firstValue("host") == null) {
-            String host = uri.getHost();
-            if (uri.getPort() != -1) {
-                host += ":" + uri.getPort();
-            }
-            result.append("host: ").append(host).append(System.lineSeparator());
-        }
-        // Add other headers.
-        headers.map().forEach((field, values) -> values.forEach(value -> {
-            result.append(field).append(": ").append(value).append(System.lineSeparator());
-        }));
-        result.append(System.lineSeparator());
-
-        return result.toString();
+    public SmithyModifiableHttpRequest toModifiable() {
+        var mod = new SmithyModifiableHttpRequestImpl();
+        mod.setHttpVersion(httpVersion);
+        mod.setMethod(method);
+        mod.setUri(uri);
+        mod.setHeaders(headers);
+        mod.setBody(body);
+        return mod;
     }
 
     static final class Builder implements SmithyHttpRequest.Builder {
@@ -112,7 +91,7 @@ record SmithyHttpRequestImpl(
             return this;
         }
 
-        public SmithyHttpRequest build() {
+        private void beforeBuild() {
             if (mutatedHeaders != null) {
                 headers = new SimpleUnmodifiableHttpHeaders(mutatedHeaders, false);
             }
@@ -120,7 +99,24 @@ record SmithyHttpRequestImpl(
             Objects.requireNonNull(method, "Method cannot be null");
             Objects.requireNonNull(uri, "URI cannot be null");
             body = Objects.requireNonNullElse(body, DataStream.ofEmpty());
+        }
+
+        @Override
+        public SmithyHttpRequest build() {
+            beforeBuild();
             return new SmithyHttpRequestImpl(httpVersion, method, uri, headers, body);
+        }
+
+        @Override
+        public SmithyModifiableHttpRequest buildModifiable() {
+            beforeBuild();
+            var mod = new SmithyModifiableHttpRequestImpl();
+            mod.setHttpVersion(httpVersion);
+            mod.setMethod(method);
+            mod.setUri(uri);
+            mod.setHeaders(headers);
+            mod.setBody(body);
+            return mod;
         }
     }
 }

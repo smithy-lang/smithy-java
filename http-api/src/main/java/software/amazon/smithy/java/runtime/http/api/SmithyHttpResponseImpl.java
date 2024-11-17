@@ -18,14 +18,13 @@ record SmithyHttpResponseImpl(
 ) implements SmithyHttpResponse {
 
     @Override
-    public String toString() {
-        StringBuilder result = new StringBuilder();
-        result.append(httpVersion).append(' ').append(statusCode).append(System.lineSeparator());
-        headers.map().forEach((field, values) -> values.forEach(value -> {
-            result.append(field).append(": ").append(value).append(System.lineSeparator());
-        }));
-        result.append(System.lineSeparator());
-        return result.toString();
+    public SmithyModifiableHttpResponse toModifiable() {
+        var mod = new SmithyModifiableHttpResponseImpl();
+        mod.setHttpVersion(httpVersion);
+        mod.setStatusCode(statusCode);
+        mod.setHeaders(headers);
+        mod.setBody(body);
+        return mod;
     }
 
     static final class Builder implements SmithyHttpResponse.Builder {
@@ -80,19 +79,32 @@ record SmithyHttpResponseImpl(
             return this;
         }
 
-        public SmithyHttpResponse build() {
+        private void beforeBuild() {
             if (statusCode == 0) {
                 throw new IllegalStateException("No status code was set on response");
             }
             if (mutatedHeaders != null) {
                 headers = new SimpleUnmodifiableHttpHeaders(mutatedHeaders, false);
             }
-            return new SmithyHttpResponseImpl(
-                Objects.requireNonNull(httpVersion),
-                statusCode,
-                headers,
-                Objects.requireNonNullElse(body, DataStream.ofEmpty())
-            );
+            Objects.requireNonNull(httpVersion);
+            body = Objects.requireNonNullElse(body, DataStream.ofEmpty());
+        }
+
+        @Override
+        public SmithyHttpResponse build() {
+            beforeBuild();
+            return new SmithyHttpResponseImpl(httpVersion, statusCode, headers, body);
+        }
+
+        @Override
+        public SmithyModifiableHttpResponse buildModifiable() {
+            beforeBuild();
+            var mod = new SmithyModifiableHttpResponseImpl();
+            mod.setHttpVersion(httpVersion);
+            mod.setStatusCode(statusCode);
+            mod.setHeaders(headers);
+            mod.setBody(body);
+            return mod;
         }
     }
 }

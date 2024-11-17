@@ -12,13 +12,6 @@ import software.amazon.smithy.java.runtime.io.datastream.DataStream;
  */
 public interface SmithyHttpMessage {
     /**
-     * Get the HTTP start line.
-     *
-     * @return start line.
-     */
-    String startLine();
-
-    /**
      * Get the HTTP version.
      *
      * @return version.

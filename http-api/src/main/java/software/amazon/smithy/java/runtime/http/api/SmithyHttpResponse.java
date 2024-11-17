@@ -15,18 +15,19 @@ import software.amazon.smithy.java.runtime.io.datastream.DataStream;
  * HTTP response.
  */
 public interface SmithyHttpResponse extends SmithyHttpMessage {
-
-    @Override
-    default String startLine() {
-        return httpVersion() + " " + statusCode();
-    }
-
-    /**
+    /*
      * Get the status code of the response.
      *
      * @return the status code.
      */
     int statusCode();
+
+    /**
+     * Get a modifiable version of the response.
+     *
+     * @return the modifiable response.
+     */
+    SmithyModifiableHttpResponse toModifiable();
 
     /**
      * Create a builder configured with the values of the response.
@@ -61,6 +62,13 @@ public interface SmithyHttpResponse extends SmithyHttpMessage {
          * @throws NullPointerException if status code is missing.
          */
         SmithyHttpResponse build();
+
+        /**
+         * Build a modifiable HTTP response.
+         *
+         * @return the mutable HTTP response.
+         */
+        SmithyModifiableHttpResponse buildModifiable();
 
         /**
          * Set the HTTP version.

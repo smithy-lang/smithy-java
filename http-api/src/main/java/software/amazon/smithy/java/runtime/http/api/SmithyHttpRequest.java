@@ -30,10 +30,12 @@ public interface SmithyHttpRequest extends SmithyHttpMessage {
      */
     URI uri();
 
-    @Override
-    default String startLine() {
-        return method() + " " + uri().getHost() + " " + httpVersion();
-    }
+    /**
+     * Get a modifiable version of the request.
+     *
+     * @return the modifiable request.
+     */
+    SmithyModifiableHttpRequest toModifiable();
 
     /**
      * Create a builder configured with the values of the request.
@@ -69,6 +71,13 @@ public interface SmithyHttpRequest extends SmithyHttpMessage {
          * @throws NullPointerException if method or uri are missing.
          */
         SmithyHttpRequest build();
+
+        /**
+         * Build a modifiable HTTP request.
+         *
+         * @return the mutable HTTP request.
+         */
+        SmithyModifiableHttpRequest buildModifiable();
 
         /**
          * Set the HTTP method.
