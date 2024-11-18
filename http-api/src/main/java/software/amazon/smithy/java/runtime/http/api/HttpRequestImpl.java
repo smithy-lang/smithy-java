@@ -27,7 +27,7 @@ record HttpRequestImpl(
         mod.setHttpVersion(httpVersion);
         mod.setMethod(method);
         mod.setUri(uri);
-        mod.setHeaders(headers);
+        mod.setHeaders(headers.toModifiable());
         mod.setBody(body);
         return mod;
     }
@@ -114,7 +114,7 @@ record HttpRequestImpl(
             mod.setHttpVersion(httpVersion);
             mod.setMethod(method);
             mod.setUri(uri);
-            mod.setHeaders(headers);
+            mod.setHeaders(headers.toModifiable());
             mod.setBody(body);
             return mod;
         }

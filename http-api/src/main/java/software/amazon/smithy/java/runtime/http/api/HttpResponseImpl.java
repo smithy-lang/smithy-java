@@ -22,7 +22,7 @@ record HttpResponseImpl(
         var mod = new ModifiableHttpResponseImpl();
         mod.setHttpVersion(httpVersion);
         mod.setStatusCode(statusCode);
-        mod.setHeaders(headers);
+        mod.setHeaders(headers.toModifiable());
         mod.setBody(body);
         return mod;
     }
@@ -102,7 +102,7 @@ record HttpResponseImpl(
             var mod = new ModifiableHttpResponseImpl();
             mod.setHttpVersion(httpVersion);
             mod.setStatusCode(statusCode);
-            mod.setHeaders(headers);
+            mod.setHeaders(headers.toModifiable());
             mod.setBody(body);
             return mod;
         }

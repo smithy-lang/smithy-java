@@ -23,7 +23,7 @@ public interface ModifiableHttpMessage extends HttpMessage {
      *
      * @param headers Headers to set.
      */
-    void setHeaders(HttpHeaders headers);
+    void setHeaders(ModifiableHttpHeaders headers);
 
     /**
      * Set the HTTP body.

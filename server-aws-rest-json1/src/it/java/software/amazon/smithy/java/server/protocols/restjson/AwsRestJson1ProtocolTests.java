@@ -12,7 +12,6 @@ import software.amazon.smithy.java.protocoltests.harness.*;
 import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.node.Node;
-import software.amazon.smithy.model.node.ObjectNode;
 
 @ProtocolTest(
     service = "aws.protocoltests.restjson#RestJson",

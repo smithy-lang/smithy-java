@@ -53,7 +53,7 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
     }
 
     @Override
-    public void setHeaders(HttpHeaders headers) {
+    public void setHeaders(ModifiableHttpHeaders headers) {
         this.headers = Objects.requireNonNull(headers);
     }
 
