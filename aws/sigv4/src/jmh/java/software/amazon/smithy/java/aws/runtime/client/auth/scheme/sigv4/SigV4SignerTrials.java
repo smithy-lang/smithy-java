@@ -25,8 +25,8 @@ import software.amazon.smithy.java.aws.runtime.client.core.identity.AwsCredentia
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.io.uri.QueryStringBuilder;
 
@@ -42,7 +42,7 @@ public class SigV4SignerTrials {
         .put(SigV4Settings.SIGNING_NAME, "service")
         .put(SigV4Settings.REGION, "us-east-1")
         .build();
-    private static final Map<String, SmithyHttpRequest> CASES = Map.ofEntries(
+    private static final Map<String, HttpRequest> CASES = Map.ofEntries(
         Map.entry(
             "put_no_headers_no_query_no_body",
             parsePostRequest(Collections.emptyMap(), Collections.emptyMap(), null)
@@ -83,8 +83,8 @@ public class SigV4SignerTrials {
         }
     )
     private String testName;
-    private SmithyHttpRequest request;
-    private Signer<SmithyHttpRequest, AwsCredentialsIdentity> signer;
+    private HttpRequest request;
+    private Signer<HttpRequest, AwsCredentialsIdentity> signer;
 
     @Setup
     public void setup() throws Exception {
@@ -97,7 +97,7 @@ public class SigV4SignerTrials {
         signer.sign(request, TEST_IDENTITY, TEST_PROPERTIES).get();
     }
 
-    private static SmithyHttpRequest parsePostRequest(
+    private static HttpRequest parsePostRequest(
         Map<String, String> queryParameters,
         Map<String, List<String>> headers,
         String body
@@ -109,9 +109,9 @@ public class SigV4SignerTrials {
             queryParameters.forEach(queryBuilder::add);
             uriString += "?" + queryBuilder;
         }
-        return SmithyHttpRequest.builder()
+        return HttpRequest.builder()
             .method("POST")
-            .httpVersion(SmithyHttpVersion.HTTP_1_1)
+            .httpVersion(HttpVersion.HTTP_1_1)
             .uri(URI.create(uriString))
             .headers(httpHeaders)
             .body(body != null ? DataStream.ofBytes(body.getBytes(StandardCharsets.UTF_8)) : null)

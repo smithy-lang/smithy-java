@@ -13,9 +13,9 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.TokenIdentity;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 
-final class HttpBearerAuthSigner implements Signer<SmithyHttpRequest, TokenIdentity> {
+final class HttpBearerAuthSigner implements Signer<HttpRequest, TokenIdentity> {
     static final HttpBearerAuthSigner INSTANCE = new HttpBearerAuthSigner();
     private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpBearerAuthSigner.class);
     private static final String AUTHORIZATION_HEADER = "authorization";
@@ -24,8 +24,8 @@ final class HttpBearerAuthSigner implements Signer<SmithyHttpRequest, TokenIdent
     private HttpBearerAuthSigner() {}
 
     @Override
-    public CompletableFuture<SmithyHttpRequest> sign(
-        SmithyHttpRequest request,
+    public CompletableFuture<HttpRequest> sign(
+        HttpRequest request,
         TokenIdentity identity,
         AuthProperties properties
     ) {
@@ -34,6 +34,6 @@ final class HttpBearerAuthSigner implements Signer<SmithyHttpRequest, TokenIdent
         if (existing != null) {
             LOGGER.debug("Replaced existing Authorization header value.");
         }
-        return CompletableFuture.completedFuture(request.withHeaders(HttpHeaders.of(headers)));
+        return CompletableFuture.completedFuture(request.toBuilder().headers(HttpHeaders.of(headers)).build());
     }
 }

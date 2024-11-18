@@ -12,6 +12,7 @@ import org.assertj.core.api.recursive.comparison.RecursiveComparisonConfiguratio
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
+import software.amazon.smithy.java.runtime.retries.api.RetrySafety;
 
 final class ComparisonUtils {
 
@@ -32,6 +33,7 @@ final class ComparisonUtils {
             .withComparatorForType(nanPermittingDoubleComparator(), Double.class)
             .withComparatorForType(nanPermittingFloatComparator(), Float.class)
             .withComparatorForType((a, b) -> Document.equals(a, b) ? 0 : 1, Document.class)
+            .withIgnoredFieldsOfTypes(RetrySafety.class)
             .build();
     }
 

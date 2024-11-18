@@ -102,4 +102,11 @@ public interface HttpHeaders extends Iterable<Map.Entry<String, List<String>>> {
      * @return the headers as a map.
      */
     Map<String, List<String>> map();
+
+    /**
+     * Get or create a modifiable version of the headers.
+     *
+     * @return the created modifiable headers.
+     */
+    ModifiableHttpHeaders toModifiable();
 }

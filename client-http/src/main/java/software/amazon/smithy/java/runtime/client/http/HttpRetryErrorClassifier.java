@@ -15,7 +15,7 @@ import software.amazon.smithy.java.runtime.client.core.CallContext;
 import software.amazon.smithy.java.runtime.client.core.settings.ClockSetting;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.retries.api.RetrySafety;
 
 /**
@@ -35,7 +35,7 @@ public final class HttpRetryErrorClassifier {
      */
     public static void applyRetryInfo(
         ApiOperation<?, ?> operation,
-        SmithyHttpResponse response,
+        HttpResponse response,
         ApiException exception,
         Context context
     ) {
@@ -59,7 +59,7 @@ public final class HttpRetryErrorClassifier {
     }
 
     // Treat 429 and 503 errors as retryable throttling errors.
-    private static boolean applyThrottlingStatusCodes(SmithyHttpResponse response, ApiException exception) {
+    private static boolean applyThrottlingStatusCodes(HttpResponse response, ApiException exception) {
         if (response.statusCode() == 429 || response.statusCode() == 503) {
             exception.isRetrySafe(RetrySafety.YES);
             exception.isThrottle(true);
@@ -69,7 +69,7 @@ public final class HttpRetryErrorClassifier {
     }
 
     // If there's a retry-after header, then the server is telling us it's retryable.
-    private static boolean applyRetryAfterHeader(SmithyHttpResponse response, ApiException exception, Context context) {
+    private static boolean applyRetryAfterHeader(HttpResponse response, ApiException exception, Context context) {
         var retryAfter = response.headers().firstValue("retry-after");
         if (retryAfter != null) {
             exception.isThrottle(true);

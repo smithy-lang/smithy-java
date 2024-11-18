@@ -32,7 +32,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.io.uri.URLEncoding;
 
@@ -41,7 +41,7 @@ import software.amazon.smithy.java.runtime.io.uri.URLEncoding;
  *
  * <p>TODO: Code still needs profiling and optimization
  */
-final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdentity> {
+final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     static final SigV4Signer INSTANCE = new SigV4Signer();
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(SigV4Signer.class);
@@ -68,8 +68,8 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
     private SigV4Signer() {}
 
     @Override
-    public CompletableFuture<SmithyHttpRequest> sign(
-        SmithyHttpRequest request,
+    public CompletableFuture<HttpRequest> sign(
+        HttpRequest request,
         AwsCredentialsIdentity identity,
         AuthProperties properties
     ) {
@@ -96,7 +96,7 @@ final class SigV4Signer implements Signer<SmithyHttpRequest, AwsCredentialsIdent
                     identity.sessionToken(),
                     !request.body().hasKnownLength()
                 );
-                return request.withHeaders(HttpHeaders.of(signedHeaders));
+                return request.toBuilder().headers(HttpHeaders.of(signedHeaders)).build();
             });
     }
 

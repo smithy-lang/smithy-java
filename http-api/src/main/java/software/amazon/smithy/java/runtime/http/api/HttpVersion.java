@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.runtime.http.api;
 
-public enum SmithyHttpVersion {
+public enum HttpVersion {
     HTTP_1_1,
     HTTP_2;
 

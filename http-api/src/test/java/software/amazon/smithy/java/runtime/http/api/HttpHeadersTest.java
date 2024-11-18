@@ -40,4 +40,13 @@ public class HttpHeadersTest {
         assertThat(httpHeaders.firstValue("hi"), equalTo("a"));
         assertThat(httpHeaders.allValues("hi"), contains("a", "b", "c"));
     }
+
+    @Test
+    public void convertUnmofiableToModifiable() {
+        Map<String, List<String>> headers = Map.of("hi", List.of("a"));
+        var httpHeaders = HttpHeaders.of(headers);
+        var mod = httpHeaders.toModifiable();
+
+        assertThat(httpHeaders.map(), equalTo(mod.map()));
+    }
 }

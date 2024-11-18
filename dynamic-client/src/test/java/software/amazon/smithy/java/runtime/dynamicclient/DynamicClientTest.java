@@ -25,9 +25,9 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -105,23 +105,23 @@ public class DynamicClientTest {
         assertThat(result.getMember("id").asString(), equalTo("1"));
     }
 
-    private ClientTransport<SmithyHttpRequest, SmithyHttpResponse> mockTransport() {
+    private ClientTransport<HttpRequest, HttpResponse> mockTransport() {
         return new ClientTransport<>() {
             @Override
-            public Class<SmithyHttpRequest> requestClass() {
-                return SmithyHttpRequest.class;
+            public Class<HttpRequest> requestClass() {
+                return HttpRequest.class;
             }
 
             @Override
-            public Class<SmithyHttpResponse> responseClass() {
-                return SmithyHttpResponse.class;
+            public Class<HttpResponse> responseClass() {
+                return HttpResponse.class;
             }
 
             @Override
-            public CompletableFuture<SmithyHttpResponse> send(Context context, SmithyHttpRequest request) {
+            public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
                 return CompletableFuture.completedFuture(
-                    SmithyHttpResponse.builder()
-                        .httpVersion(SmithyHttpVersion.HTTP_1_1)
+                    HttpResponse.builder()
+                        .httpVersion(HttpVersion.HTTP_1_1)
                         .statusCode(200)
                         .body(DataStream.ofString("{\"id\":\"1\"}"))
                         .build()
@@ -216,23 +216,23 @@ public class DynamicClientTest {
             .build();
     }
 
-    private static ClientTransport<SmithyHttpRequest, SmithyHttpResponse> createErrorTransport(String payload) {
+    private static ClientTransport<HttpRequest, HttpResponse> createErrorTransport(String payload) {
         return new ClientTransport<>() {
             @Override
-            public Class<SmithyHttpRequest> requestClass() {
-                return SmithyHttpRequest.class;
+            public Class<HttpRequest> requestClass() {
+                return HttpRequest.class;
             }
 
             @Override
-            public Class<SmithyHttpResponse> responseClass() {
-                return SmithyHttpResponse.class;
+            public Class<HttpResponse> responseClass() {
+                return HttpResponse.class;
             }
 
             @Override
-            public CompletableFuture<SmithyHttpResponse> send(Context context, SmithyHttpRequest request) {
+            public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
                 return CompletableFuture.completedFuture(
-                    SmithyHttpResponse.builder()
-                        .httpVersion(SmithyHttpVersion.HTTP_1_1)
+                    HttpResponse.builder()
+                        .httpVersion(HttpVersion.HTTP_1_1)
                         .statusCode(400)
                         .body(DataStream.ofString(payload))
                         .build()

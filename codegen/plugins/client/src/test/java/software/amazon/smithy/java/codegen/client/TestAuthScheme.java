@@ -13,13 +13,13 @@ import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityRes
 import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResolvers;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * Test auth scheme to test discovery of auth schemes during client code generation.
  */
-public final class TestAuthScheme implements AuthScheme<SmithyHttpRequest, Identity> {
+public final class TestAuthScheme implements AuthScheme<HttpRequest, Identity> {
     public static final String SIGNATURE_HEADER = "x-signature";
 
     public TestAuthScheme() {
@@ -32,8 +32,8 @@ public final class TestAuthScheme implements AuthScheme<SmithyHttpRequest, Ident
     }
 
     @Override
-    public Class<SmithyHttpRequest> requestClass() {
-        return SmithyHttpRequest.class;
+    public Class<HttpRequest> requestClass() {
+        return HttpRequest.class;
     }
 
     @Override
@@ -47,19 +47,19 @@ public final class TestAuthScheme implements AuthScheme<SmithyHttpRequest, Ident
     }
 
     @Override
-    public Signer<SmithyHttpRequest, Identity> signer() {
+    public Signer<HttpRequest, Identity> signer() {
         return new TestSigner();
     }
 
-    private static final class TestSigner implements Signer<SmithyHttpRequest, Identity> {
+    private static final class TestSigner implements Signer<HttpRequest, Identity> {
         @Override
-        public CompletableFuture<SmithyHttpRequest> sign(
-            SmithyHttpRequest request,
+        public CompletableFuture<HttpRequest> sign(
+            HttpRequest request,
             Identity identity,
             AuthProperties properties
         ) {
             return CompletableFuture.completedFuture(
-                request.withAddedHeaders(SIGNATURE_HEADER, "smithy-test-signature")
+                request.toBuilder().withAddedHeaders(SIGNATURE_HEADER, "smithy-test-signature").build()
             );
         }
     }
@@ -72,7 +72,7 @@ public final class TestAuthScheme implements AuthScheme<SmithyHttpRequest, Ident
         }
 
         @Override
-        public AuthScheme<SmithyHttpRequest, Identity> createAuthScheme(TestAuthSchemeTrait trait) {
+        public AuthScheme<HttpRequest, Identity> createAuthScheme(TestAuthSchemeTrait trait) {
             return new TestAuthScheme();
         }
     }

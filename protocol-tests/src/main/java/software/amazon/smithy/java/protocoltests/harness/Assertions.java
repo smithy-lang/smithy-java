@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpMessage;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpMessage;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 
 /**
  * Provides a number of testing utilities for validating protocol test results.
@@ -46,12 +46,12 @@ final class Assertions {
         assertEquals(expected, uri.getRawPath());
     }
 
-    static void assertHostEquals(SmithyHttpRequest request, String expected) {
+    static void assertHostEquals(HttpRequest request, String expected) {
         var hostValue = request.uri().getAuthority();
         assertEquals(hostValue, expected);
     }
 
-    static void assertHeadersEqual(SmithyHttpMessage message, Map<String, String> expected) {
+    static void assertHeadersEqual(HttpMessage message, Map<String, String> expected) {
         for (var headerEntry : expected.entrySet()) {
             var headerValues = message.headers().allValues(headerEntry.getKey());
             assertNotNull(headerValues);

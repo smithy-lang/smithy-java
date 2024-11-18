@@ -19,8 +19,8 @@ import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -57,14 +57,14 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
     protected abstract String contentType();
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct> SmithyHttpRequest createRequest(
+    public <I extends SerializableStruct, O extends SerializableStruct> HttpRequest createRequest(
         ApiOperation<I, O> operation,
         I input,
         Context context,
         URI endpoint
     ) {
         var target = service.getName() + "." + operation.schema().id().getName();
-        var builder = SmithyHttpRequest.builder();
+        var builder = HttpRequest.builder();
         builder.method("POST");
         builder.uri(endpoint);
         builder.headers(
@@ -86,8 +86,8 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
         ApiOperation<I, O> operation,
         Context context,
         TypeRegistry typeRegistry,
-        SmithyHttpRequest request,
-        SmithyHttpResponse response
+        HttpRequest request,
+        HttpResponse response
     ) {
         // Is it an error?
         if (response.statusCode() != 200) {

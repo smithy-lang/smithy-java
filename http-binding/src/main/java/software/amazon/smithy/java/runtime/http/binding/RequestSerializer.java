@@ -17,7 +17,7 @@ import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.EventStreamFrameEncodingProcessor;
 import software.amazon.smithy.java.runtime.core.serde.event.Frame;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 import software.amazon.smithy.java.runtime.io.uri.URIBuilder;
 
 /**
@@ -122,7 +122,7 @@ public final class RequestSerializer {
      *
      * @return Returns the created request.
      */
-    public SmithyHttpRequest serializeRequest() {
+    public HttpRequest serializeRequest() {
         Objects.requireNonNull(shapeValue, "shapeValue is not set");
         Objects.requireNonNull(operation, "operation is not set");
         Objects.requireNonNull(payloadCodec, "payloadCodec is not set");
@@ -154,7 +154,7 @@ public final class RequestSerializer {
 
         var targetEndpoint = uriBuilder.build();
 
-        SmithyHttpRequest.Builder builder = SmithyHttpRequest.builder()
+        HttpRequest.Builder builder = HttpRequest.builder()
             .method(httpTrait.getMethod())
             .uri(targetEndpoint);
 

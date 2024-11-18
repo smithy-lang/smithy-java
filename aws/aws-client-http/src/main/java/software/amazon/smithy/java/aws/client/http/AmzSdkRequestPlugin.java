@@ -14,7 +14,7 @@ import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 
 /**
  * Adds the header "amz-sdk-request: ttl=X; attempt=Y; max=Z".
@@ -31,15 +31,15 @@ public final class AmzSdkRequestPlugin implements ClientPlugin {
     private static final class Interceptor implements ClientInterceptor {
         @Override
         public <RequestT> RequestT modifyBeforeSigning(RequestHook<?, ?, RequestT> hook) {
-            return hook.mapRequest(SmithyHttpRequest.class, Mapper.INSTANCE);
+            return hook.mapRequest(HttpRequest.class, Mapper.INSTANCE);
         }
     }
 
-    private static final class Mapper implements Function<RequestHook<?, ?, SmithyHttpRequest>, SmithyHttpRequest> {
+    private static final class Mapper implements Function<RequestHook<?, ?, HttpRequest>, HttpRequest> {
         private static final Mapper INSTANCE = new Mapper();
 
         @Override
-        public SmithyHttpRequest apply(RequestHook<?, ?, SmithyHttpRequest> hook) {
+        public HttpRequest apply(RequestHook<?, ?, HttpRequest> hook) {
             var attempt = hook.context().get(CallContext.RETRY_ATTEMPT);
             if (attempt == null) {
                 return hook.request();
@@ -54,7 +54,7 @@ public final class AmzSdkRequestPlugin implements ClientPlugin {
                 // TODO: improve header management.
                 var headers = new HashMap<>(hook.request().headers().map());
                 headers.put("amz-sdk-request", List.of(value.toString()));
-                return hook.request().withHeaders(HttpHeaders.of(headers));
+                return hook.request().toBuilder().headers(HttpHeaders.of(headers)).build();
             }
         }
     }

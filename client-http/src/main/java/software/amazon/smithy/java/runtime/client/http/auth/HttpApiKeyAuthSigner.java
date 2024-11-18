@@ -13,19 +13,19 @@ import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.ApiKeyIdentity;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 import software.amazon.smithy.java.runtime.io.uri.QueryStringBuilder;
 import software.amazon.smithy.java.runtime.io.uri.URIBuilder;
 
-final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIdentity> {
+final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> {
     static final HttpApiKeyAuthSigner INSTANCE = new HttpApiKeyAuthSigner();
     private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpApiKeyAuthScheme.class);
 
     private HttpApiKeyAuthSigner() {}
 
     @Override
-    public CompletableFuture<SmithyHttpRequest> sign(
-        SmithyHttpRequest request,
+    public CompletableFuture<HttpRequest> sign(
+        HttpRequest request,
         ApiKeyIdentity identity,
         AuthProperties properties
     ) {
@@ -43,7 +43,7 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
                 if (existing != null) {
                     LOGGER.debug("Replaced header value for {}", name);
                 }
-                yield CompletableFuture.completedFuture(request.withHeaders(HttpHeaders.of(updated)));
+                yield CompletableFuture.completedFuture(request.toBuilder().headers(HttpHeaders.of(updated)).build());
             }
             case QUERY -> {
                 var uriBuilder = URIBuilder.of(request.uri());
@@ -54,7 +54,7 @@ final class HttpApiKeyAuthSigner implements Signer<SmithyHttpRequest, ApiKeyIden
                 addExistingQueryParams(stringBuilder, existingQuery, name);
                 queryBuilder.write(stringBuilder);
                 yield CompletableFuture.completedFuture(
-                    request.withUri(uriBuilder.query(stringBuilder.toString()).build())
+                    request.toBuilder().uri(uriBuilder.query(stringBuilder.toString()).build()).build()
                 );
             }
         };

@@ -26,8 +26,8 @@ import software.amazon.smithy.java.aws.runtime.client.core.identity.AwsCredentia
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpVersion;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
@@ -87,7 +87,7 @@ public class SigV4TestRunner {
         return this;
     }
 
-    private record TestCase(String name, Context context, SmithyHttpRequest request, SmithyHttpRequest expected) {
+    private record TestCase(String name, Context context, HttpRequest request, HttpRequest expected) {
 
         public static TestCase from(Path directory) {
             var name = directory.getFileName().toString();
@@ -98,17 +98,17 @@ public class SigV4TestRunner {
 
         }
 
-        private static SmithyHttpRequest loadRequest(Path directory) {
+        private static HttpRequest loadRequest(Path directory) {
             String fileName = directory.resolve(REQUEST).toString();
             return parseRequest(fileName);
         }
 
-        private static SmithyHttpRequest loadSigned(Path directory) {
+        private static HttpRequest loadSigned(Path directory) {
             String fileName = directory.resolve(SIGNED).toString();
             return parseRequest(fileName);
         }
 
-        private static SmithyHttpRequest parseRequest(String fileName) {
+        private static HttpRequest parseRequest(String fileName) {
             var fileContents = IoUtils.readUtf8File(fileName);
             var fileLines = new ArrayList<>(fileContents.lines().toList());
             // Parse http header line
@@ -147,9 +147,9 @@ public class SigV4TestRunner {
                 }
             }
 
-            return SmithyHttpRequest.builder()
+            return HttpRequest.builder()
                 .method(method)
-                .httpVersion(SmithyHttpVersion.HTTP_1_1)
+                .httpVersion(HttpVersion.HTTP_1_1)
                 .uri(URI.create("http://" + Objects.requireNonNull(hostValue) + path))
                 .headers(HttpHeaders.of(headers))
                 .body(body != null ? DataStream.ofBytes(body.toString().getBytes()) : null)
@@ -157,7 +157,7 @@ public class SigV4TestRunner {
         }
 
         Result createResult(
-            Signer<SmithyHttpRequest, AwsCredentialsIdentity> signer
+            Signer<HttpRequest, AwsCredentialsIdentity> signer
         ) throws ExecutionException, InterruptedException {
             var signedRequest = signer.sign(request, context.identity, context.properties).get();
             boolean isValid = signedRequest.headers().equals(expected.headers())
@@ -201,7 +201,7 @@ public class SigV4TestRunner {
         }
     }
 
-    public record Result(SmithyHttpRequest actual, SmithyHttpRequest expected, boolean isValid) {
+    public record Result(HttpRequest actual, HttpRequest expected, boolean isValid) {
         public Result unwrap() {
             if (!isValid()) {
                 throw new AssertionError(

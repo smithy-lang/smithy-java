@@ -78,7 +78,9 @@ public class RestXmlProtocolTests {
             "RestXmlEnumPayloadResponse",
             "RestXmlStringPayloadResponse",
             "RestXmlHttpPayloadWithUnion",
-            "BodyWithXmlName"
+            "BodyWithXmlName",
+            "InvalidGreetingError",
+            "ComplexError"
         }
     )
     public void responseTest(Runnable test) {

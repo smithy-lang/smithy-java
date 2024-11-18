@@ -13,7 +13,7 @@ import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.runtime.core.serde.event.Frame;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 /**
@@ -62,7 +62,7 @@ public final class ResponseDeserializer {
      * @param response Response to deserialize into the builder.
      * @return Returns the deserializer.
      */
-    public ResponseDeserializer response(SmithyHttpResponse response) {
+    public ResponseDeserializer response(HttpResponse response) {
         DataStream bodyDataStream = bodyDataStream(response);
         deserBuilder.headers(response.headers())
             .responseStatus(response.statusCode())
@@ -70,7 +70,7 @@ public final class ResponseDeserializer {
         return this;
     }
 
-    private DataStream bodyDataStream(SmithyHttpResponse response) {
+    private DataStream bodyDataStream(HttpResponse response) {
         var contentType = response.headers().contentType();
         var contentLength = response.headers().contentLength();
         return DataStream.ofPublisher(response.body(), contentType, contentLength == null ? -1 : contentLength);

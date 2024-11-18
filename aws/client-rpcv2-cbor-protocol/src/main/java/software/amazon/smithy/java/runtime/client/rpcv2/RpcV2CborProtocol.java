@@ -23,8 +23,8 @@ import software.amazon.smithy.java.runtime.core.schema.Unit;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.io.ByteBufferOutputStream;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -48,7 +48,7 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
     }
 
     @Override
-    public <I extends SerializableStruct, O extends SerializableStruct> SmithyHttpRequest createRequest(
+    public <I extends SerializableStruct, O extends SerializableStruct> HttpRequest createRequest(
         ApiOperation<I, O> operation,
         I input,
         Context context,
@@ -83,7 +83,7 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
             body = DataStream.ofByteBuffer(sink.toByteBuffer(), "application/cbor");
         }
 
-        return SmithyHttpRequest.builder()
+        return HttpRequest.builder()
             .method("POST")
             .uri(endpoint.resolve(target))
             .headers(HttpHeaders.of(headers))
@@ -96,8 +96,8 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
         ApiOperation<I, O> operation,
         Context context,
         TypeRegistry typeRegistry,
-        SmithyHttpRequest request,
-        SmithyHttpResponse response
+        HttpRequest request,
+        HttpResponse response
     ) {
         if (response.statusCode() != 200) {
             return errorDeserializer.createError(context, operation.schema().id(), typeRegistry, response)

@@ -27,7 +27,7 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -47,7 +47,7 @@ public class HttpErrorDeserializerTest {
             .serviceId(SERVICE)
             .build();
         var registry = TypeRegistry.builder().build();
-        var responseBuilder = SmithyHttpResponse.builder().statusCode(status);
+        var responseBuilder = HttpResponse.builder().statusCode(status);
 
         if (payload != null) {
             responseBuilder.body(DataStream.ofString(payload));
@@ -88,7 +88,7 @@ public class HttpErrorDeserializerTest {
         var registry = TypeRegistry.builder()
             .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
             .build();
-        var responseBuilder = SmithyHttpResponse.builder()
+        var responseBuilder = HttpResponse.builder()
             .statusCode(400)
             .headers(
                 HttpHeaders.of(
@@ -117,7 +117,7 @@ public class HttpErrorDeserializerTest {
         var registry = TypeRegistry.builder()
             .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
             .build();
-        var responseBuilder = SmithyHttpResponse.builder()
+        var responseBuilder = HttpResponse.builder()
             .statusCode(400)
             .body(DataStream.ofString("{\"__type\": \"com.foo#Baz\"}"));
         var response = responseBuilder.build();
@@ -138,7 +138,7 @@ public class HttpErrorDeserializerTest {
         var registry = TypeRegistry.builder()
             .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
             .build();
-        var responseBuilder = SmithyHttpResponse.builder()
+        var responseBuilder = HttpResponse.builder()
             .statusCode(400)
             .body(DataStream.ofString("{\"__type\": \"com.foo#SomeUnknownError\"}"));
         var response = responseBuilder.build();
@@ -161,7 +161,7 @@ public class HttpErrorDeserializerTest {
         var registry = TypeRegistry.builder()
             .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
             .build();
-        var responseBuilder = SmithyHttpResponse.builder()
+        var responseBuilder = HttpResponse.builder()
             .statusCode(400)
             .headers(
                 HttpHeaders.of(

@@ -13,15 +13,15 @@ import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
 import software.amazon.smithy.java.runtime.auth.api.identity.ApiKeyIdentity;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpVersion;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpVersion;
 import software.amazon.smithy.model.traits.HttpApiKeyAuthTrait;
 
 public class HttpApiKeyAuthSignerTest {
     private static final String API_KEY = "my-api-key";
     private static final ApiKeyIdentity TEST_IDENTITY = ApiKeyIdentity.create(API_KEY);
-    private static final SmithyHttpRequest TEST_REQUEST = SmithyHttpRequest.builder()
-        .httpVersion(SmithyHttpVersion.HTTP_1_1)
+    private static final HttpRequest TEST_REQUEST = HttpRequest.builder()
+        .httpVersion(HttpVersion.HTTP_1_1)
         .method("PUT")
         .uri(URI.create("https://www.example.com"))
         .build();
@@ -58,7 +58,7 @@ public class HttpApiKeyAuthSignerTest {
             .put(HttpApiKeyAuthScheme.NAME, "x-api-key")
             .put(HttpApiKeyAuthScheme.SCHEME, "SCHEME")
             .build();
-        var updateRequest = TEST_REQUEST.withAddedHeaders("x-api-key", "foo");
+        var updateRequest = TEST_REQUEST.toBuilder().withAddedHeaders("x-api-key", "foo").build();
         var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updateRequest, TEST_IDENTITY, authProperties).get();
         var authHeader = signedRequest.headers().firstValue("x-api-key");
         assertEquals(authHeader, "SCHEME " + API_KEY);
@@ -97,7 +97,7 @@ public class HttpApiKeyAuthSignerTest {
             .put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY)
             .put(HttpApiKeyAuthScheme.NAME, "apiKey")
             .build();
-        var updatedRequest = TEST_REQUEST.withUri(URI.create("https://www.example.com?x=1"));
+        var updatedRequest = TEST_REQUEST.toBuilder().uri(URI.create("https://www.example.com?x=1")).build();
 
         var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties).get();
         var queryParam = signedRequest.uri().getQuery();
@@ -111,7 +111,7 @@ public class HttpApiKeyAuthSignerTest {
             .put(HttpApiKeyAuthScheme.IN, HttpApiKeyAuthTrait.Location.QUERY)
             .put(HttpApiKeyAuthScheme.NAME, "apiKey")
             .build();
-        var updatedRequest = TEST_REQUEST.withUri(URI.create("https://www.example.com?x=1&apiKey=foo"));
+        var updatedRequest = TEST_REQUEST.toBuilder().uri(URI.create("https://www.example.com?x=1&apiKey=foo")).build();
 
         var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updatedRequest, TEST_IDENTITY, authProperties).get();
         var queryParam = signedRequest.uri().getQuery();

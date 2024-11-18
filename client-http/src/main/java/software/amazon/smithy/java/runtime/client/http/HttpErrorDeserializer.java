@@ -17,7 +17,7 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.core.serde.document.DiscriminatorException;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -36,7 +36,7 @@ public final class HttpErrorDeserializer {
          * @param response Response to check.
          * @return true if the header is present.
          */
-        boolean hasHeader(SmithyHttpResponse response);
+        boolean hasHeader(HttpResponse response);
 
         /**
          * Extract the header from the response and create an appropriate builder from the type registry.
@@ -46,7 +46,7 @@ public final class HttpErrorDeserializer {
          * @param registry Registry to check for builders.
          * @return the resolved builder, or null if no builder could be found.
          */
-        ShapeId resolveId(SmithyHttpResponse response, String serviceNamespace, TypeRegistry registry);
+        ShapeId resolveId(HttpResponse response, String serviceNamespace, TypeRegistry registry);
     }
 
     /**
@@ -57,7 +57,7 @@ public final class HttpErrorDeserializer {
         CompletableFuture<ApiException> createError(
             ApiException.Fault fault,
             String message,
-            SmithyHttpResponse response
+            HttpResponse response
         );
     }
 
@@ -78,7 +78,7 @@ public final class HttpErrorDeserializer {
         CompletableFuture<ModeledApiException> createError(
             Context context,
             Codec codec,
-            SmithyHttpResponse response,
+            HttpResponse response,
             ShapeBuilder<ModeledApiException> builder
         );
 
@@ -87,7 +87,7 @@ public final class HttpErrorDeserializer {
          *
          * <p>This method can be used when protocols only need to inspect the payload of an error to deserialize it.
          * The default implementation of this method will create a new response based on the provided bytes and
-         * delegate to {@link #createError(Context, Codec, SmithyHttpResponse, ShapeBuilder)}. Override this method
+         * delegate to {@link #createError(Context, Codec, HttpResponse, ShapeBuilder)}. Override this method
          * if the protocol can parse errors from documents to avoid parsing the response a second time.
          *
          * @param context Context of the call.
@@ -101,7 +101,7 @@ public final class HttpErrorDeserializer {
         default CompletableFuture<ModeledApiException> createErrorFromDocument(
             Context context,
             Codec codec,
-            SmithyHttpResponse response,
+            HttpResponse response,
             ByteBuffer responsePayload,
             Document parsedDocument,
             ShapeBuilder<ModeledApiException> builder
@@ -110,7 +110,7 @@ public final class HttpErrorDeserializer {
                 context,
                 codec,
                 // Make a new response that uses the previously read response payload.
-                response.withBody(DataStream.ofByteBuffer(responsePayload)),
+                response.toBuilder().body(DataStream.ofByteBuffer(responsePayload)).build(),
                 builder
             );
         }
@@ -119,12 +119,12 @@ public final class HttpErrorDeserializer {
     // Does not check for any error headers by default.
     private static final HeaderErrorExtractor DEFAULT_EXTRACTOR = new HeaderErrorExtractor() {
         @Override
-        public boolean hasHeader(SmithyHttpResponse response) {
+        public boolean hasHeader(HttpResponse response) {
             return false;
         }
 
         @Override
-        public ShapeId resolveId(SmithyHttpResponse response, String serviceNamespace, TypeRegistry registry) {
+        public ShapeId resolveId(HttpResponse response, String serviceNamespace, TypeRegistry registry) {
             return null;
         }
     };
@@ -139,7 +139,7 @@ public final class HttpErrorDeserializer {
         public CompletableFuture<ModeledApiException> createError(
             Context context,
             Codec codec,
-            SmithyHttpResponse response,
+            HttpResponse response,
             ShapeBuilder<ModeledApiException> builder
         ) {
             return createDataStream(response).asByteBuffer()
@@ -150,7 +150,7 @@ public final class HttpErrorDeserializer {
         public CompletableFuture<ModeledApiException> createErrorFromDocument(
             Context context,
             Codec codec,
-            SmithyHttpResponse response,
+            HttpResponse response,
             ByteBuffer responsePayload,
             Document parsedDocument,
             ShapeBuilder<ModeledApiException> builder
@@ -189,7 +189,7 @@ public final class HttpErrorDeserializer {
         Context context,
         ShapeId operation,
         TypeRegistry typeRegistry,
-        SmithyHttpResponse response
+        HttpResponse response
     ) {
         var hasErrorHeader = headerErrorExtractor.hasHeader(response);
 
@@ -216,7 +216,7 @@ public final class HttpErrorDeserializer {
         }
     }
 
-    private static DataStream createDataStream(SmithyHttpResponse response) {
+    private static DataStream createDataStream(HttpResponse response) {
         return DataStream.ofPublisher(response.body(), response.contentType(), response.contentLength(-1));
     }
 
@@ -224,7 +224,7 @@ public final class HttpErrorDeserializer {
         Context context,
         ShapeId operation,
         TypeRegistry typeRegistry,
-        SmithyHttpResponse response
+        HttpResponse response
     ) {
         // The content can be parsed directly here rather than through an intermediate document like with __type.
         var id = headerErrorExtractor.resolveId(response, serviceId.getNamespace(), typeRegistry);
@@ -245,7 +245,7 @@ public final class HttpErrorDeserializer {
         UnknownErrorFactory unknownErrorFactory,
         ShapeId operationId,
         TypeRegistry typeRegistry,
-        SmithyHttpResponse response,
+        HttpResponse response,
         DataStream content
     ) {
         // Read the payload into a JSON document so we can efficiently find __type and then directly
@@ -271,7 +271,7 @@ public final class HttpErrorDeserializer {
 
     private static CompletableFuture<ApiException> createErrorFromHints(
         ShapeId operationId,
-        SmithyHttpResponse response,
+        HttpResponse response,
         UnknownErrorFactory unknownErrorFactory
     ) {
         ApiException.Fault fault = ApiException.Fault.ofHttpStatusCode(response.statusCode());

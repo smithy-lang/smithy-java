@@ -19,7 +19,7 @@ import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public class AmznErrorHeaderExtractorTest {
@@ -27,11 +27,11 @@ public class AmznErrorHeaderExtractorTest {
     public void checksForHeaderPresence() {
         var extractor = new AmznErrorHeaderExtractor();
 
-        var response1 = SmithyHttpResponse.builder()
+        var response1 = HttpResponse.builder()
             .statusCode(400)
             .headers(HttpHeaders.of(Map.of("x-amzn-errortype", List.of("foo"))))
             .build();
-        var response2 = SmithyHttpResponse.builder().statusCode(400).build();
+        var response2 = HttpResponse.builder().statusCode(400).build();
 
         assertThat(extractor.hasHeader(response1), is(true));
         assertThat(extractor.hasHeader(response2), is(false));
@@ -40,7 +40,7 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void resolveIdReturnsNullWhenMissing() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = SmithyHttpResponse.builder().statusCode(400).build();
+        var response = HttpResponse.builder().statusCode(400).build();
 
         assertThat(extractor.resolveId(response, "com.foo", TypeRegistry.builder().build()), nullValue());
     }
@@ -48,7 +48,7 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void resolvesAbsoluteShapeIds() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(400)
             .headers(HttpHeaders.of(Map.of("x-amzn-errortype", List.of("baz#Bam"))))
             .build();
@@ -62,7 +62,7 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void resolvesAbsoluteShapeIdsWithColons() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(400)
             .headers(
                 HttpHeaders.of(
@@ -83,7 +83,7 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void resolvesRelativeShapeIds() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(400)
             .headers(
                 HttpHeaders.of(
@@ -104,7 +104,7 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void resolvesRelativeShapeIdsWithColons() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(400)
             .headers(
                 HttpHeaders.of(
@@ -125,7 +125,7 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void resolvesToServiceErrorWhenAbsoluteNotFound() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(400)
             .headers(
                 HttpHeaders.of(
@@ -146,7 +146,7 @@ public class AmznErrorHeaderExtractorTest {
     @Test
     public void returnsNullWhenNoTypeFound() {
         var extractor = new AmznErrorHeaderExtractor();
-        var response = SmithyHttpResponse.builder()
+        var response = HttpResponse.builder()
             .statusCode(400)
             .headers(
                 HttpHeaders.of(

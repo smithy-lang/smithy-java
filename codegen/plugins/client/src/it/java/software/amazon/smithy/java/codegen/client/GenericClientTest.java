@@ -25,8 +25,8 @@ import software.amazon.smithy.java.runtime.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.OutputHook;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 
 public class GenericClientTest {
     private static final EchoServer server = new EchoServer();
@@ -63,12 +63,15 @@ public class GenericClientTest {
         var interceptor = new ClientInterceptor() {
             @Override
             public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
-                return hook.mapRequest(SmithyHttpRequest.class, h -> h.request().withAddedHeaders("X-Foo", "Bar"));
+                return hook.mapRequest(
+                    HttpRequest.class,
+                    h -> h.request().toBuilder().withAddedHeaders("X-Foo", "Bar").build()
+                );
             }
 
             @Override
             public void readAfterDeserialization(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {
-                if (hook.response() instanceof SmithyHttpResponse response) {
+                if (hook.response() instanceof HttpResponse response) {
                     var value = response.headers().map().get(header);
                     assertNotNull(value);
                     assertEquals(value.get(0), "[Bar]");

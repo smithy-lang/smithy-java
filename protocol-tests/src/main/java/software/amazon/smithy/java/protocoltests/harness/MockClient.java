@@ -40,18 +40,22 @@ final class MockClient extends Client {
         ApiOperation<I, O> operation,
         RequestOverrideConfig overrideConfig
     ) {
-        return call(input, operation, overrideConfig).exceptionallyCompose(exc -> {
-            if (exc instanceof CompletionException ce
-                && ce.getCause() instanceof ApiException apiException
-                && apiException.getFault().equals(ApiException.Fault.SERVER)
-            ) {
-                LOGGER.debug("Ignoring expected exception", apiException);
-                return CompletableFuture.completedFuture(null);
-            } else {
-                LOGGER.error("Encountered Unexpected exception", exc);
-                return CompletableFuture.failedFuture(exc);
-            }
-        }).join();
+        try {
+            return call(input, operation, overrideConfig).exceptionallyCompose(exc -> {
+                if (exc instanceof CompletionException ce
+                    && ce.getCause() instanceof ApiException apiException
+                    && apiException.getFault().equals(ApiException.Fault.SERVER)
+                ) {
+                    LOGGER.debug("Ignoring expected exception", apiException);
+                    return CompletableFuture.completedFuture(null);
+                } else {
+                    LOGGER.error("Encountered Unexpected exception", exc);
+                    return CompletableFuture.failedFuture(exc);
+                }
+            }).join();
+        } catch (CompletionException e) {
+            throw unwrap(e);
+        }
     }
 
     static Builder builder() {

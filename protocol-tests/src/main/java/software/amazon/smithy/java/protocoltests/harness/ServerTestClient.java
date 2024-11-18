@@ -8,13 +8,11 @@ package software.amazon.smithy.java.protocoltests.harness;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 final class ServerTestClient {
@@ -32,11 +30,11 @@ final class ServerTestClient {
         return CLIENTS.computeIfAbsent(endpoint, ServerTestClient::new);
     }
 
-    SmithyHttpResponse sendRequest(SmithyHttpRequest request) {
+    HttpResponse sendRequest(HttpRequest request) {
 
-        var bodyPublisher = HttpRequest.BodyPublishers.fromPublisher(request.body());
+        var bodyPublisher = java.net.http.HttpRequest.BodyPublishers.fromPublisher(request.body());
 
-        HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder()
+        java.net.http.HttpRequest.Builder httpRequestBuilder = java.net.http.HttpRequest.newBuilder()
             .version(switch (request.httpVersion()) {
                 case HTTP_1_1 -> HttpClient.Version.HTTP_1_1;
                 case HTTP_2 -> HttpClient.Version.HTTP_2;
@@ -53,8 +51,11 @@ final class ServerTestClient {
         }
 
         try {
-            var response = httpClient.send(httpRequestBuilder.build(), HttpResponse.BodyHandlers.ofByteArray());
-            return SmithyHttpResponse.builder()
+            var response = httpClient.send(
+                httpRequestBuilder.build(),
+                java.net.http.HttpResponse.BodyHandlers.ofByteArray()
+            );
+            return HttpResponse.builder()
                 .statusCode(response.statusCode())
                 .body(DataStream.ofBytes(response.body()))
                 .headers(HttpHeaders.of(response.headers().map()))

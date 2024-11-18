@@ -16,6 +16,7 @@ final class MockOperation implements InvocationHandler {
     private final Object target;
     private final AtomicReference<Object> request = new AtomicReference<>();
     private final AtomicReference<Object> response = new AtomicReference<>();
+    private final AtomicReference<Throwable> error = new AtomicReference<>();
     private final AtomicBoolean wasInvoked = new AtomicBoolean(false);
 
     public MockOperation(Class<?> operationClazz) {
@@ -23,9 +24,13 @@ final class MockOperation implements InvocationHandler {
     }
 
     @Override
-    public Object invoke(Object proxy, Method method, Object[] args) {
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         wasInvoked.set(true);
         request.set(args[0]);
+        Throwable exception = this.error.get();
+        if (exception != null) {
+            throw exception;
+        }
         return response.get();
     }
 
@@ -37,6 +42,10 @@ final class MockOperation implements InvocationHandler {
         this.response.set(response);
     }
 
+    public void setError(Throwable error) {
+        this.error.set(error);
+    }
+
     public <T> T getRequest() {
         return (T) request.get();
     }
@@ -45,6 +54,7 @@ final class MockOperation implements InvocationHandler {
         wasInvoked.set(false);
         request.set(null);
         response.set(null);
+        error.set(null);
     }
 
 }

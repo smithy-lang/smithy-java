@@ -20,7 +20,7 @@ import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver
 import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 
 public class AuthSchemeTest {
     private static final EchoServer server = new EchoServer();
@@ -42,7 +42,7 @@ public class AuthSchemeTest {
         var interceptor = new ClientInterceptor() {
             @Override
             public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
-                var request = (SmithyHttpRequest) hook.request();
+                var request = (HttpRequest) hook.request();
                 var signatureValue = request.headers().firstValue(TestAuthScheme.SIGNATURE_HEADER);
                 assertEquals("smithy-test-signature", signatureValue);
             }

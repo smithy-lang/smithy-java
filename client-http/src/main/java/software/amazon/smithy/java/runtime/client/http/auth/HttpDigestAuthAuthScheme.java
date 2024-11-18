@@ -9,7 +9,7 @@ import software.amazon.smithy.java.runtime.auth.api.Signer;
 import software.amazon.smithy.java.runtime.auth.api.identity.LoginIdentity;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpDigestAuthTrait;
 
@@ -17,7 +17,7 @@ import software.amazon.smithy.model.traits.HttpDigestAuthTrait;
  * Implements the HTTP Digest Authentication Scheme as defined in
  * <a href="https://datatracker.ietf.org/doc/html/rfc2617.html">RFC 2617</a>.
  */
-public final class HttpDigestAuthAuthScheme implements AuthScheme<SmithyHttpRequest, LoginIdentity> {
+public final class HttpDigestAuthAuthScheme implements AuthScheme<HttpRequest, LoginIdentity> {
 
     @Override
     public ShapeId schemeId() {
@@ -25,8 +25,8 @@ public final class HttpDigestAuthAuthScheme implements AuthScheme<SmithyHttpRequ
     }
 
     @Override
-    public Class<SmithyHttpRequest> requestClass() {
-        return SmithyHttpRequest.class;
+    public Class<HttpRequest> requestClass() {
+        return HttpRequest.class;
     }
 
     @Override
@@ -35,7 +35,7 @@ public final class HttpDigestAuthAuthScheme implements AuthScheme<SmithyHttpRequ
     }
 
     @Override
-    public Signer<SmithyHttpRequest, LoginIdentity> signer() {
+    public Signer<HttpRequest, LoginIdentity> signer() {
         return HttpDigestAuthSigner.INSTANCE;
     }
 

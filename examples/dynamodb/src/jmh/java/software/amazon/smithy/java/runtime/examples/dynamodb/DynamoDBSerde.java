@@ -34,8 +34,8 @@ import software.amazon.smithy.java.runtime.examples.dynamodb.model.GetItemOutput
 import software.amazon.smithy.java.runtime.examples.dynamodb.model.PutItem;
 import software.amazon.smithy.java.runtime.examples.dynamodb.model.PutItemInput;
 import software.amazon.smithy.java.runtime.examples.dynamodb.model.PutItemOutput;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -90,13 +90,13 @@ public class DynamoDBSerde {
         Context context = Context.create();
         URI endpoint;
         AwsJson1Protocol protocol;
-        SmithyHttpRequest req;
+        HttpRequest req;
 
         @Setup
         public void setup() throws URISyntaxException {
             // This isn't actually used, but needed for the protocol implementation.
             endpoint = new URI("https://dynamodb.us-east-1.amazonaws.com");
-            req = SmithyHttpRequest.builder().method("POST").uri(endpoint).build();
+            req = HttpRequest.builder().method("POST").uri(endpoint).build();
             operation = new GetItem();
             protocol = new AwsJson1Protocol(ShapeId.from("com.amazonaws.dynamodb#DynamoDB_20120810"));
         }
@@ -144,8 +144,8 @@ public class DynamoDBSerde {
         return CODEC.serializeToString(GetItemOutput.builder().item(item).build()).getBytes(StandardCharsets.UTF_8);
     }
 
-    private SmithyHttpResponse fullResponse(byte[] itemBytes) {
-        return SmithyHttpResponse.builder()
+    private HttpResponse fullResponse(byte[] itemBytes) {
+        return HttpResponse.builder()
             .statusCode(200)
             .body(DataStream.ofBytes(itemBytes))
             .build();

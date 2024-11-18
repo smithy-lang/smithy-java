@@ -20,19 +20,27 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
     private final Map<String, List<String>> headers;
 
     SimpleUnmodifiableHttpHeaders(Map<String, List<String>> input) {
-        // Ensure map keys are normalized to use lower-case header names.
-        this.headers = new HashMap<>(input.size());
-        for (var entry : input.entrySet()) {
-            var key = entry.getKey().trim().toLowerCase(Locale.ENGLISH);
-            headers.computeIfAbsent(key, k -> new ArrayList<>()).addAll(trimValues(entry.getValue()));
-        }
-        // Make the value immutable.
-        for (var entry : headers.entrySet()) {
-            entry.setValue(Collections.unmodifiableList(entry.getValue()));
+        this(input, true);
+    }
+
+    SimpleUnmodifiableHttpHeaders(Map<String, List<String>> input, boolean copyHeaders) {
+        if (!copyHeaders) {
+            this.headers = input;
+        } else {
+            // Ensure map keys are normalized to use lower-case header names.
+            this.headers = new HashMap<>(input.size());
+            for (var entry : input.entrySet()) {
+                var key = entry.getKey().trim().toLowerCase(Locale.ENGLISH);
+                headers.computeIfAbsent(key, k -> new ArrayList<>()).addAll(copyAndTrimValues(entry.getValue()));
+            }
+            // Make the value immutable.
+            for (var entry : headers.entrySet()) {
+                entry.setValue(Collections.unmodifiableList(entry.getValue()));
+            }
         }
     }
 
-    private static List<String> trimValues(List<String> source) {
+    private static List<String> copyAndTrimValues(List<String> source) {
         List<String> trimmedValues = new ArrayList<>(source.size());
         for (var value : source) {
             trimmedValues.add(value.trim());
@@ -66,6 +74,17 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
     }
 
     @Override
+    public ModifiableHttpHeaders toModifiable() {
+        var mod = new SimpleModifiableHttpHeaders();
+        Map<String, List<String>> copy = new HashMap<>(headers.size());
+        for (var entry : headers.entrySet()) {
+            copy.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+        mod.putHeaders(copy);
+        return mod;
+    }
+
+    @Override
     public boolean equals(Object obj) {
         if (obj == this) {
             return true;
@@ -81,5 +100,70 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
     @Override
     public int hashCode() {
         return headers.hashCode();
+    }
+
+    // Note: all of these methods must:
+    // 1. Lowercase header names and trim them
+    // 2. Copy header value lists and trim each value.
+    //
+    // Because of this, when creating HttpHeaders from the returned maps, there's no need to copy the map.
+
+    static Map<String, List<String>> addHeaders(
+        HttpHeaders original,
+        Map<String, List<String>> mutatedHeaders,
+        HttpHeaders from
+    ) {
+        if (mutatedHeaders == null) {
+            if (original.isEmpty()) {
+                return copyHeaders(from.map());
+            }
+            mutatedHeaders = copyHeaders(original.map());
+        }
+        for (var entry : from.map().entrySet()) {
+            mutatedHeaders.computeIfAbsent(entry.getKey(), k -> new ArrayList<>())
+                .addAll(copyAndTrimValues(entry.getValue()));
+        }
+        return mutatedHeaders;
+    }
+
+    static Map<String, List<String>> addHeaders(
+        HttpHeaders original,
+        Map<String, List<String>> mutatedHeaders,
+        String... fieldAndValues
+    ) {
+        if (mutatedHeaders == null) {
+            mutatedHeaders = SimpleUnmodifiableHttpHeaders.copyHeaders(original.map());
+        }
+        if (fieldAndValues.length % 2 != 0) {
+            throw new IllegalArgumentException("Uneven number of header keys and fields: " + fieldAndValues.length);
+        }
+        for (int i = 0; i < fieldAndValues.length - 1; i += 2) {
+            String field = fieldAndValues[i].toLowerCase(Locale.ENGLISH).trim();
+            String value = fieldAndValues[i + 1].trim();
+            mutatedHeaders.computeIfAbsent(field, k -> new ArrayList<>()).add(value);
+        }
+        return mutatedHeaders;
+    }
+
+    static Map<String, List<String>> copyHeaders(Map<String, List<String>> from) {
+        Map<String, List<String>> into = new HashMap<>(from.size());
+        for (var entry : from.entrySet()) {
+            into.put(entry.getKey().toLowerCase(Locale.ENGLISH).trim(), copyAndTrimValues(entry.getValue()));
+        }
+        return into;
+    }
+
+    static Map<String, List<String>> replaceHeaders(
+        HttpHeaders original,
+        Map<String, List<String>> mutated,
+        Map<String, List<String>> replace
+    ) {
+        if (mutated == null) {
+            mutated = SimpleUnmodifiableHttpHeaders.copyHeaders(original.map());
+        }
+        for (Map.Entry<String, List<String>> entry : replace.entrySet()) {
+            mutated.put(entry.getKey().toLowerCase(Locale.ENGLISH).trim(), copyAndTrimValues(entry.getValue()));
+        }
+        return mutated;
     }
 }

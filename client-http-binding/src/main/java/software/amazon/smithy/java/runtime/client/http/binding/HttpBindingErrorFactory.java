@@ -11,7 +11,7 @@ import software.amazon.smithy.java.runtime.client.http.HttpErrorDeserializer;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
-import software.amazon.smithy.java.runtime.http.api.SmithyHttpResponse;
+import software.amazon.smithy.java.runtime.http.api.HttpResponse;
 import software.amazon.smithy.java.runtime.http.binding.HttpBinding;
 
 /**
@@ -36,7 +36,7 @@ public final class HttpBindingErrorFactory implements HttpErrorDeserializer.Know
     public CompletableFuture<ModeledApiException> createError(
         Context context,
         Codec codec,
-        SmithyHttpResponse response,
+        HttpResponse response,
         ShapeBuilder<ModeledApiException> builder
     ) {
         return httpBinding.responseDeserializer()
