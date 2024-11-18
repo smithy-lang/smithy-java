@@ -8,7 +8,6 @@ package software.amazon.smithy.java.runtime.client.core.pagination;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -21,7 +20,6 @@ import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
 final class DefaultAsyncPaginator<I extends SerializableStruct, O extends SerializableStruct> implements
     AsyncPaginator<O> {
-    private static final Complete COMPLETE = new Complete();
 
     private final Document inputDocument;
     private final PaginatableAsync<I, O> call;
