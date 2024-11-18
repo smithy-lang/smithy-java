@@ -18,7 +18,7 @@ public class RequestHookTest {
         var foo = new TestStructs.Foo();
         var context = Context.create();
         var request = new MyRequest();
-        var hook = new RequestHook<>(context, foo, request);
+        var hook = new RequestHook<>(TestStructs.OPERATION, context, foo, request);
 
         assertThat(hook.withRequest(request), sameInstance(hook));
         assertThat(hook.withRequest(new MyRequest()), not(sameInstance(hook)));
@@ -29,9 +29,9 @@ public class RequestHookTest {
         var foo = new TestStructs.Foo();
         var context = Context.create();
         var request = new MyRequest();
-        var hook = new RequestHook<>(context, foo, request);
+        var hook = new RequestHook<>(TestStructs.OPERATION, context, foo, request);
 
-        assertThat(hook.mapRequest(TestStructs.Bar.class, bar -> bar), sameInstance(request));
+        assertThat(hook.mapRequest(TestStructs.Bar.class, RequestHook::request), sameInstance(request));
         assertThat(hook.mapRequest(MyRequest.class, f -> new MyRequest()), not(sameInstance(request)));
     }
 

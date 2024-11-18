@@ -35,7 +35,7 @@ public final class CallContext {
     public static final Context.Key<Identity> IDENTITY = Context.key("Identity of the caller");
 
     /**
-     * The current number of retry attempts the client has made for the current call.
+     * The current number of retry attempts the client has made for the current call, starting at 1.
      *
      * <p>This is a read-only value; modifying this value has no effect on a request.
      */

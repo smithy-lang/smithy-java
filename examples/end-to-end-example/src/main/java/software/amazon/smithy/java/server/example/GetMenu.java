@@ -6,12 +6,12 @@
 package software.amazon.smithy.java.server.example;
 
 import java.util.List;
+import software.amazon.smithy.java.example.model.CoffeeItem;
+import software.amazon.smithy.java.example.model.CoffeeType;
+import software.amazon.smithy.java.example.model.GetMenuInput;
+import software.amazon.smithy.java.example.model.GetMenuOutput;
+import software.amazon.smithy.java.example.service.GetMenuOperation;
 import software.amazon.smithy.java.server.RequestContext;
-import software.amazon.smithy.java.server.example.model.CoffeeItem;
-import software.amazon.smithy.java.server.example.model.CoffeeType;
-import software.amazon.smithy.java.server.example.model.GetMenuInput;
-import software.amazon.smithy.java.server.example.model.GetMenuOutput;
-import software.amazon.smithy.java.server.example.service.GetMenuOperation;
 
 /**
  * Returns the menu for the coffee shop

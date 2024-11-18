@@ -53,42 +53,58 @@ final class DirectedJavaClientCodegen
 
     @Override
     public void generateStructure(GenerateStructureDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new StructureGenerator<>().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new StructureGenerator<>().accept(directive);
+        }
     }
 
     @Override
     public void generateError(GenerateErrorDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new StructureGenerator<>().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new StructureGenerator<>().accept(directive);
+        }
     }
 
     @Override
     public void generateUnion(GenerateUnionDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new UnionGenerator().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new UnionGenerator().accept(directive);
+        }
     }
 
     @Override
     public void generateList(GenerateListDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new ListGenerator().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new ListGenerator().accept(directive);
+        }
     }
 
     @Override
     public void generateMap(GenerateMapDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new MapGenerator().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new MapGenerator().accept(directive);
+        }
     }
 
     @Override
     public void generateEnumShape(GenerateEnumDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new EnumGenerator<>().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new EnumGenerator<>().accept(directive);
+        }
     }
 
     @Override
     public void generateIntEnumShape(GenerateIntEnumDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new EnumGenerator<>().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new EnumGenerator<>().accept(directive);
+        }
     }
 
     @Override
     public void generateOperation(GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new OperationGenerator().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new OperationGenerator().accept(directive);
+        }
     }
 
     @Override
@@ -99,7 +115,9 @@ final class DirectedJavaClientCodegen
 
     @Override
     public void customizeBeforeIntegrations(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        new SharedSchemasGenerator().accept(directive);
-        new SharedSerdeGenerator().accept(directive);
+        if (!directive.settings().useExternalTypes()) {
+            new SharedSchemasGenerator().accept(directive);
+            new SharedSerdeGenerator().accept(directive);
+        }
     }
 }

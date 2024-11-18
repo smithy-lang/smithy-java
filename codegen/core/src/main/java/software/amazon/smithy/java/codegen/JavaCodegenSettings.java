@@ -45,6 +45,7 @@ public final class JavaCodegenSettings {
     private static final String RELATIVE_DATE = "relativeDate";
     private static final String RELATIVE_VERSION = "relativeVersion";
     private static final String EDITION = "edition";
+    private static final String USE_EXTERNAL_TYPES = "useExternalTypes";
     private static final List<String> PROPERTIES = List.of(
         SERVICE,
         NAME,
@@ -57,7 +58,8 @@ public final class JavaCodegenSettings {
         DEFAULT_SETTINGS,
         RELATIVE_DATE,
         RELATIVE_VERSION,
-        EDITION
+        EDITION,
+        USE_EXTERNAL_TYPES
     );
 
     private final ShapeId service;
@@ -73,6 +75,7 @@ public final class JavaCodegenSettings {
     private final String relativeDate;
     private final String relativeVersion;
     private final SmithyJavaCodegenEdition edition;
+    private final boolean useExternalTypes;
     private final Map<String, Set<Symbol>> generatedSymbols = new HashMap<>();
 
     private JavaCodegenSettings(Builder builder) {
@@ -89,6 +92,7 @@ public final class JavaCodegenSettings {
         this.relativeDate = builder.relativeDate;
         this.relativeVersion = builder.relativeVersion;
         this.edition = Objects.requireNonNullElse(builder.edition, SmithyJavaCodegenEdition.LATEST);
+        this.useExternalTypes = builder.useExternalTypes;
     }
 
     /**
@@ -111,7 +115,8 @@ public final class JavaCodegenSettings {
             .getArrayMember(DEFAULT_SETTINGS, n -> n.expectStringNode().getValue(), builder::defaultSettings)
             .getStringMember(RELATIVE_DATE, builder::relativeDate)
             .getStringMember(RELATIVE_VERSION, builder::relativeVersion)
-            .getStringMember(EDITION, builder::edition);
+            .getStringMember(EDITION, builder::edition)
+            .getBooleanMember(USE_EXTERNAL_TYPES, builder::useExternalTypes);
 
         builder.sourceLocation(settingsNode.getSourceLocation().getFilename());
 
@@ -170,6 +175,10 @@ public final class JavaCodegenSettings {
         return edition;
     }
 
+    public boolean useExternalTypes() {
+        return useExternalTypes;
+    }
+
     @SmithyInternalApi
     public void addSymbol(Symbol symbol) {
         var symbols = generatedSymbols.computeIfAbsent(symbol.getNamespace(), k -> new HashSet<>());
@@ -226,6 +235,7 @@ public final class JavaCodegenSettings {
         private String relativeDate;
         private String relativeVersion;
         private SmithyJavaCodegenEdition edition;
+        private boolean useExternalTypes;
 
         public Builder service(String string) {
             this.service = ShapeId.from(string);
@@ -315,6 +325,11 @@ public final class JavaCodegenSettings {
 
         public Builder edition(String string) {
             this.edition = SmithyJavaCodegenEdition.valueOf(string.toUpperCase(Locale.ENGLISH));
+            return this;
+        }
+
+        public Builder useExternalTypes(boolean useExternalTypes) {
+            this.useExternalTypes = useExternalTypes;
             return this;
         }
 

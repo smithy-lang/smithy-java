@@ -531,24 +531,33 @@ final class XmlDeserializer implements ShapeDeserializer {
                         }
                     }
 
+                    // Open the key element.
                     var keyElement = reader.nextMemberElement();
                     if (keyElement == null) {
                         throw error("Expected map key, but map unexpectedly closed");
                     } else if (!keyElement.equals(decoder.keyName)) {
                         throw error(String.format("Expected map key '%s' but found %s", decoder.keyName, reader));
                     }
+                    // Consume the key content.
                     var key = reader.getText();
+                    // Close the key element.
                     reader.closeElement();
 
-                    var value = reader.nextMemberElement();
-                    if (value == null) {
+                    // Open the value element.
+                    var valueElement = reader.nextMemberElement();
+                    if (valueElement == null) {
                         throw error("Expected map value, but map unexpectedly closed");
-                    } else if (!decoder.valueName.equals(value)) {
+                    } else if (!decoder.valueName.equals(valueElement)) {
                         throw error(String.format("Expected map value '%s' but found %s", decoder.valueName, reader));
                     }
-
+                    // Consume the value content.
                     consumer.accept(state, key, this);
-                    // The </entry> is closed by the consumer.
+                    // Close the value element.
+                    reader.closeElement();
+
+                    // The </entry> is not closed by the consumer but the map container is,
+                    // so close one element.
+                    reader.closeElement();
                 }
             } catch (XMLStreamException e) {
                 throw error("Failed to read map", e);

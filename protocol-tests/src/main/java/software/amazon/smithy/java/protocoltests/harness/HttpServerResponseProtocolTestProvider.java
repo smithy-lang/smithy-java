@@ -13,8 +13,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.extension.ConditionEvaluationResult;
-import org.junit.jupiter.api.extension.ExecutionCondition;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
@@ -55,6 +53,10 @@ public class HttpServerResponseProtocolTestProvider extends
             var testOperation = serverTestOperation.operation();
             boolean shouldSkip = filter.skipOperation(testOperation.id());
             for (var testCase : testOperation.responseTestCases()) {
+                if (shouldSkip || filter.skipTestCase(testCase)) {
+                    invocationContexts.add(new IgnoredTestCase(testCase));
+                    continue;
+                }
                 Map<String, List<String>> headers = new HashMap<>();
                 headers.put("x-protocol-test-protocol-id", List.of(testCase.getProtocol().toString()));
                 headers.put("x-protocol-test-service", List.of(testOperation.serviceId().toString()));
@@ -75,8 +77,7 @@ public class HttpServerResponseProtocolTestProvider extends
                         (ApiOperation<SerializableStruct, SerializableStruct>) testOperation.operationModel(),
                         serverTestOperation.mockOperation(),
                         mockClient,
-                        request,
-                        shouldSkip || filter.skipTestCase(testCase)
+                        request
                     )
                 );
             }
@@ -90,8 +91,7 @@ public class HttpServerResponseProtocolTestProvider extends
         ApiOperation<SerializableStruct, SerializableStruct> operationModel,
         MockOperation mockOperation,
         ServerTestClient client,
-        SmithyHttpRequest request,
-        boolean shouldSkip
+        SmithyHttpRequest request
     ) implements TestTemplateInvocationContext {
 
         @Override
@@ -102,9 +102,6 @@ public class HttpServerResponseProtocolTestProvider extends
         @Override
         public List<Extension> getAdditionalExtensions() {
             return List.of(
-                (ExecutionCondition) context -> shouldSkip
-                    ? ConditionEvaluationResult.disabled("Skipping filtered test")
-                    : ConditionEvaluationResult.enabled(""),
                 new ParameterResolver() {
 
                     @Override

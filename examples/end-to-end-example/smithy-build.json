@@ -3,18 +3,15 @@
   "plugins": {
     "java-client-codegen": {
       "service": "com.example#CoffeeShop",
-      // TODO: Make plugin aware of existing?
-      "namespace": "software.amazon.smithy.java.client.example",
+      "namespace": "software.amazon.smithy.java.example",
       "headerFile": "license.txt",
-      "protocol": "aws.protocols#restJson1",
-      "transport": {
-        "http-java": {}
-      }
+      "protocol": "aws.protocols#restJson1"
     },
     "java-server-codegen": {
       "service": "com.example#CoffeeShop",
-      "namespace": "software.amazon.smithy.java.server.example",
-      "headerFile": "license.txt"
+      "namespace": "software.amazon.smithy.java.example",
+      "headerFile": "license.txt",
+      "useExternalTypes": true
     }
   }
 }

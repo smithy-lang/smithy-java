@@ -12,23 +12,50 @@ public abstract class ModeledApiException extends ApiException implements Serial
 
     private final Schema schema;
 
-    public ModeledApiException(Schema schema, String message) {
+    protected ModeledApiException(Schema schema, String message) {
         super(message);
         this.schema = schema;
     }
 
-    public ModeledApiException(Schema schema, String message, Fault errorType) {
-        super(message, errorType);
+    protected ModeledApiException(Schema schema, String message, Fault errorType) {
+        super(message, null, errorType, null);
         this.schema = schema;
     }
 
-    public ModeledApiException(Schema schema, String message, Throwable cause) {
-        super(message, cause);
+    protected ModeledApiException(Schema schema, String message, Fault errorType, Throwable cause) {
+        super(message, cause, errorType, null);
         this.schema = schema;
     }
 
-    public ModeledApiException(Schema schema, String message, Throwable cause, Fault errorType) {
-        super(message, cause, errorType);
+    protected ModeledApiException(
+        Schema schema,
+        String message,
+        Fault errorType,
+        Throwable cause,
+        Boolean captureStackTrace
+    ) {
+        super(message, cause, errorType, captureStackTrace);
+        this.schema = schema;
+    }
+
+    protected ModeledApiException(Schema schema, String message, Throwable cause, Boolean captureStackTrace) {
+        super(message, cause, captureStackTrace);
+        this.schema = schema;
+    }
+
+    protected ModeledApiException(Schema schema, String message, Throwable cause) {
+        super(message, cause, (Boolean) null);
+        this.schema = schema;
+    }
+
+    protected ModeledApiException(
+        Schema schema,
+        String message,
+        Throwable cause,
+        Fault errorType,
+        Boolean captureStackTrace
+    ) {
+        super(message, cause, errorType, captureStackTrace);
         this.schema = schema;
     }
 

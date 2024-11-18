@@ -32,14 +32,38 @@ public class JavaHttpClientTransport implements ClientTransport<SmithyHttpReques
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;
 
-    static {
-        // TODO: can we set this only for our generated clients?
-        // Allow clients to reset Host header.
-        System.setProperty("jdk.httpclient.allowRestrictedHeaders", "Host");
-    }
-
     public JavaHttpClientTransport() {
         this(HttpClient.newHttpClient());
+
+        // Allow clients to set Host header. This has to be done using a system property and can't be done per/client.
+        var currentValues = System.getProperty("jdk.httpclient.allowRestrictedHeaders");
+        if (currentValues == null || currentValues.isEmpty()) {
+            System.setProperty("jdk.httpclient.allowRestrictedHeaders", "host");
+        } else if (!containsHost(currentValues)) {
+            System.setProperty("jdk.httpclient.allowRestrictedHeaders", currentValues + ",host");
+        }
+    }
+
+    private static boolean containsHost(String currentValues) {
+        int length = currentValues.length();
+        for (int i = 0; i < length; i++) {
+            char c = currentValues.charAt(i);
+            // Check if "host" starts at the current position.
+            if ((c == 'h' || c == 'H') && i + 3 < length
+                && (currentValues.charAt(i + 1) == 'o')
+                && (currentValues.charAt(i + 2) == 's')
+                && (currentValues.charAt(i + 3) == 't')) {
+                // Ensure "t" is at the end or followed by a comma.
+                if (i + 4 == length || currentValues.charAt(i + 4) == ',') {
+                    return true;
+                }
+            }
+            // Skip to the next comma or end of string.
+            while (i < length && currentValues.charAt(i) != ',') {
+                i++;
+            }
+        }
+        return false;
     }
 
     /**

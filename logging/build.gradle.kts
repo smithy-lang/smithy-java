@@ -25,10 +25,10 @@ val jclTestConfiguration: Configuration by configurations.creating {
 }
 
 // These are declared here instead of the version catalog because we don't want other modules to depend on them.
-val log4j2 = "2.12.4"
-val slf4j = "2.0.13"
-val logBack = "1.5.6"
-val jcl = "1.3.2"
+val log4j2 = "2.24.1"
+val slf4j = "2.0.16"
+val logBack = "1.5.12"
+val jcl = "1.3.4"
 
 dependencies {
     compileOnly("org.apache.logging.log4j:log4j-api:$log4j2")

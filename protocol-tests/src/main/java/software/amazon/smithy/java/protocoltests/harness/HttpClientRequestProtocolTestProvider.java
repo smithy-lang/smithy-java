@@ -53,6 +53,9 @@ final class HttpClientRequestProtocolTestProvider extends
                 operation -> operation.requestTestCases()
                     .stream()
                     .map(testCase -> {
+                        if (filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)) {
+                            return new IgnoredTestCase(testCase);
+                        }
                         var testProtocol = store.getProtocol(testCase.getProtocol());
                         var testResolver = testCase.getAuthScheme().isEmpty()
                             ? AuthSchemeResolver.NO_AUTH
@@ -78,8 +81,7 @@ final class HttpClientRequestProtocolTestProvider extends
                             operation.operationModel(),
                             inputBuilder.build(),
                             overrideBuilder.build(),
-                            testTransport::getCapturedRequest,
-                            filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)
+                            testTransport::getCapturedRequest
                         );
                     })
             );
@@ -91,8 +93,7 @@ final class HttpClientRequestProtocolTestProvider extends
         ApiOperation apiOperation,
         SerializableStruct input,
         RequestOverrideConfig overrideConfig,
-        Supplier<SmithyHttpRequest> requestSupplier,
-        boolean shouldSkip
+        Supplier<SmithyHttpRequest> requestSupplier
     ) implements TestTemplateInvocationContext {
 
         @Override
@@ -103,9 +104,6 @@ final class HttpClientRequestProtocolTestProvider extends
         @Override
         public List<Extension> getAdditionalExtensions() {
             return List.of(
-                (ExecutionCondition) context -> shouldSkip
-                    ? ConditionEvaluationResult.disabled("")
-                    : ConditionEvaluationResult.enabled(""),
                 new ParameterResolver() {
                     @Override
                     public boolean supportsParameter(

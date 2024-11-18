@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.protocoltests.harness.*;
 import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
 import software.amazon.smithy.java.runtime.io.datastream.DataStream;
+import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 
 @ProtocolTest(
@@ -97,7 +98,9 @@ public class AwsRestJson1ProtocolTests {
         }
 
         if (expected.contentType().equals("application/json")) {
-            assertThat(ObjectNode.parse(actualJson)).isEqualTo(ObjectNode.parse(expectedJson));
+            var expectedNode = Node.parse(expectedJson);
+            var actualNode = Node.parse(actualJson);
+            Node.assertEquals(actualNode, expectedNode);
         } else {
             assertThat(actualJson).isEqualTo(expectedJson);
         }

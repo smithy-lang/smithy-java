@@ -5,7 +5,9 @@
 
 package software.amazon.smithy.java.protocoltests.harness;
 
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.net.ServerSocket;
 import java.net.URI;
 import java.util.*;
 import java.util.function.Predicate;
@@ -149,7 +151,7 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
 
                 Service createdService = (Service) builderStageClass.getMethod("build").invoke(builder);
 
-                var endpoint = URI.create("http://localhost:8190");
+                var endpoint = URI.create("http://localhost:" + getFreePort());
 
                 context.getStore(namespace.append(context.getUniqueId()))
                     .put(
@@ -339,6 +341,14 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
             return CodegenUtils.getImplementationByName(ApiOperation.class, fqn).getDeclaredConstructor().newInstance();
         } catch (InvocationTargetException | InstantiationException | IllegalAccessException
             | NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static int getFreePort() {
+        try (ServerSocket serverSocket = new ServerSocket(0)) {
+            return serverSocket.getLocalPort();
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }

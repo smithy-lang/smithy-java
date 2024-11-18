@@ -62,8 +62,8 @@ public class GenericClientTest {
         var header = "x-foo";
         var interceptor = new ClientInterceptor() {
             @Override
-            public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, RequestT> hook) {
-                return hook.mapRequest(SmithyHttpRequest.class, request -> request.withAddedHeaders("X-Foo", "Bar"));
+            public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
+                return hook.mapRequest(SmithyHttpRequest.class, h -> h.request().withAddedHeaders("X-Foo", "Bar"));
             }
 
             @Override
@@ -93,7 +93,7 @@ public class GenericClientTest {
     public void customerOverrideWorksCorrectly() {
         var interceptor = new ClientInterceptor() {
             @Override
-            public void readBeforeExecution(InputHook<?> hook) {
+            public void readBeforeExecution(InputHook<?, ?> hook) {
                 var constant = hook.context().get(TestClientPlugin.CONSTANT_KEY);
                 assertEquals(constant, "CONSTANT");
                 var value = hook.context().get(TestSettings.VALUE_KEY);

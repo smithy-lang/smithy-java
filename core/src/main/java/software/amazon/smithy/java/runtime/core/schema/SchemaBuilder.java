@@ -359,13 +359,9 @@ public final class SchemaBuilder {
         if (members.size() > 1) {
             // Sort members to ensure that required members with no default come before other members.
             members.sort((a, b) -> {
-                if (a.isRequiredByValidation && !b.isRequiredByValidation) {
-                    return -1;
-                } else if (a.isRequiredByValidation) {
-                    return 0;
-                } else {
-                    return 1;
-                }
+                int aRequiredWithNoDefault = a.isRequiredByValidation ? 1 : 0;
+                int bRequiredWithNoDefault = b.isRequiredByValidation ? 1 : 0;
+                return bRequiredWithNoDefault - aRequiredWithNoDefault;
             });
         }
     }

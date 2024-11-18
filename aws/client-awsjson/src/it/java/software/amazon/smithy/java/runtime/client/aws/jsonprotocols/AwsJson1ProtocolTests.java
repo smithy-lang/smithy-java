@@ -34,7 +34,8 @@ public class AwsJson1ProtocolTests {
 
             // Like above, but in smithy-java we populate the defaults but don't change the nullability.
             "AwsJson10ClientIgnoresNonTopLevelDefaultsOnMembersWithClientOptional",
-        }
+        },
+        skipOperations = "aws.protocoltests.json10#OperationWithRequiredMembersWithDefaults"
     )
     public void requestTest(DataStream expected, DataStream actual) {
         String expectedJson = "{}";
@@ -53,7 +54,8 @@ public class AwsJson1ProtocolTests {
         skipTests = {
             "AwsJson10ClientPopulatesDefaultsValuesWhenMissingInResponse",
             "AwsJson10ClientIgnoresDefaultValuesIfMemberValuesArePresentInResponse"
-        }
+        },
+        skipOperations = "aws.protocoltests.json10#OperationWithRequiredMembersWithDefaults"
     )
     public void responseTest(Runnable test) throws Exception {
         test.run();

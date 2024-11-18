@@ -9,6 +9,7 @@ plugins {
     id("com.github.spotbugs")
     id("com.diffplug.spotless")
     id("com.autonomousapps.dependency-analysis")
+    id("smithy-java.utilities")
 }
 
 // Workaround per: https://github.com/gradle/gradle/issues/15383
@@ -40,6 +41,7 @@ dependencies {
     testImplementation(libs.hamcrest)
     testImplementation(libs.assertj.core)
     compileOnly("com.github.spotbugs:spotbugs-annotations:${spotbugs.toolVersion.get()}")
+    testCompileOnly("com.github.spotbugs:spotbugs-annotations:${spotbugs.toolVersion.get()}")
 }
 
 tasks.withType<Test> {

@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import software.amazon.smithy.java.context.Context;
@@ -59,6 +58,9 @@ final class HttpClientResponseProtocolTestProvider extends
                 operation -> operation.responseTestCases()
                     .stream()
                     .map(testCase -> {
+                        if (filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)) {
+                            return new IgnoredTestCase(testCase);
+                        }
                         // Get specific values to use for this test case's context
                         var testProtocol = store.getProtocol(testCase.getProtocol());
                         var testResolver = testCase.getAuthScheme().isEmpty()
@@ -79,9 +81,7 @@ final class HttpClientResponseProtocolTestProvider extends
                             operation.operationModel(),
                             input,
                             outputBuilder.build(),
-                            overrideBuilder.build(),
-                            filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)
-
+                            overrideBuilder.build()
                         );
                     })
             );
@@ -93,8 +93,7 @@ final class HttpClientResponseProtocolTestProvider extends
         ApiOperation apiOperation,
         SerializableStruct input,
         SerializableStruct expectedOutput,
-        RequestOverrideConfig overrideConfig,
-        boolean shouldSkip
+        RequestOverrideConfig overrideConfig
     ) implements TestTemplateInvocationContext {
 
         @Override
@@ -105,7 +104,6 @@ final class HttpClientResponseProtocolTestProvider extends
         @Override
         public List<Extension> getAdditionalExtensions() {
             return List.of((ProtocolTestParameterResolver) () -> {
-                Assumptions.assumeFalse(shouldSkip);
                 var actualOutput = mockClient.clientRequest(input, apiOperation, overrideConfig);
                 assertThat(actualOutput)
                     .usingRecursiveComparison(ComparisonUtils.getComparisonConfig())

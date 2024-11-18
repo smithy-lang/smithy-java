@@ -39,6 +39,20 @@ public interface ShapeBuilder<T extends SerializableShape> {
     }
 
     /**
+     * Set a member on the builder based on the member schema.
+     *
+     * @param member Member to set.
+     * @param value Value to set.
+     * @throws IllegalArgumentException if the member is not part of the schema.
+     * @throws ClassCastException if the value is not compatible with the member.
+     */
+    default void setMemberValue(Schema member, Object value) {
+        throw new IllegalArgumentException(
+            "Attempted to set non-existent member of " + schema().id() + ": " + member.id()
+        );
+    }
+
+    /**
      * Performs any necessary error correction before the shape can be built.
      *
      * <p>For example, a shape might be missing a required number member, and error correction would set the
