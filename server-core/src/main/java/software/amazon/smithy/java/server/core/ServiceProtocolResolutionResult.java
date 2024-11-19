@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.server.core;
 
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.utils.SmithyInternalApi;

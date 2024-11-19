@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.codegen.test.model.EnumType;
-import software.amazon.smithy.java.runtime.json.JsonCodec;
+import software.amazon.smithy.java.json.JsonCodec;
 
 public class EnumTest {
 

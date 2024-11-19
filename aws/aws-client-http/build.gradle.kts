@@ -5,7 +5,7 @@ plugins {
 description = "This module provides AWS specific HTTP support"
 
 extra["displayName"] = "Smithy :: Java :: AWS :: Client :: HTTP"
-extra["moduleName"] = "software.amazon.smithy.java.runtime.aws.client.http"
+extra["moduleName"] = "software.amazon.smithy.java.aws.client.http"
 
 dependencies {
     api(project(":aws:aws-client-core"))

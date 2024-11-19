@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
-import software.amazon.smithy.java.runtime.io.uri.QueryStringParser;
+import software.amazon.smithy.java.io.uri.QueryStringParser;
 
 class QueryPattern {
     private final Map<String, String> labelKeys = new HashMap<>(); // label -> query-key

@@ -12,10 +12,10 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
-import software.amazon.smithy.java.runtime.core.schema.Schema;
-import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
-import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.serde.MapSerializer;
+import software.amazon.smithy.java.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 

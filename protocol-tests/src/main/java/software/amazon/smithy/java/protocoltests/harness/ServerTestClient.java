@@ -10,10 +10,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
-import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.HttpRequest;
-import software.amazon.smithy.java.runtime.http.api.HttpResponse;
-import software.amazon.smithy.java.runtime.io.datastream.DataStream;
+import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.io.datastream.DataStream;
 
 final class ServerTestClient {
     private static final ConcurrentHashMap<URI, ServerTestClient> CLIENTS = new ConcurrentHashMap<>();

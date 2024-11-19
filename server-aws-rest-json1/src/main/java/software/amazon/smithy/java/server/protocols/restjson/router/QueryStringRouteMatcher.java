@@ -7,7 +7,7 @@ package software.amazon.smithy.java.server.protocols.restjson.router;
 
 import java.util.HashSet;
 import java.util.Set;
-import software.amazon.smithy.java.runtime.io.uri.QueryStringParser;
+import software.amazon.smithy.java.io.uri.QueryStringParser;
 
 class QueryStringRouteMatcher implements RouteMatcher {
 

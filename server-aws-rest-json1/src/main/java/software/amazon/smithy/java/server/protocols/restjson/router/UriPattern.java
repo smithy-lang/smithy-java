@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.server.protocols.restjson.router;
 
 import java.util.Collections;
-import software.amazon.smithy.java.runtime.io.uri.QueryStringParser;
+import software.amazon.smithy.java.io.uri.QueryStringParser;
 import software.amazon.smithy.model.pattern.InvalidPatternException;
 
 public final class UriPattern {

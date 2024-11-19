@@ -21,8 +21,8 @@ import software.amazon.smithy.java.codegen.test.model.EmptyException;
 import software.amazon.smithy.java.codegen.test.model.ExceptionWithExtraStringException;
 import software.amazon.smithy.java.codegen.test.model.OptionalMessageException;
 import software.amazon.smithy.java.codegen.test.model.SimpleException;
-import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.schema.SerializableShape;
 
 @ExtendWith(ReloadClassesExtension.class)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)

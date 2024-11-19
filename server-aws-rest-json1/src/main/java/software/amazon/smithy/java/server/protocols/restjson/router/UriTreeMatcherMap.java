@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
-import software.amazon.smithy.java.runtime.io.uri.QueryStringParser;
+import software.amazon.smithy.java.io.uri.QueryStringParser;
 
 /**
  * A tree based URI Matcher map that implements path specificity URI

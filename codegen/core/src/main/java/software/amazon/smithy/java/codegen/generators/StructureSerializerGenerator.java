@@ -8,8 +8,9 @@ package software.amazon.smithy.java.codegen.generators;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.schema.Schema;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.StructureShape;
@@ -17,7 +18,7 @@ import software.amazon.smithy.model.traits.ErrorTrait;
 
 /**
  * Generates the implementation of the
- * {@link software.amazon.smithy.java.runtime.core.schema.SerializableShape#serialize(ShapeSerializer)}
+ * {@link SerializableShape#serialize(ShapeSerializer)}
  * method for a structure class.
  */
 record StructureSerializerGenerator(

@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import software.amazon.smithy.java.runtime.core.schema.TraitKey;
+import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.traits.DefaultTrait;
 import software.amazon.smithy.model.traits.LengthTrait;

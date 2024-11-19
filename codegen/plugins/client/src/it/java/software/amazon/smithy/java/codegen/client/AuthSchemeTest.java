@@ -13,14 +13,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.client.TestServiceClient;
 import smithy.java.codegen.server.test.model.EchoInput;
+import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
+import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeOption;
+import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.codegen.client.util.EchoServer;
-import software.amazon.smithy.java.runtime.aws.client.restjson.RestJsonClientProtocol;
-import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeOption;
-import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
-import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
-import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.core.schema.PreludeSchemas;
+import software.amazon.smithy.java.http.api.HttpRequest;
 
 public class AuthSchemeTest {
     private static final EchoServer server = new EchoServer();

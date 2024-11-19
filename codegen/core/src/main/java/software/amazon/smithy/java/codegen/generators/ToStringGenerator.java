@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
+import software.amazon.smithy.java.core.serde.ToStringSerializer;
 
 /**
  * Writes the toString method for a serializable Class.

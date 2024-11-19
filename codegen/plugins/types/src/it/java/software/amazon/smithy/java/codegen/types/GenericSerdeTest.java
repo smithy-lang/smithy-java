@@ -17,9 +17,9 @@ import smithy.java.codegen.server.test.model.MyUnion;
 import smithy.java.codegen.server.test.model.NestedIntEnum;
 import smithy.java.codegen.server.test.model.UsesOtherStructs;
 import smithy.java.codegen.server.test.model.YesOrNo;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
-import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.document.Document;
 
 /**
  * General tests to check that generated type classes compile and are serializable

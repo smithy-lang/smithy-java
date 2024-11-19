@@ -25,7 +25,7 @@ import smithy.java.codegen.server.test.service.EchoOperation;
 import smithy.java.codegen.server.test.service.GetBeerOperationAsync;
 import smithy.java.codegen.server.test.service.GetErrorOperationAsync;
 import smithy.java.codegen.server.test.service.TestService;
-import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.exceptions.InternalServerError;

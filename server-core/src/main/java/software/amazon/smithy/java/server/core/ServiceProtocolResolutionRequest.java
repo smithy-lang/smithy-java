@@ -7,7 +7,7 @@ package software.amazon.smithy.java.server.core;
 
 import java.net.URI;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpHeaders;
 
 public record ServiceProtocolResolutionRequest(URI uri, HttpHeaders headers, Context requestContext, String method) {
 }

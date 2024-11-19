@@ -5,9 +5,9 @@
 
 package software.amazon.smithy.java.codegen.client;
 
+import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.runtime.client.core.ClientConfig;
-import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
 
 public final class TestClientPlugin implements ClientPlugin {
     public static final Context.Key<String> CONSTANT_KEY = Context.key("A constant value.");

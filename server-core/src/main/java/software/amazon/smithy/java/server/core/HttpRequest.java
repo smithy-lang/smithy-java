@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.server.core;
 
 import java.net.URI;
-import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpHeaders;
 
 // TODO see if we can reuse SmithyHttpRequest in here.
 public final class HttpRequest extends RequestImpl {

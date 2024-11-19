@@ -7,10 +7,11 @@ package software.amazon.smithy.java.codegen;
 
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.model.traits.Trait;
 
 /**
- * Writes an initializer for a trait when adding that trait to a {@link software.amazon.smithy.java.runtime.core.schema.Schema}.
+ * Writes an initializer for a trait when adding that trait to a {@link Schema}.
  *
  * <p>{@code TraitInitializer} implementations can be added to a {@link JavaCodegenIntegration} to customize the way
  * in which traits are initialized in a Schema definition. Custom initializers are useful to improve the performance of

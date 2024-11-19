@@ -25,10 +25,10 @@ import software.amazon.smithy.java.codegen.test.model.NestedIntEnum;
 import software.amazon.smithy.java.codegen.test.model.NestedStruct;
 import software.amazon.smithy.java.codegen.test.model.NestedUnion;
 import software.amazon.smithy.java.codegen.test.model.UnionType;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.serde.SerializationException;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.serde.SerializationException;
+import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 public class UnionTest {

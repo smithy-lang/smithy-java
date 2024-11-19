@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.server.core;
 
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.exceptions.InternalServerError;
 

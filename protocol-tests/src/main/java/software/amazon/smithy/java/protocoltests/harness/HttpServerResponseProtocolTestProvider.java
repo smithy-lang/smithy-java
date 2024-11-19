@@ -19,13 +19,13 @@ import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.ParameterResolver;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
-import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.HttpRequest;
-import software.amazon.smithy.java.runtime.http.api.HttpResponse;
-import software.amazon.smithy.java.runtime.http.api.HttpVersion;
-import software.amazon.smithy.java.runtime.io.datastream.DataStream;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
 
 public class HttpServerResponseProtocolTestProvider extends

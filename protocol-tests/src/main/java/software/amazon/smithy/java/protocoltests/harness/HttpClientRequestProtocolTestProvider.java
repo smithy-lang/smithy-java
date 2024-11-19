@@ -11,17 +11,17 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.*;
+import software.amazon.smithy.java.client.core.ClientTransport;
+import software.amazon.smithy.java.client.core.RequestOverrideConfig;
+import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeOption;
+import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
+import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.runtime.client.core.ClientTransport;
-import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
-import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeOption;
-import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeResolver;
-import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
-import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.http.api.HttpRequest;
-import software.amazon.smithy.java.runtime.http.api.HttpResponse;
-import software.amazon.smithy.java.runtime.io.datastream.DataStream;
+import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 
 /**

@@ -5,7 +5,7 @@ plugins {
 description = "This module provides a dynamic Smithy client"
 
 extra["displayName"] = "Smithy :: Java :: Dynamic client"
-extra["moduleName"] = "software.amazon.smithy.java.runtime.dynamicclient"
+extra["moduleName"] = "software.amazon.smithy.java.dynamicclient"
 
 dependencies {
     api(project(":client-core"))

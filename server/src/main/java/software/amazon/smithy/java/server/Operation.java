@@ -8,8 +8,8 @@ package software.amazon.smithy.java.server;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
-import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 
 public final class Operation<I extends SerializableStruct, O extends SerializableStruct> {
     private final String name;

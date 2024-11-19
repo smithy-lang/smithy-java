@@ -7,13 +7,13 @@ package software.amazon.smithy.java.server.protocols.rpcv2;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
-import software.amazon.java.runtime.cbor.CborComparator;
+import software.amazon.java.cbor.CborComparator;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.protocoltests.harness.HttpServerRequestTests;
 import software.amazon.smithy.java.protocoltests.harness.HttpServerResponseTests;
 import software.amazon.smithy.java.protocoltests.harness.ProtocolTest;
 import software.amazon.smithy.java.protocoltests.harness.ProtocolTestFilter;
 import software.amazon.smithy.java.protocoltests.harness.TestType;
-import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 
 @ProtocolTest(
     service = "smithy.protocoltests.rpcv2Cbor#RpcV2Protocol",

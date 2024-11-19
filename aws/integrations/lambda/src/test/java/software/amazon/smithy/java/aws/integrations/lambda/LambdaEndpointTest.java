@@ -12,17 +12,17 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.cbor.Rpcv2CborCodec;
+import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.example.model.AddBeerInput;
 import software.amazon.smithy.java.example.model.AddBeerOutput;
 import software.amazon.smithy.java.example.model.Beer;
 import software.amazon.smithy.java.example.model.GetBeerInput;
 import software.amazon.smithy.java.example.model.GetBeerOutput;
-import software.amazon.smithy.java.runtime.cbor.Rpcv2CborCodec;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
-import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 
 class LambdaEndpointTest {
 

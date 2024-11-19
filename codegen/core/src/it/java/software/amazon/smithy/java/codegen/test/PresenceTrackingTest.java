@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.codegen.test.model.BooleanMembersInput;
 import software.amazon.smithy.java.codegen.test.model.NestedStruct;
 import software.amazon.smithy.java.codegen.test.model.StructureMembersInput;
-import software.amazon.smithy.java.runtime.core.serde.SerializationException;
+import software.amazon.smithy.java.core.serde.SerializationException;
 
 public class PresenceTrackingTest {
     @Test

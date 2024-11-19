@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import software.amazon.smithy.java.runtime.http.api.HttpMessage;
-import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpMessage;
+import software.amazon.smithy.java.http.api.HttpRequest;
 
 /**
  * Provides a number of testing utilities for validating protocol test results.

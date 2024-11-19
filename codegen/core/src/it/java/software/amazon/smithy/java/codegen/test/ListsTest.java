@@ -31,11 +31,11 @@ import software.amazon.smithy.java.codegen.test.model.NestedStruct;
 import software.amazon.smithy.java.codegen.test.model.NestedUnion;
 import software.amazon.smithy.java.codegen.test.model.SetsAllTypesInput;
 import software.amazon.smithy.java.codegen.test.model.SparseListsInput;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.serde.SerializationException;
-import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.java.runtime.json.JsonCodec;
+import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.SerializationException;
+import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.utils.ListUtils;
 
 public class ListsTest {

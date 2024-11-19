@@ -6,8 +6,8 @@
 package software.amazon.smithy.java.protocoltests.harness;
 
 import java.util.function.Supplier;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
 
 /**

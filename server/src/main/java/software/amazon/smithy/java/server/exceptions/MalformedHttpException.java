@@ -5,10 +5,10 @@
 
 package software.amazon.smithy.java.server.exceptions;
 
-import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
-import software.amazon.smithy.java.runtime.core.schema.Schema;
-import software.amazon.smithy.java.runtime.core.schema.SchemaUtils;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaUtils;
+import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.ErrorTrait;
 

@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.server.protocols.restjson.router;
 
-import software.amazon.smithy.java.runtime.io.uri.QueryStringParser;
+import software.amazon.smithy.java.io.uri.QueryStringParser;
 
 /**
  * Matches a full URI by matching both the path and query components. This uses the EmptySegmentPathMatcher which does

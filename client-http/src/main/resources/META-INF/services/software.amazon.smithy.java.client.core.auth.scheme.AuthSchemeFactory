@@ -1,0 +1,4 @@
+software.amazon.smithy.java.client.http.auth.HttpBasicAuthAuthScheme$Factory
+software.amazon.smithy.java.client.http.auth.HttpDigestAuthAuthScheme$Factory
+software.amazon.smithy.java.client.http.auth.HttpApiKeyAuthScheme$Factory
+software.amazon.smithy.java.client.http.auth.HttpBearerAuthScheme$Factory

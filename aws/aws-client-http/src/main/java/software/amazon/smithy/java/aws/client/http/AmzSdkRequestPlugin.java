@@ -8,13 +8,13 @@ package software.amazon.smithy.java.aws.client.http;
 import java.util.HashMap;
 import java.util.List;
 import java.util.function.Function;
-import software.amazon.smithy.java.runtime.client.core.CallContext;
-import software.amazon.smithy.java.runtime.client.core.ClientConfig;
-import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
-import software.amazon.smithy.java.runtime.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.runtime.client.core.interceptors.RequestHook;
-import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.client.core.CallContext;
+import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.ClientPlugin;
+import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpRequest;
 
 /**
  * Adds the header "amz-sdk-request: ttl=X; attempt=Y; max=Z".

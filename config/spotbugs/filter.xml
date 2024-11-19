@@ -42,16 +42,16 @@
 
     <Match>
         <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
-        <Class name="software.amazon.smithy.java.runtime.dynamicclient.SchemaGuidedDocumentBuilder$SchemaList"/>
+        <Class name="software.amazon.smithy.java.dynamicclient.SchemaGuidedDocumentBuilder$SchemaList"/>
     </Match>
 
     <Match>
         <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
-        <Class name="software.amazon.smithy.java.runtime.dynamicclient.SchemaGuidedDocumentBuilder$SchemaMap"/>
+        <Class name="software.amazon.smithy.java.dynamicclient.SchemaGuidedDocumentBuilder$SchemaMap"/>
     </Match>
 
     <Match>
-        <Class name="software.amazon.smithy.java.runtime.core.serde.document.Documents$LazyStructure">
+        <Class name="software.amazon.smithy.java.core.serde.document.Documents$LazyStructure">
             <Method name="equals">
                 <Bug pattern="HE_EQUALS_USE_HASHCODE"/>
             </Method>
@@ -59,7 +59,7 @@
     </Match>
 
     <Match>
-        <Class name="software.amazon.smithy.java.runtime.client.core.ClientCall$Builder">
+        <Class name="software.amazon.smithy.java.client.core.ClientCall$Builder">
             <Field name="executor">
                 <Bug pattern="UWF_UNWRITTEN_FIELD"/>
             </Field>

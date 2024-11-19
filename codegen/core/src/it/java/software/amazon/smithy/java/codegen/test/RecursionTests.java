@@ -21,11 +21,11 @@ import software.amazon.smithy.java.codegen.test.model.IntermediateMapStructure;
 import software.amazon.smithy.java.codegen.test.model.RecursiveStructA;
 import software.amazon.smithy.java.codegen.test.model.RecursiveStructB;
 import software.amazon.smithy.java.codegen.test.model.SelfReferencing;
-import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
-import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.java.runtime.json.JsonCodec;
+import software.amazon.smithy.java.core.schema.SerializableShape;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.json.JsonCodec;
 
 public class RecursionTests {
 

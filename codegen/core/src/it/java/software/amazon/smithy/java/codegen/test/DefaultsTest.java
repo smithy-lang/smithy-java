@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.codegen.test.model.DefaultsInput;
 import software.amazon.smithy.java.codegen.test.model.NestedEnum;
 import software.amazon.smithy.java.codegen.test.model.NestedIntEnum;
-import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.document.Document;
 
 public class DefaultsTest {
     @Test

@@ -20,12 +20,12 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
-import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.http.api.HttpHeaders;
-import software.amazon.smithy.java.runtime.http.api.HttpRequest;
-import software.amazon.smithy.java.runtime.http.api.HttpVersion;
-import software.amazon.smithy.java.runtime.io.datastream.DataStream;
+import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.http.api.HttpHeaders;
+import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 
 public class HttpServerRequestProtocolTestProvider extends

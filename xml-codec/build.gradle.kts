@@ -5,7 +5,7 @@ plugins {
 description = "This module provides XML functionality"
 
 extra["displayName"] = "Smithy :: Java :: XML"
-extra["moduleName"] = "software.amazon.smithy.java.runtime.xml"
+extra["moduleName"] = "software.amazon.smithy.java.xml"
 
 dependencies {
     api(project(":core"))

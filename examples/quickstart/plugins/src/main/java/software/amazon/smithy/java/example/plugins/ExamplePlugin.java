@@ -1,8 +1,8 @@
 package software.amazon.smithy.java.example.plugins;
 
-import software.amazon.smithy.java.runtime.client.core.ClientConfig;
-import software.amazon.smithy.java.runtime.client.core.ClientPlugin;
-import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.ClientPlugin;
+import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 
 /**
  * Example plugin that sets the static endpoint for the generated client.

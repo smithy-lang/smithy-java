@@ -8,9 +8,9 @@ package software.amazon.smithy.java.server.protocols.restjson;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import software.amazon.smithy.java.io.ByteBufferUtils;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.protocoltests.harness.*;
-import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
-import software.amazon.smithy.java.runtime.io.datastream.DataStream;
 import software.amazon.smithy.model.node.Node;
 
 @ProtocolTest(

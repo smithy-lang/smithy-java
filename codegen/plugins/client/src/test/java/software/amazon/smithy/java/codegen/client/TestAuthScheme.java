@@ -6,14 +6,14 @@
 package software.amazon.smithy.java.codegen.client;
 
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.runtime.auth.api.AuthProperties;
-import software.amazon.smithy.java.runtime.auth.api.Signer;
-import software.amazon.smithy.java.runtime.auth.api.identity.Identity;
-import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResolver;
-import software.amazon.smithy.java.runtime.client.core.auth.identity.IdentityResolvers;
-import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthScheme;
-import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeFactory;
-import software.amazon.smithy.java.runtime.http.api.HttpRequest;
+import software.amazon.smithy.java.auth.api.AuthProperties;
+import software.amazon.smithy.java.auth.api.Signer;
+import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
+import software.amazon.smithy.java.client.core.auth.identity.IdentityResolvers;
+import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
+import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeFactory;
+import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**

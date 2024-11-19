@@ -4,10 +4,10 @@
     "java-client-codegen": {
       "service": "com.amazonaws.dynamodb#DynamoDB_20120810",
       "name": "DynamoDB",
-      "namespace": "software.amazon.smithy.java.runtime.examples.dynamodb",
+      "namespace": "software.amazon.smithy.java.examples.dynamodb",
       "protocol": "aws.protocols#awsJson1_0",
       "defaultSettings": [
-        "software.amazon.smithy.java.aws.runtime.client.auth.scheme.sigv4.SigV4Settings"
+        "software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigV4Settings"
       ],
       "transport": {
         "http-java": {}

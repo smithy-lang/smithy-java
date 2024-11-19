@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.server.core;
 
-import software.amazon.smithy.java.runtime.http.api.ModifiableHttpHeaders;
+import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 
 public final class HttpResponse extends ResponseImpl {
 

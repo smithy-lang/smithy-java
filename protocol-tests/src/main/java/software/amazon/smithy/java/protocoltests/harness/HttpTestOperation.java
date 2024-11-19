@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.protocoltests.harness;
 
 import java.util.List;
-import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.protocoltests.traits.HttpMalformedRequestTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;

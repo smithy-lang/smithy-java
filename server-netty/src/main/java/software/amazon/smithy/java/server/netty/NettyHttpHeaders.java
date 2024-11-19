@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import software.amazon.smithy.java.runtime.http.api.ModifiableHttpHeaders;
+import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 
 final class NettyHttpHeaders implements ModifiableHttpHeaders {
 

@@ -14,13 +14,13 @@ import java.util.Set;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.examples.eventstreaming.client.FizzBuzzServiceClient;
 import software.amazon.smithy.java.examples.eventstreaming.model.FizzBuzzInput;
 import software.amazon.smithy.java.examples.eventstreaming.model.FizzBuzzOutput;
 import software.amazon.smithy.java.examples.eventstreaming.model.FizzBuzzStream;
 import software.amazon.smithy.java.examples.eventstreaming.model.Value;
 import software.amazon.smithy.java.examples.eventstreaming.model.ValueStream;
-import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
 
 // This test requires manually running a server locally and then verifies client behavior against it.
 public class EventStreamTest {

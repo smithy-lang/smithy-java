@@ -8,19 +8,19 @@ package software.amazon.smithy.java.protocoltests.harness;
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import software.amazon.smithy.java.client.core.Client;
+import software.amazon.smithy.java.client.core.ClientProtocol;
+import software.amazon.smithy.java.client.core.ClientTransport;
+import software.amazon.smithy.java.client.core.RequestOverrideConfig;
+import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
+import software.amazon.smithy.java.client.core.endpoint.Endpoint;
+import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.core.schema.ApiException;
+import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.logging.InternalLogger;
-import software.amazon.smithy.java.runtime.client.core.Client;
-import software.amazon.smithy.java.runtime.client.core.ClientProtocol;
-import software.amazon.smithy.java.runtime.client.core.ClientTransport;
-import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
-import software.amazon.smithy.java.runtime.client.core.auth.scheme.AuthSchemeResolver;
-import software.amazon.smithy.java.runtime.client.core.endpoint.Endpoint;
-import software.amazon.smithy.java.runtime.client.core.endpoint.EndpointResolver;
-import software.amazon.smithy.java.runtime.core.schema.ApiException;
-import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.serde.TypeRegistry;
 
 /**
  * A mock client used to execute protocol tests.

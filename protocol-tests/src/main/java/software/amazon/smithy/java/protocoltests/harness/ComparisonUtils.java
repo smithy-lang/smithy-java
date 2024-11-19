@@ -9,10 +9,10 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Comparator;
 import org.assertj.core.api.recursive.comparison.RecursiveComparisonConfiguration;
-import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.java.runtime.io.ByteBufferUtils;
-import software.amazon.smithy.java.runtime.io.datastream.DataStream;
-import software.amazon.smithy.java.runtime.retries.api.RetrySafety;
+import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.io.ByteBufferUtils;
+import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.retries.api.RetrySafety;
 
 final class ComparisonUtils {
 

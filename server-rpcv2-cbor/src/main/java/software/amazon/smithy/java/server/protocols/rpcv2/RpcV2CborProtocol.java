@@ -7,11 +7,11 @@ package software.amazon.smithy.java.server.protocols.rpcv2;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.runtime.cbor.Rpcv2CborCodec;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.schema.TraitKey;
-import software.amazon.smithy.java.runtime.io.ByteBufferOutputStream;
-import software.amazon.smithy.java.runtime.io.datastream.DataStream;
+import software.amazon.smithy.java.cbor.Rpcv2CborCodec;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.io.ByteBufferOutputStream;
+import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.Job;
 import software.amazon.smithy.java.server.core.ServerProtocol;
