@@ -125,4 +125,21 @@ public class SdkRetryStrategy implements RetryStrategy {
     public int maxAttempts() {
         return delegate.maxAttempts();
     }
+
+    @Override
+    public Builder toBuilder() {
+        var rebuild = delegate.toBuilder();
+        return new Builder() {
+            @Override
+            public RetryStrategy build() {
+                return new SdkRetryStrategy(rebuild.build());
+            }
+
+            @Override
+            public Builder maxAttempts(int maxAttempts) {
+                rebuild.maxAttempts(maxAttempts);
+                return this;
+            }
+        };
+    }
 }

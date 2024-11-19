@@ -105,6 +105,11 @@ public class ClientPipelineTest {
                 public int maxAttempts() {
                     return 1;
                 }
+
+                @Override
+                public Builder toBuilder() {
+                    throw new UnsupportedOperationException();
+                }
             })
             .build();
 
@@ -188,6 +193,11 @@ public class ClientPipelineTest {
                 @Override
                 public int maxAttempts() {
                     return 3;
+                }
+
+                @Override
+                public Builder toBuilder() {
+                    throw new UnsupportedOperationException();
                 }
             })
             .build();

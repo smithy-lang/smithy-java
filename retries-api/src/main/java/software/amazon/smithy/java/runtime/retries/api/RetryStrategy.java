@@ -61,11 +61,39 @@ public interface RetryStrategy {
     int maxAttempts();
 
     /**
+     * Create a builder for this strategy, allowing things like {@link #maxAttempts()} to be customized.
+     *
+     * @return the builder.
+     */
+    Builder toBuilder();
+
+    /**
      * Create a RetryStrategy that only allows the first request, but does not allow retries.
      *
      * @return the created strategy.
      */
     static RetryStrategy noRetries() {
         return NoRetryImpl.INSTANCE;
+    }
+
+    /**
+     * A builder used to create or modify a RetryStrategy.
+     */
+    interface Builder {
+        /**
+         * Create the retry strategy.
+         *
+         * @return the created strategy.
+         */
+        RetryStrategy build();
+
+        /**
+         * Set the max attempts of the strategy.
+         *
+         * @param maxAttempts Max attempts to use before giving up (1 means one attempt and no retries, 2 is a single
+         *                    retry if the first call fails, etc).
+         * @return the builder.
+         */
+        Builder maxAttempts(int maxAttempts);
     }
 }

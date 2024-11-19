@@ -132,6 +132,11 @@ public class AmzSdkRequestPluginTest {
                 public int maxAttempts() {
                     return 3;
                 }
+
+                @Override
+                public Builder toBuilder() {
+                    throw new UnsupportedOperationException();
+                }
             })
             .build();
 
