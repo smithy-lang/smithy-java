@@ -52,9 +52,10 @@ public final class Bird implements SerializableStruct {
     }
 
     @Override
-    public Object getMemberValue(Schema member) {
+    @SuppressWarnings("unchecked")
+    public <T> T getMemberValue(Schema member) {
         if (member.memberName().equals("name")) {
-            return name;
+            return (T) name;
         } else {
             throw new IllegalArgumentException("Unknown member " + member);
         }

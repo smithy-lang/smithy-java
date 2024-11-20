@@ -214,9 +214,9 @@ final class ClientPipeline<RequestT, ResponseT> {
     private static void setIdemTokenValue(ApiOperation<?, ?> operation, Context context, SerializableStruct input) {
         var tokenMember = operation.idempotencyTokenMember();
         if (tokenMember != null) {
-            var value = input.getMemberValue(tokenMember);
+            String value = input.getMemberValue(tokenMember);
             if (value != null) {
-                context.put(CallContext.IDEMPOTENCY_TOKEN, value.toString());
+                context.put(CallContext.IDEMPOTENCY_TOKEN, value);
             }
         }
     }

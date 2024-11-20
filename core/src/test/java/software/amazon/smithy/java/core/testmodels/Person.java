@@ -105,14 +105,15 @@ public final class Person implements SerializableStruct {
     }
 
     @Override
-    public Object getMemberValue(Schema member) {
+    @SuppressWarnings("unchecked")
+    public <T> T getMemberValue(Schema member) {
         return switch (member.memberIndex()) {
-            case 0 -> name;
-            case 1 -> favoriteColor;
-            case 2 -> age;
-            case 3 -> birthday;
-            case 4 -> binary;
-            case 5 -> queryParams;
+            case 0 -> (T) name;
+            case 1 -> (T) favoriteColor;
+            case 2 -> (T) (Integer) age;
+            case 3 -> (T) birthday;
+            case 4 -> (T) binary;
+            case 5 -> (T) queryParams;
             default -> throw new IllegalArgumentException("Unknown member index: " + member);
         };
     }

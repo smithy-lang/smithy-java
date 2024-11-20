@@ -279,8 +279,9 @@ final class Documents {
         }
 
         @Override
-        public Object getMemberValue(Schema member) {
-            return SchemaUtils.validateMemberInSchema(schema, member, members.get(member.memberName()));
+        @SuppressWarnings("unchecked")
+        public <T> T getMemberValue(Schema member) {
+            return (T) SchemaUtils.validateMemberInSchema(schema, member, members.get(member.memberName()));
         }
     }
 
@@ -381,7 +382,7 @@ final class Documents {
         }
 
         @Override
-        public Object getMemberValue(Schema member) {
+        public <T> T getMemberValue(Schema member) {
             return getDocument().getMemberValue(member);
         }
     }

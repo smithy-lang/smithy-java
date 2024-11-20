@@ -53,7 +53,7 @@ public class TypedDocumentMemberTest {
                     }
 
                     @Override
-                    public Object getMemberValue(Schema member) {
+                    public <T> T getMemberValue(Schema member) {
                         return null;
                     }
                 }
@@ -97,7 +97,7 @@ public class TypedDocumentMemberTest {
                     }
 
                     @Override
-                    public Object getMemberValue(Schema member) {
+                    public <T> T getMemberValue(Schema member) {
                         return null;
                     }
                 }
@@ -119,7 +119,7 @@ public class TypedDocumentMemberTest {
                     }
 
                     @Override
-                    public Object getMemberValue(Schema member) {
+                    public <T> T getMemberValue(Schema member) {
                         return null;
                     }
                 }
@@ -169,7 +169,7 @@ public class TypedDocumentMemberTest {
                     }
 
                     @Override
-                    public Object getMemberValue(Schema member) {
+                    public <T> T getMemberValue(Schema member) {
                         return null;
                     }
                 }
@@ -683,7 +683,7 @@ public class TypedDocumentMemberTest {
                             }
 
                             @Override
-                            public Object getMemberValue(Schema member) {
+                            public <T> T getMemberValue(Schema member) {
                                 return null;
                             }
                         }

@@ -65,8 +65,8 @@ public final class UnionGenerator
                     }
 
                     @Override
-                    public Object getMemberValue(${sdkSchema:N} member) {
-                        return ${schemaUtils:N}.validateMemberInSchema($$SCHEMA, member, getValue());
+                    public <T> T getMemberValue(${sdkSchema:N} member) {
+                        return (T) ${schemaUtils:N}.validateMemberInSchema($$SCHEMA, member, getValue());
                     }
 
                     public abstract <T> T getValue();

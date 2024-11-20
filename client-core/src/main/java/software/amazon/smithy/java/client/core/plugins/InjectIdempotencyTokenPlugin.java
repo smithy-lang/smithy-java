@@ -34,10 +34,10 @@ public final class InjectIdempotencyTokenPlugin implements ClientPlugin {
             var tokenMember = operation.idempotencyTokenMember();
 
             if (tokenMember != null) {
-                var value = hook.input().getMemberValue(tokenMember);
+                String value = hook.input().getMemberValue(tokenMember);
 
                 // Treat an empty string, possibly from error correction, as not present and set a default.
-                if (value instanceof String s && s.isEmpty()) {
+                if (value != null && value.isEmpty()) {
                     value = null;
                 }
 

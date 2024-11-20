@@ -36,8 +36,9 @@ public final class DocumentException extends ModeledApiException {
     }
 
     @Override
-    public Object getMemberValue(Schema member) {
-        return document.getMemberValue(member);
+    @SuppressWarnings("unchecked")
+    public <T> T getMemberValue(Schema member) {
+        return (T) document.getMemberValue(member);
     }
 
     /**

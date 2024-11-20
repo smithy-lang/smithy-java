@@ -27,7 +27,7 @@ public final class TestHelper {
             }
 
             @Override
-            public Object getMemberValue(Schema member) {
+            public <T> T getMemberValue(Schema member) {
                 throw new UnsupportedOperationException("Getting member not supported: " + member);
             }
         };

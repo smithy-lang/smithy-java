@@ -67,7 +67,8 @@ record WrappedDocument(ShapeId service, Schema schema, Document delegate) implem
     }
 
     @Override
-    public Object getMemberValue(Schema member) {
+    @SuppressWarnings("unchecked")
+    public <T> T getMemberValue(Schema member) {
         // Make sure it's part of the schema.
         var value = SchemaUtils.validateMemberInSchema(schema, member, getMember(member.memberName()));
         // If it's a document, unwrap it.
@@ -76,7 +77,7 @@ record WrappedDocument(ShapeId service, Schema schema, Document delegate) implem
         if (value instanceof Document d) {
             value = d.asObject();
         }
-        return value;
+        return (T) value;
     }
 
     @Override

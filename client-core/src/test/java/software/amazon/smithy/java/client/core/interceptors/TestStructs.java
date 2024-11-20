@@ -79,7 +79,7 @@ public final class TestStructs {
         }
 
         @Override
-        public Object getMemberValue(Schema member) {
+        public <T> T getMemberValue(Schema member) {
             throw new UnsupportedOperationException();
         }
     }
@@ -101,7 +101,7 @@ public final class TestStructs {
         }
 
         @Override
-        public Object getMemberValue(Schema member) {
+        public <T> T getMemberValue(Schema member) {
             throw new UnsupportedOperationException();
         }
     }

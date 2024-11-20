@@ -37,5 +37,5 @@ public interface SerializableStruct extends SerializableShape {
      * @return the value of the member, or null.
      * @throws IllegalArgumentException if the provided schema is not a member of the shape.
      */
-    Object getMemberValue(Schema member);
+    <T> T getMemberValue(Schema member);
 }
