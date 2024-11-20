@@ -9,9 +9,9 @@ import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.build.SmithyBuildPlugin;
 import software.amazon.smithy.codegen.core.directed.CodegenDirector;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
+import software.amazon.smithy.java.codegen.DefaultTransforms;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
-import software.amazon.smithy.java.codegen.transforms.DefaultTransforms;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -37,14 +37,9 @@ public final class JavaClientCodegenPlugin implements SmithyBuildPlugin {
         runner.directedCodegen(new DirectedJavaClientCodegen());
         runner.fileManifest(context.getFileManifest());
         runner.service(settings.service());
-        runner.changeStringEnumsToEnumShapes(true);
-
-        var model = DefaultTransforms.transform(context.getModel(), settings);
-
-        runner.model(model);
+        runner.model(context.getModel());
         runner.integrationClass(JavaCodegenIntegration.class);
-        runner.performDefaultCodegenTransforms();
-        runner.createDedicatedInputsAndOutputs();
+        DefaultTransforms.apply(runner, settings);
         runner.run();
         LOGGER.info("Smithy-Java client code generation complete");
     }

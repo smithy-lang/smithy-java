@@ -13,9 +13,9 @@ import software.amazon.smithy.build.SmithyBuildPlugin;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.directed.CodegenDirector;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
+import software.amazon.smithy.java.codegen.DefaultTransforms;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
-import software.amazon.smithy.java.codegen.transforms.DefaultTransforms;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.Model;
@@ -47,18 +47,14 @@ public final class JavaTypeCodegenPlugin implements SmithyBuildPlugin {
         runner.directedCodegen(new DirectedJavaTypeCodegen(settings.generateOperations()));
         runner.fileManifest(context.getFileManifest());
         runner.service(codegenSettings.service());
-        runner.changeStringEnumsToEnumShapes(true);
-
-        var model = DefaultTransforms.transform(context.getModel(), codegenSettings);
 
         // Add the synthetic service to the model
-        var closure = getClosure(model, settings);
+        var closure = getClosure(context.getModel(), settings);
         LOGGER.info("Found {} shapes in generation closure", closure.size());
-        model = SyntheticServiceTransform.transform(model, closure, settings.renames());
+        var model = SyntheticServiceTransform.transform(context.getModel(), closure, settings.renames());
         runner.model(model);
         runner.integrationClass(JavaCodegenIntegration.class);
-        runner.performDefaultCodegenTransforms();
-        runner.createDedicatedInputsAndOutputs();
+        DefaultTransforms.apply(runner, codegenSettings);
         runner.run();
         LOGGER.info("Successfully generated Java class files.");
     }

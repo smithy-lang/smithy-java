@@ -1,7 +1,7 @@
 [versions]
 junit5 = "5.11.3"
 hamcrest = "3.0"
-smithy = "1.52.1"
+smithy = "1.53.0"
 jmh = "0.7.2"
 test-logger-plugin = "4.0.0"
 spotbugs = "6.0.22"

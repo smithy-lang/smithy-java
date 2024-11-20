@@ -9,6 +9,7 @@ import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.build.SmithyBuildPlugin;
 import software.amazon.smithy.codegen.core.directed.CodegenDirector;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
+import software.amazon.smithy.java.codegen.DefaultTransforms;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -39,8 +40,7 @@ public final class JavaServerCodegenPlugin implements SmithyBuildPlugin {
         runner.service(settings.service());
         runner.model(context.getModel());
         runner.integrationClass(JavaCodegenIntegration.class);
-        runner.performDefaultCodegenTransforms();
-        runner.createDedicatedInputsAndOutputs();
+        DefaultTransforms.apply(runner, settings);
         runner.run();
         LOGGER.info("Smithy-Java server code generation complete");
     }
