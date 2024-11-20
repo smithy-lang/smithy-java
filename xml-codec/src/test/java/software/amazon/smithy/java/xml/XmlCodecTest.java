@@ -125,7 +125,7 @@ public class XmlCodecTest {
         }
 
         @Override
-        public <T> T getMemberValue(Schema member) {
+        public Object getMemberValue(Schema member) {
             throw new UnsupportedOperationException();
         }
 

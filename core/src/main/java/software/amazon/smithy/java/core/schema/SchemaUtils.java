@@ -43,7 +43,7 @@ public final class SchemaUtils {
             }
 
             @Override
-            public <T> T getMemberValue(Schema member) {
+            public Object getMemberValue(Schema member) {
                 return memberPredicate.test(schema()) ? getMemberValue(member) : null;
             }
         };

@@ -23,7 +23,6 @@ record GetMemberValueGenerator(JavaWriter writer, SymbolProvider symbolProvider,
         if (shape.members().isEmpty()) {
             template = """
                 @Override
-                @SuppressWarnings("unchecked")
                 public <T> T getMemberValue(${sdkSchema:N} member) {
                     throw new ${iae:T}("Attempted to get non-existent member: " + member.id());
                 }
@@ -31,7 +30,6 @@ record GetMemberValueGenerator(JavaWriter writer, SymbolProvider symbolProvider,
         } else {
             template = """
                 @Override
-                @SuppressWarnings("unchecked")
                 public <T> T getMemberValue(${sdkSchema:N} member) {
                     return switch (member.memberIndex()) {
                         ${cases:C|}
@@ -59,19 +57,19 @@ record GetMemberValueGenerator(JavaWriter writer, SymbolProvider symbolProvider,
             if (shape.getType() == ShapeType.UNION) {
                 // Unions need to access the member value using a getter, since subtypes provide the values.
                 writer.write(
-                    "case $L -> (T) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, ${memberName:L}());",
+                    "case $L -> ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, ${memberName:L}());",
                     idx
                 );
             } else if (isError && member.getMemberName().equalsIgnoreCase("message")) {
                 // Exception message values have to use a special getter.
                 writer.write(
-                    "case $L -> (T) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, getMessage());",
+                    "case $L -> ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, getMessage());",
                     idx
                 );
             } else {
                 // Other values can just skip the getter.
                 writer.write(
-                    "case $L -> (T) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, ${memberName:L});",
+                    "case $L -> ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, ${memberName:L});",
                     idx
                 );
             }
