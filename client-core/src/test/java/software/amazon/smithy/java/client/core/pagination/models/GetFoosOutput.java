@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.core.pagination.models;
 
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.ToStringSerializer;
@@ -24,6 +25,11 @@ public record GetFoosOutput(ResultWrapper result) implements SerializableStruct 
     }
 
     @Override
+    public Schema schema() {
+        return SCHEMA;
+    }
+
+    @Override
     public void serialize(ShapeSerializer encoder) {
         encoder.writeStruct(SCHEMA, this);
     }
@@ -33,4 +39,12 @@ public record GetFoosOutput(ResultWrapper result) implements SerializableStruct 
         serializer.writeStruct(SCHEMA_RESULT, result);
     }
 
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> T getMemberValue(Schema member) {
+        return switch (member.memberIndex()) {
+            case 0 -> (T) SchemaUtils.validateSameMember(SCHEMA_RESULT, member, result);
+            default -> throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
+        };
+    }
 }

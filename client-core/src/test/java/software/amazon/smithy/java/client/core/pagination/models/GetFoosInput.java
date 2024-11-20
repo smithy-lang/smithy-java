@@ -7,6 +7,7 @@ package software.amazon.smithy.java.client.core.pagination.models;
 
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
@@ -66,12 +67,11 @@ public final class GetFoosInput implements SerializableStruct {
     @Override
     @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
-        switch (member.id()) {
-            case 0 -> ;
-            case 1 -> ;
+        return switch (member.memberIndex()) {
+            case 0 -> (T) SchemaUtils.validateSameMember(SCHEMA_MAX_RESULTS, member, maxResults);
+            case 1 -> (T) SchemaUtils.validateSameMember(SCHEMA_NEXT_TOKEN, member, nextToken);
             default -> throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
-        }
-
+        };
     }
 
     public static Builder builder() {
@@ -103,6 +103,15 @@ public final class GetFoosInput implements SerializableStruct {
         public Builder deserialize(ShapeDeserializer decoder) {
             decoder.readStruct(SCHEMA, this, InnerDeserializer.INSTANCE);
             return this;
+        }
+
+        @Override
+        public void setMemberValue(Schema member, Object value) {
+            switch (member.memberIndex()) {
+                case 0 -> maxResults((Integer) SchemaUtils.validateSameMember(SCHEMA_MAX_RESULTS, member, value));
+                case 1 -> nextToken((String) SchemaUtils.validateSameMember(SCHEMA_NEXT_TOKEN, member, value));
+                default -> throw new IllegalArgumentException("BAD BAD BAD ");
+            }
         }
 
         @Override

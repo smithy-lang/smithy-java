@@ -10,6 +10,8 @@ import static org.hamcrest.Matchers.contains;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.pagination.models.GetFoosInput;
 import software.amazon.smithy.java.client.core.pagination.models.GetFoosOutput;
 import software.amazon.smithy.java.client.core.pagination.models.ResultWrapper;
@@ -25,12 +27,12 @@ public class PaginationTest {
     );
     private MockClient mockClient;
 
-    //@BeforeEach
+    @BeforeEach
     public void setup() {
         mockClient = new MockClient();
     }
 
-    //@Test
+    @Test
     void testSyncPagination() {
         var input = GetFoosInput.builder().maxResults(2).build();
         var paginator = Paginator.paginate(input, new TestOperationPaginated(), mockClient::getFoosSync);
@@ -41,7 +43,7 @@ public class PaginationTest {
         assertThat(results, contains(BASE_EXPECTED_RESULTS.toArray()));
     }
 
-    //@Test
+    @Test
     void testIteratorPagination() {
         var input = GetFoosInput.builder().maxResults(2).build();
         var paginator = Paginator.paginate(input, new TestOperationPaginated(), mockClient::getFoosSync);
@@ -53,7 +55,7 @@ public class PaginationTest {
         assertThat(results, contains(BASE_EXPECTED_RESULTS.toArray()));
     }
 
-    //@Test
+    @Test
     public void testMaxResultsPagination() {
         var input = GetFoosInput.builder().maxResults(4).build();
         var paginator = Paginator.paginate(input, new TestOperationPaginated(), mockClient::getFoosSync);

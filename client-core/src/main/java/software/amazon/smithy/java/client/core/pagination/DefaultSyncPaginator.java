@@ -15,36 +15,50 @@ import software.amazon.smithy.java.core.serde.document.Document;
 
 final class DefaultSyncPaginator<I extends SerializableStruct, O extends SerializableStruct> implements Paginator<O> {
 
-    private final Document inputDocument;
     private final Paginatable<I, O> call;
-    private final ApiOperation<I, O> operation;
 
     // Token members
-    private final String inputTokenMember;
-    private final String outputTokenPath;
     private String nextToken = null;
 
+    private final PaginationInputFactory<I> inputFactory;
+    private final PaginationTokenExtractor extractor;
+
+
     // Page size parameters
-    private final String itemsPath;
-    private final String pageSizeMember;
     private int pageSize;
     private int totalMaxItems = 0;
 
     // Request override for paginated requests
     private RequestOverrideConfig overrideConfig = null;
 
-    DefaultSyncPaginator(SerializableStruct input, ApiOperation<I, O> operation, Paginatable<I, O> call) {
-        this.inputDocument = Document.createTyped(input);
+    DefaultSyncPaginator(I input, ApiOperation<I, O> operation, Paginatable<I, O> call) {
         this.call = call;
-        this.operation = operation;
         var trait = operation.schema().expectTrait(TraitKey.PAGINATED_TRAIT);
-        this.inputTokenMember = trait.getInputToken().orElseThrow();
-        this.outputTokenPath = trait.getOutputToken().orElseThrow();
-        this.itemsPath = trait.getItems().orElse(null);
-        this.pageSizeMember = trait.getPageSize().orElse(null);
+        // Input and output token paths are expected to be set.
+        var inputTokenMember = trait.getInputToken().orElseThrow();
+        var outputTokenPath = trait.getOutputToken().orElseThrow();
+
+        // Page size and Items are optional
+        var pageSizeMember = trait.getPageSize().orElse(null);
+        var itemsPath = trait.getItems().orElse(null);
+
+        this.inputFactory = new PaginationInputFactory<>(
+                input,
+                operation,
+                inputTokenMember,
+                pageSizeMember
+        );
+
         if (pageSizeMember != null) {
-            pageSize = inputDocument.getMember(pageSizeMember).asNumber().intValue();
+            var pageSizeSchema = input.schema().member(pageSizeMember);
+            pageSize = input.getMemberValue(pageSizeSchema);
         }
+
+        this.extractor = new PaginationTokenExtractor(
+                operation.outputSchema(),
+                outputTokenPath,
+                itemsPath
+        );
     }
 
     @Override
@@ -77,30 +91,20 @@ final class DefaultSyncPaginator<I extends SerializableStruct, O extends Seriali
                     maxItems = remaining;
                 }
 
-                // Deserialize a new version of the original input with the new token and max value set.
-                var deserializer = new PaginationInjectingDeserializer(
-                    inputDocument,
-                    inputTokenMember,
-                    nextToken,
-                    pageSizeMember,
-                    maxItems
-                );
-                var input = operation.inputBuilder().deserialize(deserializer).build();
-
+                // Get a new version of the original input with the new token and max value injected.
+                var input = inputFactory.create(nextToken, maxItems);
                 var output = call.call(input, overrideConfig);
-                var serializer = new PaginationDiscoveringSerializer(outputTokenPath, itemsPath);
-                output.serialize(serializer);
-                serializer.flush();
+                var res = extractor.extract(output);
 
                 // If we see the same pagination token twice then stop pagination.
-                if (nextToken != null && Objects.equals(nextToken, serializer.outputToken())) {
+                if (nextToken != null && Objects.equals(nextToken, res.token())) {
                     hasNext = false;
                     return output;
                 }
 
                 // Update based on output values
-                nextToken = serializer.outputToken();
-                remaining -= serializer.totalItems();
+                nextToken = res.token();
+                remaining -= res.totalItems();
 
                 // Next token is null or max results reached, indicating there are no more values.
                 if (nextToken == null || (totalMaxItems != 0 && remaining == 0)) {
