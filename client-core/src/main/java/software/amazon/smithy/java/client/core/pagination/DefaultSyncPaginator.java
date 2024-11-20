@@ -3,15 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.client.core.pagination;
+package software.amazon.smithy.java.client.core.pagination;
 
 import java.util.Iterator;
 import java.util.Objects;
-import software.amazon.smithy.java.runtime.client.core.RequestOverrideConfig;
-import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.schema.TraitKey;
-import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.client.core.RequestOverrideConfig;
+import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.core.serde.document.Document;
 
 final class DefaultSyncPaginator<I extends SerializableStruct, O extends SerializableStruct> implements Paginator<O> {
 

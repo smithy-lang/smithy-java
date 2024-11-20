@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.client.core.pagination;
+package software.amazon.smithy.java.client.core.pagination;
 
-import software.amazon.smithy.java.runtime.core.schema.Schema;
-import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
-import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.java.runtime.core.serde.document.DocumentDeserializer;
+import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
+import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
 
 /**
  * Replaces values of a top-level structure members with values for pagination.

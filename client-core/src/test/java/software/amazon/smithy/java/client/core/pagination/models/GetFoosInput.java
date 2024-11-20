@@ -3,15 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.client.core.pagination.models;
+package software.amazon.smithy.java.client.core.pagination.models;
 
-import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.runtime.core.schema.Schema;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
-import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
-import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.runtime.core.serde.ToStringSerializer;
+import software.amazon.smithy.java.core.schema.PreludeSchemas;
+import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.core.serde.ToStringSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public final class GetFoosInput implements SerializableStruct {
@@ -46,6 +46,11 @@ public final class GetFoosInput implements SerializableStruct {
     }
 
     @Override
+    public Schema schema() {
+        return SCHEMA;
+    }
+
+    @Override
     public void serialize(ShapeSerializer encoder) {
         encoder.writeStruct(SCHEMA, this);
     }
@@ -56,6 +61,17 @@ public final class GetFoosInput implements SerializableStruct {
         if (nextToken != null) {
             serializer.writeString(SCHEMA_NEXT_TOKEN, nextToken);
         }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> T getMemberValue(Schema member) {
+        switch (member.id()) {
+            case 0 -> ;
+            case 1 -> ;
+            default -> throw new IllegalArgumentException("Attempted to get non-existent member: " + member.id());
+        }
+
     }
 
     public static Builder builder() {
