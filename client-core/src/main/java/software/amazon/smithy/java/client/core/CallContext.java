@@ -55,5 +55,12 @@ public final class CallContext {
      */
     public static final Context.Key<String> IDEMPOTENCY_TOKEN = Context.key("Idempotency token");
 
+    /**
+     * Contains the mutable user-agent header created automatically for each request.
+     *
+     * <p>This value is guaranteed to be set at the start of every request.
+     */
+    public static final Context.Key<SmithyUserAgent> USER_AGENT = Context.key("Smithy user agent");
+
     private CallContext() {}
 }

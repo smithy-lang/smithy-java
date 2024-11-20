@@ -111,37 +111,33 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
     static Map<String, List<String>> addHeaders(
         HttpHeaders original,
         Map<String, List<String>> mutatedHeaders,
-        HttpHeaders from
+        Map<String, List<String>> from
     ) {
         if (mutatedHeaders == null) {
             if (original.isEmpty()) {
-                return copyHeaders(from.map());
+                return copyHeaders(from);
             }
             mutatedHeaders = copyHeaders(original.map());
         }
-        for (var entry : from.map().entrySet()) {
+        for (var entry : from.entrySet()) {
             mutatedHeaders.computeIfAbsent(entry.getKey(), k -> new ArrayList<>())
                 .addAll(copyAndTrimValues(entry.getValue()));
         }
         return mutatedHeaders;
     }
 
-    static Map<String, List<String>> addHeaders(
+    static Map<String, List<String>> addHeader(
         HttpHeaders original,
         Map<String, List<String>> mutatedHeaders,
-        String... fieldAndValues
+        String field,
+        String value
     ) {
         if (mutatedHeaders == null) {
             mutatedHeaders = SimpleUnmodifiableHttpHeaders.copyHeaders(original.map());
         }
-        if (fieldAndValues.length % 2 != 0) {
-            throw new IllegalArgumentException("Uneven number of header keys and fields: " + fieldAndValues.length);
-        }
-        for (int i = 0; i < fieldAndValues.length - 1; i += 2) {
-            String field = fieldAndValues[i].toLowerCase(Locale.ENGLISH).trim();
-            String value = fieldAndValues[i + 1].trim();
-            mutatedHeaders.computeIfAbsent(field, k -> new ArrayList<>()).add(value);
-        }
+        field = field.toLowerCase(Locale.ENGLISH).trim();
+        value = value.trim();
+        mutatedHeaders.computeIfAbsent(field, k -> new ArrayList<>()).add(value);
         return mutatedHeaders;
     }
 

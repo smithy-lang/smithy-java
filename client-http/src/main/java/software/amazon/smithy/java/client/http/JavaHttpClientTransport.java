@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
+import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.context.Context;
@@ -32,6 +33,13 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
 
     public JavaHttpClientTransport() {
         this(HttpClient.newHttpClient());
+    }
+
+    /**
+     * @param client Java client to use.
+     */
+    public JavaHttpClientTransport(HttpClient client) {
+        this.client = client;
 
         // Allow clients to set Host header. This has to be done using a system property and can't be done per/client.
         var currentValues = System.getProperty("jdk.httpclient.allowRestrictedHeaders");
@@ -64,13 +72,6 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
         return false;
     }
 
-    /**
-     * @param client Java client to use.
-     */
-    public JavaHttpClientTransport(HttpClient client) {
-        this.client = client;
-    }
-
     @Override
     public Class<HttpRequest> requestClass() {
         return HttpRequest.class;
@@ -100,9 +101,16 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
             httpRequestBuilder.timeout(requestTimeout);
         }
 
+        // Add the user-agent if present. Note that an explicit header can overwrite it.
+        var ua = context.get(CallContext.USER_AGENT);
+        if (ua != null) {
+            httpRequestBuilder.setHeader("user-agent", ua.toString());
+        }
+
+        // Any explicitly set headers overwrite existing headers, they do not merge.
         for (var entry : request.headers().map().entrySet()) {
             for (var value : entry.getValue()) {
-                httpRequestBuilder.header(entry.getKey(), value);
+                httpRequestBuilder.setHeader(entry.getKey(), value);
             }
         }
 

@@ -74,13 +74,13 @@ record HttpRequestImpl(
         }
 
         @Override
-        public Builder withAddedHeaders(String... headers) {
-            mutatedHeaders = SimpleUnmodifiableHttpHeaders.addHeaders(this.headers, mutatedHeaders, headers);
+        public Builder withAddedHeader(String name, String value) {
+            mutatedHeaders = SimpleUnmodifiableHttpHeaders.addHeader(this.headers, mutatedHeaders, name, value);
             return this;
         }
 
         @Override
-        public Builder withAddedHeaders(HttpHeaders headers) {
+        public Builder withAddedHeaders(Map<String, List<String>> headers) {
             mutatedHeaders = SimpleUnmodifiableHttpHeaders.addHeaders(this.headers, mutatedHeaders, headers);
             return this;
         }

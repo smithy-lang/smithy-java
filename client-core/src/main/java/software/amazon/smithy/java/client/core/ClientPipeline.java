@@ -113,6 +113,9 @@ final class ClientPipeline<RequestT, ResponseT> {
         // Always start the attempt count at 1.
         call.context.put(CallContext.RETRY_ATTEMPT, call.attemptCount);
 
+        // Create a dedicated user-agent for each request.
+        setUserAgent(call.context);
+
         // 2. Interceptors: Invoke ReadBeforeExecution.
         var inputHook = new InputHook<>(call.operation, call.context, input);
         call.interceptor.readBeforeExecution(inputHook);
@@ -137,6 +140,17 @@ final class ClientPipeline<RequestT, ResponseT> {
         requestHook = requestHook.withRequest(request);
 
         return acquireRetryToken(call, requestHook);
+    }
+
+    private static void setUserAgent(Context context) {
+        // Create a dedicated user-agent for each request.
+        var currentAgent = context.get(CallContext.USER_AGENT);
+        if (currentAgent == null) {
+            context.put(CallContext.USER_AGENT, SmithyUserAgent.create());
+        } else {
+            // Copy the pre-defined user-agent if one is set.
+            context.put(CallContext.USER_AGENT, SmithyUserAgent.createFrom(currentAgent));
+        }
     }
 
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> acquireRetryToken(

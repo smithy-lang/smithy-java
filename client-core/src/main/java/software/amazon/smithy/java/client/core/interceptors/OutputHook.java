@@ -84,7 +84,7 @@ public final class OutputHook<I extends SerializableStruct, O extends Serializab
         Class<R> predicateType,
         Function<OutputHook<?, R, ?, ?>, R> mapper
     ) {
-        if (output.getClass() == predicateType) {
+        if (predicateType.isInstance(output)) {
             return (O) mapper.apply((OutputHook<?, R, ?, ?>) this);
         } else {
             return output;
@@ -106,7 +106,7 @@ public final class OutputHook<I extends SerializableStruct, O extends Serializab
         T state,
         BiFunction<OutputHook<?, R, ?, ?>, T, R> mapper
     ) {
-        if (output.getClass() == predicateType) {
+        if (predicateType.isInstance(output)) {
             return (O) mapper.apply((OutputHook<?, R, ?, ?>) this, state);
         } else {
             return output;

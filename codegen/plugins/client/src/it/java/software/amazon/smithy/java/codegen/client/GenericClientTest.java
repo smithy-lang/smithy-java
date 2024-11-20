@@ -65,7 +65,7 @@ public class GenericClientTest {
             public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
                 return hook.mapRequest(
                     HttpRequest.class,
-                    h -> h.request().toBuilder().withAddedHeaders("X-Foo", "Bar").build()
+                    h -> h.request().toBuilder().withAddedHeader("X-Foo", "Bar").build()
                 );
             }
 

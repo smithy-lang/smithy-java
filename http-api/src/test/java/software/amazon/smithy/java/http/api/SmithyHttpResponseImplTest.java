@@ -18,7 +18,9 @@ public class SmithyHttpResponseImplTest {
     public void addHeaders() {
         var response = HttpResponse.builder()
             .statusCode(200)
-            .withAddedHeaders("foo", "bar   ", "Baz", "bam", "FOO", "bar2")
+            .withAddedHeader("foo", "bar   ")
+            .withAddedHeader("Baz", "bam")
+            .withAddedHeader("FOO", "bar2")
             .build();
 
         assertThat(response.headers().allValues("foo"), contains("bar", "bar2"));
@@ -31,7 +33,9 @@ public class SmithyHttpResponseImplTest {
         var response = HttpResponse.builder()
             .statusCode(200)
             .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-            .withAddedHeaders("foo", "bar   ", "Baz", "bam", "FOO", "bar2")
+            .withAddedHeader("foo", "bar   ")
+            .withAddedHeader("Baz", "bam")
+            .withAddedHeader("FOO", "bar2")
             .build();
 
         assertThat(response.headers().allValues("foo"), contains("bar0", "bar", "bar2"));
@@ -59,7 +63,7 @@ public class SmithyHttpResponseImplTest {
         var response = HttpResponse.builder()
             .statusCode(200)
             .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-            .withAddedHeaders("a", "b")
+            .withAddedHeader("a", "b")
             .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
             .build();
 
@@ -76,7 +80,8 @@ public class SmithyHttpResponseImplTest {
             .statusCode(200)
             .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
             .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
-            .withAddedHeaders("a", "b", "foo", "bar2")
+            .withAddedHeader("a", "b")
+            .withAddedHeader("foo", "bar2")
             .build();
 
         assertThat(response.headers().allValues("foo"), contains("bar", "bar2"));

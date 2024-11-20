@@ -6,11 +6,6 @@
 package software.amazon.smithy.java.http.api;
 
 import java.net.URI;
-import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Flow;
-import software.amazon.smithy.java.io.datastream.DataStream;
 
 /**
  * HTTP request.
@@ -63,7 +58,7 @@ public interface HttpRequest extends HttpMessage {
     /**
      * HTTP request message builder.
      */
-    interface Builder {
+    interface Builder extends HttpMessage.Builder<Builder> {
         /**
          * Create the request.
          *
@@ -94,63 +89,5 @@ public interface HttpRequest extends HttpMessage {
          * @return the builder.
          */
         Builder uri(URI uri);
-
-        /**
-         * Set the HTTP version.
-         *
-         * @param httpVersion HTTP version of the message.
-         * @return the builder.
-         */
-        Builder httpVersion(HttpVersion httpVersion);
-
-        /**
-         * Set the body of the message.
-         *
-         * @param publisher Body to set.
-         * @return the builder.
-         */
-        default Builder body(Flow.Publisher<ByteBuffer> publisher) {
-            return body(DataStream.ofPublisher(publisher, null, -1));
-        }
-
-        /**
-         * Set the body of the message.
-         *
-         * @param body Body to set.
-         * @return the builder.
-         */
-        Builder body(DataStream body);
-
-        /**
-         * Set the headers of the message, replacing any previously set headers.
-         *
-         * @param headers Headers to set.
-         * @return the builder.
-         */
-        Builder headers(HttpHeaders headers);
-
-        /**
-         * Add and merge in the given headers to the message.
-         *
-         * @param headers Headers to add and merge in.
-         * @return the builder.
-         */
-        Builder withAddedHeaders(String... headers);
-
-        /**
-         * Add and merge in the given headers to the message.
-         *
-         * @param headers Headers to add and merge in.
-         * @return the builder.
-         */
-        Builder withAddedHeaders(HttpHeaders headers);
-
-        /**
-         * Put the given headers onto the message, replacing any existing headers with the same names.
-         *
-         * @param headers Headers to put.
-         * @return the builder.
-         */
-        Builder withReplacedHeaders(Map<String, List<String>> headers);
     }
 }

@@ -58,7 +58,7 @@ public class HttpApiKeyAuthSignerTest {
             .put(HttpApiKeyAuthScheme.NAME, "x-api-key")
             .put(HttpApiKeyAuthScheme.SCHEME, "SCHEME")
             .build();
-        var updateRequest = TEST_REQUEST.toBuilder().withAddedHeaders("x-api-key", "foo").build();
+        var updateRequest = TEST_REQUEST.toBuilder().withAddedHeader("x-api-key", "foo").build();
         var signedRequest = HttpApiKeyAuthSigner.INSTANCE.sign(updateRequest, TEST_IDENTITY, authProperties).get();
         var authHeader = signedRequest.headers().firstValue("x-api-key");
         assertEquals(authHeader, "SCHEME " + API_KEY);
