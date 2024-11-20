@@ -169,7 +169,15 @@ public class TypedDocumentMemberTest {
                     }
 
                     @Override
+<<<<<<< HEAD
                     public <T> T getMemberValue(Schema member) {
+=======
+<<<<<<< HEAD
+                    public <T> T  getMemberValue(Schema member) {
+=======
+                    public <T> T getMemberValue(Schema member) {
+>>>>>>> 5772cab0 (Update getMemberValue to use cast)
+>>>>>>> 68ade5b2 (Update getMemberValue to use cast)
                         return null;
                     }
                 }
