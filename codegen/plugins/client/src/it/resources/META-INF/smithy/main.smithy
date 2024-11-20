@@ -15,7 +15,6 @@ service TestService {
     version: "today"
     operations: [
         Echo
-        PaginatedOperation
     ]
 }
 
@@ -27,27 +26,4 @@ operation Echo {
     output := {
         string: String
     }
-}
-
-@http(method: "GET", uri: "/list", code: 200)
-@paginated(
-    outputToken: "outputToken",
-    items: "results"
-)
-operation PaginatedOperation {
-    input := {
-        @httpQuery("maxItems")
-        maxItems: Integer
-        @httpQuery("input")
-        inputToken: String
-    }
-    output := {
-        results: ResultsList
-        outputToken: String
-    }
-}
-
-@private
-list ResultsList {
-    member: String
 }
