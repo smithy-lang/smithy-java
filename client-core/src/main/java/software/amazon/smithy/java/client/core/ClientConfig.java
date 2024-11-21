@@ -159,7 +159,7 @@ public final class ClientConfig {
         return new Builder();
     }
 
-    private Builder toBuilder() {
+    public Builder toBuilder() {
         Builder builder = builder()
             .transport(transport)
             .protocol(protocol)
@@ -184,9 +184,15 @@ public final class ClientConfig {
         Objects.requireNonNull(overrideConfig, "overrideConfig cannot be null");
         Builder builder = toBuilder();
         applyOverrides(builder, overrideConfig);
+
         for (ClientPlugin plugin : overrideConfig.plugins()) {
             plugin.configureClient(builder);
         }
+
+        // Apply the transport plugin configuration.
+        var transport = overrideConfig.transport() != null ? overrideConfig.transport() : transport();
+        transport.configureClient(builder);
+
         return builder.build();
     }
 

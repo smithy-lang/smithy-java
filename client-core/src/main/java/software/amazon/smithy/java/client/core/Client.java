@@ -28,36 +28,40 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  * Base Smithy client class.
  */
 public abstract class Client {
+    /**
+     * This configuration is used as the base configuration when a request override is given per/call.
+     * This is the unresolved configuration that has yet to apply the transport plugin, which can potentially be
+     * changed and swapped out per/call.
+     */
+    private final ClientConfig unresolvedConfig;
 
-    private final ClientConfig config;
-    private final ClientPipeline<?, ?> pipeline;
+    /**
+     * This configuration contains the given {@link #unresolvedConfig} fully resolved with the transport of the config.
+     * This makes it so that transport plugins are only applied when used, and we don't need to re-resolve configs
+     * on every request even when an override config isn't given.
+     */
+    private final ClientConfig defaultResolvedConfig;
+    private final ClientPipeline<?, ?> defaultPipeline;
+    private final IdentityResolvers defaultIdentityResolvers;
+
     private final TypeRegistry typeRegistry;
-    private final List<ClientInterceptor> interceptors;
-    private final IdentityResolvers identityResolvers;
-    private final RetryStrategy retryStrategy;
 
     protected Client(Builder<?, ?> builder) {
-        ClientConfig.Builder configBuilder = builder.configBuilder();
+        // Create the configuration object that has yet to apply a transport plugin.
+        ClientConfig.Builder unresolvedConfigBuilder = builder.configBuilder();
         for (ClientPlugin plugin : builder.plugins()) {
-            plugin.configureClient(configBuilder);
+            plugin.configureClient(unresolvedConfigBuilder);
         }
-        this.config = configBuilder.build();
+        this.unresolvedConfig = unresolvedConfigBuilder.build();
 
-        this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
-
-        // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
-        this.interceptors = config.interceptors();
-
-        this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
+        // Create the default resolved config that applies the default transport.
+        var defaultResolvedConfigBuilder = unresolvedConfig.toBuilder();
+        unresolvedConfig.transport().configureClient(defaultResolvedConfigBuilder);
+        this.defaultResolvedConfig = defaultResolvedConfigBuilder.build();
+        this.defaultPipeline = ClientPipeline.of(defaultResolvedConfig.protocol(), defaultResolvedConfig.transport());
+        this.defaultIdentityResolvers = IdentityResolvers.of(unresolvedConfig.identityResolvers());
 
         this.typeRegistry = TypeRegistry.builder().build();
-
-        if (config.retryStrategy() != null) {
-            this.retryStrategy = config.retryStrategy();
-        } else {
-            // TODO: Pick a better default retry strategy.
-            this.retryStrategy = RetryStrategy.noRetries();
-        }
     }
 
     /**
@@ -78,29 +82,27 @@ public abstract class Client {
         // Create a copy of the type registry that adds the errors this operation can encounter.
         TypeRegistry operationRegistry = TypeRegistry.compose(operation.typeRegistry(), typeRegistry);
 
+        var callBuilder = ClientCall.<I, O>builder();
+
         ClientPipeline<?, ?> callPipeline;
         List<ClientInterceptor> callInterceptors;
         IdentityResolvers callIdentityResolvers;
         ClientConfig callConfig;
+
         if (overrideConfig == null) {
-            callConfig = config;
-            callPipeline = pipeline;
-            callInterceptors = interceptors;
-            callIdentityResolvers = identityResolvers;
+            // No overrides were given, so use the default resolved configuration values.
+            callConfig = defaultResolvedConfig;
+            callPipeline = defaultPipeline;
+            callInterceptors = defaultResolvedConfig.interceptors();
+            callIdentityResolvers = defaultIdentityResolvers;
         } else {
-            callConfig = config.withRequestOverride(overrideConfig);
+            // Rebuild the config, pipeline, interceptors, and resolvers with the overrides.
+            callConfig = unresolvedConfig.withRequestOverride(overrideConfig);
             callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
-            callInterceptors = config.interceptors();
-            callIdentityResolvers = IdentityResolvers.of(config.identityResolvers());
+            callInterceptors = callConfig.interceptors();
+            callIdentityResolvers = IdentityResolvers.of(callConfig.identityResolvers());
         }
 
-        var autoInterceptor = callConfig.transport().automaticInterceptor();
-        if (autoInterceptor != null) {
-            callInterceptors = new ArrayList<>(callInterceptors);
-            callInterceptors.add(autoInterceptor);
-        }
-
-        var callBuilder = ClientCall.<I, O>builder();
         callBuilder.input = input;
         callBuilder.operation = operation;
         callBuilder.endpointResolver = callConfig.endpointResolver();
@@ -110,7 +112,11 @@ public abstract class Client {
         callBuilder.authSchemeResolver = callConfig.authSchemeResolver();
         callBuilder.identityResolvers = callIdentityResolvers;
         callBuilder.typeRegistry = operationRegistry;
-        callBuilder.retryStrategy = retryStrategy;
+
+        // TODO: pick a better default retry strategy.
+        callBuilder.retryStrategy = callConfig.retryStrategy() != null
+            ? callConfig.retryStrategy()
+            : RetryStrategy.noRetries();
         callBuilder.retryScope = callConfig.retryScope();
 
         return callPipeline.send(callBuilder.build());
@@ -120,7 +126,7 @@ public abstract class Client {
      * @return the configuration in use by this client.
      */
     public ClientConfig config() {
-        return config;
+        return unresolvedConfig;
     }
 
     /**
@@ -157,7 +163,7 @@ public abstract class Client {
          * @return Returns the builder.
          */
         @SuppressWarnings("unchecked")
-        public B withConfiguration(ClientConfig config) {
+        public B withConfig(ClientConfig config) {
             configBuilder.transport(config.transport())
                 .protocol(config.protocol())
                 .endpointResolver(config.endpointResolver())

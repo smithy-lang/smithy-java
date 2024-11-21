@@ -59,12 +59,16 @@ public final class CallContext {
     /**
      * The set of user-defined feature IDs used with a request.
      *
-     * <p>Each feature ID must conform to the following regex: {@code [A-Za-z_][A-Za-z_0-9-+}.
+     * <p>Each value should be short and contain only ASCII letters, numbers, and hyphens.
      */
     public static final Context.Key<Set<String>> FEATURE_IDS = Context.key("Feature IDs used with a request");
 
     /**
-     * The name of the application, often used in things like user-agent headers.
+     * The name of the application, used in things like user-agent headers.
+     *
+     * <p>This value is used by AWS SDKs, but can be used generically for any client.
+     * See <a href="https://docs.aws.amazon.com/sdkref/latest/guide/feature-appid.html">Application ID</a> for more
+     * information.
      *
      * <p>This value should be less than 50 characters.
      */

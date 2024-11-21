@@ -135,7 +135,6 @@ public class JavaHttpClientTest {
         assertThat(result, hasSize(1));
         var value = result.get(0);
 
-        System.out.println(value);
         assertThat(value, containsString("app/foo"));
     }
 

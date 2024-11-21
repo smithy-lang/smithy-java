@@ -11,10 +11,10 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
+import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
-import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.client.http.useragent.UserAgentInterceptor;
+import software.amazon.smithy.java.client.http.useragent.UserAgentPlugin;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -26,11 +26,14 @@ import software.amazon.smithy.java.logging.InternalLogger;
 /**
  * A client transport that uses Java's built-in {@link HttpClient} to send {@link HttpRequest} and return
  * {@link HttpResponse}.
+ *
+ * <p>This transport automatically adds a User-Agent header by applying the {@link UserAgentPlugin}.
  */
 public class JavaHttpClientTransport implements ClientTransport<HttpRequest, HttpResponse> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;
+    private final UserAgentPlugin userAgentPlugin = new UserAgentPlugin();
 
     public JavaHttpClientTransport() {
         this(HttpClient.newHttpClient());
@@ -74,8 +77,8 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
     }
 
     @Override
-    public ClientInterceptor automaticInterceptor() {
-        return UserAgentInterceptor.INSTANCE;
+    public void configureClient(ClientConfig.Builder config) {
+        userAgentPlugin.configureClient(config);
     }
 
     @Override

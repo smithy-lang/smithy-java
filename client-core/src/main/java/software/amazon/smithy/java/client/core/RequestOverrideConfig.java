@@ -118,6 +118,7 @@ public final class RequestOverrideConfig {
             .identityResolvers(identityResolvers)
             .retryStrategy(retryStrategy)
             .retryScope(retryScope);
+        plugins.forEach(builder::addPlugin);
         interceptors.forEach(builder::addInterceptor);
         supportedAuthSchemes.forEach(builder::putSupportedAuthSchemes);
         return builder;

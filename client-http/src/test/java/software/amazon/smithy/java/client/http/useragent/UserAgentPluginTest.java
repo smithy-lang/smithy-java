@@ -27,10 +27,10 @@ import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-public class UserAgentInterceptorTest {
+public class UserAgentPluginTest {
     @Test
     public void addsDefaultAgent() throws Exception {
-        UserAgentInterceptor interceptor = new UserAgentInterceptor();
+        UserAgentPlugin.UserAgentInterceptor interceptor = new UserAgentPlugin.UserAgentInterceptor();
         var context = Context.create();
         var req = HttpRequest.builder().uri(new URI("/")).method("GET").build();
         var foo = new Foo();
@@ -45,7 +45,7 @@ public class UserAgentInterceptorTest {
 
     @Test
     public void addsApplicationId() throws Exception {
-        UserAgentInterceptor interceptor = new UserAgentInterceptor();
+        UserAgentPlugin.UserAgentInterceptor interceptor = new UserAgentPlugin.UserAgentInterceptor();
         var context = Context.create();
         context.put(CallContext.APPLICATION_ID, "hello");
         var req = HttpRequest.builder().uri(new URI("/")).method("GET").build();
@@ -60,7 +60,7 @@ public class UserAgentInterceptorTest {
 
     @Test
     public void addsFeatureIds() throws Exception {
-        UserAgentInterceptor interceptor = new UserAgentInterceptor();
+        UserAgentPlugin.UserAgentInterceptor interceptor = new UserAgentPlugin.UserAgentInterceptor();
         var context = Context.create();
 
         Set<String> s = new LinkedHashSet<>();
