@@ -119,7 +119,7 @@ public class TypedDocumentMemberTest {
                     }
 
                     @Override
-                    public <T> T  getMemberValue(Schema member) {
+                    public <T> T getMemberValue(Schema member) {
                         return null;
                     }
                 }

@@ -1,3 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.client.core.pagination;
 
 import java.util.ArrayList;
@@ -7,6 +12,12 @@ import java.util.Map;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 
+/**
+ * Extracts pagination values from the output shape of an operation call based on provided paths.
+ *
+ * <p> Paths are a series of identifiers separated by dots (.) where each identifier represents a member name in a
+ * structure.
+ */
 final class PaginationTokenExtractor {
     private final List<Schema> tokenPathSchemas;
     private final List<Schema> itemsPathSchemas;

@@ -11,20 +11,15 @@ import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
-import software.amazon.smithy.java.core.serde.document.Document;
 
 final class DefaultSyncPaginator<I extends SerializableStruct, O extends SerializableStruct> implements Paginator<O> {
 
     private final Paginatable<I, O> call;
-
-    // Token members
-    private String nextToken = null;
-
     private final PaginationInputFactory<I> inputFactory;
     private final PaginationTokenExtractor extractor;
 
-
-    // Page size parameters
+    // Pagination parameters
+    private String nextToken = null;
     private int pageSize;
     private int totalMaxItems = 0;
 
@@ -43,10 +38,10 @@ final class DefaultSyncPaginator<I extends SerializableStruct, O extends Seriali
         var itemsPath = trait.getItems().orElse(null);
 
         this.inputFactory = new PaginationInputFactory<>(
-                input,
-                operation,
-                inputTokenMember,
-                pageSizeMember
+            input,
+            operation,
+            inputTokenMember,
+            pageSizeMember
         );
 
         if (pageSizeMember != null) {
@@ -55,9 +50,9 @@ final class DefaultSyncPaginator<I extends SerializableStruct, O extends Seriali
         }
 
         this.extractor = new PaginationTokenExtractor(
-                operation.outputSchema(),
-                outputTokenPath,
-                itemsPath
+            operation.outputSchema(),
+            outputTokenPath,
+            itemsPath
         );
     }
 
@@ -96,7 +91,7 @@ final class DefaultSyncPaginator<I extends SerializableStruct, O extends Seriali
                 var output = call.call(input, overrideConfig);
                 var res = extractor.extract(output);
 
-                // If we see the same pagination token twice then stop pagination.
+                // If we see the same pagination token twice in a row then stop pagination.
                 if (nextToken != null && Objects.equals(nextToken, res.token())) {
                     hasNext = false;
                     return output;

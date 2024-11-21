@@ -1,3 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.client.core.pagination;
 
 import software.amazon.smithy.java.core.schema.ApiOperation;
@@ -17,10 +22,10 @@ final class PaginationInputFactory<I extends SerializableStruct> {
     private final Schema maxResultsSchema;
 
     PaginationInputFactory(
-            I input,
-            ApiOperation<I, ?> operation,
-            String inputTokenMember,
-            String maxResultsMember
+        I input,
+        ApiOperation<I, ?> operation,
+        String inputTokenMember,
+        String maxResultsMember
     ) {
         this.input = input;
         this.operation = operation;
