@@ -88,7 +88,7 @@ public final class ValidatedPojo implements SerializableStruct {
     }
 
     @Override
-    public Object getMemberValue(Schema member) {
+    public <T> T getMemberValue(Schema member) {
         throw new UnsupportedOperationException("Member value not supported: " + member);
     }
 

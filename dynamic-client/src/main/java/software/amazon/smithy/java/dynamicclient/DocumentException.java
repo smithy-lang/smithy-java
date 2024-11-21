@@ -36,7 +36,7 @@ public final class DocumentException extends ModeledApiException {
     }
 
     @Override
-    public Object getMemberValue(Schema member) {
+    public <T> T getMemberValue(Schema member) {
         return document.getMemberValue(member);
     }
 
