@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.core;
 
 import java.time.Duration;
+import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
@@ -56,11 +57,18 @@ public final class CallContext {
     public static final Context.Key<String> IDEMPOTENCY_TOKEN = Context.key("Idempotency token");
 
     /**
-     * Contains the mutable user-agent header created automatically for each request.
+     * The set of user-defined feature IDs used with a request.
      *
-     * <p>This value is guaranteed to be set at the start of every request.
+     * <p>Each feature ID must conform to the following regex: {@code [A-Za-z_][A-Za-z_0-9-+}.
      */
-    public static final Context.Key<SmithyUserAgent> USER_AGENT = Context.key("Smithy user agent");
+    public static final Context.Key<Set<String>> FEATURE_IDS = Context.key("Feature IDs used with a request");
+
+    /**
+     * The name of the application, often used in things like user-agent headers.
+     *
+     * <p>This value should be less than 50 characters.
+     */
+    public static final Context.Key<String> APPLICATION_ID = Context.key("Application ID");
 
     private CallContext() {}
 }

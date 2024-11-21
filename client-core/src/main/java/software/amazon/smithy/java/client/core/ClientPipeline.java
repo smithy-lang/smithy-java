@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.core;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
@@ -113,8 +114,8 @@ final class ClientPipeline<RequestT, ResponseT> {
         // Always start the attempt count at 1.
         call.context.put(CallContext.RETRY_ATTEMPT, call.attemptCount);
 
-        // Create a dedicated user-agent for each request.
-        setUserAgent(call.context);
+        // Set up a new feature IDs list.
+        call.context.put(CallContext.FEATURE_IDS, new HashSet<>());
 
         // 2. Interceptors: Invoke ReadBeforeExecution.
         var inputHook = new InputHook<>(call.operation, call.context, input);
@@ -140,17 +141,6 @@ final class ClientPipeline<RequestT, ResponseT> {
         requestHook = requestHook.withRequest(request);
 
         return acquireRetryToken(call, requestHook);
-    }
-
-    private static void setUserAgent(Context context) {
-        // Create a dedicated user-agent for each request.
-        var currentAgent = context.get(CallContext.USER_AGENT);
-        if (currentAgent == null) {
-            context.put(CallContext.USER_AGENT, SmithyUserAgent.create());
-        } else {
-            // Copy the pre-defined user-agent if one is set.
-            context.put(CallContext.USER_AGENT, SmithyUserAgent.createFrom(currentAgent));
-        }
     }
 
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> acquireRetryToken(

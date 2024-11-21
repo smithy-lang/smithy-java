@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.core;
 
 import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.context.Context;
 
 /**
@@ -37,4 +38,13 @@ public interface ClientTransport<RequestT, ResponseT> {
      * @return the response class.
      */
     Class<ResponseT> responseClass();
+
+    /**
+     * Automatically adds an interceptor to the client.
+     *
+     * @return the interceptor to add, or null.
+     */
+    default ClientInterceptor automaticInterceptor() {
+        return null;
+    }
 }

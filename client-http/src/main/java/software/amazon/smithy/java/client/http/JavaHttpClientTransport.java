@@ -11,9 +11,10 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
-import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
+import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.http.useragent.UserAgentInterceptor;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -73,6 +74,11 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
     }
 
     @Override
+    public ClientInterceptor automaticInterceptor() {
+        return UserAgentInterceptor.INSTANCE;
+    }
+
+    @Override
     public Class<HttpRequest> requestClass() {
         return HttpRequest.class;
     }
@@ -99,12 +105,6 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
 
         if (requestTimeout != null) {
             httpRequestBuilder.timeout(requestTimeout);
-        }
-
-        // Add the user-agent if present. Note that an explicit header can overwrite it.
-        var ua = context.get(CallContext.USER_AGENT);
-        if (ua != null) {
-            httpRequestBuilder.setHeader("user-agent", ua.toString());
         }
 
         // Any explicitly set headers overwrite existing headers, they do not merge.

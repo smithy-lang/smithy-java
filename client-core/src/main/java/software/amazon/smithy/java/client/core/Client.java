@@ -32,7 +32,7 @@ public abstract class Client {
     private final ClientConfig config;
     private final ClientPipeline<?, ?> pipeline;
     private final TypeRegistry typeRegistry;
-    private final ClientInterceptor interceptor;
+    private final List<ClientInterceptor> interceptors;
     private final IdentityResolvers identityResolvers;
     private final RetryStrategy retryStrategy;
 
@@ -46,7 +46,7 @@ public abstract class Client {
         this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
 
         // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
-        this.interceptor = ClientInterceptor.chain(config.interceptors());
+        this.interceptors = config.interceptors();
 
         this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
 
@@ -79,19 +79,25 @@ public abstract class Client {
         TypeRegistry operationRegistry = TypeRegistry.compose(operation.typeRegistry(), typeRegistry);
 
         ClientPipeline<?, ?> callPipeline;
-        ClientInterceptor callInterceptor;
+        List<ClientInterceptor> callInterceptors;
         IdentityResolvers callIdentityResolvers;
         ClientConfig callConfig;
         if (overrideConfig == null) {
             callConfig = config;
             callPipeline = pipeline;
-            callInterceptor = interceptor;
+            callInterceptors = interceptors;
             callIdentityResolvers = identityResolvers;
         } else {
             callConfig = config.withRequestOverride(overrideConfig);
             callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
-            callInterceptor = ClientInterceptor.chain(config.interceptors());
+            callInterceptors = config.interceptors();
             callIdentityResolvers = IdentityResolvers.of(config.identityResolvers());
+        }
+
+        var autoInterceptor = callConfig.transport().automaticInterceptor();
+        if (autoInterceptor != null) {
+            callInterceptors = new ArrayList<>(callInterceptors);
+            callInterceptors.add(autoInterceptor);
         }
 
         var callBuilder = ClientCall.<I, O>builder();
@@ -99,7 +105,7 @@ public abstract class Client {
         callBuilder.operation = operation;
         callBuilder.endpointResolver = callConfig.endpointResolver();
         callBuilder.context = Context.modifiableCopy(callConfig.context());
-        callBuilder.interceptor = callInterceptor;
+        callBuilder.interceptor = ClientInterceptor.chain(callInterceptors);
         callBuilder.supportedAuthSchemes.addAll(callConfig.supportedAuthSchemes());
         callBuilder.authSchemeResolver = callConfig.authSchemeResolver();
         callBuilder.identityResolvers = callIdentityResolvers;

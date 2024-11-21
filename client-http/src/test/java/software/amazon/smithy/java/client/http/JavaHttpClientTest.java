@@ -7,8 +7,10 @@ package software.amazon.smithy.java.client.http;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 
 import java.io.IOException;
@@ -26,6 +28,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
@@ -34,11 +37,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.client.core.CallContext;
-import software.amazon.smithy.java.client.core.SmithyUserAgent;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.Model;
@@ -127,17 +130,13 @@ public class JavaHttpClientTest {
 
     @Test
     public void usesDefaultUserAgent() {
-        var ua = SmithyUserAgent.create();
-        ua.setTool("my-client", "1.0");
-        var result = callAndGetHeader(null, ua);
+        var result = callAndGetHeader(null, context -> context.put(CallContext.APPLICATION_ID, "foo"));
 
         assertThat(result, hasSize(1));
         var value = result.get(0);
 
-        assertThat(value, startsWith("my-client/1.0 "));
-        assertThat(value, containsString("smithy-java/"));
-        assertThat(value, containsString("ua/2.1"));
-        assertThat(value, containsString("lang/java#"));
+        System.out.println(value);
+        assertThat(value, containsString("app/foo"));
     }
 
     @Test
@@ -148,17 +147,22 @@ public class JavaHttpClientTest {
         var value = result.get(0);
 
         assertThat(value, equalTo("Foo"));
+        assertThat(value, not(endsWith("m"))); // features are omitted when empty.
     }
 
-    private List<String> callAndGetHeader(String defaultHeader, SmithyUserAgent defaultUa) {
+    private List<String> callAndGetHeader(String defaultHeader, Consumer<Context> consumer) {
         AtomicReference<List<String>> ref = new AtomicReference<>();
         var service = ShapeId.from("smithy.example#Sprockets");
         var client = DynamicClient.builder()
             .service(service)
             .model(MODEL)
             .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+            .addPlugin(config -> {
+                if (consumer != null) {
+                    consumer.accept(config.context());
+                }
+            })
             .protocol(new AwsJson1Protocol(service))
-            .putConfig(CallContext.USER_AGENT, defaultUa)
             .transport(new JavaHttpClientTransport(new HttpClient() {
                 @Override
                 public Optional<CookieHandler> cookieHandler() {
