@@ -59,7 +59,7 @@ public sealed class RequestHook<I extends SerializableStruct, O extends Serializ
      */
     @SuppressWarnings("unchecked")
     public <R> RequestT mapRequest(Class<R> predicateType, Function<RequestHook<?, ?, R>, R> mapper) {
-        if (predicateType.isAssignableFrom(request.getClass())) {
+        if (predicateType.isInstance(request)) {
             return (RequestT) mapper.apply((RequestHook<?, ?, R>) this);
         } else {
             return request;
@@ -78,7 +78,7 @@ public sealed class RequestHook<I extends SerializableStruct, O extends Serializ
      */
     @SuppressWarnings("unchecked")
     public <R, T> RequestT mapRequest(Class<R> predicateType, T state, BiFunction<RequestHook<?, ?, R>, T, R> mapper) {
-        if (request.getClass() == predicateType) {
+        if (predicateType.isInstance(request)) {
             return (RequestT) mapper.apply((RequestHook<?, ?, R>) this, state);
         } else {
             return request;
