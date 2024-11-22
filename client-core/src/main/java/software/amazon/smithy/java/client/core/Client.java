@@ -55,11 +55,17 @@ public abstract class Client {
         this.unresolvedConfig = unresolvedConfigBuilder.build();
 
         // Create the default resolved config that applies the default transport.
-        var defaultResolvedConfigBuilder = unresolvedConfig.toBuilder();
-        unresolvedConfig.transport().configureClient(defaultResolvedConfigBuilder);
-        this.defaultResolvedConfig = defaultResolvedConfigBuilder.build();
-        this.defaultPipeline = ClientPipeline.of(defaultResolvedConfig.protocol(), defaultResolvedConfig.transport());
-        this.defaultIdentityResolvers = IdentityResolvers.of(unresolvedConfig.identityResolvers());
+        if (unresolvedConfig.transport() instanceof ClientPlugin tp) {
+            var defaultResolvedConfigBuilder = unresolvedConfig.toBuilder();
+            tp.configureClient(defaultResolvedConfigBuilder);
+            defaultResolvedConfig = defaultResolvedConfigBuilder.build();
+            defaultPipeline = ClientPipeline.of(defaultResolvedConfig.protocol(), defaultResolvedConfig.transport());
+            defaultIdentityResolvers = IdentityResolvers.of(defaultResolvedConfig.identityResolvers());
+        } else {
+            defaultResolvedConfig = unresolvedConfig;
+            defaultPipeline = ClientPipeline.of(unresolvedConfig.protocol(), unresolvedConfig.transport());
+            defaultIdentityResolvers = IdentityResolvers.of(unresolvedConfig.identityResolvers());
+        }
 
         this.typeRegistry = TypeRegistry.builder().build();
     }

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.client.http.useragent.UserAgentPlugin;
@@ -29,7 +30,7 @@ import software.amazon.smithy.java.logging.InternalLogger;
  *
  * <p>This transport automatically adds a User-Agent header by applying the {@link UserAgentPlugin}.
  */
-public class JavaHttpClientTransport implements ClientTransport<HttpRequest, HttpResponse> {
+public class JavaHttpClientTransport implements ClientTransport<HttpRequest, HttpResponse>, ClientPlugin {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;

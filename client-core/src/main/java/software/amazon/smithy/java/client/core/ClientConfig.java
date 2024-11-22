@@ -191,7 +191,9 @@ public final class ClientConfig {
 
         // Apply the transport plugin configuration.
         var transport = overrideConfig.transport() != null ? overrideConfig.transport() : transport();
-        transport.configureClient(builder);
+        if (transport instanceof ClientPlugin tp) {
+            tp.configureClient(builder);
+        }
 
         return builder.build();
     }
