@@ -191,9 +191,6 @@ public final class ClientConfig {
     }
 
     private void applyOverrides(Builder builder, RequestOverrideConfig overrideConfig) {
-        if (overrideConfig.transport() != null) {
-            builder.transport(overrideConfig.transport());
-        }
         if (overrideConfig.protocol() != null) {
             builder.protocol(overrideConfig.protocol());
         }
@@ -237,43 +234,72 @@ public final class ClientConfig {
         private RetryStrategy retryStrategy;
         private String retryScope;
 
-        // TODO: Docs
+        /**
+         * @return Get the transport.
+         */
         public ClientTransport<?, ?> transport() {
             return transport;
         }
 
+        /**
+         * @return Get the protocol.
+         */
         public ClientProtocol<?, ?> protocol() {
             return protocol;
         }
 
+        /**
+         * @return Get the endpoint resolver.
+         */
         public EndpointResolver endpointResolver() {
             return endpointResolver;
         }
 
+        /**
+         * @return Get the interceptors.
+         */
         public List<ClientInterceptor> interceptors() {
             return interceptors;
         }
 
+        /**
+         * @return Get the auth scheme resolver.
+         */
         public AuthSchemeResolver authSchemeResolver() {
             return authSchemeResolver;
         }
 
+        /**
+         * @return Get the supported auth schemes.
+         */
         public List<AuthScheme<?, ?>> supportedAuthSchemes() {
             return supportedAuthSchemes;
         }
 
+        /**
+         * @return Get the identity resolvers.
+         */
         public List<IdentityResolver<?>> identityResolvers() {
             return identityResolvers;
         }
 
+        /**
+         * @return Get the context.
+         */
         public Context context() {
             return context;
         }
 
+        /**
+         * @return Get the retry strategy.
+         */
         public RetryStrategy retryStrategy() {
             return retryStrategy;
         }
 
+        /**
+         * @return Get the retry scope.
+         */
         public String retryScope() {
             return retryScope;
         }

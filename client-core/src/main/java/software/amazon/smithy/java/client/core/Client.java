@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.client.core;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -38,7 +37,7 @@ public abstract class Client {
 
     protected Client(Builder<?, ?> builder) {
         ClientConfig.Builder configBuilder = builder.configBuilder();
-        for (ClientPlugin plugin : builder.plugins()) {
+        for (ClientPlugin plugin : builder.plugins) {
             plugin.configureClient(configBuilder);
         }
         this.config = configBuilder.build();
@@ -140,8 +139,18 @@ public abstract class Client {
             return configBuilder;
         }
 
-        List<ClientPlugin> plugins() {
-            return Collections.unmodifiableList(plugins);
+        @Override
+        @SuppressWarnings("unchecked")
+        public <V> B putConfig(Context.Key<V> key, V value) {
+            configBuilder().putConfig(key, value);
+            return (B) this;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T> B putConfigIfAbsent(Context.Key<T> key, T value) {
+            configBuilder().putConfigIfAbsent(key, value);
+            return (B) this;
         }
 
         /**

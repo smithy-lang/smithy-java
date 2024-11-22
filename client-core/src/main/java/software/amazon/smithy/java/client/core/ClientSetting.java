@@ -7,7 +7,12 @@ package software.amazon.smithy.java.client.core;
 
 import software.amazon.smithy.java.context.Context;
 
-public interface ClientSetting<B extends Client.Builder<?, B>> {
+/**
+ * Allows for adding settings to a client.
+ *
+ * @param <B> Fluent interface to return.
+ */
+public interface ClientSetting<B extends ClientSetting<B>> {
     /**
      * Put a strongly typed configuration on the builder.
      *
@@ -16,11 +21,7 @@ public interface ClientSetting<B extends Client.Builder<?, B>> {
      * @return the builder.
      * @param <V> Value type.
      */
-    @SuppressWarnings("unchecked")
-    default <V> B putConfig(Context.Key<V> key, V value) {
-        ((B) this).configBuilder().putConfig(key, value);
-        return (B) this;
-    }
+    <V> B putConfig(Context.Key<V> key, V value);
 
     /**
      * Put a strongly typed configuration on the builder, if not already present.
@@ -30,9 +31,5 @@ public interface ClientSetting<B extends Client.Builder<?, B>> {
      * @return the builder.
      * @param <T> Value type.
      */
-    @SuppressWarnings("unchecked")
-    default <T> B putConfigIfAbsent(Context.Key<T> key, T value) {
-        ((B) this).configBuilder().putConfigIfAbsent(key, value);
-        return (B) this;
-    }
+    <T> B putConfigIfAbsent(Context.Key<T> key, T value);
 }
