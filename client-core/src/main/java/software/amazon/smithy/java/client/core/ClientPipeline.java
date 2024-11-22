@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.core;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
@@ -101,9 +102,14 @@ final class ClientPipeline<RequestT, ResponseT> {
      */
     static void validateProtocolAndTransport(ClientProtocol<?, ?> protocol, ClientTransport<?, ?> transport) {
         if (protocol.requestClass() != transport.requestClass()) {
-            throw new IllegalStateException("Protocol request != transport: " + protocol + " vs " + transport);
+            throw new IllegalStateException(
+                "Protocol request type," + protocol.requestClass() + ", does not match transport request type: "
+                    + transport.requestClass()
+            );
         } else if (protocol.responseClass() != transport.responseClass()) {
-            throw new IllegalStateException("Protocol response != transport: " + protocol + " vs " + transport);
+            throw new IllegalStateException(
+                "Protocol response != transport: " + protocol.responseClass() + " vs " + transport.responseClass()
+            );
         }
     }
 
@@ -112,6 +118,9 @@ final class ClientPipeline<RequestT, ResponseT> {
 
         // Always start the attempt count at 1.
         call.context.put(CallContext.RETRY_ATTEMPT, call.attemptCount);
+
+        // Set up a new feature IDs list.
+        call.context.put(CallContext.FEATURE_IDS, new HashSet<>());
 
         // 2. Interceptors: Invoke ReadBeforeExecution.
         var inputHook = new InputHook<>(call.operation, call.context, input);

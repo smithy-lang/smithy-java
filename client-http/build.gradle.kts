@@ -13,4 +13,6 @@ dependencies {
     implementation(project(":logging"))
 
     testImplementation(project(":json-codec"))
+    testImplementation(project(":aws:client-awsjson"))
+    testImplementation(project(":dynamic-client"))
 }

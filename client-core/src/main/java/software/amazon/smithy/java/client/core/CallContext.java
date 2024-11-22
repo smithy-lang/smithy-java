@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.core;
 
 import java.time.Duration;
+import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
@@ -54,6 +55,26 @@ public final class CallContext {
      * <p>This is a read-only value; modifying this value has no effect on a request.
      */
     public static final Context.Key<String> IDEMPOTENCY_TOKEN = Context.key("Idempotency token");
+
+    /**
+     * The set of user-defined feature IDs used with a request.
+     *
+     * <p>Each ID is typically given as a string, though other objects can be used to provide additional functionality.
+     * When {@code toString} is called on a provided value, the string should be short and contain only ASCII letters,
+     * numbers, and hyphens. For example, "P" might be used to indicate that pagination was used with a request.
+     */
+    public static final Context.Key<Set<?>> FEATURE_IDS = Context.key("Feature IDs used with a request");
+
+    /**
+     * The name of the application, used in things like user-agent headers.
+     *
+     * <p>This value is used by AWS SDKs, but can be used generically for any client.
+     * See <a href="https://docs.aws.amazon.com/sdkref/latest/guide/feature-appid.html">Application ID</a> for more
+     * information.
+     *
+     * <p>This value should be less than 50 characters.
+     */
+    public static final Context.Key<String> APPLICATION_ID = Context.key("Application ID");
 
     private CallContext() {}
 }
