@@ -23,7 +23,7 @@ public class SmithyHttpMessageTest {
             .build();
 
         var builder = r.toBuilder();
-        builder.withAddedHeaders("foo", "bar2");
+        builder.withAddedHeader("foo", "bar2");
         builder.withAddedHeaders(HttpHeaders.of(Map.of("foo", List.of("bar3"))));
         var updated = builder.build();
 
