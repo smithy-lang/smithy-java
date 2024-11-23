@@ -81,29 +81,30 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         // TODO: Support chunk encoding
         // TODO: support UNSIGNED
 
-        return getPayloadHash(request.body())
-            .thenApply(payloadHash -> {
-                var signedHeaders = createSignedHeaders(
-                    request.method(),
-                    request.uri(),
-                    request.headers(),
-                    payloadHash,
-                    region,
-                    name,
-                    clock.instant(),
-                    identity.accessKeyId(),
-                    identity.secretAccessKey(),
-                    identity.sessionToken(),
-                    !request.body().hasKnownLength()
-                );
-                return request.toBuilder().headers(HttpHeaders.of(signedHeaders)).build();
-            });
+        return getPayloadHash(request.body()).thenApply(payloadHash -> {
+            var signedHeaders = createSignedHeaders(
+                request.method(),
+                request.uri(),
+                request.headers(),
+                payloadHash,
+                region,
+                name,
+                clock.instant(),
+                identity.accessKeyId(),
+                identity.secretAccessKey(),
+                identity.sessionToken(),
+                !request.body().hasKnownLength()
+            );
+            return request.toBuilder().headers(HttpHeaders.of(signedHeaders)).build();
+        });
     }
 
     private static CompletableFuture<String> getPayloadHash(DataStream dataStream) {
-        return dataStream.asByteBuffer()
-            .thenApply(SigV4Signer::hash)
-            .thenApply(HexFormat.of()::formatHex);
+        return dataStream.asByteBuffer().thenApply(SigV4Signer::hexHash);
+    }
+
+    private static String hexHash(ByteBuffer bytes) {
+        return HexFormat.of().formatHex(hash(bytes));
     }
 
     private static Map<String, List<String>> createSignedHeaders(
@@ -119,6 +120,9 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         String sessionToken,
         boolean isStreaming
     ) {
+        // 512 matches the JavaSdkV2 settings
+        var stringBuffer = new StringBuilder(512);
+
         var headers = new HashMap<>(httpHeaders.map());
 
         // AWS4 requires a number of headers to be set before signing including 'Host' and 'X-Amz-Date'
@@ -141,10 +145,18 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         // Determine sorted list of headers to sign
         Set<String> sortedHeaderKeys = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         sortedHeaderKeys.addAll(headers.keySet());
-        var signedHeaders = getSignedHeaders(sortedHeaderKeys);
+        var signedHeaders = getSignedHeaders(stringBuffer, sortedHeaderKeys);
 
         // Build canonicalRequest and compute its signature
-        var canonicalRequest = getCanonicalRequest(method, uri, headers, sortedHeaderKeys, signedHeaders, payloadHash);
+        var canonicalRequest = getCanonicalRequest(
+            stringBuffer,
+            method,
+            uri,
+            headers,
+            sortedHeaderKeys,
+            signedHeaders,
+            payloadHash
+        );
         var dateStamp = DATE_FORMATTER.format(signingTimestamp);
         var scope = dateStamp + "/" + regionName + "/" + serviceName + "/" + TERMINATOR;
         var signingKey = deriveSigningKey(
@@ -154,9 +166,9 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             serviceName,
             signingTimestamp
         );
-        var signature = computeSignature(canonicalRequest, scope, requestTime, signingKey);
+        var signature = computeSignature(stringBuffer, canonicalRequest, scope, requestTime, signingKey);
 
-        var authorizationHeader = getAuthHeader(accessKeyId, scope, signedHeaders, signature);
+        var authorizationHeader = getAuthHeader(stringBuffer, accessKeyId, scope, signedHeaders, signature);
         headers.put("authorization", List.of(authorizationHeader));
 
         return headers;
@@ -173,9 +185,8 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         };
     }
 
-    private static StringBuilder getSignedHeaders(Set<String> sortedHeaderKeys) {
-        // 512 matches the JavaSdkV2 settings
-        var builder = new StringBuilder(512);
+    private static String getSignedHeaders(StringBuilder builder, Set<String> sortedHeaderKeys) {
+        builder.setLength(0);
         for (var header : sortedHeaderKeys) {
             String lowerCaseHeader = header.toLowerCase(Locale.ENGLISH);
             if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(lowerCaseHeader)) {
@@ -186,16 +197,17 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             }
             builder.append(lowerCaseHeader);
         }
-        return builder;
+        return builder.toString();
     }
 
     private static String getAuthHeader(
+        StringBuilder builder,
         String accessKeyId,
         String scope,
-        StringBuilder signedHeaderBuilder,
+        String signedHeaderBuilder,
         String signature
     ) {
-        var builder = new StringBuilder();
+        builder.setLength(0);
         builder.append(ALGORITHM)
             .append(' ')
             .append("Credential=")
@@ -212,14 +224,15 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     private static byte[] getCanonicalRequest(
+        StringBuilder builder,
         String method,
         URI uri,
         Map<String, List<String>> headers,
         Set<String> sortedHeaderKeys,
-        StringBuilder signedHeaders,
+        String signedHeaders,
         String payloadHash
     ) {
-        var builder = new StringBuilder();
+        builder.setLength(0);
         builder.append(method).append('\n');
         addCanonicalizedResourcePath(uri, builder);
         builder.append('\n');
@@ -396,12 +409,13 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     private static String computeSignature(
+        StringBuilder builder,
         byte[] canonicalRequest,
         String scope,
         String requestTime,
         byte[] signingKey
     ) {
-        var builder = new StringBuilder();
+        builder.setLength(0);
         builder.append(ALGORITHM)
             .append('\n')
             .append(requestTime)

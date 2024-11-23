@@ -102,6 +102,11 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
         return headers.hashCode();
     }
 
+    @Override
+    public String toString() {
+        return "SimpleUnmodifiableHttpHeaders{" + headers + '}';
+    }
+
     // Note: all of these methods must:
     // 1. Lowercase header names and trim them
     // 2. Copy header value lists and trim each value.
