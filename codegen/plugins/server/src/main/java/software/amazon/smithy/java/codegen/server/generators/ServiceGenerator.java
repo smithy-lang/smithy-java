@@ -65,6 +65,7 @@ public final class ServiceGenerator implements
                     ${builder:C|}
 
                     @Override
+                    @SuppressWarnings("unchecked")
                     public <I extends ${serializableStruct:T}, O extends ${serializableStruct:T}> ${operationHolder:T}<I, O> getOperation(String operationName) {
                         ${getOperation:C|}
                     }

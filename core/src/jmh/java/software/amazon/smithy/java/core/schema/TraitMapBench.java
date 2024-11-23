@@ -48,7 +48,7 @@ import software.amazon.smithy.model.traits.Trait;
 @Fork(2)
 public class TraitMapBench {
     @Benchmark
-    @SuppressWarnings("rawtypes")
+    @SuppressWarnings({"rawtypes", "unchecked"})
     public void getTrait(Blackhole bh, TraitState s) {
         Class[] t = s.traitClasses;
         ThreadLocalRandom random = ThreadLocalRandom.current();
@@ -59,7 +59,7 @@ public class TraitMapBench {
     }
 
     @Benchmark
-    @SuppressWarnings("rawtypes")
+    @SuppressWarnings({"rawtypes", "unchecked"})
     public void getTraitWithKey(Blackhole bh, TraitState s) {
         TraitKey[] keys = s.traitKeys;
         ThreadLocalRandom random = ThreadLocalRandom.current();
@@ -90,6 +90,7 @@ public class TraitMapBench {
             }
         }
 
+        @SuppressWarnings("unchecked")
         private void setupConfig(String config, int i) {
             String[] split = config.split("-");
             int size = Integer.parseInt(split[0]);

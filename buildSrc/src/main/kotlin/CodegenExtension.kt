@@ -28,6 +28,7 @@ fun Project.addGenerateSrcsTask(
         environment("output", output)
         service?.let { environment("service", it) }
         environment("mode", mode)
+        systemProperty("java.util.logging.config.file", "${project.rootDir}/config/logging/logging.properties")
     }
     tasks.getByName("integ").dependsOn(task)
     tasks.getByName("compileItJava").dependsOn(task)

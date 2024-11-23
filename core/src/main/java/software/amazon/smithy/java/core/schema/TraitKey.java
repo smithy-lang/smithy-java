@@ -77,6 +77,7 @@ public final class TraitKey<T extends Trait> {
     public static final TraitKey<EndpointTrait> ENDPOINT_TRAIT = TraitKey.get(EndpointTrait.class);
     public static final TraitKey<HostLabelTrait> HOST_LABEL_TRAIT = TraitKey.get(HostLabelTrait.class);
     public static final TraitKey<MediaTypeTrait> MEDIA_TYPE_TRAIT = TraitKey.get(MediaTypeTrait.class);
+    @SuppressWarnings("deprecation")
     public static final TraitKey<EnumTrait> ENUM_TRAIT = TraitKey.get(EnumTrait.class);
     public static final TraitKey<HttpTrait> HTTP_TRAIT = TraitKey.get(HttpTrait.class);
     public static final TraitKey<HttpErrorTrait> HTTP_ERROR_TRAIT = TraitKey.get(HttpErrorTrait.class);

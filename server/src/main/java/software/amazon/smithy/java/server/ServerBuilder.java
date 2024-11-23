@@ -76,6 +76,7 @@ public abstract class ServerBuilder<T extends ServerBuilder<T>> {
 
     protected abstract Server buildServer();
 
+    @SuppressWarnings("unchecked")
     protected final T self() {
         return (T) this;
     }

@@ -170,7 +170,7 @@ public class JsonSerializerTest {
                         }
 
                         @Override
-                        public Object getMemberValue(Schema member) {
+                        public <T> T getMemberValue(Schema member) {
                             return null;
                         }
                     }
@@ -206,7 +206,7 @@ public class JsonSerializerTest {
                         }
 
                         @Override
-                        public Object getMemberValue(Schema member) {
+                        public <T> T getMemberValue(Schema member) {
                             return null;
                         }
                     }
@@ -280,7 +280,7 @@ public class JsonSerializerTest {
         }
 
         @Override
-        public Object getMemberValue(Schema member) {
+        public <T> T getMemberValue(Schema member) {
             return null;
         }
     }
@@ -295,7 +295,7 @@ public class JsonSerializerTest {
         public void serializeMembers(ShapeSerializer serializer) {}
 
         @Override
-        public Object getMemberValue(Schema member) {
+        public <T> T getMemberValue(Schema member) {
             return null;
         }
     }

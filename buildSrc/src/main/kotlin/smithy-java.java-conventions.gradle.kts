@@ -53,16 +53,16 @@ testlogger {
     showStackTraces = true
     showFullStackTraces = false
     showCauses = true
-    showSummary = true
-    showPassed = true
-    showSkipped = true
+    showSummary = false
+    showPassed = false
+    showSkipped = false
     showFailed = true
     showOnlySlow = false
     showStandardStreams = true
     showPassedStandardStreams = false
     showSkippedStandardStreams = false
     showFailedStandardStreams = true
-    logLevel = LogLevel.LIFECYCLE
+    logLevel = LogLevel.WARN
 }
 
 /*

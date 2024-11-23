@@ -137,6 +137,7 @@ abstract class BuilderGenerator implements Runnable {
 
         var template = """
             @Override
+            @SuppressWarnings("unchecked")
             public void setMemberValue(Schema member, Object value) {
                 switch (member.memberIndex()) {
                     ${memberSetters:C|}

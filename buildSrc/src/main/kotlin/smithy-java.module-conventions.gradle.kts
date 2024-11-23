@@ -37,6 +37,10 @@ tasks.withType<Javadoc>() {
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:-html", "-quiet")
 }
 
+//tasks.withType<JavaCompile> {
+//    options.compilerArgs = listOf("-Xlint:unchecked")
+//}
+
 // Include an Automatic-Module-Name in all JARs.
 afterEvaluate {
     val moduleName: String by extra
