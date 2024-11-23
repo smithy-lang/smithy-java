@@ -9,23 +9,17 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
-import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
@@ -59,11 +53,15 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     );
 
     private static final String HMAC_SHA_256 = "HmacSHA256";
-    private static final String SHA_256 = "SHA-256";
     private static final String ALGORITHM = "AWS4-HMAC-SHA256";
     private static final String TERMINATOR = "aws4_request";
 
     private static final SigningCache SIGNER_CACHE = new SigningCache(300);
+
+    // 512 matches the JavaSdkV2 settings
+    private static final ThreadLocal<StringBuilder> STRING_BUILDER = ThreadLocal.withInitial(
+        () -> new StringBuilder(512)
+    );
 
     private SigV4Signer() {}
 
@@ -82,7 +80,9 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         // TODO: support UNSIGNED
 
         return getPayloadHash(request.body()).thenApply(payloadHash -> {
+            var sb = STRING_BUILDER.get();
             var signedHeaders = createSignedHeaders(
+                sb,
                 request.method(),
                 request.uri(),
                 request.headers(),
@@ -95,6 +95,11 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
                 identity.sessionToken(),
                 !request.body().hasKnownLength()
             );
+            if (sb.length() > 1024) {
+                sb.setLength(1024);
+                sb.trimToSize();
+            }
+            sb.setLength(0);
             return request.toBuilder().headers(HttpHeaders.of(signedHeaders)).build();
         });
     }
@@ -108,6 +113,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     private static Map<String, List<String>> createSignedHeaders(
+        StringBuilder stringBuffer,
         String method,
         URI uri,
         HttpHeaders httpHeaders,
@@ -120,15 +126,14 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         String sessionToken,
         boolean isStreaming
     ) {
-        // 512 matches the JavaSdkV2 settings
-        var stringBuffer = new StringBuilder(512);
-
-        var headers = new HashMap<>(httpHeaders.map());
+        // httpHeaders.map() must return all lowercase header names.
+        Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        headers.putAll(httpHeaders.map());
 
         // AWS4 requires a number of headers to be set before signing including 'Host' and 'X-Amz-Date'
         var hostHeader = uri.getHost();
         if (uriUsingNonStandardPort(uri)) {
-            hostHeader += ":" + uri.getPort();
+            hostHeader += ':' + uri.getPort();
         }
         headers.put("host", List.of(hostHeader));
 
@@ -143,9 +148,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         }
 
         // Determine sorted list of headers to sign
-        Set<String> sortedHeaderKeys = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        sortedHeaderKeys.addAll(headers.keySet());
-        var signedHeaders = getSignedHeaders(stringBuffer, sortedHeaderKeys);
+        var signedHeaders = getSignedHeaders(stringBuffer, headers.keySet());
 
         // Build canonicalRequest and compute its signature
         var canonicalRequest = getCanonicalRequest(
@@ -153,12 +156,12 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             method,
             uri,
             headers,
-            sortedHeaderKeys,
+            headers.keySet(),
             signedHeaders,
             payloadHash
         );
         var dateStamp = DATE_FORMATTER.format(signingTimestamp);
-        var scope = dateStamp + "/" + regionName + "/" + serviceName + "/" + TERMINATOR;
+        var scope = dateStamp + '/' + regionName + '/' + serviceName + '/' + TERMINATOR;
         var signingKey = deriveSigningKey(
             secretAccessKey,
             dateStamp,
@@ -188,14 +191,13 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     private static String getSignedHeaders(StringBuilder builder, Set<String> sortedHeaderKeys) {
         builder.setLength(0);
         for (var header : sortedHeaderKeys) {
-            String lowerCaseHeader = header.toLowerCase(Locale.ENGLISH);
-            if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(lowerCaseHeader)) {
+            if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(header)) {
                 continue;
             }
             if (!builder.isEmpty()) {
                 builder.append(';');
             }
-            builder.append(lowerCaseHeader);
+            builder.append(header);
         }
         return builder.toString();
     }
@@ -253,20 +255,19 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             return;
         }
         if (!path.startsWith("/")) {
-            path = "/" + path;
+            path = '/' + path;
         }
         URLEncoding.encodeUnreserved(path, builder, true);
     }
 
     private static void addCanonicalizedQueryString(URI uri, StringBuilder builder) {
-        SortedMap<String, String> sorted = new TreeMap<>();
-
         // Getting the raw query means the keys and values don't need to be encoded again.
         var query = uri.getRawQuery();
         if (query == null) {
             return;
         }
 
+        SortedMap<String, String> sorted = new TreeMap<>();
         var params = query.split("&");
 
         for (var param : params) {
@@ -281,18 +282,15 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             }
         }
 
-        var pairs = sorted.entrySet().iterator();
-        while (pairs.hasNext()) {
-            var pair = pairs.next();
-            var key = pair.getKey();
-            var value = pair.getValue();
-            builder.append(key);
+        for (var entry : sorted.entrySet()) {
+            builder.append(entry.getKey());
             builder.append('=');
-            builder.append(value);
-            if (pairs.hasNext()) {
-                builder.append('&');
-            }
+            builder.append(entry.getValue());
+            builder.append('&');
         }
+
+        // Remove the trailing '&'.
+        builder.setLength(builder.length() - 1);
     }
 
     private static void addCanonicalizedHeaderString(
@@ -301,11 +299,10 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         StringBuilder builder
     ) {
         for (var headerKey : sortedHeaderKeys) {
-            var lowerCaseHeader = headerKey.toLowerCase(Locale.ENGLISH);
-            if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(lowerCaseHeader)) {
+            if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(headerKey)) {
                 continue;
             }
-            builder.append(lowerCaseHeader);
+            builder.append(headerKey);
             builder.append(':');
             for (String headerValue : headers.get(headerKey)) {
                 addAndTrim(builder, headerValue);
@@ -316,62 +313,53 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         }
     }
 
-    /**
-     * From JAVA V2 sdk: <a href="https://github.com/aws/aws-sdk-java-v2/blob/master/core/auth/src/main/java/software/amazon/awssdk/auth/signer/internal/AbstractAws4Signer.java#L651">JavaV2 Implementation</a>.
-     * "The addAndTrim function removes excess white space before and after values,
-     * and converts sequential spaces to a single space."
-     * <p>
-     * <a href="https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html">...</a>
-     * <p>
-     * The collapse-whitespace logic is equivalent to:
-     * <pre>
-     *     value.replaceAll("\\s+", " ")
-     * </pre>
-     * but does not create a Pattern object that needs to compile the match
-     * string; it also prevents us from having to make a Matcher object as well.
-     */
     private static void addAndTrim(StringBuilder result, String value) {
-        int lengthBefore = result.length();
-        boolean isStart = true;
-        boolean previousIsWhiteSpace = false;
+        for (int position = 0; position < value.length(); position++) {
+            if (isWhiteSpace(value.charAt(position))) {
+                addAndTrimSlow(result, value);
+                return;
+            }
+        }
+        result.append(value);
+    }
 
-        for (int i = 0; i < value.length(); i++) {
-            char ch = value.charAt(i);
+    // Used when a header has any whitespace.
+    private static void addAndTrimSlow(StringBuilder result, String value) {
+        result.ensureCapacity(result.length() + value.length());
+
+        // Trim leading whitespace.
+        int position;
+        for (position = 0; position < value.length(); position++) {
+            if (!isWhiteSpace(value.charAt(position))) {
+                break;
+            }
+        }
+
+        // Convert "<WS><WS>" to "<SP>".
+        boolean previousIsWhiteSpace = false;
+        for (; position < value.length(); position++) {
+            char ch = value.charAt(position);
             if (isWhiteSpace(ch)) {
-                if (previousIsWhiteSpace || isStart) {
+                if (previousIsWhiteSpace) {
                     continue;
                 }
                 result.append(' ');
                 previousIsWhiteSpace = true;
             } else {
                 result.append(ch);
-                isStart = false;
                 previousIsWhiteSpace = false;
             }
         }
 
-        if (lengthBefore == result.length()) {
-            return;
+        // Trim trailing WS.
+        if (!result.isEmpty() && result.charAt(result.length() - 1) == ' ') {
+            result.setLength(result.length() - 1);
         }
-
-        int lastNonWhitespaceChar = result.length() - 1;
-        while (isWhiteSpace(result.charAt(lastNonWhitespaceChar))) {
-            --lastNonWhitespaceChar;
-        }
-
-        result.setLength(lastNonWhitespaceChar + 1);
     }
 
-    /**
-     * Tests a char to see if is it whitespace.
-     * This method considers the same characters to be white
-     * space as the Pattern class does when matching {@code \s}
-     *
-     * @param ch the character to be tested
-     * @return true if the character is white  space, false otherwise.
-     */
+    // ws: ' ' | '\t' | '\n' | \u000b | \r | \f
     private static boolean isWhiteSpace(char ch) {
-        return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\u000b' || ch == '\r' || ch == '\f';
+        return ch == ' ' || (ch >= '\t' && ch <= '\f');
     }
 
     /**
@@ -428,31 +416,23 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private static byte[] sign(String data, byte[] key) {
         try {
-            var mac = Mac.getInstance(HMAC_SHA_256);
+            var mac = SigningAlgorithm.HMAC_SHA256.getMac();
             mac.init(new SecretKeySpec(key, HMAC_SHA_256));
             return mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+        } catch (InvalidKeyException e) {
             throw new RuntimeException(e);
         }
     }
 
     private static byte[] hash(ByteBuffer data) {
-        try {
-            var md = MessageDigest.getInstance(SHA_256);
-            md.update(data);
-            return md.digest();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
+        var md = DigestAlgorithm.SHA256.getDigest();
+        md.update(data);
+        return md.digest();
     }
 
     private static byte[] hash(byte[] data) {
-        try {
-            var md = MessageDigest.getInstance(SHA_256);
-            md.update(data);
-            return md.digest();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
+        var md = DigestAlgorithm.SHA256.getDigest();
+        md.update(data);
+        return md.digest();
     }
 }
