@@ -1,5 +1,9 @@
 package example;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.example.client.CoffeeShopClient;
@@ -7,6 +11,7 @@ import software.amazon.smithy.java.client.example.model.CoffeeType;
 import software.amazon.smithy.java.client.example.model.CreateOrderInput;
 import software.amazon.smithy.java.client.example.model.GetMenuInput;
 import software.amazon.smithy.java.client.example.model.GetOrderInput;
+import software.amazon.smithy.java.client.example.model.OrderNotFound;
 
 public class TestRunner {
     private final CoffeeShopClient client = CoffeeShopClient.builder().build();
