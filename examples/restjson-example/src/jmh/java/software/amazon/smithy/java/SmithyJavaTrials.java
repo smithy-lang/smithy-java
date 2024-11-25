@@ -121,7 +121,7 @@ public class SmithyJavaTrials {
         testName = testName + ".json";
 
         // TODO: for some reason, I can't access resources using relative paths with Class#getResource.
-        var url = getClass().getClassLoader().getResource("software/amazon/smithy/java/runtime/" + testName);
+        var url = SmithyJavaTrials.class.getResource(testName);
         if (url == null) {
             throw new RuntimeException("Test case not found: " + testName);
         }
