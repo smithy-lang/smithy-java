@@ -33,8 +33,6 @@ import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * AWS signature version 4 signing implementation.
- *
- * <p>TODO: Code still needs profiling and optimization
  */
 final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     static final SigV4Signer INSTANCE = new SigV4Signer();

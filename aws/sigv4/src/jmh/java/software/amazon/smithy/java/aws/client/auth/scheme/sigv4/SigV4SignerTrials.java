@@ -5,9 +5,11 @@
 
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
+import com.amazon.corretto.crypto.provider.AmazonCorrettoCryptoProvider;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.Security;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -83,18 +85,40 @@ public class SigV4SignerTrials {
         }
     )
     private String testName;
+
+    @Param({"yes", "no"})
+    private String useAccpParam;
+
+    private boolean isWindows;
+    private boolean useAccp;
+    private boolean skipTest;
     private HttpRequest request;
     private Signer<HttpRequest, AwsCredentialsIdentity> signer;
 
     @Setup
     public void setup() throws Exception {
+        useAccp = useAccpParam.equals("yes");
+        isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        skipTest = useAccp && isWindows;
+        if (!isWindows) {
+            if (useAccp) {
+                AmazonCorrettoCryptoProvider.install();
+            } else {
+                Security.removeProvider(AmazonCorrettoCryptoProvider.class.getName());
+            }
+        }
+
         request = CASES.get(testName);
         signer = SigV4Signer.INSTANCE;
     }
 
     @Benchmark
     public void sign() throws IOException, ExecutionException, InterruptedException {
-        signer.sign(request, TEST_IDENTITY, TEST_PROPERTIES).get();
+        if (!skipTest) {
+            signer.sign(request, TEST_IDENTITY, TEST_PROPERTIES).get();
+        } else {
+            System.out.println("Skipping benchmark on Windows");
+        }
     }
 
     private static HttpRequest parsePostRequest(
