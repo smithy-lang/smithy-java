@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
-import com.amazon.corretto.crypto.provider.AmazonCorrettoCryptoProvider;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -100,16 +99,18 @@ public class SigV4SignerTrials {
         useAccp = useAccpParam.equals("yes");
         isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         skipTest = useAccp && isWindows;
+
         if (!isWindows) {
+            var clazz = Class.forName("com.amazon.corretto.crypto.provider.AmazonCorrettoCryptoProvider");
             if (useAccp) {
-                AmazonCorrettoCryptoProvider.install();
+                clazz.getMethod("install").invoke(null);
             } else {
-                Security.removeProvider(AmazonCorrettoCryptoProvider.class.getName());
+                Security.removeProvider(clazz.getName());
             }
         }
 
         request = CASES.get(testName);
-        signer = SigV4Signer.INSTANCE;
+        signer = SigV4Signer.create();
     }
 
     @Benchmark
