@@ -11,10 +11,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
@@ -39,12 +40,6 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     static final SigV4Signer INSTANCE = new SigV4Signer();
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(SigV4Signer.class);
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter
-        .ofPattern("yyyyMMdd")
-        .withZone(ZoneId.of("UTC"));
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter
-        .ofPattern("yyyyMMdd'T'HHmmss'Z'")
-        .withZone(ZoneId.of("UTC"));
     private static final List<String> HEADERS_TO_IGNORE_IN_LOWER_CASE = List.of(
         "connection",
         "x-amzn-trace-id",
@@ -52,15 +47,13 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         "expect"
     );
 
+    private static final int BUFFER_SIZE = 512;
     private static final String HMAC_SHA_256 = "HmacSHA256";
     private static final String ALGORITHM = "AWS4-HMAC-SHA256";
     private static final String TERMINATOR = "aws4_request";
-
     private static final SigningCache SIGNER_CACHE = new SigningCache(300);
-
-    // 512 matches the JavaSdkV2 settings
     private static final ThreadLocal<StringBuilder> STRING_BUILDER = ThreadLocal.withInitial(
-        () -> new StringBuilder(512)
+        () -> new StringBuilder(BUFFER_SIZE)
     );
 
     private SigV4Signer() {}
@@ -95,8 +88,9 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
                 identity.sessionToken(),
                 !request.body().hasKnownLength()
             );
-            if (sb.length() > 1024) {
-                sb.setLength(1024);
+            // Don't let the cached buffers grow too large.
+            if (sb.length() > BUFFER_SIZE) {
+                sb.setLength(BUFFER_SIZE);
                 sb.trimToSize();
             }
             sb.setLength(0);
@@ -126,18 +120,15 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         String sessionToken,
         boolean isStreaming
     ) {
-        // httpHeaders.map() must return all lowercase header names.
-        Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        headers.putAll(httpHeaders.map());
+        var headers = copyHeaders(httpHeaders);
 
         // AWS4 requires a number of headers to be set before signing including 'Host' and 'X-Amz-Date'
-        var hostHeader = uri.getHost();
-        if (uriUsingNonStandardPort(uri)) {
-            hostHeader += ':' + uri.getPort();
-        }
+        var hostHeader = uriUsingNonStandardPort(uri) ? uri.getHost() + ':' + uri.getPort() : uri.getHost();
         headers.put("host", List.of(hostHeader));
 
-        var requestTime = TIME_FORMATTER.format(signingTimestamp);
+        var signingDate = signingTimestamp.atOffset(ZoneOffset.UTC).toLocalDateTime();
+        var dateStamp = formatDate(signingDate, stringBuffer);
+        var requestTime = formatRfc3339(signingDate, dateStamp, stringBuffer);
         headers.put("x-amz-date", List.of(requestTime));
 
         if (isStreaming) {
@@ -160,8 +151,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             signedHeaders,
             payloadHash
         );
-        var dateStamp = DATE_FORMATTER.format(signingTimestamp);
-        var scope = dateStamp + '/' + regionName + '/' + serviceName + '/' + TERMINATOR;
+
         var signingKey = deriveSigningKey(
             secretAccessKey,
             dateStamp,
@@ -169,6 +159,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             serviceName,
             signingTimestamp
         );
+        var scope = createScope(dateStamp, regionName, serviceName, stringBuffer);
         var signature = computeSignature(stringBuffer, canonicalRequest, scope, requestTime, signingKey);
 
         var authorizationHeader = getAuthHeader(stringBuffer, accessKeyId, scope, signedHeaders, signature);
@@ -177,13 +168,57 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         return headers;
     }
 
-    private static boolean uriUsingNonStandardPort(URI uri) {
-        if (uri.getPort() == -1) {
-            return false;
+    private static String createScope(String dateStamp, String regionName, String serviceName, StringBuilder sb) {
+        sb.setLength(0);
+        sb.append(dateStamp).append('/');
+        sb.append(regionName).append('/');
+        sb.append(serviceName).append('/');
+        sb.append(TERMINATOR);
+        return sb.toString();
+    }
+
+    private static Map<String, List<String>> copyHeaders(HttpHeaders httpHeaders) {
+        Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        // Note: httpHeaders.map _should_ always return lowercase key names.
+        for (var entry : httpHeaders.map().entrySet()) {
+            headers.put(entry.getKey().toLowerCase(Locale.ENGLISH), entry.getValue());
         }
-        return switch (uri.getScheme()) {
-            case "http" -> uri.getPort() != 80;
-            case "https" -> uri.getPort() != 443;
+        return headers;
+    }
+
+    // Formats the equivalent of "yyyyMMdd".
+    private static String formatDate(LocalDateTime date, StringBuilder sb) {
+        sb.setLength(0);
+        sb.append(date.getYear());
+        appendTwoDigits(date.getMonthValue(), sb);
+        appendTwoDigits(date.getDayOfMonth(), sb);
+        return sb.toString();
+    }
+
+    // Formats the equivalent of "yyyyMMdd'T'HHmmss'Z'".
+    private static String formatRfc3339(LocalDateTime localDate, String dateString, StringBuilder sb) {
+        sb.setLength(0);
+        sb.append(dateString);
+        sb.append('T');
+        appendTwoDigits(localDate.getHour(), sb);
+        appendTwoDigits(localDate.getMinute(), sb);
+        appendTwoDigits(localDate.getSecond(), sb);
+        sb.append('Z');
+        return sb.toString();
+    }
+
+    private static void appendTwoDigits(int value, StringBuilder sb) {
+        if (value < 10) {
+            sb.append('0');
+        }
+        sb.append(value);
+    }
+
+    private static boolean uriUsingNonStandardPort(URI uri) {
+        return switch (uri.getPort()) {
+            case -1 -> false;
+            case 80 -> uri.getScheme().equals("http");
+            case 443 -> uri.getScheme().equals("https");
             default -> throw new IllegalStateException("Unexpected value for URI scheme: " + uri.getScheme());
         };
     }
@@ -191,14 +226,12 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     private static String getSignedHeaders(StringBuilder builder, Set<String> sortedHeaderKeys) {
         builder.setLength(0);
         for (var header : sortedHeaderKeys) {
-            if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(header)) {
-                continue;
+            if (!HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(header)) {
+                builder.append(header).append(';');
             }
-            if (!builder.isEmpty()) {
-                builder.append(';');
-            }
-            builder.append(header);
         }
+        // Remove the trailing ";".
+        builder.setLength(builder.length() - 1);
         return builder.toString();
     }
 
@@ -211,16 +244,13 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     ) {
         builder.setLength(0);
         builder.append(ALGORITHM)
-            .append(' ')
-            .append("Credential=")
+            .append(" Credential=")
             .append(accessKeyId)
             .append('/')
             .append(scope)
-            .append(", ")
-            .append("SignedHeaders=")
+            .append(", SignedHeaders=")
             .append(signedHeaderBuilder)
-            .append(", ")
-            .append("Signature=")
+            .append(", Signature=")
             .append(signature);
         return builder.toString();
     }
@@ -308,6 +338,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
                 addAndTrim(builder, headerValue);
                 builder.append(',');
             }
+            // Remove the trailing comma.
             builder.setLength(builder.length() - 1);
             builder.append('\n');
         }
@@ -370,16 +401,16 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         String dateStamp,
         String regionName,
         String serviceName,
-        Instant instant
+        Instant signingDate
     ) {
         var cacheKey = new SigningCache.CacheKey(secretKey, regionName, serviceName);
         SigningKey signingKey = SIGNER_CACHE.get(cacheKey);
-        if (signingKey != null && signingKey.isValidFor(instant)) {
+        if (signingKey != null && signingKey.isValidFor(signingDate)) {
             return signingKey.signingKey();
         }
         LOGGER.trace("Generating new key as signing key could not be found in cache.");
         byte[] key = newSigningKey(secretKey, dateStamp, regionName, serviceName);
-        SIGNER_CACHE.put(cacheKey, new SigningKey(key, instant));
+        SIGNER_CACHE.put(cacheKey, new SigningKey(key, signingDate));
         return key;
     }
 
@@ -411,7 +442,8 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             .append(scope)
             .append('\n')
             .append(HexFormat.of().formatHex(hash(canonicalRequest)));
-        return HexFormat.of().formatHex(sign(builder.toString(), signingKey));
+        var toSign = builder.toString();
+        return HexFormat.of().formatHex(sign(toSign, signingKey));
     }
 
     private static byte[] sign(String data, byte[] key) {

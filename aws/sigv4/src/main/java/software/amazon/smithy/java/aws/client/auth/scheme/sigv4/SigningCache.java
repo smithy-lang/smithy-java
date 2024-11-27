@@ -52,5 +52,43 @@ final class SigningCache {
         }
     }
 
-    record CacheKey(String secretKey, String regionName, String serviceName) {}
+    static final class CacheKey {
+        private final String secretKey;
+        private final String regionName;
+        private final String serviceName;
+        private final int cachedHashCode;
+
+        CacheKey(String secretKey, String regionName, String serviceName) {
+            this.secretKey = secretKey;
+            this.regionName = regionName;
+            this.serviceName = serviceName;
+            cachedHashCode = computeHashCode(secretKey, regionName, serviceName);
+        }
+
+        private static int computeHashCode(String secretKey, String regionName, String serviceName) {
+            int result = 1;
+            result = 31 * result + secretKey.hashCode();
+            result = 31 * result + regionName.hashCode();
+            result = 31 * result + serviceName.hashCode();
+            return result;
+        }
+
+        @Override
+        public int hashCode() {
+            return cachedHashCode;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this) {
+                return true;
+            } else if (obj instanceof CacheKey c) {
+                return cachedHashCode == c.cachedHashCode
+                       && secretKey.equals(c.secretKey)
+                       && regionName.equals(c.regionName)
+                       && serviceName.equals(c.serviceName);
+            }
+            return false;
+        }
+    }
 }
