@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.codegen.client.settings;
 
-import software.amazon.smithy.java.client.core.Client;
+import software.amazon.smithy.java.client.core.ClientSetting;
 
-public interface NestedSettings<B extends Client.Builder<?, B>> extends AbSetting<B>, Nested<B> {
+public interface NestedSettings<B extends ClientSetting<B>> extends AbSetting<B>, Nested<B> {
 }

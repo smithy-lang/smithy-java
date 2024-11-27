@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.aws.client.core.settings;
 
-import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.ClientSetting;
 import software.amazon.smithy.java.context.Context;
 
@@ -22,7 +21,7 @@ import software.amazon.smithy.java.context.Context;
  * }
  * }</pre>
  */
-public interface RegionSetting<B extends Client.Builder<?, B>> extends ClientSetting<B> {
+public interface RegionSetting<B extends ClientSetting<B>> extends ClientSetting<B> {
     /**
      * AWS Region.
      *

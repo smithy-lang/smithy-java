@@ -7,7 +7,6 @@ package software.amazon.smithy.java.client.core.settings;
 
 import java.time.Clock;
 import java.util.Objects;
-import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.ClientSetting;
 import software.amazon.smithy.java.context.Context;
 
@@ -24,7 +23,7 @@ import software.amazon.smithy.java.context.Context;
  * }
  * }</pre>
  */
-public interface ClockSetting<B extends Client.Builder<?, B>> extends ClientSetting<B> {
+public interface ClockSetting<B extends ClientSetting<B>> extends ClientSetting<B> {
     /**
      * Override the {@code Clock} implementation to used in clients.
      */

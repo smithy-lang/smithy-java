@@ -5,11 +5,10 @@
 
 package software.amazon.smithy.java.codegen.client.settings;
 
-import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.ClientSetting;
 import software.amazon.smithy.java.context.Context;
 
-public interface AbSetting<B extends Client.Builder<?, B>> extends ClientSetting<B> {
+public interface AbSetting<B extends ClientSetting<B>> extends ClientSetting<B> {
     Context.Key<String> AB_KEY = Context.key("A combined string value.");
 
     default B multiValue(String valueA, String valueB) {

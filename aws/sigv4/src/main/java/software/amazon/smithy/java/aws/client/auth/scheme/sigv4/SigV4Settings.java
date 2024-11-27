@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
-import software.amazon.smithy.java.client.core.Client;
+import software.amazon.smithy.java.client.core.ClientSetting;
 import software.amazon.smithy.java.client.core.settings.ClockSetting;
 import software.amazon.smithy.java.context.Context;
 
@@ -41,7 +41,7 @@ import software.amazon.smithy.java.context.Context;
  * }
  * }</pre>
  */
-public interface SigV4Settings<B extends Client.Builder<?, B>> extends ClockSetting<B>, RegionSetting<B> {
+public interface SigV4Settings<B extends ClientSetting<B>> extends ClockSetting<B>, RegionSetting<B> {
     /**
      * Service name to use for signing. For example {@code lambda}.
      */

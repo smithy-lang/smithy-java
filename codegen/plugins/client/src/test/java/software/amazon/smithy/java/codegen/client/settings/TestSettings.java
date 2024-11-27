@@ -8,10 +8,10 @@ package software.amazon.smithy.java.codegen.client.settings;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
-import software.amazon.smithy.java.client.core.Client;
+import software.amazon.smithy.java.client.core.ClientSetting;
 import software.amazon.smithy.java.context.Context;
 
-public interface TestSettings<B extends Client.Builder<?, B>> extends AbSetting<B>, NestedSettings<B> {
+public interface TestSettings<B extends ClientSetting<B>> extends AbSetting<B>, NestedSettings<B> {
     Context.Key<BigDecimal> VALUE_KEY = Context.key("A required value.");
     Context.Key<List<String>> STRING_LIST_KEY = Context.key("A list of strings.");
     Context.Key<String> FOO_KEY = Context.key("A combined string value.");

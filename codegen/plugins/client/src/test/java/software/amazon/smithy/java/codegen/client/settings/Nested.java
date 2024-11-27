@@ -5,11 +5,10 @@
 
 package software.amazon.smithy.java.codegen.client.settings;
 
-import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.ClientSetting;
 import software.amazon.smithy.java.context.Context;
 
-public interface Nested<B extends Client.Builder<?, B>> extends ClientSetting<B> {
+public interface Nested<B extends ClientSetting<B>> extends ClientSetting<B> {
     Context.Key<Integer> NESTED_KEY = Context.key("Nested");
 
     default B nested(int nested) {
