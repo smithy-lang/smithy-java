@@ -1,4 +1,4 @@
-# <img alt="Smithy" src="https://github.com/smithy-lang/smithy/blob/main/docs/_static/favicon.png?raw=true" width="28"> Smithy Java
+# <img alt="Smithy" src="https://github.com/smithy-lang/smithy/blob/main/docs/_static/smithy-anvil.svg?raw=true" width="32"> Smithy Java
 [![ci](https://github.com/smithy-lang/smithy-java/actions/workflows/ci.yml/badge.svg)](https://github.com/smithy-lang/smithy-java/actions/workflows/ci.yml)
 
 [Smithy](https://smithy.io/2.0/index.html) code generators for [Java](https://java.com/).
