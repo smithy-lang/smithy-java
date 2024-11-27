@@ -49,6 +49,7 @@ final class HttpClientResponseProtocolTestProvider extends
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     protected Stream<TestTemplateInvocationContext> generateProtocolTests(
         ProtocolTestExtension.SharedClientTestData store,
         HttpClientResponseTests annotation,
@@ -71,8 +72,14 @@ final class HttpClientResponseProtocolTestProvider extends
                             ? AuthSchemeResolver.NO_AUTH
                             : (AuthSchemeResolver) p -> List.of(new AuthSchemeOption(testCase.getAuthScheme().get()));
                         var testTransport = new TestTransport(testCase);
+
+                        var placeholderTransport = (MockClient.PlaceHolderTransport<HttpRequest, HttpResponse>) store
+                            .mockClient()
+                            .config()
+                            .transport();
+                        placeholderTransport.setTransport(testTransport);
+
                         var overrideBuilder = RequestOverrideConfig.builder()
-                            .transport(testTransport)
                             .protocol(testProtocol)
                             .authSchemeResolver(testResolver);
                         var input = operation.operationModel().inputBuilder().errorCorrection().build();

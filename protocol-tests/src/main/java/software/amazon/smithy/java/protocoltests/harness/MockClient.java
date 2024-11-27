@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.protocoltests.harness;
 
 import java.net.URI;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import software.amazon.smithy.java.client.core.Client;
@@ -20,6 +21,8 @@ import software.amazon.smithy.java.core.schema.ApiException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
+import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -65,8 +68,8 @@ final class MockClient extends Client {
     static final class Builder extends Client.Builder<MockClient, Builder> {
         @Override
         public MockClient build() {
-            configBuilder().protocol(new PlaceHolderProtocol());
-            configBuilder().transport(new PlaceHolderTransport());
+            configBuilder().protocol(new PlaceHolderProtocol<>(HttpRequest.class, HttpResponse.class));
+            configBuilder().transport(new PlaceHolderTransport<>(HttpRequest.class, HttpResponse.class));
             configBuilder().authSchemeResolver(AuthSchemeResolver.NO_AUTH);
             configBuilder().endpointResolver(EndpointResolver.staticEndpoint("http://example.com"));
             return new MockClient(this);
@@ -76,27 +79,15 @@ final class MockClient extends Client {
     /**
      * Placeholder protocol that allows us to instantiate a client, but that we expect to override on each request.
      */
-    private static final class PlaceHolderProtocol implements ClientProtocol<Object, Object> {
-        private PlaceHolderProtocol() {
-        }
-
+    private record PlaceHolderProtocol<Req, Res>(Class<Req> requestClass, Class<Res> responseClass) implements
+        ClientProtocol<Req, Res> {
         @Override
         public String id() {
             return "placeholder";
         }
 
         @Override
-        public Class<Object> requestClass() {
-            return Object.class;
-        }
-
-        @Override
-        public Class<Object> responseClass() {
-            return Object.class;
-        }
-
-        @Override
-        public <I extends SerializableStruct, O extends SerializableStruct> Object createRequest(
+        public <I extends SerializableStruct, O extends SerializableStruct> Req createRequest(
             ApiOperation<I, O> operation,
             I input,
             Context context,
@@ -106,7 +97,7 @@ final class MockClient extends Client {
         }
 
         @Override
-        public Object setServiceEndpoint(Object request, Endpoint endpoint) {
+        public Req setServiceEndpoint(Req request, Endpoint endpoint) {
             throw new UnsupportedOperationException("Placeholder protocol must be overridden");
         }
 
@@ -115,8 +106,8 @@ final class MockClient extends Client {
             ApiOperation<I, O> operation,
             Context context,
             TypeRegistry typeRegistry,
-            Object request,
-            Object response
+            Req request,
+            Res res
         ) {
             throw new UnsupportedOperationException("Placeholder protocol must be overridden");
         }
@@ -125,21 +116,38 @@ final class MockClient extends Client {
     /**
      * Placeholder transport that allows us to instantiate a client, but that we expect to override on each request.
      */
-    private static final class PlaceHolderTransport implements ClientTransport<Object, Object> {
+    static final class PlaceHolderTransport<Req, Res> implements ClientTransport<Req, Res> {
 
-        @Override
-        public CompletableFuture<Object> send(Context context, Object request) {
-            throw new UnsupportedOperationException("Placeholder transport must be overridden");
+        private ClientTransport<Req, Res> transport;
+        private final Class<Req> req;
+        private final Class<Res> res;
+
+        public PlaceHolderTransport(Class<Req> req, Class<Res> res) {
+            this.req = req;
+            this.res = res;
+        }
+
+        public void setTransport(ClientTransport<Req, Res> transport) {
+            this.transport = transport;
+        }
+
+        private ClientTransport<Req, Res> getTransport() {
+            return Objects.requireNonNull(transport, "Placeholder transport must be overridden");
         }
 
         @Override
-        public Class<Object> requestClass() {
-            return Object.class;
+        public CompletableFuture<Res> send(Context context, Req request) {
+            return getTransport().send(context, request);
         }
 
         @Override
-        public Class<Object> responseClass() {
-            return Object.class;
+        public Class<Req> requestClass() {
+            return req;
+        }
+
+        @Override
+        public Class<Res> responseClass() {
+            return res;
         }
     }
 }
