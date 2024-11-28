@@ -295,7 +295,9 @@ final class ClientPipeline<RequestT, ResponseT> {
             return identity.thenCompose(identity -> {
                 // Throws when no identity is found.
                 var resolvedIdentity = identity.unwrap();
-                return authScheme.signer().sign(request, resolvedIdentity, signerProperties);
+                try (var signer = authScheme.signer()) {
+                    return signer.sign(request, resolvedIdentity, signerProperties);
+                }
             });
         }
     }

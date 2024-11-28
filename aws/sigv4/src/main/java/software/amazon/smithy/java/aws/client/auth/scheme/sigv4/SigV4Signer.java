@@ -47,27 +47,22 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         "expect"
     );
 
+    private static final int POOL_SIZE = 32;
     private static final int BUFFER_SIZE = 512;
     private static final String HMAC_SHA_256 = "HmacSHA256";
     private static final String ALGORITHM = "AWS4-HMAC-SHA256";
     private static final String TERMINATOR = "aws4_request";
     private static final SigningCache SIGNER_CACHE = new SigningCache(300);
 
-    private static final AdaptiveThreadLocal<StringBuilder> STRING_BUILDER = AdaptiveThreadLocal.withInitial(
-        () -> new StringBuilder(BUFFER_SIZE)
-    );
-
-    private static final AdaptiveThreadLocal<MessageDigest> SHARED_SHA256_DIGEST = AdaptiveThreadLocal.withInitial(
-        () -> {
-            try {
-                return MessageDigest.getInstance("SHA-256");
-            } catch (NoSuchAlgorithmException e) {
-                throw new RuntimeException("Unable to fetch message digest instance for SHA-256", e);
-            }
+    private static final Pool<StringBuilder> SB_POOL = new Pool<>(POOL_SIZE, () -> new StringBuilder(BUFFER_SIZE));
+    private static final Pool<MessageDigest> DIGEST_POOL = new Pool<>(POOL_SIZE, () -> {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Unable to fetch message digest instance for SHA-256", e);
         }
-    );
-
-    private static final AdaptiveThreadLocal<Mac> SHARED_SHA256_MAC = AdaptiveThreadLocal.withInitial(() -> {
+    });
+    private static final Pool<Mac> MAC_POOL = new Pool<>(POOL_SIZE, () -> {
         try {
             return Mac.getInstance(HMAC_SHA_256);
         } catch (NoSuchAlgorithmException e) {
@@ -84,11 +79,21 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     private SigV4Signer() {
-        this.sb = STRING_BUILDER.get();
-        this.sha256Digest = SHARED_SHA256_DIGEST.get();
+        this.sb = SB_POOL.get();
+        sb.setLength(0);
+
+        this.sha256Digest = DIGEST_POOL.get();
         sha256Digest.reset();
-        this.sha256Mac = SHARED_SHA256_MAC.get();
+
+        this.sha256Mac = MAC_POOL.get();
         sha256Mac.reset();
+    }
+
+    @Override
+    public void close() {
+        SB_POOL.release(sb);
+        DIGEST_POOL.release(sha256Digest);
+        MAC_POOL.release(sha256Mac);
     }
 
     @Override

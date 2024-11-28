@@ -31,7 +31,7 @@ import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.QueryStringBuilder;
 
-@State(Scope.Benchmark)
+@State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Mode.AverageTime)
 public class SigV4SignerTrials {

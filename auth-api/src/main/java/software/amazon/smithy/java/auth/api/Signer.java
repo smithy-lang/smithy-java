@@ -15,8 +15,7 @@ import software.amazon.smithy.java.auth.api.identity.Identity;
  * @param <IdentityT> Identity used when signing.
  */
 @FunctionalInterface
-public interface Signer<RequestT, IdentityT extends Identity> {
-
+public interface Signer<RequestT, IdentityT extends Identity> extends AutoCloseable {
     /**
      * Sign the given request.
      *
@@ -31,4 +30,7 @@ public interface Signer<RequestT, IdentityT extends Identity> {
     static <RequestT, IdentityT extends Identity> Signer<RequestT, IdentityT> nullSigner() {
         return (Signer<RequestT, IdentityT>) NullSigner.INSTANCE;
     }
+
+    @Override
+    default void close() {}
 }
