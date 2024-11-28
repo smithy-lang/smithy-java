@@ -74,6 +74,7 @@ public final class OutputHook<I extends SerializableStruct, O extends Serializab
     /**
      * Provides a type-safe convenience method to modify the output if it is of a specific class.
      *
+     * @param e Error to throw if not null.
      * @param predicateType Type to map over.
      * @param mapper Mapper that accepts the value if it matches the expected class.
      * @return the updated value.
@@ -81,10 +82,13 @@ public final class OutputHook<I extends SerializableStruct, O extends Serializab
      */
     @SuppressWarnings("unchecked")
     public <R extends SerializableStruct> O mapOutput(
+        RuntimeException e,
         Class<R> predicateType,
         Function<OutputHook<?, R, ?, ?>, R> mapper
     ) {
-        if (predicateType.isInstance(output)) {
+        if (e != null) {
+            throw e;
+        } else if (predicateType.isInstance(output)) {
             return (O) mapper.apply((OutputHook<?, R, ?, ?>) this);
         } else {
             return output;
@@ -94,6 +98,7 @@ public final class OutputHook<I extends SerializableStruct, O extends Serializab
     /**
      * Provides a type-safe convenience method to modify the output if it is of a specific class.
      *
+     * @param e Error to throw if not null.
      * @param predicateType Type to map over.
      * @param state State to provide to the mapper.
      * @param mapper Mapper that accepts the value if it matches the expected class.
@@ -102,11 +107,14 @@ public final class OutputHook<I extends SerializableStruct, O extends Serializab
      */
     @SuppressWarnings("unchecked")
     public <R extends SerializableStruct, T> O mapOutput(
+        RuntimeException e,
         Class<R> predicateType,
         T state,
         BiFunction<OutputHook<?, R, ?, ?>, T, R> mapper
     ) {
-        if (predicateType.isInstance(output)) {
+        if (e != null) {
+            throw e;
+        } else if (predicateType.isInstance(output)) {
             return (O) mapper.apply((OutputHook<?, R, ?, ?>) this, state);
         } else {
             return output;

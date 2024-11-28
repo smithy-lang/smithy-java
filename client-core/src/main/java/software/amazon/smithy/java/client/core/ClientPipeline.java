@@ -348,9 +348,8 @@ final class ClientPipeline<RequestT, ResponseT> {
 
                 try {
                     interceptor.readAfterDeserialization(outputHook, error);
-                    error = null;
                 } catch (RuntimeException e) {
-                    error = e;
+                    error = swapError("readAfterDeserialization", error, e);
                 }
 
                 try {
@@ -359,14 +358,13 @@ final class ClientPipeline<RequestT, ResponseT> {
                     // The expectation is that errors are re-thrown by hooks, or else they are disassociated.
                     error = null;
                 } catch (RuntimeException e) {
-                    error = e;
+                    error = swapError("modifyBeforeAttemptCompletion", error, e);
                 }
 
                 try {
                     interceptor.readAfterAttempt(outputHook, error);
-                    error = null;
                 } catch (RuntimeException e) {
-                    error = e;
+                    error = swapError("readAfterAttempt", error, e);
                 }
 
                 // 9.a If error is a retryable failure:
@@ -401,17 +399,32 @@ final class ClientPipeline<RequestT, ResponseT> {
                     outputHook = outputHook.withOutput(shape);
                     error = null;
                 } catch (RuntimeException e) {
-                    error = e;
+                    error = swapError("modifyBeforeCompletion", error, e);
                 }
 
                 // TODO: 11. TraceProbe: Invoke DispatchEvents.
 
                 // 12. Interceptors: Invoke ReadAfterExecution.
-                interceptor.readAfterExecution(outputHook, error);
+                try {
+                    interceptor.readAfterExecution(outputHook, error);
+                } catch (RuntimeException e) {
+                    error = swapError("readAfterExecution", error, e);
+                }
 
-                return CompletableFuture.completedFuture(outputHook.output());
+                if (error != null) {
+                    return CompletableFuture.failedFuture(error);
+                } else {
+                    return CompletableFuture.completedFuture(outputHook.output());
+                }
             })
             .thenCompose(o -> (CompletionStage<O>) o);
+    }
+
+    private static RuntimeException swapError(String hook, RuntimeException oldE, RuntimeException newE) {
+        if (oldE != null && oldE != newE) {
+            LOGGER.trace("Replacing error after {}: {}", hook, newE.getClass().getName(), newE.getMessage());
+        }
+        return newE;
     }
 
     private <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> retry(

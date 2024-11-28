@@ -9,6 +9,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.sameInstance;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.context.Context;
 
@@ -29,7 +30,21 @@ public class OutputHookTest {
         var context = Context.create();
         var hook = new OutputHook<>(TestStructs.OPERATION, context, foo, null, null, foo);
 
-        assertThat(hook.mapOutput(TestStructs.Bar.class, OutputHook::output), sameInstance(foo));
-        assertThat(hook.mapOutput(TestStructs.Foo.class, f -> new TestStructs.Foo()), not(sameInstance(foo)));
+        assertThat(hook.mapOutput(null, TestStructs.Bar.class, OutputHook::output), sameInstance(foo));
+        assertThat(hook.mapOutput(null, TestStructs.Foo.class, f -> new TestStructs.Foo()), not(sameInstance(foo)));
+    }
+
+    @Test
+    public void throwsErrorIfNotNull() {
+        var foo = new TestStructs.Foo();
+        var context = Context.create();
+        var hook = new OutputHook<>(TestStructs.OPERATION, context, foo, null, null, foo);
+        var err = new RuntimeException("a");
+
+        var e = Assertions.assertThrows(RuntimeException.class, () -> {
+            hook.mapOutput(err, TestStructs.Bar.class, OutputHook::output);
+        });
+
+        assertThat(e, sameInstance(err));
     }
 }

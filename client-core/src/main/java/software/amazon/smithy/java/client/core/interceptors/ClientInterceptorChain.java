@@ -10,7 +10,6 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.logging.InternalLogger;
-import software.amazon.smithy.utils.TriConsumer;
 
 final class ClientInterceptorChain implements ClientInterceptor {
 
@@ -26,20 +25,17 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public void readBeforeExecution(InputHook<?, ?> hook) {
-        applyToEachThrowLastError(ClientInterceptor::readBeforeExecution, hook);
+        applyToEachThrowLastError("readBeforeExecution", ClientInterceptor::readBeforeExecution, hook);
     }
 
     // Many interceptors require running each hook, logging errors, and throwing the last.
-    private <T> void applyToEachThrowLastError(BiConsumer<ClientInterceptor, T> consumer, T hook) {
+    private <T> void applyToEachThrowLastError(String hookName, BiConsumer<ClientInterceptor, T> consumer, T hook) {
         RuntimeException error = null;
         for (var interceptor : interceptors) {
             try {
                 consumer.accept(interceptor, hook);
             } catch (RuntimeException e) {
-                if (error != null) {
-                    LOGGER.error("Encountered Exception", e);
-                }
-                error = e;
+                error = swapError(hookName, error, e);
             }
         }
 
@@ -89,7 +85,7 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public void readBeforeAttempt(RequestHook<?, ?, ?> hook) {
-        applyToEachThrowLastError(ClientInterceptor::readBeforeAttempt, hook);
+        applyToEachThrowLastError("readBeforeAttempt", ClientInterceptor::readBeforeAttempt, hook);
     }
 
     @Override
@@ -167,26 +163,17 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public void readAfterAttempt(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {
-        applyToEachThrowLastError(ClientInterceptor::readAfterAttempt, hook, error);
-    }
-
-    private <T> void applyToEachThrowLastError(
-        TriConsumer<ClientInterceptor, T, RuntimeException> consumer,
-        T hook,
-        RuntimeException error
-    ) {
+        var originalError = error;
         for (var interceptor : interceptors) {
             try {
-                consumer.accept(interceptor, hook, error);
+                interceptor.readAfterAttempt(hook, error);
             } catch (RuntimeException e) {
-                if (error != null) {
-                    LOGGER.error("Encountered Exception", error);
-                }
-                error = e;
+                error = swapError("readAfterAttempt", error, e);
             }
         }
 
-        if (error != null) {
+        // No need to rethrow the original error since it's already registered as the error.
+        if (error != null && error != originalError) {
             throw error;
         }
     }
@@ -205,6 +192,24 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public void readAfterExecution(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {
-        applyToEachThrowLastError(ClientInterceptor::readAfterExecution, hook, error);
+        for (var interceptor : interceptors) {
+            try {
+                interceptor.readAfterExecution(hook, error);
+            } catch (RuntimeException e) {
+                error = swapError("readAfterExecution", error, e);
+            }
+        }
+
+        // Always throw the error even if it's the original error.
+        if (error != null) {
+            throw error;
+        }
+    }
+
+    private static RuntimeException swapError(String hook, RuntimeException oldE, RuntimeException newE) {
+        if (oldE != null && oldE != newE) {
+            LOGGER.trace("Replacing error after {}: {}", hook, newE.getClass().getName(), newE.getMessage());
+        }
+        return newE;
     }
 }

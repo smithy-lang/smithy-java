@@ -339,11 +339,8 @@ public interface ClientInterceptor {
      *
      * @param hook Hook data.
      * @param error Error to be thrown, present.
-     * @throws RuntimeException on error or to forward the given {@code error}.
      */
-    default void readAfterDeserialization(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {
-        hook.forward(error);
-    }
+    default void readAfterDeserialization(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {}
 
     /**
      * A hook called when an attempt is completed. This method can modify and return a new output or error matching
@@ -389,11 +386,8 @@ public interface ClientInterceptor {
      *
      * @param hook Hook data.
      * @param error Error to be thrown, present.
-     * @throws RuntimeException on error or to forward the given {@code error}.
      */
-    default void readAfterAttempt(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {
-        hook.forward(error);
-    }
+    default void readAfterAttempt(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {}
 
     /**
      * A hook called when an execution is completed.
@@ -440,9 +434,6 @@ public interface ClientInterceptor {
      *
      * @param hook Hook data.
      * @param error Error to be thrown, present.
-     * @throws RuntimeException on error or to forward the given {@code error}.
      */
-    default void readAfterExecution(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {
-        hook.forward(error);
-    }
+    default void readAfterExecution(OutputHook<?, ?, ?, ?> hook, RuntimeException error) {}
 }
