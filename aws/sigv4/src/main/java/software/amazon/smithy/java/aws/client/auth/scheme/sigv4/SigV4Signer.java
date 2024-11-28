@@ -53,19 +53,21 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     private static final String TERMINATOR = "aws4_request";
     private static final SigningCache SIGNER_CACHE = new SigningCache(300);
 
-    private static final ThreadLocal<StringBuilder> STRING_BUILDER = ThreadLocal.withInitial(
+    private static final AdaptiveThreadLocal<StringBuilder> STRING_BUILDER = AdaptiveThreadLocal.withInitial(
         () -> new StringBuilder(BUFFER_SIZE)
     );
 
-    private static final ThreadLocal<MessageDigest> SHARED_SHA256_DIGEST = ThreadLocal.withInitial(() -> {
-        try {
-            return MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Unable to fetch message digest instance for SHA-256", e);
+    private static final AdaptiveThreadLocal<MessageDigest> SHARED_SHA256_DIGEST = AdaptiveThreadLocal.withInitial(
+        () -> {
+            try {
+                return MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException e) {
+                throw new RuntimeException("Unable to fetch message digest instance for SHA-256", e);
+            }
         }
-    });
+    );
 
-    private static final ThreadLocal<Mac> SHARED_SHA256_MAC = ThreadLocal.withInitial(() -> {
+    private static final AdaptiveThreadLocal<Mac> SHARED_SHA256_MAC = AdaptiveThreadLocal.withInitial(() -> {
         try {
             return Mac.getInstance(HMAC_SHA_256);
         } catch (NoSuchAlgorithmException e) {
