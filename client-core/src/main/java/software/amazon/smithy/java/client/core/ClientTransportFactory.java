@@ -29,6 +29,13 @@ public interface ClientTransportFactory<RequestT, ResponseT> {
     String name();
 
     /**
+     * Get the message exchange.
+     *
+     * @return the message exchange.
+     */
+    MessageExchange<RequestT, ResponseT> messageExchange();
+
+    /**
      * Priority used to select when deciding between multiple transport options.
      *
      * <p>Higher numbers come before lower numbers.
@@ -54,20 +61,6 @@ public interface ClientTransportFactory<RequestT, ResponseT> {
      * <p>Configurations are typically specified in the configuration of the client-codegen plugin.
      */
     ClientTransport<RequestT, ResponseT> createTransport(Document settings);
-
-    /**
-     * The request class used by transport.
-     *
-     * @return the request class.
-     */
-    Class<RequestT> requestClass();
-
-    /**
-     * The response class used by the transport.
-     *
-     * @return the response class.
-     */
-    Class<ResponseT> responseClass();
 
     /**
      * Loads all {@link ClientTransportFactory} implementations and sorts them by priority.

@@ -25,16 +25,9 @@ public interface ClientTransport<RequestT, ResponseT> {
     CompletableFuture<ResponseT> send(Context context, RequestT request);
 
     /**
-     * The request class used by transport.
+     * Get the message exchange.
      *
-     * @return the request class.
+     * @return the message exchange.
      */
-    Class<RequestT> requestClass();
-
-    /**
-     * The response class used by the transport.
-     *
-     * @return the response class.
-     */
-    Class<ResponseT> responseClass();
+    MessageExchange<RequestT, ResponseT> messageExchange();
 }

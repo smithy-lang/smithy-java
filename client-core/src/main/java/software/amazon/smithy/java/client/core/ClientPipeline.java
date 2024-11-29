@@ -94,21 +94,18 @@ final class ClientPipeline<RequestT, ResponseT> {
     }
 
     /**
-     * Ensures that the given protocol and transport are compatible by comparing their request and response classes.
+     * Ensures that the given protocol and transport are compatible by comparing their {@link MessageExchange} class
+     * for instance equality.
      *
      * @param protocol Protocol to check.
      * @param transport Transport to check.
      * @throws IllegalStateException if the protocol and transport use different request or response classes.
      */
     static void validateProtocolAndTransport(ClientProtocol<?, ?> protocol, ClientTransport<?, ?> transport) {
-        if (protocol.requestClass() != transport.requestClass()) {
+        if (!protocol.messageExchange().equals(transport.messageExchange())) {
             throw new IllegalStateException(
-                "Protocol request type," + protocol.requestClass() + ", does not match transport request type: "
-                    + transport.requestClass()
-            );
-        } else if (protocol.responseClass() != transport.responseClass()) {
-            throw new IllegalStateException(
-                "Protocol response != transport: " + protocol.responseClass() + " vs " + transport.responseClass()
+                "Protocol MessageExchange, " + protocol.messageExchange().getClass().getName() + ", does not match "
+                    + "transport MessageExchange: " + transport.messageExchange().getClass().getName()
             );
         }
     }

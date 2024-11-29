@@ -19,10 +19,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.client.core.ClientTransport;
+import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
@@ -101,13 +103,8 @@ public class InjectIdempotencyTokenPluginTest {
                 }
 
                 @Override
-                public Class<HttpRequest> requestClass() {
-                    return HttpRequest.class;
-                }
-
-                @Override
-                public Class<HttpResponse> responseClass() {
-                    return HttpResponse.class;
+                public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
+                    return HttpMessageExchange.INSTANCE;
                 }
             })
             .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))

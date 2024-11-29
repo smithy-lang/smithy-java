@@ -12,17 +12,17 @@ import java.util.concurrent.CompletionException;
 import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientTransport;
+import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
-import software.amazon.smithy.java.http.api.HttpRequest;
-import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -68,8 +68,8 @@ final class MockClient extends Client {
     static final class Builder extends Client.Builder<MockClient, Builder> {
         @Override
         public MockClient build() {
-            configBuilder().protocol(new PlaceHolderProtocol<>(HttpRequest.class, HttpResponse.class));
-            configBuilder().transport(new PlaceHolderTransport<>(HttpRequest.class, HttpResponse.class));
+            configBuilder().protocol(new PlaceHolderProtocol<>(HttpMessageExchange.INSTANCE));
+            configBuilder().transport(new PlaceHolderTransport<>(HttpMessageExchange.INSTANCE));
             configBuilder().authSchemeResolver(AuthSchemeResolver.NO_AUTH);
             configBuilder().endpointResolver(EndpointResolver.staticEndpoint("http://example.com"));
             return new MockClient(this);
@@ -79,7 +79,7 @@ final class MockClient extends Client {
     /**
      * Placeholder protocol that allows us to instantiate a client, but that we expect to override on each request.
      */
-    private record PlaceHolderProtocol<Req, Res>(Class<Req> requestClass, Class<Res> responseClass) implements
+    private record PlaceHolderProtocol<Req, Res>(MessageExchange<Req, Res> messageExchange) implements
         ClientProtocol<Req, Res> {
         @Override
         public String id() {
@@ -119,12 +119,10 @@ final class MockClient extends Client {
     static final class PlaceHolderTransport<Req, Res> implements ClientTransport<Req, Res> {
 
         private ClientTransport<Req, Res> transport;
-        private final Class<Req> req;
-        private final Class<Res> res;
+        private final MessageExchange<Req, Res> messageExchange;
 
-        public PlaceHolderTransport(Class<Req> req, Class<Res> res) {
-            this.req = req;
-            this.res = res;
+        public PlaceHolderTransport(MessageExchange<Req, Res> messageExchange) {
+            this.messageExchange = messageExchange;
         }
 
         public void setTransport(ClientTransport<Req, Res> transport) {
@@ -141,13 +139,8 @@ final class MockClient extends Client {
         }
 
         @Override
-        public Class<Req> requestClass() {
-            return req;
-        }
-
-        @Override
-        public Class<Res> responseClass() {
-            return res;
+        public MessageExchange<Req, Res> messageExchange() {
+            return messageExchange;
         }
     }
 }

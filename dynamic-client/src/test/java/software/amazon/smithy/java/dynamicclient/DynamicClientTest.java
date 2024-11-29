@@ -17,10 +17,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.client.core.ClientTransport;
+import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiException;
 import software.amazon.smithy.java.core.schema.ModeledApiException;
@@ -108,13 +110,8 @@ public class DynamicClientTest {
     private ClientTransport<HttpRequest, HttpResponse> mockTransport() {
         return new ClientTransport<>() {
             @Override
-            public Class<HttpRequest> requestClass() {
-                return HttpRequest.class;
-            }
-
-            @Override
-            public Class<HttpResponse> responseClass() {
-                return HttpResponse.class;
+            public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
+                return HttpMessageExchange.INSTANCE;
             }
 
             @Override
@@ -219,13 +216,8 @@ public class DynamicClientTest {
     private static ClientTransport<HttpRequest, HttpResponse> createErrorTransport(String payload) {
         return new ClientTransport<>() {
             @Override
-            public Class<HttpRequest> requestClass() {
-                return HttpRequest.class;
-            }
-
-            @Override
-            public Class<HttpResponse> responseClass() {
-                return HttpResponse.class;
+            public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
+                return HttpMessageExchange.INSTANCE;
             }
 
             @Override

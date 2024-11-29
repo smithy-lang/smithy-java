@@ -13,6 +13,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
+import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -72,13 +73,8 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
     }
 
     @Override
-    public Class<HttpRequest> requestClass() {
-        return HttpRequest.class;
-    }
-
-    @Override
-    public Class<HttpResponse> responseClass() {
-        return HttpResponse.class;
+    public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
+        return HttpMessageExchange.INSTANCE;
     }
 
     @Override
@@ -171,7 +167,6 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
     }
 
     public static final class Factory implements ClientTransportFactory<HttpRequest, HttpResponse> {
-
         @Override
         public String name() {
             return "http-java";
@@ -184,13 +179,8 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
         }
 
         @Override
-        public Class<HttpRequest> requestClass() {
-            return HttpRequest.class;
-        }
-
-        @Override
-        public Class<HttpResponse> responseClass() {
-            return HttpResponse.class;
+        public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
+            return HttpMessageExchange.INSTANCE;
         }
     }
 }

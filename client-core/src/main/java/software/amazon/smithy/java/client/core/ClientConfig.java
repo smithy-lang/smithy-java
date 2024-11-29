@@ -73,9 +73,7 @@ public final class ClientConfig {
     private ClientTransport<?, ?> discoverTransport(ClientProtocol<?, ?> protocol) {
         for (var factory : transportFactories) {
             // Find the first applicable transport factory
-            if (factory.requestClass() == protocol.requestClass()
-                && factory.responseClass() == protocol.responseClass()
-            ) {
+            if (factory.messageExchange().equals(protocol.messageExchange())) {
                 return factory.createTransport();
             }
         }
