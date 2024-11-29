@@ -91,7 +91,7 @@ public final class UserAgentPlugin implements ClientPlugin {
             if (features != null && !features.isEmpty()) {
                 b.append("m/");
                 for (var feature : features) {
-                    b.append(sanitizeValue(feature.toString())).append(',');
+                    b.append(sanitizeValue(feature.getShortName())).append(',');
                 }
                 b.deleteCharAt(b.length() - 1);
             } else {

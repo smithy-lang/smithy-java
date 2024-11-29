@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.CallContext;
+import software.amazon.smithy.java.client.core.FeatureId;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
@@ -58,15 +59,26 @@ public class UserAgentPluginTest {
         assertThat(hd.get(0), containsString("app/hello_there"));
     }
 
+    private enum Features implements FeatureId {
+        FOO,
+        BAR,
+        BAZ {
+            @Override
+            public String toString() {
+                return "baz baz";
+            }
+        }
+    }
+
     @Test
     public void addsFeatureIds() throws Exception {
         UserAgentPlugin.UserAgentInterceptor interceptor = new UserAgentPlugin.UserAgentInterceptor();
         var context = Context.create();
 
-        Set<String> s = new LinkedHashSet<>();
-        s.add("a");
-        s.add("b");
-        s.add("C C");
+        Set<FeatureId> s = new LinkedHashSet<>();
+        s.add(Features.FOO);
+        s.add(Features.BAR);
+        s.add(Features.BAZ);
         context.put(CallContext.FEATURE_IDS, s);
 
         var req = HttpRequest.builder().uri(new URI("/")).method("GET").build();
@@ -76,7 +88,7 @@ public class UserAgentPluginTest {
         var hd = updated.headers().allValues("user-agent");
 
         assertThat(hd, hasSize(1));
-        assertThat(hd.get(0), containsString("m/a,b,C_C"));
+        assertThat(hd.get(0), containsString("m/FOO,BAR,baz_baz"));
     }
 
     private static final class Foo implements SerializableStruct {

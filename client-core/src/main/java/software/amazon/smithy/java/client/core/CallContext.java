@@ -59,11 +59,11 @@ public final class CallContext {
     /**
      * The set of user-defined feature IDs used with a request.
      *
-     * <p>Each ID is typically given as a string, though other objects can be used to provide additional functionality.
-     * When {@code toString} is called on a provided value, the string should be short and contain only ASCII letters,
-     * numbers, and hyphens. For example, "P" might be used to indicate that pagination was used with a request.
+     * <p>When {@link FeatureId#getShortName()} is called on a provided value, the string should be short and contain
+     * only ASCII letters, numbers, and hyphens. For example, "P" might be used to indicate that pagination was used
+     * with a request.
      */
-    public static final Context.Key<Set<?>> FEATURE_IDS = Context.key("Feature IDs used with a request");
+    public static final Context.Key<Set<FeatureId>> FEATURE_IDS = Context.key("Feature IDs used with a request");
 
     /**
      * The name of the application, used in things like user-agent headers.
