@@ -7,6 +7,7 @@ package software.amazon.smithy.java.client.core;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.java.auth.api.identity.Identity;
@@ -24,12 +25,16 @@ import software.amazon.smithy.java.retries.api.RetryStrategy;
  * <p>It has well-defined configuration elements that every {@link Client} needs. For extensible parts of a
  * {@link Client} that may need additional configuration, type safe configuration can be included using
  * {@link Context.Key}.
+ *
+ * <p>When built, the ClientTransport resolved for the protocol will apply the {@link ClientTransport#configureClient}
+ * method after other plugins are applied.
  */
 public final class ClientConfig {
     private static final List<ClientTransportFactory<?, ?>> transportFactories = ClientTransportFactory
         .load(ClientConfig.class.getClassLoader());
     private static final AuthScheme<Object, Identity> NO_AUTH_AUTH_SCHEME = AuthScheme.noAuthAuthScheme();
 
+    private final Builder originalBuilder;
     private final ClientTransport<?, ?> transport;
     private final ClientProtocol<?, ?> protocol;
     private final EndpointResolver endpointResolver;
@@ -43,10 +48,21 @@ public final class ClientConfig {
     private final String retryScope;
 
     private ClientConfig(Builder builder) {
+        // Transports can change between builders to toBuilder. Transports can modify the builder when they're applied.
+        // To prevent a previous configuration meant for one transport to impact a future configuration, we create a
+        // copy of the original builder. We also don't want to apply the transport modifications multiple times.
+        // This builder is used in toBuilder.
+        this.originalBuilder = builder.copyBuilder();
+
         this.protocol = Objects.requireNonNull(builder.protocol, "protocol cannot be null");
         // If no transport is set, try to find compatible transport via SPI.
         this.transport = builder.transport != null ? builder.transport : discoverTransport(protocol);
         ClientPipeline.validateProtocolAndTransport(protocol, transport);
+
+        transport.configureClient(builder);
+        if (this.protocol != builder.protocol) {
+            throw new IllegalStateException("ClientTransport must not change the ClientProtocol");
+        }
 
         this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
 
@@ -56,7 +72,7 @@ public final class ClientConfig {
         List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
         supportedAuthSchemes.add(NO_AUTH_AUTH_SCHEME);
         supportedAuthSchemes.addAll(builder.supportedAuthSchemes);
-        this.supportedAuthSchemes = List.copyOf(supportedAuthSchemes);
+        this.supportedAuthSchemes = Collections.unmodifiableList(supportedAuthSchemes);
 
         this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, AuthSchemeResolver.DEFAULT);
         this.identityResolvers = List.copyOf(builder.identityResolvers);
@@ -158,18 +174,7 @@ public final class ClientConfig {
     }
 
     private Builder toBuilder() {
-        Builder builder = builder()
-            .transport(transport)
-            .protocol(protocol)
-            .endpointResolver(endpointResolver)
-            .authSchemeResolver(authSchemeResolver)
-            .identityResolvers(identityResolvers)
-            .retryStrategy(retryStrategy)
-            .retryScope(retryScope);
-        interceptors.forEach(builder::addInterceptor);
-        supportedAuthSchemes.forEach(builder::putSupportedAuthSchemes);
-        builder.putAllConfig(context);
-        return builder;
+        return originalBuilder.copyBuilder();
     }
 
     /**
@@ -231,6 +236,21 @@ public final class ClientConfig {
         private final Context context = Context.create();
         private RetryStrategy retryStrategy;
         private String retryScope;
+
+        private Builder copyBuilder() {
+            Builder builder = new Builder();
+            builder.transport = transport;
+            builder.protocol = protocol;
+            builder.endpointResolver = endpointResolver;
+            builder.interceptors.addAll(interceptors);
+            builder.authSchemeResolver = authSchemeResolver;
+            builder.supportedAuthSchemes.addAll(supportedAuthSchemes);
+            builder.identityResolvers.addAll(identityResolvers);
+            context.copyTo(builder.context);
+            builder.retryStrategy = retryStrategy;
+            builder.retryScope = retryScope;
+            return builder;
+        }
 
         /**
          * @return Get the transport.

@@ -11,4 +11,9 @@ package software.amazon.smithy.java.client.core;
  * @param <RequestT> Request type.
  * @param <ResponseT> Response type.
  */
-public interface MessageExchange<RequestT, ResponseT> {}
+public interface MessageExchange<RequestT, ResponseT> extends ClientPlugin {
+    @Override
+    default void configureClient(ClientConfig.Builder config) {
+        // do nothing by default.
+    }
+}

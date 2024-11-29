@@ -6,11 +6,20 @@
 package software.amazon.smithy.java.client.http;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.not;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
+import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 public class JavaHttpClientTest {
 
@@ -65,5 +74,18 @@ public class JavaHttpClientTest {
         new JavaHttpClientTransport();
 
         assertThat(System.getProperty(NAME), equalTo("Host,foo"));
+    }
+
+    @Test
+    public void automaticallyAppliesUserAgentPlugin() throws URISyntaxException {
+        var builder = ClientConfig.builder();
+        builder.protocol(new AwsJson1Protocol(ShapeId.from("foo#Bar")));
+        builder.transport(new JavaHttpClientTransport());
+        builder.endpointResolver(EndpointResolver.staticEndpoint(new URI("localhost:8080")));
+        var config = builder.build();
+
+        assertThat(config.interceptors(), not(empty()));
+        // the interceptor is package-private, so this check will suffice.
+        assertThat(config.interceptors().toString(), containsString("UserAgentPlugin"));
     }
 }
