@@ -7,7 +7,8 @@ package software.amazon.smithy.java.client.http;
 
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.MessageExchange;
-import software.amazon.smithy.java.client.http.useragent.UserAgentPlugin;
+import software.amazon.smithy.java.client.http.plugins.ApplyHttpRetryInfoPlugin;
+import software.amazon.smithy.java.client.http.plugins.UserAgentPlugin;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 
@@ -17,6 +18,7 @@ import software.amazon.smithy.java.http.api.HttpResponse;
  * <p>Automatically applies the following plugins:
  * <ul>
  *     <li>{@link UserAgentPlugin}</li>
+ *     <li>{@link ApplyHttpRetryInfoPlugin}</li>
  * </ul>
  */
 public final class HttpMessageExchange implements MessageExchange<HttpRequest, HttpResponse> {
@@ -30,5 +32,6 @@ public final class HttpMessageExchange implements MessageExchange<HttpRequest, H
     @Override
     public void configureClient(ClientConfig.Builder config) {
         config.applyPlugin(new UserAgentPlugin());
+        config.applyPlugin(new ApplyHttpRetryInfoPlugin());
     }
 }

@@ -12,6 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
@@ -257,6 +258,7 @@ public final class ClientConfig {
         private RetryStrategy retryStrategy;
         private String retryScope;
         private final Set<Class<? extends ClientPlugin>> appliedPlugins = new LinkedHashSet<>();
+        private final List<Predicate<Class<? extends ClientPlugin>>> pluginPredicates = new ArrayList<>();
 
         private Builder copyBuilder() {
             Builder builder = new Builder();
@@ -271,6 +273,7 @@ public final class ClientConfig {
             builder.retryStrategy = retryStrategy;
             builder.retryScope = retryScope;
             builder.appliedPlugins.addAll(appliedPlugins);
+            builder.pluginPredicates.addAll(pluginPredicates);
             return builder;
         }
 
@@ -502,10 +505,31 @@ public final class ClientConfig {
          * @param plugin Plugin to apply.
          * @return the updated builder.
          */
-        public Builder applyPlugin(ClientPlugin plugin) {
+        public boolean applyPlugin(ClientPlugin plugin) {
+            for (var predicate : pluginPredicates) {
+                if (!predicate.test(plugin.getClass())) {
+                    LOGGER.debug("Skipping client plugin based on predicate: {}", plugin.getClass());
+                    return false;
+                }
+            }
+
             LOGGER.debug("Applying client plugin: {}", plugin.getClass());
             appliedPlugins.add(plugin.getClass());
             plugin.configureClient(this);
+            return true;
+        }
+
+        /**
+         * Add predicate that can be used to disable plugins by type.
+         *
+         * <p>A plugin is only applied if it passes each predicate.
+         *
+         * @param predicate To Add.
+         * @return the builder.
+         * @see Client.Builder#addPluginPredicate(Predicate)
+         */
+        public Builder addPluginPredicate(Predicate<Class<? extends ClientPlugin>> predicate) {
+            pluginPredicates.add(Objects.requireNonNull(predicate, "predicate cannot be null"));
             return this;
         }
 

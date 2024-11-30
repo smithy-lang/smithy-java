@@ -3,12 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.core.schema;
+package software.amazon.smithy.java.client.core.plugins;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.core.schema.ApiException;
+import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.retries.api.RetrySafety;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -16,13 +19,13 @@ import software.amazon.smithy.model.traits.IdempotentTrait;
 import software.amazon.smithy.model.traits.ReadonlyTrait;
 import software.amazon.smithy.model.traits.RetryableTrait;
 
-public class ApiOperationTest {
+public class ApplyModelRetryInfoPluginTest {
     @Test
     public void marksSafeWhenOperationIsReadOnly() {
         var schema = Schema.createOperation(ShapeId.from("com#Foo"), new ReadonlyTrait());
         var e = new ApiException("err");
 
-        ApiOperation.applyRetryInfoFromModel(schema, e);
+        ApplyModelRetryInfoPlugin.applyRetryInfoFromModel(schema, e);
 
         assertThat(e.isRetrySafe(), is(RetrySafety.YES));
     }
@@ -32,7 +35,7 @@ public class ApiOperationTest {
         var schema = Schema.createOperation(ShapeId.from("com#Foo"), new IdempotentTrait());
         var e = new ApiException("err");
 
-        ApiOperation.applyRetryInfoFromModel(schema, e);
+        ApplyModelRetryInfoPlugin.applyRetryInfoFromModel(schema, e);
 
         assertThat(e.isRetrySafe(), is(RetrySafety.YES));
     }
@@ -64,7 +67,7 @@ public class ApiOperationTest {
             }
         };
 
-        ApiOperation.applyRetryInfoFromModel(schema, e);
+        ApplyModelRetryInfoPlugin.applyRetryInfoFromModel(schema, e);
 
         assertThat(e.isRetrySafe(), is(RetrySafety.YES));
         assertThat(e.isThrottle(), is(true));

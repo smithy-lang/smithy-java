@@ -5,17 +5,21 @@
 
 package software.amazon.smithy.java.client.core;
 
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.function.Predicate;
 import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
 import software.amazon.smithy.java.client.core.auth.identity.IdentityResolvers;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.plugins.ApplyModelRetryInfoPlugin;
+import software.amazon.smithy.java.client.core.plugins.DefaultPlugin;
+import software.amazon.smithy.java.client.core.plugins.InjectIdempotencyTokenPlugin;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -37,9 +41,13 @@ public abstract class Client {
 
     protected Client(Builder<?, ?> builder) {
         ClientConfig.Builder configBuilder = builder.configBuilder();
-        for (ClientPlugin plugin : builder.plugins) {
+
+        // Configure plugins.
+        builder.addPlugin(DefaultPlugin.INSTANCE);
+        for (ClientPlugin plugin : builder.plugins.values()) {
             configBuilder.applyPlugin(plugin);
         }
+
         this.config = configBuilder.build();
 
         this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
@@ -129,7 +137,7 @@ public abstract class Client {
     public abstract static class Builder<I, B extends Builder<I, B>> implements ClientSetting<B> {
 
         private final ClientConfig.Builder configBuilder = ClientConfig.builder();
-        private final List<ClientPlugin> plugins = new ArrayList<>();
+        private final Map<Class<? extends ClientPlugin>, ClientPlugin> plugins = new LinkedHashMap<>();
 
         /**
          * A ClientConfig.Builder available to subclasses to initialize in their constructors with any default
@@ -278,7 +286,7 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B addPlugin(ClientPlugin plugin) {
-            plugins.add(Objects.requireNonNull(plugin, "plugin cannot be null"));
+            plugins.put(plugin.getClass(), plugin);
             return (B) this;
         }
 
@@ -305,6 +313,33 @@ public abstract class Client {
         @SuppressWarnings("unchecked")
         public B retryScope(String retryScope) {
             this.configBuilder.retryScope(retryScope);
+            return (B) this;
+        }
+
+        /**
+         * Add a predicate that can be used to disable plugins by type.
+         *
+         * <p>A plugin is only applied if it passes each predicate. For example, the following plugins are always
+         * applied by default, but they can be removed by adding a predicate:
+         *
+         * <ul>
+         *     <li>{@link ApplyModelRetryInfoPlugin}</li>
+         *     <li>{@link InjectIdempotencyTokenPlugin}</li>
+         * </ul>
+         *
+         * <pre>@{code
+         * // Disable the default model retry info plugin used to classify retries.
+         * builder.addPredicate(clazz -> !clazz.equals(ApplyModelRetryInfo.class));
+         * // Disable the default InjectIdempotencyTokenPlugin used to add missing tokens.
+         * builder.addPredicate(clazz -> !clazz.equals(InjectIdempotencyTokenPlugin.class));
+         * }</pre>
+         *
+         * @param predicate To Add.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B addPluginPredicate(Predicate<Class<? extends ClientPlugin>> predicate) {
+            configBuilder.addPluginPredicate(predicate);
             return (B) this;
         }
 

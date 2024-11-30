@@ -13,14 +13,16 @@ public interface ClientPlugin {
     /**
      * Modify the provided client configuration.
      *
-     * <p>When applying plugins to a {@code ClientConfig.Builder}, use {@link ClientConfig.Builder#applyPlugin)}
+     * <p>When applying plugins to a {@code ClientConfig.Builder}, use {@link ClientConfig.Builder#applyPlugin}
      * so that the application of the plugin is tracked with the builder.
      *
+     * <p><strong>Do this:</strong>
      * <pre>{@code
-     * // Do this:
      * configBuilder.applyPlugin(new UserAgentPlugin());
+     * }</pre>
      *
-     * // Not this:
+     * <p><strong>Don't do this:</strong>
+     * <pre>{@code
      * new UserAgentPlugin().configureClient(configBuilder);
      * }</pre>
      */

@@ -16,8 +16,12 @@ import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
  * Injects a default idempotency token into the input if it's modeled but missing.
+ *
+ * <p>This plugin is added to clients by default via {@link DefaultPlugin}.
  */
 public final class InjectIdempotencyTokenPlugin implements ClientPlugin {
+
+    public static final InjectIdempotencyTokenPlugin INSTANCE = new InjectIdempotencyTokenPlugin();
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(InjectIdempotencyTokenPlugin.class);
     private static final ClientInterceptor INTERCEPTOR = new Injector();

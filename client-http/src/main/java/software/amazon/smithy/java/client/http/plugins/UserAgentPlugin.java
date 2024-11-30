@@ -3,20 +3,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.client.http.useragent;
+package software.amazon.smithy.java.client.http.plugins;
 
 import java.util.List;
 import java.util.Locale;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientPlugin;
+import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 
 /**
  * A plugin used to apply a default User-Agent.
+ *
+ * <p>This plugin is applied by default by {@link HttpMessageExchange} and {@link ClientTransport}s that call it by
+ * default.
  */
 public final class UserAgentPlugin implements ClientPlugin {
 

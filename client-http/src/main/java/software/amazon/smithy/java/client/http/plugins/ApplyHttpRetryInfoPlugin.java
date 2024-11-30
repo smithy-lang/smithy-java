@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.client.http;
+package software.amazon.smithy.java.client.http.plugins;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -11,41 +11,52 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import software.amazon.smithy.java.client.core.CallContext;
+import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.ClientPlugin;
+import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.interceptors.OutputHook;
 import software.amazon.smithy.java.client.core.settings.ClockSetting;
+import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiException;
-import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.retries.api.RetrySafety;
 
 /**
- * A retry classifier that decides if a retry is needed based on HTTP headers and status codes.
+ * Adds retry information to HTTP errors based on retry-after headers, 429 and 503 status codes, the presence of
+ * idempotency tokens, if a request is idempotent or readonly, and whether an error is retryable.
+ *
+ * <p>This plugin is applied automatically when using an HTTP protocol via {@link HttpMessageExchange}.
  */
-public final class HttpRetryErrorClassifier {
+public final class ApplyHttpRetryInfoPlugin implements ClientPlugin {
+    @Override
+    public void configureClient(ClientConfig.Builder config) {
+        config.addInterceptor(Interceptor.INSTANCE);
+    }
 
-    private HttpRetryErrorClassifier() {}
+    private static final class Interceptor implements ClientInterceptor {
+        private static final ClientInterceptor INSTANCE = new Interceptor();
 
-    /**
-     * Applies default retry classification for HTTP protocols.
-     *
-     * @param operation Operation that was called.
-     * @param response Response received.
-     * @param exception Exception encountered.
-     * @param context Context of the call.
-     */
-    public static void applyRetryInfo(
-        ApiOperation<?, ?> operation,
-        HttpResponse response,
-        ApiException exception,
-        Context context
-    ) {
-        // (1) Check the model for retry eligibility.
-        ApiOperation.applyRetryInfoFromModel(operation.schema(), exception);
+        @Override
+        public <O extends SerializableStruct> O modifyBeforeAttemptCompletion(
+            OutputHook<?, O, ?, ?> hook,
+            RuntimeException error
+        ) {
+            if (error instanceof ApiException ae
+                && ae.isRetrySafe() == RetrySafety.MAYBE
+                && hook.response() instanceof HttpResponse res) {
+                applyRetryInfo(res, ae, hook.context());
+            }
+            return hook.forward(error);
+        }
+    }
 
-        // (2) Check with the protocol if the server explicitly wants a retry.
+    static void applyRetryInfo(HttpResponse response, ApiException exception, Context context) {
+        // (1) Check with the protocol if the server explicitly wants a retry.
         if (!applyRetryAfterHeader(response, exception, context)) {
             if (!applyThrottlingStatusCodes(response, exception)) {
-                // (3) If no retry was detected so far, is it safe to retry because of a 5XX error + idempotency token?
+                // (2) If no retry was detected so far, is it safe to retry because of a 5XX error + idempotency token?
                 if (exception.isRetrySafe() == RetrySafety.MAYBE) {
                     var idempotencyTokenUsed = context.get(CallContext.IDEMPOTENCY_TOKEN) != null;
                     if (response.statusCode() >= 500 && idempotencyTokenUsed) {
