@@ -40,6 +40,6 @@ public interface ClientTransport<RequestT, ResponseT> extends ClientPlugin {
 
     @Override
     default void configureClient(ClientConfig.Builder config) {
-        messageExchange().configureClient(config);
+        config.applyPlugin(messageExchange());
     }
 }

@@ -8,8 +8,10 @@ package software.amazon.smithy.java.client.core;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
@@ -17,6 +19,7 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.retries.api.RetryStrategy;
 
 /**
@@ -30,6 +33,7 @@ import software.amazon.smithy.java.retries.api.RetryStrategy;
  * method after other plugins are applied.
  */
 public final class ClientConfig {
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientConfig.class);
     private static final List<ClientTransportFactory<?, ?>> transportFactories = ClientTransportFactory
         .load(ClientConfig.class.getClassLoader());
     private static final AuthScheme<Object, Identity> NO_AUTH_AUTH_SCHEME = AuthScheme.noAuthAuthScheme();
@@ -43,6 +47,7 @@ public final class ClientConfig {
     private final AuthSchemeResolver authSchemeResolver;
     private final List<IdentityResolver<?>> identityResolvers;
     private final Context context;
+    private final Set<Class<? extends ClientPlugin>> appliedPlugins;
 
     private final RetryStrategy retryStrategy;
     private final String retryScope;
@@ -59,7 +64,7 @@ public final class ClientConfig {
         this.transport = builder.transport != null ? builder.transport : discoverTransport(protocol);
         ClientPipeline.validateProtocolAndTransport(protocol, transport);
 
-        transport.configureClient(builder);
+        builder.applyPlugin(transport);
         if (this.protocol != builder.protocol) {
             throw new IllegalStateException("ClientTransport must not change the ClientProtocol");
         }
@@ -81,6 +86,7 @@ public final class ClientConfig {
         this.retryScope = builder.retryScope;
 
         this.context = Context.unmodifiableCopy(builder.context);
+        this.appliedPlugins = Collections.unmodifiableSet(new LinkedHashSet<>(builder.appliedPlugins));
     }
 
     /**
@@ -98,6 +104,15 @@ public final class ClientConfig {
                 + "Add a compatible ClientTransportFactory Service provider to the classpath, "
                 + "or add a compatible transport to the client builder."
         );
+    }
+
+    /**
+     * Get the ordered set of plugins that were applied to the configuration.
+     *
+     * @return the applied plugins.
+     */
+    public Set<Class<? extends ClientPlugin>> appliedPlugins() {
+        return appliedPlugins;
     }
 
     /**
@@ -173,7 +188,12 @@ public final class ClientConfig {
         return new Builder();
     }
 
-    private Builder toBuilder() {
+    /**
+     * Convert to a builder.
+     *
+     * @return the builder based on this configuration.
+     */
+    public Builder toBuilder() {
         return originalBuilder.copyBuilder();
     }
 
@@ -188,7 +208,7 @@ public final class ClientConfig {
         Builder builder = toBuilder();
         applyOverrides(builder, overrideConfig);
         for (ClientPlugin plugin : overrideConfig.plugins()) {
-            plugin.configureClient(builder);
+            builder.applyPlugin(plugin);
         }
         return builder.build();
     }
@@ -236,6 +256,7 @@ public final class ClientConfig {
         private final Context context = Context.create();
         private RetryStrategy retryStrategy;
         private String retryScope;
+        private final Set<Class<? extends ClientPlugin>> appliedPlugins = new LinkedHashSet<>();
 
         private Builder copyBuilder() {
             Builder builder = new Builder();
@@ -249,6 +270,7 @@ public final class ClientConfig {
             context.copyTo(builder.context);
             builder.retryStrategy = retryStrategy;
             builder.retryScope = retryScope;
+            builder.appliedPlugins.addAll(appliedPlugins);
             return builder;
         }
 
@@ -471,6 +493,19 @@ public final class ClientConfig {
          */
         public Builder retryScope(String retryScope) {
             this.retryScope = retryScope;
+            return this;
+        }
+
+        /**
+         * Applies a plugin to the configuration and tracks the plugin class as applied.
+         *
+         * @param plugin Plugin to apply.
+         * @return the updated builder.
+         */
+        public Builder applyPlugin(ClientPlugin plugin) {
+            LOGGER.debug("Applying client plugin: {}", plugin.getClass());
+            appliedPlugins.add(plugin.getClass());
+            plugin.configureClient(this);
             return this;
         }
 

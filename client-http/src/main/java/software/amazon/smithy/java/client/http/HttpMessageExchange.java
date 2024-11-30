@@ -29,6 +29,6 @@ public final class HttpMessageExchange implements MessageExchange<HttpRequest, H
 
     @Override
     public void configureClient(ClientConfig.Builder config) {
-        new UserAgentPlugin().configureClient(config);
+        config.applyPlugin(new UserAgentPlugin());
     }
 }

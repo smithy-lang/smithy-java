@@ -38,7 +38,7 @@ public abstract class Client {
     protected Client(Builder<?, ?> builder) {
         ClientConfig.Builder configBuilder = builder.configBuilder();
         for (ClientPlugin plugin : builder.plugins) {
-            plugin.configureClient(configBuilder);
+            configBuilder.applyPlugin(plugin);
         }
         this.config = configBuilder.build();
 
