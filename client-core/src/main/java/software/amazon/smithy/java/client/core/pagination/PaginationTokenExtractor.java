@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.document.Document;
 
 /**
  * Extracts pagination values from the output shape of an operation call based on provided paths.
@@ -49,6 +50,8 @@ final class PaginationTokenExtractor {
                 totalItems = ic.size();
             } else if (items instanceof Map<?, ?> im) {
                 totalItems = im.size();
+            } else if (items instanceof Document doc) {
+                totalItems = doc.size();
             }
         }
         return new Result(token, totalItems);
