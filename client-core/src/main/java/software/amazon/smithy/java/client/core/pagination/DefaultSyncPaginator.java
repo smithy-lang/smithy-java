@@ -15,7 +15,7 @@ import software.amazon.smithy.java.core.schema.TraitKey;
 final class DefaultSyncPaginator<I extends SerializableStruct, O extends SerializableStruct> implements Paginator<O> {
 
     private final Paginatable<I, O> call;
-    private final PaginationInputFactory<I> inputFactory;
+    private final PaginationInputSetter<I> inputFactory;
     private final PaginationTokenExtractor extractor;
 
     // Pagination parameters
@@ -37,7 +37,7 @@ final class DefaultSyncPaginator<I extends SerializableStruct, O extends Seriali
         var pageSizeMember = trait.getPageSize().orElse(null);
         var itemsPath = trait.getItems().orElse(null);
 
-        this.inputFactory = new PaginationInputFactory<>(
+        this.inputFactory = new PaginationInputSetter<>(
             input,
             operation,
             inputTokenMember,

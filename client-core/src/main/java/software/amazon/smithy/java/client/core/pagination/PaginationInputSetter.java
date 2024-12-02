@@ -15,13 +15,13 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
  *
  * @param <I> Input shape type for paginated operation.
  */
-final class PaginationInputFactory<I extends SerializableStruct> {
+final class PaginationInputSetter<I extends SerializableStruct> {
     private final I input;
     private final ApiOperation<I, ?> operation;
     private final Schema inputTokenSchema;
     private final Schema maxResultsSchema;
 
-    PaginationInputFactory(
+    PaginationInputSetter(
         I input,
         ApiOperation<I, ?> operation,
         String inputTokenMember,

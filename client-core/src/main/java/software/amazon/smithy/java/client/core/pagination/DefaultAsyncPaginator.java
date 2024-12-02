@@ -19,7 +19,7 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
     AsyncPaginator<O> {
 
     private final PaginatableAsync<I, O> call;
-    private final PaginationInputFactory<I> inputFactory;
+    private final PaginationInputSetter<I> inputFactory;
     private final PaginationTokenExtractor extractor;
 
     // Pagination parameters
@@ -41,7 +41,7 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
         var pageSizeMember = trait.getPageSize().orElse(null);
         var itemsPath = trait.getItems().orElse(null);
 
-        this.inputFactory = new PaginationInputFactory<>(
+        this.inputFactory = new PaginationInputSetter<>(
             input,
             operation,
             inputTokenMember,
