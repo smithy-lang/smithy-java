@@ -116,10 +116,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
             .deserialize()
             .thenApply(ignore -> {
                 O output = outputBuilder.errorCorrection().build();
-
-                // TODO: error handling from the builder.
                 LOGGER.trace("Successfully built {} from HTTP response with {}", output, getClass().getName());
-
                 return output;
             });
     }
