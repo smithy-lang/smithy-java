@@ -39,7 +39,7 @@ final class PaginationInputSetter<I extends SerializableStruct> {
         if (token != null) {
             builder.setMemberValue(inputTokenSchema, token);
         }
-        if (maxResults != null) {
+        if (maxResultsSchema != null && maxResults != null) {
             builder.setMemberValue(maxResultsSchema, maxResults);
         }
         return builder.build();

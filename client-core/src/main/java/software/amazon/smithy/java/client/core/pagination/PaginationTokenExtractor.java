@@ -57,7 +57,7 @@ final class PaginationTokenExtractor {
     private static <T, O extends SerializableStruct> T getValueForPath(List<Schema> schemaPath, O outputShape) {
         SerializableStruct shape = outputShape;
         var iter = schemaPath.iterator();
-        while (iter.hasNext()) {
+        while (iter.hasNext() && shape != null) {
             var schema = iter.next();
             if (iter.hasNext()) {
                 shape = shape.getMemberValue(schema);
