@@ -6,12 +6,10 @@
 package software.amazon.smithy.java.client.core.pagination;
 
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Predicate;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -176,46 +174,5 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
         } catch (ArithmeticException e) {
             return Long.MAX_VALUE;
         }
-    }
-
-    @Override
-    public CompletableFuture<Void> forEach(Predicate<O> consumer) {
-        var future = new CompletableFuture<Void>();
-        subscribe(new Flow.Subscriber<>() {
-            private Flow.Subscription subscription;
-
-            @Override
-            public void onSubscribe(Flow.Subscription subscription) {
-                this.subscription = subscription;
-                subscription.request(1);
-            }
-
-            @Override
-            public void onNext(O item) {
-                try {
-                    if (consumer.test(item)) {
-                        subscription.request(1);
-                    } else {
-                        subscription.cancel();
-                        future.complete(null);
-                    }
-                } catch (RuntimeException exc) {
-                    // Handle the consumer throwing an exception
-                    subscription.cancel();
-                    future.completeExceptionally(exc);
-                }
-            }
-
-            @Override
-            public void onError(Throwable throwable) {
-                future.completeExceptionally(throwable);
-            }
-
-            @Override
-            public void onComplete() {
-                future.complete(null);
-            }
-        });
-        return future;
     }
 }

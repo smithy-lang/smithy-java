@@ -85,5 +85,43 @@ public interface AsyncPaginator<O extends SerializableStruct> extends PaginatorS
      * @param predicate Consumer to process pages of results. Return true from predicate to keep processing next page, false to stop.
      * @return CompletableFuture that will be notified when all events have been consumed or if an error occurs.
      */
-    CompletableFuture<Void> forEach(Predicate<O> predicate);
+    default CompletableFuture<Void> forEach(Predicate<O> predicate) {
+        var future = new CompletableFuture<Void>();
+        subscribe(new Flow.Subscriber<>() {
+            private Flow.Subscription subscription;
+
+            @Override
+            public void onSubscribe(Flow.Subscription subscription) {
+                this.subscription = subscription;
+                subscription.request(1);
+            }
+
+            @Override
+            public void onNext(O item) {
+                try {
+                    if (predicate.test(item)) {
+                        subscription.request(1);
+                    } else {
+                        subscription.cancel();
+                        future.complete(null);
+                    }
+                } catch (RuntimeException exc) {
+                    // Handle the consumer throwing an exception
+                    subscription.cancel();
+                    future.completeExceptionally(exc);
+                }
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                future.completeExceptionally(throwable);
+            }
+
+            @Override
+            public void onComplete() {
+                future.complete(null);
+            }
+        });
+        return future;
+    }
 }
