@@ -5,9 +5,8 @@
 
 package software.amazon.smithy.java.client.core;
 
-import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Predicate;
@@ -44,7 +43,7 @@ public abstract class Client {
 
         // Configure plugins.
         builder.addPlugin(DefaultPlugin.INSTANCE);
-        for (ClientPlugin plugin : builder.plugins.values()) {
+        for (ClientPlugin plugin : builder.plugins) {
             configBuilder.applyPlugin(plugin);
         }
 
@@ -137,7 +136,7 @@ public abstract class Client {
     public abstract static class Builder<I, B extends Builder<I, B>> implements ClientSetting<B> {
 
         private final ClientConfig.Builder configBuilder = ClientConfig.builder();
-        private final Map<Class<? extends ClientPlugin>, ClientPlugin> plugins = new LinkedHashMap<>();
+        private final List<ClientPlugin> plugins = new ArrayList<>();
 
         /**
          * A ClientConfig.Builder available to subclasses to initialize in their constructors with any default
@@ -279,18 +278,6 @@ public abstract class Client {
         }
 
         /**
-         * Add a plugin to the client.
-         *
-         * @param plugin Plugin to add.
-         * @return the builder.
-         */
-        @SuppressWarnings("unchecked")
-        public B addPlugin(ClientPlugin plugin) {
-            plugins.put(plugin.getClass(), plugin);
-            return (B) this;
-        }
-
-        /**
          * Set the retry strategy to use with the client.
          *
          * <p>This should only be used to override the default retry strategy.
@@ -313,6 +300,31 @@ public abstract class Client {
         @SuppressWarnings("unchecked")
         public B retryScope(String retryScope) {
             this.configBuilder.retryScope(retryScope);
+            return (B) this;
+        }
+
+        /**
+         * Add a plugin to the client.
+         *
+         * @param plugin Plugin to add.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B addPlugin(ClientPlugin plugin) {
+            plugins.add(plugin);
+            return (B) this;
+        }
+
+        /**
+         * Add an essential plugin to the client that cannot be filtered out by a predicated added with
+         * {@link #addPluginPredicate}.
+         *
+         * @param plugin Plugin to add.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B addEssentialPlugin(ClientPlugin plugin) {
+            configBuilder.applyEssentialPlugin(plugin);
             return (B) this;
         }
 

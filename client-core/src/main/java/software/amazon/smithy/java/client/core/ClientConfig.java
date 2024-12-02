@@ -506,10 +506,34 @@ public final class ClientConfig {
          * @return the updated builder.
          */
         public boolean applyPlugin(ClientPlugin plugin) {
-            for (var predicate : pluginPredicates) {
-                if (!predicate.test(plugin.getClass())) {
-                    LOGGER.debug("Skipping client plugin based on predicate: {}", plugin.getClass());
-                    return false;
+            return applyPlugin(plugin, false);
+        }
+
+        /**
+         * Applies a plugin to the configuration and tracks the plugin class as applied.
+         *
+         * <p>Essential plugins are always applied at most once and ignore any plugin predicates added via
+         * {@link #addPluginPredicate}.
+         *
+         * @param plugin Plugin to apply.
+         * @return true if the plugin was applied, or false if the plugin was already applied.
+         */
+        public boolean applyEssentialPlugin(ClientPlugin plugin) {
+            return applyPlugin(plugin, true);
+        }
+
+        private boolean applyPlugin(ClientPlugin plugin, boolean isEssential) {
+            if (appliedPlugins.contains(plugin.getClass())) {
+                LOGGER.debug("Skipping already applied client plugin: {}", plugin.getClass());
+                return false;
+            }
+
+            if (!isEssential) {
+                for (var predicate : pluginPredicates) {
+                    if (!predicate.test(plugin.getClass())) {
+                        LOGGER.debug("Skipping client plugin based on predicate: {}", plugin.getClass());
+                        return false;
+                    }
                 }
             }
 

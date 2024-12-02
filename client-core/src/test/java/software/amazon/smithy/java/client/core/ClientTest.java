@@ -81,12 +81,15 @@ public class ClientTest {
             .protocol(new RestJsonClientProtocol(SERVICE))
             .addPluginPredicate(clazz -> !clazz.equals(DefaultPlugin.class))
             .addPluginPredicate(clazz -> !clazz.equals(HttpMessageExchange.class))
+            .addPluginPredicate(clazz -> !clazz.equals(FooPlugin.class))
+            .addEssentialPlugin(new FooPlugin())
             .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
             .build();
 
         assertThat(
             c.config().appliedPlugins(),
-            contains(JavaHttpClientTransport.class)
+            // The essential FooPlugin is still applied even though the predicate tries to filter it.
+            contains(FooPlugin.class, JavaHttpClientTransport.class)
         );
     }
 
