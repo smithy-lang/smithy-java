@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.http;
 
 import software.amazon.smithy.java.client.core.ClientProtocol;
+import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -28,13 +29,8 @@ public abstract class HttpClientProtocol implements ClientProtocol<HttpRequest, 
     }
 
     @Override
-    public final Class<HttpRequest> requestClass() {
-        return HttpRequest.class;
-    }
-
-    @Override
-    public final Class<HttpResponse> responseClass() {
-        return HttpResponse.class;
+    public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
+        return HttpMessageExchange.INSTANCE;
     }
 
     @Override

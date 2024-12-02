@@ -72,7 +72,7 @@ public class SigV4TestRunner {
 
     public Stream<Object[]> parameterizedTestSource() {
         return testCases.stream().map(testCase -> {
-            Callable<Result> callable = () -> testCase.createResult(SigV4Signer.INSTANCE);
+            Callable<Result> callable = () -> testCase.createResult(SigV4Signer.create());
             Callable<Result> wrappedCallable = () -> callable.call().unwrap();
             return new Object[]{testCase.name(), wrappedCallable};
         });

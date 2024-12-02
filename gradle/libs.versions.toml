@@ -12,6 +12,8 @@ jackson = "2.18.1"
 netty = "4.1.115.Final"
 dep-analysis = "2.5.0"
 aws-sdk = "2.29.22"
+osdetector = "1.7.0"
+accp = "2.4.1" # Amazon Corretto Crypto Provider
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -47,3 +49,4 @@ dependency-analysis = { module = "com.autonomousapps:dependency-analysis-gradle-
 
 [plugins]
 jmh = { id = "me.champeau.jmh", version.ref = "jmh" }
+osdetector = { id = "com.google.osdetector", version.ref = "osdetector" }

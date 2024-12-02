@@ -13,7 +13,6 @@ import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.client.http.AmznErrorHeaderExtractor;
 import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
-import software.amazon.smithy.java.client.http.HttpRetryErrorClassifier;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -27,8 +26,6 @@ import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * Abstract class for RPC style JSON protocols.
- *
- * <p>Applies {@link HttpRetryErrorClassifier} by default to classify retries.
  */
 abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson1Protocol, AwsJson11Protocol {
 
@@ -94,7 +91,6 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
             return errorDeserializer
                 .createError(context, operation.schema().id(), typeRegistry, response)
                 .thenApply(e -> {
-                    HttpRetryErrorClassifier.applyRetryInfo(operation, response, e, context);
                     throw e;
                 });
         }

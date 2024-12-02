@@ -29,18 +29,11 @@ public interface ClientProtocol<RequestT, ResponseT> {
     String id();
 
     /**
-     * The request class used by protocol.
+     * Get the message exchange.
      *
-     * @return the request class.
+     * @return the message exchange.
      */
-    Class<RequestT> requestClass();
-
-    /**
-     * The response class used by the protocol.
-     *
-     * @return the response class.
-     */
-    Class<ResponseT> responseClass();
+    MessageExchange<RequestT, ResponseT> messageExchange();
 
     /**
      * Creates the underlying transport request.

@@ -13,11 +13,17 @@ import software.amazon.smithy.java.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Injects a default idempotency token into the input if it's modeled but missing.
+ *
+ * <p>This plugin is added to clients by default via {@link DefaultPlugin}.
  */
+@SmithyInternalApi
 public final class InjectIdempotencyTokenPlugin implements ClientPlugin {
+
+    public static final InjectIdempotencyTokenPlugin INSTANCE = new InjectIdempotencyTokenPlugin();
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(InjectIdempotencyTokenPlugin.class);
     private static final ClientInterceptor INTERCEPTOR = new Injector();

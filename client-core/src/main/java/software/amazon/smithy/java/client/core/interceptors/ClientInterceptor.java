@@ -355,7 +355,8 @@ public interface ClientInterceptor {
      * with the error as the result.
      *
      * <p>If attempting to modify a specific kind of output, it can be modified using
-     * {@link OutputHook#mapOutput(Class, Function)} or {@link OutputHook#mapOutput(Class, Object, BiFunction)}.
+     * {@link OutputHook#mapOutput(RuntimeException, Class, Function)} or
+     * {@link OutputHook#mapOutput(RuntimeException, Class, Object, BiFunction)}.
      *
      * @param hook Hook data.
      * @param error Error to be thrown, present.
@@ -403,7 +404,8 @@ public interface ClientInterceptor {
      * with the raised error as the result.
      *
      * <p>If attempting to modify a specific kind of output, it can be modified using
-     * {@link OutputHook#mapOutput(Class, Function)} or {@link OutputHook#mapOutput(Class, Object, BiFunction)}.
+     * {@link OutputHook#mapOutput(RuntimeException, Class, Function)}
+     * or {@link OutputHook#mapOutput(RuntimeException, Class, Object, BiFunction)}.
      *
      * @param hook Hook data.
      * @param error Error to be thrown, present.

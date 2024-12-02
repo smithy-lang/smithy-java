@@ -7,8 +7,11 @@ package software.amazon.smithy.java.client.core;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
@@ -16,6 +19,7 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.retries.api.RetryStrategy;
 
 /**
@@ -24,12 +28,17 @@ import software.amazon.smithy.java.retries.api.RetryStrategy;
  * <p>It has well-defined configuration elements that every {@link Client} needs. For extensible parts of a
  * {@link Client} that may need additional configuration, type safe configuration can be included using
  * {@link Context.Key}.
+ *
+ * <p>When built, the ClientTransport resolved for the protocol will apply the {@link ClientTransport#configureClient}
+ * method after other plugins are applied.
  */
 public final class ClientConfig {
-    private static final List<ClientTransportFactory<?, ?>> transportFactories = ClientTransportFactory
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientConfig.class);
+    private static final List<ClientTransportFactory<?, ?>> TRANSPORT_FACTORIES = ClientTransportFactory
         .load(ClientConfig.class.getClassLoader());
     private static final AuthScheme<Object, Identity> NO_AUTH_AUTH_SCHEME = AuthScheme.noAuthAuthScheme();
 
+    private final Builder originalBuilder;
     private final ClientTransport<?, ?> transport;
     private final ClientProtocol<?, ?> protocol;
     private final EndpointResolver endpointResolver;
@@ -38,14 +47,25 @@ public final class ClientConfig {
     private final AuthSchemeResolver authSchemeResolver;
     private final List<IdentityResolver<?>> identityResolvers;
     private final Context context;
+    private final Set<Class<? extends ClientPlugin>> appliedPlugins;
 
     private final RetryStrategy retryStrategy;
     private final String retryScope;
 
     private ClientConfig(Builder builder) {
-        this.protocol = Objects.requireNonNull(builder.protocol, "protocol cannot be null");
-        // If no transport is set, try to find compatible transport via SPI.
-        this.transport = builder.transport != null ? builder.transport : discoverTransport(protocol);
+        // Transports can change between builders to toBuilder. Transports can modify the builder when they're applied.
+        // To prevent a previous configuration meant for one transport to impact a future configuration, we create a
+        // copy of the original builder. We also don't want to apply the transport modifications multiple times.
+        // This builder is used in toBuilder.
+        this.originalBuilder = builder.copyBuilder();
+
+        // Ensure the transport was resolved and applied as a plugin.
+        // When using a Client, transport is applied before build is called to let user-defined plugins supersede
+        // transport-applied plugins. This is performed here in case configs are created manually.
+        builder.resolveTransport();
+
+        this.protocol = builder.protocol;
+        this.transport = builder.transport;
         ClientPipeline.validateProtocolAndTransport(protocol, transport);
 
         this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
@@ -56,7 +76,7 @@ public final class ClientConfig {
         List<AuthScheme<?, ?>> supportedAuthSchemes = new ArrayList<>();
         supportedAuthSchemes.add(NO_AUTH_AUTH_SCHEME);
         supportedAuthSchemes.addAll(builder.supportedAuthSchemes);
-        this.supportedAuthSchemes = List.copyOf(supportedAuthSchemes);
+        this.supportedAuthSchemes = Collections.unmodifiableList(supportedAuthSchemes);
 
         this.authSchemeResolver = Objects.requireNonNullElse(builder.authSchemeResolver, AuthSchemeResolver.DEFAULT);
         this.identityResolvers = List.copyOf(builder.identityResolvers);
@@ -65,17 +85,16 @@ public final class ClientConfig {
         this.retryScope = builder.retryScope;
 
         this.context = Context.unmodifiableCopy(builder.context);
+        this.appliedPlugins = Collections.unmodifiableSet(new LinkedHashSet<>(builder.appliedPlugins));
     }
 
     /**
      * Search for a transport service provider that is compatible with the provided protocol.
      */
-    private ClientTransport<?, ?> discoverTransport(ClientProtocol<?, ?> protocol) {
-        for (var factory : transportFactories) {
+    private static ClientTransport<?, ?> discoverTransport(ClientProtocol<?, ?> protocol) {
+        for (var factory : TRANSPORT_FACTORIES) {
             // Find the first applicable transport factory
-            if (factory.requestClass() == protocol.requestClass()
-                && factory.responseClass() == protocol.responseClass()
-            ) {
+            if (factory.messageExchange().equals(protocol.messageExchange())) {
                 return factory.createTransport();
             }
         }
@@ -84,6 +103,15 @@ public final class ClientConfig {
                 + "Add a compatible ClientTransportFactory Service provider to the classpath, "
                 + "or add a compatible transport to the client builder."
         );
+    }
+
+    /**
+     * Get the ordered set of plugins that were applied to the configuration.
+     *
+     * @return the applied plugins.
+     */
+    public Set<Class<? extends ClientPlugin>> appliedPlugins() {
+        return appliedPlugins;
     }
 
     /**
@@ -159,19 +187,13 @@ public final class ClientConfig {
         return new Builder();
     }
 
-    private Builder toBuilder() {
-        Builder builder = builder()
-            .transport(transport)
-            .protocol(protocol)
-            .endpointResolver(endpointResolver)
-            .authSchemeResolver(authSchemeResolver)
-            .identityResolvers(identityResolvers)
-            .retryStrategy(retryStrategy)
-            .retryScope(retryScope);
-        interceptors.forEach(builder::addInterceptor);
-        supportedAuthSchemes.forEach(builder::putSupportedAuthSchemes);
-        builder.putAllConfig(context);
-        return builder;
+    /**
+     * Convert to a builder.
+     *
+     * @return the builder based on this configuration.
+     */
+    public Builder toBuilder() {
+        return originalBuilder.copyBuilder();
     }
 
     /**
@@ -185,7 +207,7 @@ public final class ClientConfig {
         Builder builder = toBuilder();
         applyOverrides(builder, overrideConfig);
         for (ClientPlugin plugin : overrideConfig.plugins()) {
-            plugin.configureClient(builder);
+            builder.applyPlugin(plugin);
         }
         return builder.build();
     }
@@ -233,6 +255,23 @@ public final class ClientConfig {
         private final Context context = Context.create();
         private RetryStrategy retryStrategy;
         private String retryScope;
+        private final Set<Class<? extends ClientPlugin>> appliedPlugins = new LinkedHashSet<>();
+
+        private Builder copyBuilder() {
+            Builder builder = new Builder();
+            builder.transport = transport;
+            builder.protocol = protocol;
+            builder.endpointResolver = endpointResolver;
+            builder.interceptors.addAll(interceptors);
+            builder.authSchemeResolver = authSchemeResolver;
+            builder.supportedAuthSchemes.addAll(supportedAuthSchemes);
+            builder.identityResolvers.addAll(identityResolvers);
+            context.copyTo(builder.context);
+            builder.retryStrategy = retryStrategy;
+            builder.retryScope = retryScope;
+            builder.appliedPlugins.addAll(appliedPlugins);
+            return builder;
+        }
 
         /**
          * @return Get the transport.
@@ -312,6 +351,26 @@ public final class ClientConfig {
          */
         public Builder transport(ClientTransport<?, ?> transport) {
             this.transport = transport;
+            return this;
+        }
+
+        /**
+         * If no transport was provided, then resolve a transport now based on the selected protocol, and apply the
+         * transport as a plugin if it has not yet been applied.
+         *
+         * @return the builder.
+         * @throws NullPointerException if not protocol is set.
+         * @throws IllegalArgumentException if no transport could be resolved.
+         */
+        public Builder resolveTransport() {
+            Objects.requireNonNull(protocol, "protocol must be set to resolve a transport");
+            if (transport == null) {
+                transport(discoverTransport(protocol));
+            }
+            // If the transport has not yet been applied as a plugin, apply it now.
+            if (!appliedPlugins.contains(transport.getClass())) {
+                applyPlugin(transport);
+            }
             return this;
         }
 
@@ -453,6 +512,23 @@ public final class ClientConfig {
          */
         public Builder retryScope(String retryScope) {
             this.retryScope = retryScope;
+            return this;
+        }
+
+        /**
+         * Applies a plugin to the configuration and tracks the plugin class as applied.
+         *
+         * @param plugin Plugin to apply.
+         * @return the updated builder.
+         */
+        public Builder applyPlugin(ClientPlugin plugin) {
+            if (appliedPlugins.contains(plugin.getClass())) {
+                LOGGER.debug("Skipping already applied client plugin: {}", plugin.getClass());
+            } else {
+                LOGGER.debug("Applying client plugin: {}", plugin.getClass());
+                appliedPlugins.add(plugin.getClass());
+                plugin.configureClient(this);
+            }
             return this;
         }
 

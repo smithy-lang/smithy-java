@@ -70,7 +70,7 @@ public final class SigV4AuthScheme implements AuthScheme<HttpRequest, AwsCredent
 
     @Override
     public Signer<HttpRequest, AwsCredentialsIdentity> signer() {
-        return SigV4Signer.INSTANCE;
+        return SigV4Signer.create();
     }
 
     public static final class Factory implements AuthSchemeFactory<SigV4Trait> {

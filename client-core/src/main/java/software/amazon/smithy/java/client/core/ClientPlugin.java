@@ -10,9 +10,21 @@ package software.amazon.smithy.java.client.core;
  */
 @FunctionalInterface
 public interface ClientPlugin {
-
     /**
      * Modify the provided client configuration.
+     *
+     * <p>When applying plugins to a {@code ClientConfig.Builder}, use {@link ClientConfig.Builder#applyPlugin}
+     * so that the application of the plugin is tracked with the builder.
+     *
+     * <p><strong>Do this:</strong>
+     * <pre>{@code
+     * configBuilder.applyPlugin(new UserAgentPlugin());
+     * }</pre>
+     *
+     * <p><strong>Don't do this:</strong>
+     * <pre>{@code
+     * new UserAgentPlugin().configureClient(configBuilder);
+     * }</pre>
      */
     void configureClient(ClientConfig.Builder config);
 }

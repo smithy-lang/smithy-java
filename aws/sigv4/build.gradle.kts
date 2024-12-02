@@ -1,6 +1,9 @@
+import com.google.gradle.osdetector.OsDetector
+
 plugins {
     id("smithy-java.module-conventions")
     alias(libs.plugins.jmh)
+    alias(libs.plugins.osdetector)
 }
 
 description = "This module provides AWS-Specific http client functionality"
@@ -17,9 +20,19 @@ dependencies {
     implementation(libs.smithy.aws.traits)
 }
 
+afterEvaluate {
+    val osDetector = extensions.getByType<OsDetector>()
+    if (osDetector.os != "windows") {
+        dependencies {
+            jmh("software.amazon.cryptools:AmazonCorrettoCryptoProvider:${libs.versions.accp.get()}:${osDetector.classifier}")
+        }
+    }
+}
+
 jmh {
-    iterations = 10
+    iterations = 3
+    warmupIterations = 2
     fork = 1
-    // profilers.add("async:libPath=<PATH_TO_DYLIB>;output=flamegraph")
+    // profilers.add("async:output=flamegraph")
     // profilers.add("gc")
 }

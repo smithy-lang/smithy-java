@@ -17,9 +17,11 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import software.amazon.smithy.java.client.core.ClientTransport;
+import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
+import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.ModeledApiException;
@@ -172,13 +174,8 @@ final class HttpClientResponseProtocolTestProvider extends
         }
 
         @Override
-        public Class<HttpRequest> requestClass() {
-            return HttpRequest.class;
-        }
-
-        @Override
-        public Class<HttpResponse> responseClass() {
-            return HttpResponse.class;
+        public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
+            return HttpMessageExchange.INSTANCE;
         }
     }
 }

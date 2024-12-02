@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -130,13 +131,8 @@ public class ClientPipelineTest {
             .protocol(new RestJsonClientProtocol(service))
             .transport(new ClientTransport<HttpRequest, HttpResponse>() {
                 @Override
-                public Class<HttpRequest> requestClass() {
-                    return HttpRequest.class;
-                }
-
-                @Override
-                public Class<HttpResponse> responseClass() {
-                    return HttpResponse.class;
+                public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
+                    return HttpMessageExchange.INSTANCE;
                 }
 
                 @Override

@@ -14,10 +14,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.client.core.ClientTransport;
+import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
+import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -68,13 +70,8 @@ public class AmzSdkRequestPluginTest {
             .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
             .transport(new ClientTransport<HttpRequest, HttpResponse>() {
                 @Override
-                public Class<HttpRequest> requestClass() {
-                    return HttpRequest.class;
-                }
-
-                @Override
-                public Class<HttpResponse> responseClass() {
-                    return HttpResponse.class;
+                public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
+                    return HttpMessageExchange.INSTANCE;
                 }
 
                 @Override

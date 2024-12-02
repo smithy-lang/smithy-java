@@ -7,7 +7,6 @@ package software.amazon.smithy.java.client.core;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
@@ -16,6 +15,7 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.plugins.DefaultPlugin;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -37,9 +37,15 @@ public abstract class Client {
 
     protected Client(Builder<?, ?> builder) {
         ClientConfig.Builder configBuilder = builder.configBuilder();
+
+        // Resolve the transport and apply it as a plugin before user-defined plugins, allowing user-defined plugins
+        // to supersede and functionality of plugins applied by transports.
+        configBuilder.resolveTransport().applyPlugin(configBuilder.transport());
+
         for (ClientPlugin plugin : builder.plugins) {
-            plugin.configureClient(configBuilder);
+            configBuilder.applyPlugin(plugin);
         }
+
         this.config = configBuilder.build();
 
         this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
@@ -130,6 +136,12 @@ public abstract class Client {
 
         private final ClientConfig.Builder configBuilder = ClientConfig.builder();
         private final List<ClientPlugin> plugins = new ArrayList<>();
+
+        public Builder() {
+            // Apply the default plugin by default, and do it before user-controlled plugins.
+            // Applying this first allows user-defined plugins to make changes that potentially supersede defaults.
+            configBuilder.applyPlugin(DefaultPlugin.INSTANCE);
+        }
 
         /**
          * A ClientConfig.Builder available to subclasses to initialize in their constructors with any default
@@ -271,18 +283,6 @@ public abstract class Client {
         }
 
         /**
-         * Add a plugin to the client.
-         *
-         * @param plugin Plugin to add.
-         * @return the builder.
-         */
-        @SuppressWarnings("unchecked")
-        public B addPlugin(ClientPlugin plugin) {
-            plugins.add(Objects.requireNonNull(plugin, "plugin cannot be null"));
-            return (B) this;
-        }
-
-        /**
          * Set the retry strategy to use with the client.
          *
          * <p>This should only be used to override the default retry strategy.
@@ -305,6 +305,18 @@ public abstract class Client {
         @SuppressWarnings("unchecked")
         public B retryScope(String retryScope) {
             this.configBuilder.retryScope(retryScope);
+            return (B) this;
+        }
+
+        /**
+         * Add a plugin to the client.
+         *
+         * @param plugin Plugin to add.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B addPlugin(ClientPlugin plugin) {
+            plugins.add(plugin);
             return (B) this;
         }
 

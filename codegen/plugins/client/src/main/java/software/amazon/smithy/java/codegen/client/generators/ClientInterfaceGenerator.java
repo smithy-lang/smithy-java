@@ -128,7 +128,7 @@ public final class ClientInterfaceGenerator
                             @Override
                             public ${interface:T} build() {
                                 ${?hasDefaults}for (var plugin : defaultPlugins) {
-                                    plugin.configureClient(configBuilder());
+                                    configBuilder().applyPlugin(plugin);
                                 }
                                 ${/hasDefaults}${?hasDefaultProtocol}if (configBuilder().protocol() == null) {
                                     configBuilder().protocol(${protocolFactory:C}.createProtocol(protocolSettings, protocolTrait));

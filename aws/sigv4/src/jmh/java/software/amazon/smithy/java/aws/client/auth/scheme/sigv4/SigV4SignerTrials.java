@@ -8,6 +8,7 @@ package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.Security;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +31,7 @@ import software.amazon.smithy.java.http.api.HttpVersion;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.io.uri.QueryStringBuilder;
 
-@State(Scope.Benchmark)
+@State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Mode.AverageTime)
 public class SigV4SignerTrials {
@@ -83,18 +84,42 @@ public class SigV4SignerTrials {
         }
     )
     private String testName;
+
+    @Param({"yes", "no"})
+    private String useAccpParam;
+
+    private boolean isWindows;
+    private boolean useAccp;
+    private boolean skipTest;
     private HttpRequest request;
     private Signer<HttpRequest, AwsCredentialsIdentity> signer;
 
     @Setup
     public void setup() throws Exception {
+        useAccp = useAccpParam.equals("yes");
+        isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        skipTest = useAccp && isWindows;
+
+        if (!isWindows) {
+            var clazz = Class.forName("com.amazon.corretto.crypto.provider.AmazonCorrettoCryptoProvider");
+            if (useAccp) {
+                clazz.getMethod("install").invoke(null);
+            } else {
+                Security.removeProvider(clazz.getName());
+            }
+        }
+
         request = CASES.get(testName);
-        signer = SigV4Signer.INSTANCE;
+        signer = SigV4Signer.create();
     }
 
     @Benchmark
     public void sign() throws IOException, ExecutionException, InterruptedException {
-        signer.sign(request, TEST_IDENTITY, TEST_PROPERTIES).get();
+        if (!skipTest) {
+            signer.sign(request, TEST_IDENTITY, TEST_PROPERTIES).get();
+        } else {
+            System.out.println("Skipping benchmark on Windows");
+        }
     }
 
     private static HttpRequest parsePostRequest(
