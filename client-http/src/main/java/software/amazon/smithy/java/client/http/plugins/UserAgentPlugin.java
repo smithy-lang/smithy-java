@@ -16,6 +16,7 @@ import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * A plugin used to apply a default User-Agent.
@@ -23,6 +24,7 @@ import software.amazon.smithy.java.http.api.HttpRequest;
  * <p>This plugin is applied by default by {@link HttpMessageExchange} and {@link ClientTransport}s that call it by
  * default.
  */
+@SmithyInternalApi
 public final class UserAgentPlugin implements ClientPlugin {
 
     @Override

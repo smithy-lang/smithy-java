@@ -22,6 +22,7 @@ import software.amazon.smithy.java.core.schema.ApiException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.retries.api.RetrySafety;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Adds retry information to HTTP errors based on retry-after headers, 429 and 503 status codes, the presence of
@@ -29,6 +30,7 @@ import software.amazon.smithy.java.retries.api.RetrySafety;
  *
  * <p>This plugin is applied automatically when using an HTTP protocol via {@link HttpMessageExchange}.
  */
+@SmithyInternalApi
 public final class ApplyHttpRetryInfoPlugin implements ClientPlugin {
     @Override
     public void configureClient(ClientConfig.Builder config) {

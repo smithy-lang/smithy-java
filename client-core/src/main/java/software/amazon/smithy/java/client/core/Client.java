@@ -9,16 +9,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.function.Predicate;
 import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
 import software.amazon.smithy.java.client.core.auth.identity.IdentityResolvers;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.client.core.plugins.ApplyModelRetryInfoPlugin;
 import software.amazon.smithy.java.client.core.plugins.DefaultPlugin;
-import software.amazon.smithy.java.client.core.plugins.InjectIdempotencyTokenPlugin;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -41,8 +38,10 @@ public abstract class Client {
     protected Client(Builder<?, ?> builder) {
         ClientConfig.Builder configBuilder = builder.configBuilder();
 
-        // Configure plugins.
-        builder.addPlugin(DefaultPlugin.INSTANCE);
+        // Resolve the transport and apply it as a plugin before user-defined plugins, allowing user-defined plugins
+        // to supersede and functionality of plugins applied by transports.
+        configBuilder.resolveTransport().applyPlugin(configBuilder.transport());
+
         for (ClientPlugin plugin : builder.plugins) {
             configBuilder.applyPlugin(plugin);
         }
@@ -137,6 +136,12 @@ public abstract class Client {
 
         private final ClientConfig.Builder configBuilder = ClientConfig.builder();
         private final List<ClientPlugin> plugins = new ArrayList<>();
+
+        public Builder() {
+            // Apply the default plugin by default, and do it before user-controlled plugins.
+            // Applying this first allows user-defined plugins to make changes that potentially supersede defaults.
+            configBuilder.applyPlugin(DefaultPlugin.INSTANCE);
+        }
 
         /**
          * A ClientConfig.Builder available to subclasses to initialize in their constructors with any default
@@ -312,46 +317,6 @@ public abstract class Client {
         @SuppressWarnings("unchecked")
         public B addPlugin(ClientPlugin plugin) {
             plugins.add(plugin);
-            return (B) this;
-        }
-
-        /**
-         * Add an essential plugin to the client that cannot be filtered out by a predicated added with
-         * {@link #addPluginPredicate}.
-         *
-         * @param plugin Plugin to add.
-         * @return the builder.
-         */
-        @SuppressWarnings("unchecked")
-        public B addEssentialPlugin(ClientPlugin plugin) {
-            configBuilder.applyEssentialPlugin(plugin);
-            return (B) this;
-        }
-
-        /**
-         * Add a predicate that can be used to disable plugins by type.
-         *
-         * <p>A plugin is only applied if it passes each predicate. For example, the following plugins are always
-         * applied by default, but they can be removed by adding a predicate:
-         *
-         * <ul>
-         *     <li>{@link ApplyModelRetryInfoPlugin}</li>
-         *     <li>{@link InjectIdempotencyTokenPlugin}</li>
-         * </ul>
-         *
-         * <pre>@{code
-         * // Disable the default model retry info plugin used to classify retries.
-         * builder.addPredicate(clazz -> !clazz.equals(ApplyModelRetryInfo.class));
-         * // Disable the default InjectIdempotencyTokenPlugin used to add missing tokens.
-         * builder.addPredicate(clazz -> !clazz.equals(InjectIdempotencyTokenPlugin.class));
-         * }</pre>
-         *
-         * @param predicate To Add.
-         * @return the builder.
-         */
-        @SuppressWarnings("unchecked")
-        public B addPluginPredicate(Predicate<Class<? extends ClientPlugin>> predicate) {
-            configBuilder.addPluginPredicate(predicate);
             return (B) this;
         }
 

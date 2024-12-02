@@ -55,41 +55,21 @@ public class ClientTest {
         assertThat(
             c.config().appliedPlugins(),
             contains(
-                // User plugins are applied first.
-                FooPlugin.class,
                 // Default plugin always applied.
                 DefaultPlugin.class,
                 // DefaultPlugin applies these two:
                 ApplyModelRetryInfoPlugin.class,
                 InjectIdempotencyTokenPlugin.class,
-                // The transport is applied as a plugin.
+                // The transport is applied as a plugin, before user plugins.
                 JavaHttpClientTransport.class,
                 // The transport automatically forwards plugin application to the HttpMessageExchange.
                 HttpMessageExchange.class,
                 // And HttpMessageExchange applies the UserAgentPlugin and ApplyHttpRetryInfoPlugin.
                 UserAgentPlugin.class,
-                ApplyHttpRetryInfoPlugin.class
+                ApplyHttpRetryInfoPlugin.class,
+                // User plugins are applied last.
+                FooPlugin.class
             )
-        );
-    }
-
-    @Test
-    public void filtersPlugins() throws URISyntaxException {
-        DynamicClient c = DynamicClient.builder()
-            .model(MODEL)
-            .service(SERVICE)
-            .protocol(new RestJsonClientProtocol(SERVICE))
-            .addPluginPredicate(clazz -> !clazz.equals(DefaultPlugin.class))
-            .addPluginPredicate(clazz -> !clazz.equals(HttpMessageExchange.class))
-            .addPluginPredicate(clazz -> !clazz.equals(FooPlugin.class))
-            .addEssentialPlugin(new FooPlugin())
-            .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
-            .build();
-
-        assertThat(
-            c.config().appliedPlugins(),
-            // The essential FooPlugin is still applied even though the predicate tries to filter it.
-            contains(FooPlugin.class, JavaHttpClientTransport.class)
         );
     }
 

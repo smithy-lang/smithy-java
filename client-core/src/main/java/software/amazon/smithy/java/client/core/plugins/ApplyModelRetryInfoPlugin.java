@@ -15,12 +15,14 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.retries.api.RetrySafety;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Adds model-based retry information to an exception.
  *
  * <p>This plugin is added to clients by default via {@link DefaultPlugin}.
  */
+@SmithyInternalApi
 public final class ApplyModelRetryInfoPlugin implements ClientPlugin {
 
     public static final ApplyModelRetryInfoPlugin INSTANCE = new ApplyModelRetryInfoPlugin();

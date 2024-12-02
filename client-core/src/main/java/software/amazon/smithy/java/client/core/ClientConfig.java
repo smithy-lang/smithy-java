@@ -12,7 +12,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Predicate;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
@@ -35,7 +34,7 @@ import software.amazon.smithy.java.retries.api.RetryStrategy;
  */
 public final class ClientConfig {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientConfig.class);
-    private static final List<ClientTransportFactory<?, ?>> transportFactories = ClientTransportFactory
+    private static final List<ClientTransportFactory<?, ?>> TRANSPORT_FACTORIES = ClientTransportFactory
         .load(ClientConfig.class.getClassLoader());
     private static final AuthScheme<Object, Identity> NO_AUTH_AUTH_SCHEME = AuthScheme.noAuthAuthScheme();
 
@@ -60,15 +59,14 @@ public final class ClientConfig {
         // This builder is used in toBuilder.
         this.originalBuilder = builder.copyBuilder();
 
-        this.protocol = Objects.requireNonNull(builder.protocol, "protocol cannot be null");
-        // If no transport is set, try to find compatible transport via SPI.
-        this.transport = builder.transport != null ? builder.transport : discoverTransport(protocol);
-        ClientPipeline.validateProtocolAndTransport(protocol, transport);
+        // Ensure the transport was resolved and applied as a plugin.
+        // When using a Client, transport is applied before build is called to let user-defined plugins supersede
+        // transport-applied plugins. This is performed here in case configs are created manually.
+        builder.resolveTransport();
 
-        builder.applyPlugin(transport);
-        if (this.protocol != builder.protocol) {
-            throw new IllegalStateException("ClientTransport must not change the ClientProtocol");
-        }
+        this.protocol = builder.protocol;
+        this.transport = builder.transport;
+        ClientPipeline.validateProtocolAndTransport(protocol, transport);
 
         this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
 
@@ -93,8 +91,8 @@ public final class ClientConfig {
     /**
      * Search for a transport service provider that is compatible with the provided protocol.
      */
-    private ClientTransport<?, ?> discoverTransport(ClientProtocol<?, ?> protocol) {
-        for (var factory : transportFactories) {
+    private static ClientTransport<?, ?> discoverTransport(ClientProtocol<?, ?> protocol) {
+        for (var factory : TRANSPORT_FACTORIES) {
             // Find the first applicable transport factory
             if (factory.messageExchange().equals(protocol.messageExchange())) {
                 return factory.createTransport();
@@ -258,7 +256,6 @@ public final class ClientConfig {
         private RetryStrategy retryStrategy;
         private String retryScope;
         private final Set<Class<? extends ClientPlugin>> appliedPlugins = new LinkedHashSet<>();
-        private final List<Predicate<Class<? extends ClientPlugin>>> pluginPredicates = new ArrayList<>();
 
         private Builder copyBuilder() {
             Builder builder = new Builder();
@@ -273,7 +270,6 @@ public final class ClientConfig {
             builder.retryStrategy = retryStrategy;
             builder.retryScope = retryScope;
             builder.appliedPlugins.addAll(appliedPlugins);
-            builder.pluginPredicates.addAll(pluginPredicates);
             return builder;
         }
 
@@ -355,6 +351,26 @@ public final class ClientConfig {
          */
         public Builder transport(ClientTransport<?, ?> transport) {
             this.transport = transport;
+            return this;
+        }
+
+        /**
+         * If no transport was provided, then resolve a transport now based on the selected protocol, and apply the
+         * transport as a plugin if it has not yet been applied.
+         *
+         * @return the builder.
+         * @throws NullPointerException if not protocol is set.
+         * @throws IllegalArgumentException if no transport could be resolved.
+         */
+        public Builder resolveTransport() {
+            Objects.requireNonNull(protocol, "protocol must be set to resolve a transport");
+            if (transport == null) {
+                transport(discoverTransport(protocol));
+            }
+            // If the transport has not yet been applied as a plugin, apply it now.
+            if (!appliedPlugins.contains(transport.getClass())) {
+                applyPlugin(transport);
+            }
             return this;
         }
 
@@ -505,55 +521,14 @@ public final class ClientConfig {
          * @param plugin Plugin to apply.
          * @return the updated builder.
          */
-        public boolean applyPlugin(ClientPlugin plugin) {
-            return applyPlugin(plugin, false);
-        }
-
-        /**
-         * Applies a plugin to the configuration and tracks the plugin class as applied.
-         *
-         * <p>Essential plugins are always applied at most once and ignore any plugin predicates added via
-         * {@link #addPluginPredicate}.
-         *
-         * @param plugin Plugin to apply.
-         * @return true if the plugin was applied, or false if the plugin was already applied.
-         */
-        public boolean applyEssentialPlugin(ClientPlugin plugin) {
-            return applyPlugin(plugin, true);
-        }
-
-        private boolean applyPlugin(ClientPlugin plugin, boolean isEssential) {
+        public Builder applyPlugin(ClientPlugin plugin) {
             if (appliedPlugins.contains(plugin.getClass())) {
                 LOGGER.debug("Skipping already applied client plugin: {}", plugin.getClass());
-                return false;
+            } else {
+                LOGGER.debug("Applying client plugin: {}", plugin.getClass());
+                appliedPlugins.add(plugin.getClass());
+                plugin.configureClient(this);
             }
-
-            if (!isEssential) {
-                for (var predicate : pluginPredicates) {
-                    if (!predicate.test(plugin.getClass())) {
-                        LOGGER.debug("Skipping client plugin based on predicate: {}", plugin.getClass());
-                        return false;
-                    }
-                }
-            }
-
-            LOGGER.debug("Applying client plugin: {}", plugin.getClass());
-            appliedPlugins.add(plugin.getClass());
-            plugin.configureClient(this);
-            return true;
-        }
-
-        /**
-         * Add predicate that can be used to disable plugins by type.
-         *
-         * <p>A plugin is only applied if it passes each predicate.
-         *
-         * @param predicate To Add.
-         * @return the builder.
-         * @see Client.Builder#addPluginPredicate(Predicate)
-         */
-        public Builder addPluginPredicate(Predicate<Class<? extends ClientPlugin>> predicate) {
-            pluginPredicates.add(Objects.requireNonNull(predicate, "predicate cannot be null"));
             return this;
         }
 
