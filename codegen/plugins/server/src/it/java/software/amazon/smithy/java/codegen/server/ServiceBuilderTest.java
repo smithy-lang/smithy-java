@@ -26,10 +26,10 @@ import smithy.java.codegen.server.test.service.GetBeerOperationAsync;
 import smithy.java.codegen.server.test.service.GetErrorOperationAsync;
 import smithy.java.codegen.server.test.service.TestService;
 import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.framework.model.InternalFailureException;
+import software.amazon.smithy.java.framework.model.UnknownOperationException;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.RequestContext;
-import software.amazon.smithy.java.server.exceptions.InternalServerError;
-import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 
 public class ServiceBuilderTest {
 
@@ -67,7 +67,7 @@ public class ServiceBuilderTest {
                 }
             } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InvocationTargetException
                 | InstantiationException e) {
-                exception = new InternalServerError("Exception class not found");
+                exception = InternalFailureException.builder().message("Exception class not found").build();
             }
             return CompletableFuture.failedFuture(exception);
         }

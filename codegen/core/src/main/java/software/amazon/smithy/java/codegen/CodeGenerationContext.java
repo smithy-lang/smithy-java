@@ -7,14 +7,18 @@ package software.amazon.smithy.java.codegen;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.codegen.core.CodegenContext;
 import software.amazon.smithy.codegen.core.CodegenException;
+import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.WriterDelegator;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -104,6 +108,7 @@ public class CodeGenerationContext
     private final WriterDelegator<JavaWriter> writerDelegator;
     private final Set<ShapeId> runtimeTraits;
     private final List<TraitInitializer<?>> traitInitializers;
+    private final Map<ShapeId, Symbol> errorMapping;
 
     public CodeGenerationContext(
         Model model,
@@ -120,6 +125,7 @@ public class CodeGenerationContext
         this.writerDelegator = new WriterDelegator<>(fileManifest, symbolProvider, new JavaWriter.Factory(settings));
         this.runtimeTraits = collectRuntimeTraits();
         this.traitInitializers = collectTraitInitializers();
+        this.errorMapping = collectImplicitErrorMappings(settings);
     }
 
     @Override
@@ -154,6 +160,10 @@ public class CodeGenerationContext
 
     public Set<ShapeId> runtimeTraits() {
         return runtimeTraits;
+    }
+
+    public Symbol errorMapping(ShapeId shapeId) {
+        return Objects.requireNonNull(errorMapping.get(shapeId), "Unknown implicit error shape id: " + shapeId);
     }
 
     /**
@@ -239,5 +249,16 @@ public class CodeGenerationContext
             }
         }
         throw new IllegalArgumentException("Could not find initializer for " + trait);
+    }
+
+    // TODO: Allow additional mappings to be added from settings.
+    private Map<ShapeId, Symbol> collectImplicitErrorMappings(JavaCodegenSettings settings) {
+        Map<ShapeId, Symbol> errorMappings = new HashMap<>();
+        for (var integration : integrations) {
+            for (var entry : integration.implicitErrorMappings().entrySet()) {
+                errorMappings.put(entry.getKey(), CodegenUtils.fromClass(entry.getValue()));
+            }
+        }
+        return errorMappings;
     }
 }

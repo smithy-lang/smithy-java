@@ -154,7 +154,6 @@ final class AwsRestJson1Protocol extends ServerProtocol {
 
         job.request().setDeserializedValue(inputShapeBuilder.build());
         return CompletableFuture.completedFuture(null);
-
     }
 
     @Override

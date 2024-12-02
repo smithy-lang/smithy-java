@@ -10,6 +10,8 @@ import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.cbor.Rpcv2CborCodec;
 import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.framework.model.MalformedRequestException;
+import software.amazon.smithy.java.framework.model.UnknownOperationException;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.server.Service;
@@ -17,8 +19,6 @@ import software.amazon.smithy.java.server.core.Job;
 import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.ServiceProtocolResolutionRequest;
 import software.amazon.smithy.java.server.core.ServiceProtocolResolutionResult;
-import software.amazon.smithy.java.server.exceptions.MalformedHttpException;
-import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.protocol.traits.Rpcv2CborTrait;
 
@@ -62,7 +62,7 @@ final class RpcV2CborProtocol extends ServerProtocol {
             }
         }
         if (selectedService == null) {
-            throw new UnknownOperationException();
+            throw UnknownOperationException.builder().build();
         }
         return new ServiceProtocolResolutionResult(
             selectedService,
@@ -75,7 +75,7 @@ final class RpcV2CborProtocol extends ServerProtocol {
     public CompletableFuture<Void> deserializeInput(Job job) {
         var dataStream = job.request().getDataStream();
         if (dataStream.contentLength() > 0 && !"application/cbor".equals(dataStream.contentType())) {
-            throw new MalformedHttpException("Invalid content type");
+            throw MalformedRequestException.builder().message("Invalid content type").build();
         }
         return dataStream.asByteBuffer().thenApply(b -> {
             var input = codec.deserializeShape(
@@ -134,7 +134,7 @@ final class RpcV2CborProtocol extends ServerProtocol {
         // fail if we went all the way to the start of the path or if the first
         // character encountered is a "/" (e.g. in "/service/foo/operation/")
         if (operationNameStart == 0 || operationNameStart == term || !isValidOperationPrefix(path, pos)) {
-            throw new UnknownOperationException("Invalid RpcV2 URI");
+            throw UnknownOperationException.builder().message("Invalid RpcV2 URI").build();
         }
 
         // seek pos to the character before "/operation", pos is currently on the "n"
@@ -153,7 +153,7 @@ final class RpcV2CborProtocol extends ServerProtocol {
         // serviceNameStart < 0 means we never found a "/"
         // serviceNameStart == serviceNameEnd means we had a zero-width name, "/service//"
         if (serviceNameStart < 0 || serviceNameStart == serviceNameEnd || !isValidServicePrefix(path, pos)) {
-            throw new UnknownOperationException("Invalid RpcV2 URI");
+            throw UnknownOperationException.builder().message("Invalid RpcV2 URI").build();
         }
 
         String serviceName;

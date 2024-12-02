@@ -8,12 +8,19 @@ include(":core")
 // Codegen Base
 include(":codegen:core")
 include(":codegen:plugins")
+
 // Codegen Plugins
 include(":codegen:plugins:client")
 include(":codegen:plugins:server")
 include(":codegen:plugins:types")
 
-// Testing
+// Framework errors
+include(":framework-errors")
+// TODO: Upstream
+include(":smithy-framework-errors")
+include(":smithy-implicit-error-trait")
+
+// Protocol tests
 include(":protocol-tests")
 include(":mock-client-plugin")
 

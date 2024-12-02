@@ -7,12 +7,14 @@ package software.amazon.smithy.java.codegen.server.generators;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
+import software.amazon.smithy.framework.knowledge.ImplicitErrorIndex;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.generators.IdStringGenerator;
@@ -22,9 +24,9 @@ import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.framework.model.UnknownOperationException;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
-import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
@@ -58,6 +60,9 @@ public final class ServiceGenerator implements
 
                     ${schema:C}
 
+                    private static final ${set:T}<${schemaClass:T}> ERROR_SCHEMAS = ${set:T}.of(${#exceptions}${value:T}.$$SCHEMA${^key.last},
+                            ${/key.last}${/exceptions});
+
                     ${properties:C|}
 
                     ${constructor:C|}
@@ -79,12 +84,18 @@ public final class ServiceGenerator implements
                     public ${schemaClass:T} schema() {
                          return $$SCHEMA;
                     }
+
+                    @Override
+                    public ${set:T}<${schemaClass:T}> errorSchemas() {
+                        return ERROR_SCHEMAS;
+                    }
                 }
                 """;
             writer.putContext("operationHolder", Operation.class);
             writer.putContext("serviceType", Service.class);
             writer.putContext("serializableStruct", SerializableStruct.class);
             writer.putContext("schemaClass", Schema.class);
+            writer.putContext("set", Set.class);
             writer.putContext("service", directive.symbol());
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(
@@ -107,6 +118,12 @@ public final class ServiceGenerator implements
                 "schema",
                 new SchemaGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.context())
             );
+            var implicitErrorIndex = ImplicitErrorIndex.of(directive.model());
+            var implicitErrors = implicitErrorIndex.getImplicitErrorsForService(directive.service())
+                .stream()
+                .map(id -> directive.context().errorMapping(id))
+                .toList();
+            writer.putContext("exceptions", implicitErrors);
             writer.putContext("operationList", List.class);
             writer.write(template);
             writer.popState();
@@ -296,7 +313,7 @@ public final class ServiceGenerator implements
                     );
                 }
                 writer.write(
-                    "default -> throw new $T(\"Unknown operation name: \" + operationName);",
+                    "default -> throw $T.builder().message(\"Unknown operation name: \" + operationName).build();",
                     UnknownOperationException.class
                 );
             });

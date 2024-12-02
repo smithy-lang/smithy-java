@@ -12,6 +12,7 @@ dependencies {
     api(project(":core"))
     api(project(":auth-api"))
     api(project(":retries-api"))
+    api(project(":framework-errors"))
     implementation(project(":logging"))
 
     testImplementation(project(":dynamic-client"))

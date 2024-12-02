@@ -55,7 +55,8 @@ public abstract class Client {
 
         this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
 
-        this.typeRegistry = TypeRegistry.builder().build();
+        // Use the implicit error registry as the base type registry for all calls.
+        this.typeRegistry = implicitErrorRegistry();
 
         if (config.retryStrategy() != null) {
             this.retryStrategy = config.retryStrategy();
@@ -63,6 +64,10 @@ public abstract class Client {
             // TODO: Pick a better default retry strategy.
             this.retryStrategy = RetryStrategy.noRetries();
         }
+    }
+
+    protected TypeRegistry implicitErrorRegistry() {
+        return TypeRegistry.builder().build();
     }
 
     /**

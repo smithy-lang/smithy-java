@@ -52,7 +52,7 @@ public final class OperationGenerator
                     public final class ${shape:T} implements ${operationType:C} {
                         ${id:C|}
 
-                        private ${schema:C|}
+                        public ${schema:C|}
 
                         ${typeRegistrySection:C|}
 
@@ -222,11 +222,13 @@ public final class OperationGenerator
                     }
                 }
 
-                var exceptions = shape.getErrors()
+                // Base operation exceptions
+                var exceptions = shape.getErrors(directive.service())
                     .stream()
                     .map(directive.model()::expectShape)
                     .map(directive.symbolProvider()::toSymbol)
                     .toList();
+
                 writer.putContext("exceptions", exceptions);
                 writer.write(template);
                 writer.popState();

@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.framework.model.InternalFailureException;
 import software.amazon.smithy.java.server.Service;
-import software.amazon.smithy.java.server.exceptions.InternalServerError;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public abstract class ServerProtocol {
@@ -35,21 +35,20 @@ public abstract class ServerProtocol {
     }
 
     public final CompletableFuture<Void> serializeError(Job job, Throwable error) {
-        // Treat already-deserialized modeled exceptions as internal errors.
-        // Such errors are thrown by smithy-java clients used within the server.
-        if (error instanceof ModeledApiException me && !me.deserialized()) {
-            return serializeError(job, me);
-        }
-        return serializeError(job, new InternalServerError(error));
+        return serializeError(
+            job,
+            error instanceof ModeledApiException me ? me : InternalFailureException.builder().withCause(error).build()
+        );
     }
 
     protected abstract CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output, boolean isError);
 
     public final CompletableFuture<Void> serializeError(Job job, ModeledApiException error) {
-        if (!job.operation().getApiOperation().errorRegistry().contains(error.schema().id())) {
-            error = new InternalServerError(error);
+        // Check both implicit errors and operation errors to see if modeled API exception is
+        // defined as part of service interface. Otherwise, throw generic exception.
+        if (!job.operation().getApiOperation().errorSchemas().contains(error.schema().id())) {
+            error = InternalFailureException.builder().withCause(error).build();
         }
         return serializeOutput(job, error, true);
     }
-
 }

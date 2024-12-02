@@ -8,8 +8,8 @@ package software.amazon.smithy.java.server.core;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.framework.model.InternalFailureException;
 import software.amazon.smithy.java.server.Operation;
-import software.amazon.smithy.java.server.exceptions.InternalServerError;
 
 public class OperationHandler implements Handler {
 
@@ -29,7 +29,7 @@ public class OperationHandler implements Handler {
                     if (error instanceof ModeledApiException e) {
                         modeledError = e;
                     } else {
-                        modeledError = new InternalServerError(error);
+                        modeledError = InternalFailureException.builder().withCause(error).build();
                     }
                     output = modeledError;
                     job.setFailure(modeledError);
@@ -46,7 +46,7 @@ public class OperationHandler implements Handler {
                 job.setFailure(e);
                 response = e;
             } catch (Exception e) {
-                var modeledError = new InternalServerError(e);
+                var modeledError = InternalFailureException.builder().withCause(e).build();
                 job.setFailure(e);
                 response = modeledError;
             }

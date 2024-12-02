@@ -107,7 +107,9 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
         if (isFailure) {
             responseStatus = ModeledApiException.getHttpStatusCode(schema);
-            headers.put("X-Amzn-Errortype", List.of(schema.id().getName()));
+            // TODO: Update this to only use the full ID if the schema namespace is outside the
+            //       service namespace
+            headers.put("X-Amzn-Errortype", List.of(schema.id().toString()));
         }
 
         struct.serializeMembers(new BindingSerializer(this));

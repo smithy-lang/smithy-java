@@ -8,7 +8,7 @@ package software.amazon.smithy.java.server.core;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
+import software.amazon.smithy.java.framework.model.UnknownOperationException;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public final class ProtocolResolver {
@@ -36,7 +36,7 @@ public final class ProtocolResolver {
     public ServiceProtocolResolutionResult resolve(ServiceProtocolResolutionRequest request) {
         var candidates = serviceMatcher.getCandidateServices(request);
         if (candidates.isEmpty()) {
-            throw new UnknownOperationException("No matching services found for request");
+            throw UnknownOperationException.builder().message("No matching services found for request").build();
         }
         for (ServerProtocol protocol : serverProtocolHandlers) {
             var resolutionResult = protocol.resolveOperation(request, candidates);
@@ -44,6 +44,6 @@ public final class ProtocolResolver {
                 return resolutionResult;
             }
         }
-        throw new UnknownOperationException("No matching operations found for request");
+        throw UnknownOperationException.builder().message("No matching operations found for request").build();
     }
 }

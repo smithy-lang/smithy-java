@@ -6,8 +6,11 @@
 package software.amazon.smithy.java.codegen;
 
 import java.util.List;
+import java.util.Map;
 import software.amazon.smithy.codegen.core.SmithyIntegration;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.Trait;
 
 /**
@@ -22,5 +25,12 @@ public interface JavaCodegenIntegration
      */
     default List<TraitInitializer<? extends Trait>> traitInitializers() {
         return List.of();
+    }
+
+    /**
+     * List of Implicit error mappings to add to the code generator.
+     */
+    default Map<ShapeId, Class<? extends ModeledApiException>> implicitErrorMappings() {
+        return Map.of();
     }
 }

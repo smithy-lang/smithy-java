@@ -5,12 +5,14 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
+import software.amazon.smithy.framework.knowledge.ImplicitErrorIndex;
 import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -20,10 +22,12 @@ import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ApplyDocumentation;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
@@ -48,10 +52,18 @@ public final class ClientImplementationGenerator
             writer.pushState(new ClassSection(directive.shape(), ApplyDocumentation.NONE));
             var template = """
                 final class ${impl:T} extends ${client:T} implements ${interface:T} {
+                    ${?hasImplicitErrors}${implicitErrorRegistry:C|}
 
+                    ${/hasImplicitErrors}
                     ${impl:T}(${interface:T}.Builder builder) {
                         super(builder);
                     }
+
+                    ${?hasImplicitErrors}
+                    @Override
+                    protected TypeRegistry implicitErrorRegistry() {
+                        return IMPLICIT_ERROR_REGISTRY;
+                    }${/hasImplicitErrors}
 
                     ${operations:C|}
                 }
@@ -61,6 +73,13 @@ public final class ClientImplementationGenerator
             writer.putContext("impl", impl);
             writer.putContext("future", CompletableFuture.class);
             writer.putContext("completionException", CompletionException.class);
+            var implicitErrorIndex = ImplicitErrorIndex.of(directive.model());
+            var implicitErrors = implicitErrorIndex.getImplicitErrorsForService(directive.service());
+            writer.putContext("hasImplicitErrors", !implicitErrors.isEmpty());
+            writer.putContext(
+                "implicitErrorRegistry",
+                new ImplicitErrorRegistryGenerator(writer, directive.context(), implicitErrors)
+            );
             writer.putContext(
                 "operations",
                 new OperationMethodGenerator(
@@ -105,6 +124,32 @@ public final class ClientImplementationGenerator
                 writer.write(template);
                 writer.popState();
             }
+            writer.popState();
+        }
+    }
+
+    private record ImplicitErrorRegistryGenerator(
+        JavaWriter writer,
+        CodeGenerationContext context,
+        Set<ShapeId> ImplicitErrorIds
+    ) implements Runnable {
+
+        @Override
+        public void run() {
+            writer.pushState();
+            writer.putContext("typeRegistry", TypeRegistry.class);
+            writer.write(
+                "private static final ${typeRegistry:T} IMPLICIT_ERROR_REGISTRY = ${typeRegistry:T}.builder()"
+            );
+            writer.indent();
+            for (var implicitErrorId : ImplicitErrorIds) {
+                writer.pushState();
+                writer.putContext("errorType", context.errorMapping(implicitErrorId));
+                writer.write(".putType(${errorType:T}.$$ID, ${errorType:T}.class, ${errorType:T}::builder)");
+                writer.popState();
+            }
+            writer.writeWithNoFormatting(".build();");
+            writer.dedent();
             writer.popState();
         }
     }

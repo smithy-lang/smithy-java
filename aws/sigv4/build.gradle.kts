@@ -4,6 +4,7 @@ plugins {
     id("smithy-java.module-conventions")
     alias(libs.plugins.jmh)
     alias(libs.plugins.osdetector)
+    alias(libs.plugins.smithy.gradle.jar)
 }
 
 description = "This module provides AWS-Specific http client functionality"
@@ -18,6 +19,9 @@ dependencies {
     implementation(project(":io"))
     implementation(project(":logging"))
     implementation(libs.smithy.aws.traits)
+
+    smithyBuild(project(":codegen:plugins:types"))
+    implementation(project(":smithy-implicit-error-trait"))
 }
 
 afterEvaluate {
@@ -35,4 +39,29 @@ jmh {
     fork = 1
     // profilers.add("async:output=flamegraph")
     // profilers.add("gc")
+}
+
+// Add generated Java sources to the main sourceset
+afterEvaluate {
+    val typesPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-type-codegen")
+    sourceSets {
+        main {
+            java {
+                srcDir(typesPath)
+            }
+        }
+    }
+}
+
+tasks.named("compileJava") {
+    dependsOn("smithyBuild")
+}
+
+// Helps Intellij plugin identify models
+sourceSets {
+    main {
+        java {
+            srcDir("model")
+        }
+    }
 }

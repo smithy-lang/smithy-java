@@ -26,9 +26,9 @@ import software.amazon.smithy.java.client.core.interceptors.OutputHook;
 import software.amazon.smithy.java.core.schema.ApiException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
+import software.amazon.smithy.java.framework.model.InternalFailureException;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.retries.api.RetrySafety;
-import software.amazon.smithy.java.server.exceptions.InternalServerError;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -108,7 +108,7 @@ public class MockPluginTest {
 
     @Test
     public void returnsMockedInternalError() throws URISyntaxException {
-        var mockQueue = new MockQueue().enqueue(new InternalServerError("Oh no"));
+        var mockQueue = new MockQueue().enqueue(InternalFailureException.builder().message("Oh no").build());
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
@@ -128,7 +128,7 @@ public class MockPluginTest {
 
     @Test
     public void returnsMockedExceptionsDirectly() throws URISyntaxException {
-        var mockQueue = new MockQueue().enqueueError(new InternalServerError("Oh no"));
+        var mockQueue = new MockQueue().enqueueError(InternalFailureException.builder().message("Oh no").build());
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
@@ -139,7 +139,7 @@ public class MockPluginTest {
             .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
             .build();
 
-        Assertions.assertThrows(InternalServerError.class, () -> client.call("GetSprocket"));
+        Assertions.assertThrows(InternalFailureException.class, () -> client.call("GetSprocket"));
         assertThat(mock.getRequests(), hasSize(1));
     }
 

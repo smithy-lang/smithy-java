@@ -12,8 +12,10 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.DefaultTransforms;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.transforms.AddFrameworkErrorsTransform;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.model.transform.ModelTransformer;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
@@ -32,12 +34,16 @@ public final class JavaClientCodegenPlugin implements SmithyBuildPlugin {
     public void execute(PluginContext context) {
         CodegenDirector<JavaWriter, JavaCodegenIntegration, CodeGenerationContext, JavaCodegenSettings> runner = new CodegenDirector<>();
         var settings = JavaCodegenSettings.fromNode(context.getSettings());
-        LOGGER.info("Generating Smithy-Java client for service [{}]...", settings.service());
         runner.settings(settings);
         runner.directedCodegen(new DirectedJavaClientCodegen());
         runner.fileManifest(context.getFileManifest());
         runner.service(settings.service());
-        runner.model(context.getModel());
+        // TODO: Upstream
+        var model = new AddFrameworkErrorsTransform(AddFrameworkErrorsTransform.Mode.CLIENT).transform(
+            ModelTransformer.create(),
+            context.getModel()
+        );
+        runner.model(model);
         runner.integrationClass(JavaCodegenIntegration.class);
         DefaultTransforms.apply(runner, settings);
         runner.run();

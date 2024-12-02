@@ -15,8 +15,7 @@ dependencies {
     implementation(project(":http-api"))
     implementation(project(":logging"))
     implementation(project(":core"))
-    implementation(project(":server-core"))
-
+    api(project(":server-core"))
     testImplementation(project(":rpcv2-cbor-codec"))
     testImplementation(project(":examples:lambda-endpoint"))
 }

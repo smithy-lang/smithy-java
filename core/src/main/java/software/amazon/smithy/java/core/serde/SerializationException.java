@@ -5,11 +5,13 @@
 
 package software.amazon.smithy.java.core.serde;
 
-import software.amazon.smithy.java.core.schema.ApiException;
-
-public class SerializationException extends ApiException {
+/**
+ * Exception throw by {@link ShapeSerializer} and {@link ShapeDeserializer} implementations when they fail
+ * to serialize or deserialize a {@link software.amazon.smithy.java.core.schema.SerializableShape}.
+ */
+public class SerializationException extends RuntimeException {
     public SerializationException(String message) {
-        super(message, Fault.OTHER);
+        super(message);
     }
 
     public SerializationException(Throwable cause) {
@@ -17,6 +19,6 @@ public class SerializationException extends ApiException {
     }
 
     public SerializationException(String message, Throwable cause) {
-        super(message, cause, Fault.OTHER);
+        super(message, cause);
     }
 }

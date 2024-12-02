@@ -27,6 +27,24 @@ operation Echo {
     output := {
         string: String
     }
+    errors: [
+        MyErrorA
+        MyErrorB
+    ]
+}
+
+@error("client")
+@httpError(401)
+structure MyErrorA {
+    @required
+    message: String
+}
+
+@error("server")
+@httpError(501)
+structure MyErrorB {
+    @required
+    message: String
 }
 
 /// Tests the generation and compilation of pagination method.

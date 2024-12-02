@@ -256,7 +256,8 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     private static boolean uriUsingNonStandardPort(URI uri) {
         return switch (uri.getPort()) {
             case -1 -> false;
-            case 80 -> uri.getScheme().equals("http");
+            // TODO: Remove 8080. Just for testing
+            case 80, 8080 -> uri.getScheme().equals("http");
             case 443 -> uri.getScheme().equals("https");
             default -> throw new IllegalStateException("Unexpected value for URI scheme: " + uri.getScheme());
         };

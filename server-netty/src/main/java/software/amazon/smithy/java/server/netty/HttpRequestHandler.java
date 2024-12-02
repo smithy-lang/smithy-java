@@ -12,6 +12,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
+import software.amazon.smithy.java.framework.model.UnknownOperationException;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.server.core.HttpJob;
@@ -19,7 +20,6 @@ import software.amazon.smithy.java.server.core.HttpResponse;
 import software.amazon.smithy.java.server.core.Orchestrator;
 import software.amazon.smithy.java.server.core.ProtocolResolver;
 import software.amazon.smithy.java.server.core.ServiceProtocolResolutionRequest;
-import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 
 final class HttpRequestHandler extends ChannelDuplexHandler {
 

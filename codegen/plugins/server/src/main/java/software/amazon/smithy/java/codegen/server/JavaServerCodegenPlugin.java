@@ -12,8 +12,10 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.DefaultTransforms;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.transforms.AddFrameworkErrorsTransform;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.model.transform.ModelTransformer;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
@@ -38,7 +40,11 @@ public final class JavaServerCodegenPlugin implements SmithyBuildPlugin {
         runner.directedCodegen(new DirectedJavaServerCodegen());
         runner.fileManifest(context.getFileManifest());
         runner.service(settings.service());
-        runner.model(context.getModel());
+        var model = new AddFrameworkErrorsTransform(AddFrameworkErrorsTransform.Mode.CLIENT).transform(
+            ModelTransformer.create(),
+            context.getModel()
+        );
+        runner.model(model);
         runner.integrationClass(JavaCodegenIntegration.class);
         DefaultTransforms.apply(runner, settings);
         runner.run();
