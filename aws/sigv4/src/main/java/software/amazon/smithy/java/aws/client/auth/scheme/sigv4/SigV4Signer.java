@@ -54,46 +54,48 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     private static final String TERMINATOR = "aws4_request";
     private static final SigningCache SIGNER_CACHE = new SigningCache(300);
 
-    private static final Pool<StringBuilder> SB_POOL = new Pool<>(POOL_SIZE, () -> new StringBuilder(BUFFER_SIZE));
-    private static final Pool<MessageDigest> DIGEST_POOL = new Pool<>(POOL_SIZE, () -> {
-        try {
-            return MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Unable to fetch message digest instance for SHA-256", e);
-        }
-    });
-    private static final Pool<Mac> MAC_POOL = new Pool<>(POOL_SIZE, () -> {
-        try {
-            return Mac.getInstance(HMAC_SHA_256);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Unable to fetch Mac instance for HmacSHA256", e);
-        }
-    });
+    private static final class SigningResources {
+        final StringBuilder sb;
+        final MessageDigest sha256Digest;
+        final Mac sha256Mac;
 
-    private final StringBuilder sb;
-    private final MessageDigest sha256Digest;
-    private final Mac sha256Mac;
+        SigningResources() {
+            this.sb = new StringBuilder(BUFFER_SIZE);
+            try {
+                this.sha256Digest = MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException e) {
+                throw new RuntimeException("Unable to fetch message digest instance for SHA-256", e);
+            }
+            try {
+                this.sha256Mac = Mac.getInstance(HMAC_SHA_256);
+            } catch (NoSuchAlgorithmException e) {
+                throw new RuntimeException("Unable to fetch Mac instance for HmacSHA256", e);
+            }
+        }
+
+        void reset() {
+            sb.setLength(0);
+            sha256Digest.reset();
+            sha256Mac.reset();
+        }
+    }
+
+    private static final Pool<SigningResources> RESOURCES_POOL = new Pool<>(POOL_SIZE, SigningResources::new);
+
+    private final SigningResources signingResources;
 
     public static SigV4Signer create() {
         return new SigV4Signer();
     }
 
     private SigV4Signer() {
-        this.sb = SB_POOL.get();
-        sb.setLength(0);
-
-        this.sha256Digest = DIGEST_POOL.get();
-        sha256Digest.reset();
-
-        this.sha256Mac = MAC_POOL.get();
-        sha256Mac.reset();
+        this.signingResources = RESOURCES_POOL.get();
+        signingResources.reset();
     }
 
     @Override
     public void close() {
-        SB_POOL.release(sb);
-        DIGEST_POOL.release(sha256Digest);
-        MAC_POOL.release(sha256Mac);
+        RESOURCES_POOL.release(signingResources);
     }
 
     @Override
@@ -125,6 +127,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
                 !request.body().hasKnownLength()
             );
             // Don't let the cached buffers grow too large.
+            var sb = signingResources.sb;
             if (sb.length() > BUFFER_SIZE) {
                 sb.setLength(BUFFER_SIZE);
                 sb.trimToSize();
@@ -161,6 +164,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         var hostHeader = uriUsingNonStandardPort(uri) ? uri.getHost() + ':' + uri.getPort() : uri.getHost();
         headers.put("host", List.of(hostHeader));
 
+        var sb = signingResources.sb;
         var signingDate = signingTimestamp.atOffset(ZoneOffset.UTC).toLocalDateTime();
         var dateStamp = formatDate(signingDate, sb);
         var requestTime = formatRfc3339(signingDate, dateStamp, sb);
@@ -174,7 +178,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         }
 
         // Determine sorted list of headers to sign
-        var signedHeaders = getSignedHeaders(headers.keySet());
+        var signedHeaders = getSignedHeaders(headers.keySet(), sb);
 
         // Build canonicalRequest and compute its signature
         var canonicalRequest = getCanonicalRequest(
@@ -183,7 +187,8 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             headers,
             headers.keySet(),
             signedHeaders,
-            payloadHash
+            payloadHash,
+            sb
         );
 
         var signingKey = deriveSigningKey(
@@ -193,16 +198,16 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
             serviceName,
             signingTimestamp
         );
-        var scope = createScope(dateStamp, regionName, serviceName);
-        var signature = computeSignature(canonicalRequest, scope, requestTime, signingKey);
+        var scope = createScope(dateStamp, regionName, serviceName, sb);
+        var signature = computeSignature(canonicalRequest, scope, requestTime, signingKey, sb);
 
-        var authorizationHeader = getAuthHeader(accessKeyId, scope, signedHeaders, signature);
+        var authorizationHeader = getAuthHeader(accessKeyId, scope, signedHeaders, signature, sb);
         headers.put("authorization", List.of(authorizationHeader));
 
         return headers;
     }
 
-    private String createScope(String dateStamp, String regionName, String serviceName) {
+    private static String createScope(String dateStamp, String regionName, String serviceName, StringBuilder sb) {
         sb.setLength(0);
         sb.append(dateStamp).append('/');
         sb.append(regionName).append('/');
@@ -257,7 +262,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         };
     }
 
-    private String getSignedHeaders(Set<String> sortedHeaderKeys) {
+    private static String getSignedHeaders(Set<String> sortedHeaderKeys, StringBuilder sb) {
         sb.setLength(0);
         for (var header : sortedHeaderKeys) {
             if (!HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(header)) {
@@ -269,11 +274,12 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         return sb.toString();
     }
 
-    private String getAuthHeader(
+    private static String getAuthHeader(
         String accessKeyId,
         String scope,
         String signedHeaderBuilder,
-        String signature
+        String signature,
+        StringBuilder sb
     ) {
         sb.setLength(0);
         sb.append(ALGORITHM)
@@ -294,7 +300,8 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         Map<String, List<String>> headers,
         Set<String> sortedHeaderKeys,
         String signedHeaders,
-        String payloadHash
+        String payloadHash,
+        StringBuilder sb
     ) {
         sb.setLength(0);
         sb.append(method).append('\n');
@@ -463,7 +470,8 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         byte[] canonicalRequest,
         String scope,
         String requestTime,
-        byte[] signingKey
+        byte[] signingKey,
+        StringBuilder sb
     ) {
         sb.setLength(0);
         sb.append(ALGORITHM)
@@ -479,6 +487,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private byte[] sign(String data, byte[] key) {
         try {
+            var sha256Mac = signingResources.sha256Mac;
             sha256Mac.reset();
             sha256Mac.init(new SecretKeySpec(key, HMAC_SHA_256));
             return sha256Mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
@@ -488,12 +497,14 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     private byte[] hash(ByteBuffer data) {
+        var sha256Digest = signingResources.sha256Digest;
         sha256Digest.reset();
         sha256Digest.update(data);
         return sha256Digest.digest();
     }
 
     private byte[] hash(byte[] data) {
+        var sha256Digest = signingResources.sha256Digest;
         sha256Digest.reset();
         sha256Digest.update(data);
         return sha256Digest.digest();
