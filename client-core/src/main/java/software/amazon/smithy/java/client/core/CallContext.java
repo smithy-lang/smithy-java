@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.core;
 import java.time.Duration;
 import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
 
@@ -29,6 +30,11 @@ public final class CallContext {
      * The endpoint resolver used to resolve the destination endpoint for a request.
      */
     public static final Context.Key<EndpointResolver> ENDPOINT_RESOLVER = Context.key("EndpointResolver");
+
+    /**
+     * The read-only resolved endpoint for the request.
+     */
+    public static final Context.Key<Endpoint> ENDPOINT = Context.key("Endpoint of the request");
 
     /**
      * The identity resolved for the request.

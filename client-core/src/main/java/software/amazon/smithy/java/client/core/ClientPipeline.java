@@ -199,7 +199,10 @@ final class ClientPipeline<RequestT, ResponseT> {
 
         // TODO: what to do with supportedAuthSchemes of an endpoint?
         return resolveEndpoint(call)
-            .thenApply(endpoint -> protocol.setServiceEndpoint(requestHook.request(), endpoint))
+            .thenApply(endpoint -> {
+                call.context.put(CallContext.ENDPOINT, endpoint);
+                return protocol.setServiceEndpoint(requestHook.request(), endpoint);
+            })
             .thenCompose(resolvedAuthScheme::sign)
             .thenApply(req -> {
                 var updatedHook = requestHook.withRequest(req);
