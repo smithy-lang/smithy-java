@@ -227,7 +227,8 @@ public final class MockPlugin implements ClientPlugin {
             var matcherRequest = new MatcherRequest(
                 context,
                 currentRequest.operation().getApiOperation(),
-                currentRequest.request().input()
+                currentRequest.request().input(),
+                request
             );
             for (var matcher : matchers) {
                 result = matcher.apply(matcherRequest);
