@@ -44,7 +44,7 @@ final class UriTreeMatcherMapBuilder<T> implements UriMatcherMapBuilder<T> {
      */
     @Override
     public UriMatcherMap<T> build() {
-        return new UriTreeMatcherMap<>(root.seal(), allowEmptyPathSegments);
+        return new UriTreeMatcherMap<>(root.seal(), allowEmptyPathSegments != null && allowEmptyPathSegments);
     }
 
     /**

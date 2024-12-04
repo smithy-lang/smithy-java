@@ -21,9 +21,11 @@ import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * A mock client used to execute protocol tests.
@@ -82,8 +84,8 @@ final class MockClient extends Client {
     private record PlaceHolderProtocol<Req, Res>(MessageExchange<Req, Res> messageExchange) implements
         ClientProtocol<Req, Res> {
         @Override
-        public String id() {
-            return "placeholder";
+        public ShapeId id() {
+            return PreludeSchemas.DOCUMENT.id();
         }
 
         @Override

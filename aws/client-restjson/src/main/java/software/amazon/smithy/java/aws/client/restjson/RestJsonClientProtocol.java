@@ -39,7 +39,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
      *                relative shape IDs.
      */
     public RestJsonClientProtocol(ShapeId service) {
-        super(RestJson1Trait.ID.toString());
+        super(RestJson1Trait.ID);
 
         this.codec = JsonCodec.builder()
             .useJsonName(true)

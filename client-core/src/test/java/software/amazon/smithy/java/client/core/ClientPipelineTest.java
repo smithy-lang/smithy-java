@@ -14,19 +14,16 @@ import static org.hamcrest.Matchers.is;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
-import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
-import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.client.http.mock.MockPlugin;
+import software.amazon.smithy.java.client.http.mock.MockQueue;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
-import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.retries.api.AcquireInitialTokenRequest;
@@ -48,6 +45,7 @@ public class ClientPipelineTest {
             $version: "2"
             namespace smithy.example
 
+            @aws.protocols#restJson1
             service Sprockets {
                 operations: [GetSprocket]
                 errors: [ServiceFooError]
@@ -73,6 +71,7 @@ public class ClientPipelineTest {
             @httpError(500)
             structure ServiceFooError {}
             """)
+        .discoverModels()
         .assemble()
         .unwrap();
 
@@ -122,42 +121,27 @@ public class ClientPipelineTest {
     @Test
     public void canRetryRequests() {
         var service = ShapeId.from("smithy.example#Sprockets");
-        var attempt = new AtomicInteger(0);
         var calls = new ArrayList<>();
+
+        var mockQueue = new MockQueue()
+            .enqueue(
+                HttpResponse.builder()
+                    .statusCode(429)
+                    .body(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
+                    .build()
+            )
+            .enqueue(
+                HttpResponse.builder()
+                    .statusCode(200)
+                    .body(DataStream.ofString("{\"id\":\"1\"}"))
+                    .build()
+            );
+        var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
             .service(service)
             .model(MODEL)
-            .protocol(new RestJsonClientProtocol(service))
-            .transport(new ClientTransport<HttpRequest, HttpResponse>() {
-                @Override
-                public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
-                    return HttpMessageExchange.INSTANCE;
-                }
-
-                @Override
-                public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
-                    var i = attempt.incrementAndGet();
-                    calls.add("Send");
-                    if (i == 1) {
-                        return CompletableFuture.completedFuture(
-                            HttpResponse.builder()
-                                .statusCode(429)
-                                .body(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
-                                .build()
-                        );
-                    } else if (i == 2) {
-                        return CompletableFuture.completedFuture(
-                            HttpResponse.builder()
-                                .statusCode(200)
-                                .body(DataStream.ofString("{\"id\":\"1\"}"))
-                                .build()
-                        );
-                    } else {
-                        throw new IllegalStateException("Unexpected attempt " + i);
-                    }
-                }
-            })
+            .addPlugin(mock)
             .endpointResolver(EndpointResolver.staticEndpoint("https://localhost:8081"))
             .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
             .retryStrategy(new RetryStrategy() {
@@ -200,10 +184,10 @@ public class ClientPipelineTest {
 
         var response = client.call("GetSprocket", Document.createFromObject(Map.of("id", "1")));
 
+        assertThat(mockQueue.remaining(), is(0));
         assertThat(response.getMember("id").asString(), equalTo("1"));
         assertThat(response, instanceOf(Document.class));
-        assertThat(attempt.get(), is(2));
-        assertThat(calls, contains("Acquire", "Send", "Refresh", "Send", "Success: 1"));
+        assertThat(calls, contains("Acquire", "Refresh", "Success: 1"));
     }
 
     private static final class Token implements RetryToken {

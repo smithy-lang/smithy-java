@@ -14,6 +14,7 @@ import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
+import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -105,6 +106,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         }
 
         if (isFailure) {
+            responseStatus = ModeledApiException.getHttpStatusCode(schema);
             headers.put("X-Amzn-Errortype", List.of(schema.id().getName()));
         }
 

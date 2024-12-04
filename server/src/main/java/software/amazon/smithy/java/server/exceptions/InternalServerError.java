@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.server.exceptions;
 
 import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -17,7 +18,9 @@ public final class InternalServerError extends ModeledApiException {
         "software.amazon.smithy.exceptions#InternalServerError"
     );
 
-    private static final Schema SCHEMA = Schema.structureBuilder(ID).build();
+    private static final Schema SCHEMA = Schema.structureBuilder(ID)
+        .putMember("message", PreludeSchemas.STRING)
+        .build();
     private static final Schema SCHEMA_MESSAGE = SCHEMA.member("message");
 
     public InternalServerError(String message) {

@@ -39,7 +39,7 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
     private final HttpErrorDeserializer errorDeserializer;
 
     public RpcV2CborProtocol(ShapeId service) {
-        super(Rpcv2CborTrait.ID.toString());
+        super(Rpcv2CborTrait.ID);
         this.service = service;
         this.errorDeserializer = HttpErrorDeserializer.builder()
             .codec(CBOR_CODEC)

@@ -11,20 +11,21 @@ import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.uri.URIBuilder;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * An abstract class for implementing HTTP-Based protocol.
  */
 public abstract class HttpClientProtocol implements ClientProtocol<HttpRequest, HttpResponse> {
 
-    private final String id;
+    private final ShapeId id;
 
-    public HttpClientProtocol(String id) {
+    public HttpClientProtocol(ShapeId id) {
         this.id = id;
     }
 
     @Override
-    public final String id() {
+    public final ShapeId id() {
         return id;
     }
 

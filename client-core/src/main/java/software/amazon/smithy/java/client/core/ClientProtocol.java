@@ -13,6 +13,7 @@ import software.amazon.smithy.java.core.schema.ApiException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * Handles request and response serialization.
@@ -26,7 +27,7 @@ public interface ClientProtocol<RequestT, ResponseT> {
      *
      * @return the protocol ID.
      */
-    String id();
+    ShapeId id();
 
     /**
      * Get the message exchange.
