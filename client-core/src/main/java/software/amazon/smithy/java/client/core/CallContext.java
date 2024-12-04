@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.core;
 
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
@@ -69,7 +70,10 @@ public final class CallContext {
      * only ASCII letters, numbers, and hyphens. For example, "P" might be used to indicate that pagination was used
      * with a request.
      */
-    public static final Context.Key<Set<FeatureId>> FEATURE_IDS = Context.key("Feature IDs used with a request");
+    public static final Context.Key<Set<FeatureId>> FEATURE_IDS = Context.key(
+        "Feature IDs used with a request",
+        HashSet::new
+    );
 
     /**
      * The name of the application, used in things like user-agent headers.
