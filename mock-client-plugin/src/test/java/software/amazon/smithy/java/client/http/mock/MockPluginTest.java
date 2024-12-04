@@ -185,16 +185,16 @@ public class MockPluginTest {
         var bQueue = new MockQueue();
 
         var mock = MockPlugin.builder()
-            .addMatcher((ctx, i) -> {
-                if (i instanceof Document d) {
+            .addMatcher(request -> {
+                if (request.input() instanceof Document d) {
                     if (d.getMember("id").asString().equals("a")) {
                         return aQueue.poll();
                     }
                 }
                 return null;
             })
-            .addMatcher((ctx, i) -> {
-                if (i instanceof Document d) {
+            .addMatcher(request -> {
+                if (request.input() instanceof Document d) {
                     if (d.getMember("id").asString().equals("b")) {
                         return bQueue.poll();
                     }

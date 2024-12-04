@@ -81,7 +81,7 @@ public class InjectIdempotencyTokenPluginTest {
     private String callAndGetToken(String operation, Document input) {
         var mock = MockPlugin.builder()
             .addMatcher(
-                (ctx, i) -> new MockedResult.Response(
+                request -> new MockedResult.Response(
                     HttpResponse.builder()
                         .statusCode(200)
                         .headers(HttpHeaders.of(Map.of("content-type", List.of("application/json"))))

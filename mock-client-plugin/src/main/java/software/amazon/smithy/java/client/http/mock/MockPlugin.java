@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.client.core.ClientConfig;
@@ -64,7 +63,7 @@ public final class MockPlugin implements ClientPlugin {
         .map(ServiceLoader.Provider::get)
         .collect(Collectors.toMap(ServerProtocolProvider::getProtocolId, Function.identity()));
 
-    private final List<BiFunction<Context, SerializableStruct, MockedResult>> matchers = new ArrayList<>();
+    private final List<Function<MatcherRequest, MockedResult>> matchers = new ArrayList<>();
     private final List<MockedRequest> requests = Collections.synchronizedList(new ArrayList<>());
     private final Service mockService;
 
@@ -109,7 +108,7 @@ public final class MockPlugin implements ClientPlugin {
      * Creates a MockPlugin.
      */
     public static final class Builder {
-        private final List<BiFunction<Context, SerializableStruct, MockedResult>> matchers = new ArrayList<>();
+        private final List<Function<MatcherRequest, MockedResult>> matchers = new ArrayList<>();
 
         private Builder() {}
 
@@ -128,10 +127,10 @@ public final class MockPlugin implements ClientPlugin {
          * <p>If null is returned, then subsequent matchers will attempt to match and intercept the request. If no
          * matcher intercepts the request, {@link NoSuchElementException} is thrown.
          *
-         * @param matcher Matcher that receives the context and input shape, and returns a result or null.
+         * @param matcher Matcher that returns a result or null based on the request.
          * @return the builder.
          */
-        public Builder addMatcher(BiFunction<Context, SerializableStruct, MockedResult> matcher) {
+        public Builder addMatcher(Function<MatcherRequest, MockedResult> matcher) {
             matchers.add(matcher);
             return this;
         }
@@ -147,7 +146,7 @@ public final class MockPlugin implements ClientPlugin {
          * @return the builder.
          */
         public Builder addQueue(MockQueue resultQueue) {
-            matchers.add((context, input) -> resultQueue.poll());
+            matchers.add(request -> resultQueue.poll());
             return this;
         }
     }
@@ -225,8 +224,13 @@ public final class MockPlugin implements ClientPlugin {
             requests.add(currentRequest.request());
 
             MockedResult result = null;
+            var matcherRequest = new MatcherRequest(
+                context,
+                currentRequest.operation().getApiOperation(),
+                currentRequest.request().input()
+            );
             for (var matcher : matchers) {
-                result = matcher.apply(context, currentRequest.request().input());
+                result = matcher.apply(matcherRequest);
                 if (result != null) {
                     break;
                 }
