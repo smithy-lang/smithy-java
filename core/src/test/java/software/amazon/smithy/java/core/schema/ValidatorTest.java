@@ -663,7 +663,7 @@ public class ValidatorTest {
                 ShapeType.DOCUMENT,
                 (Consumer<ShapeSerializer>) serializer -> serializer.writeDocument(
                     PreludeSchemas.STRING,
-                    Document.createString("hi")
+                    Document.of("hi")
                 )
             ),
             Arguments.of(

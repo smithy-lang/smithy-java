@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.core.plugins;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.not;
@@ -14,22 +15,14 @@ import static org.hamcrest.Matchers.nullValue;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
-import software.amazon.smithy.java.client.core.ClientTransport;
-import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
-import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.client.core.interceptors.RequestHook;
-import software.amazon.smithy.java.client.http.HttpMessageExchange;
-import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.client.http.mock.MockPlugin;
+import software.amazon.smithy.java.client.http.mock.MockedResult;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.http.api.HttpHeaders;
-import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.model.Model;
@@ -42,6 +35,7 @@ public class InjectIdempotencyTokenPluginTest {
             $version: "2"
             namespace smithy.example
 
+            @aws.protocols#restJson1
             service Sprockets {
                 operations: [CreateSprocket, CreateSprocketNoToken]
             }
@@ -70,6 +64,7 @@ public class InjectIdempotencyTokenPluginTest {
                 output := {}
             }
             """)
+        .discoverModels()
         .assemble()
         .unwrap();
 
@@ -77,68 +72,57 @@ public class InjectIdempotencyTokenPluginTest {
 
     @Test
     public void injectsToken() {
-        var token = callAndGetToken("CreateSprocket", Document.createFromObject(Map.of("id", "1")));
+        var token = callAndGetToken("CreateSprocket", Document.ofObject(Map.of("id", "1")));
 
         assertThat(token, not(nullValue()));
         assertThat(token.length(), greaterThan(0));
     }
 
     private String callAndGetToken(String operation, Document input) {
-        AtomicReference<String> ref = new AtomicReference<>();
+        var mock = MockPlugin.builder()
+            .addMatcher(
+                request -> new MockedResult.Response(
+                    HttpResponse.builder()
+                        .statusCode(200)
+                        .headers(HttpHeaders.of(Map.of("content-type", List.of("application/json"))))
+                        .body(DataStream.ofString("{}"))
+                        .build()
+                )
+            )
+            .build();
+
         var client = DynamicClient.builder()
             .service(SERVICE)
             .model(MODEL)
-            .protocol(new RestJsonClientProtocol(SERVICE))
+            .addPlugin(mock)
             .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .transport(new ClientTransport<HttpRequest, HttpResponse>() {
-                @Override
-                public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
-                    return CompletableFuture.completedFuture(
-                        HttpResponse.builder()
-                            .statusCode(200)
-                            .headers(HttpHeaders.of(Map.of("content-type", List.of("application/json"))))
-                            .body(DataStream.ofString("{}"))
-                            .build()
-                    );
-                }
-
-                @Override
-                public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
-                    return HttpMessageExchange.INSTANCE;
-                }
-            })
             .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
             .addPlugin(new InjectIdempotencyTokenPlugin())
-            .addInterceptor(new ClientInterceptor() {
-                @Override
-                public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
-                    ref.set(((HttpRequest) hook.request()).headers().firstValue("x-token"));
-                }
-            })
+            .addPlugin(mock)
             .build();
 
-        client.call(operation, Document.createFromObject(input));
-
-        return ref.get();
+        client.call(operation, Document.of(input));
+        assertThat(mock.getRequests(), not(empty()));
+        return mock.getRequests().get(0).request().headers().firstValue("x-token");
     }
 
     @Test
     public void doesNotInjectToken() {
-        var token = callAndGetToken("CreateSprocketNoToken", Document.createFromObject(Map.of("id", "1")));
+        var token = callAndGetToken("CreateSprocketNoToken", Document.ofObject(Map.of("id", "1")));
 
         assertThat(token, nullValue());
     }
 
     @Test
     public void usesProvidedToken() {
-        var token = callAndGetToken("CreateSprocket", Document.createFromObject(Map.of("id", "1", "token", "xyz")));
+        var token = callAndGetToken("CreateSprocket", Document.ofObject(Map.of("id", "1", "token", "xyz")));
 
         assertThat(token, equalTo("xyz"));
     }
 
     @Test
     public void ignoresEmptyStringToken() {
-        var token = callAndGetToken("CreateSprocket", Document.createFromObject(Map.of("id", "1", "token", "")));
+        var token = callAndGetToken("CreateSprocket", Document.ofObject(Map.of("id", "1", "token", "")));
 
         assertThat(token, notNullValue());
         assertThat(token, not(equalTo("")));

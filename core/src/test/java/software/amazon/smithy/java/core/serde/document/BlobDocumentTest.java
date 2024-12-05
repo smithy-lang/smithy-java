@@ -23,16 +23,16 @@ public class BlobDocumentTest {
 
     @Test
     public void createsDocument() {
-        var document = Document.createBlob(wrap("hi".getBytes(StandardCharsets.UTF_8)));
+        var document = Document.of(wrap("hi".getBytes(StandardCharsets.UTF_8)));
 
         assertThat(document.type(), equalTo(ShapeType.BLOB));
         assertThat(document.asBlob(), equalTo(wrap("hi".getBytes(StandardCharsets.UTF_8))));
-        assertThat(document, equalTo(Document.createBlob(wrap("hi".getBytes(StandardCharsets.UTF_8)))));
+        assertThat(document, equalTo(Document.of(wrap("hi".getBytes(StandardCharsets.UTF_8)))));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.createBlob(wrap("hi".getBytes(StandardCharsets.UTF_8)));
+        var document = Document.of(wrap("hi".getBytes(StandardCharsets.UTF_8)));
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -44,7 +44,7 @@ public class BlobDocumentTest {
 
     @Test
     public void serializesContents() {
-        var document = Document.createBlob("hi".getBytes(StandardCharsets.UTF_8));
+        var document = Document.of("hi".getBytes(StandardCharsets.UTF_8));
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override
@@ -60,7 +60,7 @@ public class BlobDocumentTest {
     @Test
     public void toObjectReturnsSelf() {
         var bytes = "a".getBytes(StandardCharsets.UTF_8);
-        var doc = Document.createBlob(bytes);
+        var doc = Document.of(bytes);
 
         assertThat(doc.asObject(), is(wrap(bytes)));
     }

@@ -114,7 +114,7 @@ public class RecursionTests {
                 )
             )
         );
-        var document = Document.createTyped(recursive);
+        var document = Document.of(recursive);
         var builder = AttributeValue.builder();
         document.deserializeInto(builder);
         var output = builder.build();

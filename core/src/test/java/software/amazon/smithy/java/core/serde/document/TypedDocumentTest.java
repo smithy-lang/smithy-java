@@ -7,7 +7,6 @@ package software.amazon.smithy.java.core.serde.document;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
@@ -58,7 +57,7 @@ public class TypedDocumentTest {
     @Test
     public void wrapsStructContentWithTypeAndSchema() {
         var serializableShape = createSerializableShape();
-        var result = Document.createTyped(serializableShape);
+        var result = Document.of(serializableShape);
 
         assertThat(result.type(), equalTo(ShapeType.STRUCTURE));
         assertThat(
@@ -80,8 +79,8 @@ public class TypedDocumentTest {
         assertThat(result, equalTo(result));
         assertThat(result, not(equalTo(null)));
         assertThat(result, not(equalTo("X")));
-        assertThat(result, equalTo(Document.createTyped(serializableShape)));
-        assertThat(result.hashCode(), equalTo(Document.createTyped(serializableShape).hashCode()));
+        assertThat(result, equalTo(Document.of(serializableShape)));
+        assertThat(result.hashCode(), equalTo(Document.of(serializableShape).hashCode()));
 
         // Writes as document unless getting contents.
         result.serialize(new SpecificShapeSerializer() {
@@ -92,11 +91,11 @@ public class TypedDocumentTest {
         });
 
         // This is basically recreating the same document with the same captured schema.
-        assertThat(result, equalTo(Document.createTyped(result)));
+        assertThat(result, equalTo(Document.of(result)));
 
         // Not equal because the left member has a schema with the same value, but the right has no schema.
-        assertThat(result.getMember("a"), not(equalTo(Document.createString("1"))));
-        assertThat(result.getMember("b"), not(equalTo(Document.createString("2"))));
+        assertThat(result.getMember("a"), not(equalTo(Document.of("1"))));
+        assertThat(result.getMember("b"), not(equalTo(Document.of("2"))));
 
         // Converts to a string map.
         var copy1 = result.asStringMap();
@@ -107,13 +106,11 @@ public class TypedDocumentTest {
     @Test
     public void getsSchemaValue() {
         var serializableShape = createSerializableShape();
-        var result = (SerializableStruct) Document.createTyped(serializableShape);
+        var result = (SerializableStruct) Document.of(serializableShape);
         var schema = result.schema();
 
-        assertThat(result.getMemberValue(schema.member("a")), instanceOf(Document.class));
-        assertThat(((Document) result.getMemberValue(schema.member("a"))).asString(), equalTo("1"));
-        assertThat(result.getMemberValue(schema.member("b")), instanceOf(Document.class));
-        assertThat(((Document) result.getMemberValue(schema.member("b"))).asString(), equalTo("2"));
+        assertThat(result.getMemberValue(schema.member("a")), equalTo("1"));
+        assertThat(result.getMemberValue(schema.member("b")), equalTo("2"));
 
         var bogus = Schema.createString(ShapeId.from("foo#Bar"));
         Assertions.assertThrows(IllegalArgumentException.class, () -> result.getMemberValue(bogus));

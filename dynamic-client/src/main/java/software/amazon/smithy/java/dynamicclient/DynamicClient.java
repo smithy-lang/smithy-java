@@ -26,6 +26,7 @@ import software.amazon.smithy.java.core.schema.ApiException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.Model;
@@ -34,6 +35,8 @@ import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.shapes.ToShapeId;
 
 /**
  * A client that can call a service using a Smithy model directly without any codegen.
@@ -107,7 +110,7 @@ public final class DynamicClient extends Client {
      * @return the output of the operation.
      */
     public Document call(String operation) {
-        return call(operation, Document.createStringMap(Map.of()));
+        return call(operation, Document.of(Map.of()));
     }
 
     /**
@@ -148,7 +151,7 @@ public final class DynamicClient extends Client {
      * @return the output of the operation.
      */
     public CompletableFuture<Document> callAsync(String operation) {
-        return callAsync(operation, Document.createStringMap(Map.of()));
+        return callAsync(operation, Document.of(Map.of()));
     }
 
     /**
@@ -178,6 +181,21 @@ public final class DynamicClient extends Client {
         var apiOperation = getApiOperation(operation);
         var inputStruct = new WrappedDocument(service.getId(), apiOperation.inputSchema(), input);
         return call(inputStruct, apiOperation, overrideConfig).thenApply(Function.identity());
+    }
+
+    /**
+     * Create a {@link SerializableStruct} from a schema and document.
+     *
+     * @param shape Shape to mimic by the struct. The shape ID must be found in the model.
+     * @param value Value to use as the struct. Must be a map or structure.
+     * @return the serializable struct.
+     */
+    public SerializableStruct createStruct(ToShapeId shape, Document value) {
+        var schema = schemaConverter.getSchema(model.expectShape(shape.toShapeId()));
+        if (value.type() != ShapeType.MAP && value.type() != ShapeType.STRUCTURE) {
+            throw new IllegalArgumentException("Document value must be a map or structure, found " + value.type());
+        }
+        return new WrappedDocument(service.getId(), schema, value);
     }
 
     private ApiOperation<WrappedDocument, WrappedDocument> getApiOperation(String name) {

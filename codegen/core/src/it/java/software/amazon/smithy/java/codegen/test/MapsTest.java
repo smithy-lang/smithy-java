@@ -288,8 +288,8 @@ public class MapsTest {
         assertEquals(emptyInput.stringBooleanMap(), Collections.emptyMap());
         assertEquals(emptyInput.stringBooleanMap(), nullInput.stringBooleanMap());
 
-        var emptyDocument = Document.createTyped(emptyInput);
-        var nullDocument = Document.createTyped(nullInput);
+        var emptyDocument = Document.of(emptyInput);
+        var nullDocument = Document.of(nullInput);
         assertNotNull(emptyDocument.getMember("stringBooleanMap"));
         assertNull(nullDocument.getMember("stringBooleanMap"));
     }

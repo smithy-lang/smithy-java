@@ -6,8 +6,10 @@
 package software.amazon.smithy.java.client.core;
 
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.Set;
 import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.context.Context;
 
@@ -29,6 +31,11 @@ public final class CallContext {
      * The endpoint resolver used to resolve the destination endpoint for a request.
      */
     public static final Context.Key<EndpointResolver> ENDPOINT_RESOLVER = Context.key("EndpointResolver");
+
+    /**
+     * The read-only resolved endpoint for the request.
+     */
+    public static final Context.Key<Endpoint> ENDPOINT = Context.key("Endpoint of the request");
 
     /**
      * The identity resolved for the request.
@@ -63,7 +70,10 @@ public final class CallContext {
      * only ASCII letters, numbers, and hyphens. For example, "P" might be used to indicate that pagination was used
      * with a request.
      */
-    public static final Context.Key<Set<FeatureId>> FEATURE_IDS = Context.key("Feature IDs used with a request");
+    public static final Context.Key<Set<FeatureId>> FEATURE_IDS = Context.key(
+        "Feature IDs used with a request",
+        HashSet::new
+    );
 
     /**
      * The name of the application, used in things like user-agent headers.

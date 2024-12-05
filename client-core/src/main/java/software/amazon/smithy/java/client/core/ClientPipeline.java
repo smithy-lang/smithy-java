@@ -199,7 +199,10 @@ final class ClientPipeline<RequestT, ResponseT> {
 
         // TODO: what to do with supportedAuthSchemes of an endpoint?
         return resolveEndpoint(call)
-            .thenApply(endpoint -> protocol.setServiceEndpoint(requestHook.request(), endpoint))
+            .thenApply(endpoint -> {
+                call.context.put(CallContext.ENDPOINT, endpoint);
+                return protocol.setServiceEndpoint(requestHook.request(), endpoint);
+            })
             .thenCompose(resolvedAuthScheme::sign)
             .thenApply(req -> {
                 var updatedHook = requestHook.withRequest(req);
@@ -292,9 +295,10 @@ final class ClientPipeline<RequestT, ResponseT> {
             return identity.thenCompose(identity -> {
                 // Throws when no identity is found.
                 var resolvedIdentity = identity.unwrap();
-                try (var signer = authScheme.signer()) {
-                    return signer.sign(request, resolvedIdentity, signerProperties);
-                }
+                var signer = authScheme.signer();
+                var result = signer.sign(request, resolvedIdentity, signerProperties);
+                result.whenComplete((res, err) -> signer.close());
+                return result;
             });
         }
     }

@@ -75,7 +75,7 @@ public class TypeRegistryTest {
             .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
             .build();
         var person = Person.builder().name("Phreddie").build();
-        var document = Document.createTyped(person);
+        var document = Document.of(person);
         var deserialized = registry.deserialize(document);
 
         assertThat(deserialized, instanceOf(Person.class));

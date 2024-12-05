@@ -38,18 +38,30 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
 
         private final String name;
         final int id;
+        private final Function<T, T> copyFunction;
 
         /**
          * @param name Name of the value.
          */
-        private Key(String name) {
+        private Key(String name, Function<T, T> copyFunction) {
             this.name = Objects.requireNonNull(name);
             this.id = COUNTER.getAndIncrement();
+            this.copyFunction = Objects.requireNonNull(copyFunction);
         }
 
         @Override
         public String toString() {
             return name;
+        }
+
+        /**
+         * Given a value stored in a context key of this type, creates an independent copy of the value.
+         *
+         * @param value Value to copy.
+         * @return the copied value.
+         */
+        public T copyValue(T value) {
+            return copyFunction.apply(value);
         }
     }
 
@@ -61,7 +73,20 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
      * @param <T> Value type associated with the key.
      */
     static <T> Key<T> key(String name) {
-        Key<T> key = new Key<>(name);
+        return key(name, Function.identity());
+    }
+
+    /**
+     * Create a new identity-based key to store in the context, and use a function to copy mutable values so they
+     * can be independently copied into other contexts.
+     *
+     * @param name Name of the key.
+     * @param copyFunction A function that takes the current value of a key and returns an independent copy of it.
+     * @return the created key.
+     * @param <T> Value type associated with the key.
+     */
+    static <T> Key<T> key(String name, Function<T, T> copyFunction) {
+        Key<T> key = new Key<>(name, copyFunction);
         if (key.id < Key.MAX_ARRAY_KEY_SPACE) {
             Key.KEYS[key.id] = key;
         }
@@ -138,8 +163,9 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
      * Copy this context into the target context, overwriting any existing keys.
      *
      * @param target Context to copy to.
+     * @return the given {@code target} context.
      */
-    void copyTo(Context target);
+    Context copyTo(Context target);
 
     /**
      * Creates an empty Context.

@@ -26,6 +26,7 @@ import software.amazon.smithy.java.http.binding.HttpBinding;
 import software.amazon.smithy.java.http.binding.RequestSerializer;
 import software.amazon.smithy.java.http.binding.ResponseDeserializer;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * An HTTP-based protocol that uses HTTP binding traits.
@@ -37,7 +38,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
     private static final InternalLogger LOGGER = InternalLogger.getLogger(HttpBindingClientProtocol.class);
     private final HttpBinding httpBinding = new HttpBinding();
 
-    public HttpBindingClientProtocol(String id) {
+    public HttpBindingClientProtocol(ShapeId id) {
         super(id);
     }
 
@@ -116,10 +117,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
             .deserialize()
             .thenApply(ignore -> {
                 O output = outputBuilder.errorCorrection().build();
-
-                // TODO: error handling from the builder.
                 LOGGER.trace("Successfully built {} from HTTP response with {}", output, getClass().getName());
-
                 return output;
             });
     }

@@ -24,11 +24,11 @@ public class NumberDocumentTest {
     @ParameterizedTest
     @MethodSource("defaultSerializationProvider")
     public void defaultSerialization(Number value, ShapeType type) {
-        var document = Document.createNumber(value);
+        var document = Document.ofNumber(value);
 
         assertThat(document.type(), equalTo(type));
         assertThat(document.asNumber(), is(value));
-        assertThat(document, equalTo(Document.createNumber(document.asNumber())));
+        assertThat(document, equalTo(Document.ofNumber(document.asNumber())));
 
         ShapeSerializer serializer = new InterceptingSerializer() {
             @Override

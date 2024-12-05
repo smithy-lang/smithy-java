@@ -13,9 +13,9 @@ include(":codegen:plugins:client")
 include(":codegen:plugins:server")
 include(":codegen:plugins:types")
 
-
-// Protocol tests
+// Testing
 include(":protocol-tests")
+include(":mock-client-plugin")
 
 include("tracing-api")
 

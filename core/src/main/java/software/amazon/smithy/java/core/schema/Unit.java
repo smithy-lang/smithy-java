@@ -42,9 +42,8 @@ public final class Unit implements SerializableStruct {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
-        return (T) SchemaUtils.validateMemberInSchema(SCHEMA, member, null);
+        return SchemaUtils.validateMemberInSchema(SCHEMA, member, null);
     }
 
     public static Builder builder() {

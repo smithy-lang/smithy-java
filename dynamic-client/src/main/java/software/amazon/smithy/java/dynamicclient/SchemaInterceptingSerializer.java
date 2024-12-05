@@ -33,7 +33,7 @@ final class SchemaInterceptingSerializer implements ShapeSerializer {
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         delegateSerializer
-            .writeStruct(delegateSchema, new WrappedDocument(service, schema, Document.createTyped(struct)));
+            .writeStruct(delegateSchema, new WrappedDocument(service, schema, Document.of(struct)));
     }
 
     @Override

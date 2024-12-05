@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.context;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
@@ -16,7 +17,9 @@ import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 public class ContextTest {
@@ -24,6 +27,9 @@ public class ContextTest {
     static final Context.Key<String> FOO = Context.key("Foo");
     static final Context.Key<Integer> BAR = Context.key("Foo");
     static final Context.Key<Boolean> BAZ = Context.key("Foo");
+
+    static final Context.Key<Set<String>> SAD_SET = Context.key("Sad set");
+    static final Context.Key<Set<String>> HAPPY_SET = Context.key("Happy set", HashSet::new);
 
     @Test
     public void getTypedValue() {
@@ -236,5 +242,27 @@ public class ContextTest {
             // Keys outside the array keyspace were copied.
             assertThat(mapContext.get(k), not(nullValue()));
         }
+    }
+
+    @Test
+    public void canCopyKeyValues() {
+        var ctx = Context.create();
+        ctx.put(SAD_SET, new HashSet<>());
+        ctx.put(HAPPY_SET, new HashSet<>());
+        ctx.get(SAD_SET).add("a");
+        ctx.get(HAPPY_SET).add("a");
+
+        var copy = ctx.copyTo(Context.create());
+        copy.get(SAD_SET).add("b");
+        copy.get(HAPPY_SET).add("b");
+
+        // Sad set wasn't copied, so a mutation to the copied context affected the original.
+        assertThat(ctx.get(SAD_SET), containsInAnyOrder("a", "b"));
+        // Happy set was modified, so it maintained its independence.
+        assertThat(ctx.get(HAPPY_SET), containsInAnyOrder("a"));
+
+        assertThat(copy.get(SAD_SET), containsInAnyOrder("a", "b"));
+        // happy set also copied the original values from sad set when the copy was made.
+        assertThat(copy.get(HAPPY_SET), containsInAnyOrder("a", "b"));
     }
 }

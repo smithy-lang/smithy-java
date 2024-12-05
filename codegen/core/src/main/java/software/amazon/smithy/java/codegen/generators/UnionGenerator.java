@@ -64,9 +64,8 @@ public final class UnionGenerator
                     }
 
                     @Override
-                    @SuppressWarnings("unchecked")
                     public <T> T getMemberValue(${sdkSchema:N} member) {
-                        return (T) ${schemaUtils:N}.validateMemberInSchema($$SCHEMA, member, getValue());
+                        return ${schemaUtils:N}.validateMemberInSchema($$SCHEMA, member, getValue());
                     }
 
                     public abstract <T> T getValue();

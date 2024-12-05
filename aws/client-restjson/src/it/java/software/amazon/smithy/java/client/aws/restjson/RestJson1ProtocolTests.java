@@ -72,7 +72,6 @@ public class RestJson1ProtocolTests {
         skipTests = {
             "RestJsonDateTimeWithFractionalSeconds",
             "RestJsonInputAndOutputWithQuotedStringHeaders",
-            "RestJsonHttpPrefixHeadersArePresent",
             "HttpPrefixHeadersResponse",
             "RestJsonHttpPayloadTraitsWithBlob",
             "RestJsonHttpPayloadTraitsWithMediaTypeWithBlob",

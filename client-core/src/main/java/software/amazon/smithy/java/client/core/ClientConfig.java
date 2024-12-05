@@ -351,6 +351,7 @@ public final class ClientConfig {
          */
         public Builder transport(ClientTransport<?, ?> transport) {
             this.transport = transport;
+            applyPlugin(transport);
             return this;
         }
 
@@ -366,10 +367,6 @@ public final class ClientConfig {
             Objects.requireNonNull(protocol, "protocol must be set to resolve a transport");
             if (transport == null) {
                 transport(discoverTransport(protocol));
-            }
-            // If the transport has not yet been applied as a plugin, apply it now.
-            if (!appliedPlugins.contains(transport.getClass())) {
-                applyPlugin(transport);
             }
             return this;
         }

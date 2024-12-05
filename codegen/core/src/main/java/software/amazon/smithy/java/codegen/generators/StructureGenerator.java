@@ -1054,13 +1054,13 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             @Override
             public Void arrayNode(ArrayNode node) {
                 // List defaults must always be empty
-                writer.write("${document:T}.createList($T.emptyList())", Collections.class);
+                writer.write("${document:T}.of($T.emptyList())", Collections.class);
                 return null;
             }
 
             @Override
             public Void booleanNode(BooleanNode node) {
-                writer.write("${document:T}.createBoolean($L)", node.getValue());
+                writer.write("${document:T}.of($L)", node.getValue());
                 return null;
             }
 
@@ -1072,9 +1072,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             @Override
             public Void numberNode(NumberNode node) {
                 if (node.isFloatingPointNumber()) {
-                    writer.write("${document:T}.createDouble($L)", node.getValue().doubleValue());
+                    writer.write("${document:T}.of($L)", node.getValue().doubleValue());
                 } else {
-                    writer.write("${document:T}.createInteger($L)", node.getValue().intValue());
+                    writer.write("${document:T}.of($L)", node.getValue().intValue());
                 }
                 return null;
             }
@@ -1082,13 +1082,13 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             @Override
             public Void objectNode(ObjectNode node) {
                 // Map defaults must always be empty
-                writer.write("${document:T}.createStringMap($T.emptyMap())", Collections.class);
+                writer.write("${document:T}.of($T.emptyMap())", Collections.class);
                 return null;
             }
 
             @Override
             public Void stringNode(StringNode node) {
-                writer.write("${document:T}.createString($S)", node.getValue());
+                writer.write("${document:T}.of($S)", node.getValue());
                 return null;
             }
         }

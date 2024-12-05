@@ -6,23 +6,17 @@
 package software.amazon.smithy.java.aws.client.http;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
 
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
-import software.amazon.smithy.java.client.core.ClientTransport;
-import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
-import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.client.core.interceptors.RequestHook;
-import software.amazon.smithy.java.client.http.HttpMessageExchange;
-import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.client.http.mock.MockPlugin;
+import software.amazon.smithy.java.client.http.mock.MockQueue;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
-import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.java.retries.api.AcquireInitialTokenRequest;
@@ -61,54 +55,17 @@ public class AmzSdkRequestPluginTest {
 
     @Test
     public void injectsHeader() {
-        AtomicInteger attempt = new AtomicInteger(0);
+        var mockQueue = new MockQueue();
+        var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
             .service(SERVICE)
             .model(MODEL)
             .protocol(new AwsJson1Protocol(SERVICE))
+            .addPlugin(mock)
             .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .transport(new ClientTransport<HttpRequest, HttpResponse>() {
-                @Override
-                public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
-                    return HttpMessageExchange.INSTANCE;
-                }
-
-                @Override
-                public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
-                    var i = attempt.incrementAndGet();
-                    if (i == 1) {
-                        return CompletableFuture.completedFuture(
-                            HttpResponse.builder()
-                                .statusCode(429)
-                                .body(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
-                                .build()
-                        );
-                    } else if (i == 2) {
-                        return CompletableFuture.completedFuture(
-                            HttpResponse.builder()
-                                .statusCode(200)
-                                .body(DataStream.ofString("{\"id\":\"1\"}"))
-                                .build()
-                        );
-                    } else {
-                        throw new IllegalStateException("Unexpected attempt " + i);
-                    }
-                }
-            })
             .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
             .addPlugin(new AmzSdkRequestPlugin())
-            .addInterceptor(new ClientInterceptor() {
-                @Override
-                public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
-                    var request = (HttpRequest) hook.request();
-                    var i = attempt.get();
-                    assertThat(
-                        request.headers().allValues("amz-sdk-request"),
-                        contains("attempt=" + (i + 1) + "; max=3")
-                    );
-                }
-            })
             .retryStrategy(new RetryStrategy() {
                 @Override
                 public AcquireInitialTokenResponse acquireInitialToken(AcquireInitialTokenRequest request) {
@@ -137,6 +94,24 @@ public class AmzSdkRequestPluginTest {
             })
             .build();
 
+        mockQueue.enqueue(
+            HttpResponse.builder()
+                .statusCode(429)
+                .body(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
+                .build()
+        );
+        mockQueue.enqueue(
+            HttpResponse.builder()
+                .statusCode(200)
+                .body(DataStream.ofString("{\"id\":\"1\"}"))
+                .build()
+        );
+
         client.call("CreateSprocket");
+
+        var requests = mock.getRequests();
+        assertThat(requests, hasSize(2));
+        assertThat(requests.get(0).request().headers().firstValue("amz-sdk-request"), equalTo("attempt=1; max=3"));
+        assertThat(requests.get(1).request().headers().firstValue("amz-sdk-request"), equalTo("attempt=2; max=3"));
     }
 }
