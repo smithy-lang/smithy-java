@@ -58,7 +58,7 @@ public final class SchemaUtils {
      * @throws IllegalArgumentException if the member is not part of parent.
      * @return the given {@code value}.
      */
-    public static Object validateMemberInSchema(Schema parent, Schema member, Object value) {
+    public static <T> T validateMemberInSchema(Schema parent, Schema member, T value) {
         try {
             if (member == parent.members().get(member.memberIndex())) {
                 return value;

@@ -583,4 +583,3 @@ public class DocumentTest {
         assertThat(document.size(), is(-1));
     }
 }
-

@@ -12,8 +12,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SchemaUtils;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 public final class DocumentUtils {
 
@@ -131,5 +134,42 @@ public final class DocumentUtils {
     private static boolean isBig(Number a, Number b) {
         return a instanceof BigDecimal || b instanceof BigDecimal
             || a instanceof BigInteger || b instanceof BigInteger;
+    }
+
+    /**
+     * Implements getMemberValue for documents that implement {@link SerializableStruct}.
+     *
+     * <p>If the value is found in the document and is not null, this method will convert the value to an object
+     * using {@link Document#asObject()}. That value is then cast to {@code T}. This will work for most cases of
+     * attempting to use a document like a SerializableStruct, but will not work when the type is for a specific
+     * type outside what {@link Document#asObject()} returns.
+     *
+     * @param container Document that contains members.
+     * @param containerSchema The schema of the document.
+     * @param member The member schema to get.
+     * @return the value or null.
+     * @param <T> Value type.
+     * @throws ClassCastException if the value is not of the given type.
+     */
+    @SuppressWarnings("unchecked")
+    @SmithyInternalApi
+    public static <T> T getMemberValue(Document container, Schema containerSchema, Schema member) {
+        try {
+            // Make sure it's part of the schema.
+            var value = SchemaUtils.validateMemberInSchema(
+                containerSchema,
+                member,
+                container.getMember(member.memberName())
+            );
+            // If it's a document, unwrap it.
+            // This should work for most use cases of DynamicClient, but this won't perfectly interoperate with all
+            // use-cases or be a stand-in when an actual type is expected.
+            return (T) (value != null ? value.asObject() : null);
+        } catch (ClassCastException e) {
+            throw new ClassCastException(
+                "Unable to cast document member `" + member.id() + "` from document with schema `" + containerSchema
+                    .id() + "`: " + e.getMessage()
+            );
+        }
     }
 }

@@ -7,7 +7,6 @@ package software.amazon.smithy.java.core.serde.document;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
@@ -110,10 +109,8 @@ public class TypedDocumentTest {
         var result = (SerializableStruct) Document.of(serializableShape);
         var schema = result.schema();
 
-        assertThat(result.getMemberValue(schema.member("a")), instanceOf(Document.class));
-        assertThat(((Document) result.getMemberValue(schema.member("a"))).asString(), equalTo("1"));
-        assertThat(result.getMemberValue(schema.member("b")), instanceOf(Document.class));
-        assertThat(((Document) result.getMemberValue(schema.member("b"))).asString(), equalTo("2"));
+        assertThat(result.getMemberValue(schema.member("a")), equalTo("1"));
+        assertThat(result.getMemberValue(schema.member("b")), equalTo("2"));
 
         var bogus = Schema.createString(ShapeId.from("foo#Bar"));
         Assertions.assertThrows(IllegalArgumentException.class, () -> result.getMemberValue(bogus));
