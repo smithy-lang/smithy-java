@@ -91,7 +91,7 @@ public class GenericTest {
         System.out.println(codec.serializeToString(input));
 
         // Convert to a Document and then serialize to JSON.
-        Document document = Document.createTyped(input);
+        Document document = Document.of(input);
         System.out.println(codec.serializeToString(document));
 
         // Send the Document to a person builder.

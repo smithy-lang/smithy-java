@@ -109,7 +109,7 @@ public class SchemaGuidedDocumentBuilderTest {
     public void deserializesMember() {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
-        var document = Document.createFromObject(Map.of("foo", "bar"));
+        var document = Document.ofObject(Map.of("foo", "bar"));
 
         var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
         builder.deserializeMember(new DocumentDeserializer(document), schema.member("baz"));
@@ -136,8 +136,8 @@ public class SchemaGuidedDocumentBuilderTest {
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
         var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
 
-        builder.setMemberValue(schema.member("foo"), Document.createString("bar1"));
-        builder.setMemberValue(schema.member("baz"), Document.createFromObject(Map.of("foo", "bar2")));
+        builder.setMemberValue(schema.member("foo"), Document.of("bar1"));
+        builder.setMemberValue(schema.member("baz"), Document.ofObject(Map.of("foo", "bar2")));
 
         var result = builder.build();
 
@@ -200,28 +200,28 @@ public class SchemaGuidedDocumentBuilderTest {
 
     static List<Arguments> deserializesShapesProvider() {
         return List.of(
-            Arguments.of("MyDocument", Document.createFromObject(Map.of("a", "b"))),
-            Arguments.of("MyString", Document.createString("hi")),
-            Arguments.of("MyBoolean", Document.createBoolean(true)),
-            Arguments.of("MyTimestamp", Document.createTimestamp(Instant.EPOCH)),
-            Arguments.of("MyBlob", Document.createBlob("foo".getBytes(StandardCharsets.UTF_8))),
-            Arguments.of("MyByte", Document.createByte((byte) 1)),
-            Arguments.of("MyShort", Document.createShort((short) 1)),
-            Arguments.of("MyInteger", Document.createInteger(1)),
-            Arguments.of("MyLong", Document.createLong(1L)),
-            Arguments.of("MyFloat", Document.createFloat(1f)),
-            Arguments.of("MyDouble", Document.createDouble(1d)),
-            Arguments.of("MyBigInteger", Document.createBigInteger(BigInteger.ONE)),
-            Arguments.of("MyBigDecimal", Document.createBigDecimal(BigDecimal.ONE)),
-            Arguments.of("MyIntEnum", Document.createInteger(1)),
-            Arguments.of("MyEnum", Document.createString("foo")),
-            Arguments.of("SimpleList", Document.createFromObject(List.of("a", "b"))),
-            Arguments.of("SimpleMap", Document.createFromObject(Map.of("foo", "bar"))),
+            Arguments.of("MyDocument", Document.ofObject(Map.of("a", "b"))),
+            Arguments.of("MyString", Document.of("hi")),
+            Arguments.of("MyBoolean", Document.of(true)),
+            Arguments.of("MyTimestamp", Document.of(Instant.EPOCH)),
+            Arguments.of("MyBlob", Document.of("foo".getBytes(StandardCharsets.UTF_8))),
+            Arguments.of("MyByte", Document.of((byte) 1)),
+            Arguments.of("MyShort", Document.of((short) 1)),
+            Arguments.of("MyInteger", Document.of(1)),
+            Arguments.of("MyLong", Document.of(1L)),
+            Arguments.of("MyFloat", Document.of(1f)),
+            Arguments.of("MyDouble", Document.of(1d)),
+            Arguments.of("MyBigInteger", Document.of(BigInteger.ONE)),
+            Arguments.of("MyBigDecimal", Document.of(BigDecimal.ONE)),
+            Arguments.of("MyIntEnum", Document.of(1)),
+            Arguments.of("MyEnum", Document.of("foo")),
+            Arguments.of("SimpleList", Document.ofObject(List.of("a", "b"))),
+            Arguments.of("SimpleMap", Document.ofObject(Map.of("foo", "bar"))),
             Arguments.of(
                 "SimpleStruct",
-                Document.createFromObject(Map.of("foo", "bar", "baz", Document.createFromObject(Map.of("foo", "hi"))))
+                Document.ofObject(Map.of("foo", "bar", "baz", Document.ofObject(Map.of("foo", "hi"))))
             ),
-            Arguments.of("SimpleUnion", Document.createFromObject(Map.of("foo", "bar")))
+            Arguments.of("SimpleUnion", Document.ofObject(Map.of("foo", "bar")))
         );
     }
 }

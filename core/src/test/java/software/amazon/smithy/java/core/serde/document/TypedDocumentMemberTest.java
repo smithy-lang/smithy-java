@@ -60,8 +60,8 @@ public class TypedDocumentMemberTest {
             );
         };
 
-        var document = Document.createTyped(serializableShape);
-        var documentCopy = Document.createTyped(serializableShape);
+        var document = Document.of(serializableShape);
+        var documentCopy = Document.of(serializableShape);
 
         assertThat(document.getMember("foo"), equalTo(document.getMember("foo"))); // map value not cached
         assertThat(document.getMember("foo"), equalTo(document.getMember("foo"))); // cached at this point
@@ -82,7 +82,7 @@ public class TypedDocumentMemberTest {
             .putMember("foo", PreludeSchemas.INTEGER)
             .build();
 
-        var document1 = Document.createTyped(encoder -> {
+        var document1 = Document.of(encoder -> {
             encoder.writeStruct(
                 structSchema1,
                 new SerializableStruct() {
@@ -104,7 +104,7 @@ public class TypedDocumentMemberTest {
             );
         });
 
-        var document2 = Document.createTyped(encoder -> {
+        var document2 = Document.of(encoder -> {
             encoder.writeStruct(
                 structSchema2,
                 new SerializableStruct() {
@@ -154,7 +154,7 @@ public class TypedDocumentMemberTest {
         var structSchema = Schema.structureBuilder(ShapeId.from("smithy.example#Foo"))
             .putMember("a", targetSchema)
             .build();
-        var document = Document.createTyped(encoder -> {
+        var document = Document.of(encoder -> {
             encoder.writeStruct(
                 structSchema,
                 new SerializableStruct() {
@@ -614,20 +614,20 @@ public class TypedDocumentMemberTest {
             // Get the document as a list.
             Arguments.of(
                 ShapeType.DOCUMENT,
-                List.of(Document.createInteger(1)),
+                List.of(Document.of(1)),
                 (BiConsumer<Schema, ShapeSerializer>) (schema, s) -> s.writeList(
                     schema,
                     null,
                     1,
                     (v, c) -> c.writeInteger(PreludeSchemas.INTEGER, 1)
                 ),
-                (Function<Document, Object>) d -> Document.createTyped(Document.createList(d.asList())).asList()
+                (Function<Document, Object>) d -> Document.of(Document.of(d.asList())).asList()
             ),
 
             // Get the document as a string map.
             Arguments.of(
                 Documents.STR_MAP_SCHEMA,
-                Map.of("a", Document.createInteger(1)),
+                Map.of("a", Document.of(1)),
                 (BiConsumer<Schema, ShapeSerializer>) (schema, s) -> s.writeMap(
                     schema,
                     null,
@@ -645,7 +645,7 @@ public class TypedDocumentMemberTest {
             // Get a member from a map by name.
             Arguments.of(
                 Documents.STR_MAP_SCHEMA,
-                Document.createInteger(1),
+                Document.of(1),
                 (BiConsumer<Schema, ShapeSerializer>) (schema, s) -> s.writeMap(
                     schema,
                     null,

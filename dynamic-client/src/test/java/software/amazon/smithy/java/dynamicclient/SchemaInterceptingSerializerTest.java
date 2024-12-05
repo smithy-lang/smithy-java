@@ -114,19 +114,19 @@ public class SchemaInterceptingSerializerTest {
     static List<Arguments> interceptsWithSchemaProvider() {
         var bytes = ByteBuffer.wrap("hi".getBytes(StandardCharsets.UTF_8));
         return List.of(
-            Arguments.arguments("MyBoolean", Document.createBoolean(true)),
-            Arguments.arguments("MyString", Document.createString("hi")),
-            Arguments.arguments("MyByte", Document.createByte((byte) 1)),
-            Arguments.arguments("MyShort", Document.createShort((short) 1)),
-            Arguments.arguments("MyInteger", Document.createInteger(1)),
-            Arguments.arguments("MyLong", Document.createLong(1L)),
-            Arguments.arguments("MyFloat", Document.createFloat(1f)),
-            Arguments.arguments("MyDouble", Document.createDouble(1d)),
-            Arguments.arguments("MyBigDecimal", Document.createBigDecimal(BigDecimal.ONE)),
-            Arguments.arguments("MyBigInteger", Document.createBigInteger(BigInteger.ONE)),
-            Arguments.arguments("MyTimestamp", Document.createTimestamp(Instant.EPOCH)),
-            Arguments.arguments("MyBlob", Document.createBlob(bytes)),
-            Arguments.arguments("MyDocument", Document.createString("hi"))
+            Arguments.arguments("MyBoolean", Document.of(true)),
+            Arguments.arguments("MyString", Document.of("hi")),
+            Arguments.arguments("MyByte", Document.of((byte) 1)),
+            Arguments.arguments("MyShort", Document.of((short) 1)),
+            Arguments.arguments("MyInteger", Document.of(1)),
+            Arguments.arguments("MyLong", Document.of(1L)),
+            Arguments.arguments("MyFloat", Document.of(1f)),
+            Arguments.arguments("MyDouble", Document.of(1d)),
+            Arguments.arguments("MyBigDecimal", Document.of(BigDecimal.ONE)),
+            Arguments.arguments("MyBigInteger", Document.of(BigInteger.ONE)),
+            Arguments.arguments("MyTimestamp", Document.of(Instant.EPOCH)),
+            Arguments.arguments("MyBlob", Document.of(bytes)),
+            Arguments.arguments("MyDocument", Document.of("hi"))
         );
     }
 
@@ -137,7 +137,7 @@ public class SchemaInterceptingSerializerTest {
         var wrapped = new WrappedDocument(
             ShapeId.from("smithy.example#S"),
             listSchema,
-            Document.createList(Arrays.asList(Document.createString("a"), null))
+            Document.of(Arrays.asList(Document.of("a"), null))
         );
 
         wrapped.serialize(new SpecificShapeSerializer() {
@@ -167,7 +167,7 @@ public class SchemaInterceptingSerializerTest {
         var wrapped = new WrappedDocument(
             ShapeId.from("smithy.example#S"),
             mapSchema,
-            Document.createFromObject(Map.of("foo", "bar"))
+            Document.ofObject(Map.of("foo", "bar"))
         );
 
         wrapped.serialize(new SpecificShapeSerializer() {
@@ -206,7 +206,7 @@ public class SchemaInterceptingSerializerTest {
         var wrapped = new WrappedDocument(
             ShapeId.from("smithy.example#S"),
             mapSchema,
-            Document.createFromObject(Map.of("foo", "bar"))
+            Document.ofObject(Map.of("foo", "bar"))
         );
 
         wrapped.serialize(new SpecificShapeSerializer() {
@@ -245,12 +245,12 @@ public class SchemaInterceptingSerializerTest {
         var wrapped = new WrappedDocument(
             ShapeId.from("smithy.example#S"),
             structSchema,
-            Document.createFromObject(
+            Document.ofObject(
                 Map.of(
                     "foo",
                     "bar",
                     "baz",
-                    Document.createFromObject(Map.of("foo", "hi"))
+                    Document.ofObject(Map.of("foo", "hi"))
                 )
             )
         );

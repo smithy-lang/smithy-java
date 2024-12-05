@@ -52,7 +52,7 @@ public interface ClientTransportFactory<RequestT, ResponseT> {
      * <p>Transports must be able to be instantiated without any arguments for use in dynamic clients.
      */
     default ClientTransport<RequestT, ResponseT> createTransport() {
-        return createTransport(Document.createStringMap(Collections.emptyMap()));
+        return createTransport(Document.of(Collections.emptyMap()));
     }
 
     /**

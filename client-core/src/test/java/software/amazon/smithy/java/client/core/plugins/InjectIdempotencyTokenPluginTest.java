@@ -72,7 +72,7 @@ public class InjectIdempotencyTokenPluginTest {
 
     @Test
     public void injectsToken() {
-        var token = callAndGetToken("CreateSprocket", Document.createFromObject(Map.of("id", "1")));
+        var token = callAndGetToken("CreateSprocket", Document.ofObject(Map.of("id", "1")));
 
         assertThat(token, not(nullValue()));
         assertThat(token.length(), greaterThan(0));
@@ -101,28 +101,28 @@ public class InjectIdempotencyTokenPluginTest {
             .addPlugin(mock)
             .build();
 
-        client.call(operation, Document.createFromObject(input));
+        client.call(operation, Document.of(input));
         assertThat(mock.getRequests(), not(empty()));
         return mock.getRequests().get(0).request().headers().firstValue("x-token");
     }
 
     @Test
     public void doesNotInjectToken() {
-        var token = callAndGetToken("CreateSprocketNoToken", Document.createFromObject(Map.of("id", "1")));
+        var token = callAndGetToken("CreateSprocketNoToken", Document.ofObject(Map.of("id", "1")));
 
         assertThat(token, nullValue());
     }
 
     @Test
     public void usesProvidedToken() {
-        var token = callAndGetToken("CreateSprocket", Document.createFromObject(Map.of("id", "1", "token", "xyz")));
+        var token = callAndGetToken("CreateSprocket", Document.ofObject(Map.of("id", "1", "token", "xyz")));
 
         assertThat(token, equalTo("xyz"));
     }
 
     @Test
     public void ignoresEmptyStringToken() {
-        var token = callAndGetToken("CreateSprocket", Document.createFromObject(Map.of("id", "1", "token", "")));
+        var token = callAndGetToken("CreateSprocket", Document.ofObject(Map.of("id", "1", "token", "")));
 
         assertThat(token, notNullValue());
         assertThat(token, not(equalTo("")));

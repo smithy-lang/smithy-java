@@ -182,7 +182,7 @@ public class ClientPipelineTest {
             })
             .build();
 
-        var response = client.call("GetSprocket", Document.createFromObject(Map.of("id", "1")));
+        var response = client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
 
         assertThat(mockQueue.remaining(), is(0));
         assertThat(response.getMember("id").asString(), equalTo("1"));

@@ -43,14 +43,14 @@ import software.amazon.smithy.model.shapes.ShapeType;
 public class DocumentTest {
     @Test
     public void getAsNumber() {
-        assertThat(Document.createByte((byte) 1).asNumber(), equalTo(Byte.valueOf((byte) 1)));
-        assertThat(Document.createShort((short) 1).asNumber(), equalTo(Short.valueOf((short) 1)));
-        assertThat(Document.createInteger(1).asNumber(), equalTo(Integer.valueOf(1)));
-        assertThat(Document.createLong(1L).asNumber(), equalTo(Long.valueOf(1L)));
-        assertThat(Document.createFloat(1f).asNumber(), equalTo(Float.valueOf(1f)));
-        assertThat(Document.createDouble(1.0).asNumber(), equalTo(Double.valueOf(1.0)));
-        assertThat(Document.createBigDecimal(new BigDecimal(1)).asNumber(), equalTo(new BigDecimal(1)));
-        assertThat(Document.createBigInteger(BigInteger.valueOf(1)).asNumber(), equalTo(BigInteger.valueOf(1)));
+        assertThat(Document.of((byte) 1).asNumber(), equalTo(Byte.valueOf((byte) 1)));
+        assertThat(Document.of((short) 1).asNumber(), equalTo(Short.valueOf((short) 1)));
+        assertThat(Document.of(1).asNumber(), equalTo(Integer.valueOf(1)));
+        assertThat(Document.of(1L).asNumber(), equalTo(Long.valueOf(1L)));
+        assertThat(Document.of(1f).asNumber(), equalTo(Float.valueOf(1f)));
+        assertThat(Document.of(1.0).asNumber(), equalTo(Double.valueOf(1.0)));
+        assertThat(Document.of(new BigDecimal(1)).asNumber(), equalTo(new BigDecimal(1)));
+        assertThat(Document.of(BigInteger.valueOf(1)).asNumber(), equalTo(BigInteger.valueOf(1)));
     }
 
     @ParameterizedTest
@@ -65,19 +65,19 @@ public class DocumentTest {
 
     public static List<Arguments> defaultSerializationProvider() {
         return List.of(
-            Arguments.of(Document.createByte((byte) 1)),
-            Arguments.of(Document.createShort((short) 1)),
-            Arguments.of(Document.createInteger(1)),
-            Arguments.of(Document.createLong(1L)),
-            Arguments.of(Document.createFloat(1f)),
-            Arguments.of(Document.createDouble(1.0)),
-            Arguments.of(Document.createBigInteger(BigInteger.valueOf(1))),
-            Arguments.of(Document.createBigDecimal(new BigDecimal(1))),
-            Arguments.of(Document.createString("a")),
-            Arguments.of(Document.createBlob("a".getBytes(StandardCharsets.UTF_8))),
-            Arguments.of(Document.createBoolean(true)),
-            Arguments.of(Document.createTimestamp(Instant.EPOCH)),
-            Arguments.of(Document.createList(List.of(Document.createInteger(1), Document.createString("a"))))
+            Arguments.of(Document.of((byte) 1)),
+            Arguments.of(Document.of((short) 1)),
+            Arguments.of(Document.of(1)),
+            Arguments.of(Document.of(1L)),
+            Arguments.of(Document.of(1f)),
+            Arguments.of(Document.of(1.0)),
+            Arguments.of(Document.of(BigInteger.valueOf(1))),
+            Arguments.of(Document.of(new BigDecimal(1))),
+            Arguments.of(Document.of("a")),
+            Arguments.of(Document.of("a".getBytes(StandardCharsets.UTF_8))),
+            Arguments.of(Document.of(true)),
+            Arguments.of(Document.of(Instant.EPOCH)),
+            Arguments.of(Document.of(List.of(Document.of(1), Document.of("a"))))
         );
     }
 
@@ -96,14 +96,14 @@ public class DocumentTest {
 
     public static List<Arguments> onesProvider() {
         return List.of(
-            Arguments.of(Document.createByte((byte) 1)),
-            Arguments.of(Document.createShort((short) 1)),
-            Arguments.of(Document.createInteger(1)),
-            Arguments.of(Document.createLong(1L)),
-            Arguments.of(Document.createFloat(1f)),
-            Arguments.of(Document.createDouble(1.0)),
-            Arguments.of(Document.createBigInteger(BigInteger.valueOf(1))),
-            Arguments.of(Document.createBigDecimal(new BigDecimal("1.0")))
+            Arguments.of(Document.of((byte) 1)),
+            Arguments.of(Document.of((short) 1)),
+            Arguments.of(Document.of(1)),
+            Arguments.of(Document.of(1L)),
+            Arguments.of(Document.of(1f)),
+            Arguments.of(Document.of(1.0)),
+            Arguments.of(Document.of(BigInteger.valueOf(1))),
+            Arguments.of(Document.of(new BigDecimal("1.0")))
         );
     }
 
@@ -115,71 +115,71 @@ public class DocumentTest {
 
     public static List<Arguments> invalidConversionSupplier() {
         return List.of(
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asNumber),
-            Arguments.of(Document.createInteger(1), (Consumer<Document>) Document::asString),
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asBoolean),
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asTimestamp),
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asByte),
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asShort),
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asInteger),
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asLong),
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asFloat),
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asDouble),
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asBigDecimal),
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asBigInteger),
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asList),
-            Arguments.of(Document.createString("a"), (Consumer<Document>) Document::asStringMap),
-            Arguments.of(Document.createInteger(1), (Consumer<Document>) Document::asBlob),
-            Arguments.of(Document.createInteger(1), (Consumer<Document>) d -> d.getMember("a"))
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asNumber),
+            Arguments.of(Document.of(1), (Consumer<Document>) Document::asString),
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asBoolean),
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asTimestamp),
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asByte),
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asShort),
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asInteger),
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asLong),
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asFloat),
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asDouble),
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asBigDecimal),
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asBigInteger),
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asList),
+            Arguments.of(Document.of("a"), (Consumer<Document>) Document::asStringMap),
+            Arguments.of(Document.of(1), (Consumer<Document>) Document::asBlob),
+            Arguments.of(Document.of(1), (Consumer<Document>) d -> d.getMember("a"))
         );
     }
 
     @ParameterizedTest
     @MethodSource("ofValueProvider")
     public void documentFromValue(Document value, Object expected, Function<Document, Object> extractor) {
-        var document = Document.createTyped(value);
+        var document = Document.of(value);
         var extracted = extractor.apply(document);
         assertThat(extracted, equalTo(expected));
     }
 
     public static List<Arguments> ofValueProvider() {
         return List.of(
-            Arguments.of(Document.createString("a"), "a", (Function<Document, Object>) Document::asString),
-            Arguments.of(Document.createByte((byte) 1), (byte) 1, (Function<Document, Object>) Document::asByte),
-            Arguments.of(Document.createShort((short) 1), (short) 1, (Function<Document, Object>) Document::asShort),
-            Arguments.of(Document.createInteger(1), 1, (Function<Document, Object>) Document::asInteger),
-            Arguments.of(Document.createLong(1L), 1L, (Function<Document, Object>) Document::asLong),
-            Arguments.of(Document.createFloat(1f), 1f, (Function<Document, Object>) Document::asFloat),
-            Arguments.of(Document.createDouble(1.0), 1.0, (Function<Document, Object>) Document::asDouble),
+            Arguments.of(Document.of("a"), "a", (Function<Document, Object>) Document::asString),
+            Arguments.of(Document.of((byte) 1), (byte) 1, (Function<Document, Object>) Document::asByte),
+            Arguments.of(Document.of((short) 1), (short) 1, (Function<Document, Object>) Document::asShort),
+            Arguments.of(Document.of(1), 1, (Function<Document, Object>) Document::asInteger),
+            Arguments.of(Document.of(1L), 1L, (Function<Document, Object>) Document::asLong),
+            Arguments.of(Document.of(1f), 1f, (Function<Document, Object>) Document::asFloat),
+            Arguments.of(Document.of(1.0), 1.0, (Function<Document, Object>) Document::asDouble),
             Arguments.of(
-                Document.createBigInteger(BigInteger.valueOf(1)),
+                Document.of(BigInteger.valueOf(1)),
                 BigInteger.valueOf(1),
                 (Function<Document, Object>) Document::asBigInteger
             ),
             Arguments.of(
-                Document.createBigDecimal(new BigDecimal(1)),
+                Document.of(new BigDecimal(1)),
                 new BigDecimal(1),
                 (Function<Document, Object>) Document::asBigDecimal
             ),
-            Arguments.of(Document.createBoolean(true), true, (Function<Document, Object>) Document::asBoolean),
+            Arguments.of(Document.of(true), true, (Function<Document, Object>) Document::asBoolean),
             Arguments.of(
-                Document.createBlob("a".getBytes(StandardCharsets.UTF_8)),
+                Document.of("a".getBytes(StandardCharsets.UTF_8)),
                 wrap("a".getBytes(StandardCharsets.UTF_8)),
                 (Function<Document, Object>) Document::asBlob
             ),
             Arguments.of(
-                Document.createTimestamp(Instant.EPOCH),
+                Document.of(Instant.EPOCH),
                 Instant.EPOCH,
                 (Function<Document, Object>) Document::asTimestamp
             ),
             Arguments.of(
-                Document.createList(List.of(Document.createInteger(1), Document.createInteger(2))),
-                List.of(Document.createInteger(1), Document.createInteger(2)),
+                Document.of(List.of(Document.of(1), Document.of(2))),
+                List.of(Document.of(1), Document.of(2)),
                 (Function<Document, Object>) Document::asList
             ),
             Arguments.of(
-                Document.createStringMap(Map.of("A", Document.createInteger(1))),
-                Map.of("A", Document.createInteger(1)),
+                Document.of(Map.of("A", Document.of(1))),
+                Map.of("A", Document.of(1)),
                 (Function<Document, Object>) Document::asStringMap
             )
         );
@@ -193,7 +193,7 @@ public class DocumentTest {
             .binary(wrap("hi".getBytes(StandardCharsets.UTF_8)))
             .birthday(Instant.EPOCH)
             .build();
-        var doc = Document.createTyped(person);
+        var doc = Document.of(person);
 
         assertThat(doc.discriminator(), equalTo(Person.ID));
         assertThat(doc.getMember("name").asString(), equalTo("A"));
@@ -216,67 +216,67 @@ public class DocumentTest {
     public static List<Arguments> deserializesDocumentProvider() {
         return List.of(
             Arguments.of(
-                Document.createString("a"),
+                Document.of("a"),
                 "a",
                 (Function<ShapeDeserializer, Object>) s -> s.readString(PreludeSchemas.STRING)
             ),
             Arguments.of(
-                Document.createBlob("a".getBytes(StandardCharsets.UTF_8)),
+                Document.of("a".getBytes(StandardCharsets.UTF_8)),
                 wrap("a".getBytes(StandardCharsets.UTF_8)),
                 (Function<ShapeDeserializer, Object>) s -> s.readBlob(PreludeSchemas.BLOB)
             ),
             Arguments.of(
-                Document.createBoolean(true),
+                Document.of(true),
                 true,
                 (Function<ShapeDeserializer, Object>) s -> s.readBoolean(PreludeSchemas.BOOLEAN)
             ),
             Arguments.of(
-                Document.createByte((byte) 1),
+                Document.of((byte) 1),
                 (byte) 1,
                 (Function<ShapeDeserializer, Object>) s -> s.readByte(PreludeSchemas.BYTE)
             ),
             Arguments.of(
-                Document.createShort((short) 1),
+                Document.of((short) 1),
                 (short) 1,
                 (Function<ShapeDeserializer, Object>) s -> s.readShort(PreludeSchemas.SHORT)
             ),
             Arguments.of(
-                Document.createInteger(1),
+                Document.of(1),
                 1,
                 (Function<ShapeDeserializer, Object>) s -> s.readInteger(PreludeSchemas.INTEGER)
             ),
             Arguments.of(
-                Document.createLong(1L),
+                Document.of(1L),
                 1L,
                 (Function<ShapeDeserializer, Object>) s -> s.readLong(PreludeSchemas.LONG)
             ),
             Arguments.of(
-                Document.createFloat(1f),
+                Document.of(1f),
                 1f,
                 (Function<ShapeDeserializer, Object>) s -> s.readFloat(PreludeSchemas.FLOAT)
             ),
             Arguments.of(
-                Document.createDouble(1.0),
+                Document.of(1.0),
                 1.0,
                 (Function<ShapeDeserializer, Object>) s -> s.readDouble(PreludeSchemas.DOUBLE)
             ),
             Arguments.of(
-                Document.createBigInteger(BigInteger.ONE),
+                Document.of(BigInteger.ONE),
                 BigInteger.ONE,
                 (Function<ShapeDeserializer, Object>) s -> s.readBigInteger(PreludeSchemas.BIG_INTEGER)
             ),
             Arguments.of(
-                Document.createBigDecimal(BigDecimal.ONE),
+                Document.of(BigDecimal.ONE),
                 BigDecimal.ONE,
                 (Function<ShapeDeserializer, Object>) s -> s.readBigDecimal(PreludeSchemas.BIG_DECIMAL)
             ),
             Arguments.of(
-                Document.createString("a"),
-                Document.createString("a"),
+                Document.of("a"),
+                Document.of("a"),
                 (Function<ShapeDeserializer, Object>) ShapeDeserializer::readDocument
             ),
             Arguments.of(
-                Document.createTimestamp(Instant.EPOCH),
+                Document.of(Instant.EPOCH),
                 Instant.EPOCH,
                 (Function<ShapeDeserializer, Object>) s -> s.readTimestamp(PreludeSchemas.TIMESTAMP)
             )
@@ -285,7 +285,7 @@ public class DocumentTest {
 
     @Test
     public void deserializesListDocuments() {
-        Document value = Document.createList(List.of(Document.createString("a"), Document.createString("b")));
+        Document value = Document.of(List.of(Document.of("a"), Document.of("b")));
         DocumentDeserializer deserializer = new DocumentDeserializer(value);
         List<String> result = new ArrayList<>();
 
@@ -298,7 +298,7 @@ public class DocumentTest {
 
     @Test
     public void deserializesStringMap() {
-        Document value = Document.createStringMap(Map.of("a", Document.createString("v")));
+        Document value = Document.of(Map.of("a", Document.of("v")));
         DocumentDeserializer deserializer = new DocumentDeserializer(value);
         Map<String, String> result = new HashMap<>();
 
@@ -314,7 +314,7 @@ public class DocumentTest {
     @Test
     public void throwsWhenDocumentWritesNothing() {
         var e = Assertions.assertThrows(SerializationException.class, () -> {
-            var document = Document.createTyped(encoder -> {});
+            var document = Document.of(encoder -> {});
             // Trigger the lazy document to create the underlying document.
             document.getMember("hello!");
         });
@@ -336,20 +336,20 @@ public class DocumentTest {
 
     static List<Arguments> normalizedEqualsTestProvider() {
         return List.of(
-            Arguments.of(Document.createString("hi")),
-            Arguments.of(Document.createBlob("hi".getBytes(StandardCharsets.UTF_8))),
-            Arguments.of(Document.createByte((byte) 1)),
-            Arguments.of(Document.createShort((short) 1)),
-            Arguments.of(Document.createInteger(1)),
-            Arguments.of(Document.createLong(1L)),
-            Arguments.of(Document.createFloat(1f)),
-            Arguments.of(Document.createDouble(1.0)),
-            Arguments.of(Document.createBigInteger(BigInteger.ONE)),
-            Arguments.of(Document.createBigDecimal(BigDecimal.ONE)),
-            Arguments.of(Document.createBoolean(true)),
-            Arguments.of(Document.createStringMap(Map.of("hi", Document.createString("there")))),
-            Arguments.of(Document.createList(List.of(Document.createString("hi")))),
-            Arguments.of(Document.createTimestamp(Instant.EPOCH))
+            Arguments.of(Document.of("hi")),
+            Arguments.of(Document.of("hi".getBytes(StandardCharsets.UTF_8))),
+            Arguments.of(Document.of((byte) 1)),
+            Arguments.of(Document.of((short) 1)),
+            Arguments.of(Document.of(1)),
+            Arguments.of(Document.of(1L)),
+            Arguments.of(Document.of(1f)),
+            Arguments.of(Document.of(1.0)),
+            Arguments.of(Document.of(BigInteger.ONE)),
+            Arguments.of(Document.of(BigDecimal.ONE)),
+            Arguments.of(Document.of(true)),
+            Arguments.of(Document.of(Map.of("hi", Document.of("there")))),
+            Arguments.of(Document.of(List.of(Document.of("hi")))),
+            Arguments.of(Document.of(Instant.EPOCH))
         );
     }
 
@@ -361,19 +361,19 @@ public class DocumentTest {
 
     public static List<Arguments> inEqualDocumentsTestProvider() {
         return List.of(
-            Arguments.of(Document.createString("a"), Document.createInteger(1)),
-            Arguments.of(Document.createList(List.of(Document.createInteger(1))), Document.createList(List.of())),
+            Arguments.of(Document.of("a"), Document.of(1)),
+            Arguments.of(Document.of(List.of(Document.of(1))), Document.of(List.of())),
             Arguments.of(
-                Document.createList(List.of(Document.createInteger(1))),
-                Document.createList(List.of(Document.createInteger(2)))
+                Document.of(List.of(Document.of(1))),
+                Document.of(List.of(Document.of(2)))
             ),
             Arguments.of(
-                Document.createStringMap(Map.of("a", Document.createString("a"))),
-                Document.createStringMap(Map.of())
+                Document.of(Map.of("a", Document.of("a"))),
+                Document.of(Map.of())
             ),
             Arguments.of(
-                Document.createStringMap(Map.of("a", Document.createString("a"))),
-                Document.createStringMap(Map.of("a", Document.createString("b")))
+                Document.of(Map.of("a", Document.of("a"))),
+                Document.of(Map.of("a", Document.of("b")))
             )
         );
     }
@@ -505,7 +505,7 @@ public class DocumentTest {
     @ParameterizedTest
     @MethodSource("documentToObjectProvider")
     public void convertsDocumentToObject(Object value, ShapeType type) {
-        var document = Document.createFromObject(value);
+        var document = Document.ofObject(value);
 
         assertThat(document.type(), is(type));
 
@@ -535,35 +535,35 @@ public class DocumentTest {
 
     @Test
     public void returnsDocumentsAsIs() {
-        var document = Document.createString("hi");
-        var created = Document.createFromObject(document);
+        var document = Document.of("hi");
+        var created = Document.of(document);
 
         assertThat(document, is(created));
     }
 
     @Test
     public void convertsNullObjectToNullDocumentValue() {
-        assertThat(Document.createFromObject(null), nullValue());
+        assertThat(Document.ofObject(null), nullValue());
     }
 
     @Test
     public void createsDocumentFromSerializableShape() {
         Bird bird = Bird.builder().name("Iago").build();
-        var document = Document.createFromObject(bird);
+        var document = Document.of(bird);
 
         assertThat(document.type(), is(ShapeType.STRUCTURE));
     }
 
     @Test
     public void returnsNullForNonStructures() {
-        var document = Document.createString("Hi");
+        var document = Document.of("Hi");
 
         Assertions.assertThrows(DiscriminatorException.class, document::discriminator);
     }
 
     @Test
     public void returnsNullForMapsMissingType() {
-        var document = Document.createStringMap(Map.of("hi", Document.createString("bye")));
+        var document = Document.of(Map.of("hi", Document.of("bye")));
 
         Assertions.assertThrows(DiscriminatorException.class, document::discriminator);
     }
@@ -571,15 +571,16 @@ public class DocumentTest {
     @Test
     public void returnsShapeIdForTypedDocuments() {
         var person = Person.builder().build();
-        var document = Document.createTyped(person);
+        var document = Document.of(person);
 
         assertThat(document.discriminator(), equalTo(Person.ID));
     }
 
     @Test
     public void documentsDefaultToSizeNegativeOne() {
-        var document = Document.createInteger(1);
+        var document = Document.of(1);
 
         assertThat(document.size(), is(-1));
     }
 }
+

@@ -87,13 +87,13 @@ public class MockPluginTest {
         mockQueue.enqueue(
             client.createStruct(
                 ShapeId.from("smithy.example#GetSprocketOutput"),
-                Document.createStringMap(Map.of("id", Document.createString("a")))
+                Document.of(Map.of("id", Document.of("a")))
             )
         );
         mockQueue.enqueue(
             client.createStruct(
                 ShapeId.from("smithy.example#GetSprocketOutput"),
-                Document.createStringMap(Map.of("id", Document.createString("b")))
+                Document.of(Map.of("id", Document.of("b")))
             )
         );
 
@@ -216,21 +216,21 @@ public class MockPluginTest {
         aQueue.enqueue(
             client.createStruct(
                 ShapeId.from("smithy.example#GetSprocketOutput"),
-                Document.createStringMap(Map.of("id", Document.createString("a")))
+                Document.of(Map.of("id", Document.of("a")))
             )
         );
 
         bQueue.enqueue(
             client.createStruct(
                 ShapeId.from("smithy.example#GetSprocketOutput"),
-                Document.createStringMap(Map.of("id", Document.createString("b")))
+                Document.of(Map.of("id", Document.of("b")))
             )
         );
 
-        var aresult = client.call("GetSprocket", Document.createStringMap(Map.of("id", Document.createString("a"))));
+        var aresult = client.call("GetSprocket", Document.of(Map.of("id", Document.of("a"))));
         assertThat(aresult.getMember("id").asString(), equalTo("a"));
 
-        var bresult = client.call("GetSprocket", Document.createStringMap(Map.of("id", Document.createString("b"))));
+        var bresult = client.call("GetSprocket", Document.of(Map.of("id", Document.of("b"))));
         assertThat(bresult.getMember("id").asString(), equalTo("b"));
 
         assertThat(mock.getRequests(), hasSize(2));

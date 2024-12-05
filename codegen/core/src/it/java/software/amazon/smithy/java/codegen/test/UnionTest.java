@@ -60,7 +60,7 @@ public class UnionTest {
     @ParameterizedTest
     @MethodSource("unionTypes")
     void pojoToDocumentRoundTrip(UnionType pojo) {
-        var document = Document.createTyped(pojo);
+        var document = Document.of(pojo);
         var builder = UnionType.builder();
         document.deserializeInto(builder);
         var output = builder.build();
@@ -70,7 +70,7 @@ public class UnionTest {
 
     record UnknownDocument() implements Document {
 
-        private static final Map<String, Document> members = Map.of("UNKNOWN!!!", Document.createDouble(3.2));
+        private static final Map<String, Document> members = Map.of("UNKNOWN!!!", Document.of(3.2));
 
         @Override
         public ShapeType type() {
@@ -112,6 +112,6 @@ public class UnionTest {
     @Test
     void unknownUnionSerFails() {
         var union = UnionType.builder().$unknownMember("foo").build();
-        assertThrows(SerializationException.class, () -> Document.createTyped(union));
+        assertThrows(SerializationException.class, () -> Document.of(union));
     }
 }

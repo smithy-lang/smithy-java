@@ -110,7 +110,7 @@ public final class DynamicClient extends Client {
      * @return the output of the operation.
      */
     public Document call(String operation) {
-        return call(operation, Document.createStringMap(Map.of()));
+        return call(operation, Document.of(Map.of()));
     }
 
     /**
@@ -151,7 +151,7 @@ public final class DynamicClient extends Client {
      * @return the output of the operation.
      */
     public CompletableFuture<Document> callAsync(String operation) {
-        return callAsync(operation, Document.createStringMap(Map.of()));
+        return callAsync(operation, Document.of(Map.of()));
     }
 
     /**

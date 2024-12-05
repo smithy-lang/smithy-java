@@ -437,7 +437,7 @@ public class JsonDocumentTest {
         var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
         var json = de.readDocument();
 
-        assertThat(Document.equals(json, Document.createBoolean(true)), is(true));
+        assertThat(Document.equals(json, Document.of(true)), is(true));
     }
 
     @Test

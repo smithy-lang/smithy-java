@@ -58,7 +58,7 @@ public class TypedDocumentTest {
     @Test
     public void wrapsStructContentWithTypeAndSchema() {
         var serializableShape = createSerializableShape();
-        var result = Document.createTyped(serializableShape);
+        var result = Document.of(serializableShape);
 
         assertThat(result.type(), equalTo(ShapeType.STRUCTURE));
         assertThat(
@@ -80,8 +80,8 @@ public class TypedDocumentTest {
         assertThat(result, equalTo(result));
         assertThat(result, not(equalTo(null)));
         assertThat(result, not(equalTo("X")));
-        assertThat(result, equalTo(Document.createTyped(serializableShape)));
-        assertThat(result.hashCode(), equalTo(Document.createTyped(serializableShape).hashCode()));
+        assertThat(result, equalTo(Document.of(serializableShape)));
+        assertThat(result.hashCode(), equalTo(Document.of(serializableShape).hashCode()));
 
         // Writes as document unless getting contents.
         result.serialize(new SpecificShapeSerializer() {
@@ -92,11 +92,11 @@ public class TypedDocumentTest {
         });
 
         // This is basically recreating the same document with the same captured schema.
-        assertThat(result, equalTo(Document.createTyped(result)));
+        assertThat(result, equalTo(Document.of(result)));
 
         // Not equal because the left member has a schema with the same value, but the right has no schema.
-        assertThat(result.getMember("a"), not(equalTo(Document.createString("1"))));
-        assertThat(result.getMember("b"), not(equalTo(Document.createString("2"))));
+        assertThat(result.getMember("a"), not(equalTo(Document.of("1"))));
+        assertThat(result.getMember("b"), not(equalTo(Document.of("2"))));
 
         // Converts to a string map.
         var copy1 = result.asStringMap();
@@ -107,7 +107,7 @@ public class TypedDocumentTest {
     @Test
     public void getsSchemaValue() {
         var serializableShape = createSerializableShape();
-        var result = (SerializableStruct) Document.createTyped(serializableShape);
+        var result = (SerializableStruct) Document.of(serializableShape);
         var schema = result.schema();
 
         assertThat(result.getMemberValue(schema.member("a")), instanceOf(Document.class));

@@ -20,16 +20,16 @@ public class StringDocumentTest {
 
     @Test
     public void createsDocument() {
-        var document = Document.createString("hi");
+        var document = Document.of("hi");
 
         assertThat(document.type(), equalTo(ShapeType.STRING));
         assertThat(document.asString(), equalTo("hi"));
-        assertThat(document, equalTo(Document.createString("hi")));
+        assertThat(document, equalTo(Document.of("hi")));
     }
 
     @Test
     public void serializesShape() {
-        var document = Document.createString("hi");
+        var document = Document.of("hi");
 
         document.serialize(new SpecificShapeSerializer() {
             @Override
@@ -41,7 +41,7 @@ public class StringDocumentTest {
 
     @Test
     public void serializesContent() {
-        var document = Document.createString("hi");
+        var document = Document.of("hi");
 
         ShapeSerializer serializer = new SpecificShapeSerializer() {
             @Override

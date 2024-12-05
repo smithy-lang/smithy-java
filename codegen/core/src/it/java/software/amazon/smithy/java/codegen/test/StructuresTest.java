@@ -45,7 +45,7 @@ public class StructuresTest {
     static Stream<SerializableShape> memberTypes() {
         return Stream.of(
             BooleanMembersInput.builder().requiredBoolean(true).build(),
-            DocumentMembersInput.builder().requiredDoc(Document.createString("str")).build(),
+            DocumentMembersInput.builder().requiredDoc(Document.of("str")).build(),
             ListMembersInput.builder().requiredList(List.of("a", "b", "c")).build(),
             MapMembersInput.builder().requiredMap(Map.of("a", "b")).build(),
             BigDecimalMembersInput.builder().requiredBigDecimal(BigDecimal.valueOf(1.0)).build(),

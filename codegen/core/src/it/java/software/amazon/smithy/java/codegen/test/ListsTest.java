@@ -126,7 +126,7 @@ public class ListsTest {
                 .build(),
             ListAllTypesInput.builder()
                 .listOfDocuments(
-                    List.of(Document.createDouble(2.0), Document.createString("string"))
+                    List.of(Document.of(2.0), Document.of("string"))
                 )
                 .build()
         );
@@ -240,7 +240,7 @@ public class ListsTest {
                 .build(),
             SparseListsInput.builder()
                 .listOfDocuments(
-                    ListUtils.of(Document.createDouble(2.0), null, Document.createString("string"))
+                    ListUtils.of(Document.of(2.0), null, Document.of("string"))
                 )
                 .build()
         );
@@ -264,8 +264,8 @@ public class ListsTest {
         // Collections should return empty collections for access
         assertEquals(emptyInput.listOfBoolean(), Collections.emptyList());
         assertEquals(emptyInput.listOfBoolean(), nullInput.listOfBoolean());
-        var emptyDocument = Document.createTyped(emptyInput);
-        var nullDocument = Document.createTyped(nullInput);
+        var emptyDocument = Document.of(emptyInput);
+        var nullDocument = Document.of(nullInput);
         assertNotNull(emptyDocument.getMember("listOfBoolean"));
         assertNull(nullDocument.getMember("listOfBoolean"));
     }
