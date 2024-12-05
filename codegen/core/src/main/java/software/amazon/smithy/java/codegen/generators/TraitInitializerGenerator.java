@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.Map;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
@@ -16,7 +17,15 @@ record TraitInitializerGenerator(JavaWriter writer, Shape shape, CodeGenerationC
 
     @Override
     public void run() {
-        var traitsToAdd = shape.getAllTraits().keySet().stream().filter(context.runtimeTraits()::contains).toList();
+        var traitsToAdd = shape.getAllTraits()
+            .entrySet()
+            .stream()
+            .filter(entry -> !CodeGenerationContext.BUILD_ONLY_TRAITS.contains(entry.getKey()))
+            .filter(entry -> !entry.getKey().getNamespace().startsWith("smithy.test"))
+            .filter(entry -> !entry.getKey().getNamespace().startsWith("smithy.protocoltests"))
+            .map(Map.Entry::getValue)
+            .filter(trait -> !trait.isSynthetic())
+            .toList();
         if (traitsToAdd.isEmpty()) {
             return;
         }
@@ -24,7 +33,7 @@ record TraitInitializerGenerator(JavaWriter writer, Shape shape, CodeGenerationC
         writer.indent().indent();
         var iter = traitsToAdd.iterator();
         while (iter.hasNext()) {
-            var trait = shape.getAllTraits().get(iter.next());
+            var trait = iter.next();
             writer.pushState();
             context.getInitializer(trait).accept(writer, trait);
             if (iter.hasNext()) {

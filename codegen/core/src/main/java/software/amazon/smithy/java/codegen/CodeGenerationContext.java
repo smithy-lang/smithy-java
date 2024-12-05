@@ -6,51 +6,33 @@
 package software.amazon.smithy.java.codegen;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
-import java.util.Set;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.codegen.core.CodegenContext;
-import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.WriterDelegator;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.ServiceShape;
-import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.traits.AuthDefinitionTrait;
-import software.amazon.smithy.model.traits.DefaultTrait;
-import software.amazon.smithy.model.traits.EndpointTrait;
-import software.amazon.smithy.model.traits.ErrorTrait;
-import software.amazon.smithy.model.traits.EventHeaderTrait;
-import software.amazon.smithy.model.traits.EventPayloadTrait;
-import software.amazon.smithy.model.traits.HostLabelTrait;
-import software.amazon.smithy.model.traits.IdempotencyTokenTrait;
-import software.amazon.smithy.model.traits.JsonNameTrait;
-import software.amazon.smithy.model.traits.LengthTrait;
-import software.amazon.smithy.model.traits.MediaTypeTrait;
-import software.amazon.smithy.model.traits.PaginatedTrait;
-import software.amazon.smithy.model.traits.PatternTrait;
-import software.amazon.smithy.model.traits.ProtocolDefinitionTrait;
-import software.amazon.smithy.model.traits.RangeTrait;
-import software.amazon.smithy.model.traits.RequestCompressionTrait;
-import software.amazon.smithy.model.traits.RequiredTrait;
-import software.amazon.smithy.model.traits.RequiresLengthTrait;
-import software.amazon.smithy.model.traits.RetryableTrait;
-import software.amazon.smithy.model.traits.SensitiveTrait;
-import software.amazon.smithy.model.traits.SparseTrait;
-import software.amazon.smithy.model.traits.StreamingTrait;
-import software.amazon.smithy.model.traits.TimestampFormatTrait;
+import software.amazon.smithy.model.traits.AddedDefaultTrait;
+import software.amazon.smithy.model.traits.ClientOptionalTrait;
+import software.amazon.smithy.model.traits.DeprecatedTrait;
+import software.amazon.smithy.model.traits.DocumentationTrait;
+import software.amazon.smithy.model.traits.EnumValueTrait;
+import software.amazon.smithy.model.traits.ExamplesTrait;
+import software.amazon.smithy.model.traits.ExternalDocumentationTrait;
+import software.amazon.smithy.model.traits.InputTrait;
+import software.amazon.smithy.model.traits.InternalTrait;
+import software.amazon.smithy.model.traits.MixinTrait;
+import software.amazon.smithy.model.traits.OutputTrait;
+import software.amazon.smithy.model.traits.RecommendedTrait;
+import software.amazon.smithy.model.traits.SinceTrait;
+import software.amazon.smithy.model.traits.SuppressTrait;
+import software.amazon.smithy.model.traits.TagsTrait;
+import software.amazon.smithy.model.traits.TitleTrait;
 import software.amazon.smithy.model.traits.Trait;
-import software.amazon.smithy.model.traits.UniqueItemsTrait;
-import software.amazon.smithy.model.traits.XmlAttributeTrait;
-import software.amazon.smithy.model.traits.XmlFlattenedTrait;
-import software.amazon.smithy.model.traits.XmlNameTrait;
-import software.amazon.smithy.model.traits.XmlNamespaceTrait;
+import software.amazon.smithy.model.traits.UnstableTrait;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
@@ -62,37 +44,30 @@ public class CodeGenerationContext
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(CodeGenerationContext.class);
 
-    private static final List<ShapeId> PRELUDE_RUNTIME_TRAITS = List.of(
-        // Validation Traits
-        LengthTrait.ID,
-        PatternTrait.ID,
-        RangeTrait.ID,
-        RequiredTrait.ID,
-        SensitiveTrait.ID,
-        IdempotencyTokenTrait.ID,
-        SparseTrait.ID,
-        UniqueItemsTrait.ID,
-        RequiresLengthTrait.ID,
-        ErrorTrait.ID,
-        DefaultTrait.ID,
-        // Base Prelude Protocol traits
-        JsonNameTrait.ID,
-        TimestampFormatTrait.ID,
-        MediaTypeTrait.ID,
-        XmlNameTrait.ID,
-        XmlFlattenedTrait.ID,
-        XmlAttributeTrait.ID,
-        XmlNamespaceTrait.ID,
-        EventHeaderTrait.ID,
-        EventPayloadTrait.ID,
-        HostLabelTrait.ID,
-        EndpointTrait.ID,
-        // Prelude behavior traits
-        PaginatedTrait.ID,
-        IdempotencyTokenTrait.ID,
-        RetryableTrait.ID,
-        RequestCompressionTrait.ID,
-        StreamingTrait.ID
+    /*
+     * These traits are only used for modeling, and are not needed at runtime.
+     */
+    public static final List<ShapeId> BUILD_ONLY_TRAITS = List.of(
+        // Type Refinement Traits
+        AddedDefaultTrait.ID, // Documentation only
+        ClientOptionalTrait.ID, // Handled by nullability index
+        EnumValueTrait.ID, // Code generator converts enums to shapes
+        InputTrait.ID,
+        OutputTrait.ID,
+        MixinTrait.ID, // Flattened by generators
+        // Documentation Traits
+        DeprecatedTrait.ID,
+        DocumentationTrait.ID,
+        ExamplesTrait.ID,
+        ExternalDocumentationTrait.ID,
+        InternalTrait.ID,
+        RecommendedTrait.ID,
+        SinceTrait.ID,
+        TagsTrait.ID,
+        TitleTrait.ID,
+        UnstableTrait.ID,
+        // Other
+        SuppressTrait.ID
     );
 
     private final Model model;
@@ -101,7 +76,6 @@ public class CodeGenerationContext
     private final FileManifest fileManifest;
     private final List<JavaCodegenIntegration> integrations;
     private final WriterDelegator<JavaWriter> writerDelegator;
-    private final Set<ShapeId> runtimeTraits;
     private final List<TraitInitializer<?>> traitInitializers;
 
     public CodeGenerationContext(
@@ -117,7 +91,6 @@ public class CodeGenerationContext
         this.fileManifest = fileManifest;
         this.integrations = integrations;
         this.writerDelegator = new WriterDelegator<>(fileManifest, symbolProvider, new JavaWriter.Factory(settings));
-        this.runtimeTraits = collectRuntimeTraits();
         this.traitInitializers = collectTraitInitializers();
     }
 
@@ -149,59 +122,6 @@ public class CodeGenerationContext
     @Override
     public List<JavaCodegenIntegration> integrations() {
         return integrations;
-    }
-
-    public Set<ShapeId> runtimeTraits() {
-        return runtimeTraits;
-    }
-
-    /**
-     * Determines the "runtime traits" for a service, i.e. traits that should be included in Shape schemas.
-     *
-     * <p>Runtime traits are added from the following sources:
-     * <dl>
-     *     <dt>Protocol-generic prelude traits</dt>
-     *     <dd>Static list of prelude traits that should be included regardless of protocol.</dd>
-     *     <dt>Protocol traits</dt>
-     *     <dd>Traits supported explicitly by protocols the service uses should be included in Schemas.</dd>
-     *     <dt>AuthScheme traits</dt>
-     *     <dd>Traits supported explicitly by auth schemes used by the service should be included in Schemas.</dd>
-     * </dl>
-     *
-     * @return Set of trait ShapeId's to include in generated Schemas.
-     */
-    private Set<ShapeId> collectRuntimeTraits() {
-        ServiceShape shape = model.expectShape(settings.service())
-            .asServiceShape()
-            .orElseThrow(
-                () -> new CodegenException(
-                    "Expected shapeId: "
-                        + settings.service() + " to be a service shape."
-                )
-            );
-
-        // Add all default runtime traits from the prelude
-        Set<ShapeId> traits = new HashSet<>(PRELUDE_RUNTIME_TRAITS);
-        for (var entry : shape.getAllTraits().entrySet()) {
-            Optional<Shape> traitShapeOptional = model.getShape(entry.getKey());
-            if (traitShapeOptional.isEmpty()) {
-                LOGGER.debug("Skipping unknown trait: {}", entry.getKey());
-                continue;
-            }
-            var traitShape = traitShapeOptional.get();
-            // Add all traits supported by a protocol the service supports
-            if (traitShape.hasTrait(ProtocolDefinitionTrait.class)) {
-                var protocolDef = traitShape.expectTrait(ProtocolDefinitionTrait.class);
-                traits.addAll(protocolDef.getTraits());
-            }
-            // Add all traits supported by auth schemes the service supports
-            if (traitShape.hasTrait(AuthDefinitionTrait.class)) {
-                var authDef = traitShape.expectTrait(AuthDefinitionTrait.class);
-                traits.addAll(authDef.getTraits());
-            }
-        }
-
-        return Collections.unmodifiableSet(traits);
     }
 
     private List<TraitInitializer<?>> collectTraitInitializers() {

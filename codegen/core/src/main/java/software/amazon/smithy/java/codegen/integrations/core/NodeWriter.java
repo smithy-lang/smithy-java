@@ -54,6 +54,9 @@ record NodeWriter(JavaWriter writer, Node node) implements NodeVisitor<Void>, Ru
         writer.indent();
         var memberWriter = new MemberNodeWriter(writer);
         for (var memberEntry : objectNode.getStringMap().entrySet()) {
+            if (memberEntry.getValue().isNullNode()) {
+                continue;
+            }
             writer.write(
                 ".withMember($S, $C)",
                 memberEntry.getKey(),
@@ -116,6 +119,9 @@ record NodeWriter(JavaWriter writer, Node node) implements NodeVisitor<Void>, Ru
             writer.write("${node:T}.objectNodeBuilder()");
             writer.indent();
             for (var memberEntry : objectNode.getStringMap().entrySet()) {
+                if (memberEntry.getValue().isNullNode()) {
+                    continue;
+                }
                 writer.write(
                     ".withMember($S, $C)",
                     memberEntry.getKey(),
@@ -129,7 +135,7 @@ record NodeWriter(JavaWriter writer, Node node) implements NodeVisitor<Void>, Ru
 
         @Override
         public Void arrayNode(ArrayNode arrayNode) {
-            writer.write("$T.builder", ArrayNode.class);
+            writer.write("$T.builder()", ArrayNode.class);
             writer.indent();
             for (var element : arrayNode.getElements()) {
                 writer.write(".withValue($C)", (Runnable) () -> element.accept(this));

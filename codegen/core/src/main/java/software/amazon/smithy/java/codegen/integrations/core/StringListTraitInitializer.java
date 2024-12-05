@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.integrations.core;
 
+import java.util.List;
 import software.amazon.smithy.java.codegen.TraitInitializer;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.SourceLocation;
@@ -18,11 +19,14 @@ final class StringListTraitInitializer implements TraitInitializer<StringListTra
 
     @Override
     public void accept(JavaWriter writer, StringListTrait stringListTrait) {
+        writer.pushState();
+        writer.putContext("trait", stringListTrait.getClass());
+        writer.putContext("values", stringListTrait.getValues());
+        writer.putContext("location", SourceLocation.class);
+        writer.putContext("list", List.class);
         writer.writeInline(
-            "new $T($S, $T.NONE)",
-            stringListTrait.getClass(),
-            stringListTrait.getValues(),
-            SourceLocation.class
+            "new ${trait:T}(${list:T}.of(${#values}${value:S}${^key.last}, ${/key.last}${/values}), ${location:T}.NONE)"
         );
+        writer.popState();
     }
 }
