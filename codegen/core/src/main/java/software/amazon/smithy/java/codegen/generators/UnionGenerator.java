@@ -20,7 +20,6 @@ import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
-import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.Model;
@@ -218,7 +217,7 @@ public final class UnionGenerator
 
                     @Override
                     public void serialize(${shapeSerializer:T} serializer) {
-                        throw new ${serdeException:T}("Cannot serialize union with unknown member " + this.memberName);
+                        throw new ${unsupportedOperation:T}("Cannot serialize union with unknown member " + this.memberName);
                     }
 
                     @Override
@@ -231,7 +230,7 @@ public final class UnionGenerator
                     }
                 }
                 """;
-            writer.putContext("serdeException", SerializationException.class);
+            writer.putContext("unsupportedOperation", UnsupportedOperationException.class);
             writer.putContext("string", String.class);
             writer.write(template);
             writer.popState();

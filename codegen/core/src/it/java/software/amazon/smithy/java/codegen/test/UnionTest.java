@@ -26,7 +26,6 @@ import software.amazon.smithy.java.codegen.test.model.NestedStruct;
 import software.amazon.smithy.java.codegen.test.model.NestedUnion;
 import software.amazon.smithy.java.codegen.test.model.UnionType;
 import software.amazon.smithy.java.core.schema.SerializableShape;
-import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -112,6 +111,6 @@ public class UnionTest {
     @Test
     void unknownUnionSerFails() {
         var union = UnionType.builder().$unknownMember("foo").build();
-        assertThrows(SerializationException.class, () -> Document.createTyped(union));
+        assertThrows(UnsupportedOperationException.class, () -> Document.createTyped(union));
     }
 }
