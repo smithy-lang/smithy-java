@@ -25,9 +25,11 @@ final class MapStorageContext implements Context {
 
     @Override
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public void copyTo(Context target) {
+    public Context copyTo(Context target) {
         for (var entry : attributes.entrySet()) {
-            target.put((Key) entry.getKey(), entry.getValue());
+            var key = (Key) entry.getKey();
+            target.put(key, key.copyValue(entry.getValue()));
         }
+        return target;
     }
 }

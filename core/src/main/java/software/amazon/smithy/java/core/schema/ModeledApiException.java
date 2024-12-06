@@ -63,4 +63,22 @@ public abstract class ModeledApiException extends ApiException implements Serial
     public final Schema schema() {
         return schema;
     }
+
+    /**
+     * Get the status code of an error from its schema.
+     *
+     * @param schema Schema to check for the httpError and error trait.
+     * @return the resolved status code, or 500.
+     */
+    public static int getHttpStatusCode(Schema schema) {
+        var httpError = schema.getTrait(TraitKey.HTTP_ERROR_TRAIT);
+        if (httpError != null) {
+            return httpError.getCode();
+        }
+        var errorTrait = schema.getTrait(TraitKey.ERROR_TRAIT);
+        if (errorTrait != null) {
+            return errorTrait.getDefaultHttpStatusCode();
+        }
+        return 500;
+    }
 }

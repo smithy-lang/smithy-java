@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
-import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -279,9 +278,8 @@ final class Documents {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public <T> T getMemberValue(Schema member) {
-            return (T) SchemaUtils.validateMemberInSchema(schema, member, members.get(member.memberName()));
+            return DocumentUtils.getMemberValue(this, schema, member);
         }
     }
 

@@ -33,8 +33,6 @@ import software.amazon.smithy.model.traits.IdempotencyTokenTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
-// TODO: for streaming schemas and idempotency token schemas, can we use the member index rather than member name?
-// this would require that the symbol provider could provide the index position, which requires a pre-sort of members.
 @SmithyInternalApi
 public class OperationGenerator
     implements Consumer<GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings>> {

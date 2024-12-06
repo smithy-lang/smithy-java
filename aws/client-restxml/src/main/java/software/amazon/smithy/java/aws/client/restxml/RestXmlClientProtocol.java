@@ -39,7 +39,7 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
      *                relative shape IDs.
      */
     public RestXmlClientProtocol(ShapeId service) {
-        super(RestXmlTrait.ID.toString());
+        super(RestXmlTrait.ID);
 
         this.codec = XmlCodec.builder().build();
         this.errorDeserializer = HttpErrorDeserializer.builder()

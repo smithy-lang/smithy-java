@@ -240,7 +240,7 @@ public final class ClientInterfaceGenerator
             writer.putContext("nodes", consumers);
             writer.putContext("list", List.class);
             writer.write(
-                "${document:T}.createList(${list:T}.of(${#nodes}${value:C}${^key.last}, ${/key.last}${/nodes}))"
+                "${document:T}.of(${list:T}.of(${#nodes}${value:C}${^key.last}, ${/key.last}${/nodes}))"
             );
             writer.popState();
             return null;
@@ -250,7 +250,7 @@ public final class ClientInterfaceGenerator
         public Void objectNode(ObjectNode objectNode) {
             writer.pushState();
             writer.putContext("map", Map.class);
-            writer.openBlock("${document:T}.createStringMap(${map:T}.of(", "))", () -> {
+            writer.openBlock("${document:T}.of(${map:T}.of(", "))", () -> {
                 var iter = objectNode.getMembers().entrySet().iterator();
                 while (iter.hasNext()) {
                     var entry = iter.next();
@@ -271,19 +271,19 @@ public final class ClientInterfaceGenerator
 
         @Override
         public Void booleanNode(BooleanNode booleanNode) {
-            writer.writeInline("${document:T}.createBoolean($L)", booleanNode.getValue());
+            writer.writeInline("${document:T}.of($L)", booleanNode.getValue());
             return null;
         }
 
         @Override
         public Void numberNode(NumberNode numberNode) {
-            writer.writeInline("${document:T}.createNumber($L)", numberNode.getValue());
+            writer.writeInline("${document:T}.ofNumber($L)", numberNode.getValue());
             return null;
         }
 
         @Override
         public Void stringNode(StringNode stringNode) {
-            writer.writeInline("${document:T}.createString($S)", stringNode.getValue());
+            writer.writeInline("${document:T}.of($S)", stringNode.getValue());
             return null;
         }
 

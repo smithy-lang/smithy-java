@@ -146,7 +146,7 @@ public class DynamicClientTest {
             })
             .build();
 
-        var result = client.callAsync("GetSprocket", Document.createFromObject(Map.of("id", "1"))).get();
+        var result = client.callAsync("GetSprocket", Document.ofObject(Map.of("id", "1"))).get();
         assertThat(result.type(), is(ShapeType.STRUCTURE));
         assertThat(result.getMember("id").asString(), equalTo("1"));
     }
@@ -155,7 +155,7 @@ public class DynamicClientTest {
     public void deserializesDynamicErrorsWithAbsoluteId() {
         var client = createErrorClient("{\"__type\":\"smithy.example#InvalidSprocketId\", \"id\":\"1\"}");
         var e = Assertions.assertThrows(ApiException.class, () -> {
-            client.call("GetSprocket", Document.createFromObject(Map.of("id", "1")));
+            client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
         });
 
         assertThat(e, instanceOf(ModeledApiException.class));
@@ -172,7 +172,7 @@ public class DynamicClientTest {
     public void deserializesDynamicErrorsWithRelativeId() {
         var client = createErrorClient("{\"__type\":\"InvalidSprocketId\", \"id\":\"1\"}");
         var e = Assertions.assertThrows(ApiException.class, () -> {
-            client.call("GetSprocket", Document.createFromObject(Map.of("id", "1")));
+            client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
         });
 
         assertThat(e, instanceOf(ModeledApiException.class));
@@ -189,7 +189,7 @@ public class DynamicClientTest {
     public void deserializesDynamicErrorsWithRelativeIdFromService() {
         var client = createErrorClient("{\"__type\":\"ServiceFooError\", \"why\":\"IDK\"}");
         var e = Assertions.assertThrows(ApiException.class, () -> {
-            client.call("GetSprocket", Document.createFromObject(Map.of("id", "1")));
+            client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
         });
 
         assertThat(e, instanceOf(ModeledApiException.class));

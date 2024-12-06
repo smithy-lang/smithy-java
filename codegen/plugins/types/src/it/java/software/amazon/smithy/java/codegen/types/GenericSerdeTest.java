@@ -50,7 +50,7 @@ public class GenericSerdeTest {
     @ParameterizedTest
     @MethodSource("types")
     <T extends SerializableShape> void serdeTest(T pojo, ShapeBuilder<T> builder) {
-        var document = Document.createTyped(pojo);
+        var document = Document.of(pojo);
         document.deserializeInto(builder);
         var output = builder.build();
         assertEquals(pojo.hashCode(), output.hashCode());

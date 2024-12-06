@@ -40,23 +40,23 @@ public final class JsonDocuments {
 
     private JsonDocuments() {}
 
-    public static Document createString(String value, JsonCodec.Settings settings) {
+    public static Document of(String value, JsonCodec.Settings settings) {
         return new StringDocument(value, settings);
     }
 
-    public static Document createBoolean(boolean value, JsonCodec.Settings settings) {
+    public static Document of(boolean value, JsonCodec.Settings settings) {
         return new BooleanDocument(value, settings);
     }
 
-    public static Document createNumber(Number value, JsonCodec.Settings settings) {
+    public static Document of(Number value, JsonCodec.Settings settings) {
         return new NumberDocument(value, settings, DocumentUtils.getSchemaForNumber(value));
     }
 
-    public static Document createList(List<Document> values, JsonCodec.Settings settings) {
+    public static Document of(List<Document> values, JsonCodec.Settings settings) {
         return new ListDocument(values, settings);
     }
 
-    public static Document createMap(Map<String, Document> values, JsonCodec.Settings settings) {
+    public static Document of(Map<String, Document> values, JsonCodec.Settings settings) {
         return new MapDocument(values, settings);
     }
 

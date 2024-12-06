@@ -43,7 +43,7 @@ public class JsonSerializerTest {
 
     @Test
     public void writesDocumentsInline() throws Exception {
-        var document = Document.createList(List.of(Document.createString("a")));
+        var document = Document.of(List.of(Document.of("a")));
 
         try (JsonCodec codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
@@ -70,49 +70,49 @@ public class JsonSerializerTest {
         var now = Instant.now();
 
         return List.of(
-            Arguments.of(Document.createString("a"), "\"a\""),
-            Arguments.of(Document.createBlob("a".getBytes(StandardCharsets.UTF_8)), "\"YQ==\""),
-            Arguments.of(Document.createByte((byte) 1), "1"),
-            Arguments.of(Document.createShort((short) 1), "1"),
-            Arguments.of(Document.createInteger(1), "1"),
-            Arguments.of(Document.createLong(1L), "1"),
-            Arguments.of(Document.createFloat(1.1f), "1.1"),
-            Arguments.of(Document.createFloat(Float.NaN), "\"NaN\""),
-            Arguments.of(Document.createFloat(Float.POSITIVE_INFINITY), "\"Infinity\""),
-            Arguments.of(Document.createFloat(Float.NEGATIVE_INFINITY), "\"-Infinity\""),
-            Arguments.of(Document.createDouble(1.1), "1.1"),
-            Arguments.of(Document.createDouble(Double.NaN), "\"NaN\""),
-            Arguments.of(Document.createDouble(Double.POSITIVE_INFINITY), "\"Infinity\""),
-            Arguments.of(Document.createDouble(Double.NEGATIVE_INFINITY), "\"-Infinity\""),
-            Arguments.of(Document.createBigInteger(BigInteger.ZERO), "0"),
-            Arguments.of(Document.createBigDecimal(BigDecimal.ONE), "1"),
-            Arguments.of(Document.createBoolean(true), "true"),
-            Arguments.of(Document.createTimestamp(now), Double.toString(((double) now.toEpochMilli()) / 1000)),
-            Arguments.of(Document.createList(List.of(Document.createString("a"))), "[\"a\"]"),
+            Arguments.of(Document.of("a"), "\"a\""),
+            Arguments.of(Document.of("a".getBytes(StandardCharsets.UTF_8)), "\"YQ==\""),
+            Arguments.of(Document.of((byte) 1), "1"),
+            Arguments.of(Document.of((short) 1), "1"),
+            Arguments.of(Document.of(1), "1"),
+            Arguments.of(Document.of(1L), "1"),
+            Arguments.of(Document.of(1.1f), "1.1"),
+            Arguments.of(Document.of(Float.NaN), "\"NaN\""),
+            Arguments.of(Document.of(Float.POSITIVE_INFINITY), "\"Infinity\""),
+            Arguments.of(Document.of(Float.NEGATIVE_INFINITY), "\"-Infinity\""),
+            Arguments.of(Document.of(1.1), "1.1"),
+            Arguments.of(Document.of(Double.NaN), "\"NaN\""),
+            Arguments.of(Document.of(Double.POSITIVE_INFINITY), "\"Infinity\""),
+            Arguments.of(Document.of(Double.NEGATIVE_INFINITY), "\"-Infinity\""),
+            Arguments.of(Document.of(BigInteger.ZERO), "0"),
+            Arguments.of(Document.of(BigDecimal.ONE), "1"),
+            Arguments.of(Document.of(true), "true"),
+            Arguments.of(Document.of(now), Double.toString(((double) now.toEpochMilli()) / 1000)),
+            Arguments.of(Document.of(List.of(Document.of("a"))), "[\"a\"]"),
             Arguments.of(
-                Document.createList(
+                Document.of(
                     List.of(
-                        Document.createList(List.of(Document.createString("a"), Document.createString("b"))),
-                        Document.createString("c")
+                        Document.of(List.of(Document.of("a"), Document.of("b"))),
+                        Document.of("c")
                     )
                 ),
                 "[[\"a\",\"b\"],\"c\"]"
             ),
             Arguments.of(
-                Document.createList(List.of(Document.createString("a"), Document.createString("b"))),
+                Document.of(List.of(Document.of("a"), Document.of("b"))),
                 "[\"a\",\"b\"]"
             ),
-            Arguments.of(Document.createStringMap(Map.of("a", Document.createString("av"))), "{\"a\":\"av\"}"),
-            Arguments.of(Document.createStringMap(new LinkedHashMap<>() {
+            Arguments.of(Document.of(Map.of("a", Document.of("av"))), "{\"a\":\"av\"}"),
+            Arguments.of(Document.of(new LinkedHashMap<>() {
                 {
-                    this.put("a", Document.createString("av"));
-                    this.put("b", Document.createString("bv"));
-                    this.put("c", Document.createInteger(1));
+                    this.put("a", Document.of("av"));
+                    this.put("b", Document.of("bv"));
+                    this.put("c", Document.of(1));
                     this.put(
                         "d",
-                        Document.createList(List.of(Document.createInteger(1), Document.createInteger(2)))
+                        Document.of(List.of(Document.of(1), Document.of(2)))
                     );
-                    this.put("e", Document.createStringMap(Map.of("ek", Document.createString("ek1"))));
+                    this.put("e", Document.of(Map.of("ek", Document.of("ek1"))));
                 }
             }), "{\"a\":\"av\",\"b\":\"bv\",\"c\":1,\"d\":[1,2],\"e\":{\"ek\":\"ek1\"}}")
         );
@@ -231,7 +231,7 @@ public class JsonSerializerTest {
     @Test
     public void writesDunderTypeAndMoreMembers() throws Exception {
         var struct = new NestedStruct();
-        var document = Document.createTyped(struct);
+        var document = Document.of(struct);
         try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 document.serialize(serializer);
@@ -244,8 +244,8 @@ public class JsonSerializerTest {
     @Test
     public void writesNestedDunderType() throws Exception {
         var struct = new NestedStruct();
-        var document = Document.createTyped(struct);
-        var map = Document.createStringMap(Map.of("a", document));
+        var document = Document.of(struct);
+        var map = Document.of(Map.of("a", document));
         try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 map.serialize(serializer);
@@ -258,7 +258,7 @@ public class JsonSerializerTest {
     @Test
     public void writesDunderTypeForEmptyStruct() throws Exception {
         var struct = new EmptyStruct();
-        var document = Document.createTyped(struct);
+        var document = Document.of(struct);
         try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 document.serialize(serializer);

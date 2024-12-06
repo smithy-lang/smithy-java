@@ -62,14 +62,15 @@ final class ArrayStorageContext implements Context {
 
     @Override
     @SuppressWarnings("unchecked")
-    public void copyTo(Context target) {
+    public Context copyTo(Context target) {
         for (var i = 0; i < values.length; i++) {
             var v = values[i];
             if (v != null) {
                 // Grab the key from the shared keyspace when possible.
                 var k = i < Key.MAX_ARRAY_KEY_SPACE ? Key.KEYS[i] : keys.get(i);
-                target.put(k, v);
+                target.put(k, k.copyValue(v));
             }
         }
+        return target;
     }
 }

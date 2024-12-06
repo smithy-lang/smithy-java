@@ -15,7 +15,7 @@ final class Utils {
     private Utils() {}
 
     static <T extends SerializableStruct> T pojoToDocumentRoundTrip(T pojo) {
-        var document = Document.createTyped(pojo);
+        var document = Document.of(pojo);
         ShapeBuilder<T> builder = getBuilder(pojo);
         document.deserializeInto(builder);
         return builder.build();

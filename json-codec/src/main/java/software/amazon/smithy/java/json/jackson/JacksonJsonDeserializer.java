@@ -196,10 +196,10 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
             }
             return switch (token) {
                 case VALUE_NULL -> null;
-                case VALUE_STRING -> JsonDocuments.createString(parser.getText(), settings);
-                case VALUE_TRUE -> JsonDocuments.createBoolean(true, settings);
-                case VALUE_FALSE -> JsonDocuments.createBoolean(false, settings);
-                case VALUE_NUMBER_INT, VALUE_NUMBER_FLOAT -> JsonDocuments.createNumber(
+                case VALUE_STRING -> JsonDocuments.of(parser.getText(), settings);
+                case VALUE_TRUE -> JsonDocuments.of(true, settings);
+                case VALUE_FALSE -> JsonDocuments.of(false, settings);
+                case VALUE_NUMBER_INT, VALUE_NUMBER_FLOAT -> JsonDocuments.of(
                     parser.getNumberValue(),
                     settings
                 );
@@ -208,7 +208,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                     for (token = parser.nextToken(); token != END_ARRAY; token = parser.nextToken()) {
                         values.add(readDocument());
                     }
-                    yield JsonDocuments.createList(values, settings);
+                    yield JsonDocuments.of(values, settings);
                 }
                 case START_OBJECT -> {
                     Map<String, Document> values = new LinkedHashMap<>();
@@ -216,7 +216,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                         parser.nextToken();
                         values.put(field, readDocument());
                     }
-                    yield JsonDocuments.createMap(values, settings);
+                    yield JsonDocuments.of(values, settings);
                 }
                 default -> throw new SerializationException("Unexpected token: " + describeToken());
             };

@@ -40,7 +40,7 @@ public abstract class Client {
 
         // Resolve the transport and apply it as a plugin before user-defined plugins, allowing user-defined plugins
         // to supersede and functionality of plugins applied by transports.
-        configBuilder.resolveTransport().applyPlugin(configBuilder.transport());
+        configBuilder.resolveTransport();
 
         for (ClientPlugin plugin : builder.plugins) {
             configBuilder.applyPlugin(plugin);

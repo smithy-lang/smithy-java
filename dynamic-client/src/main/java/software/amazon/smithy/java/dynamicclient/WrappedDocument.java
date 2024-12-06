@@ -15,10 +15,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.java.core.schema.Schema;
-import software.amazon.smithy.java.core.schema.SchemaUtils;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.document.DocumentUtils;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -67,17 +67,8 @@ record WrappedDocument(ShapeId service, Schema schema, Document delegate) implem
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
-        // Make sure it's part of the schema.
-        var value = SchemaUtils.validateMemberInSchema(schema, member, getMember(member.memberName()));
-        // If it's a document, unwrap it.
-        // This should work for most use cases of DynamicClient, but this won't perfectly interoperate with all
-        // use-cases or be a stand-in when an actual type is expected.
-        if (value instanceof Document d) {
-            value = d.asObject();
-        }
-        return (T) value;
+        return DocumentUtils.getMemberValue(this, schema, member);
     }
 
     @Override

@@ -23,16 +23,16 @@ public class DocumentDeserializerTest {
     public void deserializesMapIntoBuilder() {
         Person.Builder builder = Person.builder();
 
-        var document = Document.createStringMap(
+        var document = Document.of(
             Map.of(
                 "name",
-                Document.createString("Savage Bob"),
+                Document.of("Savage Bob"),
                 "age",
-                Document.createInteger(100),
+                Document.of(100),
                 "birthday",
-                Document.createTimestamp(Instant.EPOCH),
+                Document.of(Instant.EPOCH),
                 "binary",
-                Document.createBlob(wrap("hi".getBytes(StandardCharsets.UTF_8)))
+                Document.of(wrap("hi".getBytes(StandardCharsets.UTF_8)))
             )
         );
 
@@ -53,7 +53,7 @@ public class DocumentDeserializerTest {
             .binary(wrap("hi".getBytes(StandardCharsets.UTF_8)))
             .build();
 
-        var bobDocument = Document.createTyped(person);
+        var bobDocument = Document.of(person);
         var personCopy = bobDocument.asShape(Person.builder());
 
         assertThat(personCopy.name(), is("Savage Bob"));

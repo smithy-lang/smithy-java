@@ -46,9 +46,6 @@ public class AwsRestJson1ProtocolTests {
 
             // Header splitting needs work.
             "RestJsonInputAndOutputWithQuotedStringHeaders",
-
-            // TODO: update this test to use lowercase prefix header names.
-            "RestJsonHttpPrefixHeadersArePresent"
         },
         skipOperations = {
             "aws.protocoltests.restjson#DocumentType",

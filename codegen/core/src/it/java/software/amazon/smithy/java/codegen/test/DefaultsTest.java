@@ -40,12 +40,12 @@ public class DefaultsTest {
         defaults.streamingBlob()
             .asByteBuffer()
             .thenAccept(b -> assertEquals(b, ByteBuffer.wrap(Base64.getDecoder().decode("c3RyZWFtaW5n"))));
-        assertEquals(defaults.boolDoc(), Document.createBoolean(true));
-        assertEquals(defaults.stringDoc(), Document.createString("string"));
-        assertEquals(defaults.numberDoc(), Document.createInteger(1));
-        assertEquals(defaults.floatingPointnumberDoc(), Document.createDouble(1.2));
-        assertEquals(defaults.listDoc(), Document.createList(Collections.emptyList()));
-        assertEquals(defaults.mapDoc(), Document.createStringMap(Collections.emptyMap()));
+        assertEquals(defaults.boolDoc(), Document.of(true));
+        assertEquals(defaults.stringDoc(), Document.of("string"));
+        assertEquals(defaults.numberDoc(), Document.of(1));
+        assertEquals(defaults.floatingPointnumberDoc(), Document.of(1.2));
+        assertEquals(defaults.listDoc(), Document.of(Collections.emptyList()));
+        assertEquals(defaults.mapDoc(), Document.of(Collections.emptyMap()));
         assertEquals(defaults.list(), List.of());
         assertEquals(defaults.map(), Map.of());
         assertEquals(defaults.timestamp(), Instant.parse("1985-04-12T23:20:50.52Z"));

@@ -8,13 +8,14 @@ package software.amazon.smithy.java.client.core.auth.scheme;
 import java.util.Objects;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
  * AuthSchemeResolver parameters.
  */
 public final class AuthSchemeResolverParams {
 
-    private final String protocolId;
+    private final ShapeId protocolId;
     private final ApiOperation<?, ?> operation;
     private final Context context;
 
@@ -38,7 +39,7 @@ public final class AuthSchemeResolverParams {
      *
      * @return the protocol ID.
      */
-    public String protocolId() {
+    public ShapeId protocolId() {
         return protocolId;
     }
 
@@ -84,7 +85,7 @@ public final class AuthSchemeResolverParams {
      */
     public static final class Builder {
 
-        private String protocolId;
+        private ShapeId protocolId;
         private ApiOperation<?, ?> operation;
         private Context context;
 
@@ -105,7 +106,7 @@ public final class AuthSchemeResolverParams {
          * @param protocolId The protocol ID.
          * @return the builder.
          */
-        public Builder protocolId(String protocolId) {
+        public Builder protocolId(ShapeId protocolId) {
             this.protocolId = protocolId;
             return this;
         }

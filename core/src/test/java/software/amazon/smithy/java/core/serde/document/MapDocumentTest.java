@@ -27,22 +27,22 @@ public class MapDocumentTest {
     public void createsDocument() {
         Map<String, Document> entries = Map.of(
             "a",
-            Document.createBoolean(true),
+            Document.of(true),
             "b",
-            Document.createBoolean(false)
+            Document.of(false)
         );
-        var map = Document.createStringMap(entries);
+        var map = Document.of(entries);
 
         assertThat(map.type(), is(ShapeType.MAP));
         assertThat(map.size(), is(2));
         assertThat(map.asStringMap(), equalTo(entries));
-        assertThat(Document.createStringMap(map.asStringMap()), equalTo(map));
+        assertThat(Document.of(map.asStringMap()), equalTo(map));
     }
 
     @Test
     public void serializesShape() {
-        Map<String, Document> entries = Map.of("a", Document.createInteger(1), "b", Document.createInteger(2));
-        var map = Document.createStringMap(entries);
+        Map<String, Document> entries = Map.of("a", Document.of(1), "b", Document.of(2));
+        var map = Document.of(entries);
 
         map.serialize(new SpecificShapeSerializer() {
             @Override
@@ -54,8 +54,8 @@ public class MapDocumentTest {
 
     @Test
     public void serializesContent() {
-        Map<String, Document> entries = Map.of("a", Document.createInteger(1), "b", Document.createInteger(2));
-        var map = Document.createStringMap(entries);
+        Map<String, Document> entries = Map.of("a", Document.of(1), "b", Document.of(2));
+        var map = Document.of(entries);
 
         var keys = new ArrayList<>();
         map.serializeContents(new SpecificShapeSerializer() {

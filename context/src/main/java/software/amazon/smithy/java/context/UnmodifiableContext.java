@@ -36,7 +36,7 @@ final class UnmodifiableContext implements Context {
     }
 
     @Override
-    public void copyTo(Context target) {
-        delegate.copyTo(target);
+    public Context copyTo(Context target) {
+        return delegate.copyTo(target);
     }
 }

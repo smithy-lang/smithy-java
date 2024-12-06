@@ -40,7 +40,7 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
      *                discriminator of documents that use relative shape IDs.
      */
     public AwsJsonProtocol(ShapeId trait, ShapeId service) {
-        super(trait.toString());
+        super(trait);
         this.service = service;
         this.codec = JsonCodec.builder().defaultNamespace(service.getNamespace()).build();
 
