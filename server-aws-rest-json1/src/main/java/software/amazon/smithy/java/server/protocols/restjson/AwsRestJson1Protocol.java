@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.server.protocols.restjson;
 
+import static java.util.stream.Collectors.toUnmodifiableMap;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +31,7 @@ import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.ServiceProtocolResolutionRequest;
 import software.amazon.smithy.java.server.core.ServiceProtocolResolutionResult;
 import software.amazon.smithy.java.server.protocols.restjson.router.UriMatcherMap;
+import software.amazon.smithy.java.server.protocols.restjson.router.UriMatcherMapBuilder;
 import software.amazon.smithy.java.server.protocols.restjson.router.UriPattern;
 import software.amazon.smithy.java.server.protocols.restjson.router.UriTreeMatcherMap;
 import software.amazon.smithy.java.server.protocols.restjson.router.ValuedMatch;
@@ -41,23 +44,28 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         .key("Aws Rest Json1 Valued Match");
 
     private final Codec codec;
-    private final UriMatcherMap<Operation<?, ?>> matcher;
+    private final Map<String, UriMatcherMap<Operation<?, ?>>> httpMethodToMatchersMap;
     private final HttpBinding httpBinding = new HttpBinding();
 
     AwsRestJson1Protocol(List<Service> services) {
         super(services);
-        var matcherBuilder = UriTreeMatcherMap.<Operation<?, ?>>builder();
+        var httpMethodToMatchers = new HashMap<String, UriMatcherMapBuilder<Operation<?, ?>>>();
         for (Service service : services) {
             for (var operation : service.getAllOperations()) {
-                String pattern = operation.getApiOperation()
+                var httpTrait = operation.getApiOperation()
                     .schema()
-                    .expectTrait(TraitKey.HTTP_TRAIT)
+                    .expectTrait(TraitKey.HTTP_TRAIT);
+                String method = httpTrait.getMethod();
+                String pattern = httpTrait
                     .getUri()
                     .toString();
-                matcherBuilder.add(UriPattern.forSpecificityRouting(pattern), operation);
+                httpMethodToMatchers.computeIfAbsent(method, k -> UriTreeMatcherMap.builder())
+                    .add(UriPattern.forSpecificityRouting(pattern), operation);
             }
         }
-        this.matcher = matcherBuilder.build();
+        this.httpMethodToMatchersMap = httpMethodToMatchers.entrySet()
+            .stream()
+            .collect(toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().build()));
         this.codec = JsonCodec.builder()
             .useJsonName(true)
             .useTimestampFormat(true)
@@ -78,6 +86,10 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         String rawQuery = request.uri().getRawQuery();
         if (rawQuery != null) {
             uri += "?" + rawQuery;
+        }
+        var matcher = httpMethodToMatchersMap.get(request.method());
+        if (matcher == null) {
+            return null;
         }
         ValuedMatch<Operation<? extends SerializableStruct, ? extends SerializableStruct>> selectedOperation = matcher
             .match(uri);
