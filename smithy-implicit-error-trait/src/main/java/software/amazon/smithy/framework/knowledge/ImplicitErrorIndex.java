@@ -17,8 +17,6 @@ import software.amazon.smithy.model.shapes.ToShapeId;
 
 /**
  * Provides an index of the implicit errors of a service.
- *
- * @see <a>TODO</a>
  */
 public final class ImplicitErrorIndex implements KnowledgeIndex {
 
@@ -26,7 +24,6 @@ public final class ImplicitErrorIndex implements KnowledgeIndex {
 
     private ImplicitErrorIndex(Model model) {
         for (var service : model.getServiceShapes()) {
-            // Search one layer for `@adds
             for (var traitEntry : service.getAllTraits().entrySet()) {
                 var traitShapeOptional = model.getShape(traitEntry.getKey());
                 if (traitShapeOptional.isEmpty()) {

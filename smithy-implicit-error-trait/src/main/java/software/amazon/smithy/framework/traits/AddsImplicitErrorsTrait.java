@@ -20,7 +20,7 @@ import software.amazon.smithy.utils.ToSmithyBuilder;
 
 @SmithyGenerated
 public final class AddsImplicitErrorsTrait extends AbstractTrait implements ToSmithyBuilder<AddsImplicitErrorsTrait> {
-    public static final ShapeId ID = ShapeId.from("smithy.framework#addsImplicitErrors");
+    public static final ShapeId ID = ShapeId.from("smithy.framework#implicitErrors");
 
     private final List<ShapeId> values;
 

@@ -136,7 +136,14 @@ public final class SingleThreadOrchestrator implements ObservableOrchestrator {
                         }
                     }
                     state = State.DONE;
-                    signal.complete(null);
+                    // TODO: For some reason with a serializable implicit exception this causes
+                    //  the server to throw an Internal Service error (CompletionError wrapping the original exception)
+                    //  instead of just the serializable exception
+                    if (job.isFailure()) {
+                        signal.completeExceptionally(job.getFailure());
+                    } else {
+                        signal.complete(null);
+                    }
                 }
             } catch (Exception e) {
                 signal.completeExceptionally(e);
