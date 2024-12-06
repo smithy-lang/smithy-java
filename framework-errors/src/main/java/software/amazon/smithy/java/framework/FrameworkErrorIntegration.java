@@ -18,7 +18,6 @@ import software.amazon.smithy.java.framework.model.ValidationException;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
-// TODO: Docs
 @SmithyInternalApi
 public final class FrameworkErrorIntegration implements JavaCodegenIntegration {
     @Override
