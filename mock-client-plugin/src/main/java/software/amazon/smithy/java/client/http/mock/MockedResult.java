@@ -47,5 +47,5 @@ public sealed interface MockedResult {
      *
      * @param e The error to throw.
      */
-    record Error(RuntimeException e) implements MockedResult {}
+    record Error(Throwable e) implements MockedResult {}
 }

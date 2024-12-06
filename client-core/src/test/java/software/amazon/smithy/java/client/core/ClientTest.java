@@ -9,16 +9,22 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
+import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.plugins.ApplyModelRetryInfoPlugin;
 import software.amazon.smithy.java.client.core.plugins.DefaultPlugin;
 import software.amazon.smithy.java.client.core.plugins.InjectIdempotencyTokenPlugin;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
+import software.amazon.smithy.java.client.http.mock.MockPlugin;
+import software.amazon.smithy.java.client.http.mock.MockQueue;
 import software.amazon.smithy.java.client.http.plugins.ApplyHttpRetryInfoPlugin;
 import software.amazon.smithy.java.client.http.plugins.UserAgentPlugin;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
@@ -32,8 +38,22 @@ public class ClientTest {
             $version: "2"
             namespace smithy.example
 
-            service Sprockets {}
+            @aws.protocols#restJson1
+            service Sprockets {
+                operations: [GetSprocket]
+            }
+
+            @http(method: "POST", uri: "/s")
+            operation GetSprocket {
+                input := {
+                    id: String
+                }
+                output := {
+                    id: String
+                }
+            }
             """)
+        .discoverModels()
         .assemble()
         .unwrap();
 
@@ -76,5 +96,22 @@ public class ClientTest {
     private static final class FooPlugin implements ClientPlugin {
         @Override
         public void configureClient(ClientConfig.Builder config) {}
+    }
+
+    @Test
+    public void correctlyUnwraps() throws URISyntaxException {
+        var queue = new MockQueue();
+        queue.enqueueError(new IOException("A"));
+
+        DynamicClient c = DynamicClient.builder()
+            .model(MODEL)
+            .service(SERVICE)
+            .protocol(new RestJsonClientProtocol(SERVICE))
+            .addPlugin(MockPlugin.builder().addQueue(queue).build())
+            .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
+            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+            .build();
+
+        Assertions.assertThrows(UncheckedIOException.class, () -> c.call("GetSprocket"));
     }
 }

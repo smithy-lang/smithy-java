@@ -85,7 +85,7 @@ public final class MockQueue {
      *
      * @param e Exception to throw.
      */
-    public MockQueue enqueueError(RuntimeException e) {
+    public MockQueue enqueueError(Throwable e) {
         queue.offer(new MockedResult.Error(e));
         return this;
     }
