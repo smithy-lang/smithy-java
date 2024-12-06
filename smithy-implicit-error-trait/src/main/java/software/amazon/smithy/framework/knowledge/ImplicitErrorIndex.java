@@ -24,7 +24,7 @@ public final class ImplicitErrorIndex implements KnowledgeIndex {
 
     private final Map<ShapeId, Set<ShapeId>> serviceImplicitErrorMap = new HashMap<>();
 
-    public ImplicitErrorIndex(Model model) {
+    private ImplicitErrorIndex(Model model) {
         for (var service : model.getServiceShapes()) {
             // Search one layer for `@adds
             for (var traitEntry : service.getAllTraits().entrySet()) {
