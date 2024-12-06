@@ -11,14 +11,16 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.util.*;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,7 +35,6 @@ import software.amazon.smithy.java.codegen.test.model.SetsAllTypesInput;
 import software.amazon.smithy.java.codegen.test.model.SparseListsInput;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
-import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.utils.ListUtils;
@@ -280,21 +281,19 @@ public class ListsTest {
             "{\"setOfUnion\":[{\"a\": \"str\"}, {\"b\": 1}, {\"a\": \"str\"}]}",
             "{\"setOfEnum\":[\"A\", \"B\", \"A\"]}",
             "{\"setOfIntEnum\":[1,1,2]}",
-            "{\"setOfStruct\":[{\"fieldA\": \"a\"}, {\"fieldA\": \"a\"}, {\"fieldA\": \"z\"}]",
+            "{\"setOfStruct\":[{\"fieldA\": \"a\"}, {\"fieldA\": \"a\"}, {\"fieldA\": \"z\"}]}",
             "{\"setOfStringList\":[[\"a\", \"b\"],[\"c\", \"d\"],[\"a\", \"b\"]]}",
-            "{\"setOfStringMap\": [{\"a\": \"b\", \"c\": \"d\"}, {\"c\": \"d\", \"a\": \"b\"}]"
+            "{\"setOfStringMap\": [{\"a\": \"b\", \"c\": \"d\"}, {\"c\": \"d\", \"a\": \"b\"}]}"
         );
     }
 
+    // Uniqueness is enforced in validation only.
     @ParameterizedTest
     @MethodSource("nonUniqueSources")
-    void nonUniqueThrows(String source) {
+    void nonUniqueIsAllowed(String source) {
         try (var codec = JsonCodec.builder().useJsonName(true).build()) {
-            var exc = assertThrows(
-                SerializationException.class,
-                () -> codec.deserializeShape(source, SetsAllTypesInput.builder())
-            );
-            assertTrue(exc.getMessage().contains("Member must have unique values"));
+            // This not throwing is the test.
+            codec.deserializeShape(source, SetsAllTypesInput.builder());
         }
     }
 }

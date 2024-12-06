@@ -26,22 +26,20 @@ import software.amazon.smithy.model.shapes.ShapeType;
 /**
  * Converts the Smithy data model into Documents.
  */
-final class DocumentParser implements ShapeSerializer {
+public final class DocumentParser implements ShapeSerializer {
 
     private Document result;
-    private boolean wroteSomething = false;
 
-    Document getResult() {
-        if (!wroteSomething) {
-            throw new SerializationException(
-                "Unable to create a document from ShapeSerializer that serialized nothing"
-            );
-        }
+    /**
+     * Get the currently stored result, or null if nothing was serialized.
+     *
+     * @return the result.
+     */
+    public Document getResult() {
         return result;
     }
 
     private void setResult(Document result) {
-        wroteSomething = true;
         this.result = result;
     }
 
@@ -98,11 +96,7 @@ final class DocumentParser implements ShapeSerializer {
     @Override
     public <T> void writeMap(Schema schema, T state, int size, BiConsumer<T, MapSerializer> consumer) {
         var keyMember = schema.mapKeyMember();
-        if (keyMember == null) {
-            throw new SerializationException(
-                "Cannot create a map from a schema that does not define a map key: " + schema
-            );
-        } else if (keyMember.type() == ShapeType.STRING || keyMember.type() == ShapeType.ENUM) {
+        if (keyMember.type() == ShapeType.STRING || keyMember.type() == ShapeType.ENUM) {
             var serializer = new DocumentMapSerializer(size);
             consumer.accept(state, serializer);
             setResult(new Documents.StringMapDocument(schema, serializer.entries));

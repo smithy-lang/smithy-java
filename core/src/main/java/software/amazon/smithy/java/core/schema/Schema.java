@@ -72,6 +72,7 @@ public abstract sealed class Schema implements MemberLookup
     final double minDoubleConstraint;
     final double maxDoubleConstraint;
     final ValidatorOfString stringValidation;
+    final boolean uniqueItemsConstraint;
 
     private Schema listMember;
     private Schema mapKeyMember;
@@ -115,6 +116,7 @@ public abstract sealed class Schema implements MemberLookup
         this.minRangeConstraint = validationState.minRangeConstraint();
         this.maxRangeConstraint = validationState.maxRangeConstraint();
         this.stringValidation = validationState.stringValidation();
+        this.uniqueItemsConstraint = type == ShapeType.LIST && hasTrait(TraitKey.UNIQUE_ITEMS_TRAIT);
 
         // Only use the slow version of required member validation if there are > 64 required members.
         this.requiredMemberCount = SchemaBuilder.computeRequiredMemberCount(type, members);
@@ -147,6 +149,7 @@ public abstract sealed class Schema implements MemberLookup
         this.maxLongConstraint = builder.validationState.maxLongConstraint();
         this.minDoubleConstraint = builder.validationState.minDoubleConstraint();
         this.maxDoubleConstraint = builder.validationState.maxDoubleConstraint();
+        this.uniqueItemsConstraint = type == ShapeType.LIST && hasTrait(TraitKey.UNIQUE_ITEMS_TRAIT);
 
         // Compute the expected bitfield, and adjust how it's computed based on if the target is a builder or not.
         if (builder.target != null) {

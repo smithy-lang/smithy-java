@@ -13,11 +13,9 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -53,7 +51,6 @@ import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.StreamingTrait;
-import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.CaseUtils;
 
@@ -132,17 +129,6 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
 
     @Override
     public Symbol listShape(ListShape listShape) {
-        // Lists with unique Items are treated as Sequenced Sets
-        if (listShape.hasTrait(UniqueItemsTrait.class)) {
-            return CodegenUtils.fromClass(Set.class)
-                .toBuilder()
-                .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, "unmodifiableSet")
-                .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashSet.class)
-                .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptySet()")
-                .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
-                .addReference(listShape.getMember().accept(this))
-                .build();
-        }
         return CodegenUtils.fromClass(List.class)
             .toBuilder()
             .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, "unmodifiableList")

@@ -17,7 +17,6 @@ import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.traits.SparseTrait;
-import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
@@ -71,14 +70,10 @@ public final class ListGenerator
                             @Override
                             public void accept(${shape:B} state, ${shapeDeserializer:T} deserializer) {
                                 if (deserializer.isNull()) {
-                                    ${?sparse}${?unique}if (!${/unique}state.add(${/sparse}deserializer.readNull()${^sparse};${/sparse}${?sparse})${^unique};${/unique}${?unique}) {
-                                        throw new ${serdeException:T}("Member must have unique values");
-                                    }${/unique}${/sparse}
+                                    ${?sparse}state.add(deserializer.readNull());${/sparse}
                                     return;
                                 }
-                                ${?unique}if (!${/unique}state.add($memberDeserializer:C)${^unique};${/unique}${?unique}) {
-                                    throw new ${serdeException:T}("Member must have unique values");
-                                }${/unique}
+                                state.add($memberDeserializer:C);
                             }
                         }
                         """;
@@ -92,7 +87,6 @@ public final class ListGenerator
                     writer.putContext("biConsumer", BiConsumer.class);
                     writer.putContext("shapeSerializer", ShapeSerializer.class);
                     writer.putContext("shapeDeserializer", ShapeDeserializer.class);
-                    writer.putContext("unique", directive.shape().hasTrait(UniqueItemsTrait.class));
                     writer.putContext("serdeException", SerializationException.class);
                     writer.putContext("sparse", directive.shape().hasTrait(SparseTrait.class));
                     writer.putContext("valueSchema", valueSchema);

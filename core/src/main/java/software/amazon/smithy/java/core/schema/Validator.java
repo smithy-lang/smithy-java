@@ -243,7 +243,14 @@ public final class Validator {
 
                 // Push a preliminary value of null. Each list element will swap this path position with its index.
                 pushPath(null);
+
+                // When necessary, validate unique items using an intermediate document representation of each value.
+                if (size != 1 && schema.uniqueItemsConstraint) {
+                    ValidatorOfUniqueItems.validate(schema, state, consumer, this);
+                }
+
                 consumer.accept(state, listValidator);
+
                 popPath();
 
                 // Grab the count and reset the schema and count.

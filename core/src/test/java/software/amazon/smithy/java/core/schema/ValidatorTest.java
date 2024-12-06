@@ -53,6 +53,7 @@ import software.amazon.smithy.model.traits.RangeTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.model.traits.Trait;
+import software.amazon.smithy.model.traits.UniqueItemsTrait;
 
 public class ValidatorTest {
 
@@ -621,6 +622,70 @@ public class ValidatorTest {
             errors.get(0).message(),
             equalTo("Value is in a map that does not allow null values")
         );
+    }
+
+    @Test
+    public void detectsDuplicateSimpleItems() {
+        Validator validator = Validator.builder().build();
+        var listSchema = Schema.listBuilder(ShapeId.from("smithy.api#Test"), new UniqueItemsTrait())
+            .putMember("member", PreludeSchemas.STRING)
+            .build();
+
+        List<String> values = new ArrayList<>();
+        values.add("a");
+        values.add("b");
+        values.add("b");
+        values.add("c");
+        values.add("d");
+        values.add("a");
+
+        var errors = validator.validate(s -> {
+            s.writeList(listSchema, values, 2, (l, ls) -> {
+                var member = listSchema.member("member");
+                for (var v : l) {
+                    ls.writeString(member, v);
+                }
+            });
+        });
+
+        assertThat(errors, hasSize(2));
+        assertThat(errors.get(0).getClass(), equalTo(ValidationError.UniqueItemConflict.class));
+        assertThat(errors.get(0).path(), equalTo("/2"));
+        assertThat(errors.get(0).message(), equalTo("Conflicting list item found at position 2"));
+
+        assertThat(errors.get(1).getClass(), equalTo(ValidationError.UniqueItemConflict.class));
+        assertThat(errors.get(1).path(), equalTo("/5"));
+        assertThat(errors.get(1).message(), equalTo("Conflicting list item found at position 5"));
+    }
+
+    @Test
+    public void detectsDuplicateComplexItems() {
+        Validator validator = Validator.builder().build();
+        var unionSchema = getTestUnionSchema();
+        var listSchema = Schema.listBuilder(ShapeId.from("smithy.api#Test"), new UniqueItemsTrait())
+            .putMember("member", unionSchema)
+            .build();
+        var errors = validator.validate(s -> {
+            s.writeList(listSchema, null, 4, (l, ls) -> {
+                var member = listSchema.member("member");
+                ls.writeStruct(member, TestHelper.create(member, (schema, writer) -> {
+                    writer.writeString(schema.member("a"), "hi");
+                }));
+                ls.writeStruct(member, TestHelper.create(member, (schema, writer) -> {
+                    writer.writeString(schema.member("b"), "hi");
+                }));
+                ls.writeStruct(member, TestHelper.create(member, (schema, writer) -> {
+                    writer.writeString(schema.member("b"), "hi");
+                }));
+                ls.writeStruct(member, TestHelper.create(member, (schema, writer) -> {
+                    writer.writeString(schema.member("c"), "hi");
+                }));
+            });
+        });
+
+        assertThat(errors, hasSize(1));
+        assertThat(errors.get(0).path(), equalTo("/2"));
+        assertThat(errors.get(0).message(), equalTo("Conflicting list item found at position 2"));
     }
 
     @ParameterizedTest

@@ -128,4 +128,14 @@ public interface ValidationError {
             }
         }
     }
+
+    record UniqueItemConflict(String path, int position, Schema schema, String message) implements ValidationError {
+        public UniqueItemConflict(String path, int position, Schema schema) {
+            this(path, position, schema, createMessage(position));
+        }
+
+        private static String createMessage(int position) {
+            return "Conflicting list item found at position " + position;
+        }
+    }
 }

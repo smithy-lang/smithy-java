@@ -36,6 +36,7 @@ import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.model.traits.Trait;
+import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.model.traits.XmlAttributeTrait;
 import software.amazon.smithy.model.traits.XmlFlattenedTrait;
 import software.amazon.smithy.model.traits.XmlNameTrait;
@@ -62,6 +63,7 @@ public final class TraitKey<T extends Trait> {
 
     public static final TraitKey<RequiredTrait> REQUIRED_TRAIT = TraitKey.get(RequiredTrait.class);
     public static final TraitKey<DefaultTrait> DEFAULT_TRAIT = TraitKey.get(DefaultTrait.class);
+    public static final TraitKey<UniqueItemsTrait> UNIQUE_ITEMS_TRAIT = TraitKey.get(UniqueItemsTrait.class);
     public static final TraitKey<TimestampFormatTrait> TIMESTAMP_FORMAT_TRAIT = TraitKey.get(
         TimestampFormatTrait.class
     );
