@@ -22,6 +22,7 @@ import software.amazon.smithy.model.traits.ErrorTrait;
 import software.amazon.smithy.model.traits.EventHeaderTrait;
 import software.amazon.smithy.model.traits.EventPayloadTrait;
 import software.amazon.smithy.model.traits.HostLabelTrait;
+import software.amazon.smithy.model.traits.HttpErrorTrait;
 import software.amazon.smithy.model.traits.HttpPayloadTrait;
 import software.amazon.smithy.model.traits.HttpQueryTrait;
 import software.amazon.smithy.model.traits.HttpTrait;
@@ -65,6 +66,8 @@ public class CodegenContextTest {
             model,
             JavaCodegenSettings.builder()
                 .service(SERVICE_ID.toString())
+                .runtimeTraitsSelector("[id=smithy.java.codegen#selectedTrait]")
+                .runtimeTraits(List.of(HttpErrorTrait.ID))
                 .packageNamespace("ns.foo")
                 .build(),
             new JavaSymbolProvider(model, model.expectShape(SERVICE_ID).asServiceShape().get(), "ns.foo"),
@@ -109,7 +112,10 @@ public class CodegenContextTest {
                 IdempotencyTokenTrait.ID,
                 RetryableTrait.ID,
                 RequestCompressionTrait.ID,
-                StreamingTrait.ID
+                StreamingTrait.ID,
+                // Added by settings
+                HttpErrorTrait.ID,
+                ShapeId.from("smithy.java.codegen#selectedTrait")
             )
         );
     }

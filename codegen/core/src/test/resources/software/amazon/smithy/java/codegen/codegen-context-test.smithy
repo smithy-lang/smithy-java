@@ -20,9 +20,24 @@ structure authScheme1 {}
 @trait(selector: "service")
 structure authScheme2 {}
 
+@trait(selector: "structure")
+structure selectedTrait {}
+
 @testProtocol
 @authScheme1
 @authScheme2
-service TestService { version: "today" }
+service TestService {
+    version: "today"
+    errors: [
+        ExampleError
+    ]
+}
+
+@error("client")
+@httpError(401)
+@selectedTrait
+structure ExampleError {
+    message: String
+}
 
 service NoProtocolService { version: "today" }

@@ -20,6 +20,7 @@ import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.node.StringNode;
+import software.amazon.smithy.model.selector.Selector;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.IoUtils;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -46,6 +47,8 @@ public final class JavaCodegenSettings {
     private static final String RELATIVE_VERSION = "relativeVersion";
     private static final String EDITION = "edition";
     private static final String USE_EXTERNAL_TYPES = "useExternalTypes";
+    private static final String RUNTIME_TRAITS = "runtimeTraits";
+    private static final String RUNTIME_TRAITS_SELECTOR = "runtimeTraitsSelector";
     private static final List<String> PROPERTIES = List.of(
         SERVICE,
         NAME,
@@ -59,7 +62,9 @@ public final class JavaCodegenSettings {
         RELATIVE_DATE,
         RELATIVE_VERSION,
         EDITION,
-        USE_EXTERNAL_TYPES
+        USE_EXTERNAL_TYPES,
+        RUNTIME_TRAITS,
+        RUNTIME_TRAITS_SELECTOR
     );
 
     private final ShapeId service;
@@ -76,6 +81,8 @@ public final class JavaCodegenSettings {
     private final String relativeVersion;
     private final SmithyJavaCodegenEdition edition;
     private final boolean useExternalTypes;
+    private final List<ShapeId> runtimeTraits;
+    private final Selector runtimeTraitsSelector;
     private final Map<String, Set<Symbol>> generatedSymbols = new HashMap<>();
 
     private JavaCodegenSettings(Builder builder) {
@@ -93,6 +100,8 @@ public final class JavaCodegenSettings {
         this.relativeVersion = builder.relativeVersion;
         this.edition = Objects.requireNonNullElse(builder.edition, SmithyJavaCodegenEdition.LATEST);
         this.useExternalTypes = builder.useExternalTypes;
+        this.runtimeTraits = Collections.unmodifiableList(builder.runtimeTraits);
+        this.runtimeTraitsSelector = builder.runtimeTraitsSelector;
     }
 
     /**
@@ -116,7 +125,9 @@ public final class JavaCodegenSettings {
             .getStringMember(RELATIVE_DATE, builder::relativeDate)
             .getStringMember(RELATIVE_VERSION, builder::relativeVersion)
             .getStringMember(EDITION, builder::edition)
-            .getBooleanMember(USE_EXTERNAL_TYPES, builder::useExternalTypes);
+            .getBooleanMember(USE_EXTERNAL_TYPES, builder::useExternalTypes)
+            .getArrayMember(RUNTIME_TRAITS, n -> n.expectStringNode().expectShapeId(), builder::runtimeTraits)
+            .getStringMember(RUNTIME_TRAITS_SELECTOR, builder::runtimeTraitsSelector);
 
         builder.sourceLocation(settingsNode.getSourceLocation().getFilename());
 
@@ -179,6 +190,14 @@ public final class JavaCodegenSettings {
         return useExternalTypes;
     }
 
+    public List<ShapeId> runtimeTraits() {
+        return runtimeTraits;
+    }
+
+    public Selector runtimeTraitsSelector() {
+        return runtimeTraitsSelector;
+    }
+
     @SmithyInternalApi
     public void addSymbol(Symbol symbol) {
         var symbols = generatedSymbols.computeIfAbsent(symbol.getNamespace(), k -> new HashSet<>());
@@ -235,6 +254,8 @@ public final class JavaCodegenSettings {
         private String relativeDate;
         private String relativeVersion;
         private SmithyJavaCodegenEdition edition;
+        private List<ShapeId> runtimeTraits = new ArrayList<>();
+        private Selector runtimeTraitsSelector;
         private boolean useExternalTypes;
 
         public Builder service(String string) {
@@ -330,6 +351,16 @@ public final class JavaCodegenSettings {
 
         public Builder useExternalTypes(boolean useExternalTypes) {
             this.useExternalTypes = useExternalTypes;
+            return this;
+        }
+
+        public Builder runtimeTraits(List<ShapeId> runtimeTraits) {
+            this.runtimeTraits.addAll(runtimeTraits);
+            return this;
+        }
+
+        public Builder runtimeTraitsSelector(String selector) {
+            this.runtimeTraitsSelector = Selector.parse(selector);
             return this;
         }
 

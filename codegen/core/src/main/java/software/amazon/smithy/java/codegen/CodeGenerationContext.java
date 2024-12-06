@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.codegen.core.CodegenContext;
 import software.amazon.smithy.codegen.core.CodegenException;
@@ -200,6 +201,17 @@ public class CodeGenerationContext
                 traits.addAll(authDef.getTraits());
             }
         }
+
+        // Add traits from customer settings
+        if (settings.runtimeTraitsSelector() != null) {
+            Set<ShapeId> selectedTraits = settings.runtimeTraitsSelector()
+                .select(model)
+                .stream()
+                .map(Shape::toShapeId)
+                .collect(Collectors.toSet());
+            traits.addAll(selectedTraits);
+        }
+        traits.addAll(settings.runtimeTraits());
 
         return Collections.unmodifiableSet(traits);
     }
