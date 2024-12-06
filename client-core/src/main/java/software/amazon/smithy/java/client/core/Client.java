@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.client.core;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -330,17 +328,12 @@ public abstract class Client {
         public abstract I build();
     }
 
-    protected static RuntimeException unwrap(CompletionException e) {
+    @SuppressWarnings("unchecked")
+    protected static <E extends Throwable> E unwrapAndThrow(CompletionException e) throws E {
         Throwable cause = e.getCause();
         if (cause != null) {
-            if (cause instanceof RuntimeException r) {
-                return r;
-            } else if (cause instanceof IOException i) {
-                return new UncheckedIOException(i);
-            } else {
-                return new RuntimeException(cause);
-            }
+            throw (E) cause;
         }
-        return e;
+        throw (E) e;
     }
 }

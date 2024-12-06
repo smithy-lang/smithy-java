@@ -8,9 +8,9 @@ package software.amazon.smithy.java.client.core;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import org.junit.jupiter.api.Assertions;
@@ -100,8 +100,9 @@ public class ClientTest {
 
     @Test
     public void correctlyUnwraps() throws URISyntaxException {
+        var expectedException = new IOException("A");
         var queue = new MockQueue();
-        queue.enqueueError(new IOException("A"));
+        queue.enqueueError(expectedException);
 
         DynamicClient c = DynamicClient.builder()
             .model(MODEL)
@@ -112,6 +113,7 @@ public class ClientTest {
             .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
             .build();
 
-        Assertions.assertThrows(UncheckedIOException.class, () -> c.call("GetSprocket"));
+        var exception = Assertions.assertThrows(IOException.class, () -> c.call("GetSprocket"));
+        assertSame(expectedException, exception);
     }
 }

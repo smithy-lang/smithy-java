@@ -136,7 +136,7 @@ public final class DynamicClient extends Client {
         try {
             return callAsync(operation, input, overrideConfig).join();
         } catch (CompletionException e) {
-            throw unwrap(e);
+            throw unwrapAndThrow(e);
         }
     }
 

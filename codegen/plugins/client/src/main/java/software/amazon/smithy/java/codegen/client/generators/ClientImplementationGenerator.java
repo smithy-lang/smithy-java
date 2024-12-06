@@ -99,7 +99,7 @@ public final class ClientImplementationGenerator
                             try {
                                 ${/async}return call(input, new ${operation:T}(), overrideConfig)${^async}.join()${/async};${^async}
                             } catch (${completionException:T} e) {
-                                throw unwrap(e);
+                                throw unwrapAndThrow(e);
                             }${/async}
                         }
                         """
