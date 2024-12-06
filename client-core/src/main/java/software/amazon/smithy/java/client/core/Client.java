@@ -329,11 +329,11 @@ public abstract class Client {
     }
 
     @SuppressWarnings("unchecked")
-    protected static <E extends Throwable> E unwrap(CompletionException e) throws E {
+    protected static <E extends Throwable> E unwrapAndThrow(CompletionException e) throws E {
         Throwable cause = e.getCause();
         if (cause != null) {
-            return (E) cause;
+            throw (E) cause;
         }
-        return (E) e;
+        throw (E) e;
     }
 }

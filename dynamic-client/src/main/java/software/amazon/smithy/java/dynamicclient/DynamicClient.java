@@ -136,11 +136,7 @@ public final class DynamicClient extends Client {
         try {
             return callAsync(operation, input, overrideConfig).join();
         } catch (CompletionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof RuntimeException re) {
-                throw re;
-            }
-            throw e;
+            throw unwrapAndThrow(e);
         }
     }
 

@@ -59,7 +59,7 @@ final class MockClient extends Client {
                 }
             }).join();
         } catch (CompletionException e) {
-            throw unwrap(e);
+            throw unwrapAndThrow(e);
         }
     }
 
