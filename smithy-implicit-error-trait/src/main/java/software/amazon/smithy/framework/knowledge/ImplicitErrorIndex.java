@@ -16,7 +16,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ToShapeId;
 
 /**
- * Allows users to quickly find the set of implicit errors
+ * Provides an index of the implicit errors of a service.
  *
  * @see <a>TODO</a>
  */
