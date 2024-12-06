@@ -27,29 +27,8 @@ import software.amazon.smithy.java.retries.api.RefreshRetryTokenRequest;
 import software.amazon.smithy.java.retries.api.RefreshRetryTokenResponse;
 import software.amazon.smithy.java.retries.api.RetryStrategy;
 import software.amazon.smithy.java.retries.api.RetryToken;
-import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.ShapeId;
 
 public class AmzSdkRequestPluginTest {
-
-    private static final Model MODEL = Model.assembler()
-        .addUnparsedModel("test.smithy", """
-            $version: "2"
-            namespace smithy.example
-
-            service Sprockets {
-                operations: [CreateSprocket]
-            }
-
-            operation CreateSprocket {
-                input := {}
-                output := {}
-            }
-            """)
-        .assemble()
-        .unwrap();
-
-    private static final ShapeId SERVICE = ShapeId.from("smithy.example#Sprockets");
 
     private static final class Token implements RetryToken {}
 
@@ -59,9 +38,9 @@ public class AmzSdkRequestPluginTest {
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
-            .service(SERVICE)
-            .model(MODEL)
-            .protocol(new AwsJson1Protocol(SERVICE))
+            .service(TestHarness.SERVICE)
+            .model(TestHarness.MODEL)
+            .protocol(new AwsJson1Protocol(TestHarness.SERVICE))
             .addPlugin(mock)
             .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
             .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
