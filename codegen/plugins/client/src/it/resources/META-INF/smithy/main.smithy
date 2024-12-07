@@ -15,6 +15,7 @@ service TestService {
     version: "today"
     operations: [
         Echo
+        PaginatedOperation
     ]
 }
 
@@ -26,4 +27,31 @@ operation Echo {
     output := {
         string: String
     }
+}
+
+/// Tests the generation and compilation of pagination method.
+/// NOTE: No actual implementation is provided in test server.
+@http(method: "GET", uri: "/list", code: 200)
+@paginated(
+    inputToken: "inputToken",
+    outputToken: "outputToken",
+    items: "results",
+    pageSize: "maxItems"
+)
+operation PaginatedOperation {
+    input := {
+        @httpQuery("maxItems")
+        maxItems: Integer
+        @httpQuery("input")
+        inputToken: String
+    }
+    output := {
+        results: ResultsList
+        outputToken: String
+    }
+}
+
+@private
+list ResultsList {
+    member: String
 }
