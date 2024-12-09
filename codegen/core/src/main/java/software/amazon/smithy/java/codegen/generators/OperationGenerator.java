@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -224,21 +225,21 @@ public final class OperationGenerator
         OperationShape operation,
         GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive
     ) {
-        List<Symbol> result = new ArrayList<>();
-
-        // Add all explicit errors to the operation
-        for (var errorId : operation.getErrors(directive.service())) {
-            var shape = directive.model().expectShape(errorId);
-            result.add(directive.symbolProvider().toSymbol(shape));
-        }
-
-        // Add any implicit errors
         var implicitIndex = ImplicitErrorIndex.of(directive.model());
-        // TODO: Switch to per-operation so we can special-case auth exceptions
-        for (var implicitErrorId : implicitIndex.getImplicitErrorsForService(directive.service())) {
-            result.add(directive.context().errorMapping(implicitErrorId));
+
+        // Add all error ids for an operation, including implicit errors
+        Set<ShapeId> errorIds = new HashSet<>(operation.getErrors(directive.service()));
+        // TODO: Switch to operation-specific so we can account for auth scheme differences
+        errorIds.addAll(implicitIndex.getImplicitErrorsForService(directive.service()));
+
+        // Add all error Symbols for the operation
+        List<Symbol> symbols = new ArrayList<>();
+        for (var errorId : errorIds) {
+            var shape = directive.model().expectShape(errorId);
+            symbols.add(directive.symbolProvider().toSymbol(shape));
         }
-        return result;
+
+        return symbols;
     }
 
     // Registers errors of an operation with the type registry.

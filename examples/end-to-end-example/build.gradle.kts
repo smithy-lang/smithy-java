@@ -12,6 +12,7 @@ dependencies {
 
     // Client dependencies
     api(project(":aws:client-restjson"))
+    api(project(":client-core"))
 
     // Common dependencies
     api(project(":core"))

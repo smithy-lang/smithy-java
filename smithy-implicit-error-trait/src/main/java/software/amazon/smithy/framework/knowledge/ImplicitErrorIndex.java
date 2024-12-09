@@ -22,13 +22,14 @@ import software.amazon.smithy.model.shapes.ToShapeId;
 public final class ImplicitErrorIndex implements KnowledgeIndex {
 
     private final Map<ShapeId, Set<ShapeId>> serviceImplicitErrorMap = new HashMap<>();
+    private final Set<ShapeId> implicitErrors = new HashSet<>();
 
     private ImplicitErrorIndex(Model model) {
         for (var service : model.getServiceShapes()) {
             for (var traitEntry : service.getAllTraits().entrySet()) {
                 var traitShapeOptional = model.getShape(traitEntry.getKey());
                 if (traitShapeOptional.isEmpty()) {
-                    // Ignore traits not found in model. This can happen if customers
+                    // Ignore traits not found in model. This can happen if a user
                     // has --allow-unknown-traits set to true.
                     continue;
                 }
@@ -40,6 +41,7 @@ public final class ImplicitErrorIndex implements KnowledgeIndex {
                         k -> new HashSet<>()
                     );
                     implicitErrorList.addAll(implicitErrorsTrait.getValues());
+                    implicitErrors.addAll(implicitErrorsTrait.getValues());
                 }
             }
         }
@@ -55,5 +57,9 @@ public final class ImplicitErrorIndex implements KnowledgeIndex {
 
     public Set<ShapeId> getImplicitErrorsForOperation(ToShapeId operationId) {
         return null;
+    }
+
+    public boolean isImplicitError(ShapeId shapeId) {
+        return implicitErrors.contains(shapeId);
     }
 }

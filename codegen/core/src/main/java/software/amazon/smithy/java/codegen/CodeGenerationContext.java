@@ -24,6 +24,7 @@ import software.amazon.smithy.codegen.core.WriterDelegator;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -119,13 +120,17 @@ public class CodeGenerationContext
     ) {
         this.model = model;
         this.settings = settings;
-        this.symbolProvider = symbolProvider;
         this.fileManifest = fileManifest;
         this.integrations = integrations;
-        this.writerDelegator = new WriterDelegator<>(fileManifest, symbolProvider, new JavaWriter.Factory(settings));
+        this.errorMapping = collectImplicitErrorMappings(settings);
+        this.symbolProvider = new ImplicitErrorDecorator(symbolProvider);
+        this.writerDelegator = new WriterDelegator<>(
+            fileManifest,
+            this.symbolProvider,
+            new JavaWriter.Factory(settings)
+        );
         this.runtimeTraits = collectRuntimeTraits();
         this.traitInitializers = collectTraitInitializers();
-        this.errorMapping = collectImplicitErrorMappings(settings);
     }
 
     @Override
@@ -160,10 +165,6 @@ public class CodeGenerationContext
 
     public Set<ShapeId> runtimeTraits() {
         return runtimeTraits;
-    }
-
-    public Symbol errorMapping(ShapeId shapeId) {
-        return Objects.requireNonNull(errorMapping.get(shapeId), "Unknown implicit error shape id: " + shapeId);
     }
 
     /**
@@ -256,9 +257,37 @@ public class CodeGenerationContext
         Map<ShapeId, Symbol> errorMappings = new HashMap<>();
         for (var integration : integrations) {
             for (var entry : integration.implicitErrorMappings().entrySet()) {
-                errorMappings.put(entry.getKey(), CodegenUtils.fromClass(entry.getValue()));
+                var symbol = CodegenUtils.fromClass(entry.getValue())
+                    .toBuilder()
+                    .putProperty(SymbolProperties.IMPLICIT_ERROR, true)
+                    .build();
+                errorMappings.put(entry.getKey(), symbol);
             }
         }
         return errorMappings;
+    }
+
+    private final class ImplicitErrorDecorator implements SymbolProvider {
+        private final SymbolProvider delegate;
+
+        public ImplicitErrorDecorator(SymbolProvider delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public Symbol toSymbol(Shape shape) {
+            if (errorMapping.containsKey(shape.toShapeId())) {
+                return Objects.requireNonNull(
+                    errorMapping.get(shape.toShapeId()),
+                    "Unknown implicit error shape id: " + shape.toShapeId()
+                );
+            }
+            return delegate.toSymbol(shape);
+        }
+
+        @Override
+        public String toMemberName(MemberShape shape) {
+            return delegate.toMemberName(shape);
+        }
     }
 }
