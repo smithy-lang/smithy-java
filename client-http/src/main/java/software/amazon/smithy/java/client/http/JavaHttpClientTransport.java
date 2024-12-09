@@ -20,6 +20,7 @@ import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.http.api.HttpVersion;
+import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.logging.InternalLogger;
 
 /**
@@ -89,7 +90,7 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
                 bodyPublisher = java.net.http.HttpRequest.BodyPublishers.noBody();
             } else {
                 bodyPublisher = java.net.http.HttpRequest.BodyPublishers.ofByteArray(
-                    request.body().waitForByteBuffer().array()
+                    ByteBufferUtils.getBytes(request.body().waitForByteBuffer())
                 );
             }
         } else {
