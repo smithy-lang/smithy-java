@@ -13,8 +13,6 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
-import software.amazon.smithy.java.client.core.pagination.AsyncPaginator;
-import software.amazon.smithy.java.client.core.pagination.Paginator;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
@@ -26,7 +24,6 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
-import software.amazon.smithy.model.traits.PaginatedTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
@@ -95,15 +92,9 @@ public final class ClientImplementationGenerator
                         throw unwrapAndThrow(e);
                     }${/async}
                 }
-                ${?paginated}
-                @Override
-                public ${paginator:T}<${output:T}> ${name:L}Paginator(${input:T} input) {
-                    return ${paginator:T}.paginate(input, new ${operation:T}(), this::${name:L});
-                }${/paginated}
                 """;
             writer.putContext("async", async);
             writer.putContext("overrideConfig", RequestOverrideConfig.class);
-            writer.putContext("paginator", async ? AsyncPaginator.class : Paginator.class);
             var opIndex = OperationIndex.of(model);
             for (var operation : TopDownIndex.of(model).getContainedOperations(service)) {
                 writer.pushState();
@@ -111,7 +102,6 @@ public final class ClientImplementationGenerator
                 writer.putContext("operation", symbolProvider.toSymbol(operation));
                 writer.putContext("input", symbolProvider.toSymbol(opIndex.expectInputShape(operation)));
                 writer.putContext("output", symbolProvider.toSymbol(opIndex.expectOutputShape(operation)));
-                writer.putContext("paginated", operation.hasTrait(PaginatedTrait.class));
                 writer.write(template);
                 writer.popState();
             }
