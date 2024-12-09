@@ -86,7 +86,6 @@ public final class ServiceGenerator implements
             writer.putContext("serviceType", Service.class);
             writer.putContext("serializableStruct", SerializableStruct.class);
             writer.putContext("schemaClass", Schema.class);
-            writer.putContext("set", Set.class);
             writer.putContext("service", directive.symbol());
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(
