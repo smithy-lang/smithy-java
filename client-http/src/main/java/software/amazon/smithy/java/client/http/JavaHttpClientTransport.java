@@ -83,7 +83,18 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
     }
 
     private java.net.http.HttpRequest createJavaRequest(Context context, HttpRequest request) {
-        var bodyPublisher = java.net.http.HttpRequest.BodyPublishers.fromPublisher(request.body());
+        java.net.http.HttpRequest.BodyPublisher bodyPublisher;
+        if (request.body().hasKnownLength()) {
+            if (request.body().contentLength() == 0) {
+                bodyPublisher = java.net.http.HttpRequest.BodyPublishers.noBody();
+            } else {
+                bodyPublisher = java.net.http.HttpRequest.BodyPublishers.ofByteArray(
+                    request.body().waitForByteBuffer().array()
+                );
+            }
+        } else {
+            bodyPublisher = java.net.http.HttpRequest.BodyPublishers.fromPublisher(request.body());
+        }
 
         java.net.http.HttpRequest.Builder httpRequestBuilder = java.net.http.HttpRequest.newBuilder()
             .version(smithyToHttpVersion(request.httpVersion()))
