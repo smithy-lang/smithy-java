@@ -11,7 +11,7 @@ import software.amazon.smithy.java.example.service.CoffeeShop;
 import software.amazon.smithy.java.server.Server;
 
 public class BasicServerExample implements Runnable {
-    static final URI endpoint = URI.create("http://localhost:8080");
+    static final URI endpoint = URI.create("http://localhost:8888");
 
     @Override
     public void run() {

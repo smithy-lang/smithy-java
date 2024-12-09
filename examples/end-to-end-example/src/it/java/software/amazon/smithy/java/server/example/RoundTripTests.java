@@ -12,18 +12,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.net.Socket;
 import java.net.URI;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.auth.api.AuthProperties;
-import software.amazon.smithy.java.aws.client.core.identity.AwsCredentialsIdentity;
-import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
-import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
-import software.amazon.smithy.java.client.core.auth.identity.IdentityResult;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.example.client.CoffeeShopClient;
 import software.amazon.smithy.java.example.model.CoffeeType;
@@ -38,7 +32,6 @@ public class RoundTripTests {
 
     @BeforeAll
     public static void setup() throws InterruptedException {
-        System.setProperty("jdk.httpclient.allowRestrictedHeaders", "host");
         var server = new BasicServerExample();
         executor.execute(server);
         // Wait for server to start
@@ -55,32 +48,12 @@ public class RoundTripTests {
         }
     }
 
-    private static final class TestIdRes implements IdentityResolver<AwsCredentialsIdentity> {
-
-        @Override
-        public CompletableFuture<IdentityResult<AwsCredentialsIdentity>> resolveIdentity(
-            AuthProperties requestProperties
-        ) {
-            return CompletableFuture.completedFuture(
-                IdentityResult.of(AwsCredentialsIdentity.create("yay", "yay"))
-            );
-        }
-
-        @Override
-        public Class<AwsCredentialsIdentity> identityType() {
-            return AwsCredentialsIdentity.class;
-        }
-    }
-
     @Test
     void executesCorrectly() throws InterruptedException {
         CoffeeShopClient client = CoffeeShopClient.builder()
             .endpointResolver(EndpointResolver.staticEndpoint(BasicServerExample.endpoint))
-            .putConfig(RegionSetting.REGION, "us-east-2")
-            .addIdentityResolver(new TestIdRes())
             .build();
 
-        // <TEMP> This will throw an Invalid signature exception
         var menu = client.getMenu(GetMenuInput.builder().build());
         var hasEspresso = menu.items().stream().anyMatch(item -> item.typeMember().equals(CoffeeType.ESPRESSO));
         assertTrue(hasEspresso);
@@ -107,8 +80,6 @@ public class RoundTripTests {
     void errorsOutIfOrderDoesNotExist() throws InterruptedException {
         CoffeeShopClient client = CoffeeShopClient.builder()
             .endpointResolver(EndpointResolver.staticEndpoint(BasicServerExample.endpoint))
-            .putConfig(RegionSetting.REGION, "us-east-2")
-            .addIdentityResolver(new TestIdRes())
             .build();
 
         var getRequest = GetOrderInput.builder().id(UUID.randomUUID().toString()).build();

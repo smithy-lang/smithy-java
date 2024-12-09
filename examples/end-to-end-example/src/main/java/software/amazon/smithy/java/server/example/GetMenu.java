@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.server.example;
 
 import java.util.List;
-import software.amazon.smithy.java.aws.client.auth.scheme.sigv4.model.InvalidSignatureException;
 import software.amazon.smithy.java.example.model.CoffeeItem;
 import software.amazon.smithy.java.example.model.CoffeeType;
 import software.amazon.smithy.java.example.model.GetMenuInput;
@@ -54,6 +53,6 @@ final class GetMenu implements GetMenuOperation {
 
     @Override
     public GetMenuOutput getMenu(GetMenuInput input, RequestContext context) {
-        throw InvalidSignatureException.builder().message("BAD BAD BAD").build();
+        return GetMenuOutput.builder().items(MENU).build();
     }
 }

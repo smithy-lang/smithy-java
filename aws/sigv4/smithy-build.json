@@ -1,9 +1,0 @@
-{
-  "version": "1.0",
-  "plugins": {
-    "java-type-codegen": {
-      "namespace": "software.amazon.smithy.java.aws.client.auth.scheme.sigv4",
-      "selector": "[id=aws.auth#InvalidSignatureException]"
-    }
-  }
-}
