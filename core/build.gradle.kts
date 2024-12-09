@@ -1,3 +1,5 @@
+import org.apache.tools.ant.filters.ReplaceTokens
+
 plugins {
     id("smithy-java.module-conventions")
     alias(libs.plugins.jmh)
@@ -24,6 +26,18 @@ val localeTest =
         systemProperty("user.language", "de")
     }
 
-tasks.build {
-    dependsOn(localeTest)
+tasks {
+    build {
+        dependsOn(localeTest)
+    }
+
+    processResources {
+        // Update the Version.java class to reflect current version of project
+        filter<ReplaceTokens>("tokens" to mapOf("SmithyJavaVersion" to version))
+    }
+
+    test {
+        // Add version property to test version replacement
+        systemProperty("smithy.java.version", version)
+    }
 }
