@@ -13,6 +13,8 @@ dependencies {
     api(project(":core"))
     api(project(":context"))
     api(project(":framework-errors"))
+    // TODO: Remove once this is in smithy-model
+    api(project(":smithy-implicit-error-trait"))
     implementation(libs.smithy.model)
     implementation(project(":io"))
     implementation(project(":logging"))

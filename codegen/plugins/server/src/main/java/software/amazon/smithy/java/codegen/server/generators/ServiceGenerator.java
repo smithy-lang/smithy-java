@@ -14,7 +14,6 @@ import java.util.stream.Collectors;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
-import software.amazon.smithy.framework.knowledge.ImplicitErrorIndex;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.generators.IdStringGenerator;
@@ -60,9 +59,6 @@ public final class ServiceGenerator implements
 
                     ${schema:C}
 
-                    private static final ${set:T}<${schemaClass:T}> ERROR_SCHEMAS = ${set:T}.of(${#exceptions}${value:T}.$$SCHEMA${^key.last},
-                            ${/key.last}${/exceptions});
-
                     ${properties:C|}
 
                     ${constructor:C|}
@@ -83,11 +79,6 @@ public final class ServiceGenerator implements
                     @Override
                     public ${schemaClass:T} schema() {
                          return $$SCHEMA;
-                    }
-
-                    @Override
-                    public ${set:T}<${schemaClass:T}> errorSchemas() {
-                        return ERROR_SCHEMAS;
                     }
                 }
                 """;
@@ -118,12 +109,6 @@ public final class ServiceGenerator implements
                 "schema",
                 new SchemaGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.context())
             );
-            var implicitErrorIndex = ImplicitErrorIndex.of(directive.model());
-            var implicitErrors = implicitErrorIndex.getImplicitErrorsForService(directive.service())
-                .stream()
-                .map(id -> directive.context().errorMapping(id))
-                .toList();
-            writer.putContext("exceptions", implicitErrors);
             writer.putContext("operationList", List.class);
             writer.write(template);
             writer.popState();

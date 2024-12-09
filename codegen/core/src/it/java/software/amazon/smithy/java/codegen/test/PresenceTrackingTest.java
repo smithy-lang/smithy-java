@@ -12,11 +12,12 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.codegen.test.model.BooleanMembersInput;
 import software.amazon.smithy.java.codegen.test.model.NestedStruct;
 import software.amazon.smithy.java.codegen.test.model.StructureMembersInput;
+import software.amazon.smithy.java.core.serde.SerializationException;
 
 public class PresenceTrackingTest {
     @Test
     void throwsSerdeExceptionOnMissingRequiredForPrimitiveField() {
-        var exc = assertThrows(IllegalArgumentException.class, () -> {
+        var exc = assertThrows(SerializationException.class, () -> {
             // Missing requiredBooleanField
             BooleanMembersInput.builder().optionalBoolean(true).build();
         });
@@ -25,7 +26,7 @@ public class PresenceTrackingTest {
 
     @Test
     void throwsSerdeExceptionOnMissingRequiredForNonPrimitiveField() {
-        var exc = assertThrows(IllegalArgumentException.class, () -> {
+        var exc = assertThrows(SerializationException.class, () -> {
             // Missing requiredBooleanField
             StructureMembersInput.builder().optionalStruct(NestedStruct.builder().build()).build();
         });

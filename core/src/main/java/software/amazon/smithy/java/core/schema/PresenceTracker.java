@@ -54,7 +54,7 @@ public abstract sealed class PresenceTracker {
      */
     public void validate() {
         if (!allSet()) {
-            throw new IllegalArgumentException("Missing required members: " + getMissingMembers());
+            throw new SerializationException("Missing required members: " + getMissingMembers());
         }
     }
 

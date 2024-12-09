@@ -40,10 +40,8 @@ public final class JavaServerCodegenPlugin implements SmithyBuildPlugin {
         runner.directedCodegen(new DirectedJavaServerCodegen());
         runner.fileManifest(context.getFileManifest());
         runner.service(settings.service());
-        var model = new AddFrameworkErrorsTransform(AddFrameworkErrorsTransform.Mode.SERVER).transform(
-            ModelTransformer.create(),
-            context.getModel()
-        );
+        // TODO: use built-in once this has been upstreamed
+        var model = AddFrameworkErrorsTransform.transform(ModelTransformer.create(), context.getModel());
         runner.model(model);
         runner.integrationClass(JavaCodegenIntegration.class);
         DefaultTransforms.apply(runner, settings);

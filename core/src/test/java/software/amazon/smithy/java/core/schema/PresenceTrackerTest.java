@@ -12,6 +12,7 @@ import static software.amazon.smithy.java.core.schema.ValidatorTest.createBigReq
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import software.amazon.smithy.java.core.serde.SerializationException;
 
 public class PresenceTrackerTest {
 
@@ -19,7 +20,7 @@ public class PresenceTrackerTest {
     @ValueSource(ints = {1, 63, 64, 65, 128})
     void throwsUnsetMembers(int requiredFields) {
         var exc = assertThrows(
-            IllegalArgumentException.class,
+            SerializationException.class,
             () -> PresenceTracker.of(createBigRequiredSchema(requiredFields, requiredFields, 0)).validate()
         );
         for (var i = 0; i < requiredFields; i++) {

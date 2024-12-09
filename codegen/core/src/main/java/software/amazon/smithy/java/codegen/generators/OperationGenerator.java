@@ -5,12 +5,14 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateOperationDirective;
+import software.amazon.smithy.framework.knowledge.ImplicitErrorIndex;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
@@ -26,7 +28,6 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.EventStreamIndex;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.shapes.OperationShape;
-import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.IdempotencyTokenTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
@@ -160,16 +161,9 @@ public final class OperationGenerator
                         directive.context()
                     )
                 );
-                writer.putContext(
-                    "typeRegistrySection",
-                    new TypeRegistryGenerator(
-                        writer,
-                        shape,
-                        directive.symbolProvider(),
-                        directive.model(),
-                        directive.service()
-                    )
-                );
+                var exceptions = getExceptionSymbols(directive.shape(), directive);
+                writer.putContext("exceptions", exceptions);
+                writer.putContext("typeRegistrySection", new TypeRegistryGenerator(writer, exceptions));
                 var serviceIndex = ServiceIndex.of(directive.model());
                 writer.putContext(
                     "schemes",
@@ -221,36 +215,44 @@ public final class OperationGenerator
                         break;
                     }
                 }
-
-                // Base operation exceptions
-                var exceptions = shape.getErrors(directive.service())
-                    .stream()
-                    .map(directive.model()::expectShape)
-                    .map(directive.symbolProvider()::toSymbol)
-                    .toList();
-
-                writer.putContext("exceptions", exceptions);
                 writer.write(template);
                 writer.popState();
             });
     }
 
+    private static List<Symbol> getExceptionSymbols(
+        OperationShape operation,
+        GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive
+    ) {
+        List<Symbol> result = new ArrayList<>();
+
+        // Add all explicit errors to the operation
+        for (var errorId : operation.getErrors(directive.service())) {
+            var shape = directive.model().expectShape(errorId);
+            result.add(directive.symbolProvider().toSymbol(shape));
+        }
+
+        // Add any implicit errors
+        var implicitIndex = ImplicitErrorIndex.of(directive.model());
+        // TODO: Switch to per-operation so we can special-case auth exceptions
+        for (var implicitErrorId : implicitIndex.getImplicitErrorsForService(directive.service())) {
+            result.add(directive.context().errorMapping(implicitErrorId));
+        }
+        return result;
+    }
+
     // Registers errors of an operation with the type registry.
     private record TypeRegistryGenerator(
         JavaWriter writer,
-        OperationShape shape,
-        SymbolProvider symbolProvider,
-        Model model,
-        ServiceShape service
+        List<Symbol> errorSymbols
     ) implements Runnable {
 
         @Override
         public void run() {
             writer.write("private static final ${typeRegistry:T} TYPE_REGISTRY = ${typeRegistry:T}.builder()");
             writer.indent();
-            for (var errorId : shape.getErrors(service)) {
-                var errorShape = model.expectShape(errorId);
-                writer.write(".putType($1T.$$ID, $1T.class, $1T::builder)", symbolProvider.toSymbol(errorShape));
+            for (var errorSymbol : errorSymbols) {
+                writer.write(".putType($1T.$$ID, $1T.class, $1T::builder)", errorSymbol);
             }
             writer.writeWithNoFormatting(".build();");
             writer.dedent();

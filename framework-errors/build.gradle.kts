@@ -11,11 +11,14 @@ extra["moduleName"] = "software.amazon.smithy.framework.errors"
 dependencies {
     smithyBuild(project(":codegen:plugins:types"))
     api(project(":codegen:core"))
-    api(project(":smithy-framework-errors"))
     api(project(":core"))
+
+    // Validation error is imported separately, b/c it is used a bit uniquely in protocol tests.
+    // TODO: Can this be collapsed into the framework errors when they are upstreamed?
+    api(libs.smithy.validation.model)
 }
 
-// Add generated Java sources to the main sourceset
+// Add generated Java sources to the main sourceSet
 afterEvaluate {
     val typesPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-type-codegen")
     sourceSets {
@@ -27,7 +30,6 @@ afterEvaluate {
     }
 }
 
-// TODO: Is there some way to get gradle to pick this dep up automatically?
 tasks.named("compileJava") {
     dependsOn("smithyBuild")
 }

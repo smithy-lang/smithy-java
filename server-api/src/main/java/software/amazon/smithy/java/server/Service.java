@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.server;
 
 import java.util.List;
-import java.util.Set;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 
@@ -23,5 +22,4 @@ public interface Service {
 
     Schema schema();
 
-    Set<Schema> errorSchemas();
 }

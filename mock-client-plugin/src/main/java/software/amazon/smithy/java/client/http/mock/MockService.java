@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.client.http.mock;
 
 import java.util.List;
-import java.util.Set;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Operation;
@@ -35,8 +34,4 @@ final class MockService implements Service {
         throw new UnsupportedOperationException();
     }
 
-    @Override
-    public Set<Schema> errorSchemas() {
-        return Set.of();
-    }
 }

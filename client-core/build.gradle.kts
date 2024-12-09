@@ -13,6 +13,8 @@ dependencies {
     api(project(":auth-api"))
     api(project(":retries-api"))
     api(project(":framework-errors"))
+    // TODO: Remove once this is in smithy-model
+    api(project(":smithy-implicit-error-trait"))
     implementation(project(":logging"))
 
     testImplementation(project(":dynamic-client"))

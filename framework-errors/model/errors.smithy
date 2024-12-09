@@ -2,6 +2,7 @@ $version: "2"
 
 namespace smithy.framework
 
+// TODO: This model should be upstreamed to a package in the main smithy repo
 /// Adds an extensible document to framework errors so users can add additional info.
 @mixin
 structure ErrorInfo {
@@ -15,7 +16,6 @@ structure ErrorInfo {
 /// prevent unintended information disclosure.
 @error("server")
 @httpError(500)
-@internal
 structure InternalFailureException {
     @default("Internal Service Exception")
     message: String
@@ -29,7 +29,6 @@ structure InternalFailureException {
 /// occurs.
 @error("client")
 @httpError(400)
-@internal
 structure MalformedRequestException with [ErrorInfo] {
     message: String
 }
@@ -43,7 +42,6 @@ structure MalformedRequestException with [ErrorInfo] {
 /// incorrectly.
 @error("client")
 @httpError(404)
-@internal
 structure UnknownOperationException with [ErrorInfo] {
     message: String
 }
@@ -53,7 +51,6 @@ structure UnknownOperationException with [ErrorInfo] {
 /// indicate that credentials are missing from the request.
 @error("client")
 @httpError(403)
-@internal
 structure AccessDeniedException with [ErrorInfo] {
     message: String
 }
@@ -64,7 +61,6 @@ structure AccessDeniedException with [ErrorInfo] {
 /// did not have acceptable permissions for the requested operation.
 @error("client")
 @httpError(401)
-@internal
 structure NotAuthorizedException with [ErrorInfo] {
     message: String
 }
