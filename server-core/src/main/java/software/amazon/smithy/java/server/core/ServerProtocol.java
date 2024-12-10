@@ -35,7 +35,12 @@ public abstract class ServerProtocol {
     }
 
     public final CompletableFuture<Void> serializeError(Job job, Throwable error) {
-        return serializeError(job, error instanceof ModeledApiException me ? me : new InternalServerError(error));
+        // Treat already-deserialized modeled exceptions as internal errors.
+        // Such errors are thrown by smithy-java clients used within the server.
+        if (error instanceof ModeledApiException me && !me.deserialized()) {
+            return serializeError(job, me);
+        }
+        return serializeError(job, new InternalServerError(error));
     }
 
     protected abstract CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output, boolean isError);

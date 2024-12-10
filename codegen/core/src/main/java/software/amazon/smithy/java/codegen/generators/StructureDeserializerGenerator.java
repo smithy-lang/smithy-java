@@ -13,6 +13,7 @@ import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.traits.ErrorTrait;
 
 record StructureDeserializerGenerator(
     JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model, ServiceShape service
@@ -23,7 +24,8 @@ record StructureDeserializerGenerator(
         writer.pushState();
         var template = """
             @Override
-            public Builder deserialize(${shapeDeserializer:N} decoder) {
+            public Builder deserialize(${shapeDeserializer:N} decoder) {${?isError}
+                this.$$deserialized = true;${/isError}
                 decoder.readStruct($$SCHEMA, this, $$InnerDeserializer.INSTANCE);
                 return this;
             }
@@ -57,6 +59,7 @@ record StructureDeserializerGenerator(
         writer.putContext("cases", writer.consumer(this::generateMemberSwitchCases));
         writer.putContext("union", shape.isUnionShape());
         writer.putContext("illegalArg", IllegalArgumentException.class);
+        writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
         writer.write(template);
         writer.popState();
     }

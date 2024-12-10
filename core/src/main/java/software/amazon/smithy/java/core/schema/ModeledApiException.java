@@ -11,6 +11,7 @@ package software.amazon.smithy.java.core.schema;
 public abstract class ModeledApiException extends ApiException implements SerializableStruct {
 
     private final Schema schema;
+    private boolean deserialized = false;
 
     protected ModeledApiException(Schema schema, String message) {
         super(message);
@@ -32,15 +33,24 @@ public abstract class ModeledApiException extends ApiException implements Serial
         String message,
         Fault errorType,
         Throwable cause,
-        Boolean captureStackTrace
+        Boolean captureStackTrace,
+        boolean deserialized
     ) {
         super(message, cause, errorType, captureStackTrace);
         this.schema = schema;
+        this.deserialized = deserialized;
     }
 
-    protected ModeledApiException(Schema schema, String message, Throwable cause, Boolean captureStackTrace) {
+    protected ModeledApiException(
+        Schema schema,
+        String message,
+        Throwable cause,
+        Boolean captureStackTrace,
+        boolean deserialized
+    ) {
         super(message, cause, captureStackTrace);
         this.schema = schema;
+        this.deserialized = deserialized;
     }
 
     protected ModeledApiException(Schema schema, String message, Throwable cause) {
@@ -53,10 +63,12 @@ public abstract class ModeledApiException extends ApiException implements Serial
         String message,
         Throwable cause,
         Fault errorType,
-        Boolean captureStackTrace
+        Boolean captureStackTrace,
+        boolean deserialized
     ) {
         super(message, cause, errorType, captureStackTrace);
         this.schema = schema;
+        this.deserialized = deserialized;
     }
 
     @Override
@@ -80,5 +92,17 @@ public abstract class ModeledApiException extends ApiException implements Serial
             return errorTrait.getDefaultHttpStatusCode();
         }
         return 500;
+    }
+
+    /**
+     * Check if the error was deserialized from a response.
+     *
+     * <p>Errors deserialized from a response should not be re-serialized by servers.
+     * Instead, these errors should be treated as an internal failures.
+     *
+     * @return true if the error was created by deserializing a response.
+     */
+    public boolean deserialized() {
+        return deserialized;
     }
 }
