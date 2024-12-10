@@ -1,9 +1,13 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.codegen.integrations.core;
 
 import software.amazon.smithy.java.codegen.TraitInitializer;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.traits.HttpErrorTrait;
-import software.amazon.smithy.model.traits.HttpTrait;
 
 final class HttpErrorTraitInitializer implements TraitInitializer<HttpErrorTrait> {
     @Override
