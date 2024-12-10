@@ -9,7 +9,7 @@ extra["displayName"] = "Smithy :: Java :: Server AWS RestJson1"
 extra["moduleName"] = "software.amazon.smithy.java.server-aws-rest-json1"
 
 dependencies {
-    api(project(":server"))
+    api(project(":server-api"))
     api(project(":http-api"))
     api(libs.smithy.aws.traits)
     implementation(project(":server-core"))
@@ -18,7 +18,7 @@ dependencies {
     implementation(project(":json-codec"))
     implementation(project(":http-binding"))
 
-    itImplementation(project(":server"))
+    itImplementation(project(":server-api"))
     itImplementation(project(":server-netty"))
     itImplementation(project(":aws:client-restjson"))
     // Protocol test dependencies

@@ -2,9 +2,9 @@ plugins {
     id("smithy-java.module-conventions")
 }
 
-description = "This module provides the public Server interface"
+description = "This module provides the public Server API"
 
-extra["displayName"] = "Smithy :: Java :: Server"
+extra["displayName"] = "Smithy :: Java :: Server API"
 extra["moduleName"] = "software.amazon.smithy.java.server"
 
 dependencies {
