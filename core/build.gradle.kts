@@ -36,7 +36,7 @@ tasks {
         filter<ReplaceTokens>("tokens" to mapOf("SmithyJavaVersion" to version))
     }
 
-    test {
+    withType<Test> {
         // Add version property to test version replacement
         systemProperty("smithy.java.version", version)
     }
