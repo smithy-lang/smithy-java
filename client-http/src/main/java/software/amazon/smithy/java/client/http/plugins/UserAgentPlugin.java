@@ -15,6 +15,7 @@ import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.core.Version;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
@@ -48,8 +49,6 @@ public final class UserAgentPlugin implements ClientPlugin {
         private static final UserAgentInterceptor INSTANCE = new UserAgentInterceptor();
 
         private static final String UA_VERSION = "2.1";
-        // TODO: add a constant to core that gets updated on each release.
-        private static final String SMITHY_VERSION = "0.1";
         private static final String STATIC_SEGMENT;
 
         private static final String ENV_APP_ID = "AWS_SDK_UA_APP_ID";
@@ -66,7 +65,7 @@ public final class UserAgentPlugin implements ClientPlugin {
                 DENYLIST[c] = true;
             }
 
-            STATIC_SEGMENT = "smithy-java/" + SMITHY_VERSION
+            STATIC_SEGMENT = "smithy-java/" + Version.VERSION
                 + " ua/" + UA_VERSION
                 + " os/" + getOsFamily() + "#" + sanitizeValue(System.getProperty("os.version"))
                 + " lang/java#" + sanitizeValue(System.getProperty("java.version"))
