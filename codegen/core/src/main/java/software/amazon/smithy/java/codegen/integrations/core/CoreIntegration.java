@@ -71,6 +71,7 @@ public class CoreIntegration implements JavaCodegenIntegration {
             new RequestCompressionTraitInitializer(),
             new DefaultTraitInitializer(),
             new HttpTraitInitializer(),
+            new HttpErrorTraitInitializer(),
             new XmlNamespaceTraitInitializer(),
             new EndpointTraitInitializer(),
             new RetryableTraitInitializer(),
