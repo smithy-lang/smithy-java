@@ -63,9 +63,8 @@ final class TypeCodegenSettings {
         return renames;
     }
 
-    static TypeCodegenSettings fromNode(Node node) {
+    static TypeCodegenSettings fromNode(ObjectNode settingsNode) {
         var builder = builder();
-        var settingsNode = node.expectObjectNode();
         settingsNode
             .getBooleanMember(GENERATE_OPERATIONS, builder::generateOperations)
             .getStringMember(SELECTOR, builder::selector)
@@ -81,6 +80,10 @@ final class TypeCodegenSettings {
 
     private static JavaCodegenSettings getCodegenSettings(ObjectNode node) {
         var nodeBuilder = node.toBuilder();
+
+        // Copy source location
+        nodeBuilder.sourceLocation(node.getSourceLocation());
+
         // Remove unused properties
         PROPERTIES.forEach(nodeBuilder::withoutMember);
         // Add the synthetic service
