@@ -34,29 +34,22 @@ import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
-public class OperationGenerator
+public final class OperationGenerator
     implements Consumer<GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     @Override
     public void accept(GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        generate(directive, directive.symbol());
-    }
-
-    protected final void generate(
-        GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive,
-        Symbol symbol
-    ) {
         var shape = directive.shape();
 
         directive.context()
-            .writerDelegator()
-            .useFileWriter(symbol.getDeclarationFile(), symbol.getNamespace(), writer -> {
-                var input = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getInputShape()));
-                var output = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getOutputShape()));
-                var eventStreamIndex = EventStreamIndex.of(directive.model());
-                writer.pushState(new ClassSection(shape));
-                writer.putContext("shape", symbol);
-                var template = """
+                .writerDelegator()
+                .useShapeWriter(shape, writer -> {
+                    var input = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getInputShape()));
+                    var output = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getOutputShape()));
+                    var eventStreamIndex = EventStreamIndex.of(directive.model());
+                    writer.pushState(new ClassSection(shape));
+                    writer.putContext("shape", directive.symbol());
+                    var template = """
                     public final class ${shape:T} implements ${operationType:C} {
                         ${id:C|}
 
@@ -141,111 +134,111 @@ public class OperationGenerator
                             return ${?idempotencyTokenMember}IDEMPOTENCY_TOKEN_MEMBER${/idempotencyTokenMember}${^idempotencyTokenMember}null${/idempotencyTokenMember};
                         }
                     }""";
-                writer.putContext("inputType", input);
-                writer.putContext("outputType", output);
-                writer.putContext("id", new IdStringGenerator(writer, shape));
-                writer.putContext("sdkSchema", Schema.class);
-                writer.putContext("shapeId", ShapeId.class);
-                writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
-                writer.putContext("list", List.class);
-                writer.putContext("string", String.class);
-                writer.putContext("set", Set.class);
-                writer.putContext("modeledApiException", ModeledApiException.class);
+                    writer.putContext("inputType", input);
+                    writer.putContext("outputType", output);
+                    writer.putContext("id", new IdStringGenerator(writer, shape));
+                    writer.putContext("sdkSchema", Schema.class);
+                    writer.putContext("shapeId", ShapeId.class);
+                    writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
+                    writer.putContext("list", List.class);
+                    writer.putContext("string", String.class);
+                    writer.putContext("set", Set.class);
+                    writer.putContext("modeledApiException", ModeledApiException.class);
 
-                writer.putContext(
-                    "operationType",
-                    new OperationTypeGenerator(
-                        writer,
-                        shape,
-                        directive.symbolProvider(),
-                        directive.model(),
-                        eventStreamIndex,
-                        directive.context()
-                    )
-                );
-
-                writer.putContext("typeRegistry", TypeRegistry.class);
-                writer.putContext(
-                    "schema",
-                    new SchemaGenerator(
-                        writer,
-                        shape,
-                        directive.symbolProvider(),
-                        directive.model(),
-                        directive.context()
-                    )
-                );
-                writer.putContext(
-                    "typeRegistrySection",
-                    new TypeRegistryGenerator(
-                        writer,
-                        shape,
-                        directive.symbolProvider(),
-                        directive.model(),
-                        directive.service()
-                    )
-                );
-                var serviceIndex = ServiceIndex.of(directive.model());
-                writer.putContext(
-                    "schemes",
-                    serviceIndex.getEffectiveAuthSchemes(
-                        directive.service(),
-                        shape,
-                        ServiceIndex.AuthSchemeMode.NO_AUTH_AWARE
-                    )
-                );
-
-                eventStreamIndex.getInputInfo(shape).ifPresentOrElse(info -> {
-                    writer.putContext("supplier", Supplier.class);
-                    writer.putContext("hasInputEventStream", true);
-                    writer.putContext("inputStreamMember", info.getEventStreamMember().getMemberName());
                     writer.putContext(
-                        "inputEventType",
-                        directive.symbolProvider().toSymbol(info.getEventStreamTarget())
+                            "operationType",
+                            new OperationTypeGenerator(
+                                    writer,
+                                    shape,
+                                    directive.symbolProvider(),
+                                    directive.model(),
+                                    eventStreamIndex,
+                                    directive.context()
+                            )
                     );
-                }, () -> {
+
+                    writer.putContext("typeRegistry", TypeRegistry.class);
+                    writer.putContext(
+                            "schema",
+                            new SchemaGenerator(
+                                    writer,
+                                    shape,
+                                    directive.symbolProvider(),
+                                    directive.model(),
+                                    directive.context()
+                            )
+                    );
+                    writer.putContext(
+                            "typeRegistrySection",
+                            new TypeRegistryGenerator(
+                                    writer,
+                                    shape,
+                                    directive.symbolProvider(),
+                                    directive.model(),
+                                    directive.service()
+                            )
+                    );
+                    var serviceIndex = ServiceIndex.of(directive.model());
+                    writer.putContext(
+                            "schemes",
+                            serviceIndex.getEffectiveAuthSchemes(
+                                    directive.service(),
+                                    shape,
+                                    ServiceIndex.AuthSchemeMode.NO_AUTH_AWARE
+                            )
+                    );
+
+                    eventStreamIndex.getInputInfo(shape).ifPresentOrElse(info -> {
+                        writer.putContext("supplier", Supplier.class);
+                        writer.putContext("hasInputEventStream", true);
+                        writer.putContext("inputStreamMember", info.getEventStreamMember().getMemberName());
+                        writer.putContext(
+                                "inputEventType",
+                                directive.symbolProvider().toSymbol(info.getEventStreamTarget())
+                        );
+                    }, () -> {
+                        for (var member : shape.members()) {
+                            if (directive.model().expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
+                                writer.putContext("inputStreamMember", member.getMemberName());
+                                break;
+                            }
+                        }
+                    });
+
+                    eventStreamIndex.getOutputInfo(shape).ifPresentOrElse(info -> {
+                        writer.putContext("supplier", Supplier.class);
+                        writer.putContext("hasOutputEventStream", true);
+                        writer.putContext("outputStreamMember", info.getEventStreamMember().getMemberName());
+                        writer.putContext(
+                                "outputEventType",
+                                directive.symbolProvider().toSymbol(info.getEventStreamTarget())
+                        );
+                    }, () -> {
+                        for (var member : shape.members()) {
+                            if (directive.model().expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
+                                writer.putContext("outputStreamMember", member.getMemberName());
+                                break;
+                            }
+                        }
+                    });
+
+                    // Add the idempotency token member.
                     for (var member : shape.members()) {
-                        if (directive.model().expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
-                            writer.putContext("inputStreamMember", member.getMemberName());
+                        if (member.hasTrait(IdempotencyTokenTrait.class)) {
+                            writer.putContext("idempotencyTokenMember", member.getMemberName());
                             break;
                         }
                     }
+
+                    var exceptions = shape.getErrors()
+                            .stream()
+                            .map(directive.model()::expectShape)
+                            .map(directive.symbolProvider()::toSymbol)
+                            .toList();
+                    writer.putContext("exceptions", exceptions);
+                    writer.write(template);
+                    writer.popState();
                 });
-
-                eventStreamIndex.getOutputInfo(shape).ifPresentOrElse(info -> {
-                    writer.putContext("supplier", Supplier.class);
-                    writer.putContext("hasOutputEventStream", true);
-                    writer.putContext("outputStreamMember", info.getEventStreamMember().getMemberName());
-                    writer.putContext(
-                        "outputEventType",
-                        directive.symbolProvider().toSymbol(info.getEventStreamTarget())
-                    );
-                }, () -> {
-                    for (var member : shape.members()) {
-                        if (directive.model().expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
-                            writer.putContext("outputStreamMember", member.getMemberName());
-                            break;
-                        }
-                    }
-                });
-
-                // Add the idempotency token member.
-                for (var member : shape.members()) {
-                    if (member.hasTrait(IdempotencyTokenTrait.class)) {
-                        writer.putContext("idempotencyTokenMember", member.getMemberName());
-                        break;
-                    }
-                }
-
-                var exceptions = shape.getErrors()
-                    .stream()
-                    .map(directive.model()::expectShape)
-                    .map(directive.symbolProvider()::toSymbol)
-                    .toList();
-                writer.putContext("exceptions", exceptions);
-                writer.write(template);
-                writer.popState();
-            });
     }
 
     // Registers errors of an operation with the type registry.

@@ -10,7 +10,6 @@ import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
-@SmithyInternalApi
 record TraitInitializerGenerator(JavaWriter writer, Shape shape, CodeGenerationContext context) implements
     Runnable {
 
