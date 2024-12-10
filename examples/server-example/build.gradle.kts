@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    api(project(":server"))
+    api(project(":server-api"))
     api(project(":server-core"))
     implementation(project(":server-netty"))
     api(project(":server-aws-rest-json1"))

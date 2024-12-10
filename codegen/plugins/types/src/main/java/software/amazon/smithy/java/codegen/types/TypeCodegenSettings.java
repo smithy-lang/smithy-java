@@ -16,7 +16,6 @@ import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.selector.Selector;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-// TODO: Add support for protocol traits on synthetic service.
 final class TypeCodegenSettings {
     private static final String SHAPES = "shapes";
     private static final String SELECTOR = "selector";
@@ -129,7 +128,7 @@ final class TypeCodegenSettings {
             return this;
         }
 
-        public TypeCodegenSettings build() {
+        TypeCodegenSettings build() {
             return new TypeCodegenSettings(this);
         }
     }

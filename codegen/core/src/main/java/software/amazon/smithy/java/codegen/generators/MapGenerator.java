@@ -23,7 +23,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  * Generates serializers and deserializers for Map shapes.
  */
 @SmithyInternalApi
-public class MapGenerator
+public final class MapGenerator
     implements Consumer<GenerateMapDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     @Override

@@ -11,7 +11,10 @@ import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.utils.CodeSection;
 
 /**
- * TODO: DOCS
+ * Adds a section for Operations.
+ *
+ * <p>This section is used operations both as stand-alone models
+ * and for operation methods on clients.
  *
  * @param operation Operation that java docs are being added to.
  */

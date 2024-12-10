@@ -28,7 +28,7 @@ import software.amazon.smithy.utils.StringUtils;
  * </ul>
  */
 @SmithyUnstableApi
-public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportContainer> {
+public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportContainer> {
     private static final char PLACEHOLDER_FORMAT_CHAR = '£';
     private final String packageNamespace;
     private final JavaCodegenSettings settings;

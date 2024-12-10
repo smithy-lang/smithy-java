@@ -209,10 +209,12 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                     if (shape.hasTrait(ErrorTrait.class)) {
                         if (shape.getMember("message").isPresent()) {
                             writer.write(
-                                "super($$SCHEMA, builder.message, builder.$$cause, builder.$$captureStackTrace);"
+                                "super($$SCHEMA, builder.message, builder.$$cause, builder.$$captureStackTrace, builder.$$deserialized);"
                             );
                         } else {
-                            writer.write("super($$SCHEMA, null, builder.$$cause, builder.$$captureStackTrace);");
+                            writer.write(
+                                "super($$SCHEMA, null, builder.$$cause, builder.$$captureStackTrace, builder.$$deserialized);"
+                            );
                         }
                     }
 
@@ -743,6 +745,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             if (shape.hasTrait(ErrorTrait.class)) {
                 writer.write("private $T $$cause;", Throwable.class);
                 writer.write("private $T $$captureStackTrace;", Boolean.class);
+                writer.write("private boolean $$deserialized;");
             }
             writer.popState();
         }

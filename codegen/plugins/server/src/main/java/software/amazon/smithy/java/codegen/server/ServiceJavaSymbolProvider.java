@@ -16,6 +16,9 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.StringUtils;
 
+/**
+ * Maps Smithy types to Java Symbols for server code generation.
+ */
 @SmithyInternalApi
 public final class ServiceJavaSymbolProvider extends JavaSymbolProvider {
     private final String serviceName;

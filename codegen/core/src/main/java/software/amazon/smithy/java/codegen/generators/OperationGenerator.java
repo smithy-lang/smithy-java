@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateOperationDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -34,28 +33,21 @@ import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
-public class OperationGenerator
+public final class OperationGenerator
     implements Consumer<GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     @Override
     public void accept(GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        generate(directive, directive.symbol());
-    }
-
-    protected final void generate(
-        GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive,
-        Symbol symbol
-    ) {
         var shape = directive.shape();
 
         directive.context()
             .writerDelegator()
-            .useFileWriter(symbol.getDeclarationFile(), symbol.getNamespace(), writer -> {
+            .useShapeWriter(shape, writer -> {
                 var input = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getInputShape()));
                 var output = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getOutputShape()));
                 var eventStreamIndex = EventStreamIndex.of(directive.model());
                 writer.pushState(new ClassSection(shape));
-                writer.putContext("shape", symbol);
+                writer.putContext("shape", directive.symbol());
                 var template = """
                     public final class ${shape:T} implements ${operationType:C} {
                         ${id:C|}

@@ -9,31 +9,31 @@ import software.amazon.smithy.codegen.core.Property;
 import software.amazon.smithy.codegen.core.Symbol;
 
 /**
- * TODO: DOCS
+ * Contains server-specific properties that may be added to symbols by smithy-java.
+ *
+ * @see software.amazon.smithy.java.codegen.SymbolProperties for other properties that may be added to symbols.
  */
 public final class ServerSymbolProperties {
 
-    private ServerSymbolProperties() {
-
-    }
+    private ServerSymbolProperties() {}
 
     /**
-     * TODO: DOCS
+     * Symbol representing the async variant of the operation stub.
      */
     public static final Property<Symbol> ASYNC_STUB_OPERATION = Property.named("async-stub-operation");
 
     /**
-     * TODO: DOCS
+     * Symbol representing the sync variant of the operation stub.
      */
     public static final Property<Symbol> STUB_OPERATION = Property.named("stub-operation");
 
     /**
-     * TODO: DOCS
+     * Symbol representing the generated operation model class.
      */
     public static final Property<Symbol> API_OPERATION = Property.named("api-operation");
 
     /**
-     * TODO: DOCS
+     * Name to use for the operation when used as a field inside the service.
      */
     public static final Property<String> OPERATION_FIELD_NAME = Property.named("operation-field-name");
 }

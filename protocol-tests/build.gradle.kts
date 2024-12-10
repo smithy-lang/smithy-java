@@ -15,7 +15,7 @@ dependencies {
     implementation(project(":client-core"))
     implementation(libs.smithy.protocol.test.traits)
     implementation(project(":http-api"))
-    implementation(project(":server"))
+    implementation(project(":server-api"))
     implementation(project(":server-core"))
     implementation(project(":client-http"))
     implementation(libs.assertj.core)

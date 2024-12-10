@@ -38,7 +38,7 @@ include(":retries-sdk-adapter")
 
 // server
 include("server-core")
-include("server")
+include("server-api")
 include("server-netty")
 include("server-core")
 include("server-aws-rest-json1")
