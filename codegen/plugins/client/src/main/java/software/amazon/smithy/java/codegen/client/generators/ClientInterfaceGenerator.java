@@ -117,13 +117,17 @@ public final class ClientInterfaceGenerator
                             return new RequestOverrideBuilder();
                         }
 
+                        /**
+                         * Builder for {@link ${interface:T}}.
+                         */
                         final class Builder extends ${client:T}.Builder<${interface:T}, Builder>${?settings}
                             implements ${#settings}${value:T}<Builder>${^key.last}, ${/key.last}${/settings}${/settings} {
                             ${?hasDefaults}${defaultPlugins:C|}
                             ${/hasDefaults}${?hasDefaultProtocol}${defaultProtocol:C|}
                             ${/hasDefaultProtocol}${?hasTransportSettings}${transportSettings:C|}
-                            ${/hasTransportSettings}${?defaultSchemes}${defaultAuth:C|}
-                            ${/defaultSchemes}
+                            ${/hasTransportSettings}${?defaultSchemes}
+                            ${defaultAuth:C|}${/defaultSchemes}
+
                             private Builder() {${?defaultSchemes}
                                 configBuilder().putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes});
                             ${/defaultSchemes}}
@@ -138,12 +142,14 @@ public final class ClientInterfaceGenerator
                                 }
                                 ${/hasDefaultProtocol}${?hasDefaultTransport}if (configBuilder().transport() == null) {
                                     configBuilder().transport(${transportFactory:C}.createTransport(${?hasTransportSettings}transportSettings${/hasTransportSettings}));
-                                }
-                                ${/hasDefaultTransport}
+                                }${/hasDefaultTransport}
                                 return new ${impl:T}(this);
                             }
                         }
 
+                        /**
+                         * Builder used to create a {@link ${requestOverride:T}} for {@link ${interface:T}} operations.
+                         */
                         final class RequestOverrideBuilder extends ${requestOverride:T}.OverrideBuilder<RequestOverrideBuilder>${?settings}
                             implements ${#settings}${value:T}<RequestOverrideBuilder>${^key.last}, ${/key.last}${/settings}${/settings} {}
                     }
@@ -311,6 +317,12 @@ public final class ClientInterfaceGenerator
                 ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig);
                 """;
             var templatePaginated = """
+                /**
+                 * Returns a {@link ${paginator:T}} for the {@link #${name:L}} operation.
+                 *
+                 * @param input Input to use as basis for paginated calls.
+                 * @return Paginator that can be used to retrieval paginated results.
+                 */
                 default ${paginator:T}<${output:T}> ${name:L}Paginator(${input:T} input) {
                     return ${paginator:T}.paginate(input, new ${operation:T}(), this::${name:L});
                 }
