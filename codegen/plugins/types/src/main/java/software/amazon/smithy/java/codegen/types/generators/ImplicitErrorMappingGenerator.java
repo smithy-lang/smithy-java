@@ -5,9 +5,12 @@
 
 package software.amazon.smithy.java.codegen.types.generators;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
 import software.amazon.smithy.framework.traits.ImplicitErrorsTrait;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -34,7 +37,16 @@ public final class ImplicitErrorMappingGenerator
             implicitErrors.addAll(implicitErrorTrait.getValues());
         }
 
-        if (implicitErrors.isEmpty()) {
+        Map<ShapeId, Symbol> errorMap = new HashMap<>();
+        for (var errorShape : directive.model().getShapesWithTrait(ErrorTrait.class)) {
+            var errorId = errorShape.getId();
+            if (implicitErrors.contains(errorId) || errorId.getNamespace().equals(FRAMEWORK_NAMESPACE)) {
+                var errorSymbol = directive.symbolProvider().toSymbol(errorShape);
+                errorMap.put(errorId, errorSymbol);
+            }
+        }
+
+        if (errorMap.isEmpty()) {
             return;
         }
 
@@ -44,14 +56,8 @@ public final class ImplicitErrorMappingGenerator
                 # This file maps implicit error Smithy IDs to concrete java class implementations
                 # WARNING: This file is code generated. Do not modify by hand.
                 """);
-            var errorShapes = directive.model().getShapesWithTrait(ErrorTrait.class);
-            for (var errorShape : errorShapes) {
-                var errorId = errorShape.getId();
-                // Add a mapping for any implicit or framework errors
-                if (implicitErrors.contains(errorId) || errorId.getNamespace().equals(FRAMEWORK_NAMESPACE)) {
-                    var errorSymbol = directive.symbolProvider().toSymbol(errorShape);
-                    writer.write("$L=$L", errorId, errorSymbol.getFullName());
-                }
+            for (var entry : errorMap.entrySet()) {
+                writer.write("$L=$L", entry.getKey(), entry.getValue());
             }
         });
     }
