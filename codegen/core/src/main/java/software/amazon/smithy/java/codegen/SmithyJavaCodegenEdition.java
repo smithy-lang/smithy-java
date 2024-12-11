@@ -17,5 +17,5 @@ package software.amazon.smithy.java.codegen;
  */
 public enum SmithyJavaCodegenEdition {
     V2024,
-    LATEST;
+    LATEST
 }

@@ -249,12 +249,12 @@ public final class JavaCodegenSettings {
         private ShapeId defaultProtocol;
         private String transportName;
         private ObjectNode transportSettings;
-        private List<String> defaultPlugins = new ArrayList<>();
-        private List<String> defaultSettings = new ArrayList<>();
+        private final List<String> defaultPlugins = new ArrayList<>();
+        private final List<String> defaultSettings = new ArrayList<>();
         private String relativeDate;
         private String relativeVersion;
         private SmithyJavaCodegenEdition edition;
-        private List<ShapeId> runtimeTraits = new ArrayList<>();
+        private final List<ShapeId> runtimeTraits = new ArrayList<>();
         private Selector runtimeTraitsSelector;
         private boolean useExternalTypes;
 
