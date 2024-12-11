@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.retries.sdkadapter;
+package software.amazon.smithy.java.aws.sdkv2.retries;
 
 import java.time.Duration;
 import software.amazon.smithy.java.retries.api.AcquireInitialTokenRequest;

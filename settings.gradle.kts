@@ -34,7 +34,6 @@ include(":dynamic-client")
 
 include(":auth-api")
 include(":retries-api")
-include(":retries-sdk-adapter")
 
 // server
 include("server-core")
@@ -61,8 +60,9 @@ include(":aws:client-restjson")
 include(":aws:client-restxml")
 include(":aws:client-rpcv2-cbor-protocol")
 include(":aws:aws-client-http")
-
-include(":server-rpcv2-cbor")
+include(":aws:sdkv2-retries")
 
 // AWS integrations
 include(":aws:integrations:lambda")
+
+include(":server-rpcv2-cbor")

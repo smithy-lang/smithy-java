@@ -43,7 +43,10 @@ final class SyntheticServiceTransform {
 
         for (Shape shape : closure) {
             switch (shape.getType()) {
-                case SERVICE, RESOURCE -> LOGGER.debug("Skipping service-associated shape {} for type codegen...", shape);
+                case SERVICE, RESOURCE -> LOGGER.debug(
+                    "Skipping service-associated shape {} for type codegen...",
+                    shape
+                );
                 case OPERATION -> serviceBuilder.addOperation(shape.asOperationShape().orElseThrow());
                 case STRUCTURE, ENUM, INT_ENUM, UNION -> {
                     var syntheticInput = createSyntheticInput(shape);
