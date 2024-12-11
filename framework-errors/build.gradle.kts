@@ -10,7 +10,6 @@ extra["moduleName"] = "software.amazon.smithy.framework.errors"
 
 dependencies {
     smithyBuild(project(":codegen:plugins:types"))
-    api(project(":codegen:core"))
     api(project(":core"))
 
     // Validation error is imported separately, b/c it is used a bit uniquely in protocol tests.
