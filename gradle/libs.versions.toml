@@ -10,8 +10,8 @@ smithy-gradle = "1.1.0"
 assertj = "3.26.3"
 jackson = "2.18.2"
 netty = "4.1.115.Final"
-dep-analysis = "2.5.0"
-aws-sdk = "2.29.26"
+dep-analysis = "2.6.0"
+aws-sdk = "2.29.31"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 
