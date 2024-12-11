@@ -10,6 +10,9 @@ dependencies {
     implementation(project(":server-netty"))
     api(project(":server-aws-rest-json1"))
 
+    // TODO: Why is this not picked up correctly???
+    api(project(":framework-errors"))
+
     // Client dependencies
     api(project(":aws:client-restjson"))
     api(project(":client-core"))

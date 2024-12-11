@@ -7,24 +7,19 @@ package software.amazon.smithy.java.codegen;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.codegen.core.CodegenContext;
 import software.amazon.smithy.codegen.core.CodegenException;
-import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.WriterDelegator;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -109,7 +104,6 @@ public class CodeGenerationContext
     private final WriterDelegator<JavaWriter> writerDelegator;
     private final Set<ShapeId> runtimeTraits;
     private final List<TraitInitializer<?>> traitInitializers;
-    private final Map<ShapeId, Symbol> errorMapping;
 
     public CodeGenerationContext(
         Model model,
@@ -122,8 +116,7 @@ public class CodeGenerationContext
         this.settings = settings;
         this.fileManifest = fileManifest;
         this.integrations = integrations;
-        this.errorMapping = collectImplicitErrorMappings(settings);
-        this.symbolProvider = new ImplicitErrorDecorator(symbolProvider);
+        this.symbolProvider = symbolProvider;
         this.writerDelegator = new WriterDelegator<>(
             fileManifest,
             this.symbolProvider,
@@ -250,44 +243,5 @@ public class CodeGenerationContext
             }
         }
         throw new IllegalArgumentException("Could not find initializer for " + trait);
-    }
-
-    // TODO: Allow additional mappings to be added from settings.
-    private Map<ShapeId, Symbol> collectImplicitErrorMappings(JavaCodegenSettings settings) {
-        Map<ShapeId, Symbol> errorMappings = new HashMap<>();
-        for (var integration : integrations) {
-            for (var entry : integration.implicitErrorMappings().entrySet()) {
-                var symbol = CodegenUtils.fromClass(entry.getValue())
-                    .toBuilder()
-                    .putProperty(SymbolProperties.IMPLICIT_ERROR, true)
-                    .build();
-                errorMappings.put(entry.getKey(), symbol);
-            }
-        }
-        return errorMappings;
-    }
-
-    private final class ImplicitErrorDecorator implements SymbolProvider {
-        private final SymbolProvider delegate;
-
-        public ImplicitErrorDecorator(SymbolProvider delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public Symbol toSymbol(Shape shape) {
-            if (errorMapping.containsKey(shape.toShapeId())) {
-                return Objects.requireNonNull(
-                    errorMapping.get(shape.toShapeId()),
-                    "Unknown implicit error shape id: " + shape.toShapeId()
-                );
-            }
-            return delegate.toSymbol(shape);
-        }
-
-        @Override
-        public String toMemberName(MemberShape shape) {
-            return delegate.toMemberName(shape);
-        }
     }
 }

@@ -26,6 +26,9 @@ afterEvaluate {
             java {
                 srcDir(typesPath)
             }
+            resources {
+                srcDir(typesPath)
+            }
         }
     }
 }

@@ -1,3 +1,7 @@
 software.amazon.smithy.java.codegen.integrations.javadoc.JavadocIntegration
 software.amazon.smithy.java.codegen.integrations.core.CoreIntegration
+<<<<<<< HEAD
 software.amazon.smithy.java.codegen.integrations.externaltypes.ExternalTypesIntegration
+=======
+software.amazon.smithy.java.codegen.integrations.core.ImplicitErrorIntegration
+>>>>>>> 4c05f459 (Use meta-inf properties file for mappings.)

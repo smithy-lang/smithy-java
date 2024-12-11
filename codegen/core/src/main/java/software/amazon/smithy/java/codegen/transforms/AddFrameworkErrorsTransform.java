@@ -7,7 +7,7 @@ package software.amazon.smithy.java.codegen.transforms;
 
 import java.util.HashSet;
 import java.util.Set;
-import software.amazon.smithy.framework.traits.AddsImplicitErrorsTrait;
+import software.amazon.smithy.framework.traits.ImplicitErrorsTrait;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.Shape;
@@ -35,7 +35,7 @@ public final class AddFrameworkErrorsTransform {
                 frameworkErrors.add(struct.getId());
             }
         }
-        var addedFrameworkErrors = AddsImplicitErrorsTrait.builder().values(frameworkErrors.stream().toList()).build();
+        var addedFrameworkErrors = ImplicitErrorsTrait.builder().values(frameworkErrors.stream().toList()).build();
         var syntheticFrameworkTraitShape = getSyntheticTraitBuilder().addTrait(addedFrameworkErrors)
             .build();
         Set<Shape> updated = new HashSet<>();

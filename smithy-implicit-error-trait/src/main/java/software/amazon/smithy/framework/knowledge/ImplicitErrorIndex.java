@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import software.amazon.smithy.framework.traits.AddsImplicitErrorsTrait;
+import software.amazon.smithy.framework.traits.ImplicitErrorsTrait;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.KnowledgeIndex;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -34,8 +34,8 @@ public final class ImplicitErrorIndex implements KnowledgeIndex {
                     continue;
                 }
                 var traitShape = traitShapeOptional.get();
-                if (traitShape.hasTrait(AddsImplicitErrorsTrait.class)) {
-                    var implicitErrorsTrait = traitShape.expectTrait(AddsImplicitErrorsTrait.class);
+                if (traitShape.hasTrait(ImplicitErrorsTrait.class)) {
+                    var implicitErrorsTrait = traitShape.expectTrait(ImplicitErrorsTrait.class);
                     var implicitErrorList = serviceImplicitErrorMap.computeIfAbsent(
                         service.toShapeId(),
                         k -> new HashSet<>()

@@ -19,12 +19,12 @@ import software.amazon.smithy.utils.SmithyGenerated;
 import software.amazon.smithy.utils.ToSmithyBuilder;
 
 @SmithyGenerated
-public final class AddsImplicitErrorsTrait extends AbstractTrait implements ToSmithyBuilder<AddsImplicitErrorsTrait> {
+public final class ImplicitErrorsTrait extends AbstractTrait implements ToSmithyBuilder<ImplicitErrorsTrait> {
     public static final ShapeId ID = ShapeId.from("smithy.framework#implicitErrors");
 
     private final List<ShapeId> values;
 
-    private AddsImplicitErrorsTrait(Builder builder) {
+    private ImplicitErrorsTrait(Builder builder) {
         super(ID, builder.getSourceLocation());
         this.values = builder.values.copy();
     }
@@ -37,13 +37,13 @@ public final class AddsImplicitErrorsTrait extends AbstractTrait implements ToSm
     }
 
     /**
-     * Creates a {@link AddsImplicitErrorsTrait} from a {@link Node}.
+     * Creates a {@link ImplicitErrorsTrait} from a {@link Node}.
      *
      * @param node Node to create the AddsImplicitErrorsTrait from.
      * @return Returns the created AddsImplicitErrorsTrait.
      * @throws ExpectationNotMetException if the given Node is invalid.
      */
-    public static AddsImplicitErrorsTrait fromNode(Node node) {
+    public static ImplicitErrorsTrait fromNode(Node node) {
         Builder builder = builder();
         node.expectArrayNode()
             .getElements()
@@ -58,9 +58,9 @@ public final class AddsImplicitErrorsTrait extends AbstractTrait implements ToSm
     }
 
     /**
-     * Creates a builder used to build a {@link AddsImplicitErrorsTrait}.
+     * Creates a builder used to build a {@link ImplicitErrorsTrait}.
      */
-    public SmithyBuilder<AddsImplicitErrorsTrait> toBuilder() {
+    public SmithyBuilder<ImplicitErrorsTrait> toBuilder() {
         return builder().sourceLocation(getSourceLocation())
             .values(getValues());
     }
@@ -70,9 +70,9 @@ public final class AddsImplicitErrorsTrait extends AbstractTrait implements ToSm
     }
 
     /**
-     * Builder for {@link AddsImplicitErrorsTrait}.
+     * Builder for {@link ImplicitErrorsTrait}.
      */
-    public static final class Builder extends AbstractTraitBuilder<AddsImplicitErrorsTrait, Builder> {
+    public static final class Builder extends AbstractTraitBuilder<ImplicitErrorsTrait, Builder> {
         private final BuilderRef<List<ShapeId>> values = BuilderRef.forList();
 
         private Builder() {}
@@ -99,8 +99,8 @@ public final class AddsImplicitErrorsTrait extends AbstractTrait implements ToSm
         }
 
         @Override
-        public AddsImplicitErrorsTrait build() {
-            return new AddsImplicitErrorsTrait(this);
+        public ImplicitErrorsTrait build() {
+            return new ImplicitErrorsTrait(this);
         }
     }
 
@@ -111,7 +111,7 @@ public final class AddsImplicitErrorsTrait extends AbstractTrait implements ToSm
 
         @Override
         public Trait createTrait(ShapeId target, Node value) {
-            AddsImplicitErrorsTrait result = AddsImplicitErrorsTrait.fromNode(value);
+            ImplicitErrorsTrait result = ImplicitErrorsTrait.fromNode(value);
             result.setNodeCache(value);
             return result;
         }
