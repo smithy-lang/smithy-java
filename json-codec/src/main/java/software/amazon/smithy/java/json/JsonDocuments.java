@@ -40,27 +40,27 @@ public final class JsonDocuments {
 
     private JsonDocuments() {}
 
-    public static Document of(String value, JsonCodec.Settings settings) {
+    public static Document of(String value, JsonSettings settings) {
         return new StringDocument(value, settings);
     }
 
-    public static Document of(boolean value, JsonCodec.Settings settings) {
+    public static Document of(boolean value, JsonSettings settings) {
         return new BooleanDocument(value, settings);
     }
 
-    public static Document of(Number value, JsonCodec.Settings settings) {
+    public static Document of(Number value, JsonSettings settings) {
         return new NumberDocument(value, settings, DocumentUtils.getSchemaForNumber(value));
     }
 
-    public static Document of(List<Document> values, JsonCodec.Settings settings) {
+    public static Document of(List<Document> values, JsonSettings settings) {
         return new ListDocument(values, settings);
     }
 
-    public static Document of(Map<String, Document> values, JsonCodec.Settings settings) {
+    public static Document of(Map<String, Document> values, JsonSettings settings) {
         return new MapDocument(values, settings);
     }
 
-    record StringDocument(String value, JsonCodec.Settings settings) implements Document {
+    record StringDocument(String value, JsonSettings settings) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.STRING;
@@ -98,7 +98,7 @@ public final class JsonDocuments {
         }
     }
 
-    record NumberDocument(Number value, JsonCodec.Settings settings, Schema schema) implements Document {
+    record NumberDocument(Number value, JsonSettings settings, Schema schema) implements Document {
         @Override
         public ShapeType type() {
             return schema.type();
@@ -161,7 +161,7 @@ public final class JsonDocuments {
         }
     }
 
-    record BooleanDocument(boolean value, JsonCodec.Settings settings) implements Document {
+    record BooleanDocument(boolean value, JsonSettings settings) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.BOOLEAN;
@@ -178,7 +178,7 @@ public final class JsonDocuments {
         }
     }
 
-    record ListDocument(List<Document> values, JsonCodec.Settings settings) implements Document {
+    record ListDocument(List<Document> values, JsonSettings settings) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.LIST;
@@ -213,7 +213,7 @@ public final class JsonDocuments {
         }
     }
 
-    record MapDocument(Map<String, Document> values, JsonCodec.Settings settings) implements Document {
+    record MapDocument(Map<String, Document> values, JsonSettings settings) implements Document {
         @Override
         public ShapeType type() {
             return ShapeType.MAP;
@@ -269,9 +269,9 @@ public final class JsonDocuments {
      */
     private static final class JsonDocumentDeserializer extends DocumentDeserializer {
 
-        private final JsonCodec.Settings settings;
+        private final JsonSettings settings;
 
-        JsonDocumentDeserializer(JsonCodec.Settings settings, Document value) {
+        JsonDocumentDeserializer(JsonSettings settings, Document value) {
             super(value);
             this.settings = settings;
         }

@@ -7,8 +7,6 @@ package software.amazon.smithy.java.json;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.util.Objects;
-import java.util.ServiceLoader;
 import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -28,75 +26,38 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
  * <p>Blobs are base64 encoded as strings.
  */
 public final class JsonCodec implements Codec {
-    private static final JsonSerdeProvider PROVIDER;
 
-    static {
-        final String preferredName = System.getProperty("smithy-java.json-provider");
-        JsonSerdeProvider selected = null;
-        for (JsonSerdeProvider provider : ServiceLoader.load(JsonSerdeProvider.class)) {
-            if (preferredName != null) {
-                if (provider.getName().equals(preferredName)) {
-                    selected = provider;
-                    break;
-                }
-            }
-            if (selected == null) {
-                selected = provider;
-            } else if (provider.getPriority() > selected.getPriority()) {
-                selected = provider;
-            }
-        }
-        if (selected == null) {
-            throw new IllegalStateException("At least one JSON provider should be registered.");
-        }
-        PROVIDER = selected;
-    }
-
-    private final Settings settings;
-    private final JsonSerdeProvider provider;
+    private final JsonSettings settings;
 
     private JsonCodec(Builder builder) {
-        var timestampResolver = builder.useTimestampFormat
-            ? new TimestampResolver.UseTimestampFormatTrait(builder.defaultTimestampFormat)
-            : new TimestampResolver.StaticFormat(builder.defaultTimestampFormat);
-        var fieldMapper = builder.useJsonName
-            ? new JsonFieldMapper.UseJsonNameTrait()
-            : JsonFieldMapper.UseMemberName.INSTANCE;
-        settings = new Settings(
-            timestampResolver,
-            fieldMapper,
-            builder.forbidUnknownUnionMembers,
-            builder.defaultNamespace
-        );
-        provider = builder.provider == null ? PROVIDER : builder.provider;
+        this.settings = builder.settingsBuilder.build();
     }
 
     public static Builder builder() {
         return new Builder();
     }
 
+    public JsonSettings settings() {
+        return settings;
+    }
+
     @Override
     public ShapeSerializer createSerializer(OutputStream sink) {
-        return provider.newSerializer(sink, settings);
+        return settings.provider().newSerializer(sink, settings);
     }
 
     @Override
     public ShapeDeserializer createDeserializer(byte[] source) {
-        return provider.newDeserializer(source, settings);
+        return settings.provider().newDeserializer(source, settings);
     }
 
     @Override
     public ShapeDeserializer createDeserializer(ByteBuffer source) {
-        return provider.newDeserializer(source, settings);
+        return settings.provider().newDeserializer(source, settings);
     }
 
     public static final class Builder {
-        private boolean useJsonName;
-        private boolean useTimestampFormat = false;
-        private TimestampFormatter defaultTimestampFormat = TimestampFormatter.Prelude.EPOCH_SECONDS;
-        private JsonSerdeProvider provider;
-        private boolean forbidUnknownUnionMembers;
-        private String defaultNamespace;
+        private final JsonSettings.Builder settingsBuilder = JsonSettings.builder();
 
         private Builder() {}
 
@@ -104,52 +65,91 @@ public final class JsonCodec implements Codec {
             return new JsonCodec(this);
         }
 
+        /**
+         * Use the given settings object with this codec.
+         *
+         * @param settings Settings to use.
+         * @return the builder.
+         */
+        public Builder settings(JsonSettings settings) {
+            settings.updateBuilder(settingsBuilder);
+            return this;
+        }
+
+        /**
+         * Whether to use the jsonName trait or just the member name.
+         *
+         * <p>The jsonName trait is ignored by default.
+         *
+         * @param useJsonName True to use the jsonName trait.
+         * @return the builder.
+         */
         public Builder useJsonName(boolean useJsonName) {
-            this.useJsonName = useJsonName;
+            settingsBuilder.useJsonName(useJsonName);
             return this;
         }
 
+        /**
+         * Whether to use the timestampFormat trait or ignore it.
+         *
+         * <p>The timestampFormat trait is ignored by default.
+         *
+         * @param useTimestampFormat True to honor the timestampFormat trait.
+         * @return the builder.
+         */
         public Builder useTimestampFormat(boolean useTimestampFormat) {
-            this.useTimestampFormat = useTimestampFormat;
+            settingsBuilder.useTimestampFormat(useTimestampFormat);
             return this;
         }
 
+        /**
+         * The default timestamp format to assume for timestamp values.
+         *
+         * <p>Assumes "epoch-seconds" by default.
+         *
+         * @param defaultTimestampFormat The default timestamp format to assume.
+         * @return the builder.
+         */
         public Builder defaultTimestampFormat(TimestampFormatter defaultTimestampFormat) {
-            this.defaultTimestampFormat = Objects.requireNonNull(defaultTimestampFormat);
+            settingsBuilder.defaultTimestampFormat(defaultTimestampFormat);
             return this;
         }
 
+        /**
+         * Whether to forbid or ignore unknown union members.
+         *
+         * <p>Unknown union members are ignored by default.
+         *
+         * @param forbid True to forbid unknown union members.
+         * @return the builder.
+         */
         public Builder forbidUnknownUnionMembers(boolean forbid) {
-            this.forbidUnknownUnionMembers = forbid;
+            settingsBuilder.forbidUnknownUnionMembers(forbid);
             return this;
         }
 
+        /**
+         * Sets the default namespace when attempting to deserialize documents that use a relative shape ID.
+         *
+         * <p>No default namespace is used unless one is explicitly provided.
+         *
+         * @param defaultNamespace Default namespace to set.
+         * @return the builder.
+         */
         public Builder defaultNamespace(String defaultNamespace) {
-            this.defaultNamespace = defaultNamespace;
+            settingsBuilder.defaultNamespace(defaultNamespace);
             return this;
         }
 
+        /**
+         * Uses a custom JSON serde provider.
+         *
+         * @param provider the JSON serde provider to use.
+         * @return the builder.
+         */
         Builder overrideSerdeProvider(JsonSerdeProvider provider) {
-            this.provider = Objects.requireNonNull(provider);
+            settingsBuilder.overrideSerdeProvider(provider);
             return this;
-        }
-
-        @Override
-        public String toString() {
-            return "JsonCodec.Builder{" +
-                "useJsonName=" + useJsonName +
-                ", useTimestampFormat=" + useTimestampFormat +
-                ", defaultTimestampFormat=" + defaultTimestampFormat +
-                ", provider=" + provider.getName() +
-                ", defaultNamespace=" + defaultNamespace +
-                '}';
         }
     }
-
-    public record Settings(
-        TimestampResolver timestampResolver,
-        JsonFieldMapper fieldMapper,
-        boolean forbidUnknownUnionMembers,
-        String defaultNamespace
-    ) {}
 }

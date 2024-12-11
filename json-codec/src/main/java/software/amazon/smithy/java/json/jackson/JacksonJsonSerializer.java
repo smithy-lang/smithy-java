@@ -21,19 +21,19 @@ import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.io.ByteBufferUtils;
-import software.amazon.smithy.java.json.JsonCodec;
+import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JacksonJsonSerializer implements ShapeSerializer {
 
     private JsonGenerator generator;
-    private final JsonCodec.Settings settings;
+    private final JsonSettings settings;
     private SerializeDocumentContents serializeDocumentContents;
     private final ShapeSerializer structSerializer = new JsonStructSerializer();
 
     JacksonJsonSerializer(
         JsonGenerator generator,
-        JsonCodec.Settings settings
+        JsonSettings settings
     ) {
         this.generator = generator;
         this.settings = settings;

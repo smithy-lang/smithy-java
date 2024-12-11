@@ -61,7 +61,13 @@ public interface TimestampFormatter {
         return of(trait.getFormat());
     }
 
-    private static TimestampFormatter of(TimestampFormatTrait.Format format) {
+    /**
+     * Create a TimestampFormatter from the given format.
+     *
+     * @param format Format to create.
+     * @return the created formatter.
+     */
+    static TimestampFormatter of(TimestampFormatTrait.Format format) {
         return switch (format) {
             case DATE_TIME -> Prelude.DATE_TIME;
             case EPOCH_SECONDS -> Prelude.EPOCH_SECONDS;

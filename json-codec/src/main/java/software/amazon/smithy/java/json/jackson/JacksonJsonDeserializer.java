@@ -24,19 +24,19 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonDocuments;
+import software.amazon.smithy.java.json.JsonSettings;
 import software.amazon.smithy.java.json.TimestampResolver;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JacksonJsonDeserializer implements ShapeDeserializer {
 
     private JsonParser parser;
-    private final JsonCodec.Settings settings;
+    private final JsonSettings settings;
 
     JacksonJsonDeserializer(
         JsonParser parser,
-        JsonCodec.Settings settings
+        JsonSettings settings
     ) {
         this.parser = parser;
         this.settings = settings;

@@ -16,10 +16,10 @@ public interface JsonSerdeProvider {
 
     String getName();
 
-    ShapeDeserializer newDeserializer(byte[] source, JsonCodec.Settings settings);
+    ShapeDeserializer newDeserializer(byte[] source, JsonSettings settings);
 
-    ShapeDeserializer newDeserializer(ByteBuffer source, JsonCodec.Settings settings);
+    ShapeDeserializer newDeserializer(ByteBuffer source, JsonSettings settings);
 
-    ShapeSerializer newSerializer(OutputStream sink, JsonCodec.Settings settings);
+    ShapeSerializer newSerializer(OutputStream sink, JsonSettings settings);
 
 }
