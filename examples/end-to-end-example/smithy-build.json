@@ -5,7 +5,10 @@
       "service": "com.example#CoffeeShop",
       "namespace": "software.amazon.smithy.java.example",
       "headerFile": "license.txt",
-      "protocol": "aws.protocols#restJson1"
+      "protocol": "aws.protocols#restJson1",
+      "defaultPlugins": [
+        "software.amazon.smithy.java.example.middleware.CustomMiddlewarePlugin"
+      ]
     },
     "java-server-codegen": {
       "service": "com.example#CoffeeShop",

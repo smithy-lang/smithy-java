@@ -57,6 +57,9 @@ include(":examples:end-to-end-example")
 include(":examples:lambda-endpoint")
 include(":examples:standalone-types-example")
 include("examples:shared-types-example")
+include(":examples:middleware-example:middleware-model")
+include(":examples:middleware-example:client-integration")
+include(":examples:middleware-example:server-integration")
 
 // AWS specific
 include(":aws:event-streams")
