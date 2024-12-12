@@ -31,6 +31,7 @@ import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.java.codegen.generators.UnionGenerator;
+import software.amazon.smithy.java.codegen.types.generators.TypeMappingGenerator;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -117,6 +118,11 @@ record DirectedJavaTypeCodegen(boolean generateOperations)
     public void customizeBeforeIntegrations(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         new SharedSchemasGenerator().accept(directive);
         new SharedSerdeGenerator().accept(directive);
+    }
+
+    @Override
+    public void customizeAfterIntegrations(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        new TypeMappingGenerator().accept(directive);
     }
 
     private static boolean isSynthetic(Shape shape) {

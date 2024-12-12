@@ -20,12 +20,21 @@ afterEvaluate {
                 srcDir(serverPath)
                 srcDir(typesPath)
             }
+            resources {
+                srcDir(typesPath)
+            }
         }
     }
 }
 
-tasks.named("compileJava") {
-    dependsOn("smithyBuild")
+tasks {
+    val smithyBuild by getting
+    compileJava {
+        dependsOn(smithyBuild)
+    }
+    processResources {
+        dependsOn(smithyBuild)
+    }
 }
 
 // Helps Intellij plugin identify models

@@ -37,6 +37,10 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
 
     @Override
     public void accept(T directive) {
+        if (directive.symbol().getProperty(SymbolProperties.EXTERNAL_TYPE).isPresent()) {
+            // skip external types
+            return;
+        }
         var shape = directive.shape();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));

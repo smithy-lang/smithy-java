@@ -50,7 +50,7 @@ public class CodegenTest {
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
         assertFalse(manifest.getFiles().isEmpty());
-        assertEquals(manifest.getFiles().size(), 6);
+        assertEquals(manifest.getFiles().size(), 7);
         assertThat(
             manifest.getFiles(),
             containsInAnyOrder(
@@ -59,7 +59,8 @@ public class CodegenTest {
                 Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
                 Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
                 Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
-                Path.of("/test/smithy/codegen/types/test/model/UnionShape.java")
+                Path.of("/test/smithy/codegen/types/test/model/UnionShape.java"),
+                Path.of("/META-INF/smithy-java/type-mappings.properties")
             )
         );
     }
@@ -72,13 +73,14 @@ public class CodegenTest {
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
         assertFalse(manifest.getFiles().isEmpty());
-        assertEquals(manifest.getFiles().size(), 3);
+        assertEquals(manifest.getFiles().size(), 4);
         assertThat(
             manifest.getFiles(),
             containsInAnyOrder(
                 Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
                 Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
-                Path.of("/test/smithy/codegen/types/test/model/StructureShape.java")
+                Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
+                Path.of("/META-INF/smithy-java/type-mappings.properties")
             )
         );
     }
@@ -92,14 +94,15 @@ public class CodegenTest {
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
         assertFalse(manifest.getFiles().isEmpty());
-        assertEquals(manifest.getFiles().size(), 4);
+        assertEquals(manifest.getFiles().size(), 5);
         assertThat(
             manifest.getFiles(),
             containsInAnyOrder(
                 Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
                 Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
                 Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
-                Path.of("/test/smithy/codegen/types/test/model/UnionShape.java")
+                Path.of("/test/smithy/codegen/types/test/model/UnionShape.java"),
+                Path.of("/META-INF/smithy-java/type-mappings.properties")
             )
         );
     }

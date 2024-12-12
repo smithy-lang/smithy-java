@@ -157,7 +157,7 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
         writer.putContext("variants", shape.members().stream().map(symbolProvider::toMemberName).toList());
         writer.putContext("set", Set.class);
         writer.write("""
-            static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createIntEnum($$ID,
+            public static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createIntEnum($$ID,
                 ${set:T}.of(${#variants}${value:L}.value${^key.last}, ${/key.last}${/variants})${traits:C}
             );
             """);
@@ -217,7 +217,7 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
         writer.putContext("variants", shape.members().stream().map(symbolProvider::toMemberName).toList());
         writer.putContext("set", Set.class);
         writer.write("""
-            static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createEnum($$ID,
+            public static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createEnum($$ID,
                 ${set:T}.of(${#variants}${value:L}.value${^key.last}, ${/key.last}${/variants})${traits:C}
             );
             """);
@@ -243,7 +243,7 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
         writer.write(
             """
                 ${?recursive}${C}
-                ${/recursive}static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.${builderMethod:L}($$ID${traits:C})${/recursive}${?hasMembers}
+                ${/recursive}public static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.${builderMethod:L}($$ID${traits:C})${/recursive}${?hasMembers}
                     ${C|}
                     ${/hasMembers}.build();
                 """,

@@ -2,6 +2,9 @@ $version: "2.0"
 
 namespace com.example
 
+use smithy.example#OrderStatus
+use smithy.example#Uuid
+
 /// An Order resource, which has an id and describes an order by the type of coffee
 /// and the order's status
 resource Order {
@@ -69,15 +72,4 @@ operation GetOrder {
 structure OrderNotFound {
     message: String
     orderId: Uuid
-}
-
-/// An identifier to describe a unique order
-@length(min: 1, max: 128)
-@pattern("^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
-string Uuid
-
-/// An enum describing the status of an order
-enum OrderStatus {
-    IN_PROGRESS
-    COMPLETED
 }

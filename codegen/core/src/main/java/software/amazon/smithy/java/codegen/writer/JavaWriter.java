@@ -32,12 +32,14 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
     private static final char PLACEHOLDER_FORMAT_CHAR = '£';
     private final String packageNamespace;
     private final JavaCodegenSettings settings;
+    private final String filename;
 
-    public JavaWriter(JavaCodegenSettings settings, String packageNamespace) {
+    public JavaWriter(JavaCodegenSettings settings, String packageNamespace, String filename) {
         super(new JavaImportContainer(packageNamespace));
 
         this.packageNamespace = packageNamespace;
         this.settings = settings;
+        this.filename = filename;
 
         // Ensure extraneous white space is trimmed
         trimBlankLines();
@@ -57,6 +59,11 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
 
     @Override
     public String toString() {
+        // Do not add headers or attempt symbol resolution for resource files
+        if (filename.startsWith("META-INF")) {
+            return super.toString();
+        }
+
         putNameContext();
         setExpressionStart(PLACEHOLDER_FORMAT_CHAR);
         return format(
@@ -119,7 +126,7 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
 
         @Override
         public JavaWriter apply(String filename, String namespace) {
-            return new JavaWriter(settings, namespace);
+            return new JavaWriter(settings, namespace, filename);
         }
     }
 

@@ -79,11 +79,13 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
 
     @Override
     public void accept(T directive) {
-        var shape = directive.shape();
-        if (shape.hasTrait(UnitTypeTrait.class)) {
-            // Do not generate Unit structures
+        if (directive.shape().hasTrait(UnitTypeTrait.class) || directive.symbol()
+            .getProperty(SymbolProperties.EXTERNAL_TYPE)
+            .isPresent()) {
+            // Skip Unit structures or external types.
             return;
         }
+        var shape = directive.shape();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
             var template = """

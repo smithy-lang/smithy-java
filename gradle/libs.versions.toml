@@ -50,3 +50,4 @@ dependency-analysis = { module = "com.autonomousapps:dependency-analysis-gradle-
 [plugins]
 jmh = { id = "me.champeau.jmh", version.ref = "jmh" }
 osdetector = { id = "com.google.osdetector", version.ref = "osdetector" }
+smithy-gradle-jar = { id = "software.amazon.smithy.gradle.smithy-jar", version.ref = "smithy-gradle" }

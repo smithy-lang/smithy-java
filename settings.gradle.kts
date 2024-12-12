@@ -50,6 +50,7 @@ include(":examples:event-streaming")
 include(":examples:end-to-end-example")
 include(":examples:lambda-endpoint")
 include(":examples:standalone-types-example")
+include("examples:shared-types-example")
 
 // AWS specific
 include(":aws:event-streams")

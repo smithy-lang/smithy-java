@@ -25,7 +25,7 @@ import software.amazon.smithy.java.example.model.CreateOrderInput;
 import software.amazon.smithy.java.example.model.GetMenuInput;
 import software.amazon.smithy.java.example.model.GetOrderInput;
 import software.amazon.smithy.java.example.model.OrderNotFound;
-import software.amazon.smithy.java.example.model.OrderStatus;
+import software.amazon.smithy.java.example.orders.model.OrderStatus;
 
 public class RoundTripTests {
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();

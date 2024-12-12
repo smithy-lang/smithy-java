@@ -61,5 +61,10 @@ public final class SymbolProperties {
      */
     public static final Property<Symbol> ENUM_VALUE_TYPE = Property.named("enum-value-type");
 
+    /**
+     * Indicates that the symbol is defined outside the current closure.
+     */
+    public static final Property<Boolean> EXTERNAL_TYPE = Property.named("external-type");
+
     private SymbolProperties() {}
 }

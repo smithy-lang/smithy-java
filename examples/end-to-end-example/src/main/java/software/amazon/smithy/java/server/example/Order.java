@@ -7,7 +7,7 @@ package software.amazon.smithy.java.server.example;
 
 import java.util.UUID;
 import software.amazon.smithy.java.example.model.CoffeeType;
-import software.amazon.smithy.java.example.model.OrderStatus;
+import software.amazon.smithy.java.example.orders.model.OrderStatus;
 
 /**
  * A coffee drink order.

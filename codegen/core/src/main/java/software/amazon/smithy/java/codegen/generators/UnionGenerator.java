@@ -35,6 +35,10 @@ public final class UnionGenerator
 
     @Override
     public void accept(GenerateUnionDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
+        if (directive.symbol().getProperty(SymbolProperties.EXTERNAL_TYPE).isPresent()) {
+            // Skip external types.
+            return;
+        }
         var shape = directive.shape();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));

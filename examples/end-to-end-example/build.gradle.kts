@@ -16,6 +16,9 @@ dependencies {
     // Common dependencies
     api(project(":core"))
     api(libs.smithy.aws.traits)
+
+    // Use some common shape definitions
+    implementation(project(":examples:shared-types-example"))
 }
 
 jmh {
