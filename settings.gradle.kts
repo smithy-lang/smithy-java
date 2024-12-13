@@ -66,3 +66,5 @@ include(":aws:sdkv2-retries")
 include(":aws:integrations:lambda")
 
 include(":server-rpcv2-cbor")
+include(":aws:sdkv2-shapes")
+include(":aws:sdkv2-shapes")

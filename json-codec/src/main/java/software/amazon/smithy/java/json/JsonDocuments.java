@@ -15,9 +15,8 @@ import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
-import software.amazon.smithy.java.core.schema.SerializableShape;
-import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.SerializationException;
+import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
@@ -88,8 +87,8 @@ public final class JsonDocuments {
         }
 
         @Override
-        public <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
-            builder.deserialize(new JsonDocumentDeserializer(settings, this));
+        public ShapeDeserializer createDeserializer() {
+            return new JsonDocumentDeserializer(settings, this);
         }
 
         @Override
@@ -151,8 +150,8 @@ public final class JsonDocuments {
         }
 
         @Override
-        public <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
-            builder.deserialize(new JsonDocumentDeserializer(settings, this));
+        public ShapeDeserializer createDeserializer() {
+            return new JsonDocumentDeserializer(settings, this);
         }
 
         @Override
@@ -176,6 +175,11 @@ public final class JsonDocuments {
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeBoolean(PreludeSchemas.BOOLEAN, value);
         }
+
+        @Override
+        public ShapeDeserializer createDeserializer() {
+            return new JsonDocumentDeserializer(settings, this);
+        }
     }
 
     record ListDocument(List<Document> values, JsonSettings settings) implements Document {
@@ -195,8 +199,8 @@ public final class JsonDocuments {
         }
 
         @Override
-        public <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
-            builder.deserialize(new JsonDocumentDeserializer(settings, this));
+        public ShapeDeserializer createDeserializer() {
+            return new JsonDocumentDeserializer(settings, this);
         }
 
         @Override
@@ -250,8 +254,8 @@ public final class JsonDocuments {
         }
 
         @Override
-        public <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
-            builder.deserialize(new JsonDocumentDeserializer(settings, this));
+        public ShapeDeserializer createDeserializer() {
+            return new JsonDocumentDeserializer(settings, this);
         }
 
         @Override

@@ -87,9 +87,7 @@ public final class DocumentParser implements ShapeSerializer {
             }
         });
         consumer.accept(state, serializer);
-        if (elementParser.result != null) {
-            elements.add(elementParser.result);
-        }
+        elements.add(elementParser.result);
         setResult(new Documents.ListDocument(schema, elements));
     }
 
