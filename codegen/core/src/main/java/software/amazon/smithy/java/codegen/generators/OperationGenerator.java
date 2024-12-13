@@ -6,14 +6,13 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateOperationDirective;
-import software.amazon.smithy.framework.knowledge.ImplicitErrorIndex;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
@@ -225,39 +224,12 @@ public final class OperationGenerator
         OperationShape operation,
         GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive
     ) {
-        var implicitIndex = ImplicitErrorIndex.of(directive.model());
-
-        // Add all error ids for an operation, including implicit errors
-        Set<ShapeId> errorIds = new HashSet<>(operation.getErrors(directive.service()));
-        // TODO: Switch to operation-specific so we can account for auth scheme differences
-        errorIds.addAll(implicitIndex.getImplicitErrorsForService(directive.service()));
-
-        // Add all error Symbols for the operation
         List<Symbol> symbols = new ArrayList<>();
-        for (var errorId : errorIds) {
+        for (var errorId : operation.getErrors(directive.service())) {
             var shape = directive.model().expectShape(errorId);
             symbols.add(directive.symbolProvider().toSymbol(shape));
         }
-
         return symbols;
-    }
-
-    // Registers errors of an operation with the type registry.
-    private record TypeRegistryGenerator(
-        JavaWriter writer,
-        List<Symbol> errorSymbols
-    ) implements Runnable {
-
-        @Override
-        public void run() {
-            writer.write("private static final ${typeRegistry:T} TYPE_REGISTRY = ${typeRegistry:T}.builder()");
-            writer.indent();
-            for (var errorSymbol : errorSymbols) {
-                writer.write(".putType($1T.$$ID, $1T.class, $1T::builder)", errorSymbol);
-            }
-            writer.writeWithNoFormatting(".build();");
-            writer.dedent();
-        }
     }
 
     private record OperationTypeGenerator(

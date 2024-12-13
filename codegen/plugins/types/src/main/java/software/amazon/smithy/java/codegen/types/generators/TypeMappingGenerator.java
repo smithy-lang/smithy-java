@@ -8,12 +8,15 @@ package software.amazon.smithy.java.codegen.types.generators;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
+import software.amazon.smithy.model.neighbor.Walker;
+import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -33,12 +36,15 @@ public final class TypeMappingGenerator
     @Override
     public void accept(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         Map<ShapeId, Symbol> symbolMap = new HashMap<>();
-        for (var shape : directive.connectedShapes().values()) {
+
+        /// Add all types within the synthetic service closure
+        Set<Shape> serviceClosure = (new Walker(directive.model())).walkShapes(directive.service());
+        for (var shape : serviceClosure) {
             var shapeId = shape.getId();
             // only add mappings for shapes that generate a class
             if (GENERATED_TYPES.contains(shape.getType()) && !SYNTHETIC_NAMESPACE.equals(shapeId.getNamespace())) {
                 var symbol = directive.symbolProvider().toSymbol(shape);
-                // Skip any external types used in this
+                // Skip any external types used in this package
                 if (symbol.getProperty(SymbolProperties.EXTERNAL_TYPE).isPresent()) {
                     continue;
                 }

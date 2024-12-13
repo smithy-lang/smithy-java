@@ -17,9 +17,11 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
+import software.amazon.smithy.java.codegen.generators.TypeRegistryGenerator;
 import software.amazon.smithy.java.codegen.sections.ApplyDocumentation;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
@@ -47,20 +49,37 @@ public final class ClientImplementationGenerator
         directive.context().writerDelegator().useFileWriter(impl.getDefinitionFile(), impl.getNamespace(), writer -> {
             writer.pushState(new ClassSection(directive.shape(), ApplyDocumentation.NONE));
             var template = """
-                final class ${impl:T} extends ${client:T} implements ${interface:T} {
+                final class ${impl:T} extends ${client:T} implements ${interface:T} {${?implicitErrors}
+                    ${typeRegistry:C|}${/implicitErrors}
 
                     ${impl:T}(${interface:T}.Builder builder) {
                         super(builder);
                     }
 
                     ${operations:C|}
+
+                    ${?implicitErrors}@Override
+                    protected ${typeRegistryClass:T} errorTypeRegistry() {
+                        return TYPE_REGISTRY;
+                    }${/implicitErrors}
                 }
                 """;
             writer.putContext("client", Client.class);
             writer.putContext("interface", symbol);
             writer.putContext("impl", impl);
             writer.putContext("future", CompletableFuture.class);
+            writer.putContext("typeRegistryClass", TypeRegistry.class);
             writer.putContext("completionException", CompletionException.class);
+            var errorSymbols = CodegenUtils.getImplicitErrorSymbols(
+                directive.symbolProvider(),
+                directive.model(),
+                directive.service()
+            );
+            writer.putContext("implicitErrors", !errorSymbols.isEmpty());
+            writer.putContext(
+                "typeRegistry",
+                new TypeRegistryGenerator(writer, errorSymbols)
+            );
             writer.putContext(
                 "operations",
                 new OperationMethodGenerator(

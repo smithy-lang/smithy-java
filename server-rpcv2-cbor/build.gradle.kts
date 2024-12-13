@@ -20,6 +20,7 @@ dependencies {
     itImplementation(project(":server-netty"))
     itImplementation(project(":aws:client-rpcv2-cbor-protocol"))
     itImplementation(testFixtures(project(":rpcv2-cbor-codec")))
+
     // Protocol test dependencies
     testImplementation(libs.smithy.aws.protocol.tests)
     testImplementation(libs.smithy.protocol.tests)

@@ -9,16 +9,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.SymbolReference;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.ListShape;
+import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -88,6 +92,19 @@ public final class ExternalTypesIntegration implements JavaCodegenIntegration {
                     return ERROR_MAPPINGS.get(shape.toShapeId());
                 } else if (shape instanceof MemberShape ms && ERROR_MAPPINGS.containsKey(ms.getTarget())) {
                     return ERROR_MAPPINGS.get(ms.getTarget());
+                } else if (shape instanceof ListShape ls && ERROR_MAPPINGS.containsKey(ls.getMember().getTarget())) {
+                    var targetSymbol = ERROR_MAPPINGS.get(ls.getMember().getTarget());
+                    return symbolProvider.toSymbol(shape)
+                        .toBuilder()
+                        .references(List.of(new SymbolReference(targetSymbol)))
+                        .build();
+                } else if (shape instanceof MapShape ms && ERROR_MAPPINGS.containsKey(ms.getValue().getTarget())) {
+                    var valueSymbol = ERROR_MAPPINGS.get(ms.getValue().getTarget());
+                    var keySymbol = symbolProvider.toSymbol(ms.getKey());
+                    return symbolProvider.toSymbol(shape)
+                        .toBuilder()
+                        .references(List.of(new SymbolReference(keySymbol), new SymbolReference(valueSymbol)))
+                        .build();
                 }
                 return symbolProvider.toSymbol(shape);
             }

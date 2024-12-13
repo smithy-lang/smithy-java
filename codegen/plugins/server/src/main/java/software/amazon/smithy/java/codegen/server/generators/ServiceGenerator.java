@@ -14,14 +14,17 @@ import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
+import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.generators.IdStringGenerator;
 import software.amazon.smithy.java.codegen.generators.SchemaGenerator;
+import software.amazon.smithy.java.codegen.generators.TypeRegistryGenerator;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.framework.model.UnknownOperationException;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
@@ -58,6 +61,8 @@ public final class ServiceGenerator implements
 
                     ${schema:C}
 
+                    ${errorRegistry:C|}
+
                     ${properties:C|}
 
                     ${constructor:C|}
@@ -79,6 +84,11 @@ public final class ServiceGenerator implements
                     public ${schemaClass:T} schema() {
                          return $$SCHEMA;
                     }
+
+                    @Override
+                    public ${typeRegistry:T} errorRegistry() {
+                        return TYPE_REGISTRY;
+                    }
                 }
                 """;
             writer.putContext("operationHolder", Operation.class);
@@ -87,6 +97,16 @@ public final class ServiceGenerator implements
             writer.putContext("schemaClass", Schema.class);
             writer.putContext("service", directive.symbol());
             writer.putContext("id", new IdStringGenerator(writer, shape));
+            writer.putContext("typeRegistry", TypeRegistry.class);
+            var errorSymbols = CodegenUtils.getImplicitErrorSymbols(
+                directive.symbolProvider(),
+                directive.model(),
+                directive.service()
+            );
+            writer.putContext(
+                "errorRegistry",
+                new TypeRegistryGenerator(writer, errorSymbols)
+            );
             writer.putContext(
                 "properties",
                 new PropertyGenerator(writer, shape, directive.symbolProvider(), operationsInfo, false)

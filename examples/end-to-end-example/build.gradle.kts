@@ -22,7 +22,7 @@ dependencies {
     implementation(project(":examples:shared-types-example"))
 
     // Example middleware for client
-    api(project(":examples:middleware-example:client-integration"))
+    implementation(project(":examples:middleware-example:client-integration"))
 
     // TODO: Add example server middleware once applicable
 }

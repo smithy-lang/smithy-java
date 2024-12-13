@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.http.mock;
 import java.util.List;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 
@@ -34,4 +35,8 @@ final class MockService implements Service {
         throw new UnsupportedOperationException();
     }
 
+    @Override
+    public TypeRegistry errorRegistry() {
+        return TypeRegistry.builder().build();
+    }
 }

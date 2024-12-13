@@ -12,12 +12,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.net.Socket;
 import java.net.URI;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.auth.api.AuthProperties;
+import software.amazon.smithy.java.auth.api.identity.TokenIdentity;
+import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
+import software.amazon.smithy.java.client.core.auth.identity.IdentityResult;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.example.client.CoffeeShopClient;
 import software.amazon.smithy.java.example.model.CoffeeType;
@@ -29,6 +35,7 @@ import software.amazon.smithy.java.example.orders.model.OrderStatus;
 
 public class RoundTripTests {
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private CoffeeShopClient client;
 
     @BeforeAll
     public static void setup() throws InterruptedException {
@@ -48,12 +55,16 @@ public class RoundTripTests {
         }
     }
 
+    @BeforeEach
+    void setupClient() {
+        client = CoffeeShopClient.builder()
+            .endpointResolver(EndpointResolver.staticEndpoint(BasicServerExample.endpoint))
+            .addIdentityResolver(new TokenIdentityResolver())
+            .build();
+    }
+
     @Test
     void executesCorrectly() throws InterruptedException {
-        CoffeeShopClient client = CoffeeShopClient.builder()
-            .endpointResolver(EndpointResolver.staticEndpoint(BasicServerExample.endpoint))
-            .build();
-
         var menu = client.getMenu(GetMenuInput.builder().build());
         var hasEspresso = menu.items().stream().anyMatch(item -> item.typeMember().equals(CoffeeType.ESPRESSO));
         assertTrue(hasEspresso);
@@ -78,10 +89,6 @@ public class RoundTripTests {
 
     @Test
     void errorsOutIfOrderDoesNotExist() throws InterruptedException {
-        CoffeeShopClient client = CoffeeShopClient.builder()
-            .endpointResolver(EndpointResolver.staticEndpoint(BasicServerExample.endpoint))
-            .build();
-
         var getRequest = GetOrderInput.builder().id(UUID.randomUUID().toString()).build();
         var orderNotFound = assertThrows(OrderNotFound.class, () -> client.getOrder(getRequest));
         assertEquals(orderNotFound.orderId(), getRequest.id());
@@ -90,5 +97,20 @@ public class RoundTripTests {
     @AfterAll
     public static void teardown() {
         executor.shutdownNow();
+    }
+
+    private static final class TokenIdentityResolver implements IdentityResolver<TokenIdentity> {
+        @Override
+        public CompletableFuture<IdentityResult<TokenIdentity>> resolveIdentity(
+            AuthProperties requestProperties
+        ) {
+            // TODO: Update to demonstrate token refresh once interceptors supported by server.
+            return CompletableFuture.completedFuture(IdentityResult.of(TokenIdentity.create("woo")));
+        }
+
+        @Override
+        public Class<TokenIdentity> identityType() {
+            return TokenIdentity.class;
+        }
     }
 }

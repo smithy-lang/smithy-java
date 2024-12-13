@@ -46,7 +46,9 @@ public abstract class ServerProtocol {
     public final CompletableFuture<Void> serializeError(Job job, ModeledApiException error) {
         // Check both implicit errors and operation errors to see if modeled API exception is
         // defined as part of service interface. Otherwise, throw generic exception.
-        if (!job.operation().getApiOperation().errorSchemas().contains(error.schema().id())) {
+        if (!job.operation().getOwningService().errorRegistry().contains(error.schema().id())
+            && !job.operation().getApiOperation().errorRegistry().contains(error.schema().id())
+        ) {
             error = InternalFailureException.builder().withCause(error).build();
         }
         return serializeOutput(job, error, true);
