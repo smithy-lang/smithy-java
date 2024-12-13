@@ -35,6 +35,14 @@ public interface TypeRegistry {
     ShapeBuilder<?> createBuilder(ShapeId shapeId);
 
     /**
+     * Returns true if this type registry contains the specified {@link ShapeId}.
+     *
+     * @param shapeId shapeId to check
+     * @return true if this type registry contains the {@code ShapeId}
+     */
+    boolean contains(ShapeId shapeId);
+
+    /**
      * Create a shape builder based on a shape ID and expected type.
      *
      * @param shapeId Shape ID to attempt to create.
@@ -116,6 +124,11 @@ public interface TypeRegistry {
                 }
                 return second.createBuilder(shapeId);
             }
+
+            @Override
+            public boolean contains(ShapeId shapeId) {
+                return first.contains(shapeId) || second.contains(shapeId);
+            }
         };
     }
 
@@ -183,6 +196,11 @@ public interface TypeRegistry {
             public ShapeBuilder<?> createBuilder(ShapeId shapeId) {
                 var entry = supplierMap.get(shapeId);
                 return entry == null ? null : entry.supplier.get();
+            }
+
+            @Override
+            public boolean contains(ShapeId shapeId) {
+                return supplierMap.containsKey(shapeId);
             }
         }
     }

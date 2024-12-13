@@ -58,8 +58,6 @@ public final class OperationGenerator
 
                         private static final ${list:T}<${shapeId:T}> SCHEMES = ${list:T}.of(${#schemes}${shapeId:T}.from(${key:S})${^key.last}, ${/key.last}${/schemes});
 
-                        private static final ${set:T}<${sdkSchema:T}> ERROR_SCHEMAS = ${set:T}.of(${#exceptions}${value:T}.$$SCHEMA${^key.last}, ${/key.last}${/exceptions});
-
                         ${?idempotencyTokenMember}private static final ${sdkSchema:T} IDEMPOTENCY_TOKEN_MEMBER = ${inputType:T}.$$SCHEMA.member(${idempotencyTokenMember:S});${/idempotencyTokenMember}
                         ${?inputStreamMember}private static final ${sdkSchema:T} INPUT_STREAM_MEMBER = ${inputType:T}.$$SCHEMA.member(${inputStreamMember:S});${/inputStreamMember}
                         ${?outputStreamMember}private static final ${sdkSchema:T} OUTPUT_STREAM_MEMBER = ${outputType:T}.$$SCHEMA.member(${outputStreamMember:S});${/outputStreamMember}
@@ -111,11 +109,6 @@ public final class OperationGenerator
                         @Override
                         public ${list:T}<${shapeId:T}> effectiveAuthSchemes() {
                             return SCHEMES;
-                        }
-
-                        @Override
-                        public ${set:T}<${sdkSchema:T}> errorSchemas() {
-                            return ERROR_SCHEMAS;
                         }
 
                         @Override

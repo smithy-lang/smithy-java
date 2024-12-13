@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.core.schema;
 
 import java.util.List;
-import java.util.Set;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -51,13 +50,6 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
      * @return Returns the output schema.
      */
     Schema outputSchema();
-
-    /**
-     * Return a Set of {@link Schema} representing errors that are allowed to be returned from this Operation.
-     *
-     * @return Set of {@link Schema} for the errors throwable by this operation.
-     */
-    Set<Schema> errorSchemas();
 
     /**
      * Get a type registry for the operation used to create errors and output types.

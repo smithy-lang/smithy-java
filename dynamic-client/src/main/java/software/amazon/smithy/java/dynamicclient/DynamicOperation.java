@@ -86,9 +86,4 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
     public List<ShapeId> effectiveAuthSchemes() {
         return effectiveAuthSchemes;
     }
-
-    @Override
-    public Set<Schema> errorSchemas() {
-        return errorSchemas;
-    }
 }
