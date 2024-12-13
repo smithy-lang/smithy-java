@@ -103,7 +103,7 @@ public final class OperationGenerator
 
                         @Override
                         public ${typeRegistry:N} typeRegistry() {
-                            return typeRegistry;
+                            return TYPE_REGISTRY;
                         }
 
                         @Override
@@ -244,7 +244,7 @@ public final class OperationGenerator
 
         @Override
         public void run() {
-            writer.write("private final ${typeRegistry:T} typeRegistry = ${typeRegistry:T}.builder()");
+            writer.write("private static final ${typeRegistry:T} TYPE_REGISTRY = ${typeRegistry:T}.builder()");
             writer.indent();
             for (var errorId : shape.getErrors(service)) {
                 var errorShape = model.expectShape(errorId);
