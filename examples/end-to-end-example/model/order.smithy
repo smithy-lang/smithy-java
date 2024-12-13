@@ -2,8 +2,8 @@ $version: "2.0"
 
 namespace com.example
 
-use smithy.example#OrderStatus
-use smithy.example#Uuid
+use com.shared.types#OrderStatus
+use com.shared.types#Uuid
 
 /// An Order resource, which has an id and describes an order by the type of coffee
 /// and the order's status

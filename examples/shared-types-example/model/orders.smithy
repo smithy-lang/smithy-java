@@ -1,6 +1,6 @@
 $version: "2"
 
-namespace smithy.example
+namespace com.shared.types
 
 /// An identifier to describe a unique order
 @length(min: 1, max: 128)
