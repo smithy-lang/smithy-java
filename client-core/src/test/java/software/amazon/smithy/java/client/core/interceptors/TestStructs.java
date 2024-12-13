@@ -46,7 +46,7 @@ public final class TestStructs {
         }
 
         @Override
-        public TypeRegistry typeRegistry() {
+        public TypeRegistry errorRegistry() {
             throw new UnsupportedOperationException();
         }
 

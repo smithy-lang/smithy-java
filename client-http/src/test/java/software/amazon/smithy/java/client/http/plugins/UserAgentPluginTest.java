@@ -136,7 +136,7 @@ public class UserAgentPluginTest {
             }
 
             @Override
-            public TypeRegistry typeRegistry() {
+            public TypeRegistry errorRegistry() {
                 return null;
             }
 

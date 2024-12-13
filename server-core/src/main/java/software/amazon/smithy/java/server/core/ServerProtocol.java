@@ -46,7 +46,7 @@ public abstract class ServerProtocol {
     protected abstract CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output, boolean isError);
 
     public final CompletableFuture<Void> serializeError(Job job, ModeledApiException error) {
-        if (!job.operation().getApiOperation().typeRegistry().contains(error.schema().id())) {
+        if (!job.operation().getApiOperation().errorRegistry().contains(error.schema().id())) {
             error = new InternalServerError(error);
         }
         return serializeOutput(job, error, true);

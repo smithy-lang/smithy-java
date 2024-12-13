@@ -102,7 +102,7 @@ public class DynamicOperationTest {
         assertThat(o.outputSchema().id(), equalTo(ShapeId.from("smithy.example#PutFooOutput")));
         assertThat(o.inputBuilder().schema().id(), equalTo(ShapeId.from("smithy.example#PutFooInput")));
         assertThat(o.outputBuilder().schema().id(), equalTo(ShapeId.from("smithy.example#PutFooOutput")));
-        assertThat(o.typeRegistry(), is(registry));
+        assertThat(o.errorRegistry(), is(registry));
         assertThat(o.effectiveAuthSchemes(), empty());
     }
 }

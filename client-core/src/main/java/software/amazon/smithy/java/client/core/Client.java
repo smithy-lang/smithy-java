@@ -81,7 +81,7 @@ public abstract class Client {
         RequestOverrideConfig overrideConfig
     ) {
         // Create a copy of the type registry that adds the errors this operation can encounter.
-        TypeRegistry operationRegistry = TypeRegistry.compose(operation.typeRegistry(), typeRegistry);
+        TypeRegistry operationRegistry = TypeRegistry.compose(operation.errorRegistry(), typeRegistry);
 
         ClientPipeline<?, ?> callPipeline;
         ClientInterceptor callInterceptor;

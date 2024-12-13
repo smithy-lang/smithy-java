@@ -50,7 +50,7 @@ public final class TestOperationPaginated implements ApiOperation<GetFoosInput, 
     }
 
     @Override
-    public TypeRegistry typeRegistry() {
+    public TypeRegistry errorRegistry() {
         throw new UnsupportedOperationException();
     }
 

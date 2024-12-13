@@ -102,7 +102,7 @@ public final class OperationGenerator
                         }
 
                         @Override
-                        public ${typeRegistry:N} typeRegistry() {
+                        public ${typeRegistry:N} errorRegistry() {
                             return TYPE_REGISTRY;
                         }
 

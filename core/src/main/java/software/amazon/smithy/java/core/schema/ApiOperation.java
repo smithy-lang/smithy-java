@@ -52,11 +52,11 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
     Schema outputSchema();
 
     /**
-     * Get a type registry for the operation used to create errors and output types.
+     * Get a type registry for the operation used to create errors.
      *
-     * @return Returns the type registry.
+     * @return Returns the type registry of errors.
      */
-    TypeRegistry typeRegistry();
+    TypeRegistry errorRegistry();
 
     /**
      * Get a list of effective authScheme for the operation.

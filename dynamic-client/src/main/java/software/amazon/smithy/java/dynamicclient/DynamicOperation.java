@@ -78,7 +78,7 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
     }
 
     @Override
-    public TypeRegistry typeRegistry() {
+    public TypeRegistry errorRegistry() {
         return typeRegistry;
     }
 

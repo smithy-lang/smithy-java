@@ -151,7 +151,7 @@ public class EndpointResolverTest {
         }
 
         @Override
-        public TypeRegistry typeRegistry() {
+        public TypeRegistry errorRegistry() {
             throw new UnsupportedOperationException();
         }
 
@@ -197,7 +197,7 @@ public class EndpointResolverTest {
         }
 
         @Override
-        public TypeRegistry typeRegistry() {
+        public TypeRegistry errorRegistry() {
             throw new UnsupportedOperationException();
         }
 
