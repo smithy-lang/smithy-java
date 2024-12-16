@@ -2,11 +2,13 @@ $version: "2.0"
 
 namespace com.example
 
+use aws.api#arn
 use com.shared.types#OrderStatus
 use com.shared.types#Uuid
 
 /// An Order resource, which has an id and describes an order by the type of coffee
 /// and the order's status
+@arn(template: "order/{id}")
 resource Order {
     identifiers: {
         id: Uuid

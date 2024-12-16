@@ -13,6 +13,7 @@ import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaBuilder;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.knowledge.BottomUpIndex;
 import software.amazon.smithy.model.shapes.BigDecimalShape;
 import software.amazon.smithy.model.shapes.BigIntegerShape;
 import software.amazon.smithy.model.shapes.BlobShape;
@@ -298,13 +299,62 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
 
     @Override
     public Void operationShape(OperationShape shape) {
-        writer.write("static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createOperation($$ID${traits:C});");
+        var index = BottomUpIndex.of(model);
+        var resourceOptional = index.getResourceBinding(context.settings().service(), shape);
+        if (resourceOptional.isEmpty()) {
+            writer.write(
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createOperation($$ID${traits:C});"
+            );
+        } else {
+            writer.pushState();
+            var resource = resourceOptional.get();
+            writer.putContext("resourceSchema", CodegenUtils.getSchemaType(writer, symbolProvider, resource));
+            writer.write("""
+                static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.operationBuilder($$ID${traits:C})
+                    .resource(${resourceSchema:L})
+                    .build();
+                """);
+            writer.popState();
+        }
         return null;
     }
 
     @Override
     public Void resourceShape(ResourceShape resourceShape) {
-        throw new UnsupportedOperationException("Schema generation not supported for resource Shapes");
+        writer.write(
+            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.resourceBuilder(${shapeId:T}.from(${id:S})${traits:C})"
+        );
+        writer.indent();
+        var index = BottomUpIndex.of(model);
+        var resourceOptional = index.getResourceBinding(context.settings().service(), shape);
+        if (resourceOptional.isPresent()) {
+            var resource = resourceOptional.get();
+            writer.pushState();
+            writer.putContext("resourceSchema", CodegenUtils.getSchemaType(writer, symbolProvider, resource));
+            writer.write(".resource(${resourceSchema:L})");
+            writer.popState();
+        }
+        for (var identifierEntry : resourceShape.getIdentifiers().entrySet()) {
+            var target = model.expectShape(identifierEntry.getValue());
+            writer.pushState();
+            writer.putContext("name", identifierEntry.getKey());
+            writer.putContext("schema", CodegenUtils.getSchemaType(writer, symbolProvider, target));
+            writer.putContext("recursive", CodegenUtils.recursiveShape(model, target));
+            writer.write(".putIdentifier(${name:S}, ${schema:L}${?recursive}_BUILDER${/recursive})");
+            writer.popState();
+        }
+        for (var propertyEntry : resourceShape.getProperties().entrySet()) {
+            var target = model.expectShape(propertyEntry.getValue());
+            writer.pushState();
+            writer.putContext("name", propertyEntry.getKey());
+            writer.putContext("schema", CodegenUtils.getSchemaType(writer, symbolProvider, target));
+            writer.putContext("recursive", CodegenUtils.recursiveShape(model, target));
+            writer.write(".putProperty(${name:S}, ${schema:L}${?recursive}_BUILDER${/recursive})");
+            writer.popState();
+        }
+        writer.writeWithNoFormatting(".build();");
+        writer.dedent();
+        return null;
     }
 
     @Override

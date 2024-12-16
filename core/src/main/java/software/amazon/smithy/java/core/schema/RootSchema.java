@@ -23,9 +23,18 @@ final class RootSchema extends Schema {
     private final List<Schema> memberList;
     private final Set<String> stringEnumValues;
     private final Set<Integer> intEnumValues;
+    private final Schema resource;
 
     RootSchema(ShapeType type, ShapeId id, TraitMap traits) {
-        this(type, id, traits, Collections.emptyList(), detectEnumTraitValues(type, traits), Collections.emptySet());
+        this(
+            type,
+            id,
+            traits,
+            Collections.emptyList(),
+            detectEnumTraitValues(type, traits),
+            Collections.emptySet(),
+            null
+        );
     }
 
     // String shapes might just have an enum trait, so find those and use them as enum values.
@@ -45,11 +54,13 @@ final class RootSchema extends Schema {
         TraitMap traits,
         List<MemberSchemaBuilder> memberBuilders,
         Set<String> stringEnumValues,
-        Set<Integer> intEnumValues
+        Set<Integer> intEnumValues,
+        Schema resource
     ) {
         super(type, id, traits, memberBuilders, stringEnumValues);
         this.stringEnumValues = Collections.unmodifiableSet(stringEnumValues);
         this.intEnumValues = Collections.unmodifiableSet(intEnumValues);
+        this.resource = resource;
 
         if (memberBuilders.isEmpty()) {
             memberList = Collections.emptyList();
@@ -81,5 +92,10 @@ final class RootSchema extends Schema {
     @Override
     public Set<String> stringEnumValues() {
         return stringEnumValues;
+    }
+
+    @Override
+    public Schema resource() {
+        return resource;
     }
 }
