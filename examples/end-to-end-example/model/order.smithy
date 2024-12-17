@@ -69,6 +69,7 @@ operation GetOrder {
 /// An error indicating an order could not be found
 @httpError(404)
 @error("client")
+@title("Thrown when no existing order is found for an ID.")
 structure OrderNotFound {
     message: String
     orderId: Uuid

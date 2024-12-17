@@ -23,7 +23,7 @@ import software.amazon.smithy.utils.StringUtils;
  * run by other interceptors for formatting.
  */
 final class JavadocFormatterInterceptor implements CodeInterceptor<JavadocSection, JavaWriter> {
-    private static final int MAX_LINE_LENGTH = 100;
+    private static final int MAX_LINE_LENGTH = 120;
     private static final Pattern PATTERN = Pattern.compile("<([a-z]+)*>.*?</\\1>", Pattern.DOTALL);
     // HTML tags supported by javadocs for Java17. Note: this list is not directly documented in JavaDocs documentation
     // and is instead found by inspecting the JDK doclint/HtmlTag.java file.
