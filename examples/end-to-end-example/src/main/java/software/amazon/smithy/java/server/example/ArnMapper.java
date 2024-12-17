@@ -36,8 +36,6 @@ record ArnMapper(String serviceName, String region) {
             if (identifier == null) {
                 throw new IllegalArgumentException("Could not find expected identifier");
             }
-            System.out.println("RESOLVED IDENTIFIER " + identifier);
-            System.out.println("MEMBERS: " + input.schema().members());
             // TODO: Either get by name or get by `@resourceIdentifier` trait
             var schema = input.schema().member(identifier.memberName());
             var value = input.getMemberValue(schema);
