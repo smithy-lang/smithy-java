@@ -21,18 +21,18 @@ import software.amazon.smithy.java.core.schema.TraitKey;
  */
 record ArnMapper(String serviceName, String region) {
     public <I extends SerializableStruct> String getActionName(I input, ApiOperation<I, ?> operation) {
-        var resourceSchema = operation.schema().resource();
-        return resourceSchema.id().getName() + "::" + operation.schema().id().getName();
+        var resource = operation.parentResource();
+        return resource.schema().id().getName() + "::" + operation.schema().id().getName();
     }
 
     public <I extends SerializableStruct> String getResourceArn(I input, ApiOperation<I, ?> operation) {
         // Get arn values
-        var resourceSchema = operation.schema().resource();
-        var arnTrait = resourceSchema.getTrait(TraitKey.get(ArnTrait.class));
+        var resource = operation.parentResource();
+        var arnTrait = resource.schema().getTrait(TraitKey.get(ArnTrait.class));
         List<String> replacements = new ArrayList<>(arnTrait.getLabels().size());
         var labels = arnTrait.getLabels();
         for (var label : labels) {
-            var identifier = resourceSchema.identifiers().get(label);
+            var identifier = resource.identifiers().get(label);
             if (identifier == null) {
                 throw new IllegalArgumentException("Could not find expected identifier");
             }

@@ -241,8 +241,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
 
     @Override
     public Symbol resourceShape(ResourceShape resourceShape) {
-        // Resource shapes do not generate a Java type
-        return null;
+        return getJavaClassSymbol(resourceShape);
     }
 
     /**

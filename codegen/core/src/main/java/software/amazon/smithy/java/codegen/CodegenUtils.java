@@ -64,6 +64,7 @@ public final class CodegenUtils {
 
     private static final String SCHEMA_STATIC_NAME = "$SCHEMA";
     private static final EnumSet<ShapeType> SHAPES_WITH_INNER_SCHEMA = EnumSet.of(
+        ShapeType.RESOURCE,
         ShapeType.OPERATION,
         ShapeType.SERVICE,
         ShapeType.ENUM,
@@ -313,16 +314,6 @@ public final class CodegenUtils {
     }
 
     /**
-     * Gets the file name to use for the SharedSchemas utility class
-     *
-     * @param settings Settings to use for package namespace
-     * @return schema file name
-     */
-    public static String getSharedSchemaFilename(JavaCodegenSettings settings) {
-        return String.format("./%s/model/SharedSchemas.java", settings.packageNamespace().replace(".", "/"));
-    }
-
-    /**
      * Gets the file name to use for the SharedSerde utility class
      *
      * @param settings Settings to use for package namespace
@@ -386,10 +377,6 @@ public final class CodegenUtils {
      * @return true if the shape should use a schema builder.
      */
     public static boolean recursiveShape(Model model, Shape shape) {
-        if (shape.isResourceShape()) {
-            // Resources cannot be recursive.
-            return false;
-        }
         var closure = TopologicalIndex.of(model).getRecursiveClosure(shape);
         if (closure.isEmpty()) {
             return false;

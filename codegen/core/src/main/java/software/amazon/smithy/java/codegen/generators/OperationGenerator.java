@@ -18,6 +18,7 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.ApiResource;
 import software.amazon.smithy.java.core.schema.InputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.OutputEventStreamingApiOperation;
@@ -25,6 +26,7 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.knowledge.BottomUpIndex;
 import software.amazon.smithy.model.knowledge.EventStreamIndex;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.shapes.OperationShape;
@@ -126,6 +128,13 @@ public final class OperationGenerator
                         public ${sdkSchema:T} idempotencyTokenMember() {
                             return ${?idempotencyTokenMember}IDEMPOTENCY_TOKEN_MEMBER${/idempotencyTokenMember}${^idempotencyTokenMember}null${/idempotencyTokenMember};
                         }
+                        ${?hasResource}
+
+                        @Override
+                        public ${resourceType:T} parentResource() {
+                            return ${resource:T}.INSTANCE;
+                        }
+                        ${/hasResource}
                     }""";
                 writer.putContext("inputType", input);
                 writer.putContext("outputType", output);
@@ -215,6 +224,15 @@ public final class OperationGenerator
                         break;
                     }
                 }
+
+                var bottomUpIndex = BottomUpIndex.of(directive.model());
+                var resourceOptional = bottomUpIndex.getResourceBinding(directive.service(), shape);
+                writer.putContext("hasResource", resourceOptional.isPresent());
+                writer.putContext("resourceType", ApiResource.class);
+                resourceOptional.ifPresent(
+                    resourceShape -> writer.putContext("resource", directive.symbolProvider().toSymbol(resourceShape))
+                );
+
                 writer.write(template);
                 writer.popState();
             });

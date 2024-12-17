@@ -33,11 +33,8 @@ public final class SchemaBuilder {
     final ShapeId id;
     final ShapeType type;
     final TraitMap traits;
-    Schema resource;
 
     final List<MemberSchemaBuilder> members;
-    final List<MemberSchemaBuilder> identifiers = new ArrayList<>();
-    final List<MemberSchemaBuilder> properties = new ArrayList<>();
 
     private Schema builtShape;
 
@@ -102,87 +99,6 @@ public final class SchemaBuilder {
     }
 
     /**
-     * Add a property to the builder.
-     *
-     * @param name Property name
-     * @param target Shape targeted by property
-     * @return the builder
-     * @throws IllegalStateException if the builder has already been built.
-     */
-    public SchemaBuilder putProperty(String name, Schema target) {
-        return putProperty(new MemberSchemaBuilder(id.withMember(name), target, new Trait[]{}));
-    }
-
-    /**
-     * Add a property to the builder.
-     *
-     * @param name Property name
-     * @param target Shape targeted by property
-     * @return the builder
-     * @throws IllegalStateException if the builder has already been built.
-     */
-    public SchemaBuilder putProperty(String name, SchemaBuilder target) {
-        return putProperty(new MemberSchemaBuilder(id.withMember(name), target, new Trait[]{}));
-    }
-
-    private SchemaBuilder putProperty(MemberSchemaBuilder builder) {
-        if (builtShape != null) {
-            throw new IllegalStateException("Cannot add a property to an already built builder");
-        }
-        if (!type.isShapeType(ShapeType.RESOURCE)) {
-            throw new IllegalStateException("Cannot add an property to a non-resource builder");
-        }
-        properties.add(builder);
-        return this;
-    }
-
-    /**
-     * Add an identifier to the builder.
-     *
-     * @param name   Name of the member.
-     * @param target Shape targeted by the member.
-     * @return the builder.
-     * @throws IllegalStateException if the builder has already been built.
-     */
-    public SchemaBuilder putIdentifier(String name, Schema target) {
-        return putIdentifier(new MemberSchemaBuilder(id.withMember(name), target, new Trait[]{}));
-    }
-
-    /**
-     * Add an identifier to the builder.
-     *
-     * @param name   Name of the member.
-     * @param target Schema builder targeted by the member.
-     * @return the builder.
-     * @throws IllegalStateException if the builder has already been built.
-     */
-    public SchemaBuilder putIdentifier(String name, SchemaBuilder target) {
-        return putIdentifier(new MemberSchemaBuilder(id.withMember(name), target, new Trait[]{}));
-    }
-
-    private SchemaBuilder putIdentifier(MemberSchemaBuilder builder) {
-        if (builtShape != null) {
-            throw new IllegalStateException("Cannot add a identifier to an already built builder");
-        }
-        if (!type.isShapeType(ShapeType.RESOURCE)) {
-            throw new IllegalStateException("Cannot add an identifier to a non-resource builder");
-        }
-        identifiers.add(builder);
-        return this;
-    }
-
-    public SchemaBuilder resource(Schema target) {
-        if (builtShape != null) {
-            throw new IllegalStateException("Cannot add a parent resource to an already built builder");
-        }
-        if (!(type.isShapeType(ShapeType.OPERATION) || type.isShapeType(ShapeType.RESOURCE))) {
-            throw new IllegalStateException("Only operations and resources can have parent resource.");
-        }
-        resource = target;
-        return this;
-    }
-
-    /**
      * Build the shape.
      *
      * @return the built shape.
@@ -212,27 +128,6 @@ public final class SchemaBuilder {
             }
         }
 
-        // Resources and operations cannot be recursive
-        if (type.isShapeType(ShapeType.RESOURCE)) {
-            return new ResourceSchema(
-                id,
-                traits,
-                new ArrayList<>(identifiers),
-                new ArrayList<>(properties),
-                resource
-            );
-        } else if (type.isShapeType(ShapeType.OPERATION)) {
-            return new RootSchema(
-                type,
-                id,
-                traits,
-                new ArrayList<>(members),
-                Collections.emptySet(),
-                Collections.emptySet(),
-                resource
-            );
-        }
-
         var hasRecursive = false;
         for (var builder : members) {
             if (builder.targetBuilder != null) {
@@ -257,8 +152,7 @@ public final class SchemaBuilder {
                 traits,
                 new ArrayList<>(members),
                 Collections.emptySet(),
-                Collections.emptySet(),
-                null
+                Collections.emptySet()
             );
         }
 

@@ -33,6 +33,7 @@ public final class SharedSchemasGenerator
     // Types that generate their own schemas
     private static final EnumSet<ShapeType> EXCLUDED_TYPES = EnumSet.of(
         ShapeType.SERVICE,
+        ShapeType.RESOURCE,
         ShapeType.UNION,
         ShapeType.ENUM,
         ShapeType.INT_ENUM,

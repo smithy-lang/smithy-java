@@ -8,7 +8,6 @@ package software.amazon.smithy.java.core.schema;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -24,7 +23,7 @@ import software.amazon.smithy.model.traits.Trait;
  * <p>Note: when creating a structure schema, all required members must come before optional members.
  */
 public abstract sealed class Schema implements MemberLookup
-    permits RootSchema, MemberSchema, DeferredRootSchema, DeferredMemberSchema, ResourceSchema {
+    permits RootSchema, MemberSchema, DeferredRootSchema, DeferredMemberSchema {
 
     private final ShapeType type;
     private final ShapeId id;
@@ -204,8 +203,7 @@ public abstract sealed class Schema implements MemberLookup
             TraitMap.create(traits),
             Collections.emptyList(),
             Collections.emptySet(),
-            values,
-            null
+            values
         );
     }
 
@@ -240,8 +238,7 @@ public abstract sealed class Schema implements MemberLookup
             TraitMap.create(traits),
             Collections.emptyList(),
             values,
-            Collections.emptySet(),
-            null
+            Collections.emptySet()
         );
     }
 
@@ -261,12 +258,12 @@ public abstract sealed class Schema implements MemberLookup
         return new RootSchema(ShapeType.OPERATION, id, TraitMap.create(traits));
     }
 
-    public static Schema createService(ShapeId id, Trait... traits) {
-        return new RootSchema(ShapeType.SERVICE, id, TraitMap.create(traits));
+    public static Schema createResource(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.RESOURCE, id, TraitMap.create(traits));
     }
 
-    public static SchemaBuilder operationBuilder(ShapeId id, Trait... traits) {
-        return new SchemaBuilder(id, ShapeType.OPERATION, traits);
+    public static Schema createService(ShapeId id, Trait... traits) {
+        return new RootSchema(ShapeType.SERVICE, id, TraitMap.create(traits));
     }
 
     public static SchemaBuilder structureBuilder(ShapeId id, Trait... traits) {
@@ -283,10 +280,6 @@ public abstract sealed class Schema implements MemberLookup
 
     public static SchemaBuilder mapBuilder(ShapeId id, Trait... traits) {
         return new SchemaBuilder(id, ShapeType.MAP, traits);
-    }
-
-    public static SchemaBuilder resourceBuilder(ShapeId id, Trait... traits) {
-        return new SchemaBuilder(id, ShapeType.RESOURCE, traits);
     }
 
     @Override
@@ -527,27 +520,5 @@ public abstract sealed class Schema implements MemberLookup
      */
     public Set<Integer> intEnumValues() {
         return Collections.emptySet();
-    }
-
-    /**
-     * Map of property string names to Shape schemas that enumerate the identifiers of the resource.
-     *
-     * @return Map of the resource identifiers
-     */
-    public Map<String, Schema> identifiers() {
-        return Collections.emptyMap();
-    }
-
-    /**
-     * Map of property string names to Shape schemas that enumerate the properties of the resource.
-     *
-     * @return Map of the resource properties
-     */
-    public Map<String, Schema> properties() {
-        return Collections.emptyMap();
-    }
-
-    public Schema resource() {
-        return null;
     }
 }
