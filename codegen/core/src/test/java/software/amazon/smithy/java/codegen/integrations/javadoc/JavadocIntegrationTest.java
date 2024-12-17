@@ -254,4 +254,45 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
                 """)
         );
     }
+
+    @Test
+    void addsBuilderSettersWithRequiredTraitDocs() {
+        var fileContents = getFileStringForClass("BuilderSettersInput");
+        assertThat(
+            fileContents,
+            containsString("""
+                        /**
+                         * Required Field
+                         *
+                         * <p><strong>Required</strong>
+                         * @return this builder.
+                         */
+                        public Builder required(String required) {
+                            this.required = Objects.requireNonNull(required, "required cannot be null");
+                            tracker.setMember($SCHEMA_REQUIRED);
+                            return this;
+                        }
+                """)
+        );
+    }
+
+    @Test
+    void addsBuilderSettersWithRecommendedTraitDocs() {
+        var fileContents = getFileStringForClass("BuilderSettersInput");
+        assertThat(
+            fileContents,
+            containsString("""
+                        /**
+                         * Recommended Field
+                         *
+                         * <p><strong>Recommended</strong>
+                         * @return this builder.
+                         */
+                        public Builder recommended(String recommended) {
+                            this.recommended = recommended;
+                            return this;
+                        }
+                """)
+        );
+    }
 }

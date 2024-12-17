@@ -146,5 +146,13 @@ operation BuilderSetters {
     input := {
         /// Member with docs
         foo: String
+
+        /// Required Field
+        @required
+        required: String
+
+        /// Recommended Field
+        @recommended
+        recommended: String
     }
 }
