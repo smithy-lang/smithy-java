@@ -659,33 +659,61 @@ public class ValidatorTest {
     }
 
     @Test
+    public void detectsNullInListWithUniqueItems() {
+        Validator validator = Validator.builder().build();
+        var listSchema = Schema.listBuilder(ShapeId.from("smithy.api#Test"), new UniqueItemsTrait())
+            .putMember("member", PreludeSchemas.STRING)
+            .build();
+
+        var errors = validator.validate(s -> {
+            s.writeList(listSchema, null, 3, (l, ls) -> {
+                var member = listSchema.member("member");
+                ls.writeString(member, "a");
+                ls.writeNull(member);
+                ls.writeString(member, "c");
+            });
+        });
+
+        assertThat(errors, hasSize(2));
+        assertThat(errors.get(0).getClass(), equalTo(ValidationError.UniqueItemConflict.class));
+        assertThat(errors.get(0).path(), equalTo("/1"));
+        assertThat(errors.get(0).message(), equalTo("null found in unique items"));
+
+        assertThat(errors.get(1).getClass(), equalTo(ValidationError.SparseValidationFailure.class));
+        assertThat(errors.get(1).path(), equalTo("/1"));
+    }
+
+    @Test
     public void detectsDuplicateComplexItems() {
         Validator validator = Validator.builder().build();
-        var unionSchema = getTestUnionSchema();
+        var data1 = PojoWithValidatedCollection.builder()
+            .list(List.of(ValidatedPojo.builder().string("hi").boxedInteger(1).integer(2).build()))
+            .map(Map.of("a", ValidatedPojo.builder().string("bye").boxedInteger(1).integer(2).build()))
+            .build();
+        var data2 = PojoWithValidatedCollection.builder()
+            .list(List.of(ValidatedPojo.builder().string("hi").boxedInteger(1).integer(2).build()))
+            .map(Map.of("b", ValidatedPojo.builder().string("bye").boxedInteger(1).integer(2).build()))
+            .build();
+        var data3 = PojoWithValidatedCollection.builder()
+            .list(List.of(ValidatedPojo.builder().string("bye").boxedInteger(1).integer(2).build()))
+            .map(Map.of("c", ValidatedPojo.builder().string("bye").boxedInteger(1).integer(2).build()))
+            .build();
         var listSchema = Schema.listBuilder(ShapeId.from("smithy.api#Test"), new UniqueItemsTrait())
-            .putMember("member", unionSchema)
+            .putMember("member", data1.schema())
             .build();
         var errors = validator.validate(s -> {
             s.writeList(listSchema, null, 4, (l, ls) -> {
                 var member = listSchema.member("member");
-                ls.writeStruct(member, TestHelper.create(member, (schema, writer) -> {
-                    writer.writeString(schema.member("a"), "hi");
-                }));
-                ls.writeStruct(member, TestHelper.create(member, (schema, writer) -> {
-                    writer.writeString(schema.member("b"), "hi");
-                }));
-                ls.writeStruct(member, TestHelper.create(member, (schema, writer) -> {
-                    writer.writeString(schema.member("b"), "hi");
-                }));
-                ls.writeStruct(member, TestHelper.create(member, (schema, writer) -> {
-                    writer.writeString(schema.member("c"), "hi");
-                }));
+                ls.writeStruct(member, data1);
+                ls.writeStruct(member, data2);
+                ls.writeStruct(member, data3);
+                ls.writeStruct(member, data1);
             });
         });
 
         assertThat(errors, hasSize(1));
-        assertThat(errors.get(0).path(), equalTo("/2"));
-        assertThat(errors.get(0).message(), equalTo("Conflicting list item found at position 2"));
+        assertThat(errors.get(0).path(), equalTo("/3"));
+        assertThat(errors.get(0).message(), equalTo("Conflicting list item found at position 3"));
     }
 
     @ParameterizedTest

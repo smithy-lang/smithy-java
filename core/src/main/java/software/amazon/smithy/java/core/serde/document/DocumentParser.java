@@ -39,6 +39,17 @@ public final class DocumentParser implements ShapeSerializer {
         return result;
     }
 
+    /**
+     * Clears the value stored in the parser, and returns the value.
+     *
+     * @return the result being cleared, or null if no result is stored.
+     */
+    public Document clearResult() {
+        var value = this.result;
+        this.result = null;
+        return value;
+    }
+
     private void setResult(Document result) {
         this.result = result;
     }

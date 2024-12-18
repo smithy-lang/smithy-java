@@ -79,8 +79,13 @@ public final class PojoWithValidatedCollection implements SerializableStruct {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public <T> T getMemberValue(Schema member) {
-        throw new UnsupportedOperationException("Member value not supported: " + member);
+        return switch (member.memberName()) {
+            case "map" -> (T) map;
+            case "list" -> (T) list;
+            default -> null;
+        };
     }
 
     private static final class InnerListSerializer implements BiConsumer<List<ValidatedPojo>, ShapeSerializer> {
