@@ -101,7 +101,7 @@ public final class ClientInterfaceGenerator
                         /**
                          * @return Configuration in use by client.
                          */
-                         ${clientConfig:T} config();
+                        ${clientConfig:T} config();
 
                         /**
                          * Create a Builder for {@link ${interface:T}}.

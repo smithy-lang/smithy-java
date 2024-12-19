@@ -87,9 +87,10 @@ public final class DocumentParser implements ShapeSerializer {
             }
         });
         consumer.accept(state, serializer);
-        if (elementParser.result != null) {
-            elements.add(elementParser.result);
-        }
+        // Note that neither here nor between values are we testing to ensure the value is not null. That's because
+        // this method is used primarily with documents that have no schema, and therefore cannot specify that a
+        // list is sparse. Rather than drop null values, they are retained.
+        elements.add(elementParser.result);
         setResult(new Documents.ListDocument(schema, elements));
     }
 

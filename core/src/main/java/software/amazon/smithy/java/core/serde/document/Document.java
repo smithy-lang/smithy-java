@@ -19,6 +19,7 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.SerializationException;
+import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -397,13 +398,22 @@ public interface Document extends SerializableShape {
     }
 
     /**
+     * Create a deserializer for the document.
+     *
+     * @return the deserializer.
+     */
+    default ShapeDeserializer createDeserializer() {
+        return new DocumentDeserializer(this);
+    }
+
+    /**
      * Attempt to deserialize the Document into a builder.
      *
      * @param builder Builder to populate from the Document.
      * @param <T> Shape type to build.
      */
     default <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
-        builder.deserialize(new DocumentDeserializer(this));
+        builder.deserialize(createDeserializer());
     }
 
     /**

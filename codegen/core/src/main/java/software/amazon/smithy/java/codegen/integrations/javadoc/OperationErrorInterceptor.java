@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.integrations.javadoc;
 import software.amazon.smithy.java.codegen.sections.JavadocSection;
 import software.amazon.smithy.java.codegen.sections.OperationSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.model.traits.TitleTrait;
 import software.amazon.smithy.utils.CodeInterceptor;
 
 /**
@@ -23,7 +24,12 @@ final class OperationErrorInterceptor implements CodeInterceptor.Appender<Javado
                 writer.pushState();
                 var errorShape = os.model().expectShape(error);
                 var errorSymbol = os.symbolProvider().toSymbol(errorShape);
-                writer.write("@throws $T", errorSymbol);
+                var hasTitle = errorShape.hasTrait(TitleTrait.class);
+                writer.putContext("hasTitle", hasTitle);
+                if (hasTitle) {
+                    writer.putContext("title", errorShape.expectTrait(TitleTrait.class).getValue());
+                }
+                writer.write("@throws $T${?hasTitle} - ${title:L}${/hasTitle}", errorSymbol);
                 writer.popState();
             }
         } else {

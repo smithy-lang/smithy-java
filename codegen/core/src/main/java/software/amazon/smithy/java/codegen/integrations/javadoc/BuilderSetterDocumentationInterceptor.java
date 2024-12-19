@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.integrations.javadoc;
 import software.amazon.smithy.java.codegen.sections.BuilderSetterSection;
 import software.amazon.smithy.java.codegen.sections.JavadocSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.model.traits.RecommendedTrait;
 import software.amazon.smithy.model.traits.RequiredTrait;
 import software.amazon.smithy.utils.CodeInterceptor;
 
@@ -20,6 +21,9 @@ final class BuilderSetterDocumentationInterceptor implements CodeInterceptor.App
     public void append(JavaWriter writer, JavadocSection section) {
         if (section.shape().hasTrait(RequiredTrait.class)) {
             writer.writeWithNoFormatting("<p><strong>Required</strong>");
+        }
+        if (section.shape().hasTrait(RecommendedTrait.class)) {
+            writer.writeWithNoFormatting("<p><strong>Recommended</strong>");
         }
         writer.writeWithNoFormatting("@return this builder.");
     }
