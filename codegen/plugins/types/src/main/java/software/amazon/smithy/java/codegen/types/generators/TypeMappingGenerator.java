@@ -37,7 +37,7 @@ public final class TypeMappingGenerator
     public void accept(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         Map<ShapeId, Symbol> symbolMap = new HashMap<>();
 
-        /// Add all types within the synthetic service closure
+        // Add all types within the synthetic service closure
         Set<Shape> serviceClosure = (new Walker(directive.model())).walkShapes(directive.service());
         for (var shape : serviceClosure) {
             var shapeId = shape.getId();
