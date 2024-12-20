@@ -90,14 +90,16 @@ sealed abstract class XmlReader implements AutoCloseable {
     final String nextMemberElement() throws XMLStreamException {
         nextIfNeeded();
         while (true) {
-            if (getEventType() == XMLStreamConstants.START_ELEMENT) {
-                // Don't go to the next node just yet since attributes may need to be deserialized.
-                pendingNext = true;
-                return getStartElementName();
-            } else if (getEventType() == XMLStreamConstants.END_ELEMENT) {
-                return null;
-            } else {
-                next();
+            switch (getEventType()) {
+                case XMLStreamConstants.START_ELEMENT:
+                    // Don't go to the next node just yet since attributes may need to be deserialized.
+                    pendingNext = true;
+                    return getStartElementName();
+                case XMLStreamConstants.END_ELEMENT:
+                case -1: // EOF
+                    return null;
+                default:
+                    next();
             }
         }
     }

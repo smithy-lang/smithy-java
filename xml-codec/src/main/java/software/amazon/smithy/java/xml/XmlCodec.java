@@ -7,6 +7,7 @@ package software.amazon.smithy.java.xml;
 
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import javax.xml.stream.XMLEventFactory;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -25,6 +26,7 @@ public final class XmlCodec implements Codec {
     private final XMLInputFactory xmlInputFactory;
     private final XMLOutputFactory xmlOutputFactory;
     private final XmlInfo xmlInfo = new XmlInfo();
+    private final XMLEventFactory eventFactory = XMLEventFactory.newInstance();
 
     private XmlCodec(Builder builder) {
         xmlInputFactory = XMLInputFactory.newInstance();
@@ -57,7 +59,7 @@ public final class XmlCodec implements Codec {
     public ShapeDeserializer createDeserializer(ByteBuffer source) {
         try {
             var reader = xmlInputFactory.createXMLStreamReader(ByteBufferUtils.byteBufferInputStream(source));
-            return XmlDeserializer.topLevel(xmlInfo, new XmlReader.StreamReader(reader, xmlInputFactory));
+            return XmlDeserializer.topLevel(xmlInfo, eventFactory, new XmlReader.StreamReader(reader, xmlInputFactory));
         } catch (XMLStreamException e) {
             throw new RuntimeException(e);
         }

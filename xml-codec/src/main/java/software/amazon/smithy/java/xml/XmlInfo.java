@@ -11,7 +11,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import javax.xml.namespace.QName;
+import javax.xml.stream.XMLEventFactory;
 import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -102,6 +105,7 @@ final class XmlInfo {
 
         <T> void readMember(
             Map<Schema, Deque<XMLEvent>> flatState,
+            XMLEventFactory eventFactory,
             ShapeDeserializer deserializer,
             XmlReader reader,
             T state,
@@ -116,9 +120,17 @@ final class XmlInfo {
                 // deserialized regardless of if they are interspersed with other nodes.
                 var current = flatState.get(member);
                 var buffer = reader.bufferElement(elementName);
+
+                // The just read start event needs to be added back to the event buffer so it can be replayed while
+                // parsing the deferred flattened list values.
+                QName qname = new QName(elementName);
+                StartElement startElement = eventFactory.createStartElement(qname, null, null);
+
                 if (current == null) {
+                    buffer.addFirst(startElement);
                     flatState.put(member, buffer);
                 } else {
+                    current.add(startElement);
                     current.addAll(buffer);
                 }
             }
@@ -126,6 +138,7 @@ final class XmlInfo {
 
         <T> void finishReadingStruct(
             Map<Schema, Deque<XMLEvent>> flatState,
+            XMLEventFactory eventFactory,
             XmlInfo decoders,
             T state,
             ShapeDeserializer.StructMemberConsumer<T> consumer
@@ -137,7 +150,7 @@ final class XmlInfo {
                     state,
                     schema,
                     // Use a special flattened deserializer that delegates validation of the encountered element.
-                    XmlDeserializer.flattened(decoders, new XmlReader.BufferedReader(events))
+                    XmlDeserializer.flattened(decoders, eventFactory, new XmlReader.BufferedReader(events))
                 );
             }
         }

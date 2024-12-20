@@ -66,13 +66,7 @@ public class RestXmlProtocolTests {
     @HttpClientResponseTests
     @ProtocolTestFilter(
         skipTests = {
-            "XmlLists",
-            "FlatNestedXmlMapResponse",
-            "FlattenedXmlMap",
-            "FlattenedXmlMapWithXmlName",
-            "RestXmlFlattenedXmlMapWithXmlNamespace",
             "RestXmlDateTimeWithFractionalSeconds",
-            "HttpPrefixHeadersArePresent", //failing due to case mismatch in keys
             "HttpPayloadTraitsWithBlob",
             "HttpPayloadTraitsWithMediaTypeWithBlob",
             "RestXmlEnumPayloadResponse",

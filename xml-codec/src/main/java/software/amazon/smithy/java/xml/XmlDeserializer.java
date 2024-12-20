@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.Base64;
+import javax.xml.stream.XMLEventFactory;
 import javax.xml.stream.XMLStreamException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -25,21 +26,32 @@ final class XmlDeserializer implements ShapeDeserializer {
 
     private final XmlInfo xmlInfo;
     private final XmlReader reader;
+    private final XMLEventFactory eventFactory;
     private final InnerDeserializer innerDeserializer;
     private final boolean isTopLevel;
 
-    static XmlDeserializer topLevel(XmlInfo xmlInfo, XmlReader reader) throws XMLStreamException {
-        return new XmlDeserializer(xmlInfo, reader, true);
+    static XmlDeserializer topLevel(
+        XmlInfo xmlInfo,
+        XMLEventFactory eventFactory,
+        XmlReader reader
+    ) throws XMLStreamException {
+        return new XmlDeserializer(xmlInfo, eventFactory, reader, true);
     }
 
-    static XmlDeserializer flattened(XmlInfo xmlInfo, XmlReader reader) throws XMLStreamException {
-        return new XmlDeserializer(xmlInfo, reader, false);
+    static XmlDeserializer flattened(
+        XmlInfo xmlInfo,
+        XMLEventFactory eventFactory,
+        XmlReader reader
+    ) throws XMLStreamException {
+        return new XmlDeserializer(xmlInfo, eventFactory, reader, false);
     }
 
-    private XmlDeserializer(XmlInfo xmlInfo, XmlReader reader, boolean isTopLevel) throws XMLStreamException {
+    private XmlDeserializer(XmlInfo xmlInfo, XMLEventFactory eventFactory, XmlReader reader, boolean isTopLevel)
+        throws XMLStreamException {
         this.xmlInfo = xmlInfo;
         this.reader = reader;
         this.isTopLevel = isTopLevel;
+        this.eventFactory = eventFactory;
         this.innerDeserializer = new InnerDeserializer();
     }
 
@@ -56,14 +68,12 @@ final class XmlDeserializer implements ShapeDeserializer {
     // The inner deserializer deserializes members and doesn't have this expectation.
     private void enter(Schema schema) {
         try {
-            // Always go to the next member element, even if deserializing a nested element.
-            var name = reader.nextMemberElement();
-
             if (!isTopLevel) {
                 // List and map members are validated in those deserializers, not here.
                 return;
             }
 
+            var name = reader.nextMemberElement();
             String expected;
             var trait = schema.getTrait(TraitKey.XML_NAME_TRAIT);
             if (trait != null) {
@@ -462,7 +472,16 @@ final class XmlDeserializer implements ShapeDeserializer {
                 for (var member = reader.nextMemberElement(); member != null; member = reader.nextMemberElement()) {
                     Schema elementSchema = decoder.elements.get(member);
                     if (elementSchema != null) {
-                        decoder.readMember(flattenedState, this, reader, state, consumer, member, elementSchema);
+                        decoder.readMember(
+                            flattenedState,
+                            eventFactory,
+                            this,
+                            reader,
+                            state,
+                            consumer,
+                            member,
+                            elementSchema
+                        );
                         reader.closeElement();
                     } else {
                         consumer.unknownMember(state, member);
@@ -470,8 +489,7 @@ final class XmlDeserializer implements ShapeDeserializer {
                     }
                 }
 
-                decoder.finishReadingStruct(flattenedState, xmlInfo, state, consumer);
-
+                decoder.finishReadingStruct(flattenedState, eventFactory, xmlInfo, state, consumer);
             } catch (XMLStreamException e) {
                 throw error("Failed to read struct", e);
             }
