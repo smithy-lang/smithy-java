@@ -67,12 +67,6 @@ public class RestXmlProtocolTests {
     @ProtocolTestFilter(
         skipTests = {
             "RestXmlDateTimeWithFractionalSeconds",
-            "HttpPayloadTraitsWithBlob",
-            "HttpPayloadTraitsWithMediaTypeWithBlob",
-            "RestXmlEnumPayloadResponse",
-            "RestXmlStringPayloadResponse",
-            "RestXmlHttpPayloadWithUnion",
-            "BodyWithXmlName",
         }
     )
     public void responseTest(Runnable test) {

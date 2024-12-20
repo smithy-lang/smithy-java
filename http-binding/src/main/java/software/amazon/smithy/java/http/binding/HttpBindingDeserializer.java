@@ -115,12 +115,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                     structMemberConsumer.accept(state, member, new HttpPrefixHeadersDeserializer(headers));
                 case BODY -> {} // handled below
                 case PAYLOAD -> {
-                    if (member.type() == ShapeType.STRUCTURE) {
-                        // Read the payload into a byte buffer to deserialize a shape in the body.
-                        bodyDeserializationCf = bodyAsByteBuffer().thenAccept(bb -> {
-                            structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bb));
-                        }).toCompletableFuture();
-                    } else if (isEventStream(member)) {
+                    if (isEventStream(member)) {
                         structMemberConsumer.accept(state, member, new SpecificShapeDeserializer() {
                             @Override
                             public Flow.Publisher<? extends SerializableStruct> readEventStream(Schema schema) {
@@ -135,6 +130,13 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                                 return body;
                             }
                         });
+                    } else if (member.type() == ShapeType.STRUCTURE || member.type() == ShapeType.UNION) {
+                        // Read the payload into a byte buffer to deserialize a shape in the body.
+                        bodyDeserializationCf = bodyAsByteBuffer().thenAccept(bb -> {
+                            if (bb.remaining() > 0) {
+                                structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bb));
+                            }
+                        }).toCompletableFuture();
                     } else if (body != null && body.contentLength() > 0) {
                         structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
                     }

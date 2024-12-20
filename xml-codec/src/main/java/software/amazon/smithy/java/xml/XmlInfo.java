@@ -44,7 +44,7 @@ final class XmlInfo {
     }
 
     private static String getName(Schema schema) {
-        var xmlName = schema.getTrait(TraitKey.XML_NAME_TRAIT);
+        var xmlName = schema.getDirectTrait(TraitKey.XML_NAME_TRAIT);
         if (xmlName != null) {
             return xmlName.getValue();
         } else if (schema.isMember()) {

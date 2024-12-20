@@ -73,7 +73,7 @@ public final class ResponseDeserializer {
     private DataStream bodyDataStream(HttpResponse response) {
         var contentType = response.headers().contentType();
         var contentLength = response.headers().contentLength();
-        return DataStream.ofPublisher(response.body(), contentType, contentLength == null ? -1 : contentLength);
+        return DataStream.withMetadata(response.body(), contentType, contentLength, null);
     }
 
     /**

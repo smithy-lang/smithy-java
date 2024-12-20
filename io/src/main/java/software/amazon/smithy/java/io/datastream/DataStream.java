@@ -308,13 +308,45 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
         boolean isReplayable
     ) {
         if (publisher instanceof DataStream ds) {
-            if (ds.contentLength() == contentLength
-                && Objects.equals(ds.contentType(), contentType)
-                && ds.isReplayable() == isReplayable) {
-                return ds;
-            }
-            return new WrappedDataStream(ds, contentLength, contentType, isReplayable);
+            return withMetadata(ds, contentType, contentLength, isReplayable);
         }
         return new PublisherDataStream(publisher, contentLength, contentType, isReplayable);
+    }
+
+    /**
+     * Creates DataStream that returns potentially more specific metadata about the stream.
+     *
+     * <p>This might be necessary if the payload of a request is streaming, but an HTTP response gave a Content-Length.
+     *
+     * @param ds The DataStream to wrap, if necessary.
+     * @param contentType Content-Type to associate with the stream. Can be null to not attempt to alter it.
+     * @param contentLength Content length of the stream. Can be null to not attempt to alter it.
+     * @param isReplayable True if the publisher can be replayed. Can be null to not attempt to alter it.
+     * @return the wrapped DataStream.
+     */
+    static DataStream withMetadata(DataStream ds, String contentType, Long contentLength, Boolean isReplayable) {
+        boolean isChanged = false;
+        var changedContentType = ds.contentType();
+        var changedContentLength = ds.contentLength();
+        var changedIsReplayable = ds.isReplayable();
+
+        if (contentType != null && !Objects.equals(contentType, ds.contentType())) {
+            isChanged = true;
+            changedContentType = contentType;
+        }
+
+        if (contentLength != null && !Objects.equals(contentLength, ds.contentLength())) {
+            isChanged = true;
+            changedContentLength = contentLength;
+        }
+
+        if (isReplayable != null && !Objects.equals(isReplayable, ds.isReplayable())) {
+            isChanged = true;
+            changedIsReplayable = isReplayable;
+        }
+
+        return isChanged
+            ? new WrappedDataStream(ds, changedContentLength, changedContentType, changedIsReplayable)
+            : ds;
     }
 }

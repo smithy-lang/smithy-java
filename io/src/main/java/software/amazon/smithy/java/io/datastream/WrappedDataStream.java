@@ -15,7 +15,7 @@ final class WrappedDataStream implements DataStream {
     private final DataStream delegate;
     private final String contentType;
     private final long contentLength;
-    private boolean isReplayable;
+    private final boolean isReplayable;
 
     WrappedDataStream(DataStream delegate, long contentLength, String contentType, boolean isReplayable) {
         this.delegate = delegate;
