@@ -53,7 +53,7 @@ public final class OperationGenerator
                     public final class ${shape:T} implements ${operationType:C} {
                         ${id:C|}
 
-                        public ${schema:C|}
+                        private ${schema:C|}
 
                         ${typeRegistrySection:C|}
 
