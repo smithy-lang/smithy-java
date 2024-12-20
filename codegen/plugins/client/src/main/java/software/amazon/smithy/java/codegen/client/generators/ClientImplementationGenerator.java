@@ -59,7 +59,7 @@ public final class ClientImplementationGenerator
                     ${operations:C|}
 
                     ${?implicitErrors}@Override
-                    protected ${typeRegistryClass:T} errorTypeRegistry() {
+                    protected ${typeRegistryClass:T} typeRegistry() {
                         return TYPE_REGISTRY;
                     }${/implicitErrors}
                 }

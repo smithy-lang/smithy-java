@@ -44,7 +44,7 @@ public class DynamicOperationTest {
             .assemble()
             .unwrap();
         var converter = new SchemaConverter(model);
-        var registry = TypeRegistry.builder().build();
+        var registry = TypeRegistry.empty();
         var operationSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFoo")));
         var input = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFooInput")));
         var output = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFooOutput")));
@@ -81,7 +81,7 @@ public class DynamicOperationTest {
             .assemble()
             .unwrap();
         var converter = new SchemaConverter(model);
-        var registry = TypeRegistry.builder().build();
+        var registry = TypeRegistry.empty();
         var operationSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFoo")));
         var input = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFooInput")));
         var output = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFooOutput")));

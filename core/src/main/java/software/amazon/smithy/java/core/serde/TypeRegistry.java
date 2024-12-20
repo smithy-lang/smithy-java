@@ -18,6 +18,8 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * Supports on-demand deserialization of types by providing a registry of shape IDs to shape builders.
  */
 public interface TypeRegistry {
+    TypeRegistry EMPTY = TypeRegistry.builder().build();
+
     /**
      * Gets the shape class registered for the given shape ID.
      *
@@ -41,6 +43,15 @@ public interface TypeRegistry {
      * @return true if this type registry contains the {@code ShapeId}
      */
     boolean contains(ShapeId shapeId);
+
+    /**
+     * Get an empty TypeRegistry.
+     *
+     * @return the empty TypeRegistry.
+     */
+    static TypeRegistry empty() {
+        return EMPTY;
+    }
 
     /**
      * Create a shape builder based on a shape ID and expected type.

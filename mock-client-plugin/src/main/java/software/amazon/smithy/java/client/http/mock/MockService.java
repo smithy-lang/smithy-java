@@ -37,6 +37,6 @@ final class MockService implements Service {
 
     @Override
     public TypeRegistry errorRegistry() {
-        return TypeRegistry.builder().build();
+        return TypeRegistry.empty();
     }
 }

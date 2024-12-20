@@ -55,7 +55,7 @@ public abstract class Client {
 
         this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
 
-        this.typeRegistry = errorTypeRegistry();
+        this.typeRegistry = typeRegistry();
 
         if (config.retryStrategy() != null) {
             this.retryStrategy = config.retryStrategy();
@@ -122,8 +122,8 @@ public abstract class Client {
      *
      * @return Error type registry.
      */
-    protected TypeRegistry errorTypeRegistry() {
-        return TypeRegistry.builder().build();
+    protected TypeRegistry typeRegistry() {
+        return TypeRegistry.empty();
     };
 
     /**

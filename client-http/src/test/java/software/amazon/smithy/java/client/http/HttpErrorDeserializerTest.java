@@ -46,7 +46,7 @@ public class HttpErrorDeserializerTest {
             .codec(CODEC)
             .serviceId(SERVICE)
             .build();
-        var registry = TypeRegistry.builder().build();
+        var registry = TypeRegistry.empty();
         var responseBuilder = HttpResponse.builder().statusCode(status);
 
         if (payload != null) {

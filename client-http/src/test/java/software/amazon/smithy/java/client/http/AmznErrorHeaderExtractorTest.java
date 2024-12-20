@@ -157,7 +157,7 @@ public class AmznErrorHeaderExtractorTest {
                 )
             )
             .build();
-        var registry = TypeRegistry.builder().build();
+        var registry = TypeRegistry.empty();
 
         assertThat(extractor.resolveId(response, "com.foo", registry), nullValue());
     }
