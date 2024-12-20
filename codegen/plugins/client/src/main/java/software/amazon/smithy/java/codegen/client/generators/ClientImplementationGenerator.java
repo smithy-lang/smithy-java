@@ -5,12 +5,15 @@
 
 package software.amazon.smithy.java.codegen.client.generators;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
+import software.amazon.smithy.framework.knowledge.ImplicitErrorIndex;
 import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -70,7 +73,7 @@ public final class ClientImplementationGenerator
             writer.putContext("future", CompletableFuture.class);
             writer.putContext("typeRegistryClass", TypeRegistry.class);
             writer.putContext("completionException", CompletionException.class);
-            var errorSymbols = CodegenUtils.getImplicitErrorSymbols(
+            var errorSymbols = getImplicitErrorSymbols(
                 directive.symbolProvider(),
                 directive.model(),
                 directive.service()
@@ -126,5 +129,20 @@ public final class ClientImplementationGenerator
             }
             writer.popState();
         }
+    }
+
+    // TODO: Move into common CodegenUtils once ImplicitError index is available from smithy-model
+    private static List<Symbol> getImplicitErrorSymbols(
+        SymbolProvider symbolProvider,
+        Model model,
+        ServiceShape service
+    ) {
+        var implicitIndex = ImplicitErrorIndex.of(model);
+        List<Symbol> symbols = new ArrayList<>();
+        for (var errorId : implicitIndex.getImplicitErrorsForService(service)) {
+            var shape = model.expectShape(errorId);
+            symbols.add(symbolProvider.toSymbol(shape));
+        }
+        return symbols;
     }
 }

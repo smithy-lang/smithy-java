@@ -55,10 +55,6 @@ public final class ImplicitErrorIndex implements KnowledgeIndex {
         return serviceImplicitErrorMap.computeIfAbsent(toShapeId.toShapeId(), k -> new HashSet<>());
     }
 
-    public Set<ShapeId> getImplicitErrorsForOperation(ToShapeId operationId) {
-        return null;
-    }
-
     public boolean isImplicitError(ShapeId shapeId) {
         return implicitErrors.contains(shapeId);
     }

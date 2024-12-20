@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.codegen.transforms;
+package software.amazon.smithy.framework.transform;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -20,7 +20,7 @@ import software.amazon.smithy.model.transform.ModelTransformer;
 
 /**
  * Adds any framework errors (error shapes found in `smithy.framework` namespace) to service shapes in the model.
- * TODO: Upstream this transform to directed codegen
+ * TODO: Upstream this transform to directed codegen and a smithy-build transform
  */
 public final class AddFrameworkErrorsTransform {
     private static final String SMITHY_FRAMEWORK_NAMESPACE = "smithy.framework";

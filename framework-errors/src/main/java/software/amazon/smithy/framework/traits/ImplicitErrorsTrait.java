@@ -31,9 +31,11 @@ public final class ImplicitErrorsTrait extends AbstractTrait implements ToSmithy
 
     @Override
     protected Node createNode() {
-        return values.stream()
-            .map(s -> Node.from(s.toString()))
-            .collect(ArrayNode.collect(getSourceLocation()));
+        var builder = ArrayNode.builder();
+        for (var value : values) {
+            builder.withValue(value.toString());
+        }
+        return builder.build();
     }
 
     /**
@@ -45,11 +47,9 @@ public final class ImplicitErrorsTrait extends AbstractTrait implements ToSmithy
      */
     public static ImplicitErrorsTrait fromNode(Node node) {
         Builder builder = builder();
-        node.expectArrayNode()
-            .getElements()
-            .stream()
-            .map(ShapeId::fromNode)
-            .forEach(builder::addValues);
+        for (var element : node.expectArrayNode().getElements()) {
+            builder.addValues(ShapeId.fromNode(element));
+        }
         return builder.build();
     }
 
@@ -61,8 +61,7 @@ public final class ImplicitErrorsTrait extends AbstractTrait implements ToSmithy
      * Creates a builder used to build a {@link ImplicitErrorsTrait}.
      */
     public SmithyBuilder<ImplicitErrorsTrait> toBuilder() {
-        return builder().sourceLocation(getSourceLocation())
-            .values(getValues());
+        return builder().sourceLocation(getSourceLocation()).values(getValues());
     }
 
     public static Builder builder() {

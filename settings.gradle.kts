@@ -16,8 +16,6 @@ include(":codegen:plugins:types")
 
 // Framework errors
 include(":framework-errors")
-// TODO: Upstream
-include(":smithy-implicit-error-trait")
 
 // Protocol tests
 include(":protocol-tests")

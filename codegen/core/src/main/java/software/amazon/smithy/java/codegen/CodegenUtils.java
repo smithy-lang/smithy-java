@@ -7,7 +7,6 @@ package software.amazon.smithy.java.codegen;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -20,7 +19,6 @@ import software.amazon.smithy.codegen.core.ReservedWordsBuilder;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.TopologicalIndex;
-import software.amazon.smithy.framework.knowledge.ImplicitErrorIndex;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.model.Model;
@@ -430,29 +428,6 @@ public final class CodegenUtils {
         } catch (ClassNotFoundException exc) {
             throw new CodegenException("Could not find class " + name + ". Check your dependencies.", exc);
         }
-    }
-
-    /**
-     * Resolve all implicit error symbols for implicit errors attached to a service.
-     *
-     * @param symbolProvider Symbol provider
-     * @param model Model used for code generation
-     * @param service Service implicit shapes are bound to
-     *
-     * @return list of symbols representing the implicit errors on the service.
-     */
-    public static List<Symbol> getImplicitErrorSymbols(
-        SymbolProvider symbolProvider,
-        Model model,
-        ServiceShape service
-    ) {
-        var implicitIndex = ImplicitErrorIndex.of(model);
-        List<Symbol> symbols = new ArrayList<>();
-        for (var errorId : implicitIndex.getImplicitErrorsForService(service)) {
-            var shape = model.expectShape(errorId);
-            symbols.add(symbolProvider.toSymbol(shape));
-        }
-        return symbols;
     }
 
     /**

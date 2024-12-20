@@ -5,9 +5,8 @@ plugins {
 
 dependencies {
     api(project(":core"))
-
-    // TODO: remove once this is upstreamed to prelude.
-    api(project(":smithy-implicit-error-trait"))
+    // TODO: remove once the implicitErrors trait is upstreamed to prelude.
+    api(project(":framework-errors"))
 }
 
 afterEvaluate {

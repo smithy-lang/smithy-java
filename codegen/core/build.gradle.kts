@@ -10,7 +10,6 @@ extra["moduleName"] = "software.amazon.smithy.java.codegen.core"
 
 dependencies {
     api(libs.smithy.codegen)
-    implementation(project(":smithy-implicit-error-trait"))
     itImplementation(project(":json-codec"))
 }
 
