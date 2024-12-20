@@ -62,7 +62,7 @@ public final class ServiceGenerator implements
 
                     ${schema:C}
 
-                    ${errorRegistry:C|}
+                    ${typeRegistry:C|}
 
                     ${properties:C|}
 
@@ -87,7 +87,7 @@ public final class ServiceGenerator implements
                     }
 
                     @Override
-                    public ${typeRegistry:T} errorRegistry() {
+                    public ${typeRegistryClass:T} typeRegistry() {
                         return TYPE_REGISTRY;
                     }
                 }
@@ -98,14 +98,14 @@ public final class ServiceGenerator implements
             writer.putContext("schemaClass", Schema.class);
             writer.putContext("service", directive.symbol());
             writer.putContext("id", new IdStringGenerator(writer, shape));
-            writer.putContext("typeRegistry", TypeRegistry.class);
+            writer.putContext("typeRegistryClass", TypeRegistry.class);
             var errorSymbols = getImplicitErrorSymbols(
                 directive.symbolProvider(),
                 directive.model(),
                 directive.service()
             );
             writer.putContext(
-                "errorRegistry",
+                "typeRegistry",
                 new TypeRegistryGenerator(writer, errorSymbols)
             );
             writer.putContext(

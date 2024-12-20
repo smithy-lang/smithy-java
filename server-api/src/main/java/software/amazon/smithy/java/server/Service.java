@@ -23,5 +23,5 @@ public interface Service {
 
     Schema schema();
 
-    TypeRegistry errorRegistry();
+    TypeRegistry typeRegistry();
 }

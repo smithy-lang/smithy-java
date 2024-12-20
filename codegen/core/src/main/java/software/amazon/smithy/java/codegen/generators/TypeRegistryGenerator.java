@@ -17,6 +17,11 @@ public record TypeRegistryGenerator(JavaWriter writer, List<Symbol> errorSymbols
     public void run() {
         writer.pushState();
         writer.putContext("typeRegistry", TypeRegistry.class);
+        if (errorSymbols.isEmpty()) {
+            writer.write("private static final ${typeRegistry:T} TYPE_REGISTRY = ${typeRegistry:T}.empty();");
+            writer.popState();
+            return;
+        }
         writer.write("private static final ${typeRegistry:T} TYPE_REGISTRY = ${typeRegistry:T}.builder()");
         writer.indent();
         for (var errorSymbol : errorSymbols) {
