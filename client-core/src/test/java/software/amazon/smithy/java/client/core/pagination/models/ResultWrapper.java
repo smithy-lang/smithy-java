@@ -16,12 +16,12 @@ import software.amazon.smithy.model.shapes.ShapeId;
 
 public record ResultWrapper(String nextToken, List<String> foos) implements SerializableStruct {
     private static final Schema LIST_OF_STRINGS = Schema.listBuilder(ShapeId.from("smithy.example#ListOfStrings"))
-        .putMember("member", PreludeSchemas.STRING)
-        .build();
+            .putMember("member", PreludeSchemas.STRING)
+            .build();
     static final Schema SCHEMA = Schema.structureBuilder(ShapeId.from("smithy.example#ResultWrapper"))
-        .putMember("nextToken", PreludeSchemas.STRING)
-        .putMember("foos", LIST_OF_STRINGS)
-        .build();
+            .putMember("nextToken", PreludeSchemas.STRING)
+            .putMember("foos", LIST_OF_STRINGS)
+            .build();
     private static final Schema SCHEMA_NEXT_TOKEN = SCHEMA.member("nextToken");
     private static final Schema SCHEMA_FOOS = SCHEMA.member("foos");
 

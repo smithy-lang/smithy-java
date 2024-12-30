@@ -65,8 +65,8 @@ public final class ResponseDeserializer {
     public ResponseDeserializer response(HttpResponse response) {
         DataStream bodyDataStream = bodyDataStream(response);
         deserBuilder.headers(response.headers())
-            .responseStatus(response.statusCode())
-            .body(bodyDataStream);
+                .responseStatus(response.statusCode())
+                .body(bodyDataStream);
         return this;
     }
 

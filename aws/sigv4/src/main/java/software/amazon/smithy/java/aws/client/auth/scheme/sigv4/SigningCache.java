@@ -84,9 +84,9 @@ final class SigningCache {
                 return true;
             } else if (obj instanceof CacheKey c) {
                 return cachedHashCode == c.cachedHashCode
-                    && secretKey.equals(c.secretKey)
-                    && regionName.equals(c.regionName)
-                    && serviceName.equals(c.serviceName);
+                        && secretKey.equals(c.secretKey)
+                        && regionName.equals(c.regionName)
+                        && serviceName.equals(c.serviceName);
             }
             return false;
         }

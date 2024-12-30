@@ -29,11 +29,11 @@ public class XmlReaderTest {
     @Test
     public void usesStreamReader() throws Exception {
         var xml = """
-            <foo>
-                <bar>bar</bar>
-                <baz hi="A" bye="B">1</baz>
-            </foo>
-            """;
+                <foo>
+                    <bar>bar</bar>
+                    <baz hi="A" bye="B">1</baz>
+                </foo>
+                """;
 
         var factory = getFactory();
         try (var reader = new XmlReader.StreamReader(factory.createXMLStreamReader(new StringReader(xml)), factory)) {
@@ -109,19 +109,18 @@ public class XmlReaderTest {
     @Test
     public void buffersEvents() throws Exception {
         var xml = """
-            <foo>
-                <bar>bar</bar>
-                <baz hi="A" bye="B">1</baz>
-            </foo>
-            """;
+                <foo>
+                    <bar>bar</bar>
+                    <baz hi="A" bye="B">1</baz>
+                </foo>
+                """;
 
         var factory = getFactory();
         try (
-            var r = new XmlReader.StreamReader(
-                factory.createXMLStreamReader(new StringReader(xml)),
-                factory
-            ); var reader = new XmlReader.BufferedReader(r.bufferElement("foo"))
-        ) {
+                var r = new XmlReader.StreamReader(
+                        factory.createXMLStreamReader(new StringReader(xml)),
+                        factory);
+                var reader = new XmlReader.BufferedReader(r.bufferElement("foo"))) {
             assertThat(reader.getLocation().getLineNumber(), equalTo(1));
             assertThat(reader.getText(), equalTo(""));
             assertThat(reader.nextMemberElement(), equalTo("foo"));

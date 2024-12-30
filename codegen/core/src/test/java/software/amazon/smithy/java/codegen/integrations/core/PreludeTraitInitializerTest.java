@@ -17,8 +17,7 @@ import software.amazon.smithy.java.codegen.utils.AbstractCodegenFileTest;
 
 public class PreludeTraitInitializerTest extends AbstractCodegenFileTest {
     private static final URL TEST_FILE = Objects.requireNonNull(
-        PreludeTraitInitializerTest.class.getResource("prelude-trait-initializer-test.smithy")
-    );
+            PreludeTraitInitializerTest.class.getResource("prelude-trait-initializer-test.smithy"));
 
     @Override
     protected URL testFile() {
@@ -27,11 +26,10 @@ public class PreludeTraitInitializerTest extends AbstractCodegenFileTest {
 
     static List<String> customInitializersInput() {
         return List.of(
-            "new DefaultTrait(Node.from(\"string\"))",
-            "LengthTrait.builder().min(10L).build()",
-            "RangeTrait.builder().max(new BigDecimal(\"100\")).build()",
-            "XmlNamespaceTrait.builder().uri(\"http://foo.com\").build()"
-        );
+                "new DefaultTrait(Node.from(\"string\"))",
+                "LengthTrait.builder().min(10L).build()",
+                "RangeTrait.builder().max(new BigDecimal(\"100\")).build()",
+                "XmlNamespaceTrait.builder().uri(\"http://foo.com\").build()");
     }
 
     @ParameterizedTest

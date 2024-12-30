@@ -24,8 +24,8 @@ public abstract class ServerProtocol {
     public abstract ShapeId getProtocolId();
 
     public abstract ServiceProtocolResolutionResult resolveOperation(
-        ServiceProtocolResolutionRequest request,
-        List<Service> candidates
+            ServiceProtocolResolutionRequest request,
+            List<Service> candidates
     );
 
     public abstract CompletableFuture<Void> deserializeInput(Job job);
@@ -36,9 +36,9 @@ public abstract class ServerProtocol {
 
     public final CompletableFuture<Void> serializeError(Job job, Throwable error) {
         return serializeError(
-            job,
-            error instanceof ModeledApiException me ? me : InternalFailureException.builder().withCause(error).build()
-        );
+                job,
+                error instanceof ModeledApiException me ? me
+                        : InternalFailureException.builder().withCause(error).build());
     }
 
     protected abstract CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output, boolean isError);
@@ -47,8 +47,7 @@ public abstract class ServerProtocol {
         // Check both implicit errors and operation errors to see if modeled API exception is
         // defined as part of service interface. Otherwise, throw generic exception.
         if (!job.operation().getOwningService().typeRegistry().contains(error.schema().id())
-            && !job.operation().getApiOperation().errorRegistry().contains(error.schema().id())
-        ) {
+                && !job.operation().getApiOperation().errorRegistry().contains(error.schema().id())) {
             error = InternalFailureException.builder().withCause(error).build();
         }
         return serializeOutput(job, error, true);

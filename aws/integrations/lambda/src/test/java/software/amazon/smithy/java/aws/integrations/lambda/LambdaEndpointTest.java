@@ -32,24 +32,23 @@ class LambdaEndpointTest {
     @Test
     public void canAddBeer() {
         String body = """
-            {
-                "beer": {
-                    "name": "Oatmeal Stout",
-                    "quanity": 1
+                {
+                    "beer": {
+                        "name": "Oatmeal Stout",
+                        "quanity": 1
+                    }
                 }
-            }
-            """;
+                """;
 
         ProxyRequest request = ProxyRequest.builder()
-            .httpMethod("POST")
-            .path("/add-beer")
-            .requestContext(
-                RequestContext.builder()
-                    .requestId("abc123")
-                    .build()
-            )
-            .body(body)
-            .build();
+                .httpMethod("POST")
+                .path("/add-beer")
+                .requestContext(
+                        RequestContext.builder()
+                                .requestId("abc123")
+                                .build())
+                .body(body)
+                .build();
 
         ProxyResponse response = endpoint.handleRequest(request, null);
         String expectedBody = "{\"id\":\"T2F0bWVhbCBTdG91dA==\"}";
@@ -61,21 +60,20 @@ class LambdaEndpointTest {
     @Test
     public void canGetBeer() {
         String body = """
-            {
-                "id": "TXVuaWNoIEhlbGxlcw=="
-            }
-            """;
+                {
+                    "id": "TXVuaWNoIEhlbGxlcw=="
+                }
+                """;
 
         ProxyRequest request = ProxyRequest.builder()
-            .httpMethod("POST")
-            .path("/get-beer")
-            .requestContext(
-                RequestContext.builder()
-                    .requestId("abc123")
-                    .build()
-            )
-            .body(body)
-            .build();
+                .httpMethod("POST")
+                .path("/get-beer")
+                .requestContext(
+                        RequestContext.builder()
+                                .requestId("abc123")
+                                .build())
+                .body(body)
+                .build();
 
         ProxyResponse response = endpoint.handleRequest(request, null);
         String expectedBody = "{\"beer\":{\"name\":\"Munich Helles\",\"quantity\":1}}";
@@ -87,40 +85,36 @@ class LambdaEndpointTest {
     @Test
     public void canAddBeer_cbor() {
         AddBeerInput input = AddBeerInput.builder()
-            .beer(
-                Beer.builder()
-                    .name("Oatmeal Stout")
-                    .quantity(1)
-                    .build()
-            )
-            .build();
+                .beer(
+                        Beer.builder()
+                                .name("Oatmeal Stout")
+                                .quantity(1)
+                                .build())
+                .build();
 
         ProxyRequest request = ProxyRequest.builder()
-            .httpMethod("POST")
-            .path("/service/BeerService/operation/AddBeer")
-            .multiValueHeaders(
-                Map.of(
-                    "smithy-protocol",
-                    List.of("rpc-v2-cbor"),
-                    "content-type",
-                    List.of("application/cbor")
-                )
-            )
-            .requestContext(
-                RequestContext.builder()
-                    .requestId("abc123")
-                    .build()
-            )
-            .isBase64Encoded(true)
-            .body(getBody(input))
-            .build();
+                .httpMethod("POST")
+                .path("/service/BeerService/operation/AddBeer")
+                .multiValueHeaders(
+                        Map.of(
+                                "smithy-protocol",
+                                List.of("rpc-v2-cbor"),
+                                "content-type",
+                                List.of("application/cbor")))
+                .requestContext(
+                        RequestContext.builder()
+                                .requestId("abc123")
+                                .build())
+                .isBase64Encoded(true)
+                .body(getBody(input))
+                .build();
 
         ProxyResponse response = endpoint.handleRequest(request, null);
 
         AddBeerOutput output = getOutput(response.getBody(), AddBeerOutput.builder());
         AddBeerOutput expectedOutput = AddBeerOutput.builder()
-            .id("T2F0bWVhbCBTdG91dA==")
-            .build();
+                .id("T2F0bWVhbCBTdG91dA==")
+                .build();
 
         assertEquals(200, response.getStatusCode());
         assertEquals(expectedOutput, output);
@@ -129,40 +123,36 @@ class LambdaEndpointTest {
     @Test
     public void canGetBeer_cbor() {
         GetBeerInput input = GetBeerInput.builder()
-            .id("TXVuaWNoIEhlbGxlcw==")
-            .build();
+                .id("TXVuaWNoIEhlbGxlcw==")
+                .build();
 
         ProxyRequest request = ProxyRequest.builder()
-            .httpMethod("POST")
-            .path("/service/BeerService/operation/GetBeer")
-            .multiValueHeaders(
-                Map.of(
-                    "smithy-protocol",
-                    List.of("rpc-v2-cbor"),
-                    "content-type",
-                    List.of("application/cbor")
-                )
-            )
-            .requestContext(
-                RequestContext.builder()
-                    .requestId("abc123")
-                    .build()
-            )
-            .isBase64Encoded(true)
-            .body(getBody(input))
-            .build();
+                .httpMethod("POST")
+                .path("/service/BeerService/operation/GetBeer")
+                .multiValueHeaders(
+                        Map.of(
+                                "smithy-protocol",
+                                List.of("rpc-v2-cbor"),
+                                "content-type",
+                                List.of("application/cbor")))
+                .requestContext(
+                        RequestContext.builder()
+                                .requestId("abc123")
+                                .build())
+                .isBase64Encoded(true)
+                .body(getBody(input))
+                .build();
 
         ProxyResponse response = endpoint.handleRequest(request, null);
 
         GetBeerOutput output = getOutput(response.getBody(), GetBeerOutput.builder());
         GetBeerOutput expectedOutput = GetBeerOutput.builder()
-            .beer(
-                Beer.builder()
-                    .name("Munich Helles")
-                    .quantity(1)
-                    .build()
-            )
-            .build();
+                .beer(
+                        Beer.builder()
+                                .name("Munich Helles")
+                                .quantity(1)
+                                .build())
+                .build();
 
         assertEquals(200, response.getStatusCode());
         assertEquals(expectedOutput, output);

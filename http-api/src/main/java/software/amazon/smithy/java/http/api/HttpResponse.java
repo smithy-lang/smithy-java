@@ -30,10 +30,10 @@ public interface HttpResponse extends HttpMessage {
      */
     default Builder toBuilder() {
         return builder()
-            .httpVersion(httpVersion())
-            .statusCode(statusCode())
-            .headers(headers())
-            .body(body());
+                .httpVersion(httpVersion())
+                .statusCode(statusCode())
+                .headers(headers())
+                .body(body());
     }
 
     /**

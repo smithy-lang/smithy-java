@@ -69,9 +69,9 @@ public interface AsyncPaginator<O extends SerializableStruct> extends PaginatorS
      * @param <O> Operation output shape type.
      */
     static <I extends SerializableStruct, O extends SerializableStruct> AsyncPaginator<O> paginate(
-        I input,
-        ApiOperation<I, O> operation,
-        PaginatableAsync<I, O> call
+            I input,
+            ApiOperation<I, O> operation,
+            PaginatableAsync<I, O> call
     ) {
         return new DefaultAsyncPaginator<>(input, operation, call);
     }

@@ -33,61 +33,61 @@ public class SchemaGuidedDocumentBuilderTest {
     @BeforeAll
     public static void setup() {
         model = Model.assembler()
-            .addUnparsedModel("test.smithy", """
-                $version: "2"
-                namespace smithy.example
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
 
-                document MyDocument
-                string MyString
-                boolean MyBoolean
-                timestamp MyTimestamp
-                blob MyBlob
-                byte MyByte
-                short MyShort
-                integer MyInteger
-                long MyLong
-                float MyFloat
-                double MyDouble
-                bigInteger MyBigInteger
-                bigDecimal MyBigDecimal
+                        document MyDocument
+                        string MyString
+                        boolean MyBoolean
+                        timestamp MyTimestamp
+                        blob MyBlob
+                        byte MyByte
+                        short MyShort
+                        integer MyInteger
+                        long MyLong
+                        float MyFloat
+                        double MyDouble
+                        bigInteger MyBigInteger
+                        bigDecimal MyBigDecimal
 
-                intEnum MyIntEnum {
-                    foo = 1
-                    bar = 2
-                }
+                        intEnum MyIntEnum {
+                            foo = 1
+                            bar = 2
+                        }
 
-                enum MyEnum {
-                    foo
-                    bar
-                }
+                        enum MyEnum {
+                            foo
+                            bar
+                        }
 
-                @sparse
-                list SimpleList {
-                    member: String
-                }
+                        @sparse
+                        list SimpleList {
+                            member: String
+                        }
 
-                map SimpleMap {
-                    key: MyString
-                    value: MyString
-                }
+                        map SimpleMap {
+                            key: MyString
+                            value: MyString
+                        }
 
-                map DocumentMap {
-                    key: MyString
-                    value: MyDocument
-                }
+                        map DocumentMap {
+                            key: MyString
+                            value: MyDocument
+                        }
 
-                structure SimpleStruct {
-                    foo: String
-                    baz: SimpleStruct
-                }
+                        structure SimpleStruct {
+                            foo: String
+                            baz: SimpleStruct
+                        }
 
-                union SimpleUnion {
-                    foo: String
-                    baz: SimpleStruct
-                }
-                """)
-            .assemble()
-            .unwrap();
+                        union SimpleUnion {
+                            foo: String
+                            baz: SimpleStruct
+                        }
+                        """)
+                .assemble()
+                .unwrap();
     }
 
     @ParameterizedTest
@@ -200,28 +200,26 @@ public class SchemaGuidedDocumentBuilderTest {
 
     static List<Arguments> deserializesShapesProvider() {
         return List.of(
-            Arguments.of("MyDocument", Document.ofObject(Map.of("a", "b"))),
-            Arguments.of("MyString", Document.of("hi")),
-            Arguments.of("MyBoolean", Document.of(true)),
-            Arguments.of("MyTimestamp", Document.of(Instant.EPOCH)),
-            Arguments.of("MyBlob", Document.of("foo".getBytes(StandardCharsets.UTF_8))),
-            Arguments.of("MyByte", Document.of((byte) 1)),
-            Arguments.of("MyShort", Document.of((short) 1)),
-            Arguments.of("MyInteger", Document.of(1)),
-            Arguments.of("MyLong", Document.of(1L)),
-            Arguments.of("MyFloat", Document.of(1f)),
-            Arguments.of("MyDouble", Document.of(1d)),
-            Arguments.of("MyBigInteger", Document.of(BigInteger.ONE)),
-            Arguments.of("MyBigDecimal", Document.of(BigDecimal.ONE)),
-            Arguments.of("MyIntEnum", Document.of(1)),
-            Arguments.of("MyEnum", Document.of("foo")),
-            Arguments.of("SimpleList", Document.ofObject(List.of("a", "b"))),
-            Arguments.of("SimpleMap", Document.ofObject(Map.of("foo", "bar"))),
-            Arguments.of(
-                "SimpleStruct",
-                Document.ofObject(Map.of("foo", "bar", "baz", Document.ofObject(Map.of("foo", "hi"))))
-            ),
-            Arguments.of("SimpleUnion", Document.ofObject(Map.of("foo", "bar")))
-        );
+                Arguments.of("MyDocument", Document.ofObject(Map.of("a", "b"))),
+                Arguments.of("MyString", Document.of("hi")),
+                Arguments.of("MyBoolean", Document.of(true)),
+                Arguments.of("MyTimestamp", Document.of(Instant.EPOCH)),
+                Arguments.of("MyBlob", Document.of("foo".getBytes(StandardCharsets.UTF_8))),
+                Arguments.of("MyByte", Document.of((byte) 1)),
+                Arguments.of("MyShort", Document.of((short) 1)),
+                Arguments.of("MyInteger", Document.of(1)),
+                Arguments.of("MyLong", Document.of(1L)),
+                Arguments.of("MyFloat", Document.of(1f)),
+                Arguments.of("MyDouble", Document.of(1d)),
+                Arguments.of("MyBigInteger", Document.of(BigInteger.ONE)),
+                Arguments.of("MyBigDecimal", Document.of(BigDecimal.ONE)),
+                Arguments.of("MyIntEnum", Document.of(1)),
+                Arguments.of("MyEnum", Document.of("foo")),
+                Arguments.of("SimpleList", Document.ofObject(List.of("a", "b"))),
+                Arguments.of("SimpleMap", Document.ofObject(Map.of("foo", "bar"))),
+                Arguments.of(
+                        "SimpleStruct",
+                        Document.ofObject(Map.of("foo", "bar", "baz", Document.ofObject(Map.of("foo", "hi"))))),
+                Arguments.of("SimpleUnion", Document.ofObject(Map.of("foo", "bar"))));
     }
 }

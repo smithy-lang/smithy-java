@@ -42,12 +42,12 @@ public final class ApplyHttpRetryInfoPlugin implements ClientPlugin {
 
         @Override
         public <O extends SerializableStruct> O modifyBeforeAttemptCompletion(
-            OutputHook<?, O, ?, ?> hook,
-            RuntimeException error
+                OutputHook<?, O, ?, ?> hook,
+                RuntimeException error
         ) {
             if (error instanceof ApiException ae
-                && ae.isRetrySafe() == RetrySafety.MAYBE
-                && hook.response() instanceof HttpResponse res) {
+                    && ae.isRetrySafe() == RetrySafety.MAYBE
+                    && hook.response() instanceof HttpResponse res) {
                 applyRetryInfo(res, ae, hook.context());
             }
             return hook.forward(error);

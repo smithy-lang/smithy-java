@@ -18,12 +18,12 @@ public class SmithyHttpRequestImplTest {
     @Test
     public void addHeaders() throws Exception {
         var request = HttpRequest.builder()
-            .method("GET")
-            .uri(new URI("https://localhost"))
-            .withAddedHeader("foo", "bar   ")
-            .withAddedHeader("Baz", "bam")
-            .withAddedHeader("FOO", "bar2")
-            .build();
+                .method("GET")
+                .uri(new URI("https://localhost"))
+                .withAddedHeader("foo", "bar   ")
+                .withAddedHeader("Baz", "bam")
+                .withAddedHeader("FOO", "bar2")
+                .build();
 
         assertThat(request.headers().allValues("foo"), contains("bar", "bar2"));
         assertThat(request.headers().allValues("baz"), contains("bam"));
@@ -33,13 +33,13 @@ public class SmithyHttpRequestImplTest {
     @Test
     public void addHeadersToExistingHeaders() throws Exception {
         var request = HttpRequest.builder()
-            .method("GET")
-            .uri(new URI("https://localhost"))
-            .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-            .withAddedHeader("foo", "bar   ")
-            .withAddedHeader("Baz", "bam")
-            .withAddedHeader("FOO", "bar2")
-            .build();
+                .method("GET")
+                .uri(new URI("https://localhost"))
+                .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
+                .withAddedHeader("foo", "bar   ")
+                .withAddedHeader("Baz", "bam")
+                .withAddedHeader("FOO", "bar2")
+                .build();
 
         assertThat(request.headers().allValues("foo"), contains("bar0", "bar", "bar2"));
         assertThat(request.headers().allValues("baz"), contains("bam"));
@@ -50,11 +50,11 @@ public class SmithyHttpRequestImplTest {
     @Test
     public void replacesHeaders() throws Exception {
         var request = HttpRequest.builder()
-            .method("GET")
-            .uri(new URI("https://localhost"))
-            .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-            .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
-            .build();
+                .method("GET")
+                .uri(new URI("https://localhost"))
+                .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
+                .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
+                .build();
 
         assertThat(request.headers().allValues("foo"), contains("bar"));
         assertThat(request.headers().allValues("baz"), contains("bam"));
@@ -65,12 +65,12 @@ public class SmithyHttpRequestImplTest {
     @Test
     public void replacesHeadersOnExisting() throws Exception {
         var request = HttpRequest.builder()
-            .method("GET")
-            .uri(new URI("https://localhost"))
-            .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-            .withAddedHeader("a", "b")
-            .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
-            .build();
+                .method("GET")
+                .uri(new URI("https://localhost"))
+                .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
+                .withAddedHeader("a", "b")
+                .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
+                .build();
 
         assertThat(request.headers().allValues("foo"), contains("bar"));
         assertThat(request.headers().allValues("baz"), contains("bam"));
@@ -82,13 +82,13 @@ public class SmithyHttpRequestImplTest {
     @Test
     public void addsHeadersToReplacements() throws Exception {
         var request = HttpRequest.builder()
-            .method("GET")
-            .uri(new URI("https://localhost"))
-            .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
-            .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
-            .withAddedHeader("a", "b")
-            .withAddedHeader("foo", "bar2")
-            .build();
+                .method("GET")
+                .uri(new URI("https://localhost"))
+                .headers(HttpHeaders.of(Map.of("foo", List.of("bar0"), "bam", List.of(" A "))))
+                .withReplacedHeaders(Map.of("foo", List.of("bar   "), "Baz", List.of("bam")))
+                .withAddedHeader("a", "b")
+                .withAddedHeader("foo", "bar2")
+                .build();
 
         assertThat(request.headers().allValues("foo"), contains("bar", "bar2"));
         assertThat(request.headers().allValues("baz"), contains("bam"));

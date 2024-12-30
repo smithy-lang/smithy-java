@@ -21,17 +21,17 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
  * @param <O> Output shape.
  */
 public final class OutputHook<I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT> extends
-    ResponseHook<I, O, RequestT, ResponseT> {
+        ResponseHook<I, O, RequestT, ResponseT> {
 
     private final O output;
 
     public OutputHook(
-        ApiOperation<I, O> operation,
-        Context context,
-        I input,
-        RequestT request,
-        ResponseT response,
-        O output
+            ApiOperation<I, O> operation,
+            Context context,
+            I input,
+            RequestT request,
+            ResponseT response,
+            O output
     ) {
         super(operation, context, input, request, response);
         this.output = output;
@@ -54,8 +54,8 @@ public final class OutputHook<I extends SerializableStruct, O extends Serializab
      */
     public OutputHook<I, O, RequestT, ResponseT> withOutput(O output) {
         return Objects.equals(output, this.output)
-            ? this
-            : new OutputHook<>(operation(), context(), input(), request(), response(), output);
+                ? this
+                : new OutputHook<>(operation(), context(), input(), request(), response(), output);
     }
 
     /**
@@ -82,9 +82,9 @@ public final class OutputHook<I extends SerializableStruct, O extends Serializab
      */
     @SuppressWarnings("unchecked")
     public <R extends SerializableStruct> O mapOutput(
-        RuntimeException e,
-        Class<R> predicateType,
-        Function<OutputHook<?, R, ?, ?>, R> mapper
+            RuntimeException e,
+            Class<R> predicateType,
+            Function<OutputHook<?, R, ?, ?>, R> mapper
     ) {
         if (e != null) {
             throw e;
@@ -107,10 +107,10 @@ public final class OutputHook<I extends SerializableStruct, O extends Serializab
      */
     @SuppressWarnings("unchecked")
     public <R extends SerializableStruct, T> O mapOutput(
-        RuntimeException e,
-        Class<R> predicateType,
-        T state,
-        BiFunction<OutputHook<?, R, ?, ?>, T, R> mapper
+            RuntimeException e,
+            Class<R> predicateType,
+            T state,
+            BiFunction<OutputHook<?, R, ?, ?>, T, R> mapper
     ) {
         if (e != null) {
             throw e;

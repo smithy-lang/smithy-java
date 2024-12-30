@@ -30,22 +30,19 @@ import software.amazon.smithy.java.protocoltests.harness.StringBuildingSubscribe
 import software.amazon.smithy.java.protocoltests.harness.TestType;
 
 @ProtocolTest(
-    service = "aws.protocoltests.restxml#RestXml",
-    testType = TestType.CLIENT
-)
+        service = "aws.protocoltests.restxml#RestXml",
+        testType = TestType.CLIENT)
 @ProtocolTestFilter(
-    skipOperations = {
+        skipOperations = {
 
-    }
-)
+        })
 public class RestXmlProtocolTests {
     @HttpClientRequestTests
     @ProtocolTestFilter(
-        skipTests = {
-            "SDKAppliedContentEncoding_restXml",
-            "SDKAppendedGzipAfterProvidedEncoding_restXml"
-        }
-    )
+            skipTests = {
+                    "SDKAppliedContentEncoding_restXml",
+                    "SDKAppendedGzipAfterProvidedEncoding_restXml"
+            })
     public void requestTest(DataStream expected, DataStream actual) {
         if (expected.contentLength() != 0) {
             var a = new String(ByteBufferUtils.getBytes(actual.waitForByteBuffer()), StandardCharsets.UTF_8);
@@ -65,10 +62,9 @@ public class RestXmlProtocolTests {
 
     @HttpClientResponseTests
     @ProtocolTestFilter(
-        skipTests = {
-            "RestXmlDateTimeWithFractionalSeconds",
-        }
-    )
+            skipTests = {
+                    "RestXmlDateTimeWithFractionalSeconds",
+            })
     public void responseTest(Runnable test) {
         test.run();
     }

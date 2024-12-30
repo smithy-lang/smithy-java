@@ -53,8 +53,8 @@ final class SdkJsonDocumentParser implements ShapeSerializer {
     }
 
     static software.amazon.awssdk.core.document.Document writeJsonDocument(
-        Document document,
-        JsonSettings settings
+            Document document,
+            JsonSettings settings
     ) {
         if (document == null) {
             return software.amazon.awssdk.core.document.Document.fromNull();
@@ -104,8 +104,8 @@ final class SdkJsonDocumentParser implements ShapeSerializer {
     @Override
     public <T> void writeList(Schema schema, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
         List<software.amazon.awssdk.core.document.Document> elements = size == -1
-            ? new ArrayList<>()
-            : new ArrayList<>(size);
+                ? new ArrayList<>()
+                : new ArrayList<>(size);
         var elementParser = new SdkJsonDocumentParser(settings);
         ListSerializer serializer = new ListSerializer(elementParser, position -> {
             if (position > 0) {
@@ -141,10 +141,10 @@ final class SdkJsonDocumentParser implements ShapeSerializer {
 
         @Override
         public <U> void writeEntry(
-            Schema keySchema,
-            String key,
-            U keyState,
-            BiConsumer<U, ShapeSerializer> valueSerializer
+                Schema keySchema,
+                String key,
+                U keyState,
+                BiConsumer<U, ShapeSerializer> valueSerializer
         ) {
             var valueParser = new SdkJsonDocumentParser(settings);
             valueSerializer.accept(keyState, valueParser);

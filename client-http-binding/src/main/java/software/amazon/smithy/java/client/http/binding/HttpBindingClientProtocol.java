@@ -66,18 +66,18 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
 
     @Override
     public <I extends SerializableStruct, O extends SerializableStruct> HttpRequest createRequest(
-        ApiOperation<I, O> operation,
-        I input,
-        Context context,
-        URI endpoint
+            ApiOperation<I, O> operation,
+            I input,
+            Context context,
+            URI endpoint
     ) {
         RequestSerializer serializer = httpBinding.requestSerializer()
-            .operation(operation)
-            .payloadCodec(codec())
-            .payloadMediaType(payloadMediaType())
-            .shapeValue(input)
-            .endpoint(endpoint)
-            .omitEmptyPayload(omitEmptyPayload());
+                .operation(operation)
+                .payloadCodec(codec())
+                .payloadMediaType(payloadMediaType())
+                .shapeValue(input)
+                .endpoint(endpoint)
+                .omitEmptyPayload(omitEmptyPayload());
 
         if (operation instanceof InputEventStreamingApiOperation<?, ?, ?> i) {
             serializer.eventEncoderFactory(getEventEncoderFactory(i));
@@ -88,11 +88,11 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
 
     @Override
     public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
-        ApiOperation<I, O> operation,
-        Context context,
-        TypeRegistry typeRegistry,
-        HttpRequest request,
-        HttpResponse response
+            ApiOperation<I, O> operation,
+            Context context,
+            TypeRegistry typeRegistry,
+            HttpRequest request,
+            HttpResponse response
     ) {
         if (!isSuccess(operation, context, response)) {
             return createError(operation, context, typeRegistry, request, response).thenApply(e -> {
@@ -104,22 +104,22 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
 
         var outputBuilder = operation.outputBuilder();
         ResponseDeserializer deser = httpBinding.responseDeserializer()
-            .payloadCodec(codec())
-            .payloadMediaType(payloadMediaType())
-            .outputShapeBuilder(outputBuilder)
-            .response(response);
+                .payloadCodec(codec())
+                .payloadMediaType(payloadMediaType())
+                .outputShapeBuilder(outputBuilder)
+                .response(response);
 
         if (operation instanceof OutputEventStreamingApiOperation<?, ?, ?> o) {
             deser.eventDecoderFactory(getEventDecoderFactory(o));
         }
 
         return deser
-            .deserialize()
-            .thenApply(ignore -> {
-                O output = outputBuilder.errorCorrection().build();
-                LOGGER.trace("Successfully built {} from HTTP response with {}", output, getClass().getName());
-                return output;
-            });
+                .deserialize()
+                .thenApply(ignore -> {
+                    O output = outputBuilder.errorCorrection().build();
+                    LOGGER.trace("Successfully built {} from HTTP response with {}", output, getClass().getName());
+                    return output;
+                });
     }
 
     /**
@@ -144,13 +144,14 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
      * @param response HTTP response to deserialize.
      * @return Returns the deserialized error.
      */
-    protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<? extends ApiException> createError(
-        ApiOperation<I, O> operation,
-        Context context,
-        TypeRegistry typeRegistry,
-        HttpRequest request,
-        HttpResponse response
-    ) {
+    protected <I extends SerializableStruct,
+            O extends SerializableStruct> CompletableFuture<? extends ApiException> createError(
+                    ApiOperation<I, O> operation,
+                    Context context,
+                    TypeRegistry typeRegistry,
+                    HttpRequest request,
+                    HttpResponse response
+            ) {
         return getErrorDeserializer(context).createError(context, operation.schema().id(), typeRegistry, response);
     }
 }

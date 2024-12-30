@@ -26,10 +26,10 @@ final class SchemaBuilderGenerator extends ShapeVisitor.Default<Void> implements
     private final CodeGenerationContext context;
 
     SchemaBuilderGenerator(
-        JavaWriter writer,
-        Shape shape,
-        Model model,
-        CodeGenerationContext context
+            JavaWriter writer,
+            Shape shape,
+            Model model,
+            CodeGenerationContext context
     ) {
         this.writer = writer;
         this.shape = shape;
@@ -63,32 +63,28 @@ final class SchemaBuilderGenerator extends ShapeVisitor.Default<Void> implements
     @Override
     public Void listShape(ListShape shape) {
         writer.write(
-            "static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.listBuilder(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.listBuilder(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
     @Override
     public Void mapShape(MapShape shape) {
         writer.write(
-            "static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.mapBuilder(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.mapBuilder(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
     @Override
     public Void structureShape(StructureShape shape) {
         writer.write(
-            "static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.structureBuilder($$ID${traits:C});"
-        );
+                "static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.structureBuilder($$ID${traits:C});");
         return null;
     }
 
     @Override
     public Void unionShape(UnionShape shape) {
         writer.write(
-            "static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.structureBuilder($$ID${traits:C});"
-        );
+                "static final ${schemaBuilder:T} ${name:L}_BUILDER = ${schemaClass:T}.structureBuilder($$ID${traits:C});");
         return null;
     }
 }

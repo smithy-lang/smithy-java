@@ -62,7 +62,7 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
         authSchemeResolver = Objects.requireNonNull(builder.authSchemeResolver, "authSchemeResolver is null");
         identityResolvers = Objects.requireNonNull(builder.identityResolvers, "identityResolvers is null");
         supportedAuthSchemes = builder.supportedAuthSchemes.stream()
-            .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity(), (key1, key2) -> key1));
+                .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity(), (key1, key2) -> key1));
 
         // Retries
         retryStrategy = Objects.requireNonNull(builder.retryStrategy, "retryStrategy is null");

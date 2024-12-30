@@ -18,9 +18,9 @@ public final class OrchestratorGroup implements ObservableOrchestrator {
     private final Strategy strategy;
 
     public OrchestratorGroup(
-        int numberOfOrchestrators,
-        Supplier<ObservableOrchestrator> orchestratorSupplier,
-        Strategy strategy
+            int numberOfOrchestrators,
+            Supplier<ObservableOrchestrator> orchestratorSupplier,
+            Strategy strategy
     ) {
         this.strategy = strategy;
         List<ObservableOrchestrator> orchestrators = new ArrayList<>(numberOfOrchestrators);
@@ -42,8 +42,7 @@ public final class OrchestratorGroup implements ObservableOrchestrator {
     @Override
     public CompletableFuture<Void> shutdown() {
         return CompletableFuture.allOf(
-            orchestrators.stream().map(Orchestrator::shutdown).toArray(CompletableFuture[]::new)
-        );
+                orchestrators.stream().map(Orchestrator::shutdown).toArray(CompletableFuture[]::new));
     }
 
     @Override

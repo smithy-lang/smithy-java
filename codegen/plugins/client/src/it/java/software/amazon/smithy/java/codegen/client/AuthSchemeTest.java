@@ -48,12 +48,12 @@ public class AuthSchemeTest {
             }
         };
         var client = TestServiceClient.builder()
-            .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
-            .endpointResolver(ENDPOINT_RESOLVER)
-            .authSchemeResolver(params -> List.of(new AuthSchemeOption(TestAuthSchemeTrait.ID)))
-            .addInterceptor(interceptor)
-            .value(2L)
-            .build();
+                .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
+                .endpointResolver(ENDPOINT_RESOLVER)
+                .authSchemeResolver(params -> List.of(new AuthSchemeOption(TestAuthSchemeTrait.ID)))
+                .addInterceptor(interceptor)
+                .value(2L)
+                .build();
 
         var value = "hello world";
         var input = EchoInput.builder().string(value).build();

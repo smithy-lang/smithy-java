@@ -19,7 +19,7 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
  * @param <RequestT> Protocol specific request.
  */
 public sealed class RequestHook<I extends SerializableStruct, O extends SerializableStruct, RequestT> extends
-    InputHook<I, O> permits ResponseHook {
+        InputHook<I, O> permits ResponseHook {
 
     private final RequestT request;
 
@@ -45,8 +45,8 @@ public sealed class RequestHook<I extends SerializableStruct, O extends Serializ
      */
     public RequestHook<I, O, RequestT> withRequest(RequestT request) {
         return Objects.equals(request, this.request)
-            ? this
-            : new RequestHook<>(operation(), context(), input(), request);
+                ? this
+                : new RequestHook<>(operation(), context(), input(), request);
     }
 
     /**

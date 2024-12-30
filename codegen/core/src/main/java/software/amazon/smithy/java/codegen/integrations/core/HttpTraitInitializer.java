@@ -24,7 +24,6 @@ final class HttpTraitInitializer implements TraitInitializer<HttpTrait> {
         writer.putContext("uriPattern", UriPattern.class);
         writer.putContext("uri", httpTrait.getUri());
         writer.writeInline(
-            "${http:T}.builder().method(${method:S}).code(${code:L}).uri(${uriPattern:T}.parse(${uri:S})).build()"
-        );
+                "${http:T}.builder().method(${method:S}).code(${code:L}).uri(${uriPattern:T}.parse(${uri:S})).build()");
     }
 }

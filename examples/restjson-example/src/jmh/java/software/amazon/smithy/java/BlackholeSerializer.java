@@ -71,10 +71,10 @@ public final class BlackholeSerializer implements ShapeSerializer {
     private record BhMapSerializer(BlackholeSerializer bs) implements MapSerializer {
         @Override
         public <T> void writeEntry(
-            Schema keySchema,
-            String key,
-            T state,
-            BiConsumer<T, ShapeSerializer> valueSerializer
+                Schema keySchema,
+                String key,
+                T state,
+                BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
             valueSerializer.accept(state, bs);
         }

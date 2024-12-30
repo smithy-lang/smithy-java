@@ -55,117 +55,113 @@ public class CodegenContextTest {
     @BeforeAll
     public static void before() {
         model = Model.assembler()
-            .addImport(Objects.requireNonNull(CodegenContextTest.class.getResource("codegen-context-test.smithy")))
-            .assemble()
-            .unwrap();
+                .addImport(Objects.requireNonNull(CodegenContextTest.class.getResource("codegen-context-test.smithy")))
+                .assemble()
+                .unwrap();
     }
 
     @Test
     void getsCorrectRuntimeTraitsForProtocolsAndAuth() {
         var context = new CodeGenerationContext(
-            model,
-            JavaCodegenSettings.builder()
-                .service(SERVICE_ID.toString())
-                .runtimeTraitsSelector("[id=smithy.java.codegen#selectedTrait]")
-                .runtimeTraits(List.of(HttpErrorTrait.ID))
-                .packageNamespace("ns.foo")
-                .build(),
-            new JavaSymbolProvider(model, model.expectShape(SERVICE_ID).asServiceShape().get(), "ns.foo"),
-            new MockManifest(),
-            List.of()
-        );
+                model,
+                JavaCodegenSettings.builder()
+                        .service(SERVICE_ID.toString())
+                        .runtimeTraitsSelector("[id=smithy.java.codegen#selectedTrait]")
+                        .runtimeTraits(List.of(HttpErrorTrait.ID))
+                        .packageNamespace("ns.foo")
+                        .build(),
+                new JavaSymbolProvider(model, model.expectShape(SERVICE_ID).asServiceShape().get(), "ns.foo"),
+                new MockManifest(),
+                List.of());
 
         assertThat(
-            context.runtimeTraits(),
-            containsInAnyOrder(
-                // Prelude validation traits
-                LengthTrait.ID,
-                PatternTrait.ID,
-                RangeTrait.ID,
-                RequiredTrait.ID,
-                SensitiveTrait.ID,
-                SparseTrait.ID,
-                UniqueItemsTrait.ID,
-                RequiresLengthTrait.ID,
-                ErrorTrait.ID,
-                DefaultTrait.ID,
-                // Base Prelude Protocol traits
-                JsonNameTrait.ID,
-                TimestampFormatTrait.ID,
-                MediaTypeTrait.ID,
-                XmlNameTrait.ID,
-                XmlFlattenedTrait.ID,
-                XmlAttributeTrait.ID,
-                XmlNamespaceTrait.ID,
-                EventHeaderTrait.ID,
-                EventPayloadTrait.ID,
-                HostLabelTrait.ID,
-                EndpointTrait.ID,
-                // Protocol Traits
-                CorsTrait.ID,
-                HttpTrait.ID,
-                // Auth traits
-                HttpQueryTrait.ID,
-                HttpPayloadTrait.ID,
-                // Prelude behavior traits
-                PaginatedTrait.ID,
-                IdempotencyTokenTrait.ID,
-                RetryableTrait.ID,
-                RequestCompressionTrait.ID,
-                StreamingTrait.ID,
-                // Added by settings
-                HttpErrorTrait.ID,
-                ShapeId.from("smithy.java.codegen#selectedTrait")
-            )
-        );
+                context.runtimeTraits(),
+                containsInAnyOrder(
+                        // Prelude validation traits
+                        LengthTrait.ID,
+                        PatternTrait.ID,
+                        RangeTrait.ID,
+                        RequiredTrait.ID,
+                        SensitiveTrait.ID,
+                        SparseTrait.ID,
+                        UniqueItemsTrait.ID,
+                        RequiresLengthTrait.ID,
+                        ErrorTrait.ID,
+                        DefaultTrait.ID,
+                        // Base Prelude Protocol traits
+                        JsonNameTrait.ID,
+                        TimestampFormatTrait.ID,
+                        MediaTypeTrait.ID,
+                        XmlNameTrait.ID,
+                        XmlFlattenedTrait.ID,
+                        XmlAttributeTrait.ID,
+                        XmlNamespaceTrait.ID,
+                        EventHeaderTrait.ID,
+                        EventPayloadTrait.ID,
+                        HostLabelTrait.ID,
+                        EndpointTrait.ID,
+                        // Protocol Traits
+                        CorsTrait.ID,
+                        HttpTrait.ID,
+                        // Auth traits
+                        HttpQueryTrait.ID,
+                        HttpPayloadTrait.ID,
+                        // Prelude behavior traits
+                        PaginatedTrait.ID,
+                        IdempotencyTokenTrait.ID,
+                        RetryableTrait.ID,
+                        RequestCompressionTrait.ID,
+                        StreamingTrait.ID,
+                        // Added by settings
+                        HttpErrorTrait.ID,
+                        ShapeId.from("smithy.java.codegen#selectedTrait")));
     }
 
     @Test
     void getsCorrectTraitsWithNoProtocolOrAuth() {
         var context = new CodeGenerationContext(
-            model,
-            JavaCodegenSettings.builder()
-                .service(NO_PROTOCOL_SERVICE_ID.toString())
-                .packageNamespace("ns.foo")
-                .build(),
-            new JavaSymbolProvider(model, model.expectShape(NO_PROTOCOL_SERVICE_ID).asServiceShape().get(), "ns.foo"),
-            new MockManifest(),
-            List.of()
-        );
+                model,
+                JavaCodegenSettings.builder()
+                        .service(NO_PROTOCOL_SERVICE_ID.toString())
+                        .packageNamespace("ns.foo")
+                        .build(),
+                new JavaSymbolProvider(model,
+                        model.expectShape(NO_PROTOCOL_SERVICE_ID).asServiceShape().get(),
+                        "ns.foo"),
+                new MockManifest(),
+                List.of());
 
         assertThat(
-            context.runtimeTraits(),
-            containsInAnyOrder(
-                // Prelude Validation Traits
-                LengthTrait.ID,
-                PatternTrait.ID,
-                RangeTrait.ID,
-                RequiredTrait.ID,
-                SensitiveTrait.ID,
-                SparseTrait.ID,
-                UniqueItemsTrait.ID,
-                RequiresLengthTrait.ID,
-                ErrorTrait.ID,
-                DefaultTrait.ID,
-                // Base Prelude Protocol traits
-                JsonNameTrait.ID,
-                TimestampFormatTrait.ID,
-                MediaTypeTrait.ID,
-                XmlNameTrait.ID,
-                XmlFlattenedTrait.ID,
-                XmlAttributeTrait.ID,
-                XmlNamespaceTrait.ID,
-                EventHeaderTrait.ID,
-                EventPayloadTrait.ID,
-                HostLabelTrait.ID,
-                EndpointTrait.ID,
-                // Prelude behavior traits
-                PaginatedTrait.ID,
-                IdempotencyTokenTrait.ID,
-                RetryableTrait.ID,
-                RequestCompressionTrait.ID,
-                StreamingTrait.ID
-            )
-        );
+                context.runtimeTraits(),
+                containsInAnyOrder(
+                        // Prelude Validation Traits
+                        LengthTrait.ID,
+                        PatternTrait.ID,
+                        RangeTrait.ID,
+                        RequiredTrait.ID,
+                        SensitiveTrait.ID,
+                        SparseTrait.ID,
+                        UniqueItemsTrait.ID,
+                        RequiresLengthTrait.ID,
+                        ErrorTrait.ID,
+                        DefaultTrait.ID,
+                        // Base Prelude Protocol traits
+                        JsonNameTrait.ID,
+                        TimestampFormatTrait.ID,
+                        MediaTypeTrait.ID,
+                        XmlNameTrait.ID,
+                        XmlFlattenedTrait.ID,
+                        XmlAttributeTrait.ID,
+                        XmlNamespaceTrait.ID,
+                        EventHeaderTrait.ID,
+                        EventPayloadTrait.ID,
+                        HostLabelTrait.ID,
+                        EndpointTrait.ID,
+                        // Prelude behavior traits
+                        PaginatedTrait.ID,
+                        IdempotencyTokenTrait.ID,
+                        RetryableTrait.ID,
+                        RequestCompressionTrait.ID,
+                        StreamingTrait.ID));
     }
 }

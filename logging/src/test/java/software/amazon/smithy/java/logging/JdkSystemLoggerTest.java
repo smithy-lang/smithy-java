@@ -45,8 +45,7 @@ class JdkSystemLoggerTest {
         assertThat(lines[2]).startsWith("SEVERE [FATAL] a: test3: b c");
         assertThat(lines[3]).startsWith("java.lang.NullPointerException: BANG!");
         assertThat(lines[4]).contains(
-            "at software.amazon.smithy.java.logging.JdkSystemLoggerTest.smokeTest(JdkSystemLoggerTest.java:"
-        );
+                "at software.amazon.smithy.java.logging.JdkSystemLoggerTest.smokeTest(JdkSystemLoggerTest.java:");
     }
 
     @Test
@@ -63,8 +62,7 @@ class JdkSystemLoggerTest {
         assertThat(lines[1]).startsWith("SEVERE [FATAL] a: test3: b c");
         assertThat(lines[2]).startsWith("java.lang.NullPointerException: BANG!");
         assertThat(lines[3]).contains(
-            "at software.amazon.smithy.java.logging.JdkSystemLoggerTest.levelTest(JdkSystemLoggerTest.java:"
-        );
+                "at software.amazon.smithy.java.logging.JdkSystemLoggerTest.levelTest(JdkSystemLoggerTest.java:");
     }
 
     @Test
@@ -74,13 +72,12 @@ class JdkSystemLoggerTest {
         logger.log(InternalLogger.Level.ERROR, "test1");
         logger.log(InternalLogger.Level.WARN, "test2: {}", "abc");
         logger.log(
-            InternalLogger.Level.FATAL,
-            "{}: test3: {} {}",
-            "a",
-            "b",
-            "c",
-            new NullPointerException("BANG!")
-        );
+                InternalLogger.Level.FATAL,
+                "{}: test3: {} {}",
+                "a",
+                "b",
+                "c",
+                new NullPointerException("BANG!"));
 
         var lines = testLog.buffer.toString().split(System.lineSeparator());
         assertThat(lines).hasSizeGreaterThan(4);
@@ -88,8 +85,7 @@ class JdkSystemLoggerTest {
         assertThat(lines[1]).startsWith("SEVERE [FATAL] a: test3: b c");
         assertThat(lines[2]).startsWith("java.lang.NullPointerException: BANG!");
         assertThat(lines[3]).contains(
-            "at software.amazon.smithy.java.logging.JdkSystemLoggerTest.dynamicLevelTest(JdkSystemLoggerTest.java:"
-        );
+                "at software.amazon.smithy.java.logging.JdkSystemLoggerTest.dynamicLevelTest(JdkSystemLoggerTest.java:");
     }
 
     private static final class TestLogger extends java.util.logging.Logger {

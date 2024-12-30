@@ -24,12 +24,12 @@ final class DeferredRootSchema extends Schema {
     private volatile ResolvedMembers resolvedMembers;
 
     DeferredRootSchema(
-        ShapeType type,
-        ShapeId id,
-        TraitMap traits,
-        List<MemberSchemaBuilder> memberBuilders,
-        Set<String> stringEnumValues,
-        Set<Integer> intEnumValues
+            ShapeType type,
+            ShapeId id,
+            TraitMap traits,
+            List<MemberSchemaBuilder> memberBuilders,
+            Set<String> stringEnumValues,
+            Set<Integer> intEnumValues
     ) {
         super(type, id, traits, memberBuilders, stringEnumValues);
         this.stringEnumValues = Collections.unmodifiableSet(stringEnumValues);

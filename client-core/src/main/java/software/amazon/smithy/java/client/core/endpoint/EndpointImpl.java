@@ -58,7 +58,7 @@ final class EndpointImpl implements Endpoint {
         }
         EndpointImpl endpoint = (EndpointImpl) o;
         return Objects.equals(uri, endpoint.uri) && Objects.equals(authSchemes, endpoint.authSchemes)
-            && Objects.equals(properties, endpoint.properties);
+                && Objects.equals(properties, endpoint.properties);
     }
 
     @Override

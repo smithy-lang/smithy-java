@@ -24,10 +24,9 @@ import software.amazon.smithy.model.shapes.ShapeId;
  * @see AuthScheme
  */
 public record AuthSchemeOption(
-    ShapeId schemeId,
-    AuthProperties identityPropertyOverrides,
-    AuthProperties signerPropertyOverrides
-) {
+        ShapeId schemeId,
+        AuthProperties identityPropertyOverrides,
+        AuthProperties signerPropertyOverrides) {
     public AuthSchemeOption {
         Objects.requireNonNull(schemeId, "schemeId cannot be null.");
         Objects.requireNonNull(identityPropertyOverrides, "identityPropertyOverrides cannot be null.");

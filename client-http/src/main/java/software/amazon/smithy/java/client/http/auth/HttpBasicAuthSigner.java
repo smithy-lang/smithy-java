@@ -27,9 +27,9 @@ final class HttpBasicAuthSigner implements Signer<HttpRequest, LoginIdentity> {
 
     @Override
     public CompletableFuture<HttpRequest> sign(
-        HttpRequest request,
-        LoginIdentity identity,
-        AuthProperties properties
+            HttpRequest request,
+            LoginIdentity identity,
+            AuthProperties properties
     ) {
         var identityString = identity.username() + ":" + identity.password();
         var base64Value = Base64.getEncoder().encodeToString(identityString.getBytes(StandardCharsets.UTF_8));

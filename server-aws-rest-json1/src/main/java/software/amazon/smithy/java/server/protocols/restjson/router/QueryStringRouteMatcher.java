@@ -39,7 +39,7 @@ class QueryStringRouteMatcher implements RouteMatcher {
             } else if (queryPattern.getRequiredLiteralKeys().contains(key)) {
                 CharSequence requiredValue = queryPattern.getRequiredLiteralValue(key);
                 if (requiredValue != null &&
-                    !requiredValue.toString().equalsIgnoreCase(value)) {
+                        !requiredValue.toString().equalsIgnoreCase(value)) {
                     return false;
                 }
 

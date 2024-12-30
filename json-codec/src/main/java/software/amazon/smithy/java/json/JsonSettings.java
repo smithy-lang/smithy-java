@@ -46,11 +46,11 @@ public final class JsonSettings {
 
     private JsonSettings(Builder builder) {
         this.timestampResolver = builder.useTimestampFormat
-            ? new TimestampResolver.UseTimestampFormatTrait(builder.defaultTimestampFormat)
-            : new TimestampResolver.StaticFormat(builder.defaultTimestampFormat);
+                ? new TimestampResolver.UseTimestampFormatTrait(builder.defaultTimestampFormat)
+                : new TimestampResolver.StaticFormat(builder.defaultTimestampFormat);
         this.fieldMapper = builder.useJsonName
-            ? new JsonFieldMapper.UseJsonNameTrait()
-            : JsonFieldMapper.UseMemberName.INSTANCE;
+                ? new JsonFieldMapper.UseJsonNameTrait()
+                : JsonFieldMapper.UseMemberName.INSTANCE;
         this.forbidUnknownUnionMembers = builder.forbidUnknownUnionMembers;
         this.defaultNamespace = builder.defaultNamespace;
         this.provider = builder.provider;

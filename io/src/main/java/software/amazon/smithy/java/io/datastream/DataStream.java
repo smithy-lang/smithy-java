@@ -302,10 +302,10 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      * @return the created DataStream.
      */
     static DataStream ofPublisher(
-        Flow.Publisher<ByteBuffer> publisher,
-        String contentType,
-        long contentLength,
-        boolean isReplayable
+            Flow.Publisher<ByteBuffer> publisher,
+            String contentType,
+            long contentLength,
+            boolean isReplayable
     ) {
         if (publisher instanceof DataStream ds) {
             return withMetadata(ds, contentType, contentLength, isReplayable);
@@ -346,7 +346,7 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
         }
 
         return isChanged
-            ? new WrappedDataStream(ds, changedContentLength, changedContentType, changedIsReplayable)
-            : ds;
+                ? new WrappedDataStream(ds, changedContentLength, changedContentType, changedIsReplayable)
+                : ds;
     }
 }

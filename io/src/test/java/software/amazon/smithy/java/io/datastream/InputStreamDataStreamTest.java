@@ -30,10 +30,9 @@ public class InputStreamDataStreamTest {
     @Test
     public void createsInputStreamDataStreamWithMetadata() throws Exception {
         var ds = DataStream.ofInputStream(
-            Files.newInputStream(Paths.get(getClass().getResource("test.txt").toURI())),
-            "text/plain",
-            6
-        );
+                Files.newInputStream(Paths.get(getClass().getResource("test.txt").toURI())),
+                "text/plain",
+                6);
 
         assertThat(ds.contentLength(), equalTo(6L));
         assertThat(ds.contentType(), equalTo("text/plain"));
@@ -43,10 +42,9 @@ public class InputStreamDataStreamTest {
     @Test
     public void convertsToInputStream() throws Exception {
         var ds = DataStream.ofInputStream(
-            Files.newInputStream(Paths.get(getClass().getResource("test.txt").toURI())),
-            "text/plain",
-            6
-        );
+                Files.newInputStream(Paths.get(getClass().getResource("test.txt").toURI())),
+                "text/plain",
+                6);
 
         assertThat(ds.asInputStream().get().readAllBytes(), equalTo("Hello!".getBytes(StandardCharsets.UTF_8)));
     }
@@ -54,10 +52,9 @@ public class InputStreamDataStreamTest {
     @Test
     public void readsDataToByteBuffer() throws Exception {
         var ds = DataStream.ofInputStream(
-            Files.newInputStream(Paths.get(getClass().getResource("test.txt").toURI())),
-            "text/plain",
-            6
-        );
+                Files.newInputStream(Paths.get(getClass().getResource("test.txt").toURI())),
+                "text/plain",
+                6);
 
         assertThat(ds.waitForByteBuffer(), equalTo(ByteBuffer.wrap("Hello!".getBytes(StandardCharsets.UTF_8))));
     }

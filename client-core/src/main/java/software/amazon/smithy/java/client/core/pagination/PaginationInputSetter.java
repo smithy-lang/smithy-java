@@ -22,10 +22,10 @@ final class PaginationInputSetter<I extends SerializableStruct> {
     private final Schema maxResultsSchema;
 
     PaginationInputSetter(
-        I input,
-        ApiOperation<I, ?> operation,
-        String inputTokenMember,
-        String maxResultsMember
+            I input,
+            ApiOperation<I, ?> operation,
+            String inputTokenMember,
+            String maxResultsMember
     ) {
         this.input = input;
         this.operation = operation;

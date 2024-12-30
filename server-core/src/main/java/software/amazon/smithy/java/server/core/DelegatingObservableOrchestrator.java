@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 public abstract sealed class DelegatingObservableOrchestrator implements ObservableOrchestrator permits
-    ErrorHandlingOrchestrator {
+        ErrorHandlingOrchestrator {
 
     protected final ObservableOrchestrator delegate;
 

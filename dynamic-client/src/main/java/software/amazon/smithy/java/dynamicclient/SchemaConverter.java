@@ -47,8 +47,8 @@ final class SchemaConverter {
 
     private Schema createSchema(Shape shape) {
         return isRecursive(shape)
-            ? getOrCreateRecursiveSchemaBuilder(shape).build()
-            : createNonRecursiveSchema(shape);
+                ? getOrCreateRecursiveSchemaBuilder(shape).build()
+                : createNonRecursiveSchema(shape);
     }
 
     private boolean isRecursive(Shape shape) {
@@ -94,15 +94,13 @@ final class SchemaConverter {
             case BIG_DECIMAL -> Schema.createBigDecimal(shape.getId(), convertTraits(shape));
             case BIG_INTEGER -> Schema.createBigInteger(shape.getId(), convertTraits(shape));
             case ENUM -> Schema.createEnum(
-                shape.getId(),
-                new HashSet<>(shape.asEnumShape().orElseThrow().getEnumValues().values()),
-                convertTraits(shape)
-            );
+                    shape.getId(),
+                    new HashSet<>(shape.asEnumShape().orElseThrow().getEnumValues().values()),
+                    convertTraits(shape));
             case INT_ENUM -> Schema.createIntEnum(
-                shape.getId(),
-                new HashSet<>(shape.asIntEnumShape().orElseThrow().getEnumValues().values()),
-                convertTraits(shape)
-            );
+                    shape.getId(),
+                    new HashSet<>(shape.asIntEnumShape().orElseThrow().getEnumValues().values()),
+                    convertTraits(shape));
             case LIST, SET, MAP, STRUCTURE, UNION -> getOrCreateRecursiveSchemaBuilder(shape).build();
             case OPERATION -> Schema.createOperation(shape.getId(), convertTraits(shape));
             case SERVICE -> Schema.createService(shape.getId(), convertTraits(shape));

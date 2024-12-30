@@ -37,7 +37,7 @@ public final class AddFrameworkErrorsTransform {
         }
         var addedFrameworkErrors = ImplicitErrorsTrait.builder().values(frameworkErrors.stream().toList()).build();
         var syntheticFrameworkTraitShape = getSyntheticTraitBuilder().addTrait(addedFrameworkErrors)
-            .build();
+                .build();
         Set<Shape> updated = new HashSet<>();
         updated.add(syntheticFrameworkTraitShape);
         for (var service : model.getServiceShapes()) {
@@ -49,8 +49,8 @@ public final class AddFrameworkErrorsTransform {
 
     private static StructureShape.Builder getSyntheticTraitBuilder() {
         return StructureShape.builder()
-            .id(SYNTHETIC_TRAIT_ID)
-            .addTrait(TraitDefinition.builder().build());
+                .id(SYNTHETIC_TRAIT_ID)
+                .addTrait(TraitDefinition.builder().build());
     }
 
     private static final class SyntheticErrorTrait implements Trait {

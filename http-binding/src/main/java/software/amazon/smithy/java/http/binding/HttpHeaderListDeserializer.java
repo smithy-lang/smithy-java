@@ -22,7 +22,7 @@ final class HttpHeaderListDeserializer extends SpecificShapeDeserializer {
         var listMember = schema.memberTarget().listMember();
         switch (listMember.type()) {
             case STRING, ENUM, INT_ENUM, BOOLEAN,
-                BYTE, SHORT, INTEGER, LONG, FLOAT, DOUBLE, BIG_INTEGER, BIG_DECIMAL -> {
+                    BYTE, SHORT, INTEGER, LONG, FLOAT, DOUBLE, BIG_INTEGER, BIG_DECIMAL -> {
                 splitString(values, actualValues);
             }
             case TIMESTAMP -> {
@@ -43,8 +43,7 @@ final class HttpHeaderListDeserializer extends SpecificShapeDeserializer {
     }
 
     private static void splitString(List<String> values, List<String> accumulator) {
-        outer:
-        for (var v : values) {
+        outer: for (var v : values) {
             boolean hasComma = false;
             // Do a single pass over the string to check if quotes need to be processed or commas.
             for (var i = 0; i < v.length(); i++) {

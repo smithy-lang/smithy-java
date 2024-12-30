@@ -17,9 +17,9 @@ import software.amazon.smithy.model.shapes.ShapeId;
 final class CborTestData {
     static final ShapeId BIRD_ID = ShapeId.from("smithy.example#Bird");
     static final Schema BIRD = Schema.structureBuilder(BIRD_ID)
-        .putMember("name", PreludeSchemas.STRING)
-        .putMember("bytes", PreludeSchemas.BLOB)
-        .build();
+            .putMember("name", PreludeSchemas.STRING)
+            .putMember("bytes", PreludeSchemas.BLOB)
+            .build();
     static final Schema BIRD_NAME = BIRD.member("name");
     static final Schema BIRD_BYTES = BIRD.member("bytes");
 

@@ -20,9 +20,9 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct> implements
     private final Codec codec;
 
     public AwsEventShapeDecoder(
-        Supplier<ShapeBuilder<E>> eventBuilder,
-        Schema eventSchema,
-        Codec codec
+            Supplier<ShapeBuilder<E>> eventBuilder,
+            Schema eventSchema,
+            Codec codec
     ) {
         this.eventBuilder = eventBuilder;
         this.eventSchema = eventSchema;
@@ -43,13 +43,11 @@ public final class AwsEventShapeDecoder<E extends SerializableStruct> implements
         }
 
         return eventBuilder.get()
-            .deserialize(
-                new AwsEventDeserializer(
-                    memberSchema,
-                    codec.createDeserializer(message.getPayload())
-                )
-            )
-            .build();
+                .deserialize(
+                        new AwsEventDeserializer(
+                                memberSchema,
+                                codec.createDeserializer(message.getPayload())))
+                .build();
     }
 
     private String getEventType(Message message) {

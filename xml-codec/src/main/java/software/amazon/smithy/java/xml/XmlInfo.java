@@ -104,14 +104,14 @@ final class XmlInfo {
         }
 
         <T> void readMember(
-            Map<Schema, Deque<XMLEvent>> flatState,
-            XMLEventFactory eventFactory,
-            ShapeDeserializer deserializer,
-            XmlReader reader,
-            T state,
-            ShapeDeserializer.StructMemberConsumer<T> consumer,
-            String elementName,
-            Schema member
+                Map<Schema, Deque<XMLEvent>> flatState,
+                XMLEventFactory eventFactory,
+                ShapeDeserializer deserializer,
+                XmlReader reader,
+                T state,
+                ShapeDeserializer.StructMemberConsumer<T> consumer,
+                String elementName,
+                Schema member
         ) throws XMLStreamException {
             if (!hasFlattened || !member.hasTrait(TraitKey.XML_FLATTENED_TRAIT)) {
                 consumer.accept(state, member, deserializer);
@@ -137,21 +137,20 @@ final class XmlInfo {
         }
 
         <T> void finishReadingStruct(
-            Map<Schema, Deque<XMLEvent>> flatState,
-            XMLEventFactory eventFactory,
-            XmlInfo decoders,
-            T state,
-            ShapeDeserializer.StructMemberConsumer<T> consumer
+                Map<Schema, Deque<XMLEvent>> flatState,
+                XMLEventFactory eventFactory,
+                XmlInfo decoders,
+                T state,
+                ShapeDeserializer.StructMemberConsumer<T> consumer
         ) throws XMLStreamException {
             for (var entry : flatState.entrySet()) {
                 var schema = entry.getKey();
                 var events = entry.getValue();
                 consumer.accept(
-                    state,
-                    schema,
-                    // Use a special flattened deserializer that delegates validation of the encountered element.
-                    XmlDeserializer.flattened(decoders, eventFactory, new XmlReader.BufferedReader(events))
-                );
+                        state,
+                        schema,
+                        // Use a special flattened deserializer that delegates validation of the encountered element.
+                        XmlDeserializer.flattened(decoders, eventFactory, new XmlReader.BufferedReader(events)));
             }
         }
     }

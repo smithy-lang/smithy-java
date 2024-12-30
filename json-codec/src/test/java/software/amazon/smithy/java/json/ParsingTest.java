@@ -76,9 +76,8 @@ public class ParsingTest {
     public static List<Path> loadJsonFiles() throws IOException, URISyntaxException {
         List<Path> files = new ArrayList<>();
         var resource = Objects.requireNonNull(
-            JsonSerializerTest.class.getResource("tests/test_parsing"),
-            "no test cases"
-        );
+                JsonSerializerTest.class.getResource("tests/test_parsing"),
+                "no test cases");
         Path dir = Paths.get(resource.toURI());
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "*.json")) {
             for (Path path : stream) {

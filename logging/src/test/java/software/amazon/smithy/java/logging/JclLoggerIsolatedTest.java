@@ -51,8 +51,7 @@ public class JclLoggerIsolatedTest {
         assertThat(lines[2]).startsWith("FATAL a: test3: b c");
         assertThat(lines[3]).startsWith("java.lang.NullPointerException: BANG!");
         assertThat(lines[4]).contains(
-            "at software.amazon.smithy.java.logging.JclLoggerIsolatedTest.smokeTest(JclLoggerIsolatedTest.java:"
-        );
+                "at software.amazon.smithy.java.logging.JclLoggerIsolatedTest.smokeTest(JclLoggerIsolatedTest.java:");
     }
 
     @Test
@@ -69,8 +68,7 @@ public class JclLoggerIsolatedTest {
         assertThat(lines[1]).startsWith("FATAL a: test3: b c");
         assertThat(lines[2]).startsWith("java.lang.NullPointerException: BANG!");
         assertThat(lines[3]).contains(
-            "at software.amazon.smithy.java.logging.JclLoggerIsolatedTest.levelTest(JclLoggerIsolatedTest.java:"
-        );
+                "at software.amazon.smithy.java.logging.JclLoggerIsolatedTest.levelTest(JclLoggerIsolatedTest.java:");
     }
 
     @Test
@@ -80,13 +78,12 @@ public class JclLoggerIsolatedTest {
         logger.log(InternalLogger.Level.ERROR, "test1");
         logger.log(InternalLogger.Level.WARN, "test2: {}", "abc");
         logger.log(
-            InternalLogger.Level.FATAL,
-            "{}: test3: {} {}",
-            "a",
-            "b",
-            "c",
-            new NullPointerException("BANG!")
-        );
+                InternalLogger.Level.FATAL,
+                "{}: test3: {} {}",
+                "a",
+                "b",
+                "c",
+                new NullPointerException("BANG!"));
 
         var lines = JclLog.BUFFER.toString().split(System.lineSeparator());
         assertThat(lines).hasSizeGreaterThan(4);
@@ -94,8 +91,7 @@ public class JclLoggerIsolatedTest {
         assertThat(lines[1]).startsWith("FATAL a: test3: b c");
         assertThat(lines[2]).startsWith("java.lang.NullPointerException: BANG!");
         assertThat(lines[3]).contains(
-            "at software.amazon.smithy.java.logging.JclLoggerIsolatedTest.dynamicLevelTest(JclLoggerIsolatedTest.java:"
-        );
+                "at software.amazon.smithy.java.logging.JclLoggerIsolatedTest.dynamicLevelTest(JclLoggerIsolatedTest.java:");
     }
 
     public static final class JclLogFactory extends LogFactory {
@@ -120,16 +116,13 @@ public class JclLoggerIsolatedTest {
         }
 
         @Override
-        public void release() {
-        }
+        public void release() {}
 
         @Override
-        public void removeAttribute(String name) {
-        }
+        public void removeAttribute(String name) {}
 
         @Override
-        public void setAttribute(String name, Object value) {
-        }
+        public void setAttribute(String name, Object value) {}
     }
 
     static final class JclLog implements Log {
@@ -138,8 +131,7 @@ public class JclLoggerIsolatedTest {
 
         static volatile boolean warnEnabled = true;
 
-        public JclLog() {
-        }
+        public JclLog() {}
 
         @Override
         public void debug(Object message) {
@@ -263,12 +255,10 @@ public class JclLoggerIsolatedTest {
         }
 
         @Override
-        public void trace(Object message) {
-        }
+        public void trace(Object message) {}
 
         @Override
-        public void trace(Object message, Throwable t) {
-        }
+        public void trace(Object message, Throwable t) {}
     }
 
 }

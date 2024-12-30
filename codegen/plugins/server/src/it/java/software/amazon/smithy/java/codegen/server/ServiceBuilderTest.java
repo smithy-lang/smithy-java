@@ -45,8 +45,9 @@ public class ServiceBuilderTest {
         @Override
         public CompletableFuture<GetBeerOutput> getBeer(GetBeerInput input, RequestContext context) {
             return CompletableFuture.completedFuture(
-                GetBeerOutput.builder().value(List.of(Beer.builder().id(input.id()).name("TestBeer").build())).build()
-            );
+                    GetBeerOutput.builder()
+                            .value(List.of(Beer.builder().id(input.id()).name("TestBeer").build()))
+                            .build());
         }
     }
 
@@ -59,14 +60,17 @@ public class ServiceBuilderTest {
                 if (ModeledApiException.class.isAssignableFrom(clazz)) {
                     Object builderInstance = clazz.getDeclaredMethod("builder").invoke(null);
                     builderInstance = builderInstance.getClass()
-                        .getMethod("message")
-                        .invoke(builderInstance, input.message());
+                            .getMethod("message")
+                            .invoke(builderInstance, input.message());
                     exception = (Throwable) builderInstance.getClass().getMethod("build").invoke(builderInstance);
                 } else {
                     exception = (Throwable) clazz.getConstructor().newInstance(input.message());
                 }
-            } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InvocationTargetException
-                | InstantiationException e) {
+            } catch (ClassNotFoundException
+                    | NoSuchMethodException
+                    | IllegalAccessException
+                    | InvocationTargetException
+                    | InstantiationException e) {
                 exception = InternalFailureException.builder().message("Exception class not found").build();
             }
             return CompletableFuture.failedFuture(exception);
@@ -74,10 +78,10 @@ public class ServiceBuilderTest {
     }
 
     private final TestService service = TestService.builder()
-        .addEchoOperation(new EchoImpl())
-        .addGetBeerOperation(new GetBeerImpl())
-        .addGetErrorOperation(new GetErrorImpl())
-        .build();
+            .addEchoOperation(new EchoImpl())
+            .addGetBeerOperation(new GetBeerImpl())
+            .addGetErrorOperation(new GetErrorImpl())
+            .build();
 
     @Test
     void testRouting() throws ExecutionException, InterruptedException {
@@ -85,13 +89,13 @@ public class ServiceBuilderTest {
         assertThat("GetBeer").isEqualTo(getBeer.name());
         var output = getBeer.asyncFunction().apply(GetBeerInput.builder().id(1).build(), null);
         assertThat(output.get().value())
-            .hasSize(1)
-            .containsExactly(Beer.builder().id(1).name("TestBeer").build());
+                .hasSize(1)
+                .containsExactly(Beer.builder().id(1).name("TestBeer").build());
 
         Operation<EchoInput, EchoOutput> echo = service.getOperation("Echo");
         assertThat("Echo").isEqualTo(echo.name());
         var echoOutput = echo.function()
-            .apply(EchoInput.builder().value(EchoPayload.builder().string("A").build()).build(), null);
+                .apply(EchoInput.builder().value(EchoPayload.builder().string("A").build()).build(), null);
         assertThat(echoOutput.value().echoCount()).isEqualTo(1);
         assertThat(echoOutput.value().string()).isEqualTo("A");
     }
@@ -99,6 +103,6 @@ public class ServiceBuilderTest {
     @Test
     void unknownOperation() {
         assertThatThrownBy(() -> service.getOperation("UnknownOperation"))
-            .isInstanceOf(UnknownOperationException.class);
+                .isInstanceOf(UnknownOperationException.class);
     }
 }

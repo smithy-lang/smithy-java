@@ -22,18 +22,16 @@ public final class UriPattern {
 
     public UriPattern(String pattern, boolean allowEmptyPathSegments) {
         this(
-            new PathPattern(QueryStringParser.getPath(pattern)),
-            getQueryPattern(QueryStringParser.getQuery(pattern)),
-            allowEmptyPathSegments
-        );
+                new PathPattern(QueryStringParser.getPath(pattern)),
+                getQueryPattern(QueryStringParser.getQuery(pattern)),
+                allowEmptyPathSegments);
     }
 
     UriPattern(String pattern, boolean allowEmptyPathSegments, boolean checkForLabelsAfterGreedyLabels) {
         this(
-            new PathPattern(QueryStringParser.getPath(pattern), checkForLabelsAfterGreedyLabels),
-            getQueryPattern(QueryStringParser.getQuery(pattern)),
-            allowEmptyPathSegments
-        );
+                new PathPattern(QueryStringParser.getPath(pattern), checkForLabelsAfterGreedyLabels),
+                getQueryPattern(QueryStringParser.getQuery(pattern)),
+                allowEmptyPathSegments);
     }
 
     UriPattern(PathPattern pathPattern, QueryPattern queryPattern) {

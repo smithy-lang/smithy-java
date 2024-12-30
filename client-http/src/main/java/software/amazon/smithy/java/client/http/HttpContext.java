@@ -25,8 +25,7 @@ public final class HttpContext {
      * Custom HTTP headers returned from an {@link EndpointResolver} to use with a request.
      */
     public static final Context.Key<HttpHeaders> ENDPOINT_RESOLVER_HTTP_HEADERS = Context.key(
-        "HTTP headers to use with the request returned from an endpoint resolver"
-    );
+            "HTTP headers to use with the request returned from an endpoint resolver");
 
     private HttpContext() {}
 }

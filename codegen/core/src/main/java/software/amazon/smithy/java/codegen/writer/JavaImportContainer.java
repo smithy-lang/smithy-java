@@ -51,11 +51,11 @@ final class JavaImportContainer implements ImportContainer {
      */
     private Set<String> getSortedAndFilteredImports() {
         return imports.values()
-            .stream()
-            .filter(s -> s.size() == 1)
-            .map(s -> s.iterator().next())
-            .filter(s -> !s.getNamespace().equals(namespace))
-            .map(Symbol::getFullName)
-            .collect(Collectors.toCollection(TreeSet::new));
+                .stream()
+                .filter(s -> s.size() == 1)
+                .map(s -> s.iterator().next())
+                .filter(s -> !s.getNamespace().equals(namespace))
+                .map(Symbol::getFullName)
+                .collect(Collectors.toCollection(TreeSet::new));
     }
 }

@@ -47,8 +47,7 @@ sealed interface TestFilter {
 
         public FilterImpl(ProtocolTestFilter filter) {
             skippedOperations.addAll(
-                Arrays.stream(filter.skipOperations()).map(ShapeId::from).collect(Collectors.toSet())
-            );
+                    Arrays.stream(filter.skipOperations()).map(ShapeId::from).collect(Collectors.toSet()));
             for (var id : filter.operations()) {
                 var operationId = ShapeId.from(id);
                 if (skippedOperations.contains(operationId)) {
@@ -68,13 +67,13 @@ sealed interface TestFilter {
         @Override
         public boolean skipOperation(ShapeId operationId) {
             return skippedOperations.contains(operationId)
-                || (!operations.isEmpty() && !operations.contains(operationId));
+                    || (!operations.isEmpty() && !operations.contains(operationId));
         }
 
         @Override
         public boolean skipTestCase(HttpMessageTestCase testCase) {
             return skippedTests.contains(testCase.getId())
-                || (!tests.isEmpty() && !tests.contains(testCase.getId()));
+                    || (!tests.isEmpty() && !tests.contains(testCase.getId()));
         }
     }
 

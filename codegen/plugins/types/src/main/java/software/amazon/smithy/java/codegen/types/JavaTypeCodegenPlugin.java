@@ -39,7 +39,8 @@ public final class JavaTypeCodegenPlugin implements SmithyBuildPlugin {
     @Override
     public void execute(PluginContext context) {
         LOGGER.info("Generating Java types from smithy model.");
-        CodegenDirector<JavaWriter, JavaCodegenIntegration, CodeGenerationContext, JavaCodegenSettings> runner = new CodegenDirector<>();
+        CodegenDirector<JavaWriter, JavaCodegenIntegration, CodeGenerationContext, JavaCodegenSettings> runner =
+                new CodegenDirector<>();
 
         var settings = TypeCodegenSettings.fromNode(context.getSettings());
         var codegenSettings = settings.codegenSettings();
@@ -62,27 +63,26 @@ public final class JavaTypeCodegenPlugin implements SmithyBuildPlugin {
     private static Set<Shape> getClosure(Model model, TypeCodegenSettings settings) {
         Set<Shape> closure = new HashSet<>();
         settings.shapes()
-            .stream()
-            .map(model::expectShape)
-            .forEach(closure::add);
+                .stream()
+                .map(model::expectShape)
+                .forEach(closure::add);
         settings.selector()
-            .shapes(model)
-            .filter(s -> !s.isMemberShape())
-            .filter(s -> !Prelude.isPreludeShape(s))
-            .forEach(closure::add);
+                .shapes(model)
+                .filter(s -> !s.isMemberShape())
+                .filter(s -> !Prelude.isPreludeShape(s))
+                .forEach(closure::add);
 
         // Filter out any shapes from this closure that are contained by any other shapes in the closure
         Walker walker = new Walker(model);
         Set<Shape> nested = new HashSet<>();
         for (Shape shape : closure) {
             nested.addAll(
-                walker.walkShapes(shape)
-                    .stream()
-                    .filter(s -> !shape.equals(s))
-                    .filter(s -> !s.isMemberShape())
-                    .filter(s -> !Prelude.isPreludeShape(s))
-                    .collect(Collectors.toSet())
-            );
+                    walker.walkShapes(shape)
+                            .stream()
+                            .filter(s -> !shape.equals(s))
+                            .filter(s -> !s.isMemberShape())
+                            .filter(s -> !Prelude.isPreludeShape(s))
+                            .collect(Collectors.toSet()));
         }
         closure.removeAll(nested);
         if (closure.isEmpty()) {

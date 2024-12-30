@@ -54,8 +54,8 @@ public class SigV4TestRunner {
 
     public static Stream<Object[]> defaultParameterizedTestSource(Class<?> contextClass) {
         return SigV4TestRunner.runner()
-            .addTestCasesFromUrl(Objects.requireNonNull(contextClass.getResource(DEFAULT_TEST_CASE_LOCATION)))
-            .parameterizedTestSource();
+                .addTestCasesFromUrl(Objects.requireNonNull(contextClass.getResource(DEFAULT_TEST_CASE_LOCATION)))
+                .parameterizedTestSource();
     }
 
     public SigV4TestRunner addTestCasesFromUrl(URL url) {
@@ -74,7 +74,7 @@ public class SigV4TestRunner {
         return testCases.stream().map(testCase -> {
             Callable<Result> callable = () -> testCase.createResult(SigV4Signer.create());
             Callable<Result> wrappedCallable = () -> callable.call().unwrap();
-            return new Object[]{testCase.name(), wrappedCallable};
+            return new Object[] {testCase.name(), wrappedCallable};
         });
     }
 
@@ -148,52 +148,49 @@ public class SigV4TestRunner {
             }
 
             return HttpRequest.builder()
-                .method(method)
-                .httpVersion(HttpVersion.HTTP_1_1)
-                .uri(URI.create("http://" + Objects.requireNonNull(hostValue) + path))
-                .headers(HttpHeaders.of(headers))
-                .body(body != null ? DataStream.ofBytes(body.toString().getBytes()) : null)
-                .build();
+                    .method(method)
+                    .httpVersion(HttpVersion.HTTP_1_1)
+                    .uri(URI.create("http://" + Objects.requireNonNull(hostValue) + path))
+                    .headers(HttpHeaders.of(headers))
+                    .body(body != null ? DataStream.ofBytes(body.toString().getBytes()) : null)
+                    .build();
         }
 
         Result createResult(
-            Signer<HttpRequest, AwsCredentialsIdentity> signer
+                Signer<HttpRequest, AwsCredentialsIdentity> signer
         ) throws ExecutionException, InterruptedException {
             var signedRequest = signer.sign(request, context.identity, context.properties).get();
             boolean isValid = signedRequest.headers().equals(expected.headers())
-                && signedRequest.uri().equals(expected.uri())
-                && signedRequest.method().equals(expected.method());
+                    && signedRequest.uri().equals(expected.uri())
+                    && signedRequest.method().equals(expected.method());
             return new Result(signedRequest, expected, isValid);
         }
     }
 
     record Context(
-        AwsCredentialsIdentity identity,
-        AuthProperties properties
-    ) {
+            AwsCredentialsIdentity identity,
+            AuthProperties properties) {
         static Context load(Path directory) {
             String fileName = directory.resolve(CONTEXT).toString();
             var node = Node.parse(IoUtils.readUtf8File(fileName)).expectObjectNode();
             return new Context(
-                getIdentity(node.expectObjectMember("credentials")),
-                getAuthProperties(node.expectObjectMember("properties"))
-            );
+                    getIdentity(node.expectObjectMember("credentials")),
+                    getAuthProperties(node.expectObjectMember("properties")));
         }
 
         private static AwsCredentialsIdentity getIdentity(ObjectNode credentialsNode) {
             return AwsCredentialsIdentity.create(
-                credentialsNode.expectStringMember("access_key_id").getValue(),
-                credentialsNode.expectStringMember("secret_access_key").getValue(),
-                credentialsNode.getStringMemberOrDefault("token", null)
-            );
+                    credentialsNode.expectStringMember("access_key_id").getValue(),
+                    credentialsNode.expectStringMember("secret_access_key").getValue(),
+                    credentialsNode.getStringMemberOrDefault("token", null));
         }
 
         private static AuthProperties getAuthProperties(ObjectNode objectNode) {
             return AuthProperties.builder()
-                .put(SigV4Settings.SIGNING_NAME, objectNode.expectStringMember("service").getValue())
-                .put(SigV4Settings.REGION, objectNode.expectStringMember("region").getValue())
-                .put(SigV4Settings.CLOCK, getStaticClock(objectNode.expectStringMember("timestamp").getValue()))
-                .build();
+                    .put(SigV4Settings.SIGNING_NAME, objectNode.expectStringMember("service").getValue())
+                    .put(SigV4Settings.REGION, objectNode.expectStringMember("region").getValue())
+                    .put(SigV4Settings.CLOCK, getStaticClock(objectNode.expectStringMember("timestamp").getValue()))
+                    .build();
         }
 
         private static Clock getStaticClock(String timeString) {
@@ -205,10 +202,9 @@ public class SigV4TestRunner {
         public Result unwrap() {
             if (!isValid()) {
                 throw new AssertionError(
-                    "Expected does not match actual. \n"
-                        + "Expected: -------------- \n" + expected()
-                        + "\n  Actual -------------- \n" + actual()
-                );
+                        "Expected does not match actual. \n"
+                                + "Expected: -------------- \n" + expected()
+                                + "\n  Actual -------------- \n" + actual());
             }
             return this;
         }

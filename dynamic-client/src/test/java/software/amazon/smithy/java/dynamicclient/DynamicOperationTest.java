@@ -25,24 +25,24 @@ public class DynamicOperationTest {
     @Test
     public void doesNotCurrentlySupportStreaming() {
         Model model = Model.assembler()
-            .addUnparsedModel("test.smithy", """
-                $version: "2"
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
 
-                namespace smithy.example
+                        namespace smithy.example
 
-                operation PutFoo {
-                    input := {
-                        @required
-                        someStream: SomeStream
-                    }
-                    output := {}
-                }
+                        operation PutFoo {
+                            input := {
+                                @required
+                                someStream: SomeStream
+                            }
+                            output := {}
+                        }
 
-                @streaming
-                blob SomeStream
-                """)
-            .assemble()
-            .unwrap();
+                        @streaming
+                        blob SomeStream
+                        """)
+                .assemble()
+                .unwrap();
         var converter = new SchemaConverter(model);
         var registry = TypeRegistry.empty();
         var operationSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFoo")));
@@ -51,14 +51,13 @@ public class DynamicOperationTest {
 
         var e = Assertions.assertThrows(UnsupportedOperationException.class, () -> {
             DynamicOperation o = new DynamicOperation(
-                ShapeId.from("smithy.example#S"),
-                operationSchema,
-                input,
-                output,
-                Set.of(),
-                registry,
-                List.of()
-            );
+                    ShapeId.from("smithy.example#S"),
+                    operationSchema,
+                    input,
+                    output,
+                    Set.of(),
+                    registry,
+                    List.of());
         });
 
         assertThat(e.getMessage(), containsString("does not support streaming"));
@@ -67,19 +66,19 @@ public class DynamicOperationTest {
     @Test
     public void convertsSchemas() {
         Model model = Model.assembler()
-            .addUnparsedModel("test.smithy", """
-                $version: "2"
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
 
-                namespace smithy.example
+                        namespace smithy.example
 
-                @deprecated
-                operation PutFoo {
-                    input := {}
-                    output := {}
-                }
-                """)
-            .assemble()
-            .unwrap();
+                        @deprecated
+                        operation PutFoo {
+                            input := {}
+                            output := {}
+                        }
+                        """)
+                .assemble()
+                .unwrap();
         var converter = new SchemaConverter(model);
         var registry = TypeRegistry.empty();
         var operationSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFoo")));
@@ -87,14 +86,13 @@ public class DynamicOperationTest {
         var output = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFooOutput")));
 
         var o = new DynamicOperation(
-            ShapeId.from("smithy.example#S"),
-            operationSchema,
-            input,
-            output,
-            Set.of(),
-            registry,
-            List.of()
-        );
+                ShapeId.from("smithy.example#S"),
+                operationSchema,
+                input,
+                output,
+                Set.of(),
+                registry,
+                List.of());
 
         assertThat(o.schema().id(), equalTo(ShapeId.from("smithy.example#PutFoo")));
         assertThat(o.schema().hasTrait(TraitKey.get(DeprecatedTrait.class)), is(true));

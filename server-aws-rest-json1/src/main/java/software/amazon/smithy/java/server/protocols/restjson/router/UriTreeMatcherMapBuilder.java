@@ -68,13 +68,13 @@ final class UriTreeMatcherMapBuilder<T> implements UriMatcherMapBuilder<T> {
         }
 
         TreeNodeBuilder(
-            CharSequence content,
-            List<TreeNode.QueryMatcher<T>> queryMatchers,
-            Map<String, TreeNodeBuilder<T>> children,
-            Map<String, TreeNodeBuilder<T>> placeholdersMap,
-            Map<String, TreeNodeBuilder<T>> greedyPlaceholdersMap,
-            boolean isPlaceholder,
-            boolean isGreedyPlaceholder
+                CharSequence content,
+                List<TreeNode.QueryMatcher<T>> queryMatchers,
+                Map<String, TreeNodeBuilder<T>> children,
+                Map<String, TreeNodeBuilder<T>> placeholdersMap,
+                Map<String, TreeNodeBuilder<T>> greedyPlaceholdersMap,
+                boolean isPlaceholder,
+                boolean isGreedyPlaceholder
         ) {
             this.content = Objects.requireNonNull(content).toString();
             this.queryMatchers = Objects.requireNonNull(queryMatchers);
@@ -86,20 +86,19 @@ final class UriTreeMatcherMapBuilder<T> implements UriMatcherMapBuilder<T> {
         }
 
         TreeNodeBuilder(
-            CharSequence content,
-            List<TreeNode.QueryMatcher<T>> queryMatcher,
-            boolean isPlaceholder,
-            boolean isGreedyPlaceholder
+                CharSequence content,
+                List<TreeNode.QueryMatcher<T>> queryMatcher,
+                boolean isPlaceholder,
+                boolean isGreedyPlaceholder
         ) {
             this(
-                content,
-                queryMatcher,
-                new HashMap<>(),
-                new HashMap<>(),
-                new HashMap<>(),
-                isPlaceholder,
-                isGreedyPlaceholder
-            );
+                    content,
+                    queryMatcher,
+                    new HashMap<>(),
+                    new HashMap<>(),
+                    new HashMap<>(),
+                    isPlaceholder,
+                    isGreedyPlaceholder);
         }
 
         TreeNodeBuilder<T> addPattern(UriPattern pattern, T mapping) {
@@ -123,11 +122,10 @@ final class UriTreeMatcherMapBuilder<T> implements UriMatcherMapBuilder<T> {
             List<PathPattern.Segment> segments = pattern.getPathPattern().getSegments();
             if (segments.size() - 1 == start) {
                 addLeaf(
-                    segments.get(start),
-                    pattern.getQueryPattern(),
-                    getPathPatternRank(segments),
-                    mapping
-                );
+                        segments.get(start),
+                        pattern.getQueryPattern(),
+                        getPathPatternRank(segments),
+                        mapping);
             } else {
                 addSegment(segments.get(start)).addAllSegments(pattern, start + 1, mapping);
             }
@@ -159,10 +157,9 @@ final class UriTreeMatcherMapBuilder<T> implements UriMatcherMapBuilder<T> {
          */
         TreeNodeBuilder<T> addSegment(PathPattern.Segment segment) {
             return getMapForSegment(segment)
-                .computeIfAbsent(
-                    segment.getContent().toString(),
-                    k -> from(segment)
-                );
+                    .computeIfAbsent(
+                            segment.getContent().toString(),
+                            k -> from(segment));
         }
 
         /**
@@ -189,10 +186,10 @@ final class UriTreeMatcherMapBuilder<T> implements UriMatcherMapBuilder<T> {
          * @return The updated tree node
          */
         TreeNodeBuilder<T> addLeaf(
-            PathPattern.Segment segment,
-            QueryPattern pattern,
-            int pathRank,
-            T mapping
+                PathPattern.Segment segment,
+                QueryPattern pattern,
+                int pathRank,
+                T mapping
         ) {
             String key = segment.getContent().toString();
             Map<String, TreeNodeBuilder<T>> contentToNode = getMapForSegment(segment);
@@ -232,11 +229,10 @@ final class UriTreeMatcherMapBuilder<T> implements UriMatcherMapBuilder<T> {
          */
         static <T> TreeNodeBuilder<T> from(PathPattern.Segment segment) {
             return new TreeNodeBuilder<>(
-                segment.getContent(),
-                new ArrayList<>(),
-                segment.isLabel(),
-                segment.isGreedyLabel()
-            );
+                    segment.getContent(),
+                    new ArrayList<>(),
+                    segment.isLabel(),
+                    segment.isGreedyLabel());
         }
 
         /**
@@ -250,19 +246,18 @@ final class UriTreeMatcherMapBuilder<T> implements UriMatcherMapBuilder<T> {
          * @return A new leaf tree node from the given path segment.
          */
         static <T> TreeNodeBuilder<T> from(
-            PathPattern.Segment segment,
-            QueryPattern pattern,
-            int pathRank,
-            T mapping
+                PathPattern.Segment segment,
+                QueryPattern pattern,
+                int pathRank,
+                T mapping
         ) {
             List<TreeNode.QueryMatcher<T>> queryMatchers = new ArrayList<>();
             queryMatchers.add(new TreeNode.QueryMatcher<>(pattern, pathRank, mapping));
             return new TreeNodeBuilder<>(
-                segment.getContent(),
-                queryMatchers,
-                segment.isLabel(),
-                segment.isGreedyLabel()
-            );
+                    segment.getContent(),
+                    queryMatchers,
+                    segment.isLabel(),
+                    segment.isGreedyLabel());
         }
 
         /**
@@ -280,14 +275,13 @@ final class UriTreeMatcherMapBuilder<T> implements UriMatcherMapBuilder<T> {
                 newQueryMatchers = Collections.unmodifiableList(queryMatchers);
             }
             return new TreeNode<>(
-                content,
-                newQueryMatchers,
-                sealAll(children),
-                sealAllPlaceholders(placeholdersMap),
-                sealAllPlaceholders(greedyPlaceholdersMap),
-                isPlaceholder,
-                isGreedyPlaceholder
-            );
+                    content,
+                    newQueryMatchers,
+                    sealAll(children),
+                    sealAllPlaceholders(placeholdersMap),
+                    sealAllPlaceholders(greedyPlaceholdersMap),
+                    isPlaceholder,
+                    isGreedyPlaceholder);
         }
 
         /**

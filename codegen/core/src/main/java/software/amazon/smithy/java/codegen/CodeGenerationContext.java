@@ -59,42 +59,41 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  */
 @SmithyUnstableApi
 public class CodeGenerationContext
-    implements CodegenContext<JavaCodegenSettings, JavaWriter, JavaCodegenIntegration> {
+        implements CodegenContext<JavaCodegenSettings, JavaWriter, JavaCodegenIntegration> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(CodeGenerationContext.class);
 
     private static final List<ShapeId> PRELUDE_RUNTIME_TRAITS = List.of(
-        // Validation Traits
-        LengthTrait.ID,
-        PatternTrait.ID,
-        RangeTrait.ID,
-        RequiredTrait.ID,
-        SensitiveTrait.ID,
-        IdempotencyTokenTrait.ID,
-        SparseTrait.ID,
-        UniqueItemsTrait.ID,
-        RequiresLengthTrait.ID,
-        ErrorTrait.ID,
-        DefaultTrait.ID,
-        // Base Prelude Protocol traits
-        JsonNameTrait.ID,
-        TimestampFormatTrait.ID,
-        MediaTypeTrait.ID,
-        XmlNameTrait.ID,
-        XmlFlattenedTrait.ID,
-        XmlAttributeTrait.ID,
-        XmlNamespaceTrait.ID,
-        EventHeaderTrait.ID,
-        EventPayloadTrait.ID,
-        HostLabelTrait.ID,
-        EndpointTrait.ID,
-        // Prelude behavior traits
-        PaginatedTrait.ID,
-        IdempotencyTokenTrait.ID,
-        RetryableTrait.ID,
-        RequestCompressionTrait.ID,
-        StreamingTrait.ID
-    );
+            // Validation Traits
+            LengthTrait.ID,
+            PatternTrait.ID,
+            RangeTrait.ID,
+            RequiredTrait.ID,
+            SensitiveTrait.ID,
+            IdempotencyTokenTrait.ID,
+            SparseTrait.ID,
+            UniqueItemsTrait.ID,
+            RequiresLengthTrait.ID,
+            ErrorTrait.ID,
+            DefaultTrait.ID,
+            // Base Prelude Protocol traits
+            JsonNameTrait.ID,
+            TimestampFormatTrait.ID,
+            MediaTypeTrait.ID,
+            XmlNameTrait.ID,
+            XmlFlattenedTrait.ID,
+            XmlAttributeTrait.ID,
+            XmlNamespaceTrait.ID,
+            EventHeaderTrait.ID,
+            EventPayloadTrait.ID,
+            HostLabelTrait.ID,
+            EndpointTrait.ID,
+            // Prelude behavior traits
+            PaginatedTrait.ID,
+            IdempotencyTokenTrait.ID,
+            RetryableTrait.ID,
+            RequestCompressionTrait.ID,
+            StreamingTrait.ID);
 
     private final Model model;
     private final JavaCodegenSettings settings;
@@ -106,11 +105,11 @@ public class CodeGenerationContext
     private final List<TraitInitializer<?>> traitInitializers;
 
     public CodeGenerationContext(
-        Model model,
-        JavaCodegenSettings settings,
-        SymbolProvider symbolProvider,
-        FileManifest fileManifest,
-        List<JavaCodegenIntegration> integrations
+            Model model,
+            JavaCodegenSettings settings,
+            SymbolProvider symbolProvider,
+            FileManifest fileManifest,
+            List<JavaCodegenIntegration> integrations
     ) {
         this.model = model;
         this.settings = settings;
@@ -118,10 +117,9 @@ public class CodeGenerationContext
         this.integrations = integrations;
         this.symbolProvider = symbolProvider;
         this.writerDelegator = new WriterDelegator<>(
-            fileManifest,
-            this.symbolProvider,
-            new JavaWriter.Factory(settings)
-        );
+                fileManifest,
+                this.symbolProvider,
+                new JavaWriter.Factory(settings));
         this.runtimeTraits = collectRuntimeTraits();
         this.traitInitializers = collectTraitInitializers();
     }
@@ -177,13 +175,11 @@ public class CodeGenerationContext
      */
     private Set<ShapeId> collectRuntimeTraits() {
         ServiceShape shape = model.expectShape(settings.service())
-            .asServiceShape()
-            .orElseThrow(
-                () -> new CodegenException(
-                    "Expected shapeId: "
-                        + settings.service() + " to be a service shape."
-                )
-            );
+                .asServiceShape()
+                .orElseThrow(
+                        () -> new CodegenException(
+                                "Expected shapeId: "
+                                        + settings.service() + " to be a service shape."));
 
         // Add all default runtime traits from the prelude
         Set<ShapeId> traits = new HashSet<>(PRELUDE_RUNTIME_TRAITS);
@@ -209,10 +205,10 @@ public class CodeGenerationContext
         // Add traits from customer settings
         if (settings.runtimeTraitsSelector() != null) {
             Set<ShapeId> selectedTraits = settings.runtimeTraitsSelector()
-                .select(model)
-                .stream()
-                .map(Shape::toShapeId)
-                .collect(Collectors.toSet());
+                    .select(model)
+                    .stream()
+                    .map(Shape::toShapeId)
+                    .collect(Collectors.toSet());
             traits.addAll(selectedTraits);
         }
         traits.addAll(settings.runtimeTraits());

@@ -65,14 +65,14 @@ final class TypeCodegenSettings {
     static TypeCodegenSettings fromNode(ObjectNode settingsNode) {
         var builder = builder();
         settingsNode
-            .getBooleanMember(GENERATE_OPERATIONS, builder::generateOperations)
-            .getStringMember(SELECTOR, builder::selector)
-            .getArrayMember(SHAPES, n -> n.expectStringNode().expectShapeId(), builder::shapes)
-            .getObjectMember(RENAMES, n -> {
-                for (Map.Entry<String, Node> entry : n.getStringMap().entrySet()) {
-                    builder.rename(ShapeId.from(entry.getKey()), entry.getValue().expectStringNode().getValue());
-                }
-            });
+                .getBooleanMember(GENERATE_OPERATIONS, builder::generateOperations)
+                .getStringMember(SELECTOR, builder::selector)
+                .getArrayMember(SHAPES, n -> n.expectStringNode().expectShapeId(), builder::shapes)
+                .getObjectMember(RENAMES, n -> {
+                    for (Map.Entry<String, Node> entry : n.getStringMap().entrySet()) {
+                        builder.rename(ShapeId.from(entry.getKey()), entry.getValue().expectStringNode().getValue());
+                    }
+                });
         builder.codegenSettings(getCodegenSettings(settingsNode));
         return builder.build();
     }

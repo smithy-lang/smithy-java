@@ -19,10 +19,9 @@ final class StringListTraitInitializer implements TraitInitializer<StringListTra
     @Override
     public void accept(JavaWriter writer, StringListTrait stringListTrait) {
         writer.writeInline(
-            "new $T($S, $T.NONE)",
-            stringListTrait.getClass(),
-            stringListTrait.getValues(),
-            SourceLocation.class
-        );
+                "new $T($S, $T.NONE)",
+                stringListTrait.getClass(),
+                stringListTrait.getValues(),
+                SourceLocation.class);
     }
 }

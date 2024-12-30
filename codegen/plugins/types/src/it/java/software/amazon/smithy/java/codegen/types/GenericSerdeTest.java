@@ -28,23 +28,19 @@ public class GenericSerdeTest {
 
     static Stream<Arguments> types() {
         return Stream.of(
-            Arguments.of(YesOrNo.YES, YesOrNo.builder()),
-            Arguments.of(
-                UsesOtherStructs.builder()
-                    .other(
-                        MyStruct.builder()
-                            .fieldA("a")
-                            .fieldB(
-                                MyNestedStruct.builder().fieldC(1).fieldD(1f).build()
-                            )
-                            .build()
-                    )
-                    .nested(NestedIntEnum.ONE)
-                    .build(),
-                UsesOtherStructs.builder()
-            ),
-            Arguments.of(new MyUnion.OptionAMember("Value"), MyUnion.builder())
-        );
+                Arguments.of(YesOrNo.YES, YesOrNo.builder()),
+                Arguments.of(
+                        UsesOtherStructs.builder()
+                                .other(
+                                        MyStruct.builder()
+                                                .fieldA("a")
+                                                .fieldB(
+                                                        MyNestedStruct.builder().fieldC(1).fieldD(1f).build())
+                                                .build())
+                                .nested(NestedIntEnum.ONE)
+                                .build(),
+                        UsesOtherStructs.builder()),
+                Arguments.of(new MyUnion.OptionAMember("Value"), MyUnion.builder()));
     }
 
     @ParameterizedTest

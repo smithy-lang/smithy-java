@@ -11,21 +11,21 @@ import software.amazon.smithy.model.shapes.ShapeId;
 final class TestHarness {
 
     static final Model MODEL = Model.assembler()
-        .addUnparsedModel("test.smithy", """
-            $version: "2"
-            namespace smithy.example
+            .addUnparsedModel("test.smithy", """
+                    $version: "2"
+                    namespace smithy.example
 
-            service Sprockets {
-                operations: [CreateSprocket]
-            }
+                    service Sprockets {
+                        operations: [CreateSprocket]
+                    }
 
-            operation CreateSprocket {
-                input := {}
-                output := {}
-            }
-            """)
-        .assemble()
-        .unwrap();
+                    operation CreateSprocket {
+                        input := {}
+                        output := {}
+                    }
+                    """)
+            .assemble()
+            .unwrap();
 
     static final ShapeId SERVICE = ShapeId.from("smithy.example#Sprockets");
 }

@@ -31,19 +31,18 @@ public final class Person implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Person");
     static final Schema SCHEMA = Schema.structureBuilder(ID)
-        .putMember(
-            "name",
-            PreludeSchemas.STRING,
-            new HttpLabelTrait(),
-            new RequiredTrait(),
-            LengthTrait.builder().max(7L).build()
-        )
-        .putMember("favoriteColor", PreludeSchemas.STRING)
-        .putMember("age", PreludeSchemas.INTEGER, RangeTrait.builder().max(BigDecimal.valueOf(150)).build())
-        .putMember("birthday", SharedSchemas.BIRTHDAY)
-        .putMember("binary", PreludeSchemas.BLOB)
-        .putMember("queryParams", SharedSchemas.MAP_LIST_STRING)
-        .build();
+            .putMember(
+                    "name",
+                    PreludeSchemas.STRING,
+                    new HttpLabelTrait(),
+                    new RequiredTrait(),
+                    LengthTrait.builder().max(7L).build())
+            .putMember("favoriteColor", PreludeSchemas.STRING)
+            .putMember("age", PreludeSchemas.INTEGER, RangeTrait.builder().max(BigDecimal.valueOf(150)).build())
+            .putMember("birthday", SharedSchemas.BIRTHDAY)
+            .putMember("binary", PreludeSchemas.BLOB)
+            .putMember("queryParams", SharedSchemas.MAP_LIST_STRING)
+            .build();
     private static final Schema SCHEMA_NAME = SCHEMA.member("name");
     private static final Schema SCHEMA_FAVORITE_COLOR = SCHEMA.member("favoriteColor");
     private static final Schema SCHEMA_AGE = SCHEMA.member("age");
@@ -139,21 +138,19 @@ public final class Person implements SerializableStruct {
     private static void writeQueryParamsMember(Person shape, MapSerializer serializer) {
         for (var queryParamsEntry : shape.queryParams.entrySet()) {
             serializer.writeEntry(
-                SCHEMA_QUERY_PARAMS_KEY,
-                queryParamsEntry.getKey(),
-                queryParamsEntry.getValue(),
-                Person::writeQueryParamsMemberEntry
-            );
+                    SCHEMA_QUERY_PARAMS_KEY,
+                    queryParamsEntry.getKey(),
+                    queryParamsEntry.getValue(),
+                    Person::writeQueryParamsMemberEntry);
         }
     }
 
     private static void writeQueryParamsMemberEntry(List<String> values, ShapeSerializer serializer) {
         serializer.writeList(
-            SCHEMA_QUERY_PARAMS_VALUE,
-            values,
-            values.size(),
-            Person::writeQueryParamsMemberEntryElement
-        );
+                SCHEMA_QUERY_PARAMS_VALUE,
+                values,
+                values.size(),
+                Person::writeQueryParamsMemberEntryElement);
     }
 
     private static void writeQueryParamsMemberEntryElement(List<String> listValue, ShapeSerializer serializer) {

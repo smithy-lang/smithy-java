@@ -83,9 +83,8 @@ final class XmlSerializer extends InterceptingSerializer {
 
     private static String formatTimestamp(Schema schema, Instant value) {
         return TimestampFormatter.of(
-            schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT),
-            DEFAULT_FORMAT
-        ).writeString(value);
+                schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT),
+                DEFAULT_FORMAT).writeString(value);
     }
 
     // Write to structure elements that are _not_ attributes.
@@ -373,10 +372,10 @@ final class XmlSerializer extends InterceptingSerializer {
 
         @Override
         public <T> void writeEntry(
-            Schema keySchema,
-            String key,
-            T state,
-            BiConsumer<T, ShapeSerializer> valueSerializer
+                Schema keySchema,
+                String key,
+                T state,
+                BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
             try {
                 // Write the "<entry>" element.

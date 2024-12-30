@@ -43,47 +43,47 @@ public class DynamicClientTest {
     @BeforeAll
     public static void setup() {
         model = Model.assembler()
-            .addUnparsedModel("test.smithy", """
-                $version: "2"
-                namespace smithy.example
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
 
-                @aws.protocols#awsJson1_0
-                service Sprockets {
-                    operations: [CreateSprocket, GetSprocket]
-                    errors: [ServiceFooError]
-                }
+                        @aws.protocols#awsJson1_0
+                        service Sprockets {
+                            operations: [CreateSprocket, GetSprocket]
+                            errors: [ServiceFooError]
+                        }
 
-                operation CreateSprocket {
-                    input := {}
-                    output := {
-                        id: String
-                    }
-                    errors: [InvalidSprocketId]
-                }
+                        operation CreateSprocket {
+                            input := {}
+                            output := {
+                                id: String
+                            }
+                            errors: [InvalidSprocketId]
+                        }
 
-                operation GetSprocket {
-                    input := {
-                        id: String
-                    }
-                    output := {
-                        id: String
-                    }
-                    errors: [InvalidSprocketId]
-                }
+                        operation GetSprocket {
+                            input := {
+                                id: String
+                            }
+                            output := {
+                                id: String
+                            }
+                            errors: [InvalidSprocketId]
+                        }
 
-                @error("client")
-                structure InvalidSprocketId {
-                    id: String
-                }
+                        @error("client")
+                        structure InvalidSprocketId {
+                            id: String
+                        }
 
-                @error("server")
-                structure ServiceFooError {
-                    why: String
-                }
-                """)
-            .discoverModels()
-            .assemble()
-            .unwrap();
+                        @error("server")
+                        structure ServiceFooError {
+                            why: String
+                        }
+                        """)
+                .discoverModels()
+                .assemble()
+                .unwrap();
     }
 
     @Test
@@ -94,13 +94,13 @@ public class DynamicClientTest {
     @Test
     public void sendsRequestWithNoInput() throws Exception {
         var client = DynamicClient.builder()
-            .service(service)
-            .model(model)
-            .protocol(new AwsJson1Protocol(service))
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .transport(mockTransport())
-            .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
-            .build();
+                .service(service)
+                .model(model)
+                .protocol(new AwsJson1Protocol(service))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .transport(mockTransport())
+                .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
+                .build();
 
         var result = client.call("CreateSprocket");
         assertThat(result.type(), is(ShapeType.STRUCTURE));
@@ -117,12 +117,11 @@ public class DynamicClientTest {
             @Override
             public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
                 return CompletableFuture.completedFuture(
-                    HttpResponse.builder()
-                        .httpVersion(HttpVersion.HTTP_1_1)
-                        .statusCode(200)
-                        .body(DataStream.ofString("{\"id\":\"1\"}"))
-                        .build()
-                );
+                        HttpResponse.builder()
+                                .httpVersion(HttpVersion.HTTP_1_1)
+                                .statusCode(200)
+                                .body(DataStream.ofString("{\"id\":\"1\"}"))
+                                .build());
             }
         };
     }
@@ -130,21 +129,21 @@ public class DynamicClientTest {
     @Test
     public void sendsRequestWithInput() throws Exception {
         var client = DynamicClient.builder()
-            .service(service)
-            .model(model)
-            .protocol(new AwsJson1Protocol(service))
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .transport(mockTransport())
-            .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
-            .addInterceptor(new ClientInterceptor() {
-                @Override
-                public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
-                    var input = hook.input();
-                    assertThat(input, instanceOf(Document.class));
-                    assertThat(((Document) input).getMember("id").asString(), equalTo("1"));
-                }
-            })
-            .build();
+                .service(service)
+                .model(model)
+                .protocol(new AwsJson1Protocol(service))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .transport(mockTransport())
+                .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
+                .addInterceptor(new ClientInterceptor() {
+                    @Override
+                    public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {
+                        var input = hook.input();
+                        assertThat(input, instanceOf(Document.class));
+                        assertThat(((Document) input).getMember("id").asString(), equalTo("1"));
+                    }
+                })
+                .build();
 
         var result = client.callAsync("GetSprocket", Document.ofObject(Map.of("id", "1"))).get();
         assertThat(result.type(), is(ShapeType.STRUCTURE));
@@ -204,13 +203,13 @@ public class DynamicClientTest {
 
     private static DynamicClient createErrorClient(String payload) {
         return DynamicClient.builder()
-            .service(service)
-            .model(model)
-            .protocol(new AwsJson1Protocol(service))
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .transport(createErrorTransport(payload))
-            .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
-            .build();
+                .service(service)
+                .model(model)
+                .protocol(new AwsJson1Protocol(service))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .transport(createErrorTransport(payload))
+                .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
+                .build();
     }
 
     private static ClientTransport<HttpRequest, HttpResponse> createErrorTransport(String payload) {
@@ -223,12 +222,11 @@ public class DynamicClientTest {
             @Override
             public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
                 return CompletableFuture.completedFuture(
-                    HttpResponse.builder()
-                        .httpVersion(HttpVersion.HTTP_1_1)
-                        .statusCode(400)
-                        .body(DataStream.ofString(payload))
-                        .build()
-                );
+                        HttpResponse.builder()
+                                .httpVersion(HttpVersion.HTTP_1_1)
+                                .statusCode(400)
+                                .body(DataStream.ofString(payload))
+                                .build());
             }
         };
     }
@@ -236,11 +234,11 @@ public class DynamicClientTest {
     @Test
     public void detectsClientProtocol() {
         var client = DynamicClient.builder()
-            .service(service)
-            .model(model)
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
-            .build();
+                .service(service)
+                .model(model)
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
+                .build();
 
         assertThat(client.config().protocol(), instanceOf(AwsJson1Protocol.class));
     }

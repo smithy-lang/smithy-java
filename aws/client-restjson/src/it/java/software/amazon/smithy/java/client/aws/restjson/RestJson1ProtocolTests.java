@@ -20,41 +20,37 @@ import software.amazon.smithy.java.protocoltests.harness.TestType;
 import software.amazon.smithy.model.node.Node;
 
 @ProtocolTest(
-    service = "aws.protocoltests.restjson#RestJson",
-    testType = TestType.CLIENT
-)
+        service = "aws.protocoltests.restjson#RestJson",
+        testType = TestType.CLIENT)
 @ProtocolTestFilter(
-    skipOperations = {
-        // We dont ignore defaults on input shapes
-        "aws.protocoltests.restjson#OperationWithDefaults",
-        // TODO: support content-encoding
-        "aws.protocoltests.restjson#PutWithContentEncoding"
-    }
-)
+        skipOperations = {
+                // We dont ignore defaults on input shapes
+                "aws.protocoltests.restjson#OperationWithDefaults",
+                // TODO: support content-encoding
+                "aws.protocoltests.restjson#PutWithContentEncoding"
+        })
 public class RestJson1ProtocolTests {
     private static final String EMPTY_BODY = "";
 
     @HttpClientRequestTests
     @ProtocolTestFilter(
-        skipTests = {
-            // TODO: support checksums in requests
-            "RestJsonHttpChecksumRequired",
-            // TODO: These tests require a payload even when the httpPayload member is null. Should it?
-            "RestJsonHttpWithHeadersButNoPayload",
-            "RestJsonHttpWithEmptyStructurePayload"
-        }
-    )
+            skipTests = {
+                    // TODO: support checksums in requests
+                    "RestJsonHttpChecksumRequired",
+                    // TODO: These tests require a payload even when the httpPayload member is null. Should it?
+                    "RestJsonHttpWithHeadersButNoPayload",
+                    "RestJsonHttpWithEmptyStructurePayload"
+            })
     public void requestTest(DataStream expected, DataStream actual) {
         assertThat(expected.hasKnownLength())
-            .isTrue()
-            .isSameAs(actual.hasKnownLength());
+                .isTrue()
+                .isSameAs(actual.hasKnownLength());
 
         var actualStr = new StringBuildingSubscriber(actual).getResult();
         if (expected.contentLength() != 0) {
             var expectedStr = new String(
-                ByteBufferUtils.getBytes(expected.waitForByteBuffer()),
-                StandardCharsets.UTF_8
-            );
+                    ByteBufferUtils.getBytes(expected.waitForByteBuffer()),
+                    StandardCharsets.UTF_8);
             if ("application/json".equals(expected.contentType())) {
                 var expectedNode = Node.parse(expectedStr);
                 var actualNode = Node.parse(actualStr);
@@ -69,24 +65,23 @@ public class RestJson1ProtocolTests {
 
     @HttpClientResponseTests
     @ProtocolTestFilter(
-        skipTests = {
-            "RestJsonDateTimeWithFractionalSeconds",
-            "RestJsonInputAndOutputWithQuotedStringHeaders",
-            "HttpPrefixHeadersResponse",
-            "RestJsonHttpPayloadTraitsWithBlob",
-            "RestJsonHttpPayloadTraitsWithMediaTypeWithBlob",
-            "RestJsonEnumPayloadResponse",
-            "RestJsonStringPayloadResponse",
-            "RestJsonHttpPayloadWithUnion",
-            "RestJsonInputAndOutputWithQuotedStringHeaders",
-            "DocumentTypeAsPayloadOutput",
-            "DocumentTypeAsPayloadOutputString",
-            "RestJsonFooErrorUsingCode",
-            "RestJsonFooErrorUsingCodeAndNamespace",
-            "RestJsonFooErrorUsingCodeUriAndNamespace",
-            "RestJsonFooErrorWithDunderTypeUriAndNamespace"
-        }
-    )
+            skipTests = {
+                    "RestJsonDateTimeWithFractionalSeconds",
+                    "RestJsonInputAndOutputWithQuotedStringHeaders",
+                    "HttpPrefixHeadersResponse",
+                    "RestJsonHttpPayloadTraitsWithBlob",
+                    "RestJsonHttpPayloadTraitsWithMediaTypeWithBlob",
+                    "RestJsonEnumPayloadResponse",
+                    "RestJsonStringPayloadResponse",
+                    "RestJsonHttpPayloadWithUnion",
+                    "RestJsonInputAndOutputWithQuotedStringHeaders",
+                    "DocumentTypeAsPayloadOutput",
+                    "DocumentTypeAsPayloadOutputString",
+                    "RestJsonFooErrorUsingCode",
+                    "RestJsonFooErrorUsingCodeAndNamespace",
+                    "RestJsonFooErrorUsingCodeUriAndNamespace",
+                    "RestJsonFooErrorWithDunderTypeUriAndNamespace"
+            })
     public void responseTest(Runnable test) {
         test.run();
     }

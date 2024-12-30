@@ -17,10 +17,9 @@ public class SystemPropertiesIdentityResolverTest {
         var resolver = new SystemPropertiesIdentityResolver();
         var value = resolver.resolveIdentity(AuthProperties.empty()).get();
         var expected = AwsCredentialsIdentity.create(
-            "property_access_key",
-            "property_secret_key",
-            "property_token"
-        );
+                "property_access_key",
+                "property_secret_key",
+                "property_token");
 
         assertEquals(expected, value.unwrap());
     }

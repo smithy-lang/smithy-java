@@ -27,8 +27,7 @@ abstract class LabelHelper {
                     braces++;
                 } else {
                     throw new InvalidPatternException(
-                        "Left brace may only be used as leading character of a label reference"
-                    );
+                            "Left brace may only be used as leading character of a label reference");
                 }
             }
 
@@ -37,8 +36,7 @@ abstract class LabelHelper {
                     braces++;
                 } else {
                     throw new InvalidPatternException(
-                        "Right brace may only be used as last character of a label reference"
-                    );
+                            "Right brace may only be used as last character of a label reference");
                 }
             }
         }
@@ -142,18 +140,16 @@ abstract class LabelHelper {
                 case '{':
                     if (sb != null) {
                         throw new InvalidPatternException(
-                            "Illegal nested label at index: " + i
-                                + ".  Input was: '" + pattern + "'"
-                        );
+                                "Illegal nested label at index: " + i
+                                        + ".  Input was: '" + pattern + "'");
                     }
                     sb = new StringBuilder();
                     break;
                 case '}':
                     if (sb == null) {
                         throw new InvalidPatternException(
-                            "Unmatched closing brace at index: " + i
-                                + ".  Input was: '" + pattern + "'"
-                        );
+                                "Unmatched closing brace at index: " + i
+                                        + ".  Input was: '" + pattern + "'");
                     }
                     labels.add(sb.toString());
                     sb = null;

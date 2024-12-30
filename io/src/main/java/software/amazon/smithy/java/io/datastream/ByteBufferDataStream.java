@@ -73,7 +73,7 @@ final class ByteBufferDataStream implements DataStream {
         var p = publisher;
         if (p == null) {
             publisher = p = HttpRequest.BodyPublishers
-                .ofByteArray(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
+                    .ofByteArray(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
         }
         p.subscribe(subscriber);
     }

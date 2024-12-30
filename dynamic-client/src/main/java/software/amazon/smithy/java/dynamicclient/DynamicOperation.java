@@ -25,13 +25,13 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
     private final List<ShapeId> effectiveAuthSchemes;
 
     public DynamicOperation(
-        ShapeId service,
-        Schema operationSchema,
-        Schema inputSchema,
-        Schema outputSchema,
-        Set<Schema> errorSchemas,
-        TypeRegistry typeRegistry,
-        List<ShapeId> effectiveAuthSchemes
+            ShapeId service,
+            Schema operationSchema,
+            Schema inputSchema,
+            Schema outputSchema,
+            Set<Schema> errorSchemas,
+            TypeRegistry typeRegistry,
+            List<ShapeId> effectiveAuthSchemes
     ) {
         this.service = service;
         this.effectiveAuthSchemes = effectiveAuthSchemes;

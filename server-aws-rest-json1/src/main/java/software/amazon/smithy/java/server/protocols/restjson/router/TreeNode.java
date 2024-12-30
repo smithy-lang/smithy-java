@@ -37,13 +37,13 @@ final class TreeNode<T> {
     private final boolean isPlaceholder;
 
     TreeNode(
-        CharSequence content,
-        List<QueryMatcher<T>> queryMatchers,
-        Map<String, TreeNode<T>> children,
-        List<TreeNode<T>> placeholders,
-        List<TreeNode<T>> greedyPlaceholders,
-        boolean isPlaceholder,
-        boolean isGreedyPlaceholder
+            CharSequence content,
+            List<QueryMatcher<T>> queryMatchers,
+            Map<String, TreeNode<T>> children,
+            List<TreeNode<T>> placeholders,
+            List<TreeNode<T>> greedyPlaceholders,
+            boolean isPlaceholder,
+            boolean isGreedyPlaceholder
     ) {
         this.content = Objects.requireNonNull(content).toString();
         this.queryMatchers = Objects.requireNonNull(queryMatchers);
@@ -80,9 +80,9 @@ final class TreeNode<T> {
      * @return The match result
      */
     private TreeMatch<T> route(
-        ParsedUri uri,
-        int index,
-        LabelValuesNode captures
+            ParsedUri uri,
+            int index,
+            LabelValuesNode captures
     ) {
         if (!uri.hasSegmentAt(index)) {
             if (isLeaf()) {
@@ -128,10 +128,10 @@ final class TreeNode<T> {
      * @return The match result
      */
     private TreeMatch<T> routeLabels(
-        ParsedUri uri,
-        int index,
-        LabelValuesNode captures,
-        List<TreeNode<T>> placeholders
+            ParsedUri uri,
+            int index,
+            LabelValuesNode captures,
+            List<TreeNode<T>> placeholders
     ) {
         TreeMatch<T> result = UriTreeMatcherMap.noMatch();
         String segment = uri.getSegment(index);
@@ -153,8 +153,8 @@ final class TreeNode<T> {
      * @return The match result
      */
     private TreeMatch<T> matchQuery(
-        ParsedUri uri,
-        LabelValuesNode captures
+            ParsedUri uri,
+            LabelValuesNode captures
     ) {
         TreeMatch<T> result = UriTreeMatcherMap.noMatch();
         for (QueryMatcher<T> queryMatcher : queryMatchers) {
@@ -276,8 +276,8 @@ final class TreeNode<T> {
         }
 
         public TreeMatch<T> match(
-            ParsedUri uri,
-            LabelValuesNode captures
+                ParsedUri uri,
+                LabelValuesNode captures
         ) {
             Match match = matchQuery(uri);
             if (match != null) {

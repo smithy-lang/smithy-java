@@ -24,14 +24,13 @@ public class BasicServerExample {
     public static void main(String[] args) throws InterruptedException, ExecutionException {
 
         Server server = Server.builder()
-            .endpoints(URI.create("http://localhost:8080"))
-            .addService(
-                BeerService.builder()
-                    .addAddBeerOperation(new AddBeerImpl())
-                    .addGetBeerOperation(new GetBeerImpl())
-                    .build()
-            )
-            .build();
+                .endpoints(URI.create("http://localhost:8080"))
+                .addService(
+                        BeerService.builder()
+                                .addAddBeerOperation(new AddBeerImpl())
+                                .addGetBeerOperation(new GetBeerImpl())
+                                .build())
+                .build();
         server.start();
         try {
             Thread.currentThread().join();
@@ -58,9 +57,8 @@ public class BasicServerExample {
         @Override
         public CompletableFuture<GetBeerOutput> getBeer(GetBeerInput input, RequestContext context) {
             return CompletableFuture.supplyAsync(
-                () -> GetBeerOutput.builder().beer(FRIDGE.get(input.id())).build(),
-                CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS)
-            );
+                    () -> GetBeerOutput.builder().beer(FRIDGE.get(input.id())).build(),
+                    CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS));
         }
     }
 

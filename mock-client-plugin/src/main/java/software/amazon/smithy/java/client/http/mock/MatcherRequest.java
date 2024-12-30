@@ -19,8 +19,7 @@ import software.amazon.smithy.java.http.api.HttpRequest;
  * @param request the HTTP request being mocked.
  */
 public record MatcherRequest(
-    Context context,
-    ApiOperation<?, ?> operation,
-    SerializableStruct input,
-    HttpRequest request
-) {}
+        Context context,
+        ApiOperation<?, ?> operation,
+        SerializableStruct input,
+        HttpRequest request) {}

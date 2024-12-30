@@ -17,8 +17,6 @@ import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
  * @param outputBuilder {@link Supplier} to a {@link ShapeBuilder} of the operation output, which can also be an error.
  */
 record HttpResponseProtocolTestCase(
-    HttpResponseTestCase responseTestCase,
-    boolean isErrorTest,
-    Supplier<ShapeBuilder<? extends SerializableStruct>> outputBuilder
-) {
-}
+        HttpResponseTestCase responseTestCase,
+        boolean isErrorTest,
+        Supplier<ShapeBuilder<? extends SerializableStruct>> outputBuilder) {}

@@ -22,20 +22,18 @@ public final class ValidatedPojo implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#ValidatedPojo");
     static final Schema SCHEMA = Schema.structureBuilder(ID)
-        .putMember(
-            "string",
-            PreludeSchemas.STRING,
-            new RequiredTrait(),
-            LengthTrait.builder().min(1L).max(100L).build()
-        )
-        .putMember("boxedInteger", PreludeSchemas.INTEGER, new RequiredTrait())
-        .putMember(
-            "integer",
-            PreludeSchemas.PRIMITIVE_INTEGER,
-            new RequiredTrait(),
-            RangeTrait.builder().min(BigDecimal.valueOf(0)).build()
-        )
-        .build();
+            .putMember(
+                    "string",
+                    PreludeSchemas.STRING,
+                    new RequiredTrait(),
+                    LengthTrait.builder().min(1L).max(100L).build())
+            .putMember("boxedInteger", PreludeSchemas.INTEGER, new RequiredTrait())
+            .putMember(
+                    "integer",
+                    PreludeSchemas.PRIMITIVE_INTEGER,
+                    new RequiredTrait(),
+                    RangeTrait.builder().min(BigDecimal.valueOf(0)).build())
+            .build();
     private static final Schema SCHEMA_STRING = SCHEMA.member("string");
     private static final Schema SCHEMA_BOXED_INTEGER = SCHEMA.member("boxedInteger");
     private static final Schema SCHEMA_INTEGER = SCHEMA.member("integer");

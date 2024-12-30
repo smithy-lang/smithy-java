@@ -25,8 +25,8 @@ import java.util.stream.Stream;
  * @param <O> the type published to the downstream subscriber.
  */
 public abstract class BufferingFlatMapProcessor<I, O> implements
-    Flow.Processor<I, O>,
-    Flow.Subscription {
+        Flow.Processor<I, O>,
+        Flow.Subscription {
     private static final Throwable COMPLETE_SENTINEL = new RuntimeException();
 
     private final AtomicReference<Throwable> terminalEvent = new AtomicReference<>();
@@ -40,7 +40,7 @@ public abstract class BufferingFlatMapProcessor<I, O> implements
     private boolean terminated = false;
 
     public BufferingFlatMapProcessor(
-        Flow.Publisher<I> publisher
+            Flow.Publisher<I> publisher
     ) {
         this.publisher = publisher;
         publisher.subscribe(this);

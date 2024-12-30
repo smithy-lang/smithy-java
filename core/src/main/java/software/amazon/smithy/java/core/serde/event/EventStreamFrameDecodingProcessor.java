@@ -12,14 +12,14 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.BufferingFlatMapProcessor;
 
 public final class EventStreamFrameDecodingProcessor<F extends Frame<?>>
-    extends BufferingFlatMapProcessor<ByteBuffer, SerializableStruct> {
+        extends BufferingFlatMapProcessor<ByteBuffer, SerializableStruct> {
     private final FrameDecoder<F> decoder;
     private final EventDecoder<F> eventDecoder;
 
     public EventStreamFrameDecodingProcessor(
-        Flow.Publisher<ByteBuffer> publisher,
-        FrameDecoder<F> decoder,
-        EventDecoder<F> eventDecoder
+            Flow.Publisher<ByteBuffer> publisher,
+            FrameDecoder<F> decoder,
+            EventDecoder<F> eventDecoder
     ) {
         super(publisher);
         this.decoder = decoder;
@@ -27,14 +27,13 @@ public final class EventStreamFrameDecodingProcessor<F extends Frame<?>>
     }
 
     public static <F extends Frame<?>> EventStreamFrameDecodingProcessor<F> create(
-        Flow.Publisher<ByteBuffer> publisher,
-        EventDecoderFactory<F> eventDecoderFactory
+            Flow.Publisher<ByteBuffer> publisher,
+            EventDecoderFactory<F> eventDecoderFactory
     ) {
         return new EventStreamFrameDecodingProcessor<>(
-            publisher,
-            eventDecoderFactory.newFrameDecoder(),
-            eventDecoderFactory.newEventDecoder()
-        );
+                publisher,
+                eventDecoderFactory.newFrameDecoder(),
+                eventDecoderFactory.newEventDecoder());
     }
 
     @Override

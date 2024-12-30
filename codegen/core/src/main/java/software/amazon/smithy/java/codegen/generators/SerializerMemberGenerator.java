@@ -38,7 +38,7 @@ import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
 
 final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void> implements
-    Runnable {
+        Runnable {
     private final JavaWriter writer;
     private final SymbolProvider provider;
     private final Model model;
@@ -47,12 +47,12 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     private final String state;
 
     SerializerMemberGenerator(
-        JavaWriter writer,
-        SymbolProvider provider,
-        Model model,
-        ServiceShape service,
-        Shape shape,
-        String state
+            JavaWriter writer,
+            SymbolProvider provider,
+            Model model,
+            ServiceShape service,
+            Shape shape,
+            String state
     ) {
         this.writer = writer;
         this.provider = provider;
@@ -90,18 +90,16 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     @Override
     public Void listShape(ListShape listShape) {
         writer.write(
-            "serializer.writeList(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
-            CodegenUtils.getDefaultName(listShape, service)
-        );
+                "serializer.writeList(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
+                CodegenUtils.getDefaultName(listShape, service));
         return null;
     }
 
     @Override
     public Void mapShape(MapShape mapShape) {
         writer.write(
-            "serializer.writeMap(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
-            CodegenUtils.getDefaultName(mapShape, service)
-        );
+                "serializer.writeMap(${schema:L}, ${state:L}, ${state:L}.size(), SharedSerde.$USerializer.INSTANCE)",
+                CodegenUtils.getDefaultName(mapShape, service));
         return null;
     }
 

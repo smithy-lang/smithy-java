@@ -18,14 +18,14 @@ final class GetOrder implements GetOrderOperation {
         var order = OrderTracker.getOrderById(UUID.fromString(input.id()));
         if (order == null) {
             throw OrderNotFound.builder()
-                .orderId(input.id())
-                .message("Order not found")
-                .build();
+                    .orderId(input.id())
+                    .message("Order not found")
+                    .build();
         }
         return GetOrderOutput.builder()
-            .id(input.id())
-            .coffeeType(order.type())
-            .status(order.status())
-            .build();
+                .id(input.id())
+                .coffeeType(order.type())
+                .status(order.status())
+                .build();
     }
 }

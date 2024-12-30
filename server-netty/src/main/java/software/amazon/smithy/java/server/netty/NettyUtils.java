@@ -10,8 +10,7 @@ import java.util.concurrent.CompletableFuture;
 
 final class NettyUtils {
 
-    private NettyUtils() {
-    }
+    private NettyUtils() {}
 
     static CompletableFuture<Void> toVoidCompletableFuture(Future<?> future) {
         var cf = new CompletableFuture<Void>();

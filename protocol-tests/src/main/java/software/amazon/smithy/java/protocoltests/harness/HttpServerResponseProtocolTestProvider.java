@@ -29,7 +29,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
 
 public class HttpServerResponseProtocolTestProvider extends
-    ProtocolTestProvider<HttpServerResponseTests, ProtocolTestExtension.SharedServerTestData> {
+        ProtocolTestProvider<HttpServerResponseTests, ProtocolTestExtension.SharedServerTestData> {
 
     @Override
     protected Class<HttpServerResponseTests> getAnnotationType() {
@@ -43,9 +43,9 @@ public class HttpServerResponseProtocolTestProvider extends
 
     @Override
     protected Stream<TestTemplateInvocationContext> generateProtocolTests(
-        ProtocolTestExtension.SharedServerTestData testData,
-        HttpServerResponseTests annotation,
-        TestFilter filter
+            ProtocolTestExtension.SharedServerTestData testData,
+            HttpServerResponseTests annotation,
+            TestFilter filter
     ) {
         var mockClient = ServerTestClient.get(testData.endpoint());
         List<TestTemplateInvocationContext> invocationContexts = new ArrayList<>();
@@ -66,22 +66,20 @@ public class HttpServerResponseProtocolTestProvider extends
                 headers.put("content-type", List.of("application/json"));
 
                 var request = HttpRequest.builder()
-                    .httpVersion(HttpVersion.HTTP_1_1)
-                    .body(DataStream.ofBytes(new byte[0]))
-                    .uri(testData.endpoint())
-                    .headers(HttpHeaders.of(headers))
-                    .method("POST")
-                    .build();
+                        .httpVersion(HttpVersion.HTTP_1_1)
+                        .body(DataStream.ofBytes(new byte[0]))
+                        .uri(testData.endpoint())
+                        .headers(HttpHeaders.of(headers))
+                        .method("POST")
+                        .build();
                 invocationContexts.add(
-                    new ServerResponseInvocationContext(
-                        testCase,
-                        serverTestOperation.mockOperation(),
-                        mockClient,
-                        request,
-                        protocolTestCase.outputBuilder().get(),
-                        protocolTestCase.isErrorTest()
-                    )
-                );
+                        new ServerResponseInvocationContext(
+                                testCase,
+                                serverTestOperation.mockOperation(),
+                                mockClient,
+                                request,
+                                protocolTestCase.outputBuilder().get(),
+                                protocolTestCase.isErrorTest()));
             }
 
         }
@@ -89,13 +87,12 @@ public class HttpServerResponseProtocolTestProvider extends
     }
 
     private record ServerResponseInvocationContext(
-        HttpResponseTestCase testCase,
-        MockOperation mockOperation,
-        ServerTestClient client,
-        HttpRequest request,
-        ShapeBuilder<? extends SerializableStruct> outputBuilder,
-        boolean isErrorTestCase
-    ) implements TestTemplateInvocationContext {
+            HttpResponseTestCase testCase,
+            MockOperation mockOperation,
+            ServerTestClient client,
+            HttpRequest request,
+            ShapeBuilder<? extends SerializableStruct> outputBuilder,
+            boolean isErrorTestCase) implements TestTemplateInvocationContext {
 
         @Override
         public String getDisplayName(int invocationIndex) {
@@ -105,64 +102,65 @@ public class HttpServerResponseProtocolTestProvider extends
         @Override
         public List<Extension> getAdditionalExtensions() {
             return List.of(
-                new ParameterResolver() {
+                    new ParameterResolver() {
 
-                    @Override
-                    public boolean supportsParameter(
-                        ParameterContext parameterContext,
-                        ExtensionContext extensionContext
-                    ) throws ParameterResolutionException {
-                        return DataStream.class.isAssignableFrom(parameterContext.getParameter().getType())
-                            && parameterContext.getIndex() == 0;
-                    }
-
-                    @Override
-                    public Object resolveParameter(
-                        ParameterContext parameterContext,
-                        ExtensionContext extensionContext
-                    ) throws ParameterResolutionException {
-                        if (testCase.getBody().isEmpty()) {
-                            return DataStream.ofEmpty();
+                        @Override
+                        public boolean supportsParameter(
+                                ParameterContext parameterContext,
+                                ExtensionContext extensionContext
+                        ) throws ParameterResolutionException {
+                            return DataStream.class.isAssignableFrom(parameterContext.getParameter().getType())
+                                    && parameterContext.getIndex() == 0;
                         }
-                        if (testCase.getBodyMediaType().map(ProtocolTestProvider::isBinaryMediaType).orElse(false)) {
-                            return DataStream.ofBytes(
-                                Base64.getDecoder().decode(testCase.getBody().get()),
-                                testCase.getBodyMediaType().get()
-                            );
-                        }
-                        return DataStream.ofString(testCase.getBody().get(), testCase.getBodyMediaType().orElse(null));
-                    }
-                },
-                new ParameterResolver() {
 
-                    @Override
-                    public boolean supportsParameter(
-                        ParameterContext parameterContext,
-                        ExtensionContext extensionContext
-                    ) throws ParameterResolutionException {
-                        return DataStream.class.isAssignableFrom(parameterContext.getParameter().getType())
-                            && parameterContext.getIndex() == 1;
-                    }
-
-                    @Override
-                    public Object resolveParameter(
-                        ParameterContext parameterContext,
-                        ExtensionContext extensionContext
-                    ) throws ParameterResolutionException {
-                        new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
-                            .deserializeInto(outputBuilder);
-                        if (isErrorTestCase) {
-                            mockOperation.setError((Throwable) outputBuilder.build());
-                        } else {
-                            mockOperation.setResponse(outputBuilder.build());
+                        @Override
+                        public Object resolveParameter(
+                                ParameterContext parameterContext,
+                                ExtensionContext extensionContext
+                        ) throws ParameterResolutionException {
+                            if (testCase.getBody().isEmpty()) {
+                                return DataStream.ofEmpty();
+                            }
+                            if (testCase.getBodyMediaType()
+                                    .map(ProtocolTestProvider::isBinaryMediaType)
+                                    .orElse(false)) {
+                                return DataStream.ofBytes(
+                                        Base64.getDecoder().decode(testCase.getBody().get()),
+                                        testCase.getBodyMediaType().get());
+                            }
+                            return DataStream.ofString(testCase.getBody().get(),
+                                    testCase.getBodyMediaType().orElse(null));
                         }
-                        HttpResponse response = client.sendRequest(request);
-                        Assertions.assertHeadersEqual(response, testCase.getHeaders());
-                        assertEquals(testCase.getCode(), response.statusCode());
-                        return response.body();
-                    }
-                }
-            );
+                    },
+                    new ParameterResolver() {
+
+                        @Override
+                        public boolean supportsParameter(
+                                ParameterContext parameterContext,
+                                ExtensionContext extensionContext
+                        ) throws ParameterResolutionException {
+                            return DataStream.class.isAssignableFrom(parameterContext.getParameter().getType())
+                                    && parameterContext.getIndex() == 1;
+                        }
+
+                        @Override
+                        public Object resolveParameter(
+                                ParameterContext parameterContext,
+                                ExtensionContext extensionContext
+                        ) throws ParameterResolutionException {
+                            new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
+                                    .deserializeInto(outputBuilder);
+                            if (isErrorTestCase) {
+                                mockOperation.setError((Throwable) outputBuilder.build());
+                            } else {
+                                mockOperation.setResponse(outputBuilder.build());
+                            }
+                            HttpResponse response = client.sendRequest(request);
+                            Assertions.assertHeadersEqual(response, testCase.getHeaders());
+                            assertEquals(testCase.getCode(), response.statusCode());
+                            return response.body();
+                        }
+                    });
         }
     }
 }

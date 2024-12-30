@@ -14,22 +14,21 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public final class ProtocolResolver {
 
     private static final Map<ShapeId, ServerProtocolProvider> SERVER_PROTOCOL_HANDLERS = ServiceLoader.load(
-        ServerProtocolProvider.class,
-        ProtocolResolver.class.getClassLoader()
-    )
-        .stream()
-        .map(ServiceLoader.Provider::get)
-        .collect(Collectors.toMap(ServerProtocolProvider::getProtocolId, Function.identity()));
+            ServerProtocolProvider.class,
+            ProtocolResolver.class.getClassLoader())
+            .stream()
+            .map(ServiceLoader.Provider::get)
+            .collect(Collectors.toMap(ServerProtocolProvider::getProtocolId, Function.identity()));
 
     private final List<? extends ServerProtocol> serverProtocolHandlers;
     private final ServiceMatcher serviceMatcher;
 
     public ProtocolResolver(ServiceMatcher serviceMatcher) {
         serverProtocolHandlers = SERVER_PROTOCOL_HANDLERS.values()
-            .stream()
-            .sorted(Comparator.comparing(ServerProtocolProvider::priority).reversed())
-            .map(p -> p.provideProtocolHandler(serviceMatcher.getAllServices()))
-            .toList();
+                .stream()
+                .sorted(Comparator.comparing(ServerProtocolProvider::priority).reversed())
+                .map(p -> p.provideProtocolHandler(serviceMatcher.getAllServices()))
+                .toList();
         this.serviceMatcher = serviceMatcher;
     }
 

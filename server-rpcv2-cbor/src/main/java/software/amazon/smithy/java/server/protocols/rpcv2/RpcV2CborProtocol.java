@@ -38,8 +38,8 @@ final class RpcV2CborProtocol extends ServerProtocol {
 
     @Override
     public ServiceProtocolResolutionResult resolveOperation(
-        ServiceProtocolResolutionRequest request,
-        List<Service> candidates
+            ServiceProtocolResolutionRequest request,
+            List<Service> candidates
     ) {
         if (!isRpcV2Request(request)) {
             // This doesn't appear to be an RpcV2 request, let other protocols try.
@@ -65,10 +65,9 @@ final class RpcV2CborProtocol extends ServerProtocol {
             throw UnknownOperationException.builder().build();
         }
         return new ServiceProtocolResolutionResult(
-            selectedService,
-            selectedService.getOperation(serviceAndOperation.operation),
-            this
-        );
+                selectedService,
+                selectedService.getOperation(serviceAndOperation.operation),
+                this);
     }
 
     @Override
@@ -79,9 +78,8 @@ final class RpcV2CborProtocol extends ServerProtocol {
         }
         return dataStream.asByteBuffer().thenApply(b -> {
             var input = codec.deserializeShape(
-                dataStream.waitForByteBuffer(),
-                job.operation().getApiOperation().inputBuilder()
-            );
+                    dataStream.waitForByteBuffer(),
+                    job.operation().getApiOperation().inputBuilder());
             job.request().setDeserializedValue(input);
             return null;
         });
@@ -110,7 +108,8 @@ final class RpcV2CborProtocol extends ServerProtocol {
         var schema = service.schema();
         if (serviceAndOperation.isFullyQualifiedService()) {
             return schema.id().toString().equals(serviceAndOperation.service());
-        } else return service.schema().id().getName().equals(serviceAndOperation.service());
+        } else
+            return service.schema().id().getName().equals(serviceAndOperation.service());
     }
 
     private static ServiceAndOperation parseRpcV2StylePath(String path) {
@@ -167,39 +166,52 @@ final class RpcV2CborProtocol extends ServerProtocol {
         }
 
         return new ServiceAndOperation(
-            serviceName,
-            path.substring(operationNameStart, operationNameEnd),
-            isFullyQualifiedService
-        );
+                serviceName,
+                path.substring(operationNameStart, operationNameEnd),
+                isFullyQualifiedService);
     }
 
     private static boolean isValidOperationPrefix(String uri, int pos) {
         // need 10 chars: "/operation/", pos points to "/"
         // then need another 9 chars for "/service/"
         return pos >= 19 &&
-            ((uri.charAt(pos - 10) == '/') &&
-                (uri.charAt(pos - 9) == 'o') &&
-                (uri.charAt(pos - 8) == 'p') &&
-                (uri.charAt(pos - 7) == 'e') &&
-                (uri.charAt(pos - 6) == 'r') &&
-                (uri.charAt(pos - 5) == 'a') &&
-                (uri.charAt(pos - 4) == 't') &&
-                (uri.charAt(pos - 3) == 'i') &&
-                (uri.charAt(pos - 2) == 'o') &&
-                (uri.charAt(pos - 1) == 'n'));
+                ((uri.charAt(pos - 10) == '/') &&
+                        (uri.charAt(pos - 9) == 'o')
+                        &&
+                        (uri.charAt(pos - 8) == 'p')
+                        &&
+                        (uri.charAt(pos - 7) == 'e')
+                        &&
+                        (uri.charAt(pos - 6) == 'r')
+                        &&
+                        (uri.charAt(pos - 5) == 'a')
+                        &&
+                        (uri.charAt(pos - 4) == 't')
+                        &&
+                        (uri.charAt(pos - 3) == 'i')
+                        &&
+                        (uri.charAt(pos - 2) == 'o')
+                        &&
+                        (uri.charAt(pos - 1) == 'n'));
     }
 
     private static boolean isValidServicePrefix(String uri, int pos) {
         // need 8 chars: "/service/", pos points to "/"
         return pos >= 8 &&
-            ((uri.charAt(pos - 8) == '/') &&
-                (uri.charAt(pos - 7) == 's') &&
-                (uri.charAt(pos - 6) == 'e') &&
-                (uri.charAt(pos - 5) == 'r') &&
-                (uri.charAt(pos - 4) == 'v') &&
-                (uri.charAt(pos - 3) == 'i') &&
-                (uri.charAt(pos - 2) == 'c') &&
-                (uri.charAt(pos - 1) == 'e'));
+                ((uri.charAt(pos - 8) == '/') &&
+                        (uri.charAt(pos - 7) == 's')
+                        &&
+                        (uri.charAt(pos - 6) == 'e')
+                        &&
+                        (uri.charAt(pos - 5) == 'r')
+                        &&
+                        (uri.charAt(pos - 4) == 'v')
+                        &&
+                        (uri.charAt(pos - 3) == 'i')
+                        &&
+                        (uri.charAt(pos - 2) == 'c')
+                        &&
+                        (uri.charAt(pos - 1) == 'e'));
     }
 
     private static boolean isRpcV2Request(ServiceProtocolResolutionRequest request) {
@@ -209,6 +221,5 @@ final class RpcV2CborProtocol extends ServerProtocol {
         return "rpc-v2-cbor".equals(request.headers().firstValue("smithy-protocol"));
     }
 
-    private record ServiceAndOperation(String service, String operation, boolean isFullyQualifiedService) {
-    }
+    private record ServiceAndOperation(String service, String operation, boolean isFullyQualifiedService) {}
 }

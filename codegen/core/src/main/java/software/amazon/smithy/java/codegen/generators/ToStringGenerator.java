@@ -18,11 +18,11 @@ record ToStringGenerator(JavaWriter writer) implements Runnable {
         writer.putContext("string", String.class);
         writer.putContext("toStringSerializer", ToStringSerializer.class);
         writer.write("""
-            @Override
-            public ${string:N} toString() {
-                return ${toStringSerializer:T}.serialize(this);
-            }
-            """);
+                @Override
+                public ${string:N} toString() {
+                    return ${toStringSerializer:T}.serialize(this);
+                }
+                """);
         writer.popState();
     }
 }

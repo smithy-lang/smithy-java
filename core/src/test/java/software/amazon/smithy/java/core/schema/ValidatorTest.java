@@ -60,10 +60,9 @@ public class ValidatorTest {
     @Test
     public void storesErrors() {
         Schema schema = Schema.createString(
-            ShapeId.from("smithy.example#Str"),
-            LengthTrait.builder().max(1L).build(),
-            new PatternTrait("[0-9]+")
-        );
+                ShapeId.from("smithy.example#Str"),
+                LengthTrait.builder().max(1L).build(),
+                new PatternTrait("[0-9]+"));
         Validator validator = Validator.builder().maxDepth(1).maxAllowedErrors(2).build();
         var errors = validator.validate(ser -> ser.writeString(schema, "Hiii"));
 
@@ -73,10 +72,9 @@ public class ValidatorTest {
     @Test
     public void stopsWhenTooManyErrors() {
         Schema schema = Schema.createString(
-            ShapeId.from("smithy.example#Str"),
-            LengthTrait.builder().max(1L).build(),
-            new PatternTrait("[0-9]+")
-        );
+                ShapeId.from("smithy.example#Str"),
+                LengthTrait.builder().max(1L).build(),
+                new PatternTrait("[0-9]+"));
         Validator validator = Validator.builder().maxDepth(1).maxAllowedErrors(1).build();
 
         var errors = validator.validate(ser -> ser.writeString(schema, "Hiii"));
@@ -88,9 +86,8 @@ public class ValidatorTest {
     public void stopsValidatingWhenMaxErrorsReached() {
         Validator validator = Validator.builder().maxAllowedErrors(2).build();
         Schema schema = Schema.createByte(
-            ShapeId.from("smithy.example#E"),
-            RangeTrait.builder().min(BigDecimal.valueOf(2)).build()
-        );
+                ShapeId.from("smithy.example#E"),
+                RangeTrait.builder().min(BigDecimal.valueOf(2)).build());
 
         var errors = validator.validate(encoder -> {
             encoder.writeByte(schema, (byte) 1);
@@ -139,16 +136,14 @@ public class ValidatorTest {
         for (int i = depth; i > 0; i--) {
             if (i == depth) {
                 schemas.add(
-                    Schema.listBuilder(ShapeId.from("s#L" + depth))
-                        .putMember("member", PreludeSchemas.STRING)
-                        .build()
-                );
+                        Schema.listBuilder(ShapeId.from("s#L" + depth))
+                                .putMember("member", PreludeSchemas.STRING)
+                                .build());
             } else {
                 schemas.add(
-                    Schema.listBuilder(ShapeId.from("s#L3"))
-                        .putMember("member", schemas.get(schemas.size() - 1))
-                        .build()
-                );
+                        Schema.listBuilder(ShapeId.from("s#L3"))
+                                .putMember("member", schemas.get(schemas.size() - 1))
+                                .build());
             }
         }
         return schemas;
@@ -191,17 +186,15 @@ public class ValidatorTest {
         Validator validator = Validator.builder().build();
         var errors = validator.validate(encoder -> {
             encoder.writeString(
-                Schema.createString(ShapeId.from("smithy.example#Foo"), new PatternTrait("^[a-z]+$")),
-                "abc123"
-            );
+                    Schema.createString(ShapeId.from("smithy.example#Foo"), new PatternTrait("^[a-z]+$")),
+                    "abc123");
         });
 
         assertThat(errors, hasSize(1));
         assertThat(errors.get(0).path(), equalTo("/"));
         assertThat(
-            errors.get(0).message(),
-            equalTo("Value must satisfy regular expression pattern: ^[a-z]+$")
-        );
+                errors.get(0).message(),
+                equalTo("Value must satisfy regular expression pattern: ^[a-z]+$"));
     }
 
     // Required member validation
@@ -210,13 +203,13 @@ public class ValidatorTest {
     public void validatesRequiredMembersMissingMultiple() {
         var string = PreludeSchemas.STRING;
         Schema struct = Schema.structureBuilder(ShapeId.from("smithy.example#Foo"))
-            .putMember("a", string, new RequiredTrait())
-            .putMember("b", string, new RequiredTrait())
-            .putMember("c", string, new RequiredTrait())
-            .putMember("d", string, new RequiredTrait(), new DefaultTrait(Node.from("default")))
-            .putMember("e", string, new DefaultTrait(Node.from("default")))
-            .putMember("f", string)
-            .build();
+                .putMember("a", string, new RequiredTrait())
+                .putMember("b", string, new RequiredTrait())
+                .putMember("c", string, new RequiredTrait())
+                .putMember("d", string, new RequiredTrait(), new DefaultTrait(Node.from("default")))
+                .putMember("e", string, new DefaultTrait(Node.from("default")))
+                .putMember("f", string)
+                .build();
 
         Validator validator = Validator.builder().build();
 
@@ -237,8 +230,8 @@ public class ValidatorTest {
     @Test
     public void validatesRequiredMembersMissingSingle() {
         Schema struct = Schema.structureBuilder(ShapeId.from("smithy.example#Foo"))
-            .putMember("a", PreludeSchemas.STRING, new RequiredTrait())
-            .build();
+                .putMember("a", PreludeSchemas.STRING, new RequiredTrait())
+                .build();
 
         Validator validator = Validator.builder().build();
         var errors = validator.validate(encoder -> {
@@ -298,8 +291,8 @@ public class ValidatorTest {
 
         var memberTarget = Schema.createString(ShapeId.from("s#S"), LengthTrait.builder().min(3L).build());
         var list = Schema.listBuilder(ShapeId.from("s#L"))
-            .putMember("member", memberTarget)
-            .build();
+                .putMember("member", memberTarget)
+                .build();
 
         var errors = validator.validate(s -> {
             s.writeList(list, list.member("member"), 3, (member, ls) -> {
@@ -312,14 +305,12 @@ public class ValidatorTest {
         assertThat(errors, hasSize(2));
         assertThat(errors.get(0).path(), equalTo("/0"));
         assertThat(
-            errors.get(0).message(),
-            equalTo("Value with length 1 must have length greater than or equal to 3")
-        );
+                errors.get(0).message(),
+                equalTo("Value with length 1 must have length greater than or equal to 3"));
         assertThat(errors.get(1).path(), equalTo("/1"));
         assertThat(
-            errors.get(1).message(),
-            equalTo("Value with length 2 must have length greater than or equal to 3")
-        );
+                errors.get(1).message(),
+                equalTo("Value with length 2 must have length greater than or equal to 3"));
     }
 
     @Test
@@ -328,9 +319,9 @@ public class ValidatorTest {
 
         var keySchema = Schema.createString(ShapeId.from("s#K"), LengthTrait.builder().min(3L).build());
         var map = Schema.mapBuilder(ShapeId.from("s#M"))
-            .putMember("key", keySchema)
-            .putMember("value", PreludeSchemas.STRING, LengthTrait.builder().min(2L).build())
-            .build();
+                .putMember("key", keySchema)
+                .putMember("value", PreludeSchemas.STRING, LengthTrait.builder().min(2L).build())
+                .build();
 
         var errors = validator.validate(s -> {
             s.writeMap(map, map.member("key"), 4, (mapKey, ms) -> {
@@ -344,19 +335,16 @@ public class ValidatorTest {
         assertThat(errors, hasSize(3));
         assertThat(errors.get(0).path(), equalTo("/a/key"));
         assertThat(
-            errors.get(0).message(),
-            equalTo("Value with length 1 must have length greater than or equal to 3")
-        );
+                errors.get(0).message(),
+                equalTo("Value with length 1 must have length greater than or equal to 3"));
         assertThat(errors.get(1).path(), equalTo("/b/key"));
         assertThat(
-            errors.get(1).message(),
-            equalTo("Value with length 1 must have length greater than or equal to 3")
-        );
+                errors.get(1).message(),
+                equalTo("Value with length 1 must have length greater than or equal to 3"));
         assertThat(errors.get(2).path(), equalTo("/good-key-bad-value/value"));
         assertThat(
-            errors.get(2).message(),
-            equalTo("Value with length 1 must have length greater than or equal to 2")
-        );
+                errors.get(2).message(),
+                equalTo("Value with length 1 must have length greater than or equal to 2"));
     }
 
     // Validation of mocked up types.
@@ -364,10 +352,10 @@ public class ValidatorTest {
     @Test
     public void validatesSimplePojo() {
         var pojo = ValidatedPojo.builder()
-            .string("hi")
-            .integer(1)
-            .boxedInteger(2)
-            .build();
+                .string("hi")
+                .integer(1)
+                .boxedInteger(2)
+                .build();
 
         Validator validator = Validator.builder().build();
         var errors = validator.validate(pojo);
@@ -378,10 +366,10 @@ public class ValidatorTest {
     @Test
     public void validatesUnvalidatedPojo() {
         var pojo = UnvalidatedPojo.builder()
-            .string("hi")
-            .integer(1)
-            .boxedInteger(2)
-            .build();
+                .string("hi")
+                .integer(1)
+                .boxedInteger(2)
+                .build();
 
         Validator validator = Validator.builder().build();
         var errors = validator.validate(pojo);
@@ -392,10 +380,10 @@ public class ValidatorTest {
     @Test
     public void validatesPerson() {
         var person = Person.builder()
-            .name("Luka")
-            .age(77)
-            .birthday(Instant.now())
-            .build();
+                .name("Luka")
+                .age(77)
+                .birthday(Instant.now())
+                .build();
 
         Validator validator = Validator.builder().build();
         var errors = validator.validate(person);
@@ -406,24 +394,20 @@ public class ValidatorTest {
     @Test
     public void validatesPojoWithValidatedCollection() {
         var pojoWithValidatedCollection = PojoWithValidatedCollection.builder()
-            .list(
-                List.of(
-                    ValidatedPojo.builder().string("abc").integer(100).boxedInteger(1).build(),
-                    ValidatedPojo.builder().string("123").integer(5).boxedInteger(0).build(),
-                    ValidatedPojo.builder().string("1").integer(2).boxedInteger(3).build()
-                )
-            )
-            .map(
-                Map.of(
-                    "a",
-                    ValidatedPojo.builder().string("abc").integer(100).boxedInteger(1).build(),
-                    "b",
-                    ValidatedPojo.builder().string("123").integer(5).boxedInteger(0).build(),
-                    "c",
-                    ValidatedPojo.builder().string("1").integer(2).boxedInteger(3).build()
-                )
-            )
-            .build();
+                .list(
+                        List.of(
+                                ValidatedPojo.builder().string("abc").integer(100).boxedInteger(1).build(),
+                                ValidatedPojo.builder().string("123").integer(5).boxedInteger(0).build(),
+                                ValidatedPojo.builder().string("1").integer(2).boxedInteger(3).build()))
+                .map(
+                        Map.of(
+                                "a",
+                                ValidatedPojo.builder().string("abc").integer(100).boxedInteger(1).build(),
+                                "b",
+                                ValidatedPojo.builder().string("123").integer(5).boxedInteger(0).build(),
+                                "c",
+                                ValidatedPojo.builder().string("1").integer(2).boxedInteger(3).build()))
+                .build();
 
         Validator validator = Validator.builder().build();
         var errors = validator.validate(pojoWithValidatedCollection);
@@ -435,10 +419,10 @@ public class ValidatorTest {
 
     private Schema getTestUnionSchema() {
         return Schema.unionBuilder(ShapeId.from("smithy.example#U"))
-            .putMember("a", PreludeSchemas.STRING, LengthTrait.builder().max(3L).build())
-            .putMember("b", PreludeSchemas.STRING)
-            .putMember("c", PreludeSchemas.STRING)
-            .build();
+                .putMember("a", PreludeSchemas.STRING, LengthTrait.builder().max(3L).build())
+                .putMember("b", PreludeSchemas.STRING)
+                .putMember("c", PreludeSchemas.STRING)
+                .build();
     }
 
     @Test
@@ -499,9 +483,8 @@ public class ValidatorTest {
         assertThat(errors, hasSize(1));
         assertThat(errors.get(0).path(), equalTo("/a"));
         assertThat(
-            errors.get(0).message(),
-            equalTo("Value with length 17 must have length less than or equal to 3")
-        );
+                errors.get(0).message(),
+                equalTo("Value with length 17 must have length less than or equal to 3"));
     }
 
     @Test
@@ -512,7 +495,7 @@ public class ValidatorTest {
         var errors = validator.validate(s -> {
             s.writeStruct(unionSchema, TestHelper.create(unionSchema, (schema, serializer) -> {
                 serializer.writeString(schema.member("a"), null); // ignore it
-                serializer.writeNull(schema.member("b"));         // ignore it
+                serializer.writeNull(schema.member("b")); // ignore it
                 serializer.writeString(schema.member("c"), "ok"); // it's set, it's the only non-null value.
             }));
         });
@@ -537,8 +520,8 @@ public class ValidatorTest {
     public void allowsNullInSparseList() {
         Validator validator = Validator.builder().build();
         var listSchema = Schema.listBuilder(ShapeId.from("smithy.api#Test"), new SparseTrait())
-            .putMember("member", PreludeSchemas.STRING)
-            .build();
+                .putMember("member", PreludeSchemas.STRING)
+                .build();
 
         var errors = validator.validate(s -> {
             s.writeList(listSchema, listSchema.member("member"), 2, (member, ls) -> {
@@ -555,8 +538,8 @@ public class ValidatorTest {
         // Required structure member is validated elsewhere.
         Validator validator = Validator.builder().build();
         Schema schema = Schema.structureBuilder(ShapeId.from("smithy.example#Test"))
-            .putMember("foo", PreludeSchemas.STRING)
-            .build();
+                .putMember("foo", PreludeSchemas.STRING)
+                .build();
 
         var errors = validator.validate(s -> {
             s.writeStruct(schema, TestHelper.create(schema, (passedSchema, serializer) -> {
@@ -572,8 +555,8 @@ public class ValidatorTest {
     public void doesNotAllowNullValuesInListByDefault() {
         Validator validator = Validator.builder().build();
         var listSchema = Schema.listBuilder(ShapeId.from("smithy.api#Test"))
-            .putMember("member", PreludeSchemas.STRING)
-            .build();
+                .putMember("member", PreludeSchemas.STRING)
+                .build();
 
         var errors = validator.validate(s -> {
             s.writeList(listSchema, listSchema.member("member"), 2, (member, ls) -> {
@@ -585,9 +568,8 @@ public class ValidatorTest {
         assertThat(errors, hasSize(1));
         assertThat(errors.get(0).path(), equalTo("/1"));
         assertThat(
-            errors.get(0).message(),
-            equalTo("Value is in a list that does not allow null values")
-        );
+                errors.get(0).message(),
+                equalTo("Value is in a list that does not allow null values"));
     }
 
     // To write a null in a map, it has to have the sparse trait.
@@ -595,41 +577,38 @@ public class ValidatorTest {
     public void doesNotAllowNullValuesInMapsByDefault() {
         Validator validator = Validator.builder().build();
         var mapSchema = Schema.mapBuilder(ShapeId.from("smithy.api#Test"))
-            .putMember("key", PreludeSchemas.STRING)
-            .putMember("value", PreludeSchemas.STRING)
-            .build();
+                .putMember("key", PreludeSchemas.STRING)
+                .putMember("value", PreludeSchemas.STRING)
+                .build();
 
         var errors = validator.validate(s -> {
             s.writeMap(mapSchema, mapSchema, 2, (schema, ms) -> {
                 ms.writeEntry(
-                    schema.member("key"),
-                    "hi",
-                    schema,
-                    (mapSchema2, msvs) -> msvs.writeString(mapSchema2.member("value"), "ok")
-                );
+                        schema.member("key"),
+                        "hi",
+                        schema,
+                        (mapSchema2, msvs) -> msvs.writeString(mapSchema2.member("value"), "ok"));
                 ms.writeEntry(
-                    schema.member("key"),
-                    "oops",
-                    schema,
-                    (mapSchema2, msvs) -> msvs.writeNull(mapSchema2.member("value"))
-                );
+                        schema.member("key"),
+                        "oops",
+                        schema,
+                        (mapSchema2, msvs) -> msvs.writeNull(mapSchema2.member("value")));
             });
         });
 
         assertThat(errors, hasSize(1));
         assertThat(errors.get(0).path(), equalTo("/oops/value"));
         assertThat(
-            errors.get(0).message(),
-            equalTo("Value is in a map that does not allow null values")
-        );
+                errors.get(0).message(),
+                equalTo("Value is in a map that does not allow null values"));
     }
 
     @Test
     public void detectsDuplicateSimpleItems() {
         Validator validator = Validator.builder().build();
         var listSchema = Schema.listBuilder(ShapeId.from("smithy.api#Test"), new UniqueItemsTrait())
-            .putMember("member", PreludeSchemas.STRING)
-            .build();
+                .putMember("member", PreludeSchemas.STRING)
+                .build();
 
         List<String> values = new ArrayList<>();
         values.add("a");
@@ -662,8 +641,8 @@ public class ValidatorTest {
     public void detectsNullInListWithUniqueItems() {
         Validator validator = Validator.builder().build();
         var listSchema = Schema.listBuilder(ShapeId.from("smithy.api#Test"), new UniqueItemsTrait())
-            .putMember("member", PreludeSchemas.STRING)
-            .build();
+                .putMember("member", PreludeSchemas.STRING)
+                .build();
 
         var errors = validator.validate(s -> {
             s.writeList(listSchema, null, 3, (l, ls) -> {
@@ -687,20 +666,20 @@ public class ValidatorTest {
     public void detectsDuplicateComplexItems() {
         Validator validator = Validator.builder().build();
         var data1 = PojoWithValidatedCollection.builder()
-            .list(List.of(ValidatedPojo.builder().string("hi").boxedInteger(1).integer(2).build()))
-            .map(Map.of("a", ValidatedPojo.builder().string("bye").boxedInteger(1).integer(2).build()))
-            .build();
+                .list(List.of(ValidatedPojo.builder().string("hi").boxedInteger(1).integer(2).build()))
+                .map(Map.of("a", ValidatedPojo.builder().string("bye").boxedInteger(1).integer(2).build()))
+                .build();
         var data2 = PojoWithValidatedCollection.builder()
-            .list(List.of(ValidatedPojo.builder().string("hi").boxedInteger(1).integer(2).build()))
-            .map(Map.of("b", ValidatedPojo.builder().string("bye").boxedInteger(1).integer(2).build()))
-            .build();
+                .list(List.of(ValidatedPojo.builder().string("hi").boxedInteger(1).integer(2).build()))
+                .map(Map.of("b", ValidatedPojo.builder().string("bye").boxedInteger(1).integer(2).build()))
+                .build();
         var data3 = PojoWithValidatedCollection.builder()
-            .list(List.of(ValidatedPojo.builder().string("bye").boxedInteger(1).integer(2).build()))
-            .map(Map.of("c", ValidatedPojo.builder().string("bye").boxedInteger(1).integer(2).build()))
-            .build();
+                .list(List.of(ValidatedPojo.builder().string("bye").boxedInteger(1).integer(2).build()))
+                .map(Map.of("c", ValidatedPojo.builder().string("bye").boxedInteger(1).integer(2).build()))
+                .build();
         var listSchema = Schema.listBuilder(ShapeId.from("smithy.api#Test"), new UniqueItemsTrait())
-            .putMember("member", data1.schema())
-            .build();
+                .putMember("member", data1.schema())
+                .build();
         var errors = validator.validate(s -> {
             s.writeList(listSchema, null, 4, (l, ls) -> {
                 var member = listSchema.member("member");
@@ -730,115 +709,92 @@ public class ValidatorTest {
 
     public static List<Arguments> detectsIncorrectTypeSupplier() {
         return List.of(
-            Arguments.of(
-                ShapeType.BLOB,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeBlob(
-                    PreludeSchemas.INTEGER,
-                    wrap("a".getBytes(StandardCharsets.UTF_8))
-                )
-            ),
-            Arguments.of(
-                ShapeType.STRING,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeString(PreludeSchemas.INTEGER, "a")
-            ),
-            Arguments.of(
-                ShapeType.TIMESTAMP,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeTimestamp(
-                    PreludeSchemas.STRING,
-                    Instant.EPOCH
-                )
-            ),
-            Arguments.of(
-                ShapeType.BOOLEAN,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeBoolean(PreludeSchemas.STRING, true)
-            ),
-            Arguments.of(
-                ShapeType.DOCUMENT,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeDocument(
-                    PreludeSchemas.STRING,
-                    Document.of("hi")
-                )
-            ),
-            Arguments.of(
-                ShapeType.BYTE,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeByte(PreludeSchemas.STRING, (byte) 1)
-            ),
-            Arguments.of(
-                ShapeType.SHORT,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeShort(PreludeSchemas.STRING, (short) 1)
-            ),
-            Arguments.of(
-                ShapeType.INTEGER,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeInteger(PreludeSchemas.STRING, 1)
-            ),
-            Arguments.of(
-                ShapeType.LONG,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeLong(PreludeSchemas.STRING, 1L)
-            ),
-            Arguments.of(
-                ShapeType.FLOAT,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeFloat(PreludeSchemas.STRING, 1f)
-            ),
-            Arguments.of(
-                ShapeType.DOUBLE,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeDouble(PreludeSchemas.STRING, 1.0)
-            ),
-            Arguments.of(
-                ShapeType.BIG_INTEGER,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeBigInteger(
-                    PreludeSchemas.STRING,
-                    BigInteger.ONE
-                )
-            ),
-            Arguments.of(
-                ShapeType.BIG_DECIMAL,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeBigDecimal(
-                    PreludeSchemas.STRING,
-                    BigDecimal.ONE
-                )
-            ),
-            Arguments.of(
-                ShapeType.STRUCTURE,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeStruct(
-                    PreludeSchemas.STRING,
-                    TestHelper.create(PreludeSchemas.STRING, (a, b) -> {})
-                )
-            ),
-            Arguments.of(
-                ShapeType.LIST,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeList(
-                    PreludeSchemas.STRING,
-                    null,
-                    0,
-                    (v, s) -> {}
-                )
-            ),
-            Arguments.of(
-                ShapeType.MAP,
-                (Consumer<ShapeSerializer>) serializer -> serializer.writeMap(
-                    PreludeSchemas.STRING,
-                    null,
-                    0,
-                    (v, s) -> {}
-                )
-            )
-        );
+                Arguments.of(
+                        ShapeType.BLOB,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeBlob(
+                                PreludeSchemas.INTEGER,
+                                wrap("a".getBytes(StandardCharsets.UTF_8)))),
+                Arguments.of(
+                        ShapeType.STRING,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeString(PreludeSchemas.INTEGER, "a")),
+                Arguments.of(
+                        ShapeType.TIMESTAMP,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeTimestamp(
+                                PreludeSchemas.STRING,
+                                Instant.EPOCH)),
+                Arguments.of(
+                        ShapeType.BOOLEAN,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeBoolean(PreludeSchemas.STRING, true)),
+                Arguments.of(
+                        ShapeType.DOCUMENT,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeDocument(
+                                PreludeSchemas.STRING,
+                                Document.of("hi"))),
+                Arguments.of(
+                        ShapeType.BYTE,
+                        (Consumer<
+                                ShapeSerializer>) serializer -> serializer.writeByte(PreludeSchemas.STRING, (byte) 1)),
+                Arguments.of(
+                        ShapeType.SHORT,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeShort(PreludeSchemas.STRING,
+                                (short) 1)),
+                Arguments.of(
+                        ShapeType.INTEGER,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeInteger(PreludeSchemas.STRING, 1)),
+                Arguments.of(
+                        ShapeType.LONG,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeLong(PreludeSchemas.STRING, 1L)),
+                Arguments.of(
+                        ShapeType.FLOAT,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeFloat(PreludeSchemas.STRING, 1f)),
+                Arguments.of(
+                        ShapeType.DOUBLE,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeDouble(PreludeSchemas.STRING, 1.0)),
+                Arguments.of(
+                        ShapeType.BIG_INTEGER,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeBigInteger(
+                                PreludeSchemas.STRING,
+                                BigInteger.ONE)),
+                Arguments.of(
+                        ShapeType.BIG_DECIMAL,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeBigDecimal(
+                                PreludeSchemas.STRING,
+                                BigDecimal.ONE)),
+                Arguments.of(
+                        ShapeType.STRUCTURE,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeStruct(
+                                PreludeSchemas.STRING,
+                                TestHelper.create(PreludeSchemas.STRING, (a, b) -> {}))),
+                Arguments.of(
+                        ShapeType.LIST,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeList(
+                                PreludeSchemas.STRING,
+                                null,
+                                0,
+                                (v, s) -> {})),
+                Arguments.of(
+                        ShapeType.MAP,
+                        (Consumer<ShapeSerializer>) serializer -> serializer.writeMap(
+                                PreludeSchemas.STRING,
+                                null,
+                                0,
+                                (v, s) -> {})));
     }
 
     @ParameterizedTest
     @MethodSource("validatesRangeAndLengthSupplier")
     public void validatesRanges(
-        Class<? extends ValidationError> error,
-        BiFunction<ShapeId, Trait[], Schema> creator,
-        BiConsumer<Schema, ShapeSerializer> consumer
+            Class<? extends ValidationError> error,
+            BiFunction<ShapeId, Trait[], Schema> creator,
+            BiConsumer<Schema, ShapeSerializer> consumer
     ) {
-        var traits = new Trait[]{
-            RangeTrait.builder().min(BigDecimal.ONE).max(BigDecimal.TEN).build(),
-            LengthTrait
-                .builder()
-                .min(1L)
-                .max(10L)
-                .build()
+        var traits = new Trait[] {
+                RangeTrait.builder().min(BigDecimal.ONE).max(BigDecimal.TEN).build(),
+                LengthTrait
+                        .builder()
+                        .min(1L)
+                        .max(10L)
+                        .build()
         };
         Schema schema = creator.apply(ShapeId.from("smithy.example#Number"), traits);
 
@@ -858,9 +814,8 @@ public class ValidatorTest {
             assertThat(errors.get(0).path(), equalTo("/"));
             assertThat(errors.get(0).message(), startsWith("Value with length "));
             assertThat(
-                errors.get(0).message(),
-                endsWith("must have length between 1 and 10, inclusive")
-            );
+                    errors.get(0).message(),
+                    endsWith("must have length between 1 and 10, inclusive"));
         } else {
             throw new RuntimeException("Invalid error type");
         }
@@ -868,312 +823,270 @@ public class ValidatorTest {
 
     public static List<Arguments> validatesRangeAndLengthSupplier() {
         return List.of(
-            Arguments.of(
-                null,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createByte,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeByte(schema, (byte) 1)
-            ),
-            Arguments.of(
-                null,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createShort,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeShort(
-                    schema,
-                    (short) 1
-                )
-            ),
-            Arguments.of(
-                null,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createInteger,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeInteger(schema, 1)
-            ),
-            Arguments.of(
-                null,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createLong,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeLong(schema, 1L)
-            ),
-            Arguments.of(
-                null,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createFloat,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeFloat(schema, 1f)
-            ),
-            Arguments.of(
-                null,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createDouble,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeDouble(schema, 1.0)
-            ),
-            Arguments.of(
-                null,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createBigInteger,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBigInteger(
-                    schema,
-                    BigInteger.ONE
-                )
-            ),
-            Arguments.of(
-                null,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createBigDecimal,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBigDecimal(
-                    schema,
-                    BigDecimal.ONE
-                )
-            ),
-
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createByte,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeByte(schema, (byte) 0)
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createShort,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeShort(
-                    schema,
-                    (short) 0
-                )
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createInteger,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeInteger(schema, 0)
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createLong,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeLong(schema, 0L)
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createFloat,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeFloat(schema, 0f)
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createDouble,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeDouble(schema, 0.0)
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createBigInteger,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBigInteger(
-                    schema,
-                    BigInteger.ZERO
-                )
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createBigDecimal,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBigDecimal(
-                    schema,
-                    BigDecimal.ZERO
-                )
-            ),
-
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createByte,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeByte(schema, (byte) 11)
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createShort,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeShort(
-                    schema,
-                    (short) 11
-                )
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createInteger,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeInteger(schema, 11)
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createLong,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeLong(schema, 11L)
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createFloat,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeFloat(schema, 11f)
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createDouble,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeDouble(schema, 11.0)
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createBigInteger,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBigInteger(
-                    schema,
-                    BigInteger.valueOf(11)
-                )
-            ),
-            Arguments.of(
-                ValidationError.RangeValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createBigDecimal,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBigDecimal(
-                    schema,
-                    BigDecimal.valueOf(11)
-                )
-            ),
-
-            Arguments.of(
-                null,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createBlob,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBlob(
-                    schema,
-                    wrap("a".getBytes(StandardCharsets.UTF_8))
-                )
-            ),
-            Arguments.of(
-                null,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createString,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeString(schema, "a")
-            ),
-            Arguments.of(
-                null,
-                (BiFunction<ShapeId, Trait[], Schema>) (id, traits) -> {
-                    return Schema.listBuilder(id, traits)
-                        .putMember("member", PreludeSchemas.STRING)
-                        .build();
-                },
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeList(
-                    schema,
-                    null,
-                    1,
-                    (v, ls) -> ls.writeString(PreludeSchemas.STRING, "a")
-                )
-            ),
-            Arguments.of(
-                null,
-                (BiFunction<ShapeId, Trait[], Schema>) (id, traits) -> {
-                    return Schema.mapBuilder(id, traits)
-                        .putMember("key", PreludeSchemas.STRING)
-                        .putMember("value", PreludeSchemas.STRING)
-                        .build();
-                },
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeMap(
-                    schema,
-                    null,
-                    1,
-                    (mapStateValue, mapSerializer) -> mapSerializer.writeEntry(
-                        PreludeSchemas.STRING,
-                        "a",
+                Arguments.of(
                         null,
-                        (mapValueState, mapValueSerializer) -> {
-                            mapValueSerializer.writeString(PreludeSchemas.STRING, "a");
-                        }
-                    )
-                )
-            ),
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createByte,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeByte(schema, (byte) 1)),
+                Arguments.of(
+                        null,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createShort,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeShort(
+                                schema,
+                                (short) 1)),
+                Arguments.of(
+                        null,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createInteger,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeInteger(schema, 1)),
+                Arguments.of(
+                        null,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createLong,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeLong(schema, 1L)),
+                Arguments.of(
+                        null,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createFloat,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeFloat(schema, 1f)),
+                Arguments.of(
+                        null,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createDouble,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeDouble(schema, 1.0)),
+                Arguments.of(
+                        null,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createBigInteger,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBigInteger(
+                                schema,
+                                BigInteger.ONE)),
+                Arguments.of(
+                        null,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createBigDecimal,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBigDecimal(
+                                schema,
+                                BigDecimal.ONE)),
 
-            Arguments.of(
-                ValidationError.LengthValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createBlob,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBlob(
-                    schema,
-                    wrap("".getBytes(StandardCharsets.UTF_8))
-                )
-            ),
-            Arguments.of(
-                ValidationError.LengthValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createString,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeString(schema, "")
-            ),
-            Arguments.of(
-                ValidationError.LengthValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) (id, traits) -> {
-                    return Schema.listBuilder(id, traits)
-                        .putMember("member", PreludeSchemas.STRING)
-                        .build();
-                },
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeList(
-                    schema,
-                    null,
-                    0,
-                    (v, ls) -> {}
-                )
-            ),
-            Arguments.of(
-                ValidationError.LengthValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) (id, traits) -> {
-                    return Schema.mapBuilder(id, traits)
-                        .putMember("key", PreludeSchemas.STRING)
-                        .putMember("value", PreludeSchemas.STRING)
-                        .build();
-                },
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> {
-                    serializer.writeMap(schema, null, 0, (mapStateValue, mapSerializer) -> {});
-                }
-            ),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createByte,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeByte(schema, (byte) 0)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createShort,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeShort(
+                                schema,
+                                (short) 0)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createInteger,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeInteger(schema, 0)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createLong,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeLong(schema, 0L)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createFloat,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeFloat(schema, 0f)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createDouble,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeDouble(schema, 0.0)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createBigInteger,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBigInteger(
+                                schema,
+                                BigInteger.ZERO)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createBigDecimal,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBigDecimal(
+                                schema,
+                                BigDecimal.ZERO)),
 
-            Arguments.of(
-                ValidationError.LengthValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createBlob,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBlob(
-                    schema,
-                    wrap("abcdefghijklmnop".getBytes(StandardCharsets.UTF_8))
-                )
-            ),
-            Arguments.of(
-                ValidationError.LengthValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) Schema::createString,
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeString(
-                    schema,
-                    "abcdefghijklmnop"
-                )
-            ),
-            Arguments.of(
-                ValidationError.LengthValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) (id, traits) -> {
-                    return Schema.listBuilder(id, traits)
-                        .putMember("member", PreludeSchemas.STRING)
-                        .build();
-                },
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeList(
-                    schema,
-                    null,
-                    11,
-                    (v, ls) -> {
-                        for (int i = 0; i < 11; i++) {
-                            ls.writeString(PreludeSchemas.STRING, "a");
-                        }
-                    }
-                )
-            ),
-            Arguments.of(
-                ValidationError.LengthValidationFailure.class,
-                (BiFunction<ShapeId, Trait[], Schema>) (id, traits) -> {
-                    return Schema.mapBuilder(id, traits)
-                        .putMember("key", PreludeSchemas.STRING)
-                        .putMember("value", PreludeSchemas.STRING)
-                        .build();
-                },
-                (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> {
-                    serializer.writeMap(schema, null, 11, (mapState, mapSerializer) -> {
-                        for (int i = 0; i < 11; i++) {
-                            mapSerializer.writeEntry(
-                                PreludeSchemas.STRING,
-                                "a" + i,
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createByte,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeByte(schema, (byte) 11)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createShort,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeShort(
+                                schema,
+                                (short) 11)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createInteger,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeInteger(schema, 11)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createLong,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeLong(schema, 11L)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createFloat,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeFloat(schema, 11f)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createDouble,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeDouble(schema, 11.0)),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createBigInteger,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBigInteger(
+                                schema,
+                                BigInteger.valueOf(11))),
+                Arguments.of(
+                        ValidationError.RangeValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createBigDecimal,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBigDecimal(
+                                schema,
+                                BigDecimal.valueOf(11))),
+
+                Arguments.of(
+                        null,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createBlob,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBlob(
+                                schema,
+                                wrap("a".getBytes(StandardCharsets.UTF_8)))),
+                Arguments.of(
+                        null,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createString,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeString(schema, "a")),
+                Arguments.of(
+                        null,
+                        (BiFunction<ShapeId, Trait[], Schema>) (id, traits) -> {
+                            return Schema.listBuilder(id, traits)
+                                    .putMember("member", PreludeSchemas.STRING)
+                                    .build();
+                        },
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeList(
+                                schema,
                                 null,
-                                (mapValueState, mapValueSerializer) -> {
-                                    mapValueSerializer.writeString(PreludeSchemas.STRING, "a");
+                                1,
+                                (v, ls) -> ls.writeString(PreludeSchemas.STRING, "a"))),
+                Arguments.of(
+                        null,
+                        (BiFunction<ShapeId, Trait[], Schema>) (id, traits) -> {
+                            return Schema.mapBuilder(id, traits)
+                                    .putMember("key", PreludeSchemas.STRING)
+                                    .putMember("value", PreludeSchemas.STRING)
+                                    .build();
+                        },
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeMap(
+                                schema,
+                                null,
+                                1,
+                                (mapStateValue, mapSerializer) -> mapSerializer.writeEntry(
+                                        PreludeSchemas.STRING,
+                                        "a",
+                                        null,
+                                        (mapValueState, mapValueSerializer) -> {
+                                            mapValueSerializer.writeString(PreludeSchemas.STRING, "a");
+                                        }))),
+
+                Arguments.of(
+                        ValidationError.LengthValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createBlob,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBlob(
+                                schema,
+                                wrap("".getBytes(StandardCharsets.UTF_8)))),
+                Arguments.of(
+                        ValidationError.LengthValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createString,
+                        (BiConsumer<Schema,
+                                ShapeSerializer>) (schema, serializer) -> serializer.writeString(schema, "")),
+                Arguments.of(
+                        ValidationError.LengthValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) (id, traits) -> {
+                            return Schema.listBuilder(id, traits)
+                                    .putMember("member", PreludeSchemas.STRING)
+                                    .build();
+                        },
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeList(
+                                schema,
+                                null,
+                                0,
+                                (v, ls) -> {})),
+                Arguments.of(
+                        ValidationError.LengthValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) (id, traits) -> {
+                            return Schema.mapBuilder(id, traits)
+                                    .putMember("key", PreludeSchemas.STRING)
+                                    .putMember("value", PreludeSchemas.STRING)
+                                    .build();
+                        },
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> {
+                            serializer.writeMap(schema, null, 0, (mapStateValue, mapSerializer) -> {});
+                        }),
+
+                Arguments.of(
+                        ValidationError.LengthValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createBlob,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeBlob(
+                                schema,
+                                wrap("abcdefghijklmnop".getBytes(StandardCharsets.UTF_8)))),
+                Arguments.of(
+                        ValidationError.LengthValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) Schema::createString,
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeString(
+                                schema,
+                                "abcdefghijklmnop")),
+                Arguments.of(
+                        ValidationError.LengthValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) (id, traits) -> {
+                            return Schema.listBuilder(id, traits)
+                                    .putMember("member", PreludeSchemas.STRING)
+                                    .build();
+                        },
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> serializer.writeList(
+                                schema,
+                                null,
+                                11,
+                                (v, ls) -> {
+                                    for (int i = 0; i < 11; i++) {
+                                        ls.writeString(PreludeSchemas.STRING, "a");
+                                    }
+                                })),
+                Arguments.of(
+                        ValidationError.LengthValidationFailure.class,
+                        (BiFunction<ShapeId, Trait[], Schema>) (id, traits) -> {
+                            return Schema.mapBuilder(id, traits)
+                                    .putMember("key", PreludeSchemas.STRING)
+                                    .putMember("value", PreludeSchemas.STRING)
+                                    .build();
+                        },
+                        (BiConsumer<Schema, ShapeSerializer>) (schema, serializer) -> {
+                            serializer.writeMap(schema, null, 11, (mapState, mapSerializer) -> {
+                                for (int i = 0; i < 11; i++) {
+                                    mapSerializer.writeEntry(
+                                            PreludeSchemas.STRING,
+                                            "a" + i,
+                                            null,
+                                            (mapValueState, mapValueSerializer) -> {
+                                                mapValueSerializer.writeString(PreludeSchemas.STRING, "a");
+                                            });
                                 }
-                            );
-                        }
-                    });
-                }
-            )
-        );
+                            });
+                        }));
     }
 
     @Test
     public void rangeErrorTooSmall() {
         var schema = Schema.createFloat(
-            ShapeId.from("smithy.example#Number"),
-            RangeTrait.builder().min(new BigDecimal("1.2")).build()
-        );
+                ShapeId.from("smithy.example#Number"),
+                RangeTrait.builder().min(new BigDecimal("1.2")).build());
         var validator = Validator.builder().build();
         var errors = validator.validate(e -> e.writeFloat(schema, 1.0f));
 
@@ -1185,9 +1098,8 @@ public class ValidatorTest {
     @Test
     public void rangeErrorTooBig() {
         var schema = Schema.createFloat(
-            ShapeId.from("smithy.example#Number"),
-            RangeTrait.builder().max(new BigDecimal("1.2")).build()
-        );
+                ShapeId.from("smithy.example#Number"),
+                RangeTrait.builder().max(new BigDecimal("1.2")).build());
         var validator = Validator.builder().build();
         var errors = validator.validate(e -> e.writeFloat(schema, 1.3f));
 
@@ -1199,9 +1111,8 @@ public class ValidatorTest {
     @Test
     public void rangeErrorNotBetween() {
         var schema = Schema.createFloat(
-            ShapeId.from("smithy.example#Number"),
-            RangeTrait.builder().min(new BigDecimal("1.1")).max(new BigDecimal("1.2")).build()
-        );
+                ShapeId.from("smithy.example#Number"),
+                RangeTrait.builder().min(new BigDecimal("1.1")).max(new BigDecimal("1.2")).build());
         var validator = Validator.builder().build();
         var errors = validator.validate(e -> e.writeFloat(schema, 1.3f));
 
@@ -1220,24 +1131,23 @@ public class ValidatorTest {
     @Test
     public void lengthTooShort() {
         var schema = Schema.listBuilder(ShapeId.from("smithy.api#Test"), LengthTrait.builder().min(2L).build())
-            .putMember("member", PreludeSchemas.STRING)
-            .build();
+                .putMember("member", PreludeSchemas.STRING)
+                .build();
         var validator = Validator.builder().build();
         var errors = validator.validate(e -> e.writeList(schema, null, 0, (v, ser) -> {}));
 
         assertThat(errors, hasSize(1));
         assertThat(errors.get(0), instanceOf(ValidationError.LengthValidationFailure.class));
         assertThat(
-            errors.get(0).message(),
-            equalTo("Value with length 0 must have length greater than or equal to 2")
-        );
+                errors.get(0).message(),
+                equalTo("Value with length 0 must have length greater than or equal to 2"));
     }
 
     @Test
     public void lengthTooLong() {
         var schema = Schema.listBuilder(ShapeId.from("smithy.api#Test"), LengthTrait.builder().max(1L).build())
-            .putMember("member", PreludeSchemas.STRING)
-            .build();
+                .putMember("member", PreludeSchemas.STRING)
+                .build();
         var validator = Validator.builder().build();
         var errors = validator.validate(e -> e.writeList(schema, schema.member("member"), 2, (member, ser) -> {
             ser.writeString(member, "a");
@@ -1247,16 +1157,15 @@ public class ValidatorTest {
         assertThat(errors, hasSize(1));
         assertThat(errors.get(0), instanceOf(ValidationError.LengthValidationFailure.class));
         assertThat(
-            errors.get(0).message(),
-            equalTo("Value with length 2 must have length less than or equal to 1")
-        );
+                errors.get(0).message(),
+                equalTo("Value with length 2 must have length less than or equal to 1"));
     }
 
     @Test
     public void lengthNotBetween() {
         var schema = Schema.listBuilder(ShapeId.from("smithy.api#Test"), LengthTrait.builder().min(1L).max(2L).build())
-            .putMember("member", PreludeSchemas.STRING)
-            .build();
+                .putMember("member", PreludeSchemas.STRING)
+                .build();
         var validator = Validator.builder().build();
         var errors = validator.validate(e -> e.writeList(schema, schema.member("member"), 3, (member, ser) -> {
             ser.writeString(member, "a");
@@ -1279,10 +1188,10 @@ public class ValidatorTest {
     @ParameterizedTest
     @MethodSource("validatesRequiredMembersOfBigStructsProvider")
     public void validatesRequiredMembersOfBigStructs(
-        int totalMembers,
-        int requiredCount,
-        int defaultedCount,
-        int failures
+            int totalMembers,
+            int requiredCount,
+            int defaultedCount,
+            int failures
     ) {
         var struct = createBigRequiredSchema(totalMembers, requiredCount, defaultedCount);
         Validator validator = Validator.builder().build();
@@ -1327,17 +1236,16 @@ public class ValidatorTest {
 
     static List<Arguments> validatesRequiredMembersOfBigStructsProvider() {
         return Arrays.asList(
-            // int totalMembers, int requiredCount, int defaultedCount, int failures
-            Arguments.of(100, 100, 0, 100),
-            Arguments.of(100, 80, 0, 80),
-            Arguments.of(100, 80, 20, 60),
-            Arguments.of(100, 100, 100, 0),
-            Arguments.of(1000, 10, 0, 10),
-            Arguments.of(0, 0, 0, 0),
-            Arguments.of(63, 63, 0, 63),
-            Arguments.of(64, 64, 0, 64),
-            Arguments.of(65, 65, 0, 65)
-        );
+                // int totalMembers, int requiredCount, int defaultedCount, int failures
+                Arguments.of(100, 100, 0, 100),
+                Arguments.of(100, 80, 0, 80),
+                Arguments.of(100, 80, 20, 60),
+                Arguments.of(100, 100, 100, 0),
+                Arguments.of(1000, 10, 0, 10),
+                Arguments.of(0, 0, 0, 0),
+                Arguments.of(63, 63, 0, 63),
+                Arguments.of(64, 64, 0, 64),
+                Arguments.of(65, 65, 0, 65));
     }
 
     static Schema createBigRequiredSchema(int totalMembers, int requiredCount, int defaultedCount) {

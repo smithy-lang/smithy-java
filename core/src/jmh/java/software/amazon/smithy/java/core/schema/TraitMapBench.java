@@ -37,13 +37,11 @@ import software.amazon.smithy.model.traits.Trait;
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Warmup(
-    iterations = 2,
-    time = 3
-)
+        iterations = 2,
+        time = 3)
 @Measurement(
-    iterations = 3,
-    time = 3
-)
+        iterations = 3,
+        time = 3)
 @BenchmarkMode(Mode.AverageTime)
 @Fork(2)
 public class TraitMapBench {

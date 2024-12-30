@@ -14,8 +14,9 @@ import java.util.function.Supplier;
  * @param <O> Operation output shape type.
  * @param <IE> Operation input event shape type.
  */
-public interface InputEventStreamingApiOperation<I extends SerializableStruct, O extends SerializableStruct, IE extends SerializableStruct>
-    extends ApiOperation<I, O> {
+public interface InputEventStreamingApiOperation<I extends SerializableStruct, O extends SerializableStruct,
+        IE extends SerializableStruct>
+        extends ApiOperation<I, O> {
     /**
      * Retrieves a supplier of builders for input events.
      *

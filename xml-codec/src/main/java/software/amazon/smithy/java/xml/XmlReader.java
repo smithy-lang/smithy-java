@@ -331,12 +331,13 @@ sealed abstract class XmlReader implements AutoCloseable {
     private static boolean canSkipEvent(int event) {
         return switch (event) {
             case XMLStreamConstants.START_DOCUMENT,
-                XMLStreamConstants.COMMENT,
-                XMLStreamConstants.SPACE,
-                XMLStreamConstants.DTD,
-                XMLStreamConstants.PROCESSING_INSTRUCTION,
-                XMLStreamConstants.NOTATION_DECLARATION,
-                XMLStreamConstants.ENTITY_DECLARATION -> true;
+                    XMLStreamConstants.COMMENT,
+                    XMLStreamConstants.SPACE,
+                    XMLStreamConstants.DTD,
+                    XMLStreamConstants.PROCESSING_INSTRUCTION,
+                    XMLStreamConstants.NOTATION_DECLARATION,
+                    XMLStreamConstants.ENTITY_DECLARATION ->
+                true;
             default -> false;
         };
     }

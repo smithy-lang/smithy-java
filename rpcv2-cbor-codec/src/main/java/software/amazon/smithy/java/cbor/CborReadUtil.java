@@ -27,8 +27,10 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 @SmithyInternalApi
 public final class CborReadUtil {
     public static int argLength(int minorType) {
-        if (minorType <= ZERO_BYTES) return 0;
-        if (minorType > EIGHT_BYTES) throw new BadCborException("illegal arg length type: " + minorType);
+        if (minorType <= ZERO_BYTES)
+            return 0;
+        if (minorType > EIGHT_BYTES)
+            throw new BadCborException("illegal arg length type: " + minorType);
         int shift = minorType - ONE_BYTE;
         return 1 << shift;
     }
@@ -38,8 +40,10 @@ public final class CborReadUtil {
             return buffer[off] & MINOR_TYPE_MASK;
         }
         long val = readLong0(buffer, off, len);
-        if (val > Integer.MAX_VALUE) throw new BadCborException("value cannot fit into an int");
-        if (val < 0) throw new BadCborException("expected positive int");
+        if (val > Integer.MAX_VALUE)
+            throw new BadCborException("value cannot fit into an int");
+        if (val < 0)
+            throw new BadCborException("expected positive int");
         return (int) val;
     }
 
@@ -62,8 +66,10 @@ public final class CborReadUtil {
 
     public static long readLong(byte[] buffer, byte type, int off, int len) {
         long val = len == 0 ? buffer[off] & MINOR_TYPE_MASK : readLong0(buffer, off, len);
-        if (type == TYPE_NEGINT) return -val - 1;
-        else return val;
+        if (type == TYPE_NEGINT)
+            return -val - 1;
+        else
+            return val;
     }
 
     @SuppressFBWarnings("SF_SWITCH_FALLTHROUGH")
@@ -73,12 +79,12 @@ public final class CborReadUtil {
         switch (len) {
             case 8:
                 acc = ((long) buffer[off++] & 0xff) << 56
-                    | ((long) buffer[off++] & 0xff) << 48
-                    | ((long) buffer[off++] & 0xff) << 40
-                    | ((long) buffer[off++] & 0xff) << 32;
+                        | ((long) buffer[off++] & 0xff) << 48
+                        | ((long) buffer[off++] & 0xff) << 40
+                        | ((long) buffer[off++] & 0xff) << 32;
             case 4:
                 acc |= ((long) buffer[off++] & 0xff) << 24
-                    | ((long) buffer[off++] & 0xff) << 16;
+                        | ((long) buffer[off++] & 0xff) << 16;
             case 2:
                 acc |= ((long) buffer[off++] & 0xff) << 8;
             case 1:
@@ -217,7 +223,8 @@ public final class CborReadUtil {
     }
 
     private static void readBytesFinite(byte[] b, int off, byte[] dest, int destOff, int len) {
-        if (off + len > b.length) throw new BadCborException("out-of-bounds finite string read operands", true);
+        if (off + len > b.length)
+            throw new BadCborException("out-of-bounds finite string read operands", true);
         System.arraycopy(b, off, dest, destOff, len);
     }
 
@@ -239,7 +246,8 @@ public final class CborReadUtil {
             off += strLen;
             strPos += strLen;
         }
-        if (strPos != len) throw new BadCborException("cannot read unclosed indefinite length string");
+        if (strPos != len)
+            throw new BadCborException("cannot read unclosed indefinite length string");
     }
 
     /**
@@ -276,7 +284,8 @@ public final class CborReadUtil {
     }
 
     private static boolean compareIndefinite(byte[] buf, int bOff, int bLen, byte[] s, int sOff, int sLen) {
-        if (bLen != sLen) return false;
+        if (bLen != sLen)
+            return false;
         int lim = sOff + sLen;
         while (sOff < lim) {
             byte b = buf[bOff];
@@ -284,11 +293,13 @@ public final class CborReadUtil {
             int argLen = argLength(minor);
             int chunkLen = readStrLen(buf, bOff, minor, argLen);
             bOff += argLen + 1;
-            if (!compareFinite(buf, bOff, chunkLen, s, sOff, chunkLen)) return false;
+            if (!compareFinite(buf, bOff, chunkLen, s, sOff, chunkLen))
+                return false;
             bOff += chunkLen;
             sOff += chunkLen;
         }
-        if (sOff != lim) throw new BadCborException("cannot compare unclosed indefinite length string");
+        if (sOff != lim)
+            throw new BadCborException("cannot compare unclosed indefinite length string");
         return true;
     }
 

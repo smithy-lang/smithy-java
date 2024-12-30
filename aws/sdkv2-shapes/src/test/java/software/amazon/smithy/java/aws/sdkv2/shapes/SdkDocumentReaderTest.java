@@ -83,9 +83,9 @@ public class SdkDocumentReaderTest {
         var sdk = Document.fromMap(Map.of("A", Document.fromString("a1"), "B", Document.fromString("b1")));
         var smithy = AwsJsonProtocols.REST_JSON_1.sdkToSmithy(sdk);
         var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
-            .putMember("a", PreludeSchemas.STRING, new JsonNameTrait("A"))
-            .putMember("b", PreludeSchemas.STRING, new JsonNameTrait("B"))
-            .build();
+                .putMember("a", PreludeSchemas.STRING, new JsonNameTrait("A"))
+                .putMember("b", PreludeSchemas.STRING, new JsonNameTrait("B"))
+                .build();
 
         List<Schema> members = new ArrayList<>();
         try (var deser = smithy.createDeserializer()) {

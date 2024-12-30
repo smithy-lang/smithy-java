@@ -40,8 +40,9 @@ import software.amazon.smithy.model.shapes.ShapeId;
 
 final class AwsRestJson1Protocol extends ServerProtocol {
 
-    private static final Context.Key<ValuedMatch<Operation<? extends SerializableStruct, ? extends SerializableStruct>>> MATCH_KEY = Context
-        .key("Aws Rest Json1 Valued Match");
+    private static final Context.Key<
+            ValuedMatch<Operation<? extends SerializableStruct, ? extends SerializableStruct>>> MATCH_KEY = Context
+                    .key("Aws Rest Json1 Valued Match");
 
     private final Codec codec;
     private final Map<String, UriMatcherMap<Operation<?, ?>>> httpMethodToMatchersMap;
@@ -53,23 +54,23 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         for (Service service : services) {
             for (var operation : service.getAllOperations()) {
                 var httpTrait = operation.getApiOperation()
-                    .schema()
-                    .expectTrait(TraitKey.HTTP_TRAIT);
+                        .schema()
+                        .expectTrait(TraitKey.HTTP_TRAIT);
                 String method = httpTrait.getMethod();
                 String pattern = httpTrait
-                    .getUri()
-                    .toString();
+                        .getUri()
+                        .toString();
                 httpMethodToMatchers.computeIfAbsent(method, k -> UriTreeMatcherMap.builder())
-                    .add(UriPattern.forSpecificityRouting(pattern), operation);
+                        .add(UriPattern.forSpecificityRouting(pattern), operation);
             }
         }
         this.httpMethodToMatchersMap = httpMethodToMatchers.entrySet()
-            .stream()
-            .collect(toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().build()));
+                .stream()
+                .collect(toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().build()));
         this.codec = JsonCodec.builder()
-            .useJsonName(true)
-            .useTimestampFormat(true)
-            .build();
+                .useJsonName(true)
+                .useTimestampFormat(true)
+                .build();
     }
 
     @Override
@@ -79,8 +80,8 @@ final class AwsRestJson1Protocol extends ServerProtocol {
 
     @Override
     public ServiceProtocolResolutionResult resolveOperation(
-        ServiceProtocolResolutionRequest request,
-        List<Service> candidates
+            ServiceProtocolResolutionRequest request,
+            List<Service> candidates
     ) {
         var uri = request.uri().getPath();
         String rawQuery = request.uri().getRawQuery();
@@ -92,17 +93,16 @@ final class AwsRestJson1Protocol extends ServerProtocol {
             return null;
         }
         ValuedMatch<Operation<? extends SerializableStruct, ? extends SerializableStruct>> selectedOperation = matcher
-            .match(uri);
+                .match(uri);
         if (selectedOperation == null) {
             return null;
         }
         request.requestContext().put(MATCH_KEY, selectedOperation);
 
         return new ServiceProtocolResolutionResult(
-            selectedOperation.getValue().getOwningService(),
-            selectedOperation.getValue(),
-            this
-        );
+                selectedOperation.getValue().getOwningService(),
+                selectedOperation.getValue(),
+                this);
 
     }
 
@@ -110,19 +110,18 @@ final class AwsRestJson1Protocol extends ServerProtocol {
     public CompletableFuture<Void> deserializeInput(Job job) {
         if (!job.isHttpJob()) {
             return CompletableFuture.failedFuture(
-                new IllegalStateException("Unsupported Job type. Only HttpJob is supported")
-            );
+                    new IllegalStateException("Unsupported Job type. Only HttpJob is supported"));
         }
 
         var httpJob = job.asHttpJob();
         var selectedOperation = job.request().context().get(MATCH_KEY);
         Map<String, String> labelValues = new HashMap<>();
         for (SmithyPattern.Segment label : job.operation()
-            .getApiOperation()
-            .schema()
-            .expectTrait(TraitKey.HTTP_TRAIT)
-            .getUri()
-            .getLabels()) {
+                .getApiOperation()
+                .schema()
+                .expectTrait(TraitKey.HTTP_TRAIT)
+                .getUri()
+                .getLabels()) {
             var values = selectedOperation.getLabelValues(label.getContent());
             if (values != null) {
                 labelValues.put(label.getContent(), URLEncoding.urlDecode(values.get(0)));
@@ -131,19 +130,18 @@ final class AwsRestJson1Protocol extends ServerProtocol {
         HttpHeaders headers = httpJob.request().headers();
         var inputShapeBuilder = job.operation().getApiOperation().inputBuilder();
         var deser = httpBinding
-            .requestDeserializer()
-            .inputShapeBuilder(inputShapeBuilder)
-            .pathLabelValues(labelValues)
-            .request(
-                HttpRequest.builder()
-                    .headers(headers)
-                    .uri(httpJob.request().uri())
-                    .method(httpJob.request().method())
-                    .body(job.request().getDataStream())
-                    .build()
-            )
-            .payloadCodec(codec)
-            .payloadMediaType("application/json");
+                .requestDeserializer()
+                .inputShapeBuilder(inputShapeBuilder)
+                .pathLabelValues(labelValues)
+                .request(
+                        HttpRequest.builder()
+                                .headers(headers)
+                                .uri(httpJob.request().uri())
+                                .method(httpJob.request().method())
+                                .body(job.request().getDataStream())
+                                .build())
+                .payloadCodec(codec)
+                .payloadMediaType("application/json");
 
         try {
             deser.deserialize().get();
@@ -160,10 +158,10 @@ final class AwsRestJson1Protocol extends ServerProtocol {
     public CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output, boolean isError) {
         HttpJob httpJob = (HttpJob) job; //We already check in the deserializeInput method.
         ResponseSerializer serializer = httpBinding.responseSerializer()
-            .operation(job.operation().getApiOperation())
-            .payloadCodec(codec)
-            .payloadMediaType("application/json")
-            .shapeValue(output);
+                .operation(job.operation().getApiOperation())
+                .payloadCodec(codec)
+                .payloadMediaType("application/json")
+                .shapeValue(output);
         if (isError) {
             serializer.errorSchema(output.schema());
         }

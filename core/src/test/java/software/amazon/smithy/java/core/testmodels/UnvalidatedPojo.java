@@ -21,10 +21,10 @@ public final class UnvalidatedPojo implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#UnvalidatedPojo");
     static final Schema SCHEMA = Schema.structureBuilder(ID)
-        .putMember("string", PreludeSchemas.STRING)
-        .putMember("boxedInteger", PreludeSchemas.INTEGER)
-        .putMember("integer", PreludeSchemas.PRIMITIVE_INTEGER)
-        .build();
+            .putMember("string", PreludeSchemas.STRING)
+            .putMember("boxedInteger", PreludeSchemas.INTEGER)
+            .putMember("integer", PreludeSchemas.PRIMITIVE_INTEGER)
+            .build();
     private static final Schema SCHEMA_STRING = SCHEMA.member("string");
     private static final Schema SCHEMA_BOXED_INTEGER = SCHEMA.member("boxedInteger");
     private static final Schema SCHEMA_INTEGER = SCHEMA.member("integer");

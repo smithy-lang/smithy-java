@@ -22,10 +22,10 @@ final class HttpApiKeyAuthTraitInitializer implements TraitInitializer<HttpApiKe
         writer.putContext("in", httpApiKeyAuthTrait.getIn());
         writer.putContext("scheme", httpApiKeyAuthTrait.getScheme());
         writer.writeInline("""
-            ${auth:T}.builder()
-                .name(${name:S})
-                .in(${auth:T}.Location.from(${in:S})${?scheme}
-                .scheme(${scheme:S})${/scheme}
-                .build()""");
+                ${auth:T}.builder()
+                    .name(${name:S})
+                    .in(${auth:T}.Location.from(${in:S})${?scheme}
+                    .scheme(${scheme:S})${/scheme}
+                    .build()""");
     }
 }

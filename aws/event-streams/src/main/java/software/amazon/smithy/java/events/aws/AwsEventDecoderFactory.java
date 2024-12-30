@@ -25,10 +25,10 @@ public class AwsEventDecoderFactory<E extends SerializableStruct> implements Eve
     private final FrameTransformer<AwsEventFrame> transformer;
 
     private AwsEventDecoderFactory(
-        Schema schema,
-        Codec codec,
-        Supplier<ShapeBuilder<E>> eventBuilder,
-        FrameTransformer<AwsEventFrame> transformer
+            Schema schema,
+            Codec codec,
+            Supplier<ShapeBuilder<E>> eventBuilder,
+            FrameTransformer<AwsEventFrame> transformer
     ) {
         this.schema = schema.isMember() ? schema.memberTarget() : schema;
         this.codec = codec;
@@ -37,29 +37,27 @@ public class AwsEventDecoderFactory<E extends SerializableStruct> implements Eve
     }
 
     public static <IE extends SerializableStruct> AwsEventDecoderFactory<IE> forInputStream(
-        InputEventStreamingApiOperation<?, ?, IE> operation,
-        Codec codec,
-        FrameTransformer<AwsEventFrame> transformer
+            InputEventStreamingApiOperation<?, ?, IE> operation,
+            Codec codec,
+            FrameTransformer<AwsEventFrame> transformer
     ) {
         return new AwsEventDecoderFactory<>(
-            operation.inputStreamMember(),
-            codec,
-            operation.inputEventBuilderSupplier(),
-            transformer
-        );
+                operation.inputStreamMember(),
+                codec,
+                operation.inputEventBuilderSupplier(),
+                transformer);
     }
 
     public static <OE extends SerializableStruct> AwsEventDecoderFactory<OE> forOutputStream(
-        OutputEventStreamingApiOperation<?, ?, OE> operation,
-        Codec codec,
-        FrameTransformer<AwsEventFrame> transformer
+            OutputEventStreamingApiOperation<?, ?, OE> operation,
+            Codec codec,
+            FrameTransformer<AwsEventFrame> transformer
     ) {
         return new AwsEventDecoderFactory<>(
-            operation.outputStreamMember(),
-            codec,
-            operation.outputEventBuilderSupplier(),
-            transformer
-        );
+                operation.outputStreamMember(),
+                codec,
+                operation.outputEventBuilderSupplier(),
+                transformer);
     }
 
     @Override

@@ -19,10 +19,9 @@ import software.amazon.smithy.java.server.Operation;
  * @param protocol
  */
 record CurrentRequest(
-    Operation<? extends SerializableStruct, ? extends SerializableStruct> operation,
-    MockedRequest request,
-    ClientProtocol<HttpRequest, HttpResponse> protocol
-) {
+        Operation<? extends SerializableStruct, ? extends SerializableStruct> operation,
+        MockedRequest request,
+        ClientProtocol<HttpRequest, HttpResponse> protocol) {
     /**
      * Create a new CurrentRequest using the provided request.
      *

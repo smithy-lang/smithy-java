@@ -11,11 +11,10 @@ import java.util.Objects;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 record HttpResponseImpl(
-    HttpVersion httpVersion,
-    int statusCode,
-    HttpHeaders headers,
-    DataStream body
-) implements HttpResponse {
+        HttpVersion httpVersion,
+        int statusCode,
+        HttpHeaders headers,
+        DataStream body) implements HttpResponse {
 
     @Override
     public ModifiableHttpResponse toModifiable() {

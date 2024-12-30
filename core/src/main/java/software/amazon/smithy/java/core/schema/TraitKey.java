@@ -65,8 +65,7 @@ public final class TraitKey<T extends Trait> {
     public static final TraitKey<DefaultTrait> DEFAULT_TRAIT = TraitKey.get(DefaultTrait.class);
     public static final TraitKey<UniqueItemsTrait> UNIQUE_ITEMS_TRAIT = TraitKey.get(UniqueItemsTrait.class);
     public static final TraitKey<TimestampFormatTrait> TIMESTAMP_FORMAT_TRAIT = TraitKey.get(
-        TimestampFormatTrait.class
-    );
+            TimestampFormatTrait.class);
     public static final TraitKey<JsonNameTrait> JSON_NAME_TRAIT = TraitKey.get(JsonNameTrait.class);
     public static final TraitKey<SparseTrait> SPARSE_TRAIT = TraitKey.get(SparseTrait.class);
     public static final TraitKey<LengthTrait> LENGTH_TRAIT = TraitKey.get(LengthTrait.class);
@@ -89,15 +88,12 @@ public final class TraitKey<T extends Trait> {
     public static final TraitKey<HttpLabelTrait> HTTP_LABEL_TRAIT = TraitKey.get(HttpLabelTrait.class);
     public static final TraitKey<HttpQueryTrait> HTTP_QUERY_TRAIT = TraitKey.get(HttpQueryTrait.class);
     public static final TraitKey<HttpQueryParamsTrait> HTTP_QUERY_PARAMS_TRAIT = TraitKey.get(
-        HttpQueryParamsTrait.class
-    );
+            HttpQueryParamsTrait.class);
     public static final TraitKey<HttpPrefixHeadersTrait> HTTP_PREFIX_HEADERS_TRAIT = TraitKey.get(
-        HttpPrefixHeadersTrait.class
-    );
+            HttpPrefixHeadersTrait.class);
     public static final TraitKey<HttpPayloadTrait> HTTP_PAYLOAD_TRAIT = TraitKey.get(HttpPayloadTrait.class);
     public static final TraitKey<HttpResponseCodeTrait> HTTP_RESPONSE_CODE_TRAIT = TraitKey.get(
-        HttpResponseCodeTrait.class
-    );
+            HttpResponseCodeTrait.class);
     public static final TraitKey<StreamingTrait> STREAMING_TRAIT = TraitKey.get(StreamingTrait.class);
     public static final TraitKey<SensitiveTrait> SENSITIVE_TRAIT = TraitKey.get(SensitiveTrait.class);
     public static final TraitKey<XmlNameTrait> XML_NAME_TRAIT = TraitKey.get(XmlNameTrait.class);

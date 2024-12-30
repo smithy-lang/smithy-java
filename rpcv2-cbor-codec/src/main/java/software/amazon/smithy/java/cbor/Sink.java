@@ -22,7 +22,9 @@ sealed interface Sink permits Sink.OutputStreamSink, Sink.ResizingSink, Sink.Nul
 
     void writeAscii(String s);
 
-    default ByteBuffer finish() { return null; }
+    default ByteBuffer finish() {
+        return null;
+    }
 
     final class OutputStreamSink implements Sink {
         private final OutputStream os;

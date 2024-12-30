@@ -47,17 +47,15 @@ public final class ExternalTypesIntegration implements JavaCodegenIntegration {
                     var shapeId = ShapeId.from((String) property.getKey());
                     var shapeClass = Class.forName((String) property.getValue());
                     var symbol = CodegenUtils.fromClass(shapeClass)
-                        .toBuilder()
-                        .putProperty(SymbolProperties.EXTERNAL_TYPE, true)
-                        .build();
-                    ;
+                            .toBuilder()
+                            .putProperty(SymbolProperties.EXTERNAL_TYPE, true)
+                            .build();;
                     var existing = result.put(shapeId, symbol);
                     if (existing != null) {
                         throw new CodegenException(
-                            "Found duplicate mapping for external type: "
-                                + property.getKey() + ". Existing: " + existing
-                                + "Duplicate: " + property.getValue()
-                        );
+                                "Found duplicate mapping for external type: "
+                                        + property.getKey() + ". Existing: " + existing
+                                        + "Duplicate: " + property.getValue());
                     }
                 }
             }
@@ -81,9 +79,9 @@ public final class ExternalTypesIntegration implements JavaCodegenIntegration {
 
     @Override
     public SymbolProvider decorateSymbolProvider(
-        Model model,
-        JavaCodegenSettings settings,
-        SymbolProvider symbolProvider
+            Model model,
+            JavaCodegenSettings settings,
+            SymbolProvider symbolProvider
     ) {
         return new SymbolProvider() {
             @Override
@@ -95,16 +93,16 @@ public final class ExternalTypesIntegration implements JavaCodegenIntegration {
                 } else if (shape instanceof ListShape ls && TYPE_MAPPINGS.containsKey(ls.getMember().getTarget())) {
                     var targetSymbol = TYPE_MAPPINGS.get(ls.getMember().getTarget());
                     return symbolProvider.toSymbol(shape)
-                        .toBuilder()
-                        .references(List.of(new SymbolReference(targetSymbol)))
-                        .build();
+                            .toBuilder()
+                            .references(List.of(new SymbolReference(targetSymbol)))
+                            .build();
                 } else if (shape instanceof MapShape ms && TYPE_MAPPINGS.containsKey(ms.getValue().getTarget())) {
                     var valueSymbol = TYPE_MAPPINGS.get(ms.getValue().getTarget());
                     var keySymbol = symbolProvider.toSymbol(ms.getKey());
                     return symbolProvider.toSymbol(shape)
-                        .toBuilder()
-                        .references(List.of(new SymbolReference(keySymbol), new SymbolReference(valueSymbol)))
-                        .build();
+                            .toBuilder()
+                            .references(List.of(new SymbolReference(keySymbol), new SymbolReference(valueSymbol)))
+                            .build();
                 }
                 return symbolProvider.toSymbol(shape);
             }

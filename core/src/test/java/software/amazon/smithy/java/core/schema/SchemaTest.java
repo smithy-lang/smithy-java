@@ -41,8 +41,8 @@ public class SchemaTest {
     public void directlyRecursiveSchema() {
         var builder = Schema.structureBuilder(ShapeId.from("smithy.example#Foo"), new SensitiveTrait());
         directlyRecursiveSchema = builder
-            .putMember("foo", builder, new DocumentationTrait("Hi"))
-            .build();
+                .putMember("foo", builder, new DocumentationTrait("Hi"))
+                .build();
 
         assertThat(directlyRecursiveSchema.members(), hasSize(1));
         assertThat(directlyRecursiveSchema.member("foo").memberTarget(), is(directlyRecursiveSchema));
@@ -67,16 +67,14 @@ public class SchemaTest {
     @Test
     public void supportsSupercedingTargetTraits() {
         var intSchema = Schema.createInteger(
-            ShapeId.from("smithy.example#DocumentedInt"),
-            new DocumentationTrait("Target")
-        );
+                ShapeId.from("smithy.example#DocumentedInt"),
+                new DocumentationTrait("Target"));
         var structWithMember = Schema.structureBuilder(ShapeId.from("smithy.example#StructWithMember"))
-            .putMember("member", intSchema, new DocumentationTrait("Member"))
-            .build();
+                .putMember("member", intSchema, new DocumentationTrait("Member"))
+                .build();
 
         assertThat(
-            structWithMember.member("member").expectTrait(TraitKey.get(DocumentationTrait.class)).getValue(),
-            equalTo("Member")
-        );
+                structWithMember.member("member").expectTrait(TraitKey.get(DocumentationTrait.class)).getValue(),
+                equalTo("Member"));
     }
 }

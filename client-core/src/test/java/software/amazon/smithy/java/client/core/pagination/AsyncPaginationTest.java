@@ -23,12 +23,11 @@ import software.amazon.smithy.java.client.core.pagination.models.TestOperationPa
 
 public class AsyncPaginationTest {
     private static final List<GetFoosOutput> BASE_EXPECTED_RESULTS = List.of(
-        new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1"))),
-        new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1"))),
-        new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1"))),
-        new GetFoosOutput(new ResultWrapper("final", List.of("foo0", "foo1"))),
-        new GetFoosOutput(new ResultWrapper(null, List.of("foo0", "foo1")))
-    );
+            new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1"))),
+            new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1"))),
+            new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1"))),
+            new GetFoosOutput(new ResultWrapper("final", List.of("foo0", "foo1"))),
+            new GetFoosOutput(new ResultWrapper(null, List.of("foo0", "foo1"))));
 
     private MockClient mockClient;
 
@@ -59,10 +58,9 @@ public class AsyncPaginationTest {
         // Block and wait on results
         var results = subscriber.results();
         var expectedResult = List.of(
-            new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
-            new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))),
-            new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1")))
-        );
+                new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
+                new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))),
+                new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1"))));
         assertThat(results, contains(expectedResult.toArray()));
     }
 
@@ -76,10 +74,9 @@ public class AsyncPaginationTest {
         paginator.forEach(results::add).join();
 
         var expectedResult = List.of(
-            new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
-            new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))),
-            new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1")))
-        );
+                new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
+                new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))),
+                new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1"))));
         assertThat(results, contains(expectedResult.toArray()));
     }
 
@@ -96,9 +93,8 @@ public class AsyncPaginationTest {
         }).join();
 
         var expectedResult = List.of(
-            new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
-            new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3")))
-        );
+                new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
+                new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))));
         assertThat(results, contains(expectedResult.toArray()));
     }
 

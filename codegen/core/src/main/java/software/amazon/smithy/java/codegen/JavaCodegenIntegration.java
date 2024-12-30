@@ -15,7 +15,7 @@ import software.amazon.smithy.model.traits.Trait;
  * adding custom code, etc.
  */
 public interface JavaCodegenIntegration
-    extends SmithyIntegration<JavaCodegenSettings, JavaWriter, CodeGenerationContext> {
+        extends SmithyIntegration<JavaCodegenSettings, JavaWriter, CodeGenerationContext> {
 
     /**
      * List of {@link TraitInitializer}'s to use when writing traits in Schema definitions.

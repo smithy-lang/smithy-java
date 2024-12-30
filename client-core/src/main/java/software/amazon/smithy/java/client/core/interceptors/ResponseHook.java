@@ -20,8 +20,8 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
  * @param <ResponseT> Protocol specific response.
  */
 public sealed class ResponseHook<I extends SerializableStruct, O extends SerializableStruct, RequestT, ResponseT>
-    extends RequestHook<I, O, RequestT>
-    permits OutputHook {
+        extends RequestHook<I, O, RequestT>
+        permits OutputHook {
 
     private final ResponseT response;
 
@@ -47,8 +47,8 @@ public sealed class ResponseHook<I extends SerializableStruct, O extends Seriali
      */
     public ResponseHook<I, O, RequestT, ResponseT> withResponse(ResponseT response) {
         return Objects.equals(response, this.response)
-            ? this
-            : new ResponseHook<>(operation(), context(), input(), request(), response);
+                ? this
+                : new ResponseHook<>(operation(), context(), input(), request(), response);
     }
 
     /**
@@ -80,9 +80,9 @@ public sealed class ResponseHook<I extends SerializableStruct, O extends Seriali
      */
     @SuppressWarnings("unchecked")
     public <R, T> ResponseT mapResponse(
-        Class<R> predicateType,
-        T state,
-        BiFunction<ResponseHook<?, ?, ?, R>, T, R> mapper
+            Class<R> predicateType,
+            T state,
+            BiFunction<ResponseHook<?, ?, ?, R>, T, R> mapper
     ) {
         if (predicateType.isInstance(response)) {
             return (ResponseT) mapper.apply((ResponseHook<?, ?, ?, R>) this, state);

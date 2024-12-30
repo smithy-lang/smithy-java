@@ -20,7 +20,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
 public final class OperationInterfaceGenerator implements
-    Consumer<GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings>> {
+        Consumer<GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     @Override
     public void accept(GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
@@ -33,30 +33,30 @@ public final class OperationInterfaceGenerator implements
 
         for (Symbol symbol : List.of(stubSymbol, asyncStubSymbol)) {
             directive.context()
-                .writerDelegator()
-                .useFileWriter(symbol.getDeclarationFile(), symbol.getNamespace(), writer -> {
-                    writer.pushState(new ClassSection(shape));
-                    var template = """
-                        @${functionalInterface:T}
-                        public interface ${interface:T} {
-                            ${output:T} ${methodName:L}(${input:T} input, ${requestContext:T} context);
-                        }
-                        """;
-                    writer.putContext("functionalInterface", FunctionalInterface.class);
-                    writer.putContext("interface", symbol);
-                    writer.putContext("requestContext", RequestContext.class);
-                    var outputSymbol = symbol == stubSymbol
-                        ? output
-                        : CodegenUtils.fromClass(CompletableFuture.class)
-                            .toBuilder()
-                            .addReference(output)
-                            .build();
-                    writer.putContext("output", outputSymbol);
-                    writer.putContext("methodName", operationMethodName);
-                    writer.putContext("input", input);
-                    writer.write(template);
-                    writer.popState();
-                });
+                    .writerDelegator()
+                    .useFileWriter(symbol.getDeclarationFile(), symbol.getNamespace(), writer -> {
+                        writer.pushState(new ClassSection(shape));
+                        var template = """
+                                @${functionalInterface:T}
+                                public interface ${interface:T} {
+                                    ${output:T} ${methodName:L}(${input:T} input, ${requestContext:T} context);
+                                }
+                                """;
+                        writer.putContext("functionalInterface", FunctionalInterface.class);
+                        writer.putContext("interface", symbol);
+                        writer.putContext("requestContext", RequestContext.class);
+                        var outputSymbol = symbol == stubSymbol
+                                ? output
+                                : CodegenUtils.fromClass(CompletableFuture.class)
+                                        .toBuilder()
+                                        .addReference(output)
+                                        .build();
+                        writer.putContext("output", outputSymbol);
+                        writer.putContext("methodName", operationMethodName);
+                        writer.putContext("input", input);
+                        writer.write(template);
+                        writer.popState();
+                    });
         }
     }
 

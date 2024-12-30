@@ -65,8 +65,7 @@ final class ParameterFormatter {
 
     private static ThreadLocal<SimpleDateFormat> threadLocalSimpleDateFormat = new ThreadLocal<>();
 
-    private ParameterFormatter() {
-    }
+    private ParameterFormatter() {}
 
     /**
      * Counts the number of unescaped placeholders in the given messagePattern.
@@ -180,11 +179,11 @@ final class ParameterFormatter {
      * @param arguments      the arguments to be used to replace placeholders.
      */
     static void formatMessage2(
-        final StringBuilder buffer,
-        final String messagePattern,
-        final Object[] arguments,
-        final int argCount,
-        final int[] indices
+            final StringBuilder buffer,
+            final String messagePattern,
+            final Object[] arguments,
+            final int argCount,
+            final int[] indices
     ) {
         if (messagePattern == null || arguments == null || argCount == 0) {
             buffer.append(messagePattern);
@@ -207,12 +206,12 @@ final class ParameterFormatter {
      * @param arguments      the arguments to be used to replace placeholders.
      */
     static void formatMessage3(
-        final StringBuilder buffer,
-        final char[] messagePattern,
-        final int patternLength,
-        final Object[] arguments,
-        final int argCount,
-        final int[] indices
+            final StringBuilder buffer,
+            final char[] messagePattern,
+            final int patternLength,
+            final Object[] arguments,
+            final int argCount,
+            final int[] indices
     ) {
         if (messagePattern == null) {
             return;
@@ -238,10 +237,10 @@ final class ParameterFormatter {
      * @param arguments      the arguments to be used to replace placeholders.
      */
     static void formatMessage(
-        final StringBuilder buffer,
-        final String messagePattern,
-        final Object[] arguments,
-        final int argCount
+            final StringBuilder buffer,
+            final String messagePattern,
+            final Object[] arguments,
+            final int argCount
     ) {
         if (messagePattern == null || arguments == null || argCount == 0) {
             buffer.append(messagePattern);
@@ -296,11 +295,11 @@ final class ParameterFormatter {
     // Profiling showed this method is important to log4j performance. Modify with care!
     // 28 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
     private static void handleRemainingCharIfAny(
-        final String messagePattern,
-        final int len,
-        final StringBuilder buffer,
-        final int escapeCounter,
-        final int i
+            final String messagePattern,
+            final int len,
+            final StringBuilder buffer,
+            final int escapeCounter,
+            final int i
     ) {
         if (i == len - 1) {
             final char curChar = messagePattern.charAt(i);
@@ -384,10 +383,10 @@ final class ParameterFormatter {
     // Profiling showed this method is important to log4j performance. Modify with care!
     // 25 bytes (allows immediate JVM inlining: < 35 bytes) LOG4J2-1096
     private static void writeArgOrDelimPair(
-        final Object[] arguments,
-        final int argCount,
-        final int currentArgument,
-        final StringBuilder buffer
+            final Object[] arguments,
+            final int argCount,
+            final int currentArgument,
+            final StringBuilder buffer
     ) {
         if (currentArgument < argCount) {
             recursiveDeepToString(arguments[currentArgument], buffer, null);
@@ -517,9 +516,9 @@ final class ParameterFormatter {
     }
 
     private static void appendPotentiallyRecursiveValue(
-        final Object o,
-        final StringBuilder str,
-        final Set<String> dejaVu
+            final Object o,
+            final StringBuilder str,
+            final Set<String> dejaVu
     ) {
         final Class<?> oClass = o.getClass();
         if (oClass.isArray()) {
@@ -532,10 +531,10 @@ final class ParameterFormatter {
     }
 
     private static void appendArray(
-        final Object o,
-        final StringBuilder str,
-        Set<String> dejaVu,
-        final Class<?> oClass
+            final Object o,
+            final StringBuilder str,
+            Set<String> dejaVu,
+            final Class<?> oClass
     ) {
         if (oClass == byte[].class) {
             str.append(Arrays.toString((byte[]) o));
@@ -699,8 +698,7 @@ final class ParameterFormatter {
             timeClass = clazz;
         }
 
-        private StringBuilders() {
-        }
+        private StringBuilders() {}
 
         /**
          * Appends in the following format: double quoted value.
@@ -798,12 +796,12 @@ final class ParameterFormatter {
          * @return true if equal, false otherwise
          */
         public static boolean equals(
-            final CharSequence left,
-            final int leftOffset,
-            final int leftLength,
-            final CharSequence right,
-            final int rightOffset,
-            final int rightLength
+                final CharSequence left,
+                final int leftOffset,
+                final int leftLength,
+                final CharSequence right,
+                final int rightOffset,
+                final int rightLength
         ) {
             if (leftLength == rightLength) {
                 for (int i = 0; i < rightLength; i++) {
@@ -829,12 +827,12 @@ final class ParameterFormatter {
          * @return true if equal ignoring case, false otherwise
          */
         public static boolean equalsIgnoreCase(
-            final CharSequence left,
-            final int leftOffset,
-            final int leftLength,
-            final CharSequence right,
-            final int rightOffset,
-            final int rightLength
+                final CharSequence left,
+                final int leftOffset,
+                final int leftLength,
+                final CharSequence right,
+                final int rightOffset,
+                final int rightLength
         ) {
             if (leftLength == rightLength) {
                 for (int i = 0; i < rightLength; i++) {

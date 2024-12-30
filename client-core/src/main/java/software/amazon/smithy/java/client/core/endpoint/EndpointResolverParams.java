@@ -71,8 +71,8 @@ public final class EndpointResolverParams {
         }
         EndpointResolverParams params = (EndpointResolverParams) o;
         return Objects.equals(operation, params.operation)
-            && Objects.equals(inputValue, params.inputValue)
-            && Objects.equals(context, params.context);
+                && Objects.equals(inputValue, params.inputValue)
+                && Objects.equals(context, params.context);
     }
 
     @Override
@@ -89,8 +89,7 @@ public final class EndpointResolverParams {
         private ApiOperation<?, ?> operation;
         private SerializableStruct inputValue;
 
-        private Builder() {
-        }
+        private Builder() {}
 
         /**
          * Build the params.

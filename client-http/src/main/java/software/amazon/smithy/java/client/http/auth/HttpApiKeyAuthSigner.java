@@ -25,9 +25,9 @@ final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> 
 
     @Override
     public CompletableFuture<HttpRequest> sign(
-        HttpRequest request,
-        ApiKeyIdentity identity,
-        AuthProperties properties
+            HttpRequest request,
+            ApiKeyIdentity identity,
+            AuthProperties properties
     ) {
         var name = properties.expect(HttpApiKeyAuthScheme.NAME);
         return switch (properties.expect(HttpApiKeyAuthScheme.IN)) {
@@ -54,8 +54,7 @@ final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> 
                 addExistingQueryParams(stringBuilder, existingQuery, name);
                 queryBuilder.write(stringBuilder);
                 yield CompletableFuture.completedFuture(
-                    request.toBuilder().uri(uriBuilder.query(stringBuilder.toString()).build()).build()
-                );
+                        request.toBuilder().uri(uriBuilder.query(stringBuilder.toString()).build()).build());
             }
         };
     }

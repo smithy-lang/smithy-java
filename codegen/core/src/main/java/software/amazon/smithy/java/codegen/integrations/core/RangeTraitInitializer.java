@@ -23,8 +23,7 @@ final class RangeTraitInitializer implements TraitInitializer<RangeTrait> {
         writer.putContext("range", RangeTrait.class);
         writer.putContext("bigDecimal", BigDecimal.class);
         writer.writeInline(
-            "${range:T}.builder()${?min}.min(new ${bigDecimal:T}(${min:S}))${/min}"
-                + "${?max}.max(new ${bigDecimal:T}(${max:S}))${/max}.build()"
-        );
+                "${range:T}.builder()${?min}.min(new ${bigDecimal:T}(${min:S}))${/min}"
+                        + "${?max}.max(new ${bigDecimal:T}(${max:S}))${/max}.build()");
     }
 }

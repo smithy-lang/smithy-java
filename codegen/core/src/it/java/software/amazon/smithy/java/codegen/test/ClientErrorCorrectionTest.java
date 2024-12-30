@@ -24,8 +24,8 @@ public class ClientErrorCorrectionTest {
     @Test
     void correctsErrors() {
         var corrected = ClientErrorCorrectionInput.builder()
-            .errorCorrection()
-            .build();
+                .errorCorrection()
+                .build();
 
         assertFalse(corrected.booleanMember());
         assertEquals(corrected.bigDecimal(), BigDecimal.ZERO);

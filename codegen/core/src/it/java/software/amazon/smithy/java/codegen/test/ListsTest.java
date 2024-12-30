@@ -43,208 +43,168 @@ public class ListsTest {
 
     static Stream<SerializableShape> listTypes() {
         return Stream.of(
-            ListAllTypesInput.builder()
-                .listOfBoolean(
-                    List.of(true, true, false)
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfBigDecimal(
-                    List.of(BigDecimal.TEN, BigDecimal.ZERO)
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfBigInteger(
-                    List.of(BigInteger.TEN, BigInteger.ZERO)
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfByte(
-                    List.of((byte) 1, (byte) 2)
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfDouble(
-                    List.of(2.0, 3.0)
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfFloat(
-                    List.of(2f, 3f)
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfInteger(
-                    List.of(1, 2)
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfLong(
-                    List.of(1L, 2L)
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfShort(
-                    List.of((short) 1, (short) 2)
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfString(
-                    List.of("a", "b")
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfBlobs(
-                    Stream.of(Base64.getDecoder().decode("YmxvYg=="), Base64.getDecoder().decode("YmlyZHM="))
-                        .map(ByteBuffer::wrap)
-                        .toList()
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfTimestamps(
-                    List.of(Instant.EPOCH, Instant.MIN)
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfUnion(
-                    List.of(new NestedUnion.AMember("string"), new NestedUnion.BMember(2))
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfEnum(
-                    List.of(NestedEnum.A, NestedEnum.B)
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfIntEnum(
-                    List.of(NestedIntEnum.A, NestedIntEnum.B)
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfStruct(
-                    List.of(NestedStruct.builder().build(), NestedStruct.builder().build())
-                )
-                .build(),
-            ListAllTypesInput.builder()
-                .listOfDocuments(
-                    List.of(Document.of(2.0), Document.of("string"))
-                )
-                .build()
-        );
+                ListAllTypesInput.builder()
+                        .listOfBoolean(
+                                List.of(true, true, false))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfBigDecimal(
+                                List.of(BigDecimal.TEN, BigDecimal.ZERO))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfBigInteger(
+                                List.of(BigInteger.TEN, BigInteger.ZERO))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfByte(
+                                List.of((byte) 1, (byte) 2))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfDouble(
+                                List.of(2.0, 3.0))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfFloat(
+                                List.of(2f, 3f))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfInteger(
+                                List.of(1, 2))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfLong(
+                                List.of(1L, 2L))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfShort(
+                                List.of((short) 1, (short) 2))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfString(
+                                List.of("a", "b"))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfBlobs(
+                                Stream.of(Base64.getDecoder().decode("YmxvYg=="),
+                                        Base64.getDecoder().decode("YmlyZHM="))
+                                        .map(ByteBuffer::wrap)
+                                        .toList())
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfTimestamps(
+                                List.of(Instant.EPOCH, Instant.MIN))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfUnion(
+                                List.of(new NestedUnion.AMember("string"), new NestedUnion.BMember(2)))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfEnum(
+                                List.of(NestedEnum.A, NestedEnum.B))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfIntEnum(
+                                List.of(NestedIntEnum.A, NestedIntEnum.B))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfStruct(
+                                List.of(NestedStruct.builder().build(), NestedStruct.builder().build()))
+                        .build(),
+                ListAllTypesInput.builder()
+                        .listOfDocuments(
+                                List.of(Document.of(2.0), Document.of("string")))
+                        .build());
     }
 
     static Stream<SerializableShape> nestedLists() {
         return Stream.of(
-            NestedListsInput.builder()
-                .listOfLists(
-                    List.of(List.of("a", "b"), List.of("c", "d"))
-                )
-                .build(),
-            NestedListsInput.builder()
-                .listOfListOfList(
-                    List.of(List.of(List.of("a", "b"), List.of("c", "d")))
-                )
-                .build(),
-            NestedListsInput.builder()
-                .listOfMaps(
-                    List.of(Map.of("a", "b"), Map.of("c", "d"))
-                )
-                .build()
-        );
+                NestedListsInput.builder()
+                        .listOfLists(
+                                List.of(List.of("a", "b"), List.of("c", "d")))
+                        .build(),
+                NestedListsInput.builder()
+                        .listOfListOfList(
+                                List.of(List.of(List.of("a", "b"), List.of("c", "d"))))
+                        .build(),
+                NestedListsInput.builder()
+                        .listOfMaps(
+                                List.of(Map.of("a", "b"), Map.of("c", "d")))
+                        .build());
     }
 
     static Stream<SerializableShape> sparseLists() {
         return Stream.of(
-            SparseListsInput.builder()
-                .listOfBooleans(
-                    ListUtils.of(true, true, null, false)
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfBigDecimal(
-                    ListUtils.of(BigDecimal.TEN, null, BigDecimal.ZERO)
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfBigInteger(
-                    ListUtils.of(BigInteger.TEN, null, BigInteger.ZERO)
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfByte(
-                    ListUtils.of((byte) 1, null, (byte) 2)
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfDouble(
-                    ListUtils.of(2.0, null, 3.0)
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfFloat(
-                    ListUtils.of(2f, null, 3f)
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfInteger(
-                    ListUtils.of(1, null, 2)
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfLong(
-                    ListUtils.of(1L, null, 2L)
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfShort(
-                    ListUtils.of((short) 1, null, (short) 2)
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfString(
-                    ListUtils.of("a", null, "b")
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfBlobs(
-                    ListUtils.of(
-                        wrap(Base64.getDecoder().decode("YmxvYg==")),
-                        null,
-                        wrap(Base64.getDecoder().decode("YmlyZHM="))
-                    )
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfTimestamps(
-                    ListUtils.of(Instant.EPOCH, null, Instant.MIN)
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfUnion(
-                    ListUtils.of(new NestedUnion.AMember("string"), null, new NestedUnion.BMember(2))
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfEnum(
-                    ListUtils.of(NestedEnum.A, null, NestedEnum.B)
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfIntEnum(
-                    ListUtils.of(NestedIntEnum.A, null, NestedIntEnum.B)
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfStruct(
-                    ListUtils.of(NestedStruct.builder().build(), null, NestedStruct.builder().build())
-                )
-                .build(),
-            SparseListsInput.builder()
-                .listOfDocuments(
-                    ListUtils.of(Document.of(2.0), null, Document.of("string"))
-                )
-                .build()
-        );
+                SparseListsInput.builder()
+                        .listOfBooleans(
+                                ListUtils.of(true, true, null, false))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfBigDecimal(
+                                ListUtils.of(BigDecimal.TEN, null, BigDecimal.ZERO))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfBigInteger(
+                                ListUtils.of(BigInteger.TEN, null, BigInteger.ZERO))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfByte(
+                                ListUtils.of((byte) 1, null, (byte) 2))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfDouble(
+                                ListUtils.of(2.0, null, 3.0))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfFloat(
+                                ListUtils.of(2f, null, 3f))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfInteger(
+                                ListUtils.of(1, null, 2))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfLong(
+                                ListUtils.of(1L, null, 2L))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfShort(
+                                ListUtils.of((short) 1, null, (short) 2))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfString(
+                                ListUtils.of("a", null, "b"))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfBlobs(
+                                ListUtils.of(
+                                        wrap(Base64.getDecoder().decode("YmxvYg==")),
+                                        null,
+                                        wrap(Base64.getDecoder().decode("YmlyZHM="))))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfTimestamps(
+                                ListUtils.of(Instant.EPOCH, null, Instant.MIN))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfUnion(
+                                ListUtils.of(new NestedUnion.AMember("string"), null, new NestedUnion.BMember(2)))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfEnum(
+                                ListUtils.of(NestedEnum.A, null, NestedEnum.B))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfIntEnum(
+                                ListUtils.of(NestedIntEnum.A, null, NestedIntEnum.B))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfStruct(
+                                ListUtils.of(NestedStruct.builder().build(), null, NestedStruct.builder().build()))
+                        .build(),
+                SparseListsInput.builder()
+                        .listOfDocuments(
+                                ListUtils.of(Document.of(2.0), null, Document.of("string")))
+                        .build());
     }
 
     @ParameterizedTest
@@ -273,18 +233,17 @@ public class ListsTest {
 
     static Stream<String> nonUniqueSources() {
         return Stream.of(
-            "{\"setOfBoolean\":[true, false, false]}",
-            "{\"setOfNumber\":[1,2,2]}",
-            "{\"setOfString\":[\"a\", \"a\", \"b\"]}",
-            "{\"setOfBlobs\":[\"YmxvYg==\", \"YmxvYg==\"]}",
-            "{\"setOfTimestamps\":[0, 20, 0]}",
-            "{\"setOfUnion\":[{\"a\": \"str\"}, {\"b\": 1}, {\"a\": \"str\"}]}",
-            "{\"setOfEnum\":[\"A\", \"B\", \"A\"]}",
-            "{\"setOfIntEnum\":[1,1,2]}",
-            "{\"setOfStruct\":[{\"fieldA\": \"a\"}, {\"fieldA\": \"a\"}, {\"fieldA\": \"z\"}]}",
-            "{\"setOfStringList\":[[\"a\", \"b\"],[\"c\", \"d\"],[\"a\", \"b\"]]}",
-            "{\"setOfStringMap\": [{\"a\": \"b\", \"c\": \"d\"}, {\"c\": \"d\", \"a\": \"b\"}]}"
-        );
+                "{\"setOfBoolean\":[true, false, false]}",
+                "{\"setOfNumber\":[1,2,2]}",
+                "{\"setOfString\":[\"a\", \"a\", \"b\"]}",
+                "{\"setOfBlobs\":[\"YmxvYg==\", \"YmxvYg==\"]}",
+                "{\"setOfTimestamps\":[0, 20, 0]}",
+                "{\"setOfUnion\":[{\"a\": \"str\"}, {\"b\": 1}, {\"a\": \"str\"}]}",
+                "{\"setOfEnum\":[\"A\", \"B\", \"A\"]}",
+                "{\"setOfIntEnum\":[1,1,2]}",
+                "{\"setOfStruct\":[{\"fieldA\": \"a\"}, {\"fieldA\": \"a\"}, {\"fieldA\": \"z\"}]}",
+                "{\"setOfStringList\":[[\"a\", \"b\"],[\"c\", \"d\"],[\"a\", \"b\"]]}",
+                "{\"setOfStringMap\": [{\"a\": \"b\", \"c\": \"d\"}, {\"c\": \"d\", \"a\": \"b\"}]}");
     }
 
     // Uniqueness is enforced in validation only.

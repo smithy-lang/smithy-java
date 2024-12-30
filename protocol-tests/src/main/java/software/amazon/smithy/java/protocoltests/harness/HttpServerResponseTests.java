@@ -20,5 +20,4 @@ import org.junit.platform.commons.annotation.Testable;
 @Testable
 @Timeout(5)
 @ExtendWith(HttpServerResponseProtocolTestProvider.class)
-public @interface HttpServerResponseTests {
-}
+public @interface HttpServerResponseTests {}

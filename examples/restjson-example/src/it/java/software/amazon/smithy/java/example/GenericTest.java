@@ -34,15 +34,15 @@ public class GenericTest {
     public void putPerson() throws ExecutionException, InterruptedException {
         // Create a generated client using rest-json and a fixed endpoint.
         var client = PersonDirectoryClient.builder()
-            .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
-            .build();
+                .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
+                .build();
 
         PutPersonInput input = PutPersonInput.builder()
-            .name("Michael")
-            .age(999)
-            .favoriteColor("Green")
-            .birthday(Instant.now())
-            .build();
+                .name("Michael")
+                .age(999)
+                .favoriteColor("Green")
+                .birthday(Instant.now())
+                .build();
 
         PutPersonOutput output = client.putPerson(input);
         System.out.println("Output: " + output);
@@ -51,8 +51,8 @@ public class GenericTest {
     @Test
     public void getPersonImage() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
-            .build();
+                .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
+                .build();
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
         GetPersonImageOutput output = client.getPersonImage(input);
@@ -62,15 +62,15 @@ public class GenericTest {
     @Test
     public void streamingRequestPayload() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
-            .build();
+                .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
+                .build();
 
         PutPersonImageInput input = PutPersonImageInput.builder()
-            .name("Michael")
-            .tags(List.of("Foo", "Bar"))
-            .moreTags(List.of("Abc", "one two"))
-            .image(DataStream.ofString("image..."))
-            .build();
+                .name("Michael")
+                .tags(List.of("Foo", "Bar"))
+                .moreTags(List.of("Abc", "one two"))
+                .image(DataStream.ofString("image..."))
+                .build();
         PutPersonImageOutput output = client.putPersonImage(input);
         System.out.println("Output: " + output);
     }
@@ -80,12 +80,12 @@ public class GenericTest {
         Codec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
 
         PutPersonInput input = PutPersonInput.builder()
-            .name("Michael")
-            .age(999)
-            .favoriteColor("Green")
-            .birthday(Instant.now())
-            .binary(wrap("Hello".getBytes(StandardCharsets.UTF_8)))
-            .build();
+                .name("Michael")
+                .age(999)
+                .favoriteColor("Green")
+                .birthday(Instant.now())
+                .binary(wrap("Hello".getBytes(StandardCharsets.UTF_8)))
+                .build();
 
         // Serialize directly to JSON.
         System.out.println(codec.serializeToString(input));
@@ -104,11 +104,11 @@ public class GenericTest {
     @Test
     public void serde() {
         PutPersonInput input = PutPersonInput.builder()
-            .name("Michael")
-            .age(999)
-            .favoriteColor("Green")
-            .birthday(Instant.now())
-            .build();
+                .name("Michael")
+                .age(999)
+                .favoriteColor("Green")
+                .birthday(Instant.now())
+                .build();
 
         JsonCodec codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
 
@@ -133,16 +133,15 @@ public class GenericTest {
             @Override
             public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
                 return hook.mapRequest(
-                    HttpRequest.class,
-                    h -> h.request().toBuilder().withAddedHeader("X-Foo", "Bar").build()
-                );
+                        HttpRequest.class,
+                        h -> h.request().toBuilder().withAddedHeader("X-Foo", "Bar").build());
             }
         };
 
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
-            .addInterceptor(interceptor)
-            .build();
+                .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
+                .addInterceptor(interceptor)
+                .build();
 
         GetPersonImageInput input = GetPersonImageInput.builder().name("Michael").build();
         GetPersonImageOutput output = client.getPersonImage(input);

@@ -16,8 +16,8 @@ public abstract sealed class DefaultJob implements Job permits HttpJob {
     private volatile Throwable failure;
 
     protected DefaultJob(
-        Operation<? extends SerializableStruct, ? extends SerializableStruct> operation,
-        ServerProtocol protocol
+            Operation<? extends SerializableStruct, ? extends SerializableStruct> operation,
+            ServerProtocol protocol
     ) {
         this.operation = Objects.requireNonNull(operation, "Operation must not be null");
         this.protocol = Objects.requireNonNull(protocol, "Protocol must not be null");

@@ -21,9 +21,9 @@ final class HttpDigestAuthSigner implements Signer<HttpRequest, LoginIdentity> {
 
     @Override
     public CompletableFuture<HttpRequest> sign(
-        HttpRequest request,
-        LoginIdentity identity,
-        AuthProperties properties
+            HttpRequest request,
+            LoginIdentity identity,
+            AuthProperties properties
     ) {
         throw new UnsupportedOperationException();
     }

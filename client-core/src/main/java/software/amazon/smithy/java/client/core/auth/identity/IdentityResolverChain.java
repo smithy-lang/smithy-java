@@ -36,10 +36,10 @@ final class IdentityResolverChain<IdentityT extends Identity> implements Identit
     }
 
     private CompletableFuture<IdentityResult<IdentityT>> executeChain(
-        IdentityResolver<IdentityT> resolver,
-        AuthProperties requestProperties,
-        List<IdentityResult<?>> errors,
-        int idx
+            IdentityResolver<IdentityT> resolver,
+            AuthProperties requestProperties,
+            List<IdentityResult<?>> errors,
+            int idx
     ) {
         var result = resolver.resolveIdentity(requestProperties);
         if (idx + 1 < resolvers.size()) {

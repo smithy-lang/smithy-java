@@ -40,10 +40,10 @@ final class ValidatorOfUniqueItems implements ShapeSerializer {
     private int position = 0;
 
     static <T> void validate(
-        Schema container,
-        T state,
-        BiConsumer<T, ShapeSerializer> consumer,
-        Validator.ShapeValidator validator
+            Schema container,
+            T state,
+            BiConsumer<T, ShapeSerializer> consumer,
+            Validator.ShapeValidator validator
     ) {
         consumer.accept(state, new ValidatorOfUniqueItems(container, validator));
     }
@@ -182,8 +182,8 @@ final class ValidatorOfUniqueItems implements ShapeSerializer {
     private void addError(String message) {
         validator.swapPath(position);
         var error = message == null
-            ? new ValidationError.UniqueItemConflict(validator.createPath(), position, container)
-            : new ValidationError.UniqueItemConflict(validator.createPath(), position, container, message);
+                ? new ValidationError.UniqueItemConflict(validator.createPath(), position, container)
+                : new ValidationError.UniqueItemConflict(validator.createPath(), position, container, message);
         validator.addError(error);
         position++;
     }

@@ -18,8 +18,7 @@ import software.amazon.smithy.java.codegen.utils.AbstractCodegenFileTest;
 
 public class NamingTest extends AbstractCodegenFileTest {
     private static final URL TEST_FILE = Objects.requireNonNull(
-        NamingTest.class.getResource("naming-test.smithy")
-    );
+            NamingTest.class.getResource("naming-test.smithy"));
 
     @Override
     protected URL testFile() {
@@ -31,16 +30,16 @@ public class NamingTest extends AbstractCodegenFileTest {
         var fileStr = getFileStringForClass("NamingConflictsInput");
         // Java map uses fully qualified name
         var expectedJavaMapGetter = """
-                public java.util.Map<String, String> javaMap() {
-            """;
+                    public java.util.Map<String, String> javaMap() {
+                """;
         assertTrue(fileStr.contains(expectedJavaMapGetter));
 
         // Custom map does not use fully qualified name
         var expectedCustomMap = """
-                public Map map() {
-                    return map;
-                }
-            """;
+                    public Map map() {
+                        return map;
+                    }
+                """;
         assertTrue(fileStr.contains(expectedCustomMap));
     }
 
@@ -49,16 +48,16 @@ public class NamingTest extends AbstractCodegenFileTest {
         var fileStr = getFileStringForClass("NamingConflictsInput");
         // Java map uses fully qualified name
         var expectedJavaListGetter = """
-                public java.util.List<String> javaList() {
-            """;
+                    public java.util.List<String> javaList() {
+                """;
         assertTrue(fileStr.contains(expectedJavaListGetter));
 
         // Custom map does not use fully qualified name
         var expectedCustomList = """
-                public List list() {
-                    return list;
-                }
-            """;
+                    public List list() {
+                        return list;
+                    }
+                """;
         assertTrue(fileStr.contains(expectedCustomList));
     }
 
@@ -66,10 +65,10 @@ public class NamingTest extends AbstractCodegenFileTest {
     void escapesMemberNames() {
         var fileStr = getFileStringForClass("ReservedWordMembersInput");
         var expected = """
-                private final transient Byte byteMember;
-                private final transient String staticMember;
-                private final transient Double doubleMember;
-            """;
+                    private final transient Byte byteMember;
+                    private final transient String staticMember;
+                    private final transient Double doubleMember;
+                """;
         assertTrue(fileStr.contains(expected));
     }
 
@@ -125,11 +124,10 @@ public class NamingTest extends AbstractCodegenFileTest {
 
     static List<Arguments> enumCaseArgs() {
         return List.of(
-            Arguments.of("CAMEL_CASE", "camelCase"),
-            Arguments.of("SNAKE_CASE", "snake_case"),
-            Arguments.of("PASCAL_CASE", "PascalCase"),
-            Arguments.of("WITH_1_NUMBER", "with_1_number")
-        );
+                Arguments.of("CAMEL_CASE", "camelCase"),
+                Arguments.of("SNAKE_CASE", "snake_case"),
+                Arguments.of("PASCAL_CASE", "PascalCase"),
+                Arguments.of("WITH_1_NUMBER", "with_1_number"));
     }
 
     @ParameterizedTest

@@ -14,12 +14,11 @@ import java.util.concurrent.Flow;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
 record HttpRequestImpl(
-    HttpVersion httpVersion,
-    String method,
-    URI uri,
-    HttpHeaders headers,
-    DataStream body
-) implements HttpRequest {
+        HttpVersion httpVersion,
+        String method,
+        URI uri,
+        HttpHeaders headers,
+        DataStream body) implements HttpRequest {
 
     @Override
     public ModifiableHttpRequest toModifiable() {

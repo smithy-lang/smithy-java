@@ -40,16 +40,16 @@ public class HttpBindingErrorDeserializerTest {
     @Test
     public void deserializesErrorsWithHttpBindingsToo() throws Exception {
         var deserializer = HttpErrorDeserializer.builder()
-            .codec(CODEC)
-            .serviceId(SERVICE)
-            .knownErrorFactory(new HttpBindingErrorFactory())
-            .build();
+                .codec(CODEC)
+                .serviceId(SERVICE)
+                .knownErrorFactory(new HttpBindingErrorFactory())
+                .build();
         var registry = TypeRegistry.builder()
-            .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
-            .build();
+                .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
+                .build();
         var responseBuilder = HttpResponse.builder()
-            .statusCode(400)
-            .body(DataStream.ofString("{\"__type\": \"com.foo#Baz\"}"));
+                .statusCode(400)
+                .body(DataStream.ofString("{\"__type\": \"com.foo#Baz\"}"));
         var response = responseBuilder.build();
         var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
 
@@ -59,19 +59,18 @@ public class HttpBindingErrorDeserializerTest {
     @Test
     public void usesGenericErrorWhenPayloadTypeIsUnknown() throws Exception {
         var deserializer = HttpErrorDeserializer.builder()
-            .codec(CODEC)
-            .serviceId(SERVICE)
-            .knownErrorFactory(new HttpBindingErrorFactory())
-            .unknownErrorFactory(
-                (fault, message, response) -> CompletableFuture.completedFuture(new ApiException("Hi!", fault))
-            )
-            .build();
+                .codec(CODEC)
+                .serviceId(SERVICE)
+                .knownErrorFactory(new HttpBindingErrorFactory())
+                .unknownErrorFactory(
+                        (fault, message, response) -> CompletableFuture.completedFuture(new ApiException("Hi!", fault)))
+                .build();
         var registry = TypeRegistry.builder()
-            .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
-            .build();
+                .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
+                .build();
         var responseBuilder = HttpResponse.builder()
-            .statusCode(400)
-            .body(DataStream.ofString("{\"__type\": \"com.foo#SomeUnknownError\"}"));
+                .statusCode(400)
+                .body(DataStream.ofString("{\"__type\": \"com.foo#SomeUnknownError\"}"));
         var response = responseBuilder.build();
         var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
 
@@ -82,30 +81,26 @@ public class HttpBindingErrorDeserializerTest {
     @Test
     public void usesGenericErrorWhenHeaderTypeIsUnknown() throws Exception {
         var deserializer = HttpErrorDeserializer.builder()
-            .codec(CODEC)
-            .serviceId(SERVICE)
-            .knownErrorFactory(new HttpBindingErrorFactory())
-            .headerErrorExtractor(new AmznErrorHeaderExtractor())
-            .unknownErrorFactory(
-                (fault, message, response) -> CompletableFuture.completedFuture(new ApiException("Hi!", fault))
-            )
-            .build();
+                .codec(CODEC)
+                .serviceId(SERVICE)
+                .knownErrorFactory(new HttpBindingErrorFactory())
+                .headerErrorExtractor(new AmznErrorHeaderExtractor())
+                .unknownErrorFactory(
+                        (fault, message, response) -> CompletableFuture.completedFuture(new ApiException("Hi!", fault)))
+                .build();
         var registry = TypeRegistry.builder()
-            .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
-            .build();
+                .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
+                .build();
         var responseBuilder = HttpResponse.builder()
-            .statusCode(400)
-            .headers(
-                HttpHeaders.of(
-                    Map.of(
-                        "content-length",
-                        List.of("2"),
-                        "x-amzn-errortype",
-                        List.of("com.foo#SomeUnknownError")
-                    )
-                )
-            )
-            .body(DataStream.ofString("{}"));
+                .statusCode(400)
+                .headers(
+                        HttpHeaders.of(
+                                Map.of(
+                                        "content-length",
+                                        List.of("2"),
+                                        "x-amzn-errortype",
+                                        List.of("com.foo#SomeUnknownError"))))
+                .body(DataStream.ofString("{}"));
         var response = responseBuilder.build();
         var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
 
@@ -116,8 +111,8 @@ public class HttpBindingErrorDeserializerTest {
     static final class Baz extends ModeledApiException {
 
         static final Schema SCHEMA = Schema
-            .structureBuilder(ShapeId.from("com.foo#Baz"), new ErrorTrait("client"))
-            .build();
+                .structureBuilder(ShapeId.from("com.foo#Baz"), new ErrorTrait("client"))
+                .build();
 
         public Baz(String message) {
             super(SCHEMA, message);

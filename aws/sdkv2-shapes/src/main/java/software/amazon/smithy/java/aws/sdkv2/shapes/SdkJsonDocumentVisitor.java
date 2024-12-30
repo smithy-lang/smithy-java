@@ -40,8 +40,7 @@ record SdkJsonDocumentVisitor(JsonSettings settings) implements DocumentVisitor<
     @Override
     public Document visitMap(Map<String, software.amazon.awssdk.core.document.Document> map) {
         Map<String, Document> mapping = new LinkedHashMap<>(
-            map.size()
-        );
+                map.size());
         for (var entry : map.entrySet()) {
             mapping.put(entry.getKey(), entry.getValue().accept(this));
         }

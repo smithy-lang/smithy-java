@@ -49,9 +49,9 @@ public final class AmzSdkRequestPlugin implements ClientPlugin {
                     value.append("; max=").append(max);
                 }
                 return hook.request()
-                    .toBuilder()
-                    .withReplacedHeader("amz-sdk-request", List.of(value.toString()))
-                    .build();
+                        .toBuilder()
+                        .withReplacedHeader("amz-sdk-request", List.of(value.toString()))
+                        .build();
             }
         }
     }

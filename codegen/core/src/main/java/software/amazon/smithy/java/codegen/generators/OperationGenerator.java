@@ -35,194 +35,189 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
 public final class OperationGenerator
-    implements Consumer<GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings>> {
+        implements Consumer<GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     @Override
     public void accept(GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         var shape = directive.shape();
 
         directive.context()
-            .writerDelegator()
-            .useShapeWriter(shape, writer -> {
-                var input = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getInputShape()));
-                var output = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getOutputShape()));
-                var eventStreamIndex = EventStreamIndex.of(directive.model());
-                writer.pushState(new ClassSection(shape));
-                writer.putContext("shape", directive.symbol());
-                var template = """
-                    public final class ${shape:T} implements ${operationType:C} {
-                        ${id:C|}
+                .writerDelegator()
+                .useShapeWriter(shape, writer -> {
+                    var input =
+                            directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getInputShape()));
+                    var output =
+                            directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getOutputShape()));
+                    var eventStreamIndex = EventStreamIndex.of(directive.model());
+                    writer.pushState(new ClassSection(shape));
+                    writer.putContext("shape", directive.symbol());
+                    var template =
+                            """
+                                    public final class ${shape:T} implements ${operationType:C} {
+                                        ${id:C|}
 
-                        private ${schema:C|}
+                                        private ${schema:C|}
 
-                        ${typeRegistrySection:C|}
+                                        ${typeRegistrySection:C|}
 
-                        private static final ${list:T}<${shapeId:T}> SCHEMES = ${list:T}.of(${#schemes}${shapeId:T}.from(${key:S})${^key.last}, ${/key.last}${/schemes});
+                                        private static final ${list:T}<${shapeId:T}> SCHEMES = ${list:T}.of(${#schemes}${shapeId:T}.from(${key:S})${^key.last}, ${/key.last}${/schemes});
 
-                        ${?idempotencyTokenMember}private static final ${sdkSchema:T} IDEMPOTENCY_TOKEN_MEMBER = ${inputType:T}.$$SCHEMA.member(${idempotencyTokenMember:S});${/idempotencyTokenMember}
-                        ${?inputStreamMember}private static final ${sdkSchema:T} INPUT_STREAM_MEMBER = ${inputType:T}.$$SCHEMA.member(${inputStreamMember:S});${/inputStreamMember}
-                        ${?outputStreamMember}private static final ${sdkSchema:T} OUTPUT_STREAM_MEMBER = ${outputType:T}.$$SCHEMA.member(${outputStreamMember:S});${/outputStreamMember}
+                                        ${?idempotencyTokenMember}private static final ${sdkSchema:T} IDEMPOTENCY_TOKEN_MEMBER = ${inputType:T}.$$SCHEMA.member(${idempotencyTokenMember:S});${/idempotencyTokenMember}
+                                        ${?inputStreamMember}private static final ${sdkSchema:T} INPUT_STREAM_MEMBER = ${inputType:T}.$$SCHEMA.member(${inputStreamMember:S});${/inputStreamMember}
+                                        ${?outputStreamMember}private static final ${sdkSchema:T} OUTPUT_STREAM_MEMBER = ${outputType:T}.$$SCHEMA.member(${outputStreamMember:S});${/outputStreamMember}
 
-                        @Override
-                        public ${sdkShapeBuilder:N}<${inputType:T}> inputBuilder() {
-                            return ${inputType:T}.builder();
-                        }
+                                        @Override
+                                        public ${sdkShapeBuilder:N}<${inputType:T}> inputBuilder() {
+                                            return ${inputType:T}.builder();
+                                        }
 
-                        ${?hasInputEventStream}
-                        @Override
-                        public ${supplier:T}<${sdkShapeBuilder:T}<${inputEventType:T}>> inputEventBuilderSupplier() {
-                            return () -> ${inputEventType:T}.builder();
-                        }
-                        ${/hasInputEventStream}
+                                        ${?hasInputEventStream}
+                                        @Override
+                                        public ${supplier:T}<${sdkShapeBuilder:T}<${inputEventType:T}>> inputEventBuilderSupplier() {
+                                            return () -> ${inputEventType:T}.builder();
+                                        }
+                                        ${/hasInputEventStream}
 
-                        @Override
-                        public ${sdkShapeBuilder:N}<${outputType:T}> outputBuilder() {
-                            return ${outputType:T}.builder();
-                        }
+                                        @Override
+                                        public ${sdkShapeBuilder:N}<${outputType:T}> outputBuilder() {
+                                            return ${outputType:T}.builder();
+                                        }
 
-                        ${?hasOutputEventStream}
-                        @Override
-                        public ${supplier:T}<${sdkShapeBuilder:T}<${outputEventType:T}>> outputEventBuilderSupplier() {
-                            return () -> ${outputEventType:T}.builder();
-                        }
-                        ${/hasOutputEventStream}
+                                        ${?hasOutputEventStream}
+                                        @Override
+                                        public ${supplier:T}<${sdkShapeBuilder:T}<${outputEventType:T}>> outputEventBuilderSupplier() {
+                                            return () -> ${outputEventType:T}.builder();
+                                        }
+                                        ${/hasOutputEventStream}
 
-                        @Override
-                        public ${sdkSchema:N} schema() {
-                            return $$SCHEMA;
-                        }
+                                        @Override
+                                        public ${sdkSchema:N} schema() {
+                                            return $$SCHEMA;
+                                        }
 
-                        @Override
-                        public ${sdkSchema:N} inputSchema() {
-                            return ${inputType:T}.$$SCHEMA;
-                        }
+                                        @Override
+                                        public ${sdkSchema:N} inputSchema() {
+                                            return ${inputType:T}.$$SCHEMA;
+                                        }
 
-                        @Override
-                        public ${sdkSchema:N} outputSchema() {
-                            return ${outputType:T}.$$SCHEMA;
-                        }
+                                        @Override
+                                        public ${sdkSchema:N} outputSchema() {
+                                            return ${outputType:T}.$$SCHEMA;
+                                        }
 
-                        @Override
-                        public ${typeRegistry:N} errorRegistry() {
-                            return TYPE_REGISTRY;
-                        }
+                                        @Override
+                                        public ${typeRegistry:N} errorRegistry() {
+                                            return TYPE_REGISTRY;
+                                        }
 
-                        @Override
-                        public ${list:T}<${shapeId:T}> effectiveAuthSchemes() {
-                            return SCHEMES;
-                        }
+                                        @Override
+                                        public ${list:T}<${shapeId:T}> effectiveAuthSchemes() {
+                                            return SCHEMES;
+                                        }
 
-                        @Override
-                        public ${sdkSchema:T} inputStreamMember() {
-                            return ${?inputStreamMember}INPUT_STREAM_MEMBER${/inputStreamMember}${^inputStreamMember}null${/inputStreamMember};
-                        }
+                                        @Override
+                                        public ${sdkSchema:T} inputStreamMember() {
+                                            return ${?inputStreamMember}INPUT_STREAM_MEMBER${/inputStreamMember}${^inputStreamMember}null${/inputStreamMember};
+                                        }
 
-                        @Override
-                        public ${sdkSchema:T} outputStreamMember() {
-                            return ${?outputStreamMember}OUTPUT_STREAM_MEMBER${/outputStreamMember}${^outputStreamMember}null${/outputStreamMember};
-                        }
+                                        @Override
+                                        public ${sdkSchema:T} outputStreamMember() {
+                                            return ${?outputStreamMember}OUTPUT_STREAM_MEMBER${/outputStreamMember}${^outputStreamMember}null${/outputStreamMember};
+                                        }
 
-                        @Override
-                        public ${sdkSchema:T} idempotencyTokenMember() {
-                            return ${?idempotencyTokenMember}IDEMPOTENCY_TOKEN_MEMBER${/idempotencyTokenMember}${^idempotencyTokenMember}null${/idempotencyTokenMember};
-                        }
-                    }""";
-                writer.putContext("inputType", input);
-                writer.putContext("outputType", output);
-                writer.putContext("id", new IdStringGenerator(writer, shape));
-                writer.putContext("sdkSchema", Schema.class);
-                writer.putContext("shapeId", ShapeId.class);
-                writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
-                writer.putContext("list", List.class);
-                writer.putContext("string", String.class);
-                writer.putContext("set", Set.class);
-                writer.putContext("modeledApiException", ModeledApiException.class);
+                                        @Override
+                                        public ${sdkSchema:T} idempotencyTokenMember() {
+                                            return ${?idempotencyTokenMember}IDEMPOTENCY_TOKEN_MEMBER${/idempotencyTokenMember}${^idempotencyTokenMember}null${/idempotencyTokenMember};
+                                        }
+                                    }""";
+                    writer.putContext("inputType", input);
+                    writer.putContext("outputType", output);
+                    writer.putContext("id", new IdStringGenerator(writer, shape));
+                    writer.putContext("sdkSchema", Schema.class);
+                    writer.putContext("shapeId", ShapeId.class);
+                    writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
+                    writer.putContext("list", List.class);
+                    writer.putContext("string", String.class);
+                    writer.putContext("set", Set.class);
+                    writer.putContext("modeledApiException", ModeledApiException.class);
 
-                writer.putContext(
-                    "operationType",
-                    new OperationTypeGenerator(
-                        writer,
-                        shape,
-                        directive.symbolProvider(),
-                        directive.model(),
-                        eventStreamIndex,
-                        directive.context()
-                    )
-                );
-
-                writer.putContext("typeRegistry", TypeRegistry.class);
-                writer.putContext(
-                    "schema",
-                    new SchemaGenerator(
-                        writer,
-                        shape,
-                        directive.symbolProvider(),
-                        directive.model(),
-                        directive.context()
-                    )
-                );
-                var exceptions = getExceptionSymbols(directive.shape(), directive);
-                writer.putContext("exceptions", exceptions);
-                writer.putContext("typeRegistrySection", new TypeRegistryGenerator(writer, exceptions));
-                var serviceIndex = ServiceIndex.of(directive.model());
-                writer.putContext(
-                    "schemes",
-                    serviceIndex.getEffectiveAuthSchemes(
-                        directive.service(),
-                        shape,
-                        ServiceIndex.AuthSchemeMode.NO_AUTH_AWARE
-                    )
-                );
-
-                eventStreamIndex.getInputInfo(shape).ifPresentOrElse(info -> {
-                    writer.putContext("supplier", Supplier.class);
-                    writer.putContext("hasInputEventStream", true);
-                    writer.putContext("inputStreamMember", info.getEventStreamMember().getMemberName());
                     writer.putContext(
-                        "inputEventType",
-                        directive.symbolProvider().toSymbol(info.getEventStreamTarget())
-                    );
-                }, () -> {
+                            "operationType",
+                            new OperationTypeGenerator(
+                                    writer,
+                                    shape,
+                                    directive.symbolProvider(),
+                                    directive.model(),
+                                    eventStreamIndex,
+                                    directive.context()));
+
+                    writer.putContext("typeRegistry", TypeRegistry.class);
+                    writer.putContext(
+                            "schema",
+                            new SchemaGenerator(
+                                    writer,
+                                    shape,
+                                    directive.symbolProvider(),
+                                    directive.model(),
+                                    directive.context()));
+                    var exceptions = getExceptionSymbols(directive.shape(), directive);
+                    writer.putContext("exceptions", exceptions);
+                    writer.putContext("typeRegistrySection", new TypeRegistryGenerator(writer, exceptions));
+                    var serviceIndex = ServiceIndex.of(directive.model());
+                    writer.putContext(
+                            "schemes",
+                            serviceIndex.getEffectiveAuthSchemes(
+                                    directive.service(),
+                                    shape,
+                                    ServiceIndex.AuthSchemeMode.NO_AUTH_AWARE));
+
+                    eventStreamIndex.getInputInfo(shape).ifPresentOrElse(info -> {
+                        writer.putContext("supplier", Supplier.class);
+                        writer.putContext("hasInputEventStream", true);
+                        writer.putContext("inputStreamMember", info.getEventStreamMember().getMemberName());
+                        writer.putContext(
+                                "inputEventType",
+                                directive.symbolProvider().toSymbol(info.getEventStreamTarget()));
+                    }, () -> {
+                        for (var member : shape.members()) {
+                            if (directive.model().expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
+                                writer.putContext("inputStreamMember", member.getMemberName());
+                                break;
+                            }
+                        }
+                    });
+
+                    eventStreamIndex.getOutputInfo(shape).ifPresentOrElse(info -> {
+                        writer.putContext("supplier", Supplier.class);
+                        writer.putContext("hasOutputEventStream", true);
+                        writer.putContext("outputStreamMember", info.getEventStreamMember().getMemberName());
+                        writer.putContext(
+                                "outputEventType",
+                                directive.symbolProvider().toSymbol(info.getEventStreamTarget()));
+                    }, () -> {
+                        for (var member : shape.members()) {
+                            if (directive.model().expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
+                                writer.putContext("outputStreamMember", member.getMemberName());
+                                break;
+                            }
+                        }
+                    });
+
+                    // Add the idempotency token member.
                     for (var member : shape.members()) {
-                        if (directive.model().expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
-                            writer.putContext("inputStreamMember", member.getMemberName());
+                        if (member.hasTrait(IdempotencyTokenTrait.class)) {
+                            writer.putContext("idempotencyTokenMember", member.getMemberName());
                             break;
                         }
                     }
+                    writer.write(template);
+                    writer.popState();
                 });
-
-                eventStreamIndex.getOutputInfo(shape).ifPresentOrElse(info -> {
-                    writer.putContext("supplier", Supplier.class);
-                    writer.putContext("hasOutputEventStream", true);
-                    writer.putContext("outputStreamMember", info.getEventStreamMember().getMemberName());
-                    writer.putContext(
-                        "outputEventType",
-                        directive.symbolProvider().toSymbol(info.getEventStreamTarget())
-                    );
-                }, () -> {
-                    for (var member : shape.members()) {
-                        if (directive.model().expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
-                            writer.putContext("outputStreamMember", member.getMemberName());
-                            break;
-                        }
-                    }
-                });
-
-                // Add the idempotency token member.
-                for (var member : shape.members()) {
-                    if (member.hasTrait(IdempotencyTokenTrait.class)) {
-                        writer.putContext("idempotencyTokenMember", member.getMemberName());
-                        break;
-                    }
-                }
-                writer.write(template);
-                writer.popState();
-            });
     }
 
     private static List<Symbol> getExceptionSymbols(
-        OperationShape operation,
-        GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive
+            OperationShape operation,
+            GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive
     ) {
         List<Symbol> symbols = new ArrayList<>();
         for (var errorId : operation.getErrors(directive.service())) {
@@ -233,9 +228,12 @@ public final class OperationGenerator
     }
 
     private record OperationTypeGenerator(
-        JavaWriter writer, OperationShape shape, SymbolProvider symbolProvider,
-        Model model, EventStreamIndex index, CodeGenerationContext context
-    ) implements Runnable {
+            JavaWriter writer,
+            OperationShape shape,
+            SymbolProvider symbolProvider,
+            Model model,
+            EventStreamIndex index,
+            CodeGenerationContext context) implements Runnable {
         @Override
         public void run() {
             var inputShape = model.expectShape(shape.getInputShape());
@@ -246,25 +244,22 @@ public final class OperationGenerator
             var inputEventStreamInfo = index.getInputInfo(shape);
             var outputEventStreamInfo = index.getOutputInfo(shape);
             inputEventStreamInfo.ifPresent(
-                info -> writer.writeInline(
-                    "$1T<$2T, $3T, $4T>",
-                    InputEventStreamingApiOperation.class,
-                    input,
-                    output,
-                    symbolProvider.toSymbol(info.getEventStreamTarget())
-                )
-            );
+                    info -> writer.writeInline(
+                            "$1T<$2T, $3T, $4T>",
+                            InputEventStreamingApiOperation.class,
+                            input,
+                            output,
+                            symbolProvider.toSymbol(info.getEventStreamTarget())));
             outputEventStreamInfo.ifPresent(info -> {
                 if (inputEventStreamInfo.isPresent()) {
                     writer.writeInline(", ");
                 }
                 writer.writeInline(
-                    "$1T<$2T, $3T, $4T>",
-                    OutputEventStreamingApiOperation.class,
-                    input,
-                    output,
-                    symbolProvider.toSymbol(info.getEventStreamTarget())
-                );
+                        "$1T<$2T, $3T, $4T>",
+                        OutputEventStreamingApiOperation.class,
+                        input,
+                        output,
+                        symbolProvider.toSymbol(info.getEventStreamTarget()));
             });
 
             if (inputEventStreamInfo.isEmpty() && outputEventStreamInfo.isEmpty()) {

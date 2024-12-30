@@ -22,43 +22,43 @@ public class CodegenUtilsTest {
     void requiredMemberOrdering() {
         Shape stringShape = StringShape.builder().id("foo.bar#Baz").build();
         MemberShape requiredA = MemberShape.builder()
-            .id("foo.baz#Container$requiredA")
-            .addTrait(new RequiredTrait())
-            .target(stringShape)
-            .build();
+                .id("foo.baz#Container$requiredA")
+                .addTrait(new RequiredTrait())
+                .target(stringShape)
+                .build();
         MemberShape requiredB = MemberShape.builder()
-            .id("foo.baz#Container$requiredB")
-            .addTrait(new RequiredTrait())
-            .target(stringShape)
-            .build();
+                .id("foo.baz#Container$requiredB")
+                .addTrait(new RequiredTrait())
+                .target(stringShape)
+                .build();
         MemberShape requiredWithDefault = MemberShape.builder()
-            .id("foo.baz#Container$requiredDefault")
-            .addTrait(new RequiredTrait())
-            .addTrait(new DefaultTrait(StringNode.from("default")))
-            .target(stringShape)
-            .build();
+                .id("foo.baz#Container$requiredDefault")
+                .addTrait(new RequiredTrait())
+                .addTrait(new DefaultTrait(StringNode.from("default")))
+                .target(stringShape)
+                .build();
         MemberShape defaultMember = MemberShape.builder()
-            .id("foo.baz#Container$default")
-            .addTrait(new RequiredTrait())
-            .addTrait(new DefaultTrait(StringNode.from("default")))
-            .target(stringShape)
-            .build();
+                .id("foo.baz#Container$default")
+                .addTrait(new RequiredTrait())
+                .addTrait(new DefaultTrait(StringNode.from("default")))
+                .target(stringShape)
+                .build();
         MemberShape optionalA = MemberShape.builder()
-            .id("foo.baz#Container$optionalA")
-            .target(stringShape)
-            .build();
+                .id("foo.baz#Container$optionalA")
+                .target(stringShape)
+                .build();
         MemberShape optionalB = MemberShape.builder()
-            .id("foo.baz#Container$optionalB")
-            .target(stringShape)
-            .build();
+                .id("foo.baz#Container$optionalB")
+                .target(stringShape)
+                .build();
         var exampleShape = StructureShape.builder()
-            .id("foo.baz#Container")
-            .addMember(optionalA)
-            .addMember(defaultMember)
-            .addMember(requiredWithDefault)
-            .addMember(requiredB)
-            .addMember(requiredA)
-            .build();
+                .id("foo.baz#Container")
+                .addMember(optionalA)
+                .addMember(defaultMember)
+                .addMember(requiredWithDefault)
+                .addMember(requiredB)
+                .addMember(requiredA)
+                .build();
         var result = CodegenUtils.getSortedMembers(exampleShape);
         assertEquals(result, List.of(requiredB, requiredA, optionalA, defaultMember, requiredWithDefault));
     }

@@ -12,7 +12,7 @@ import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 
 record TypeEnumGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements
-    Runnable {
+        Runnable {
 
     @Override
     public void run() {
@@ -24,14 +24,14 @@ record TypeEnumGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolPr
         writer.pushState();
         writer.putContext("variants", enumList);
         writer.write("""
-            /**
-             * Enum representing the possible variants of {@link ${shape:T}}.
-             */
-            public enum Type {
-                ${#variants}${value:L}${^key.last},
-                ${/key.last}${/variants}
-            }
-            """);
+                /**
+                 * Enum representing the possible variants of {@link ${shape:T}}.
+                 */
+                public enum Type {
+                    ${#variants}${value:L}${^key.last},
+                    ${/key.last}${/variants}
+                }
+                """);
         writer.popState();
     }
 }

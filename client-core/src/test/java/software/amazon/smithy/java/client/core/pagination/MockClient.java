@@ -31,8 +31,7 @@ final class MockClient {
     public CompletableFuture<GetFoosOutput> getFoosAsync(GetFoosInput in, RequestOverrideConfig override) {
         if (!Objects.equals(nextToken, in.nextToken())) {
             throw new IllegalArgumentException(
-                "Next token " + nextToken + " does not match expected " + in.nextToken()
-            );
+                    "Next token " + nextToken + " does not match expected " + in.nextToken());
         } else if (completed) {
             throw new IllegalArgumentException("No more requests expected but got: " + in);
         }

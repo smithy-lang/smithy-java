@@ -35,8 +35,8 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     private final JsonSettings settings;
 
     JacksonJsonDeserializer(
-        JsonParser parser,
-        JsonSettings settings
+            JsonParser parser,
+            JsonSettings settings
     ) {
         this.parser = parser;
         this.settings = settings;
@@ -200,9 +200,8 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                 case VALUE_TRUE -> JsonDocuments.of(true, settings);
                 case VALUE_FALSE -> JsonDocuments.of(false, settings);
                 case VALUE_NUMBER_INT, VALUE_NUMBER_FLOAT -> JsonDocuments.of(
-                    parser.getNumberValue(),
-                    settings
-                );
+                        parser.getNumberValue(),
+                        settings);
                 case START_ARRAY -> {
                     List<Document> values = new ArrayList<>();
                     for (token = parser.nextToken(); token != END_ARRAY; token = parser.nextToken()) {
@@ -234,7 +233,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
         try {
             var format = settings.timestampResolver().resolve(schema);
             if (parser.getCurrentToken() == JsonToken.VALUE_NUMBER_FLOAT
-                || parser.getCurrentToken() == JsonToken.VALUE_NUMBER_INT) {
+                    || parser.getCurrentToken() == JsonToken.VALUE_NUMBER_INT) {
                 return TimestampResolver.readTimestamp(parser.getNumberValue(), format);
             } else if (parser.getCurrentToken() == JsonToken.VALUE_STRING) {
                 return TimestampResolver.readTimestamp(parser.getText(), format);

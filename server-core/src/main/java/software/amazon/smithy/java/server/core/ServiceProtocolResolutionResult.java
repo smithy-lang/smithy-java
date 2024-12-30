@@ -12,8 +12,6 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
 public record ServiceProtocolResolutionResult(
-    Service service,
-    Operation<? extends SerializableStruct, ? extends SerializableStruct> operation,
-    ServerProtocol protocol
-) {
-}
+        Service service,
+        Operation<? extends SerializableStruct, ? extends SerializableStruct> operation,
+        ServerProtocol protocol) {}

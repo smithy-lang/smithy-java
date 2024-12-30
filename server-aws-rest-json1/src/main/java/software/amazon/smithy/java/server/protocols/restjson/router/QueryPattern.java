@@ -40,7 +40,7 @@ class QueryPattern {
                 requiredLiteralQueryParams.put(key, value);
             }
             paramToValue.computeIfAbsent(key, x -> new LinkedHashSet<>())
-                .add(paramValue);
+                    .add(paramValue);
 
             return true;
         });
@@ -73,12 +73,13 @@ class QueryPattern {
 
     public boolean conflictsWith(QueryPattern queryPattern) {
         return doConflictsWith(
-            requiredLiteralQueryParams,
-            queryPattern.requiredLiteralQueryParams,
-            queryPattern.keyLabels.keySet()
-        )
-            ||
-            doConflictsWith(queryPattern.requiredLiteralQueryParams, requiredLiteralQueryParams, keyLabels.keySet());
+                requiredLiteralQueryParams,
+                queryPattern.requiredLiteralQueryParams,
+                queryPattern.keyLabels.keySet())
+                ||
+                doConflictsWith(queryPattern.requiredLiteralQueryParams,
+                        requiredLiteralQueryParams,
+                        keyLabels.keySet());
     }
 
     private void validateQueryParams(Map<String, Set<QueryParamValue>> paramToValue) {
@@ -86,16 +87,15 @@ class QueryPattern {
         for (Map.Entry<String, Set<QueryParamValue>> kvp : paramToValue.entrySet()) {
             if (kvp.getValue().size() > 1) {
                 buf.append("Query param with key ")
-                    .append("\"")
-                    .append(kvp.getKey())
-                    .append("\" defined multiple times: ")
-                    .append(
-                        kvp.getValue()
-                            .stream()
-                            .map(QueryParamValue::toString)
-                            .collect(Collectors.joining(", "))
-                    )
-                    .append('\n');
+                        .append("\"")
+                        .append(kvp.getKey())
+                        .append("\" defined multiple times: ")
+                        .append(
+                                kvp.getValue()
+                                        .stream()
+                                        .map(QueryParamValue::toString)
+                                        .collect(Collectors.joining(", ")))
+                        .append('\n');
             }
         }
         if (!buf.isEmpty()) {
@@ -104,9 +104,9 @@ class QueryPattern {
     }
 
     private static boolean doConflictsWith(
-        Map<String, String> a,
-        Map<String, String> b,
-        Collection<String> bLabels
+            Map<String, String> a,
+            Map<String, String> b,
+            Collection<String> bLabels
     ) {
         if (a.size() == 0 && b.size() == 0)
             return true;

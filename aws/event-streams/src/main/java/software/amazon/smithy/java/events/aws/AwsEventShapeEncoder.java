@@ -34,19 +34,19 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
     private final Function<Throwable, EventStreamingException> exceptionHandler;
 
     public AwsEventShapeEncoder(
-        Schema eventSchema,
-        Codec codec,
-        String payloadMediaType,
-        Function<Throwable, EventStreamingException> exceptionHandler
+            Schema eventSchema,
+            Codec codec,
+            String payloadMediaType,
+            Function<Throwable, EventStreamingException> exceptionHandler
     ) {
         this.eventSchema = eventSchema;
         this.codec = codec;
         this.payloadMediaType = payloadMediaType;
         this.possibleTypes = eventSchema.members().stream().map(Schema::memberName).collect(Collectors.toSet());
         this.possibleExceptions = eventSchema.members()
-            .stream()
-            .filter(s -> s.hasTrait(TraitKey.ERROR_TRAIT))
-            .collect(Collectors.toMap(s -> s.memberTarget().id(), Function.identity()));
+                .stream()
+                .filter(s -> s.hasTrait(TraitKey.ERROR_TRAIT))
+                .collect(Collectors.toMap(s -> s.memberTarget().id(), Function.identity()));
         this.exceptionHandler = exceptionHandler;
     }
 
@@ -80,14 +80,12 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
         AwsEventFrame frame;
         Schema exceptionSchema;
         if (exception instanceof ModeledApiException me && (exceptionSchema = possibleExceptions.get(
-            me.schema().id()
-        )) != null) {
+                me.schema().id())) != null) {
             var headers = new HashMap<String, HeaderValue>();
             headers.put(":message-type", HeaderValue.fromString("exception"));
             headers.put(
-                ":exception-type",
-                HeaderValue.fromString(exceptionSchema.memberName())
-            );
+                    ":exception-type",
+                    HeaderValue.fromString(exceptionSchema.memberName()));
             headers.put(":content-type", HeaderValue.fromString(payloadMediaType));
             var payload = codec.serialize(me);
             var bytes = new byte[payload.remaining()];

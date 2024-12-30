@@ -98,9 +98,8 @@ public final class PathPattern {
 
             if (!labels.add(s.getContent())) {
                 throw new InvalidPatternException(
-                    "Label '" + s.getContent()
-                        + "' is defined more than once in pattern: '" + pattern + "'"
-                );
+                        "Label '" + s.getContent()
+                                + "' is defined more than once in pattern: '" + pattern + "'");
             }
         }
     }
@@ -113,15 +112,13 @@ public final class PathPattern {
                 for (int j = i + 1; j < segments.size(); j++) {
                     if (segments.get(j).isGreedyLabel()) {
                         throw new InvalidPatternException(
-                            "At most one greedy label segment may exist in pattern: '"
-                                + pattern + "'"
-                        );
+                                "At most one greedy label segment may exist in pattern: '"
+                                        + pattern + "'");
                     }
                     if (segments.get(j).isLabel()) {
                         throw new InvalidPatternException(
-                            "A greedy label segment must be the last label segment in its pattern: '" + pattern
-                                + "'"
-                        );
+                                "A greedy label segment must be the last label segment in its pattern: '" + pattern
+                                        + "'");
                     }
                 }
             }
@@ -217,18 +214,18 @@ public final class PathPattern {
 
             Segment s = (Segment) o;
             return (isLabel() == s.isLabel()) &&
-                (isGreedyLabel() == s.isGreedyLabel()) &&
-                (getContent().toString()).equalsIgnoreCase(s.getContent().toString());
+                    (isGreedyLabel() == s.isGreedyLabel())
+                    &&
+                    (getContent().toString()).equalsIgnoreCase(s.getContent().toString());
 
         }
 
         @Override
         public int hashCode() {
             return Objects.hash(
-                isLabel(),
-                isGreedyLabel(),
-                getContent()
-            );
+                    isLabel(),
+                    isGreedyLabel(),
+                    getContent());
         }
 
         static Segment parse(CharSequence segment, CharSequence pattern, int offset) {
@@ -243,9 +240,8 @@ public final class PathPattern {
                 // isLabel
                 if (segment.isEmpty()) {
                     throw new InvalidPatternException(
-                        "Empty label declaration in path pattern: '" + pattern
-                            + "' at index: " + (offset + 1)
-                    );
+                            "Empty label declaration in path pattern: '" + pattern
+                                    + "' at index: " + (offset + 1));
                 }
 
                 // make sure no {} present in content, and make sure greedy symbol '+' doesn't exist in the label name
@@ -255,19 +251,16 @@ public final class PathPattern {
                     switch (segment.charAt(i)) {
                         case '{':
                             throw new InvalidPatternException(
-                                "Attempted to create nested label in path pattern: '"
-                                    + pattern + "' at index: " + idx
-                            );
+                                    "Attempted to create nested label in path pattern: '"
+                                            + pattern + "' at index: " + idx);
                         case '}':
                             throw new InvalidPatternException(
-                                "Unmatched label termination in path pattern: '" + pattern
-                                    + "' at index: " + idx
-                            );
+                                    "Unmatched label termination in path pattern: '" + pattern
+                                            + "' at index: " + idx);
                         case '+':
                             throw new InvalidPatternException(
-                                "Labels may contain '+' only as the last character, and only to denote use as a greedy pattern.  Error in pattern: '"
-                                    + pattern + "' at index: " + idx
-                            );
+                                    "Labels may contain '+' only as the last character, and only to denote use as a greedy pattern.  Error in pattern: '"
+                                            + pattern + "' at index: " + idx);
                     }
                 }
 
@@ -283,9 +276,8 @@ public final class PathPattern {
                         case '{':
                         case '}':
                             throw new InvalidPatternException(
-                                "Labels must be delimited by slash ('/') characters.  Error in pattern: '" + pattern
-                                    + "' at index: " + idx
-                            );
+                                    "Labels must be delimited by slash ('/') characters.  Error in pattern: '" + pattern
+                                            + "' at index: " + idx);
                     }
                 }
 
@@ -296,9 +288,8 @@ public final class PathPattern {
         private static void validateLabelName(CharSequence name, CharSequence pattern, int offset) {
             if (!LABEL_PATTERN.matcher(name).matches()) {
                 throw new InvalidPatternException(
-                    "Invalid label name in path pattern at index: " + offset
-                        + " pattern: '" + pattern + "'. Must satisfy: " + LABEL_PATTERN_REGEX
-                );
+                        "Invalid label name in path pattern at index: " + offset
+                                + " pattern: '" + pattern + "'. Must satisfy: " + LABEL_PATTERN_REGEX);
             }
         }
     }

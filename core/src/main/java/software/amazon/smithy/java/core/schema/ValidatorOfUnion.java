@@ -37,10 +37,9 @@ final class ValidatorOfUnion implements ShapeSerializer {
     private void checkResult() {
         if (setMember == null) {
             var err = new ValidationError.UnionValidationFailure(
-                validator.createPath(),
-                "No member is set in the union",
-                schema
-            );
+                    validator.createPath(),
+                    "No member is set in the union",
+                    schema);
             validator.addError(err);
         }
     }

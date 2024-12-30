@@ -24,10 +24,10 @@ public final class AwsFrameDecoder implements FrameDecoder<AwsEventFrame> {
     public List<AwsEventFrame> decode(ByteBuffer buffer) {
         decoder.feed(buffer);
         return decoder.getDecodedMessages()
-            .stream()
-            .map(AwsEventFrame::new)
-            .map(transformer)
-            .filter(Objects::nonNull)
-            .toList();
+                .stream()
+                .map(AwsEventFrame::new)
+                .map(transformer)
+                .filter(Objects::nonNull)
+                .toList();
     }
 }

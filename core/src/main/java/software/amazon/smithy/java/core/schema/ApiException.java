@@ -20,8 +20,7 @@ import software.amazon.smithy.java.retries.api.RetrySafety;
 public class ApiException extends RuntimeException implements RetryInfo {
 
     private static final boolean GLOBAL_CAPTURE_STACK_TRACE_ENABLED = Boolean.getBoolean(
-        "smithy.java.captureExceptionStackTraces"
-    );
+            "smithy.java.captureExceptionStackTraces");
 
     /**
      * The party that is at fault for the error, if any.
@@ -112,11 +111,10 @@ public class ApiException extends RuntimeException implements RetryInfo {
 
     protected ApiException(String message, Throwable cause, Fault errorType, Boolean captureStackTrace) {
         super(
-            message,
-            cause,
-            false,
-            captureStackTrace != null ? captureStackTrace : GLOBAL_CAPTURE_STACK_TRACE_ENABLED
-        );
+                message,
+                cause,
+                false,
+                captureStackTrace != null ? captureStackTrace : GLOBAL_CAPTURE_STACK_TRACE_ENABLED);
         this.errorType = Objects.requireNonNull(errorType);
     }
 

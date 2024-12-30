@@ -29,9 +29,9 @@ public class ApplyHttpRetryInfoPluginTest {
     @Test
     public void appliesRetryAfterHeader() {
         var response = HttpResponse.builder()
-            .statusCode(500)
-            .headers(HttpHeaders.of(Map.of("retry-after", List.of("10"))))
-            .build();
+                .statusCode(500)
+                .headers(HttpHeaders.of(Map.of("retry-after", List.of("10"))))
+                .build();
         var e = new ApiException("err");
         var context = Context.create();
 
@@ -45,9 +45,9 @@ public class ApplyHttpRetryInfoPluginTest {
     @Test
     public void appliesRetryAfterHeaderDate() {
         var response = HttpResponse.builder()
-            .statusCode(500)
-            .headers(HttpHeaders.of(Map.of("retry-after", List.of("Wed, 21 Oct 2015 07:28:00 GMT"))))
-            .build();
+                .statusCode(500)
+                .headers(HttpHeaders.of(Map.of("retry-after", List.of("Wed, 21 Oct 2015 07:28:00 GMT"))))
+                .build();
         var e = new ApiException("err");
         var context = Context.create();
         context.put(ClockSetting.CLOCK, Clock.fixed(Instant.parse("2015-10-21T05:28:00Z"), ZoneId.of("UTC")));

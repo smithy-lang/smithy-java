@@ -39,8 +39,8 @@ public final class RecursionDetectionPlugin implements ClientPlugin {
 
     private static String getTraceIdEnv() {
         return System.getenv("AWS_LAMBDA_FUNCTION_NAME") != null
-            ? System.getenv("_X_AMZN_TRACE_ID")
-            : null;
+                ? System.getenv("_X_AMZN_TRACE_ID")
+                : null;
     }
 
     private record Interceptor(List<String> traceIdHeader) implements ClientInterceptor {

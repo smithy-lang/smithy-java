@@ -31,33 +31,26 @@ public final class PreludeSchemas {
 
     // Primitive types
     public static final Schema PRIMITIVE_BOOLEAN = Schema.createBoolean(
-        ShapeId.from("smithy.api#PrimitiveBoolean"),
-        new DefaultTrait(Node.from(false))
-    );
+            ShapeId.from("smithy.api#PrimitiveBoolean"),
+            new DefaultTrait(Node.from(false)));
     public static final Schema PRIMITIVE_BYTE = Schema.createByte(
-        ShapeId.from("smithy.api#PrimitiveByte"),
-        new DefaultTrait(Node.from((byte) 0))
-    );
+            ShapeId.from("smithy.api#PrimitiveByte"),
+            new DefaultTrait(Node.from((byte) 0)));
     public static final Schema PRIMITIVE_SHORT = Schema.createShort(
-        ShapeId.from("smithy.api#PrimitiveShort"),
-        new DefaultTrait(Node.from((short) 0))
-    );
+            ShapeId.from("smithy.api#PrimitiveShort"),
+            new DefaultTrait(Node.from((short) 0)));
     public static final Schema PRIMITIVE_INTEGER = Schema.createInteger(
-        ShapeId.from("smithy.api#PrimitiveInteger"),
-        new DefaultTrait(Node.from(0))
-    );
+            ShapeId.from("smithy.api#PrimitiveInteger"),
+            new DefaultTrait(Node.from(0)));
     public static final Schema PRIMITIVE_LONG = Schema.createLong(
-        ShapeId.from("smithy.api#PrimitiveLong"),
-        new DefaultTrait(Node.from(0L))
-    );
+            ShapeId.from("smithy.api#PrimitiveLong"),
+            new DefaultTrait(Node.from(0L)));
     public static final Schema PRIMITIVE_FLOAT = Schema.createFloat(
-        ShapeId.from("smithy.api#PrimitiveFloat"),
-        new DefaultTrait(Node.from(0f))
-    );
+            ShapeId.from("smithy.api#PrimitiveFloat"),
+            new DefaultTrait(Node.from(0f)));
     public static final Schema PRIMITIVE_DOUBLE = Schema.createDouble(
-        ShapeId.from("smithy.api#PrimitiveDouble"),
-        new DefaultTrait(Node.from(0.0))
-    );
+            ShapeId.from("smithy.api#PrimitiveDouble"),
+            new DefaultTrait(Node.from(0.0)));
 
     private PreludeSchemas() {
         // Class should not be instantiated.

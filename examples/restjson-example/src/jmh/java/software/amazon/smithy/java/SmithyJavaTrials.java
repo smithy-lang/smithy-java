@@ -36,32 +36,29 @@ import software.amazon.smithy.utils.IoUtils;
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Mode.AverageTime)
 @Warmup(
-    iterations = 2,
-    time = 3,
-    timeUnit = TimeUnit.SECONDS
-)
+        iterations = 2,
+        time = 3,
+        timeUnit = TimeUnit.SECONDS)
 @Measurement(
-    iterations = 3,
-    time = 3,
-    timeUnit = TimeUnit.SECONDS
-)
+        iterations = 3,
+        time = 3,
+        timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 public class SmithyJavaTrials {
     private static final Map<String, Class<? extends ShapeBuilder<?>>> CASES = Map.ofEntries(
-        Map.entry("all_fields_optional_0", AllFieldsOptional.Builder.class),
-        Map.entry("all_fields_optional_1", AllFieldsOptional.Builder.class),
-        Map.entry("all_fields_optional_3", AllFieldsOptional.Builder.class),
-        Map.entry("all_fields_optional_5", AllFieldsOptional.Builder.class),
-        Map.entry("all_fields_optional_6", AllFieldsOptional.Builder.class),
-        Map.entry("attribute_updates_1", AttributeUpdates.Builder.class),
-        Map.entry("attribute_updates_2", AttributeUpdates.Builder.class),
-        Map.entry("attribute_updates_3", AttributeUpdates.Builder.class),
-        Map.entry("struct_1", CodegenStruct.Builder.class),
-        Map.entry("struct_2", CodegenStruct.Builder.class),
-        Map.entry("struct_3", CodegenStruct.Builder.class),
-        Map.entry("struct_4", CodegenStruct.Builder.class),
-        Map.entry("send_message_request_1", SendMessageRequest.Builder.class)
-    );
+            Map.entry("all_fields_optional_0", AllFieldsOptional.Builder.class),
+            Map.entry("all_fields_optional_1", AllFieldsOptional.Builder.class),
+            Map.entry("all_fields_optional_3", AllFieldsOptional.Builder.class),
+            Map.entry("all_fields_optional_5", AllFieldsOptional.Builder.class),
+            Map.entry("all_fields_optional_6", AllFieldsOptional.Builder.class),
+            Map.entry("attribute_updates_1", AttributeUpdates.Builder.class),
+            Map.entry("attribute_updates_2", AttributeUpdates.Builder.class),
+            Map.entry("attribute_updates_3", AttributeUpdates.Builder.class),
+            Map.entry("struct_1", CodegenStruct.Builder.class),
+            Map.entry("struct_2", CodegenStruct.Builder.class),
+            Map.entry("struct_3", CodegenStruct.Builder.class),
+            Map.entry("struct_4", CodegenStruct.Builder.class),
+            Map.entry("send_message_request_1", SendMessageRequest.Builder.class));
 
     public enum Protocol {
         RestJson(JsonCodec.builder().build()),
@@ -79,16 +76,13 @@ public class SmithyJavaTrials {
         }
     }
 
-    @Param(
-        {
+    @Param({
             "RestJson",
             "RpcV2",
-        }
-    )
+    })
     private Protocol type;
 
-    @Param(
-        {
+    @Param({
             "all_fields_optional_0",
             "all_fields_optional_1",
             "all_fields_optional_3",
@@ -102,8 +96,7 @@ public class SmithyJavaTrials {
             "struct_3",
             "struct_4",
             "send_message_request_1"
-        }
-    )
+    })
     private String testName;
 
     private ByteBuffer bytes;
@@ -160,22 +153,21 @@ public class SmithyJavaTrials {
 
         private void runAll() throws Exception {
             for (var testName : Arrays.asList(
-                new String[]{
-                    "all_fields_optional_0",
-                    "all_fields_optional_1",
-                    "all_fields_optional_3",
-                    "all_fields_optional_5",
-                    "all_fields_optional_6",
-                    "attribute_updates_1",
-                    "attribute_updates_2",
-                    "attribute_updates_3",
-                    "struct_1",
-                    "struct_2",
-                    "struct_3",
-                    "struct_4",
-                    "send_message_request_1"
-                }
-            )) {
+                    new String[] {
+                            "all_fields_optional_0",
+                            "all_fields_optional_1",
+                            "all_fields_optional_3",
+                            "all_fields_optional_5",
+                            "all_fields_optional_6",
+                            "attribute_updates_1",
+                            "attribute_updates_2",
+                            "attribute_updates_3",
+                            "struct_1",
+                            "struct_2",
+                            "struct_3",
+                            "struct_4",
+                            "send_message_request_1"
+                    })) {
                 run(Protocol.RpcV2, testName);
             }
         }

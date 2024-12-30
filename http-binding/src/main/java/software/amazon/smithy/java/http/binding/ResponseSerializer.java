@@ -86,7 +86,7 @@ public final class ResponseSerializer {
      * @return Returns the serializer.
      */
     public ResponseSerializer eventEncoderFactory(
-        EventEncoderFactory<?> encoderFactory
+            EventEncoderFactory<?> encoderFactory
     ) {
         this.eventEncoderFactory = encoderFactory;
         return this;
@@ -135,24 +135,22 @@ public final class ResponseSerializer {
 
         var httpTrait = operation.schema().expectTrait(TraitKey.HTTP_TRAIT);
         var serializer = new HttpBindingSerializer(
-            httpTrait,
-            payloadCodec,
-            payloadMediaType,
-            bindingCache.computeIfAbsent(schema, BindingMatcher::responseMatcher),
-            omitEmptyPayload,
-            isFailure
-        );
+                httpTrait,
+                payloadCodec,
+                payloadMediaType,
+                bindingCache.computeIfAbsent(schema, BindingMatcher::responseMatcher),
+                omitEmptyPayload,
+                isFailure);
         shapeValue.serialize(serializer);
         serializer.flush();
 
         var builder = HttpResponse.builder()
-            .statusCode(serializer.getResponseStatus());
+                .statusCode(serializer.getResponseStatus());
 
         var eventStream = serializer.getEventStream();
         if (eventStream != null && operation instanceof OutputEventStreamingApiOperation<?, ?, ?>) {
             builder.body(
-                EventStreamFrameEncodingProcessor.create(eventStream, eventEncoderFactory)
-            );
+                    EventStreamFrameEncodingProcessor.create(eventStream, eventEncoderFactory));
             serializer.setContentType(eventEncoderFactory.contentType());
         } else if (serializer.hasBody()) {
             builder.body(serializer.getBody());

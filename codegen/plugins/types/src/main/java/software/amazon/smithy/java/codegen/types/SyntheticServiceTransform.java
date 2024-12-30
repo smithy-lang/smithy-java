@@ -44,9 +44,8 @@ final class SyntheticServiceTransform {
         for (Shape shape : closure) {
             switch (shape.getType()) {
                 case SERVICE, RESOURCE -> LOGGER.debug(
-                    "Skipping service-associated shape {} for type codegen...",
-                    shape
-                );
+                        "Skipping service-associated shape {} for type codegen...",
+                        shape);
                 case OPERATION -> serviceBuilder.addOperation(shape.asOperationShape().orElseThrow());
                 case STRUCTURE, ENUM, INT_ENUM, UNION -> {
                     var syntheticInput = createSyntheticInput(shape);
@@ -69,8 +68,8 @@ final class SyntheticServiceTransform {
     private static OperationShape createSyntheticOperation(Shape shape) {
         var id = ShapeId.fromParts(SYNTHETIC_NAMESPACE, shape.getId().getName() + "Operation");
         var operationBuilder = OperationShape.builder()
-            .id(id)
-            .addTrait(new PrivateTrait());
+                .id(id)
+                .addTrait(new PrivateTrait());
         if (shape.hasTrait(ErrorTrait.class)) {
             operationBuilder.addError(shape.toShapeId());
         } else {
@@ -82,8 +81,8 @@ final class SyntheticServiceTransform {
     private static StructureShape createSyntheticInput(Shape shape) {
         var id = ShapeId.fromParts(SYNTHETIC_NAMESPACE, shape.getId().getName() + "Input");
         return StructureShape.builder()
-            .id(id)
-            .addMember("syntheticMember", shape.getId())
-            .build();
+                .id(id)
+                .addMember("syntheticMember", shape.getId())
+                .build();
     }
 }

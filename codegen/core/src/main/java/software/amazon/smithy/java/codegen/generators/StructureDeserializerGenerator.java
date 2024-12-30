@@ -16,42 +16,46 @@ import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.traits.ErrorTrait;
 
 record StructureDeserializerGenerator(
-    JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model, ServiceShape service
-) implements Runnable {
+        JavaWriter writer,
+        Shape shape,
+        SymbolProvider symbolProvider,
+        Model model,
+        ServiceShape service) implements Runnable {
 
     @Override
     public void run() {
         writer.pushState();
-        var template = """
-            @Override
-            public Builder deserialize(${shapeDeserializer:N} decoder) {${?isError}
-                this.$$deserialized = true;${/isError}
-                decoder.readStruct($$SCHEMA, this, $$InnerDeserializer.INSTANCE);
-                return this;
-            }
+        var template =
+                """
+                        @Override
+                        public Builder deserialize(${shapeDeserializer:N} decoder) {${?isError}
+                            this.$$deserialized = true;${/isError}
+                            decoder.readStruct($$SCHEMA, this, $$InnerDeserializer.INSTANCE);
+                            return this;
+                        }
 
-            @Override
-            public Builder deserializeMember(${shapeDeserializer:N} decoder, ${sdkSchema:N} schema) {
-                decoder.readStruct(schema.assertMemberTargetIs($$SCHEMA), this, $$InnerDeserializer.INSTANCE);
-                return this;
-            }
+                        @Override
+                        public Builder deserializeMember(${shapeDeserializer:N} decoder, ${sdkSchema:N} schema) {
+                            decoder.readStruct(schema.assertMemberTargetIs($$SCHEMA), this, $$InnerDeserializer.INSTANCE);
+                            return this;
+                        }
 
-            private static final class $$InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer<Builder> {
-                private static final $$InnerDeserializer INSTANCE = new $$InnerDeserializer();
+                        private static final class $$InnerDeserializer implements ${shapeDeserializer:T}.StructMemberConsumer<Builder> {
+                            private static final $$InnerDeserializer INSTANCE = new $$InnerDeserializer();
 
-                @Override
-                public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {${?hasMembers}
-                    switch (member.memberIndex()) {
-                        ${cases:C|}
-                        default -> throw new ${illegalArg:T}("Unexpected member: " + member.memberName());
-                    }
-                ${/hasMembers}}${?union}
+                            @Override
+                            public void accept(Builder builder, ${sdkSchema:T} member, ${shapeDeserializer:T} de) {${?hasMembers}
+                                switch (member.memberIndex()) {
+                                    ${cases:C|}
+                                    default -> throw new ${illegalArg:T}("Unexpected member: " + member.memberName());
+                                }
+                            ${/hasMembers}}${?union}
 
-                @Override
-                public void unknownMember(Builder builder, ${string:T} memberName) {
-                    builder.$$unknownMember(memberName);
-                }${/union}
-            }""";
+                            @Override
+                            public void unknownMember(Builder builder, ${string:T} memberName) {
+                                builder.$$unknownMember(memberName);
+                            }${/union}
+                        }""";
         writer.putContext("shapeDeserializer", ShapeDeserializer.class);
         writer.putContext("sdkSchema", Schema.class);
         writer.putContext("string", String.class);
@@ -71,10 +75,9 @@ record StructureDeserializerGenerator(
             writer.pushState();
             writer.putContext("memberName", symbolProvider.toMemberName(member));
             writer.write(
-                "case $L -> builder.${memberName:L}($C);",
-                idx,
-                new DeserializerGenerator(writer, member, symbolProvider, model, service, "de", "member")
-            );
+                    "case $L -> builder.${memberName:L}($C);",
+                    idx,
+                    new DeserializerGenerator(writer, member, symbolProvider, model, service, "de", "member"));
             writer.popState();
         }
     }

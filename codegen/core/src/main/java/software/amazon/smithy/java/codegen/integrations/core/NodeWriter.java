@@ -55,10 +55,9 @@ record NodeWriter(JavaWriter writer, Node node) implements NodeVisitor<Void>, Ru
         var memberWriter = new MemberNodeWriter(writer);
         for (var memberEntry : objectNode.getStringMap().entrySet()) {
             writer.write(
-                ".withMember($S, $C)",
-                memberEntry.getKey(),
-                (Runnable) () -> memberEntry.getValue().accept(memberWriter)
-            );
+                    ".withMember($S, $C)",
+                    memberEntry.getKey(),
+                    (Runnable) () -> memberEntry.getValue().accept(memberWriter));
         }
         writer.writeWithNoFormatting(".build()");
         writer.dedent();
@@ -117,10 +116,9 @@ record NodeWriter(JavaWriter writer, Node node) implements NodeVisitor<Void>, Ru
             writer.indent();
             for (var memberEntry : objectNode.getStringMap().entrySet()) {
                 writer.write(
-                    ".withMember($S, $C)",
-                    memberEntry.getKey(),
-                    (Runnable) () -> memberEntry.getValue().accept(this)
-                );
+                        ".withMember($S, $C)",
+                        memberEntry.getKey(),
+                        (Runnable) () -> memberEntry.getValue().accept(this));
             }
             writer.writeWithNoFormatting(".build()");
             writer.dedent();

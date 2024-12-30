@@ -57,9 +57,9 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
             char c = currentValues.charAt(i);
             // Check if "host" starts at the current position.
             if ((c == 'h' || c == 'H') && i + 3 < length
-                && (currentValues.charAt(i + 1) == 'o')
-                && (currentValues.charAt(i + 2) == 's')
-                && (currentValues.charAt(i + 3) == 't')) {
+                    && (currentValues.charAt(i + 1) == 'o')
+                    && (currentValues.charAt(i + 2) == 's')
+                    && (currentValues.charAt(i + 3) == 't')) {
                 // Ensure "t" is at the end or followed by a comma.
                 if (i + 4 == length || currentValues.charAt(i + 4) == ',') {
                     return true;
@@ -90,17 +90,16 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
                 bodyPublisher = java.net.http.HttpRequest.BodyPublishers.noBody();
             } else {
                 bodyPublisher = java.net.http.HttpRequest.BodyPublishers.ofByteArray(
-                    ByteBufferUtils.getBytes(request.body().waitForByteBuffer())
-                );
+                        ByteBufferUtils.getBytes(request.body().waitForByteBuffer()));
             }
         } else {
             bodyPublisher = java.net.http.HttpRequest.BodyPublishers.fromPublisher(request.body());
         }
 
         java.net.http.HttpRequest.Builder httpRequestBuilder = java.net.http.HttpRequest.newBuilder()
-            .version(smithyToHttpVersion(request.httpVersion()))
-            .method(request.method(), bodyPublisher)
-            .uri(request.uri());
+                .version(smithyToHttpVersion(request.httpVersion()))
+                .method(request.method(), bodyPublisher)
+                .uri(request.uri());
 
         Duration requestTimeout = context.get(HttpContext.HTTP_REQUEST_TIMEOUT);
 
@@ -120,17 +119,17 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
 
     private CompletableFuture<HttpResponse> sendRequest(java.net.http.HttpRequest request) {
         return client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofPublisher())
-            .thenApply(this::createSmithyResponse);
+                .thenApply(this::createSmithyResponse);
     }
 
     private HttpResponse createSmithyResponse(java.net.http.HttpResponse<Flow.Publisher<List<ByteBuffer>>> response) {
         LOGGER.trace("Got response: {}; headers: {}", response, response.headers().map());
         return HttpResponse.builder()
-            .httpVersion(javaToSmithyVersion(response.version()))
-            .statusCode(response.statusCode())
-            .headers(HttpHeaders.of(response.headers().map()))
-            .body(new ListByteBufferToByteBuffer(response.body())) // Flatten the List<ByteBuffer> to ByteBuffer.
-            .build();
+                .httpVersion(javaToSmithyVersion(response.version()))
+                .statusCode(response.statusCode())
+                .headers(HttpHeaders.of(response.headers().map()))
+                .body(new ListByteBufferToByteBuffer(response.body())) // Flatten the List<ByteBuffer> to ByteBuffer.
+                .build();
     }
 
     private static HttpClient.Version smithyToHttpVersion(HttpVersion version) {
@@ -150,7 +149,7 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
     }
 
     private record ListByteBufferToByteBuffer(Flow.Publisher<List<ByteBuffer>> originalPublisher)
-        implements Flow.Publisher<ByteBuffer> {
+            implements Flow.Publisher<ByteBuffer> {
         @Override
         public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
             originalPublisher.subscribe(new Flow.Subscriber<>() {

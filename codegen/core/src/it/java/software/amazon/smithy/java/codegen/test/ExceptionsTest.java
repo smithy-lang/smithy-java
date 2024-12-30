@@ -29,12 +29,11 @@ import software.amazon.smithy.java.core.schema.SerializableShape;
 public class ExceptionsTest {
     static Stream<SerializableShape> exceptions() {
         return Stream.of(
-            SimpleException.builder().message("OOOPS!").build(),
-            ExceptionWithExtraStringException.builder().message("whoopsy").extra("daisy").build(),
-            EmptyException.builder().build(),
-            OptionalMessageException.builder().build(),
-            OptionalMessageException.builder().message("optional").build()
-        );
+                SimpleException.builder().message("OOOPS!").build(),
+                ExceptionWithExtraStringException.builder().message("whoopsy").extra("daisy").build(),
+                EmptyException.builder().build(),
+                OptionalMessageException.builder().build(),
+                OptionalMessageException.builder().message("optional").build());
     }
 
     @ParameterizedTest
@@ -53,9 +52,9 @@ public class ExceptionsTest {
         var cause = getCauseThrowable();
         var exception = SimpleException.builder().withCause(cause).withStackTrace().message("OOOPS!").build();
         assertThat(exception)
-            .hasStackTraceContaining("exceptionWithExplicitStackTraceCapture")
-            .hasStackTraceContaining("getCauseThrowable")
-            .hasCause(cause);
+                .hasStackTraceContaining("exceptionWithExplicitStackTraceCapture")
+                .hasStackTraceContaining("getCauseThrowable")
+                .hasCause(cause);
     }
 
     @Test
@@ -73,19 +72,19 @@ public class ExceptionsTest {
         try {
             var exception = SimpleException.builder().message("OOOPS!").build();
             assertThat(exception)
-                .hasStackTraceContaining("explicitDisableStackTraceCapture");
+                    .hasStackTraceContaining("explicitDisableStackTraceCapture");
             var exceptionWithoutStackTrace = SimpleException.builder().withoutStackTrace().message("OOOPS!").build();
             assertThat(exceptionWithoutStackTrace.getStackTrace()).isEmpty();
             var cause = getCauseThrowable();
             var exceptionWithCauseWithoutStackTrace = SimpleException.builder()
-                .withoutStackTrace()
-                .withCause(cause)
-                .message("OOOPS!")
-                .build();
+                    .withoutStackTrace()
+                    .withCause(cause)
+                    .message("OOOPS!")
+                    .build();
             assertThat(exceptionWithCauseWithoutStackTrace.getStackTrace()).isEmpty();
             assertThat(exceptionWithCauseWithoutStackTrace)
-                .hasStackTraceContaining("getCauseThrowable")
-                .hasCause(cause);
+                    .hasStackTraceContaining("getCauseThrowable")
+                    .hasCause(cause);
         } finally {
             disableGlobalStackTraceCapture();
         }

@@ -20,7 +20,7 @@ final class MockOperation implements InvocationHandler {
     private final AtomicBoolean wasInvoked = new AtomicBoolean(false);
 
     public MockOperation(Class<?> operationClazz) {
-        this.target = Proxy.newProxyInstance(MockOperation.class.getClassLoader(), new Class[]{operationClazz}, this);
+        this.target = Proxy.newProxyInstance(MockOperation.class.getClassLoader(), new Class[] {operationClazz}, this);
     }
 
     @Override

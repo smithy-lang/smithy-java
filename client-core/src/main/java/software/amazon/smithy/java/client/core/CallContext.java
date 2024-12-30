@@ -71,9 +71,8 @@ public final class CallContext {
      * with a request.
      */
     public static final Context.Key<Set<FeatureId>> FEATURE_IDS = Context.key(
-        "Feature IDs used with a request",
-        HashSet::new
-    );
+            "Feature IDs used with a request",
+            HashSet::new);
 
     /**
      * The name of the application, used in things like user-agent headers.

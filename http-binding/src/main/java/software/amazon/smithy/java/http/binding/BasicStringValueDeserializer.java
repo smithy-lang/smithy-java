@@ -137,8 +137,8 @@ abstract class BasicStringValueDeserializer implements ShapeDeserializer {
     public Instant readTimestamp(Schema schema) {
         var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
         TimestampFormatter formatter = trait != null
-            ? TimestampFormatter.of(trait)
-            : defaultTimestampFormatter();
+                ? TimestampFormatter.of(trait)
+                : defaultTimestampFormatter();
         return formatter.readFromString(value, false); // labels are always strings
     }
 

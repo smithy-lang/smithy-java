@@ -30,18 +30,17 @@ public final class JavadocIntegration implements JavaCodegenIntegration {
 
     @Override
     public List<? extends CodeInterceptor<? extends CodeSection, JavaWriter>> interceptors(
-        CodeGenerationContext codegenContext
+            CodeGenerationContext codegenContext
     ) {
         return List.of(
-            new SmithyGeneratedInterceptor(),
-            new JavadocInjectorInterceptor(),
-            new OperationErrorInterceptor(),
-            new BuilderSetterDocumentationInterceptor(),
-            new ExternalDocumentationTraitInterceptor(),
-            new SinceTraitInterceptor(),
-            new DeprecatedTraitInterceptor(),
-            new DocumentationTraitInterceptor(),
-            new JavadocFormatterInterceptor()
-        );
+                new SmithyGeneratedInterceptor(),
+                new JavadocInjectorInterceptor(),
+                new OperationErrorInterceptor(),
+                new BuilderSetterDocumentationInterceptor(),
+                new ExternalDocumentationTraitInterceptor(),
+                new SinceTraitInterceptor(),
+                new DeprecatedTraitInterceptor(),
+                new DocumentationTraitInterceptor(),
+                new JavadocFormatterInterceptor());
     }
 }

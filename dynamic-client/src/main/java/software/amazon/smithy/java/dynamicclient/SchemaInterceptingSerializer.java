@@ -33,7 +33,7 @@ final class SchemaInterceptingSerializer implements ShapeSerializer {
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         delegateSerializer
-            .writeStruct(delegateSchema, new WrappedDocument(service, schema, Document.of(struct)));
+                .writeStruct(delegateSchema, new WrappedDocument(service, schema, Document.of(struct)));
     }
 
     @Override
@@ -51,10 +51,10 @@ final class SchemaInterceptingSerializer implements ShapeSerializer {
             consumer.accept(s, new MapSerializer() {
                 @Override
                 public <V> void writeEntry(
-                    Schema keySchema,
-                    String key,
-                    V state,
-                    BiConsumer<V, ShapeSerializer> valueSerializer
+                        Schema keySchema,
+                        String key,
+                        V state,
+                        BiConsumer<V, ShapeSerializer> valueSerializer
                 ) {
                     ms.writeEntry(delegateKeySchema, key, state, (s, ms) -> {
                         valueSerializer.accept(s, new SchemaInterceptingSerializer(service, delegateValueSchema, ms));

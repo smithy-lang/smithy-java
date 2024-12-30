@@ -70,69 +70,62 @@ public class JsonSerializerTest {
         var now = Instant.now();
 
         return List.of(
-            Arguments.of(Document.of("a"), "\"a\""),
-            Arguments.of(Document.of("a".getBytes(StandardCharsets.UTF_8)), "\"YQ==\""),
-            Arguments.of(Document.of((byte) 1), "1"),
-            Arguments.of(Document.of((short) 1), "1"),
-            Arguments.of(Document.of(1), "1"),
-            Arguments.of(Document.of(1L), "1"),
-            Arguments.of(Document.of(1.1f), "1.1"),
-            Arguments.of(Document.of(Float.NaN), "\"NaN\""),
-            Arguments.of(Document.of(Float.POSITIVE_INFINITY), "\"Infinity\""),
-            Arguments.of(Document.of(Float.NEGATIVE_INFINITY), "\"-Infinity\""),
-            Arguments.of(Document.of(1.1), "1.1"),
-            Arguments.of(Document.of(Double.NaN), "\"NaN\""),
-            Arguments.of(Document.of(Double.POSITIVE_INFINITY), "\"Infinity\""),
-            Arguments.of(Document.of(Double.NEGATIVE_INFINITY), "\"-Infinity\""),
-            Arguments.of(Document.of(BigInteger.ZERO), "0"),
-            Arguments.of(Document.of(BigDecimal.ONE), "1"),
-            Arguments.of(Document.of(true), "true"),
-            Arguments.of(Document.of(now), Double.toString(((double) now.toEpochMilli()) / 1000)),
-            Arguments.of(Document.of(List.of(Document.of("a"))), "[\"a\"]"),
-            Arguments.of(
-                Document.of(
-                    List.of(
+                Arguments.of(Document.of("a"), "\"a\""),
+                Arguments.of(Document.of("a".getBytes(StandardCharsets.UTF_8)), "\"YQ==\""),
+                Arguments.of(Document.of((byte) 1), "1"),
+                Arguments.of(Document.of((short) 1), "1"),
+                Arguments.of(Document.of(1), "1"),
+                Arguments.of(Document.of(1L), "1"),
+                Arguments.of(Document.of(1.1f), "1.1"),
+                Arguments.of(Document.of(Float.NaN), "\"NaN\""),
+                Arguments.of(Document.of(Float.POSITIVE_INFINITY), "\"Infinity\""),
+                Arguments.of(Document.of(Float.NEGATIVE_INFINITY), "\"-Infinity\""),
+                Arguments.of(Document.of(1.1), "1.1"),
+                Arguments.of(Document.of(Double.NaN), "\"NaN\""),
+                Arguments.of(Document.of(Double.POSITIVE_INFINITY), "\"Infinity\""),
+                Arguments.of(Document.of(Double.NEGATIVE_INFINITY), "\"-Infinity\""),
+                Arguments.of(Document.of(BigInteger.ZERO), "0"),
+                Arguments.of(Document.of(BigDecimal.ONE), "1"),
+                Arguments.of(Document.of(true), "true"),
+                Arguments.of(Document.of(now), Double.toString(((double) now.toEpochMilli()) / 1000)),
+                Arguments.of(Document.of(List.of(Document.of("a"))), "[\"a\"]"),
+                Arguments.of(
+                        Document.of(
+                                List.of(
+                                        Document.of(List.of(Document.of("a"), Document.of("b"))),
+                                        Document.of("c"))),
+                        "[[\"a\",\"b\"],\"c\"]"),
+                Arguments.of(
                         Document.of(List.of(Document.of("a"), Document.of("b"))),
-                        Document.of("c")
-                    )
-                ),
-                "[[\"a\",\"b\"],\"c\"]"
-            ),
-            Arguments.of(
-                Document.of(List.of(Document.of("a"), Document.of("b"))),
-                "[\"a\",\"b\"]"
-            ),
-            Arguments.of(Document.of(Map.of("a", Document.of("av"))), "{\"a\":\"av\"}"),
-            Arguments.of(Document.of(new LinkedHashMap<>() {
-                {
-                    this.put("a", Document.of("av"));
-                    this.put("b", Document.of("bv"));
-                    this.put("c", Document.of(1));
-                    this.put(
-                        "d",
-                        Document.of(List.of(Document.of(1), Document.of(2)))
-                    );
-                    this.put("e", Document.of(Map.of("ek", Document.of("ek1"))));
-                }
-            }), "{\"a\":\"av\",\"b\":\"bv\",\"c\":1,\"d\":[1,2],\"e\":{\"ek\":\"ek1\"}}")
-        );
+                        "[\"a\",\"b\"]"),
+                Arguments.of(Document.of(Map.of("a", Document.of("av"))), "{\"a\":\"av\"}"),
+                Arguments.of(Document.of(new LinkedHashMap<>() {
+                    {
+                        this.put("a", Document.of("av"));
+                        this.put("b", Document.of("bv"));
+                        this.put("c", Document.of(1));
+                        this.put(
+                                "d",
+                                Document.of(List.of(Document.of(1), Document.of(2))));
+                        this.put("e", Document.of(Map.of("ek", Document.of("ek1"))));
+                    }
+                }), "{\"a\":\"av\",\"b\":\"bv\",\"c\":1,\"d\":[1,2],\"e\":{\"ek\":\"ek1\"}}"));
     }
 
     @ParameterizedTest
     @MethodSource("configurableTimestampFormatProvider")
     public void configurableTimestampFormat(
-        boolean useTimestampFormat,
-        String json
+            boolean useTimestampFormat,
+            String json
     ) throws Exception {
         Schema schema = Schema.createTimestamp(
-            ShapeId.from("smithy.example#foo"),
-            new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME)
-        );
+                ShapeId.from("smithy.example#foo"),
+                new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME));
         try (
-            var codec = JsonCodec.builder()
-                .useTimestampFormat(useTimestampFormat)
-                .build(); var output = new ByteArrayOutputStream()
-        ) {
+                var codec = JsonCodec.builder()
+                        .useTimestampFormat(useTimestampFormat)
+                        .build();
+                var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeTimestamp(schema, Instant.EPOCH);
             }
@@ -143,38 +136,36 @@ public class JsonSerializerTest {
 
     public static List<Arguments> configurableTimestampFormatProvider() {
         return List.of(
-            Arguments.of(true, "\"1970-01-01T00:00:00Z\""),
-            Arguments.of(false, "0")
-        );
+                Arguments.of(true, "\"1970-01-01T00:00:00Z\""),
+                Arguments.of(false, "0"));
     }
 
     @ParameterizedTest
     @MethodSource("configurableJsonNameProvider")
     public void configurableJsonName(boolean useJsonName, String json) throws Exception {
         try (
-            var codec = JsonCodec.builder().useJsonName(useJsonName).build(); var output = new ByteArrayOutputStream()
-        ) {
+                var codec = JsonCodec.builder().useJsonName(useJsonName).build();
+                var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeStruct(
-                    JsonTestData.BIRD,
-                    new SerializableStruct() {
-                        @Override
-                        public Schema schema() {
-                            return JsonTestData.BIRD;
-                        }
+                        JsonTestData.BIRD,
+                        new SerializableStruct() {
+                            @Override
+                            public Schema schema() {
+                                return JsonTestData.BIRD;
+                            }
 
-                        @Override
-                        public void serializeMembers(ShapeSerializer ser) {
-                            ser.writeString(schema().member("name"), "Toucan");
-                            ser.writeString(schema().member("color"), "red");
-                        }
+                            @Override
+                            public void serializeMembers(ShapeSerializer ser) {
+                                ser.writeString(schema().member("name"), "Toucan");
+                                ser.writeString(schema().member("color"), "red");
+                            }
 
-                        @Override
-                        public <T> T getMemberValue(Schema member) {
-                            return null;
-                        }
-                    }
-                );
+                            @Override
+                            public <T> T getMemberValue(Schema member) {
+                                return null;
+                            }
+                        });
             }
             var result = output.toString(StandardCharsets.UTF_8);
             assertThat(result, equalTo(json));
@@ -183,9 +174,8 @@ public class JsonSerializerTest {
 
     public static List<Arguments> configurableJsonNameProvider() {
         return List.of(
-            Arguments.of(true, "{\"name\":\"Toucan\",\"Color\":\"red\"}"),
-            Arguments.of(false, "{\"name\":\"Toucan\",\"color\":\"red\"}")
-        );
+                Arguments.of(true, "{\"name\":\"Toucan\",\"Color\":\"red\"}"),
+                Arguments.of(false, "{\"name\":\"Toucan\",\"color\":\"red\"}"));
     }
 
     @Test
@@ -193,24 +183,23 @@ public class JsonSerializerTest {
         try (var codec = JsonCodec.builder().build(); var output = new ByteArrayOutputStream()) {
             try (var serializer = codec.createSerializer(output)) {
                 serializer.writeStruct(
-                    JsonTestData.BIRD,
-                    new SerializableStruct() {
-                        @Override
-                        public Schema schema() {
-                            return JsonTestData.BIRD;
-                        }
+                        JsonTestData.BIRD,
+                        new SerializableStruct() {
+                            @Override
+                            public Schema schema() {
+                                return JsonTestData.BIRD;
+                            }
 
-                        @Override
-                        public void serializeMembers(ShapeSerializer ser) {
-                            ser.writeStruct(schema().member("nested"), new NestedStruct());
-                        }
+                            @Override
+                            public void serializeMembers(ShapeSerializer ser) {
+                                ser.writeStruct(schema().member("nested"), new NestedStruct());
+                            }
 
-                        @Override
-                        public <T> T getMemberValue(Schema member) {
-                            return null;
-                        }
-                    }
-                );
+                            @Override
+                            public <T> T getMemberValue(Schema member) {
+                                return null;
+                            }
+                        });
             }
             var result = output.toString(StandardCharsets.UTF_8);
             assertThat(result, equalTo("{\"nested\":{\"number\":10}}"));

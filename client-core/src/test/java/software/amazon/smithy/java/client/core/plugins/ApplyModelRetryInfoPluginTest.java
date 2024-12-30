@@ -47,8 +47,8 @@ public class ApplyModelRetryInfoPluginTest {
 
         // The error is marked retryable.
         var errorSchema = Schema
-            .structureBuilder(ShapeId.from("com#Err"), RetryableTrait.builder().throttling(true).build())
-            .build();
+                .structureBuilder(ShapeId.from("com#Err"), RetryableTrait.builder().throttling(true).build())
+                .build();
 
         var e = new ModeledApiException(errorSchema, "err") {
             @Override

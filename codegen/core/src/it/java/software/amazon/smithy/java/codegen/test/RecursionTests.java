@@ -31,42 +31,33 @@ public class RecursionTests {
 
     static Stream<SerializableShape> recursiveTypeSource() {
         return Stream.of(
-            SelfReferencing.builder()
-                .self(SelfReferencing.builder().self(SelfReferencing.builder().build()).build())
-                .build(),
-            IntermediateListStructure.builder()
-                .foo(
-                    List.of(
-                        IntermediateListStructure.builder()
-                            .foo(
-                                List.of(IntermediateListStructure.builder().build())
-                            )
-                            .build()
-                    )
-                )
-                .build(),
-            IntermediateMapStructure.builder()
-                .foo(
-                    Map.of(
-                        "a",
-                        IntermediateMapStructure.builder()
-                            .foo(
-                                Map.of("b", IntermediateMapStructure.builder().build())
-                            )
-                            .build()
-                    )
-                )
-                .build(),
-            RecursiveStructA.builder()
-                .b(
-                    RecursiveStructB.builder()
-                        .a(
-                            RecursiveStructA.builder().build()
-                        )
-                        .build()
-                )
-                .build()
-        );
+                SelfReferencing.builder()
+                        .self(SelfReferencing.builder().self(SelfReferencing.builder().build()).build())
+                        .build(),
+                IntermediateListStructure.builder()
+                        .foo(
+                                List.of(
+                                        IntermediateListStructure.builder()
+                                                .foo(
+                                                        List.of(IntermediateListStructure.builder().build()))
+                                                .build()))
+                        .build(),
+                IntermediateMapStructure.builder()
+                        .foo(
+                                Map.of(
+                                        "a",
+                                        IntermediateMapStructure.builder()
+                                                .foo(
+                                                        Map.of("b", IntermediateMapStructure.builder().build()))
+                                                .build()))
+                        .build(),
+                RecursiveStructA.builder()
+                        .b(
+                                RecursiveStructB.builder()
+                                        .a(
+                                                RecursiveStructA.builder().build())
+                                        .build())
+                        .build());
     }
 
     @ParameterizedTest
@@ -79,21 +70,19 @@ public class RecursionTests {
 
     static Stream<Arguments> recursiveJsonSource() {
         return Stream.of(
-            Arguments.of("{\"self\":{\"self\":{}}}", SelfReferencing.builder()),
-            Arguments.of("{\"foo\":[{\"foo\":[{\"foo\":[]}]}]}", IntermediateListStructure.builder()),
-            Arguments.of(
-                "{\"foo\":{\"a\":{\"foo\":{}},\"b\":{\"foo\":{\"c\":{\"foo\":{}}}}}}",
-                IntermediateMapStructure.builder()
-            ),
-            Arguments.of("{\"b\":{\"a\":{\"b\":{}}}}", RecursiveStructA.builder())
-        );
+                Arguments.of("{\"self\":{\"self\":{}}}", SelfReferencing.builder()),
+                Arguments.of("{\"foo\":[{\"foo\":[{\"foo\":[]}]}]}", IntermediateListStructure.builder()),
+                Arguments.of(
+                        "{\"foo\":{\"a\":{\"foo\":{}},\"b\":{\"foo\":{\"c\":{\"foo\":{}}}}}}",
+                        IntermediateMapStructure.builder()),
+                Arguments.of("{\"b\":{\"a\":{\"b\":{}}}}", RecursiveStructA.builder()));
     }
 
     @ParameterizedTest
     @MethodSource("recursiveJsonSource")
     <B extends ShapeBuilder<T>, T extends SerializableShape> void jsonDeserializationOfSelfReferencing(
-        String json,
-        B builder
+            String json,
+            B builder
     ) {
         try (var codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build()) {
             var output = codec.deserializeShape(json, builder);
@@ -105,15 +94,11 @@ public class RecursionTests {
     @Test
     void multiplyRecursiveUnionWorks() {
         var recursive = new AttributeValue.LMember(
-            List.of(
-                new AttributeValue.MMember(
-                    Map.of(
-                        "stringList",
-                        new AttributeValue.LMember(List.of())
-                    )
-                )
-            )
-        );
+                List.of(
+                        new AttributeValue.MMember(
+                                Map.of(
+                                        "stringList",
+                                        new AttributeValue.LMember(List.of())))));
         var document = Document.of(recursive);
         var builder = AttributeValue.builder();
         document.deserializeInto(builder);

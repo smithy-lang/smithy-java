@@ -41,11 +41,9 @@ public final class AwsJson11Protocol extends AwsJsonProtocol {
         @Override
         public ClientProtocol<?, ?> createProtocol(ProtocolSettings settings, AwsJson1_1Trait trait) {
             return new AwsJson11Protocol(
-                Objects.requireNonNull(
-                    settings.service(),
-                    "service is a required protocol setting"
-                )
-            );
+                    Objects.requireNonNull(
+                            settings.service(),
+                            "service is a required protocol setting"));
         }
     }
 }

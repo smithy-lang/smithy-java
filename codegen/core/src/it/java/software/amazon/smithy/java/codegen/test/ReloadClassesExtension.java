@@ -24,9 +24,9 @@ public class ReloadClassesExtension implements InvocationInterceptor {
     @Override
     @SuppressFBWarnings("DP_CREATE_CLASSLOADER_INSIDE_DO_PRIVILEGED")
     public void interceptTestMethod(
-        Invocation<Void> invocation,
-        ReflectiveInvocationContext<Method> invocationContext,
-        ExtensionContext extensionContext
+            Invocation<Void> invocation,
+            ReflectiveInvocationContext<Method> invocationContext,
+            ExtensionContext extensionContext
     ) throws Throwable {
         ReloadClasses annotation = invocationContext.getExecutable().getAnnotation(ReloadClasses.class);
         if (annotation == null) {
@@ -43,8 +43,8 @@ public class ReloadClassesExtension implements InvocationInterceptor {
         } else {
             String classPath = System.getProperty("java.class.path");
             jars = Arrays.stream(classPath.split(File.pathSeparator))
-                .map(this::getURL)
-                .toArray(URL[]::new);
+                    .map(this::getURL)
+                    .toArray(URL[]::new);
         }
 
         try (URLClassLoader classLoader = new URLClassLoader(jars, null)) {
@@ -61,18 +61,17 @@ public class ReloadClassesExtension implements InvocationInterceptor {
     }
 
     private void invokeMethodWithModifiedClasspath(
-        ReflectiveInvocationContext<Method> invocationContext,
-        ClassLoader modifiedClassLoader
+            ReflectiveInvocationContext<Method> invocationContext,
+            ClassLoader modifiedClassLoader
     ) {
         ClassLoader prev = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(modifiedClassLoader);
 
         try {
             invokeMethodWithModifiedClasspath(
-                invocationContext.getExecutable().getDeclaringClass().getName(),
-                invocationContext.getExecutable().getName(),
-                modifiedClassLoader
-            );
+                    invocationContext.getExecutable().getDeclaringClass().getName(),
+                    invocationContext.getExecutable().getName(),
+                    modifiedClassLoader);
         } finally {
             Thread.currentThread().setContextClassLoader(prev);
         }
@@ -89,8 +88,7 @@ public class ReloadClassesExtension implements InvocationInterceptor {
         Object testInstance = ReflectionUtils.newInstance(testClass);
         final Optional<Method> method = ReflectionUtils.findMethod(testClass, methodName);
         ReflectionUtils.invokeMethod(
-            method.orElseThrow(() -> new IllegalStateException("No test method named " + methodName)),
-            testInstance
-        );
+                method.orElseThrow(() -> new IllegalStateException("No test method named " + methodName)),
+                testInstance);
     }
 }

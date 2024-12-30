@@ -38,29 +38,27 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
 record DirectedJavaTypeCodegen(boolean generateOperations)
-    implements DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
+        implements DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(DirectedJavaTypeCodegen.class);
 
     @Override
     public CodeGenerationContext createContext(
-        CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive
+            CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive
     ) {
         return new CodeGenerationContext(
-            directive.model(),
-            directive.settings(),
-            directive.symbolProvider(),
-            directive.fileManifest(),
-            directive.integrations()
-        );
+                directive.model(),
+                directive.settings(),
+                directive.symbolProvider(),
+                directive.fileManifest(),
+                directive.integrations());
     }
 
     @Override
     public SymbolProvider createSymbolProvider(CreateSymbolProviderDirective<JavaCodegenSettings> directive) {
         return new JavaSymbolProvider(
-            directive.model(),
-            directive.service(),
-            directive.settings().packageNamespace()
-        );
+                directive.model(),
+                directive.service(),
+                directive.settings().packageNamespace());
     }
 
     @Override

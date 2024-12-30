@@ -20,8 +20,7 @@ import software.amazon.smithy.model.node.ObjectNode;
 
 public class NonNullAnnotationTest extends AbstractCodegenFileTest {
     private static final URL TEST_FILE = Objects.requireNonNull(
-        NonNullAnnotationTest.class.getResource("null-annotation-test.smithy")
-    );
+            NonNullAnnotationTest.class.getResource("null-annotation-test.smithy"));
 
     @Override
     protected URL testFile() {
@@ -31,8 +30,8 @@ public class NonNullAnnotationTest extends AbstractCodegenFileTest {
     @Override
     protected ObjectNode settings() {
         return super.settings().toBuilder()
-            .withMember("nonNullAnnotation", "software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation")
-            .build();
+                .withMember("nonNullAnnotation", "software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation")
+                .build();
     }
 
     @Test

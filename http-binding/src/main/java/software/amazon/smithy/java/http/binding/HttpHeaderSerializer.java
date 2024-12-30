@@ -38,9 +38,8 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
         // which will use the header member's schema, and not the schema of the type we're writing
         // to call writeHeader
         consumer.accept(
-            listState,
-            new ListSerializer(new SpecificHttpHeaderSerializer(schema, this), HttpHeaderSerializer::noOpPosition)
-        );
+                listState,
+                new ListSerializer(new SpecificHttpHeaderSerializer(schema, this), HttpHeaderSerializer::noOpPosition));
     }
 
     private static void noOpPosition(int position) {}
@@ -116,8 +115,8 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
     public void writeTimestamp(Schema schema, Instant value) {
         var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
         TimestampFormatter formatter = trait != null
-            ? TimestampFormatter.of(trait)
-            : TimestampFormatter.Prelude.HTTP_DATE;
+                ? TimestampFormatter.of(trait)
+                : TimestampFormatter.Prelude.HTTP_DATE;
         writeHeader(schema, formatter.writeString(value));
     }
 }

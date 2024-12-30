@@ -31,8 +31,8 @@ public class CborComparator {
             return;
         }
         assertThat(CborValue.parse(actualBytes))
-            .usingRecursiveComparison()
-            .isEqualTo(CborValue.parse(expectedBytes));
+                .usingRecursiveComparison()
+                .isEqualTo(CborValue.parse(expectedBytes));
 
     }
 
@@ -74,10 +74,9 @@ public class CborComparator {
                     case CborParser.Token.FLOAT -> add(keys, context, new FloatValue(buf, token, parser));
                     case CborParser.Token.TRUE, CborParser.Token.FALSE -> add(keys, context, new BooleanValue(token));
                     case CborParser.Token.EPOCH_F, CborParser.Token.EPOCH_INEG, CborParser.Token.EPOCH_IPOS -> add(
-                        keys,
-                        context,
-                        new TimeValue(buf, token, parser)
-                    );
+                            keys,
+                            context,
+                            new TimeValue(buf, token, parser));
                     case CborParser.Token.BYTE_STRING -> add(keys, context, new BlobValue(buf, parser));
                     default -> throw new RuntimeException("can't handle " + CborParser.Token.name(token));
                 }

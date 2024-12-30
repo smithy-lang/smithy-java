@@ -54,13 +54,12 @@ public final class TestAuthScheme implements AuthScheme<HttpRequest, Identity> {
     private static final class TestSigner implements Signer<HttpRequest, Identity> {
         @Override
         public CompletableFuture<HttpRequest> sign(
-            HttpRequest request,
-            Identity identity,
-            AuthProperties properties
+                HttpRequest request,
+                Identity identity,
+                AuthProperties properties
         ) {
             return CompletableFuture.completedFuture(
-                request.toBuilder().withAddedHeader(SIGNATURE_HEADER, "smithy-test-signature").build()
-            );
+                    request.toBuilder().withAddedHeader(SIGNATURE_HEADER, "smithy-test-signature").build());
         }
     }
 

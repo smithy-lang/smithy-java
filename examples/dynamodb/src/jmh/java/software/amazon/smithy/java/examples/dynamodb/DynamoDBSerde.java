@@ -57,7 +57,7 @@ public class DynamoDBSerde {
     public void getItem(GetItemState s, Blackhole bh) throws Exception {
         var resp = fullResponse(s.testItem.utf8);
         var result = s.protocol.deserializeResponse(s.operation, s.context, s.operation.errorRegistry(), s.req, resp)
-            .get();
+                .get();
         bh.consume(result);
     }
 
@@ -146,9 +146,9 @@ public class DynamoDBSerde {
 
     private HttpResponse fullResponse(byte[] itemBytes) {
         return HttpResponse.builder()
-            .statusCode(200)
-            .body(DataStream.ofBytes(itemBytes))
-            .build();
+                .statusCode(200)
+                .body(DataStream.ofBytes(itemBytes))
+                .build();
     }
 
     static final class ItemFactory {
@@ -162,102 +162,88 @@ public class DynamoDBSerde {
 
         Map<String, AttributeValue> small() {
             return Map.of(
-                "stringAttr",
-                av(randomS()),
-                "binaryAttr",
-                av(randomB()),
-                "listAttr",
-                av(List.of(av(randomS()), av(randomB()), av(randomS())))
-            );
+                    "stringAttr",
+                    av(randomS()),
+                    "binaryAttr",
+                    av(randomB()),
+                    "listAttr",
+                    av(List.of(av(randomS()), av(randomB()), av(randomS()))));
         }
 
         Map<String, AttributeValue> huge() {
             return Map.of(
-                "hashKey",
-                av(randomS()),
-                "stringAttr",
-                av(randomS()),
-                "binaryAttr",
-                av(randomB()),
-                "listAttr",
-                av(
-                    List.of(
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomS()),
-                        av(randomB()),
-                        av(Collections.singletonList(av(randomS()))),
-                        av(Map.of("attrOne", av(randomS()))),
-                        av(
-                            Arrays.asList(
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomB()),
-                                (av(randomS())),
-                                av(Map.of("attrOne", av(randomS())))
-                            )
-                        )
-                    )
-                ),
-                "mapAttr",
-                av(
-                    Map.of(
-                        "attrOne",
-                        av(randomS()),
-                        "attrTwo",
-                        av(randomB()),
-                        "attrThree",
-                        av(
+                    "hashKey",
+                    av(randomS()),
+                    "stringAttr",
+                    av(randomS()),
+                    "binaryAttr",
+                    av(randomB()),
+                    "listAttr",
+                    av(
                             List.of(
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(randomS()),
-                                av(
-                                    Map.of(
-                                        "attrOne",
-                                        av(randomS()),
-                                        "attrTwo",
-                                        av(randomB()),
-                                        "attrThree",
-                                        av(
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomS()),
+                                    av(randomB()),
+                                    av(Collections.singletonList(av(randomS()))),
+                                    av(Map.of("attrOne", av(randomS()))),
+                                    av(
+                                            Arrays.asList(
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomB()),
+                                                    (av(randomS())),
+                                                    av(Map.of("attrOne", av(randomS()))))))),
+                    "mapAttr",
+                    av(
+                            Map.of(
+                                    "attrOne",
+                                    av(randomS()),
+                                    "attrTwo",
+                                    av(randomB()),
+                                    "attrThree",
+                                    av(
                                             List.of(
-                                                av(randomS()),
-                                                av(randomS()),
-                                                av(randomS()),
-                                                av(randomS())
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
-            );
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(randomS()),
+                                                    av(
+                                                            Map.of(
+                                                                    "attrOne",
+                                                                    av(randomS()),
+                                                                    "attrTwo",
+                                                                    av(randomB()),
+                                                                    "attrThree",
+                                                                    av(
+                                                                            List.of(
+                                                                                    av(randomS()),
+                                                                                    av(randomS()),
+                                                                                    av(randomS()),
+                                                                                    av(randomS()))))))))));
         }
 
         private AttributeValue av(String val) {

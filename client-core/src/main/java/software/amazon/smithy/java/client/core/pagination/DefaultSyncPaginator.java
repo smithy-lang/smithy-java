@@ -38,11 +38,10 @@ final class DefaultSyncPaginator<I extends SerializableStruct, O extends Seriali
         var itemsPath = trait.getItems().orElse(null);
 
         this.inputFactory = new PaginationInputSetter<>(
-            input,
-            operation,
-            inputTokenMember,
-            pageSizeMember
-        );
+                input,
+                operation,
+                inputTokenMember,
+                pageSizeMember);
 
         if (pageSizeMember != null) {
             var pageSizeSchema = input.schema().member(pageSizeMember);
@@ -50,10 +49,9 @@ final class DefaultSyncPaginator<I extends SerializableStruct, O extends Seriali
         }
 
         this.extractor = new PaginationTokenExtractor(
-            operation.outputSchema(),
-            outputTokenPath,
-            itemsPath
-        );
+                operation.outputSchema(),
+                outputTokenPath,
+                itemsPath);
     }
 
     @Override

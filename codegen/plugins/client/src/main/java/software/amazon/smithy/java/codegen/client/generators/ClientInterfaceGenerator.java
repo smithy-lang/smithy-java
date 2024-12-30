@@ -61,20 +61,21 @@ import software.amazon.smithy.utils.StringUtils;
 @SmithyInternalApi
 @SuppressWarnings("rawtypes")
 public final class ClientInterfaceGenerator
-    implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
+        implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientInterfaceGenerator.class);
 
     private static final Map<ShapeId, Class<? extends AuthSchemeFactory>> authSchemeFactories = new HashMap<>();
-    private static final Map<String, Class<? extends ClientTransportFactory>> clientTransportFactories = new HashMap<>();
+    private static final Map<String, Class<? extends ClientTransportFactory>> clientTransportFactories =
+            new HashMap<>();
 
     static {
         // Add all trait services to a map, so they can be queried for a provider class
         ServiceLoader.load(AuthSchemeFactory.class, ClientInterfaceGenerator.class.getClassLoader())
-            .forEach((service) -> authSchemeFactories.put(service.schemeId(), service.getClass()));
+                .forEach((service) -> authSchemeFactories.put(service.schemeId(), service.getClass()));
         // Add all transport services to a map, so they can be queried for a provider class
         ServiceLoader.load(ClientTransportFactory.class, ClientInterfaceGenerator.class.getClassLoader())
-            .forEach((service) -> clientTransportFactories.put(service.name(), service.getClass()));
+                .forEach((service) -> clientTransportFactories.put(service.name(), service.getClass()));
     }
 
     @Override
@@ -86,129 +87,124 @@ public final class ClientInterfaceGenerator
     }
 
     private static void writeForSymbol(
-        Symbol symbol,
-        GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive
+            Symbol symbol,
+            GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive
     ) {
         directive.context()
-            .writerDelegator()
-            .useFileWriter(symbol.getDefinitionFile(), symbol.getNamespace(), writer -> {
-                writer.pushState(new ClassSection(directive.shape()));
-                var template = """
-                    public interface ${interface:T} {
+                .writerDelegator()
+                .useFileWriter(symbol.getDefinitionFile(), symbol.getNamespace(), writer -> {
+                    writer.pushState(new ClassSection(directive.shape()));
+                    var template =
+                            """
+                                    public interface ${interface:T} {
 
-                        ${operations:C|}
+                                        ${operations:C|}
 
-                        /**
-                         * @return Configuration in use by client.
-                         */
-                        ${clientConfig:T} config();
+                                        /**
+                                         * @return Configuration in use by client.
+                                         */
+                                        ${clientConfig:T} config();
 
-                        /**
-                         * Create a Builder for {@link ${interface:T}}.
-                         */
-                        static Builder builder() {
-                            return new Builder();
-                        }
+                                        /**
+                                         * Create a Builder for {@link ${interface:T}}.
+                                         */
+                                        static Builder builder() {
+                                            return new Builder();
+                                        }
 
-                        /**
-                         * Create a {@link ${requestOverride:T}} builder for this client.
-                         */
-                        static RequestOverrideBuilder requestOverrideBuilder() {
-                            return new RequestOverrideBuilder();
-                        }
+                                        /**
+                                         * Create a {@link ${requestOverride:T}} builder for this client.
+                                         */
+                                        static RequestOverrideBuilder requestOverrideBuilder() {
+                                            return new RequestOverrideBuilder();
+                                        }
 
-                        /**
-                         * Builder for {@link ${interface:T}}.
-                         */
-                        final class Builder extends ${client:T}.Builder<${interface:T}, Builder>${?settings}
-                            implements ${#settings}${value:T}<Builder>${^key.last}, ${/key.last}${/settings}${/settings} {
-                            ${?hasDefaults}${defaultPlugins:C|}
-                            ${/hasDefaults}${?hasDefaultProtocol}${defaultProtocol:C|}
-                            ${/hasDefaultProtocol}${?hasTransportSettings}${transportSettings:C|}
-                            ${/hasTransportSettings}${?defaultSchemes}
-                            ${defaultAuth:C|}${/defaultSchemes}
+                                        /**
+                                         * Builder for {@link ${interface:T}}.
+                                         */
+                                        final class Builder extends ${client:T}.Builder<${interface:T}, Builder>${?settings}
+                                            implements ${#settings}${value:T}<Builder>${^key.last}, ${/key.last}${/settings}${/settings} {
+                                            ${?hasDefaults}${defaultPlugins:C|}
+                                            ${/hasDefaults}${?hasDefaultProtocol}${defaultProtocol:C|}
+                                            ${/hasDefaultProtocol}${?hasTransportSettings}${transportSettings:C|}
+                                            ${/hasTransportSettings}${?defaultSchemes}
+                                            ${defaultAuth:C|}${/defaultSchemes}
 
-                            private Builder() {${?defaultSchemes}
-                                configBuilder().putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes});
-                            ${/defaultSchemes}}
+                                            private Builder() {${?defaultSchemes}
+                                                configBuilder().putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes});
+                                            ${/defaultSchemes}}
 
-                            @Override
-                            public ${interface:T} build() {
-                                ${?hasDefaults}for (var plugin : defaultPlugins) {
-                                    configBuilder().applyPlugin(plugin);
-                                }
-                                ${/hasDefaults}${?hasDefaultProtocol}if (configBuilder().protocol() == null) {
-                                    configBuilder().protocol(${protocolFactory:C}.createProtocol(protocolSettings, protocolTrait));
-                                }
-                                ${/hasDefaultProtocol}${?hasDefaultTransport}if (configBuilder().transport() == null) {
-                                    configBuilder().transport(${transportFactory:C}.createTransport(${?hasTransportSettings}transportSettings${/hasTransportSettings}));
-                                }${/hasDefaultTransport}
-                                return new ${impl:T}(this);
-                            }
-                        }
+                                            @Override
+                                            public ${interface:T} build() {
+                                                ${?hasDefaults}for (var plugin : defaultPlugins) {
+                                                    configBuilder().applyPlugin(plugin);
+                                                }
+                                                ${/hasDefaults}${?hasDefaultProtocol}if (configBuilder().protocol() == null) {
+                                                    configBuilder().protocol(${protocolFactory:C}.createProtocol(protocolSettings, protocolTrait));
+                                                }
+                                                ${/hasDefaultProtocol}${?hasDefaultTransport}if (configBuilder().transport() == null) {
+                                                    configBuilder().transport(${transportFactory:C}.createTransport(${?hasTransportSettings}transportSettings${/hasTransportSettings}));
+                                                }${/hasDefaultTransport}
+                                                return new ${impl:T}(this);
+                                            }
+                                        }
 
-                        /**
-                         * Builder used to create a {@link ${requestOverride:T}} for {@link ${interface:T}} operations.
-                         */
-                        final class RequestOverrideBuilder extends ${requestOverride:T}.OverrideBuilder<RequestOverrideBuilder>${?settings}
-                            implements ${#settings}${value:T}<RequestOverrideBuilder>${^key.last}, ${/key.last}${/settings}${/settings} {}
-                    }
-                    """;
-                var settings = directive.settings();
-                var defaultProtocolTrait = getDefaultProtocolTrait(directive.model(), settings);
-                writer.putContext("hasDefaultProtocol", defaultProtocolTrait != null);
-                writer.putContext("protocolFactory", new FactoryGenerator(writer, getFactory(defaultProtocolTrait)));
-                writer.putContext(
-                    "defaultProtocol",
-                    new DefaultProtocolGenerator(
-                        writer,
-                        settings.service(),
-                        defaultProtocolTrait,
-                        directive.context()
-                    )
-                );
-                writer.putContext("clientPlugin", ClientPlugin.class);
-                writer.putContext("client", Client.class);
-                writer.putContext("requestOverride", RequestOverrideConfig.class);
-                writer.putContext("clientConfig", ClientConfig.class);
-                writer.putContext("interface", symbol);
-                writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
-                writer.putContext("hasDefaultTransport", settings.transport() != null);
-                var hasTransportSettings = settings.transportSettings() != null && !settings.transportSettings()
-                    .isEmpty();
-                writer.putContext("hasTransportSettings", hasTransportSettings);
-                writer.putContext(
-                    "transportFactory",
-                    new FactoryGenerator(writer, getTransportFactory(directive.settings()))
-                );
-                writer.putContext(
-                    "transportSettings",
-                    new TransportSettingsGenerator(writer, settings.transportSettings())
-                );
-                writer.putContext(
-                    "operations",
-                    new OperationMethodGenerator(
-                        writer,
-                        directive.shape(),
-                        directive.symbolProvider(),
-                        symbol,
-                        directive.model()
-                    )
-                );
-                var defaultAuth = getAuthFactoryMapping(directive.model(), directive.service());
-                writer.putContext(
-                    "defaultAuth",
-                    new AuthInitializerGenerator(writer, directive.context(), defaultAuth)
-                );
-                var schemes = getAuthSchemes(defaultAuth.keySet());
-                writer.putContext("defaultSchemes", schemes);
-                var defaultPlugins = resolveDefaultPlugins(directive.settings());
-                writer.putContext("hasDefaults", !defaultPlugins.isEmpty());
-                writer.putContext("defaultPlugins", new PluginPropertyWriter(writer, defaultPlugins));
-                writer.putContext("settings", getBuilderSettings(directive.settings()));
-                writer.write(template);
-                writer.popState();
-            });
+                                        /**
+                                         * Builder used to create a {@link ${requestOverride:T}} for {@link ${interface:T}} operations.
+                                         */
+                                        final class RequestOverrideBuilder extends ${requestOverride:T}.OverrideBuilder<RequestOverrideBuilder>${?settings}
+                                            implements ${#settings}${value:T}<RequestOverrideBuilder>${^key.last}, ${/key.last}${/settings}${/settings} {}
+                                    }
+                                    """;
+                    var settings = directive.settings();
+                    var defaultProtocolTrait = getDefaultProtocolTrait(directive.model(), settings);
+                    writer.putContext("hasDefaultProtocol", defaultProtocolTrait != null);
+                    writer.putContext("protocolFactory",
+                            new FactoryGenerator(writer, getFactory(defaultProtocolTrait)));
+                    writer.putContext(
+                            "defaultProtocol",
+                            new DefaultProtocolGenerator(
+                                    writer,
+                                    settings.service(),
+                                    defaultProtocolTrait,
+                                    directive.context()));
+                    writer.putContext("clientPlugin", ClientPlugin.class);
+                    writer.putContext("client", Client.class);
+                    writer.putContext("requestOverride", RequestOverrideConfig.class);
+                    writer.putContext("clientConfig", ClientConfig.class);
+                    writer.putContext("interface", symbol);
+                    writer.putContext("impl", symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL));
+                    writer.putContext("hasDefaultTransport", settings.transport() != null);
+                    var hasTransportSettings = settings.transportSettings() != null && !settings.transportSettings()
+                            .isEmpty();
+                    writer.putContext("hasTransportSettings", hasTransportSettings);
+                    writer.putContext(
+                            "transportFactory",
+                            new FactoryGenerator(writer, getTransportFactory(directive.settings())));
+                    writer.putContext(
+                            "transportSettings",
+                            new TransportSettingsGenerator(writer, settings.transportSettings()));
+                    writer.putContext(
+                            "operations",
+                            new OperationMethodGenerator(
+                                    writer,
+                                    directive.shape(),
+                                    directive.symbolProvider(),
+                                    symbol,
+                                    directive.model()));
+                    var defaultAuth = getAuthFactoryMapping(directive.model(), directive.service());
+                    writer.putContext(
+                            "defaultAuth",
+                            new AuthInitializerGenerator(writer, directive.context(), defaultAuth));
+                    var schemes = getAuthSchemes(defaultAuth.keySet());
+                    writer.putContext("defaultSchemes", schemes);
+                    var defaultPlugins = resolveDefaultPlugins(directive.settings());
+                    writer.putContext("hasDefaults", !defaultPlugins.isEmpty());
+                    writer.putContext("defaultPlugins", new PluginPropertyWriter(writer, defaultPlugins));
+                    writer.putContext("settings", getBuilderSettings(directive.settings()));
+                    writer.write(template);
+                    writer.popState();
+                });
     }
 
     private static Class<? extends ClientTransportFactory> getTransportFactory(JavaCodegenSettings settings) {
@@ -218,8 +214,7 @@ public final class ClientInterfaceGenerator
         var factory = clientTransportFactories.get(settings.transport());
         if (factory == null) {
             throw new CodegenException(
-                "Transport " + settings.transport() + " request, but no matching factory was found."
-            );
+                    "Transport " + settings.transport() + " request, but no matching factory was found.");
         }
         return factory;
     }
@@ -249,8 +244,7 @@ public final class ClientInterfaceGenerator
             writer.putContext("nodes", consumers);
             writer.putContext("list", List.class);
             writer.write(
-                "${document:T}.of(${list:T}.of(${#nodes}${value:C}${^key.last}, ${/key.last}${/nodes}))"
-            );
+                    "${document:T}.of(${list:T}.of(${#nodes}${value:C}${^key.last}, ${/key.last}${/nodes}))");
             writer.popState();
             return null;
         }
@@ -264,10 +258,9 @@ public final class ClientInterfaceGenerator
                 while (iter.hasNext()) {
                     var entry = iter.next();
                     writer.writeInline(
-                        "$S, $C",
-                        entry.getKey().getValue(),
-                        (Runnable) () -> entry.getValue().accept(this)
-                    );
+                            "$S, $C",
+                            entry.getKey().getValue(),
+                            (Runnable) () -> entry.getValue().accept(this));
                     if (iter.hasNext()) {
                         writer.writeInline(",");
                     }
@@ -303,30 +296,34 @@ public final class ClientInterfaceGenerator
     }
 
     private record OperationMethodGenerator(
-        JavaWriter writer, ServiceShape service, SymbolProvider symbolProvider, Symbol symbol, Model model
-    ) implements Runnable {
+            JavaWriter writer,
+            ServiceShape service,
+            SymbolProvider symbolProvider,
+            Symbol symbol,
+            Model model) implements Runnable {
 
         @Override
         public void run() {
             var templateDefault = """
-                default ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input) {
-                    return ${name:L}(input, null);
-                }
-                """;
-            var templateBase = """
-                ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig);
-                """;
+                    default ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input) {
+                        return ${name:L}(input, null);
+                    }
+                    """;
+            var templateBase =
+                    """
+                            ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig);
+                            """;
             var templatePaginated = """
-                /**
-                 * Returns a {@link ${paginator:T}} for the {@link #${name:L}} operation.
-                 *
-                 * @param input Input to use as basis for paginated calls.
-                 * @return Paginator that can be used to retrieval paginated results.
-                 */
-                default ${paginator:T}<${output:T}> ${name:L}Paginator(${input:T} input) {
-                    return ${paginator:T}.paginate(input, new ${operation:T}(), this::${name:L});
-                }
-                """;
+                    /**
+                     * Returns a {@link ${paginator:T}} for the {@link #${name:L}} operation.
+                     *
+                     * @param input Input to use as basis for paginated calls.
+                     * @return Paginator that can be used to retrieval paginated results.
+                     */
+                    default ${paginator:T}<${output:T}> ${name:L}Paginator(${input:T} input) {
+                        return ${paginator:T}.paginate(input, new ${operation:T}(), this::${name:L});
+                    }
+                    """;
             writer.pushState();
             var isAsync = symbol.expectProperty(ClientSymbolProperties.ASYNC);
             writer.putContext("async", isAsync);
@@ -375,9 +372,11 @@ public final class ClientInterfaceGenerator
     }
 
     private record DefaultProtocolGenerator(
-        JavaWriter writer, ShapeId service, Trait defaultProtocolTrait, CodeGenerationContext context
-    ) implements
-        Runnable {
+            JavaWriter writer,
+            ShapeId service,
+            Trait defaultProtocolTrait,
+            CodeGenerationContext context) implements
+            Runnable {
         @Override
         public void run() {
             if (defaultProtocolTrait == null) {
@@ -385,11 +384,11 @@ public final class ClientInterfaceGenerator
             }
             writer.pushState();
             var template = """
-                private static final ${protocolSettings:T} protocolSettings = ${protocolSettings:T}.builder()
-                        .service(${shapeId:T}.from(${service:S}))
-                        .build();
-                private static final ${trait:T} protocolTrait = ${initializer:C};
-                """;
+                    private static final ${protocolSettings:T} protocolSettings = ${protocolSettings:T}.builder()
+                            .service(${shapeId:T}.from(${service:S}))
+                            .build();
+                    private static final ${trait:T} protocolTrait = ${initializer:C};
+                    """;
             writer.putContext("protocolSettings", ProtocolSettings.class);
             writer.putContext("trait", defaultProtocolTrait.getClass());
             var initializer = context.getInitializer(defaultProtocolTrait);
@@ -415,9 +414,8 @@ public final class ClientInterfaceGenerator
         }
 
         throw new UnsupportedOperationException(
-            "Specified protocol `" + defaultProtocol + "` not found on service "
-                + settings.service() + ". Expected one of: " + protocols.keySet() + "."
-        );
+                "Specified protocol `" + defaultProtocol + "` not found on service "
+                        + settings.service() + ". Expected one of: " + protocols.keySet() + ".");
     }
 
     private static Class<? extends ClientProtocolFactory> getFactory(Trait defaultProtocolTrait) {
@@ -425,9 +423,8 @@ public final class ClientInterfaceGenerator
             return null;
         }
         for (var factory : ServiceLoader.load(
-            ClientProtocolFactory.class,
-            ClientInterfaceGenerator.class.getClassLoader()
-        )) {
+                ClientProtocolFactory.class,
+                ClientInterfaceGenerator.class.getClassLoader())) {
             if (factory.id().equals(defaultProtocolTrait.toShapeId())) {
                 return factory.getClass();
             }
@@ -437,8 +434,8 @@ public final class ClientInterfaceGenerator
 
     @SuppressWarnings("rawtypes")
     private static Map<Trait, Class<? extends AuthSchemeFactory>> getAuthFactoryMapping(
-        Model model,
-        ToShapeId service
+            Model model,
+            ToShapeId service
     ) {
         var index = ServiceIndex.of(model);
         var schemes = index.getAuthSchemes(service);
@@ -449,9 +446,8 @@ public final class ClientInterfaceGenerator
                 var existing = result.put(schemeEntry.getValue(), schemeFactoryClass);
                 if (existing != null) {
                     throw new CodegenException(
-                        "Multiple auth scheme factory implementations found for scheme: " + schemeEntry.getKey()
-                            + "Found: " + schemeFactoryClass + " and " + existing
-                    );
+                            "Multiple auth scheme factory implementations found for scheme: " + schemeEntry.getKey()
+                                    + "Found: " + schemeFactoryClass + " and " + existing);
                 }
             } else {
                 LOGGER.warn("Could not find implementation for auth scheme {}", schemeEntry.getKey());
@@ -461,19 +457,19 @@ public final class ClientInterfaceGenerator
     }
 
     private record AuthInitializerGenerator(
-        JavaWriter writer,
-        CodeGenerationContext context,
-        Map<Trait, Class<? extends AuthSchemeFactory>> authMapping
-    ) implements Runnable {
+            JavaWriter writer,
+            CodeGenerationContext context,
+            Map<Trait, Class<? extends AuthSchemeFactory>> authMapping) implements Runnable {
 
         @Override
         public void run() {
             writer.pushState();
             for (var entry : authMapping.entrySet()) {
-                var template = """
-                    private static final ${trait:T} ${traitName:L} = ${?cast}(${trait:T}) ${/cast}${initializer:C};
-                    private static final ${authFactory:T}<${trait:T}> ${traitName:L}Factory = new ${?outer}${outer:T}.${authFactoryImplName:L}${/outer}${^outer}${authFactoryImpl:T}${/outer}();
-                    """;
+                var template =
+                        """
+                                private static final ${trait:T} ${traitName:L} = ${?cast}(${trait:T}) ${/cast}${initializer:C};
+                                private static final ${authFactory:T}<${trait:T}> ${traitName:L}Factory = new ${?outer}${outer:T}.${authFactoryImplName:L}${/outer}${^outer}${authFactoryImpl:T}${/outer}();
+                                """;
                 var trait = entry.getKey();
                 writer.putContext("trait", trait.getClass());
                 writer.putContext("traitName", getAuthTraitPropertyName(trait));
@@ -507,7 +503,7 @@ public final class ClientInterfaceGenerator
     }
 
     private record PluginPropertyWriter(JavaWriter writer, Map<String, Class<? extends ClientPlugin>> pluginMap)
-        implements Runnable {
+            implements Runnable {
         @Override
         public void run() {
             if (pluginMap.isEmpty()) {
@@ -517,12 +513,11 @@ public final class ClientInterfaceGenerator
             writer.putContext("list", List.class);
             writer.putContext("plugins", pluginMap);
             writer.write(
-                """
-                    ${#plugins}private final ${value:T} ${key:L} = new ${value:T}();
-                    ${/plugins}
-                    private final ${list:T}<${clientPlugin:T}> defaultPlugins = List.of(${#plugins}${key:L}${^key.last}, ${/key.last}${/plugins});
                     """
-            );
+                            ${#plugins}private final ${value:T} ${key:L} = new ${value:T}();
+                            ${/plugins}
+                            private final ${list:T}<${clientPlugin:T}> defaultPlugins = List.of(${#plugins}${key:L}${^key.last}, ${/key.last}${/plugins});
+                            """);
             writer.popState();
         }
 
@@ -553,9 +548,8 @@ public final class ClientInterfaceGenerator
             var clazz = CodegenUtils.getClassForName(settingName);
             if (clazz.isAssignableFrom(ClientSetting.class)) {
                 throw new CodegenException(
-                    "Settings must extend from `ClientSetting` interface. Could not"
-                        + " cast class `" + settingName + "` to `ClientSetting"
-                );
+                        "Settings must extend from `ClientSetting` interface. Could not"
+                                + " cast class `" + settingName + "` to `ClientSetting");
             }
             result.add(clazz);
         }

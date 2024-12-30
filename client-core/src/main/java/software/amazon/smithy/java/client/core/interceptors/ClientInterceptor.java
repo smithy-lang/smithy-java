@@ -365,8 +365,8 @@ public interface ClientInterceptor {
      * @param <O> Output type.
      */
     default <O extends SerializableStruct> O modifyBeforeAttemptCompletion(
-        OutputHook<?, O, ?, ?> hook,
-        RuntimeException error
+            OutputHook<?, O, ?, ?> hook,
+            RuntimeException error
     ) {
         return hook.forward(error);
     }
@@ -414,8 +414,8 @@ public interface ClientInterceptor {
      * @param <O> Output type.
      */
     default <O extends SerializableStruct> O modifyBeforeCompletion(
-        OutputHook<?, O, ?, ?> hook,
-        RuntimeException error
+            OutputHook<?, O, ?, ?> hook,
+            RuntimeException error
     ) {
         return hook.forward(error);
     }

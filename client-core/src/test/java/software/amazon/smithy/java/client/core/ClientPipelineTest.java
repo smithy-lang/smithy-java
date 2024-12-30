@@ -41,77 +41,77 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public class ClientPipelineTest {
 
     private static final Model MODEL = Model.assembler()
-        .addUnparsedModel("test.smithy", """
-            $version: "2"
-            namespace smithy.example
+            .addUnparsedModel("test.smithy", """
+                    $version: "2"
+                    namespace smithy.example
 
-            @aws.protocols#restJson1
-            service Sprockets {
-                operations: [GetSprocket]
-                errors: [ServiceFooError]
-            }
+                    @aws.protocols#restJson1
+                    service Sprockets {
+                        operations: [GetSprocket]
+                        errors: [ServiceFooError]
+                    }
 
-            @http(method: "POST", uri: "/s")
-            operation GetSprocket {
-                input := {
-                    id: String
-                }
-                output := {
-                    id: String
-                }
-                errors: [InvalidSprocketId]
-            }
+                    @http(method: "POST", uri: "/s")
+                    operation GetSprocket {
+                        input := {
+                            id: String
+                        }
+                        output := {
+                            id: String
+                        }
+                        errors: [InvalidSprocketId]
+                    }
 
-            @error("client")
-            @httpError(429)
-            @retryable
-            structure InvalidSprocketId {}
+                    @error("client")
+                    @httpError(429)
+                    @retryable
+                    structure InvalidSprocketId {}
 
-            @error("server")
-            @httpError(500)
-            structure ServiceFooError {}
-            """)
-        .discoverModels()
-        .assemble()
-        .unwrap();
+                    @error("server")
+                    @httpError(500)
+                    structure ServiceFooError {}
+                    """)
+            .discoverModels()
+            .assemble()
+            .unwrap();
 
     @Test
     public void canShortCircuitRequests() {
         var service = ShapeId.from("smithy.example#Sprockets");
         var client = DynamicClient.builder()
-            .service(service)
-            .model(MODEL)
-            .protocol(new RestJsonClientProtocol(service))
-            .transport(new JavaHttpClientTransport())
-            .endpointResolver(EndpointResolver.staticEndpoint("https://localhost:8081"))
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .retryStrategy(new RetryStrategy() {
-                @Override
-                public AcquireInitialTokenResponse acquireInitialToken(AcquireInitialTokenRequest request) {
-                    throw new TokenAcquisitionFailedException("Short circuit");
-                }
+                .service(service)
+                .model(MODEL)
+                .protocol(new RestJsonClientProtocol(service))
+                .transport(new JavaHttpClientTransport())
+                .endpointResolver(EndpointResolver.staticEndpoint("https://localhost:8081"))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .retryStrategy(new RetryStrategy() {
+                    @Override
+                    public AcquireInitialTokenResponse acquireInitialToken(AcquireInitialTokenRequest request) {
+                        throw new TokenAcquisitionFailedException("Short circuit");
+                    }
 
-                @Override
-                public RefreshRetryTokenResponse refreshRetryToken(RefreshRetryTokenRequest request) {
-                    throw new UnsupportedOperationException();
-                }
+                    @Override
+                    public RefreshRetryTokenResponse refreshRetryToken(RefreshRetryTokenRequest request) {
+                        throw new UnsupportedOperationException();
+                    }
 
-                @Override
-                public RecordSuccessResponse recordSuccess(RecordSuccessRequest request) {
-                    throw new UnsupportedOperationException();
-                }
+                    @Override
+                    public RecordSuccessResponse recordSuccess(RecordSuccessRequest request) {
+                        throw new UnsupportedOperationException();
+                    }
 
-                @Override
-                public int maxAttempts() {
-                    return 1;
-                }
+                    @Override
+                    public int maxAttempts() {
+                        return 1;
+                    }
 
-                @Override
-                public Builder toBuilder() {
-                    throw new UnsupportedOperationException();
-                }
-            })
-            .build();
+                    @Override
+                    public Builder toBuilder() {
+                        throw new UnsupportedOperationException();
+                    }
+                })
+                .build();
 
         var e = Assertions.assertThrows(TokenAcquisitionFailedException.class, () -> client.call("GetSprocket"));
 
@@ -124,63 +124,61 @@ public class ClientPipelineTest {
         var calls = new ArrayList<>();
 
         var mockQueue = new MockQueue()
-            .enqueue(
-                HttpResponse.builder()
-                    .statusCode(429)
-                    .body(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
-                    .build()
-            )
-            .enqueue(
-                HttpResponse.builder()
-                    .statusCode(200)
-                    .body(DataStream.ofString("{\"id\":\"1\"}"))
-                    .build()
-            );
+                .enqueue(
+                        HttpResponse.builder()
+                                .statusCode(429)
+                                .body(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
+                                .build())
+                .enqueue(
+                        HttpResponse.builder()
+                                .statusCode(200)
+                                .body(DataStream.ofString("{\"id\":\"1\"}"))
+                                .build());
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
-            .service(service)
-            .model(MODEL)
-            .addPlugin(mock)
-            .endpointResolver(EndpointResolver.staticEndpoint("https://localhost:8081"))
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .retryStrategy(new RetryStrategy() {
-                @Override
-                public AcquireInitialTokenResponse acquireInitialToken(AcquireInitialTokenRequest request) {
-                    calls.add("Acquire");
-                    return new AcquireInitialTokenResponse(new Token(0), Duration.ZERO);
-                }
-
-                @Override
-                public RefreshRetryTokenResponse refreshRetryToken(RefreshRetryTokenRequest request) {
-                    calls.add("Refresh");
-                    if (request.token() instanceof Token t) {
-                        return new RefreshRetryTokenResponse(new Token(t.retry + 1), Duration.ZERO);
+                .service(service)
+                .model(MODEL)
+                .addPlugin(mock)
+                .endpointResolver(EndpointResolver.staticEndpoint("https://localhost:8081"))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .retryStrategy(new RetryStrategy() {
+                    @Override
+                    public AcquireInitialTokenResponse acquireInitialToken(AcquireInitialTokenRequest request) {
+                        calls.add("Acquire");
+                        return new AcquireInitialTokenResponse(new Token(0), Duration.ZERO);
                     }
-                    throw new IllegalArgumentException();
-                }
 
-                @Override
-                public RecordSuccessResponse recordSuccess(RecordSuccessRequest request) {
-                    if (request.token() instanceof Token t) {
-                        calls.add("Success: " + t.retry);
-                        return new RecordSuccessResponse(request.token());
-                    } else {
+                    @Override
+                    public RefreshRetryTokenResponse refreshRetryToken(RefreshRetryTokenRequest request) {
+                        calls.add("Refresh");
+                        if (request.token() instanceof Token t) {
+                            return new RefreshRetryTokenResponse(new Token(t.retry + 1), Duration.ZERO);
+                        }
                         throw new IllegalArgumentException();
                     }
-                }
 
-                @Override
-                public int maxAttempts() {
-                    return 3;
-                }
+                    @Override
+                    public RecordSuccessResponse recordSuccess(RecordSuccessRequest request) {
+                        if (request.token() instanceof Token t) {
+                            calls.add("Success: " + t.retry);
+                            return new RecordSuccessResponse(request.token());
+                        } else {
+                            throw new IllegalArgumentException();
+                        }
+                    }
 
-                @Override
-                public Builder toBuilder() {
-                    throw new UnsupportedOperationException();
-                }
-            })
-            .build();
+                    @Override
+                    public int maxAttempts() {
+                        return 3;
+                    }
+
+                    @Override
+                    public Builder toBuilder() {
+                        throw new UnsupportedOperationException();
+                    }
+                })
+                .build();
 
         var response = client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
 

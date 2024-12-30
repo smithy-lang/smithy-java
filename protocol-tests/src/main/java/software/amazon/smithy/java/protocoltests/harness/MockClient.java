@@ -41,16 +41,15 @@ final class MockClient extends Client {
      * Executes a client request, ignoring any server-side failures.
      */
     public <I extends SerializableStruct, O extends SerializableStruct> O clientRequest(
-        I input,
-        ApiOperation<I, O> operation,
-        RequestOverrideConfig overrideConfig
+            I input,
+            ApiOperation<I, O> operation,
+            RequestOverrideConfig overrideConfig
     ) {
         try {
             return call(input, operation, overrideConfig).exceptionallyCompose(exc -> {
                 if (exc instanceof CompletionException ce
-                    && ce.getCause() instanceof ApiException apiException
-                    && apiException.getFault().equals(ApiException.Fault.SERVER)
-                ) {
+                        && ce.getCause() instanceof ApiException apiException
+                        && apiException.getFault().equals(ApiException.Fault.SERVER)) {
                     LOGGER.debug("Ignoring expected exception", apiException);
                     return CompletableFuture.completedFuture(null);
                 } else {
@@ -82,7 +81,7 @@ final class MockClient extends Client {
      * Placeholder protocol that allows us to instantiate a client, but that we expect to override on each request.
      */
     private record PlaceHolderProtocol<Req, Res>(MessageExchange<Req, Res> messageExchange) implements
-        ClientProtocol<Req, Res> {
+            ClientProtocol<Req, Res> {
         @Override
         public ShapeId id() {
             return PreludeSchemas.DOCUMENT.id();
@@ -90,10 +89,10 @@ final class MockClient extends Client {
 
         @Override
         public <I extends SerializableStruct, O extends SerializableStruct> Req createRequest(
-            ApiOperation<I, O> operation,
-            I input,
-            Context context,
-            URI endpoint
+                ApiOperation<I, O> operation,
+                I input,
+                Context context,
+                URI endpoint
         ) {
             throw new UnsupportedOperationException("Placeholder protocol must be overridden");
         }
@@ -105,11 +104,11 @@ final class MockClient extends Client {
 
         @Override
         public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
-            ApiOperation<I, O> operation,
-            Context context,
-            TypeRegistry typeRegistry,
-            Req request,
-            Res res
+                ApiOperation<I, O> operation,
+                Context context,
+                TypeRegistry typeRegistry,
+                Req request,
+                Res res
         ) {
             throw new UnsupportedOperationException("Placeholder protocol must be overridden");
         }

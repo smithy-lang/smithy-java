@@ -312,10 +312,10 @@ public final class Validator {
 
         @Override
         public <T> void writeEntry(
-            Schema keySchema,
-            String key,
-            T state,
-            BiConsumer<T, ShapeSerializer> valueSerializer
+                Schema keySchema,
+                String key,
+                T state,
+                BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
             elementCount++;
             path[depth - 2] = key; // set /map/<key>
@@ -380,8 +380,7 @@ public final class Validator {
             if (schema.minRangeConstraint != null && value.compareTo(schema.minRangeConstraint.toBigInteger()) < 0) {
                 emitRangeError(schema, value);
             } else if (schema.maxRangeConstraint != null && value.compareTo(
-                schema.maxRangeConstraint.toBigInteger()
-            ) > 0) {
+                    schema.maxRangeConstraint.toBigInteger()) > 0) {
                 emitRangeError(schema, value);
             }
         }

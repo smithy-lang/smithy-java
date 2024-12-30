@@ -25,14 +25,14 @@ public abstract class AbstractCodegenFileTest {
     @BeforeEach
     public void setup() {
         var model = Model.assembler()
-            .addImport(testFile())
-            .assemble()
-            .unwrap();
+                .addImport(testFile())
+                .assemble()
+                .unwrap();
         var context = PluginContext.builder()
-            .fileManifest(manifest)
-            .settings(settings())
-            .model(model)
-            .build();
+                .fileManifest(manifest)
+                .settings(settings())
+                .model(model)
+                .build();
         plugin.execute(context);
         assertFalse(manifest.getFiles().isEmpty());
     }
@@ -41,15 +41,14 @@ public abstract class AbstractCodegenFileTest {
 
     protected ObjectNode settings() {
         return ObjectNode.builder()
-            .withMember("service", "smithy.java.codegen#TestService")
-            .withMember("namespace", "test.smithy.codegen")
-            .build();
+                .withMember("service", "smithy.java.codegen#TestService")
+                .withMember("namespace", "test.smithy.codegen")
+                .build();
     }
 
     protected String getFileStringForClass(String className) {
         var fileStringOptional = manifest.getFileString(
-            Paths.get(String.format("/test/smithy/codegen/model/%s.java", className))
-        );
+                Paths.get(String.format("/test/smithy/codegen/model/%s.java", className)));
         assertTrue(fileStringOptional.isPresent());
         return fileStringOptional.get();
     }

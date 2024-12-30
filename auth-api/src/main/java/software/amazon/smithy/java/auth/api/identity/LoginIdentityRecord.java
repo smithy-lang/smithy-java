@@ -5,5 +5,4 @@
 
 package software.amazon.smithy.java.auth.api.identity;
 
-record LoginIdentityRecord(String username, String password) implements LoginIdentity {
-}
+record LoginIdentityRecord(String username, String password) implements LoginIdentity {}

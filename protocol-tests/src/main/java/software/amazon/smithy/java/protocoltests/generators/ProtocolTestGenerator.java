@@ -27,20 +27,19 @@ public final class ProtocolTestGenerator {
             default -> throw new IllegalStateException("Unknown mode '" + mode + "'. Expect 'client' or 'server'.");
         };
         Model model = Model.assembler(ProtocolTestGenerator.class.getClassLoader())
-            .discoverModels(ProtocolTestGenerator.class.getClassLoader())
-            .assemble()
-            .unwrap();
+                .discoverModels(ProtocolTestGenerator.class.getClassLoader())
+                .assemble()
+                .unwrap();
         var serviceId = ShapeId.from(Objects.requireNonNull(System.getenv("service")));
         PluginContext context = PluginContext.builder()
-            .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
-            .settings(
-                ObjectNode.builder()
-                    .withMember("service", serviceId.toString())
-                    .withMember("namespace", serviceId.getNamespace())
-                    .build()
-            )
-            .model(model)
-            .build();
+                .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
+                .settings(
+                        ObjectNode.builder()
+                                .withMember("service", serviceId.toString())
+                                .withMember("namespace", serviceId.getNamespace())
+                                .build())
+                .model(model)
+                .build();
         plugin.execute(context);
     }
 }

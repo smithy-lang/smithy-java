@@ -28,18 +28,17 @@ public class Log4j2LoggerIsolatedTest {
         Configuration cfg = ctx.getConfiguration();
         cfg.getLoggerConfig("").setLevel(org.apache.logging.log4j.Level.TRACE);
         APPENDER = WriterAppender.newBuilder()
-            .setTarget(WRITER)
-            .setName("Log4j2LoggerTestAppender")
-            .setLayout(PatternLayout.newBuilder().withPattern("%level %m%n").build())
-            .build();
+                .setTarget(WRITER)
+                .setName("Log4j2LoggerTestAppender")
+                .setLayout(PatternLayout.newBuilder().withPattern("%level %m%n").build())
+                .build();
         cfg.addAppender(APPENDER);
 
         cfg.start();
 
         ctx.getRootLogger()
-            .removeAppender(
-                ctx.getRootLogger().getAppenders().values().stream().findAny().get()
-            );
+                .removeAppender(
+                        ctx.getRootLogger().getAppenders().values().stream().findAny().get());
         ctx.getRootLogger().addAppender(APPENDER);
 
         ctx.updateLoggers();
@@ -64,8 +63,7 @@ public class Log4j2LoggerIsolatedTest {
         assertThat(lines[2]).startsWith("FATAL a: test3: b c");
         assertThat(lines[3]).startsWith("java.lang.NullPointerException: BANG!");
         assertThat(lines[4]).contains(
-            "at software.amazon.smithy.java.logging.Log4j2LoggerIsolatedTest.smokeTest(Log4j2LoggerIsolatedTest.java:"
-        );
+                "at software.amazon.smithy.java.logging.Log4j2LoggerIsolatedTest.smokeTest(Log4j2LoggerIsolatedTest.java:");
     }
 
     @Test
@@ -74,13 +72,12 @@ public class Log4j2LoggerIsolatedTest {
         logger.log(InternalLogger.Level.ERROR, "test1");
         logger.log(InternalLogger.Level.WARN, "test2: {}", "abc");
         logger.log(
-            InternalLogger.Level.FATAL,
-            "{}: test3: {} {}",
-            "a",
-            "b",
-            "c",
-            new NullPointerException("BANG!")
-        );
+                InternalLogger.Level.FATAL,
+                "{}: test3: {} {}",
+                "a",
+                "b",
+                "c",
+                new NullPointerException("BANG!"));
 
         var lines = WRITER.toString().split(System.lineSeparator());
         assertThat(lines).hasSizeGreaterThan(5);
@@ -89,7 +86,6 @@ public class Log4j2LoggerIsolatedTest {
         assertThat(lines[2]).startsWith("FATAL a: test3: b c");
         assertThat(lines[3]).startsWith("java.lang.NullPointerException: BANG!");
         assertThat(lines[4]).contains(
-            "at software.amazon.smithy.java.logging.Log4j2LoggerIsolatedTest.dynamicLevelSmokeTest(Log4j2LoggerIsolatedTest.java:"
-        );
+                "at software.amazon.smithy.java.logging.Log4j2LoggerIsolatedTest.dynamicLevelSmokeTest(Log4j2LoggerIsolatedTest.java:");
     }
 }

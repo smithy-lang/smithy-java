@@ -28,11 +28,11 @@ abstract class BuilderGenerator implements Runnable {
     protected final ServiceShape service;
 
     protected BuilderGenerator(
-        JavaWriter writer,
-        Shape shape,
-        SymbolProvider symbolProvider,
-        Model model,
-        ServiceShape service
+            JavaWriter writer,
+            Shape shape,
+            SymbolProvider symbolProvider,
+            Model model,
+            ServiceShape service
     ) {
         this.writer = writer;
         this.shape = shape;
@@ -44,41 +44,42 @@ abstract class BuilderGenerator implements Runnable {
     @Override
     public void run() {
         writer.pushState();
-        var template = """
-            ${?isStaged}
-            ${stageGen:C|}
+        var template =
+                """
+                        ${?isStaged}
+                        ${stageGen:C|}
 
-            ${/isStaged}
-            /**
-             * @return returns a new Builder.
-             */
-            public static Builder builder() {
-                return new Builder();
-            }
+                        ${/isStaged}
+                        /**
+                         * @return returns a new Builder.
+                         */
+                        public static Builder builder() {
+                            return new Builder();
+                        }
 
-            /**
-             * Builder for {@link ${shape:T}}.
-             */
-            public static final class Builder implements ${sdkShapeBuilder:T}<${shape:T}>${?isStaged}, ${#stages}${value:L}${^key.last}, ${/key.last}${/stages}${/isStaged} {
-                ${builderProperties:C|}
+                        /**
+                         * Builder for {@link ${shape:T}}.
+                         */
+                        public static final class Builder implements ${sdkShapeBuilder:T}<${shape:T}>${?isStaged}, ${#stages}${value:L}${^key.last}, ${/key.last}${/stages}${/isStaged} {
+                            ${builderProperties:C|}
 
-                ${builderConstructor:C|}
+                            ${builderConstructor:C|}
 
-                @Override
-                public ${schema:T} schema() {
-                    return $$SCHEMA;
-                }
+                            @Override
+                            public ${schema:T} schema() {
+                                return $$SCHEMA;
+                            }
 
-                ${builderSetters:C|}
+                            ${builderSetters:C|}
 
-                ${buildMethod:C|}
+                            ${buildMethod:C|}
 
-                ${setMemberValue:C|}
+                            ${setMemberValue:C|}
 
-                ${errorCorrection:C|}
+                            ${errorCorrection:C|}
 
-                ${deserializer:C|}
-            }""";
+                            ${deserializer:C|}
+                        }""";
         writer.putContext("schema", Schema.class);
         writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
         writer.putContext("builderProperties", writer.consumer(this::generateProperties));
@@ -136,14 +137,14 @@ abstract class BuilderGenerator implements Runnable {
         }
 
         var template = """
-            @Override
-            @SuppressWarnings("unchecked")
-            public void setMemberValue(Schema member, Object value) {
-                switch (member.memberIndex()) {
-                    ${memberSetters:C|}
-                    default -> ${shapeBuilderClass:T}.super.setMemberValue(member, value);
-                }
-            }""";
+                @Override
+                @SuppressWarnings("unchecked")
+                public void setMemberValue(Schema member, Object value) {
+                    switch (member.memberIndex()) {
+                        ${memberSetters:C|}
+                        default -> ${shapeBuilderClass:T}.super.setMemberValue(member, value);
+                    }
+                }""";
         writer.putContext("memberSetters", writer.consumer(this::generateMemberValueSetters));
         writer.putContext("shapeBuilderClass", ShapeBuilder.class);
         writer.write(template);
@@ -159,9 +160,8 @@ abstract class BuilderGenerator implements Runnable {
             writer.putContext("memberSchema", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
             writer.putContext("schemaUtilsClass", SchemaUtils.class);
             writer.write(
-                "case $L -> ${memberName:L}((${type:T}) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, value));",
-                idx
-            );
+                    "case $L -> ${memberName:L}((${type:T}) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, value));",
+                    idx);
             writer.popState();
         }
     }

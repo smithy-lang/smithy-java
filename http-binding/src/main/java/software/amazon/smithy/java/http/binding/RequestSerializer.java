@@ -100,7 +100,7 @@ public final class RequestSerializer {
      * @return Returns the serializer.
      */
     public <F extends Frame<?>> RequestSerializer eventEncoderFactory(
-        EventEncoderFactory<F> eventStreamEncodingFactory
+            EventEncoderFactory<F> eventStreamEncodingFactory
     ) {
         this.eventStreamEncodingFactory = eventStreamEncodingFactory;
         return this;
@@ -133,13 +133,12 @@ public final class RequestSerializer {
         var matcher = bindingCache.computeIfAbsent(operation.inputSchema(), BindingMatcher::requestMatcher);
         var httpTrait = operation.schema().expectTrait(TraitKey.HTTP_TRAIT);
         var serializer = new HttpBindingSerializer(
-            httpTrait,
-            payloadCodec,
-            payloadMediaType,
-            matcher,
-            omitEmptyPayload,
-            false
-        );
+                httpTrait,
+                payloadCodec,
+                payloadMediaType,
+                matcher,
+                omitEmptyPayload,
+                false);
         shapeValue.serialize(serializer);
         serializer.flush();
 
@@ -155,8 +154,8 @@ public final class RequestSerializer {
         var targetEndpoint = uriBuilder.build();
 
         HttpRequest.Builder builder = HttpRequest.builder()
-            .method(httpTrait.getMethod())
-            .uri(targetEndpoint);
+                .method(httpTrait.getMethod())
+                .uri(targetEndpoint);
 
         var eventStream = serializer.getEventStream();
         if (eventStream != null && operation instanceof InputEventStreamingApiOperation<?, ?, ?>) {

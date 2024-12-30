@@ -35,8 +35,8 @@ public class CborParserTest {
 
     private static byte[] write(Consumer<CborSerializer> consumer) {
         try (
-            var stream = new ByteBufferOutputStream(); var ser = new CborSerializer(new Sink.OutputStreamSink(stream))
-        ) {
+                var stream = new ByteBufferOutputStream();
+                var ser = new CborSerializer(new Sink.OutputStreamSink(stream))) {
             try {
                 consumer.accept(ser);
             } catch (StopWritingException ignored) {}
@@ -413,9 +413,9 @@ public class CborParserTest {
 
     @Test
     public void bigDecimalLongExponent() {
-        byte[][] payloads = new byte[][]{
-            new byte[]{-60, -126, 27, 0, 0, 0, 7, -1, -1, -1, -1, 1},
-            new byte[]{-60, -126, 59, 0, 0, 0, 7, -1, -1, -1, -1, 1},
+        byte[][] payloads = new byte[][] {
+                new byte[] {-60, -126, 27, 0, 0, 0, 7, -1, -1, -1, -1, 1},
+                new byte[] {-60, -126, 59, 0, 0, 0, 7, -1, -1, -1, -1, 1},
         };
         for (byte[] payload : payloads) {
             cbor = payload;
@@ -505,11 +505,10 @@ public class CborParserTest {
     private void token(byte token, int position, int itemLength) {
         token(token, position);
         assertEquals(
-            itemLength,
-            CborParser.itemLength(parser.getItemLength()),
-            "expected len " + itemLength
-                + " but was " + CborParser.itemLength(parser.getItemLength())
-        );
+                itemLength,
+                CborParser.itemLength(parser.getItemLength()),
+                "expected len " + itemLength
+                        + " but was " + CborParser.itemLength(parser.getItemLength()));
     }
 
     private void num(double d) {

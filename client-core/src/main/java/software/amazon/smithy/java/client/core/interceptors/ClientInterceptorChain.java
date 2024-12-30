@@ -73,8 +73,8 @@ final class ClientInterceptorChain implements ClientInterceptor {
     }
 
     private <I extends SerializableStruct, RequestT> RequestT modifyRequestHook(
-        BiFunction<ClientInterceptor, RequestHook<I, ?, RequestT>, RequestT> mapper,
-        RequestHook<I, ?, RequestT> hook
+            BiFunction<ClientInterceptor, RequestHook<I, ?, RequestT>, RequestT> mapper,
+            RequestHook<I, ?, RequestT> hook
     ) {
         var request = hook.request();
         for (var interceptor : interceptors) {
@@ -151,8 +151,8 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <O extends SerializableStruct> O modifyBeforeAttemptCompletion(
-        OutputHook<?, O, ?, ?> hook,
-        RuntimeException error
+            OutputHook<?, O, ?, ?> hook,
+            RuntimeException error
     ) {
         var output = hook.output();
         for (var interceptor : interceptors) {
@@ -180,8 +180,8 @@ final class ClientInterceptorChain implements ClientInterceptor {
 
     @Override
     public <O extends SerializableStruct> O modifyBeforeCompletion(
-        OutputHook<?, O, ?, ?> hook,
-        RuntimeException error
+            OutputHook<?, O, ?, ?> hook,
+            RuntimeException error
     ) {
         var output = hook.output();
         for (var interceptor : interceptors) {

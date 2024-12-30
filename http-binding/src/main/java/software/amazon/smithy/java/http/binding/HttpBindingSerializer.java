@@ -66,17 +66,16 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
     private final BindingMatcher bindingMatcher;
     private final UriPattern uriPattern;
     private final BiConsumer<String, String> headerConsumer = (field, value) -> headers.computeIfAbsent(
-        field,
-        f -> new ArrayList<>()
-    ).add(value);
+            field,
+            f -> new ArrayList<>()).add(value);
 
     HttpBindingSerializer(
-        HttpTrait httpTrait,
-        Codec payloadCodec,
-        String payloadMediaType,
-        BindingMatcher bindingMatcher,
-        boolean omitEmptyPayload,
-        boolean isFailure
+            HttpTrait httpTrait,
+            Codec payloadCodec,
+            String payloadMediaType,
+            BindingMatcher bindingMatcher,
+            boolean omitEmptyPayload,
+            boolean isFailure
     ) {
         uriPattern = httpTrait.getUri();
         responseStatus = httpTrait.getCode();
@@ -101,7 +100,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
             // Serialize only the body members to the codec.
             SchemaUtils.withFilteredMembers(schema, struct, this::bodyBindingPredicate)
-                .serialize(shapeBodySerializer);
+                    .serialize(shapeBodySerializer);
             headers.put("content-type", List.of(payloadMediaType));
         }
 
@@ -140,8 +139,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             contentType = value.contentType();
             if (contentType == null) {
                 contentType = schema.type() == ShapeType.BLOB
-                    ? DEFAULT_BLOB_CONTENT_TYPE
-                    : DEFAULT_STRING_CONTENT_TYPE;
+                        ? DEFAULT_BLOB_CONTENT_TYPE
+                        : DEFAULT_STRING_CONTENT_TYPE;
             }
         }
         headers.put("content-type", List.of(contentType));
@@ -233,9 +232,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
                 case LABEL -> serializer.labelSerializer;
                 case STATUS -> new ResponseStatusSerializer(i -> serializer.responseStatus = i);
                 case PREFIX_HEADERS -> new HttpPrefixHeadersSerializer(
-                    schema.expectTrait(TraitKey.HTTP_PREFIX_HEADERS_TRAIT).getValue(),
-                    serializer.headerConsumer
-                );
+                        schema.expectTrait(TraitKey.HTTP_PREFIX_HEADERS_TRAIT).getValue(),
+                        serializer.headerConsumer);
                 case QUERY_PARAMS -> new HttpQueryParamsSerializer(serializer.queryStringParams::add);
                 case BODY -> ShapeSerializer.nullSerializer(); // handled in HttpBindingSerializer#writeStruct.
                 case PAYLOAD -> {
@@ -251,9 +249,8 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
             if (payloadSerializer != null && !payloadSerializer.isPayloadWritten()) {
                 payloadSerializer.flush();
                 serializer.setHttpPayload(
-                    schema,
-                    DataStream.ofBytes(payloadSerializer.toByteArray())
-                );
+                        schema,
+                        DataStream.ofBytes(payloadSerializer.toByteArray()));
             }
         }
     }

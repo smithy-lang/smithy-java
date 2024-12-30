@@ -29,7 +29,7 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 
 public class HttpServerRequestProtocolTestProvider extends
-    ProtocolTestProvider<HttpServerRequestTests, ProtocolTestExtension.SharedServerTestData> {
+        ProtocolTestProvider<HttpServerRequestTests, ProtocolTestExtension.SharedServerTestData> {
 
     @Override
     protected Class<HttpServerRequestTests> getAnnotationType() {
@@ -44,9 +44,9 @@ public class HttpServerRequestProtocolTestProvider extends
 
     @Override
     protected Stream<TestTemplateInvocationContext> generateProtocolTests(
-        ProtocolTestExtension.SharedServerTestData testData,
-        HttpServerRequestTests annotation,
-        TestFilter testFilter
+            ProtocolTestExtension.SharedServerTestData testData,
+            HttpServerRequestTests annotation,
+            TestFilter testFilter
     ) {
         var mockClient = ServerTestClient.get(testData.endpoint());
         List<TestTemplateInvocationContext> invocationContexts = new ArrayList<>();
@@ -67,21 +67,19 @@ public class HttpServerRequestProtocolTestProvider extends
                     mapper = String::getBytes;
                 }
                 var request = HttpRequest.builder()
-                    .uri(createUri)
-                    .body(DataStream.ofBytes(testCase.getBody().map(mapper).orElse(new byte[0])))
-                    .httpVersion(HttpVersion.HTTP_1_1)
-                    .method(testCase.getMethod())
-                    .headers(headers)
-                    .build();
+                        .uri(createUri)
+                        .body(DataStream.ofBytes(testCase.getBody().map(mapper).orElse(new byte[0])))
+                        .httpVersion(HttpVersion.HTTP_1_1)
+                        .method(testCase.getMethod())
+                        .headers(headers)
+                        .build();
                 invocationContexts.add(
-                    new ServerRequestInvocationContext(
-                        testCase,
-                        (ApiOperation<SerializableStruct, SerializableStruct>) testOperation.operationModel(),
-                        serverTestOperation.mockOperation(),
-                        mockClient,
-                        request
-                    )
-                );
+                        new ServerRequestInvocationContext(
+                                testCase,
+                                (ApiOperation<SerializableStruct, SerializableStruct>) testOperation.operationModel(),
+                                serverTestOperation.mockOperation(),
+                                mockClient,
+                                request));
             }
         }
         return invocationContexts.stream();
@@ -105,16 +103,14 @@ public class HttpServerRequestProtocolTestProvider extends
         try {
             //Can't pass query params directly because Java URL encoding double encodes
             return URI.create(
-                new URI(
-                    endpoint.getScheme(),
-                    endpoint.getUserInfo(),
-                    endpoint.getHost(),
-                    endpoint.getPort(),
-                    path,
-                    null,
-                    null
-                ) + query
-            );
+                    new URI(
+                            endpoint.getScheme(),
+                            endpoint.getUserInfo(),
+                            endpoint.getHost(),
+                            endpoint.getPort(),
+                            path,
+                            null,
+                            null) + query);
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
@@ -126,9 +122,9 @@ public class HttpServerRequestProtocolTestProvider extends
             var key = headerEntry.getKey();
             var value = headerEntry.getValue();
             if (key.equalsIgnoreCase("x-timestamplist")
-                || key.equalsIgnoreCase("x-memberhttpdate")
-                || key.equalsIgnoreCase("x-defaultformat")
-                || key.equalsIgnoreCase("x-targethttpdate")) {
+                    || key.equalsIgnoreCase("x-memberhttpdate")
+                    || key.equalsIgnoreCase("x-defaultformat")
+                    || key.equalsIgnoreCase("x-targethttpdate")) {
                 List<String> result = new ArrayList<>();
                 String[] split = value.split(", ");
                 for (int i = 0; i < split.length; i += 2) {
@@ -184,12 +180,11 @@ public class HttpServerRequestProtocolTestProvider extends
     }
 
     private record ServerRequestInvocationContext(
-        HttpRequestTestCase testCase,
-        ApiOperation<SerializableStruct, SerializableStruct> operationModel,
-        MockOperation mockOperation,
-        ServerTestClient client,
-        HttpRequest request
-    ) implements TestTemplateInvocationContext {
+            HttpRequestTestCase testCase,
+            ApiOperation<SerializableStruct, SerializableStruct> operationModel,
+            MockOperation mockOperation,
+            ServerTestClient client,
+            HttpRequest request) implements TestTemplateInvocationContext {
 
         @Override
         public String getDisplayName(int invocationIndex) {
@@ -199,57 +194,53 @@ public class HttpServerRequestProtocolTestProvider extends
         @Override
         public List<Extension> getAdditionalExtensions() {
             return List.of(
-                new ProtocolTestParameterResolver() {
+                    new ProtocolTestParameterResolver() {
 
-                    @Override
-                    @SuppressFBWarnings(
-                        value = "DE_MIGHT_IGNORE",
-                        justification = "We need to swallow all exceptions from the client because we are only validating requests."
-                    )
-                    public void test() {
-                        mockOperation.reset();
-                        var response = operationModel.outputBuilder()
-                            .errorCorrection()
-                            .build();
-                        mockOperation.setResponse(response);
-                        try {
-                            client.sendRequest(request);
-                        } catch (Exception ignored) {}
-                        var inputBuilder = operationModel.inputBuilder();
-                        new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
-                            .deserializeInto(inputBuilder);
-                        // Compare as documents so any datastream members are correctly compared.
-                        assertThat((Object) mockOperation.getRequest())
-                            // Compare objects by field
-                            .usingRecursiveComparison(
-                                ComparisonUtils.getComparisonConfig()
-                            )
-                            .isEqualTo(inputBuilder.build());
-                    }
-                }
-            );
+                        @Override
+                        @SuppressFBWarnings(
+                                value = "DE_MIGHT_IGNORE",
+                                justification = "We need to swallow all exceptions from the client because we are only validating requests.")
+                        public void test() {
+                            mockOperation.reset();
+                            var response = operationModel.outputBuilder()
+                                    .errorCorrection()
+                                    .build();
+                            mockOperation.setResponse(response);
+                            try {
+                                client.sendRequest(request);
+                            } catch (Exception ignored) {}
+                            var inputBuilder = operationModel.inputBuilder();
+                            new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
+                                    .deserializeInto(inputBuilder);
+                            // Compare as documents so any datastream members are correctly compared.
+                            assertThat((Object) mockOperation.getRequest())
+                                    // Compare objects by field
+                                    .usingRecursiveComparison(
+                                            ComparisonUtils.getComparisonConfig())
+                                    .isEqualTo(inputBuilder.build());
+                        }
+                    });
         }
     }
 
     private static final Set<Character> HEADER_DELIMS = Set.of(
-        '"',
-        '(',
-        ')',
-        ',',
-        '/',
-        ':',
-        ';',
-        '<',
-        '=',
-        '>',
-        '?',
-        '@',
-        '[',
-        '\\',
-        ']',
-        '{',
-        '}'
-    );
+            '"',
+            '(',
+            ')',
+            ',',
+            '/',
+            ':',
+            ';',
+            '<',
+            '=',
+            '>',
+            '?',
+            '@',
+            '[',
+            '\\',
+            ']',
+            '{',
+            '}');
 
     static boolean isHeaderDelimiter(char c) {
         return HEADER_DELIMS.contains(c);

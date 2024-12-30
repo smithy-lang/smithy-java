@@ -22,13 +22,13 @@ import software.amazon.smithy.model.shapes.ShapeType;
 final class Documents {
 
     static final Schema LIST_SCHEMA = Schema.listBuilder(PreludeSchemas.DOCUMENT.id())
-        .putMember("member", PreludeSchemas.DOCUMENT)
-        .build();
+            .putMember("member", PreludeSchemas.DOCUMENT)
+            .build();
 
     static final Schema STR_MAP_SCHEMA = Schema.mapBuilder(PreludeSchemas.DOCUMENT.id())
-        .putMember("key", PreludeSchemas.STRING)
-        .putMember("value", PreludeSchemas.DOCUMENT)
-        .build();
+            .putMember("key", PreludeSchemas.STRING)
+            .putMember("value", PreludeSchemas.DOCUMENT)
+            .build();
 
     private Documents() {}
 
