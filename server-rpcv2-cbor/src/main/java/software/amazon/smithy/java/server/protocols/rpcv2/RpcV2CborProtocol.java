@@ -10,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.cbor.Rpcv2CborCodec;
 import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.framework.model.MalformedRequestException;
 import software.amazon.smithy.java.framework.model.UnknownOperationException;
 import software.amazon.smithy.java.io.ByteBufferOutputStream;
@@ -71,18 +72,15 @@ final class RpcV2CborProtocol extends ServerProtocol {
     }
 
     @Override
-    public CompletableFuture<Void> deserializeInput(Job job) {
+    protected CompletableFuture<ShapeDeserializer> getDeserializer(
+            Job job
+    ) {
         var dataStream = job.request().getDataStream();
         if (dataStream.contentLength() > 0 && !"application/cbor".equals(dataStream.contentType())) {
             throw MalformedRequestException.builder().message("Invalid content type").build();
         }
-        return dataStream.asByteBuffer().thenApply(b -> {
-            var input = codec.deserializeShape(
-                    dataStream.waitForByteBuffer(),
-                    job.operation().getApiOperation().inputBuilder());
-            job.request().setDeserializedValue(input);
-            return null;
-        });
+        return dataStream.asByteBuffer()
+                .thenApply(codec::createDeserializer);
     }
 
     @Override

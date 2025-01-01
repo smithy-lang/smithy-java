@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
@@ -59,7 +60,7 @@ public interface ShapeSerializer extends Flushable, AutoCloseable {
      * @param size      Number of elements in the list, or -1 if unknown.
      * @param consumer  Received in the context of the list and writes zero or more values.
      */
-    <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer);
+    <T extends List<?>> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer);
 
     /**
      * Begin a map and write zero or more entries into it using the provided serializer.

@@ -224,6 +224,27 @@ public class JsonDeserializerTest {
     }
 
     @Test
+    public void deserializesStructInsideList() {
+        try (var codec = JsonCodec.builder().build()) {
+            var de = codec.createDeserializer("""
+                    [{"name":"Sam"}]
+                    """.getBytes(StandardCharsets.UTF_8));
+            List<String> values = new ArrayList<>();
+
+            de.readList(PreludeSchemas.DOCUMENT, null, (ignore, firstList) -> {
+                de.readStruct(JsonTestData.BIRD, new LinkedHashSet<>(), (memberResult, member, deser) -> {
+                    memberResult.add(member.memberName());
+                    switch (member.memberName()) {
+                        case "name" -> assertThat(deser.readString(JsonTestData.BIRD.member("name")), equalTo("Sam"));
+                        case "color" -> assertThat(deser.readString(JsonTestData.BIRD.member("color")), equalTo("red"));
+                        default -> throw new IllegalStateException("Unexpected member: " + member);
+                    }
+                });
+            });
+        }
+    }
+
+    @Test
     public void deserializesMap() {
         try (var codec = JsonCodec.builder().build()) {
             var de = codec.createDeserializer("{\"foo\":\"bar\",\"baz\":\"bam\"}".getBytes(StandardCharsets.UTF_8));

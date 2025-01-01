@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.List;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -37,7 +38,12 @@ final class SchemaInterceptingSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T extends List<?>> void writeList(
+            Schema schema,
+            T listState,
+            int size,
+            BiConsumer<T, ShapeSerializer> consumer
+    ) {
         delegateSerializer.writeList(delegateSchema, listState, size, (s, ls) -> {
             consumer.accept(s, new SchemaInterceptingSerializer(service, delegateSchema.listMember(), ls));
         });

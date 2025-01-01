@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.List;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -27,7 +28,12 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T extends List<?>> void writeList(
+            Schema schema,
+            T listState,
+            int size,
+            BiConsumer<T, ShapeSerializer> consumer
+    ) {
         consumer.accept(listState, this);
     }
 

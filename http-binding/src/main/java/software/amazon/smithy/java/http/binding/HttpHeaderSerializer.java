@@ -13,6 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -30,7 +31,12 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T extends List<?>> void writeList(
+            Schema schema,
+            T listState,
+            int size,
+            BiConsumer<T, ShapeSerializer> consumer
+    ) {
         // Consumer is generally going to be something generic - like a shared serializer for iterating
         // lists of strings and writing them back out to the delegate serializer (this). However, this
         // means writeHeader, below, will receive something like the schema for smithy.api#String

@@ -205,6 +205,7 @@ public final class SchemaBuilder {
     }
 
     record ValidationState(
+            boolean hasRangeConstraint,
             long minLengthConstraint,
             long maxLengthConstraint,
             BigDecimal minRangeConstraint,
@@ -224,6 +225,7 @@ public final class SchemaBuilder {
             double minDoubleConstraint;
             double maxDoubleConstraint;
             ValidatorOfString stringValidation;
+            boolean hasRangeConstraint;
 
             // Precompute an allowed range, setting Long.MIN and Long.MAX when missing.
             LengthTrait lengthTrait = traits.get(TraitKey.LENGTH_TRAIT);
@@ -254,6 +256,8 @@ public final class SchemaBuilder {
                 minRangeConstraint = null;
                 maxRangeConstraint = null;
             }
+
+            hasRangeConstraint = maxRangeConstraint != null || minRangeConstraint != null;
 
             // Pre-compute allowable ranges so this doesn't have to be looked up during validation.
             // BigInteger and BigDecimal just use the rangeConstraint BigDecimal directly.
@@ -311,6 +315,7 @@ public final class SchemaBuilder {
             }
 
             return new ValidationState(
+                    hasRangeConstraint,
                     minLengthConstraint,
                     maxLengthConstraint,
                     minRangeConstraint,

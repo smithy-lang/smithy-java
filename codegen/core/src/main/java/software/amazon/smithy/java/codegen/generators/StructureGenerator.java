@@ -228,10 +228,10 @@ public final class StructureGenerator<
                                         memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER));
                                 writer.putContext("collections", Collections.class);
                                 writer.write(
-                                        "this.${memberName:L} = ${?nullable}builder.${memberName:L} == null ? null : ${/nullable}${collections:T}.${wrapper:L}(builder.${memberName:L});");
+                                        "this.${memberName:L} = builder.${memberName:L} == null ? null : ${collections:T}.${wrapper:L}(builder.${memberName:L});");
                             } else if (target.isBlobShape() && !CodegenUtils.isStreamingBlob(target)) {
                                 writer.write(
-                                        "this.${memberName:L} = ${?nullable}builder.${memberName:L} == null ? null : ${/nullable}builder.${memberName:L}.duplicate();");
+                                        "this.${memberName:L} = builder.${memberName:L} == null ? null : builder.${memberName:L}.duplicate();");
                             } else {
                                 writer.write("this.${memberName:L} = builder.${memberName:L};");
                             }
@@ -692,6 +692,7 @@ public final class StructureGenerator<
 
             // Add presence tracker if any members are required by validation.
             if (shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault)) {
+                writer.write("private boolean disableChecks = false;");
                 writer.putContext("tracker", PresenceTracker.class);
                 writer.write("private final ${tracker:T} tracker = ${tracker:T}.of($$SCHEMA);");
             }
@@ -728,11 +729,13 @@ public final class StructureGenerator<
             writer.putContext("objects", Objects.class);
             writer.putContext("throwable", Throwable.class);
             for (var member : shape.members()) {
+                boolean isTracked = CodegenUtils.isRequiredWithNoDefault(member);
+                boolean requiresNullCheck = CodegenUtils.requiresSetterNullCheck(symbolProvider, member);
                 writer.pushState(new BuilderSetterSection(member));
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
                 writer.putContext("memberSymbol", symbolProvider.toSymbol(member));
-                writer.putContext("tracked", CodegenUtils.isRequiredWithNoDefault(member));
-                writer.putContext("check", CodegenUtils.requiresSetterNullCheck(symbolProvider, member));
+                writer.putContext("tracked", isTracked);
+                writer.putContext("check", requiresNullCheck);
                 writer.putContext("schemaName", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
 
                 writer.write(
@@ -743,6 +746,16 @@ public final class StructureGenerator<
                                     return this;
                                 }
                                 """);
+
+                if (isTracked || requiresNullCheck) {
+                    writer.write(
+                            """
+                                    private Builder ${memberName:L}NoCheck(${memberSymbol:T} ${memberName:L}) {
+                                        this.${memberName:L} = ${memberName:L};
+                                        return this;
+                                    }
+                                    """);
+                }
                 writer.popState();
             }
             if (shape.hasTrait(ErrorTrait.class)) {
@@ -775,7 +788,9 @@ public final class StructureGenerator<
             writer.write("""
                     @Override
                     public ${shape:N} build() {${?hasRequiredMembers}
-                        tracker.validate();${/hasRequiredMembers}
+                        if (!disableChecks) {
+                            tracker.validate();
+                        }${/hasRequiredMembers}
                         return new ${shape:T}(this);
                     }
                     """);

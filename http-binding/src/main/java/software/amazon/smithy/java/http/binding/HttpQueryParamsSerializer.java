@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.http.binding;
 
+import java.util.List;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.MapSerializer;
@@ -42,7 +43,7 @@ final class HttpQueryParamsSerializer extends SpecificShapeSerializer {
                 }
 
                 @Override
-                public <L> void writeList(
+                public <L extends List<?>> void writeList(
                         Schema schema,
                         L listState,
                         int size,

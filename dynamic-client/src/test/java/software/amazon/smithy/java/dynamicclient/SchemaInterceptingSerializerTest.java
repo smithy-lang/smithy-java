@@ -140,7 +140,12 @@ public class SchemaInterceptingSerializerTest {
 
         wrapped.serialize(new SpecificShapeSerializer() {
             @Override
-            public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+            public <T extends List<?>> void writeList(
+                    Schema schema,
+                    T listState,
+                    int size,
+                    BiConsumer<T, ShapeSerializer> consumer
+            ) {
                 assertThat(schema, equalTo(listSchema));
 
                 consumer.accept(listState, new SpecificShapeSerializer() {

@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.List;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -143,7 +144,12 @@ final class ValidatorOfStruct implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema member, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T extends List<?>> void writeList(
+            Schema member,
+            T state,
+            int size,
+            BiConsumer<T, ShapeSerializer> consumer
+    ) {
         structValidator.setMember(member);
         validator.pushPath(member.memberName());
         validator.writeList(member, state, size, consumer);

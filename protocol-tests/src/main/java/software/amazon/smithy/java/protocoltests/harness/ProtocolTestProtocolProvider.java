@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.Job;
 import software.amazon.smithy.java.server.core.ProtocolResolver;
@@ -98,6 +99,14 @@ public class ProtocolTestProtocolProvider implements ServerProtocolProvider {
                 return CompletableFuture.completedFuture(null);
             }
             throw new IllegalStateException("Should not be invoked if no protocol was selected");
+        }
+
+        @Override
+        protected CompletableFuture<ShapeDeserializer> getDeserializer(
+                Job job
+        ) {
+            throw new IllegalStateException(
+                    "Should not be invoked because we are overriding deserializeInput directly.");
         }
 
         @Override

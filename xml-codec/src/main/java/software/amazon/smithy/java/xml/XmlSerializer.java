@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.List;
 import java.util.function.BiConsumer;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
@@ -172,7 +173,12 @@ final class XmlSerializer extends InterceptingSerializer {
         }
 
         @Override
-        public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+        public <T extends List<?>> void writeList(
+                Schema schema,
+                T listState,
+                int size,
+                BiConsumer<T, ShapeSerializer> consumer
+        ) {
             var info = xmlInfo.getListInfo(schema);
             consumer.accept(listState, new XmlListItemSerializer(info));
         }

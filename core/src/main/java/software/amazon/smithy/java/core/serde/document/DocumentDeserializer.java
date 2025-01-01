@@ -9,6 +9,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
@@ -149,7 +151,7 @@ public class DocumentDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
+    public <T extends List<?>> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
         for (var element : value.asList()) {
             listMemberConsumer.accept(state, deserializer(element));
         }
@@ -161,7 +163,11 @@ public class DocumentDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
+    public <T extends Map<?, ?>> void readStringMap(
+            Schema schema,
+            T state,
+            MapMemberConsumer<String, T> mapMemberConsumer
+    ) {
         var map = value.asStringMap();
         for (var entry : map.entrySet()) {
             mapMemberConsumer.accept(state, entry.getKey(), deserializer(entry.getValue()));

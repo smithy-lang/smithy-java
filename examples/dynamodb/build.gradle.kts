@@ -21,4 +21,8 @@ tasks {
     spotbugsMain {
         enabled = false
     }
+
+    spotbugsJmh {
+        enabled = false
+    }
 }

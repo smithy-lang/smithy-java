@@ -9,6 +9,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -100,12 +102,16 @@ public abstract class SpecificShapeDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
+    public <T extends List<?>> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
         throw throwForInvalidState(schema);
     }
 
     @Override
-    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer) {
+    public <T extends Map<?, ?>> void readStringMap(
+            Schema schema,
+            T state,
+            MapMemberConsumer<String, T> consumer
+    ) {
         throw throwForInvalidState(schema);
     }
 

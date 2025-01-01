@@ -43,6 +43,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
     private final BindingMatcher bindingMatcher;
     private final DataStream body;
     private final EventDecoderFactory<?> eventDecoderFactory;
+    private final boolean deserializeSynchronously;
     private CompletableFuture<Void> bodyDeserializationCf;
     private final String payloadMediaType;
 
@@ -56,6 +57,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         this.responseStatus = builder.responseStatus;
         this.requestPathLabels = builder.requestPathLabels;
         this.payloadMediaType = builder.payloadMediaType;
+        this.deserializeSynchronously = builder.deserializeSynchronously;
     }
 
     static Builder builder() {
@@ -130,11 +132,18 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                         });
                     } else if (member.type() == ShapeType.STRUCTURE || member.type() == ShapeType.UNION) {
                         // Read the payload into a byte buffer to deserialize a shape in the body.
-                        bodyDeserializationCf = bodyAsByteBuffer().thenAccept(bb -> {
+                        if (deserializeSynchronously) {
+                            var bb = body.waitForByteBuffer();
                             if (bb.remaining() > 0) {
                                 structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bb));
                             }
-                        }).toCompletableFuture();
+                        } else {
+                            bodyDeserializationCf = body.asByteBuffer().thenAccept(bb -> {
+                                if (bb.remaining() > 0) {
+                                    structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bb));
+                                }
+                            }).toCompletableFuture();
+                        }
                     } else if (body != null && body.contentLength() > 0) {
                         structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
                     }
@@ -149,24 +158,32 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         // Now parse members in the payload of body.
         if (bindingMatcher.hasBody()) {
             validateMediaType();
-            // Need to read the entire payload into a byte buffer to deserialize via a codec.
-            bodyDeserializationCf = bodyAsByteBuffer().thenAccept(bb -> {
-                payloadCodec.createDeserializer(bb).readStruct(schema, bindingMatcher, (body, m, de) -> {
-                    if (bindingMatcher.match(m) == BindingMatcher.Binding.BODY) {
-                        structMemberConsumer.accept(state, m, de);
-                    }
-                });
-            });
+            if (this.deserializeSynchronously) {
+                deserializeBody(schema, state, structMemberConsumer, body.waitForByteBuffer());
+            } else {
+                // Need to read the entire payload into a byte buffer to deserialize via a codec.
+                bodyDeserializationCf = body.asByteBuffer()
+                        .thenAccept(bb -> deserializeBody(schema, state, structMemberConsumer, bb));
+            }
         }
+
+    }
+
+    private <T> void deserializeBody(
+            Schema schema,
+            T state,
+            StructMemberConsumer<T> structMemberConsumer,
+            ByteBuffer bb
+    ) {
+        payloadCodec.createDeserializer(bb).readStruct(schema, bindingMatcher, (body, m, de) -> {
+            if (bindingMatcher.match(m) == BindingMatcher.Binding.BODY) {
+                structMemberConsumer.accept(state, m, de);
+            }
+        });
     }
 
     private static boolean isEventStream(Schema member) {
         return member.type() == ShapeType.UNION && member.hasTrait(TraitKey.STREAMING_TRAIT);
-    }
-
-    // TODO: Should there be a configurable limit on the client/server for how much can be read in memory?
-    private CompletableFuture<ByteBuffer> bodyAsByteBuffer() {
-        return body.asByteBuffer();
     }
 
     CompletableFuture<Void> completeBodyDeserialization() {
@@ -197,6 +214,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         private EventDecoderFactory<?> eventDecoderFactory;
         private String payloadMediaType;
         private BindingMatcher bindingMatcher;
+        private boolean deserializeSynchronously = false;
 
         private Builder() {}
 
@@ -263,6 +281,9 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          */
         Builder body(DataStream body) {
             this.body = body;
+            if (body.hasByteBuffer()) {
+                this.deserializeSynchronously = true;
+            }
             return this;
         }
 
@@ -289,6 +310,11 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
 
         Builder bindingMatcher(BindingMatcher bindingMatcher) {
             this.bindingMatcher = bindingMatcher;
+            return this;
+        }
+
+        Builder deserializeSynchronously() {
+            this.deserializeSynchronously = true;
             return this;
         }
     }

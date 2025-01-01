@@ -24,7 +24,11 @@ final class HttpQueryParamsDeserializer extends SpecificShapeDeserializer {
     }
 
     @Override
-    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer) {
+    public <T extends Map<?, ?>> void readStringMap(
+            Schema schema,
+            T state,
+            MapMemberConsumer<String, T> consumer
+    ) {
         for (Map.Entry<String, List<String>> e : queryParams.entrySet()) {
             consumer.accept(state, e.getKey(), new HttpQueryStringDeserializer(e.getValue()));
         }

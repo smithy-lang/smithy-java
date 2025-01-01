@@ -11,6 +11,8 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.SerializationException;
@@ -148,12 +150,16 @@ abstract class BasicStringValueDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
+    public <T extends List<?>> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
         throw new UnsupportedOperationException("Lists are not supported in " + location);
     }
 
     @Override
-    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
+    public <T extends Map<?, ?>> void readStringMap(
+            Schema schema,
+            T state,
+            MapMemberConsumer<String, T> mapMemberConsumer
+    ) {
         throw new UnsupportedOperationException("Maps are not supported in HTTP " + location);
     }
 

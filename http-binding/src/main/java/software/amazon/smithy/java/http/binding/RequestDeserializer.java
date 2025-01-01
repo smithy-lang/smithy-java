@@ -9,8 +9,8 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import software.amazon.smithy.java.core.schema.Schema;
-import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.Frame;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -22,8 +22,8 @@ import software.amazon.smithy.java.io.datastream.DataStream;
 public final class RequestDeserializer {
 
     private final HttpBindingDeserializer.Builder deserBuilder = HttpBindingDeserializer.builder();
-    private ShapeBuilder<?> inputShapeBuilder;
     private final ConcurrentMap<Schema, BindingMatcher> bindingCache;
+    private DataStream body;
 
     RequestDeserializer(ConcurrentMap<Schema, BindingMatcher> bindingCache) {
         this.bindingCache = bindingCache;
@@ -66,17 +66,12 @@ public final class RequestDeserializer {
         deserBuilder.headers(request.headers())
                 .requestRawQueryString(request.uri().getRawQuery())
                 .body(bodyDataStream);
+        this.body = bodyDataStream;
         return this;
     }
 
-    /**
-     * Input shape builder to populate from the request.
-     *
-     * @param inputShapeBuilder Output shape builder.
-     * @return Returns the deserializer.
-     */
-    public RequestDeserializer inputShapeBuilder(ShapeBuilder<?> inputShapeBuilder) {
-        this.inputShapeBuilder = inputShapeBuilder;
+    public RequestDeserializer schema(Schema schema) {
+        deserBuilder.bindingMatcher(bindingCache.computeIfAbsent(schema, BindingMatcher::requestMatcher));
         return this;
     }
 
@@ -97,18 +92,9 @@ public final class RequestDeserializer {
     }
 
     /**
-     * Finish setting up and deserialize the response into the builder.
+     *  Return a ShapeDeserializer.
      */
-    public CompletableFuture<Void> deserialize() {
-        if (inputShapeBuilder == null) {
-            throw new IllegalStateException("inputShapeBuilder must be set");
-        }
-
-        var matcher = bindingCache.computeIfAbsent(inputShapeBuilder.schema(), BindingMatcher::requestMatcher);
-        deserBuilder.bindingMatcher(matcher);
-        HttpBindingDeserializer deserializer = deserBuilder.build();
-
-        inputShapeBuilder.deserialize(deserializer);
-        return deserializer.completeBodyDeserialization();
+    public CompletableFuture<ShapeDeserializer> build() {
+        return body.asByteBuffer().thenApply(i -> deserBuilder.build());
     }
 }

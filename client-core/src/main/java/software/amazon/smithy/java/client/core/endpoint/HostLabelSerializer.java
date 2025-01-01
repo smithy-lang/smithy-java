@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -98,7 +99,12 @@ final class HostLabelSerializer extends SpecificShapeSerializer implements Shape
         }
 
         @Override
-        public <T> void writeList(Schema schema, T listState, int size, BiConsumer<T, ShapeSerializer> consumer) {
+        public <T extends List<?>> void writeList(
+                Schema schema,
+                T listState,
+                int size,
+                BiConsumer<T, ShapeSerializer> consumer
+        ) {
             // ignore
         }
 

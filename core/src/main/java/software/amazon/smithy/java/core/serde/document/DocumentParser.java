@@ -88,7 +88,12 @@ public final class DocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T extends List<?>> void writeList(
+            Schema schema,
+            T state,
+            int size,
+            BiConsumer<T, ShapeSerializer> consumer
+    ) {
         List<Document> elements = size == -1 ? new ArrayList<>() : new ArrayList<>(size);
         var elementParser = new DocumentParser();
         ListSerializer serializer = new ListSerializer(elementParser, position -> {

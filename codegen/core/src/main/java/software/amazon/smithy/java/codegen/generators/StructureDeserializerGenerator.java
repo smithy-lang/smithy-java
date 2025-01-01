@@ -30,13 +30,15 @@ record StructureDeserializerGenerator(
                         @Override
                         public Builder deserialize(${shapeDeserializer:N} decoder) {${?isError}
                             this.$$deserialized = true;${/isError}
-                            decoder.readStruct($$SCHEMA, this, $$InnerDeserializer.INSTANCE);
+                            decoder.readStruct($$SCHEMA, this, $$InnerDeserializer.INSTANCE);${?hasChecks}
+                            this.disableChecks = true;${/hasChecks}
                             return this;
                         }
 
                         @Override
                         public Builder deserializeMember(${shapeDeserializer:N} decoder, ${sdkSchema:N} schema) {
-                            decoder.readStruct(schema.assertMemberTargetIs($$SCHEMA), this, $$InnerDeserializer.INSTANCE);
+                            decoder.readStruct(schema.assertMemberTargetIs($$SCHEMA), this, $$InnerDeserializer.INSTANCE);${?hasChecks}
+                            this.disableChecks = true;${/hasChecks}
                             return this;
                         }
 
@@ -64,6 +66,8 @@ record StructureDeserializerGenerator(
         writer.putContext("union", shape.isUnionShape());
         writer.putContext("illegalArg", IllegalArgumentException.class);
         writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
+        writer.putContext("hasChecks",
+                shape.isUnionShape() || shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault));
         writer.write(template);
         writer.popState();
     }
@@ -72,10 +76,18 @@ record StructureDeserializerGenerator(
         int idx = 0;
         for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {
             var member = iter.next();
+            boolean isTracked = CodegenUtils.isRequiredWithNoDefault(member);
+            boolean requiresNullCheck = CodegenUtils.requiresSetterNullCheck(symbolProvider, member);
             writer.pushState();
-            writer.putContext("memberName", symbolProvider.toMemberName(member));
+            var memberName = symbolProvider.toMemberName(member);
+            var builderMethodName = memberName;
+            if (isTracked || requiresNullCheck) {
+                builderMethodName = memberName + "NoCheck";
+            }
+            writer.putContext("memberName", memberName);
+            writer.putContext("builderMethodName", builderMethodName);
             writer.write(
-                    "case $L -> builder.${memberName:L}($C);",
+                    "case $L -> builder.${builderMethodName:L}($C);",
                     idx,
                     new DeserializerGenerator(writer, member, symbolProvider, model, service, "de", "member"));
             writer.popState();

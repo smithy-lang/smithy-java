@@ -276,7 +276,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
+    public <T extends List<?>> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
         try {
             for (var token = parser.nextToken(); token != END_ARRAY; token = parser.nextToken()) {
                 listMemberConsumer.accept(state, this);
@@ -287,7 +287,11 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> mapMemberConsumer) {
+    public <T extends Map<?, ?>> void readStringMap(
+            Schema schema,
+            T state,
+            MapMemberConsumer<String, T> mapMemberConsumer
+    ) {
         try {
             for (var fieldName = parser.nextFieldName(); fieldName != null; fieldName = parser.nextFieldName()) {
                 parser.nextToken();

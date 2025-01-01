@@ -16,7 +16,11 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  * Tracks the presence of required fields
  */
 @SmithyInternalApi
-public abstract sealed class PresenceTracker {
+public abstract sealed class PresenceTracker permits
+        PresenceTracker.BigRequiredMemberPresenceTracker,
+        PresenceTracker.NoOpPresenceTracker,
+        PresenceTracker.RequiredMemberPresenceTracker,
+        ShapeValidator.UnionPresenceTracker {
 
     /**
      * Sets a member as present.

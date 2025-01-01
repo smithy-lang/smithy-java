@@ -73,6 +73,8 @@ public abstract sealed class Schema implements MemberLookup
     final double maxDoubleConstraint;
     final ValidatorOfString stringValidation;
     final boolean uniqueItemsConstraint;
+    final boolean hasRangeConstraint;
+    final String rangeValidationFailureMessage;
 
     private Schema listMember;
     private Schema mapKeyMember;
@@ -107,6 +109,7 @@ public abstract sealed class Schema implements MemberLookup
 
         // Even root-level shapes have computed validation information to allow for validating root strings directly.
         var validationState = SchemaBuilder.ValidationState.of(type, traits, stringEnumValues);
+        this.hasRangeConstraint = validationState.hasRangeConstraint();
         this.minLengthConstraint = validationState.minLengthConstraint();
         this.maxLengthConstraint = validationState.maxLengthConstraint();
         this.minLongConstraint = validationState.minLongConstraint();
@@ -117,6 +120,13 @@ public abstract sealed class Schema implements MemberLookup
         this.maxRangeConstraint = validationState.maxRangeConstraint();
         this.stringValidation = validationState.stringValidation();
         this.uniqueItemsConstraint = type == ShapeType.LIST && hasTrait(TraitKey.UNIQUE_ITEMS_TRAIT);
+
+        if (this.minRangeConstraint != null || this.maxRangeConstraint != null) {
+            this.rangeValidationFailureMessage = ValidationError.RangeValidationFailure
+                    .createMessage(this.minRangeConstraint, this.maxRangeConstraint);
+        } else {
+            this.rangeValidationFailureMessage = null;
+        }
 
         // Only use the slow version of required member validation if there are > 64 required members.
         this.requiredMemberCount = SchemaBuilder.computeRequiredMemberCount(type, members);
@@ -139,6 +149,7 @@ public abstract sealed class Schema implements MemberLookup
         this.requiredMemberCount = builder.requiredMemberCount;
         this.isRequiredByValidation = builder.isRequiredByValidation;
 
+        this.hasRangeConstraint = builder.validationState.hasRangeConstraint();
         this.minLengthConstraint = builder.validationState.minLengthConstraint();
         this.maxLengthConstraint = builder.validationState.maxLengthConstraint();
         this.minRangeConstraint = builder.validationState.minRangeConstraint();
@@ -149,6 +160,13 @@ public abstract sealed class Schema implements MemberLookup
         this.minDoubleConstraint = builder.validationState.minDoubleConstraint();
         this.maxDoubleConstraint = builder.validationState.maxDoubleConstraint();
         this.uniqueItemsConstraint = type == ShapeType.LIST && hasTrait(TraitKey.UNIQUE_ITEMS_TRAIT);
+
+        if (this.minRangeConstraint != null || this.maxRangeConstraint != null) {
+            this.rangeValidationFailureMessage = ValidationError.RangeValidationFailure
+                    .createMessage(this.minRangeConstraint, this.maxRangeConstraint);
+        } else {
+            this.rangeValidationFailureMessage = null;
+        }
 
         // Compute the expected bitfield, and adjust how it's computed based on if the target is a builder or not.
         if (builder.target != null) {

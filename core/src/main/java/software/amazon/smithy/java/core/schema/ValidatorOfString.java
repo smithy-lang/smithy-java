@@ -8,11 +8,9 @@ package software.amazon.smithy.java.core.schema;
 import java.util.List;
 import java.util.regex.Pattern;
 
-abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValidation,
-        ValidatorOfString.EnumStringValidator,
-        ValidatorOfString.LengthStringValidator,
-        ValidatorOfString.PatternStringValidator,
-        ValidatorOfString.CompositeStringValidator {
+abstract sealed class ValidatorOfString {
+
+    abstract void apply(Schema schema, String value, ShapeValidator validator);
 
     abstract void apply(Schema schema, String value, Validator.ShapeValidator validator);
 
@@ -30,7 +28,12 @@ abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValida
         static final NoStringValidation INSTANCE = new NoStringValidation();
 
         @Override
-        public void apply(Schema schema, String value, Validator.ShapeValidator validator) {}
+        public void apply(Schema schema, String value, ShapeValidator validator) {}
+
+        @Override
+        void apply(Schema schema, String value, Validator.ShapeValidator validator) {
+
+        }
     }
 
     static final class CompositeStringValidator extends ValidatorOfString {
@@ -41,7 +44,14 @@ abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValida
         }
 
         @Override
-        public void apply(Schema schema, String value, Validator.ShapeValidator validator) {
+        public void apply(Schema schema, String value, ShapeValidator validator) {
+            for (var v : validators) {
+                v.apply(schema, value, validator);
+            }
+        }
+
+        @Override
+        void apply(Schema schema, String value, Validator.ShapeValidator validator) {
             for (var v : validators) {
                 v.apply(schema, value, validator);
             }
@@ -59,7 +69,21 @@ abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValida
         }
 
         @Override
-        public void apply(Schema schema, String value, Validator.ShapeValidator validator) {
+        public void apply(Schema schema, String value, ShapeValidator validator) {
+            if (value == null) {
+                return;
+            }
+            var length = value.codePointCount(0, value.length());
+            if (length < min || length > max) {
+                validator.addError(new ValidationError.LengthValidationFailure(validator.createPath(), length, schema));
+            }
+        }
+
+        @Override
+        void apply(Schema schema, String value, Validator.ShapeValidator validator) {
+            if (value == null) {
+                return;
+            }
             var length = value.codePointCount(0, value.length());
             if (length < min || length > max) {
                 validator.addError(new ValidationError.LengthValidationFailure(validator.createPath(), length, schema));
@@ -76,7 +100,31 @@ abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValida
         }
 
         @Override
-        public void apply(Schema schema, String value, Validator.ShapeValidator validator) {
+        public void apply(Schema schema, String value, ShapeValidator validator) {
+            if (value == null) {
+                return;
+            }
+            try {
+                // Note: using Matcher#find() here and not Matcher#match() because Smithy expects patterns to be rooted
+                // with ^ and $ to get the same behavior as #match().
+                if (!pattern.matcher(value).find()) {
+                    validator.addError(
+                            new ValidationError.PatternValidationFailure(validator.createPath(), value, schema));
+                }
+            } catch (StackOverflowError e) {
+                throw new StackOverflowError(
+                        String.format(
+                                "Pattern '%s' is too expensive to evaluate against given input. Please "
+                                        + "refactor your pattern to be more performant",
+                                pattern));
+            }
+        }
+
+        @Override
+        void apply(Schema schema, String value, Validator.ShapeValidator validator) {
+            if (value == null) {
+                return;
+            }
             try {
                 // Note: using Matcher#find() here and not Matcher#match() because Smithy expects patterns to be rooted
                 // with ^ and $ to get the same behavior as #match().
@@ -98,7 +146,20 @@ abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValida
         static final EnumStringValidator INSTANCE = new EnumStringValidator();
 
         @Override
-        public void apply(Schema schema, String value, Validator.ShapeValidator validator) {
+        public void apply(Schema schema, String value, ShapeValidator validator) {
+            if (value == null) {
+                return;
+            }
+            if (!schema.stringEnumValues().contains(value)) {
+                validator.addError(new ValidationError.EnumValidationFailure(validator.createPath(), value, schema));
+            }
+        }
+
+        @Override
+        void apply(Schema schema, String value, Validator.ShapeValidator validator) {
+            if (value == null) {
+                return;
+            }
             if (!schema.stringEnumValues().contains(value)) {
                 validator.addError(new ValidationError.EnumValidationFailure(validator.createPath(), value, schema));
             }

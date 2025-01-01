@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -130,7 +131,7 @@ public class ToStringSerializerTest {
 
         var str = ToStringSerializer.serialize(e -> {
             e.writeStruct(schema, TestHelper.create(schema, (s, ser) -> {
-                ser.writeList(s.member("foo"), listSchema, 2, (innerListSchema, ls) -> {
+                ser.writeList(s.member("foo"), new ArrayList<>(), 2, (innerListSchema, ls) -> {
                     ls.writeString(listSchema.member("member"), "a");
                     ls.writeString(listSchema.member("member"), "b");
                 });

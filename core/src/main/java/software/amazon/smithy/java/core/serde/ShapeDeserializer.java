@@ -9,6 +9,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -141,7 +143,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param state    State to pass to the consumer.
      * @param consumer Consumer that receives the state and deserializer.
      */
-    <T> void readList(Schema schema, T state, ListMemberConsumer<T> consumer);
+    <T extends List<?>> void readList(Schema schema, T state, ListMemberConsumer<T> consumer);
 
     /**
      * If the value about to be read is a list or map, returns the number of entries it contains.
@@ -162,7 +164,7 @@ public interface ShapeDeserializer extends AutoCloseable {
      * @param state    State to pass to the consumer.
      * @param consumer Consumer that receives the state, map key, and deserializer.
      */
-    <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer);
+    <T extends Map<?, ?>> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer);
 
     /**
      *

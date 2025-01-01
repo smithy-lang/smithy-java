@@ -11,15 +11,14 @@ public final class ProtocolHandler implements Handler {
 
     @Override
     public CompletableFuture<Void> before(Job job) {
-        // TODO: Failures here should be converted to Malformed Request exceptions
         return job.chosenProtocol().deserializeInput(job);
     }
 
     @Override
     public CompletableFuture<Void> after(Job job) {
-        if (job.isFailure()) {
-            return job.chosenProtocol().serializeError(job, job.getFailure());
+        if (!job.isFailure()) {
+            return job.chosenProtocol().serializeOutput(job, job.response().getValue());
         }
-        return job.chosenProtocol().serializeOutput(job, job.response().getValue());
+        return CompletableFuture.completedFuture(null);
     }
 }

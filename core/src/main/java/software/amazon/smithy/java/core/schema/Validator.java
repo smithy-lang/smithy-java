@@ -15,6 +15,7 @@ import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.serde.ListSerializer;
 import software.amazon.smithy.java.core.serde.MapSerializer;
 import software.amazon.smithy.java.core.serde.SerializationException;
+import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -56,13 +57,42 @@ public final class Validator {
      * @param shape Shape to validate.
      * @return the validation errors produced by the shape.
      */
-    public List<ValidationError> validate(SerializableShape shape) {
-        var shapeValidator = new ShapeValidator(maxAllowedErrors, maxDepth);
+    public List<ValidationError> validate(SerializableStruct shape) {
+        var shapeValidator = new software.amazon.smithy.java.core.schema.ShapeValidator(maxDepth, maxAllowedErrors);
+        var serializer = new ValidatingSerializer(shapeValidator);
         try {
-            shape.serialize(shapeValidator);
-            return shapeValidator.errors;
-        } catch (ValidationShortCircuitException ignored) {
-            return shapeValidator.errors;
+            shape.serialize(serializer);
+            return shapeValidator.getErrors();
+        } catch (software.amazon.smithy.java.core.schema.ShapeValidator.ValidationShortCircuitException ignored) {
+            return shapeValidator.getErrors();
+        }
+    }
+
+    public List<ValidationError> oldValidate(SerializableStruct shape) {
+        var oldValidator = new ShapeValidator(maxAllowedErrors, maxDepth);
+        try {
+            shape.serialize(oldValidator);
+            return oldValidator.errors;
+        } catch (Throwable ignored) {
+            return oldValidator.errors;
+        }
+    }
+
+    public <T extends SerializableStruct> List<ValidationError> deserializeAndValidate(
+            ShapeBuilder<T> shapeBuilder,
+            ShapeDeserializer deserializer
+    ) {
+        var shapeValidator = new software.amazon.smithy.java.core.schema.ShapeValidator(maxDepth, maxAllowedErrors);
+        try {
+            shapeBuilder.deserialize(new ValidatingDeserializer(shapeValidator, deserializer));
+            return shapeValidator.getErrors();
+        } catch (software.amazon.smithy.java.core.schema.ShapeValidator.ValidationShortCircuitException ignored) {
+            return shapeValidator.getErrors();
+        } catch (SerializationException e) {
+            if (e.getCause() instanceof software.amazon.smithy.java.core.schema.ShapeValidator.ValidationShortCircuitException) {
+                return shapeValidator.getErrors();
+            }
+            throw e;
         }
     }
 
@@ -229,7 +259,12 @@ public final class Validator {
         }
 
         @Override
-        public <T> void writeList(Schema schema, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
+        public <T extends List<?>> void writeList(
+                Schema schema,
+                T state,
+                int size,
+                BiConsumer<T, ShapeSerializer> consumer
+        ) {
             checkType(schema, ShapeType.LIST);
 
             if (size == 0) {

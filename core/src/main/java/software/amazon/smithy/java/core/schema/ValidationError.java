@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.core.schema;
 
+import java.math.BigDecimal;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
@@ -83,18 +84,17 @@ public interface ValidationError {
     record RangeValidationFailure(String path, String message, Number value, Schema schema) implements
             ValidationError {
         public RangeValidationFailure(String path, Number value, Schema schema) {
-            this(path, createMessage(schema), value, schema);
+            this(path, createMessage(schema.minRangeConstraint, schema.maxRangeConstraint), value, schema);
         }
 
-        private static String createMessage(Schema schema) {
-            if (schema.minRangeConstraint == null) {
-                return "Value must be less than or equal to " + formatDecimal(schema.maxRangeConstraint);
-            } else if (schema.maxRangeConstraint == null) {
-                return "Value must be greater than or equal to " + formatDecimal(schema.minRangeConstraint);
+        static String createMessage(BigDecimal min, BigDecimal max) {
+            if (min == null) {
+                return "Value must be less than or equal to " + formatDecimal(max);
+            } else if (max == null) {
+                return "Value must be greater than or equal to " + formatDecimal(min);
             } else {
-                return "Value must be between " + formatDecimal(schema.minRangeConstraint) + " and "
-                        + formatDecimal(
-                                schema.maxRangeConstraint)
+                return "Value must be between " + formatDecimal(min) + " and "
+                        + formatDecimal(max)
                         + ", inclusive";
             }
         }

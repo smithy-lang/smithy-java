@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.IntConsumer;
@@ -56,7 +57,12 @@ public final class ListSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T extends List<?>> void writeList(
+            Schema schema,
+            T state,
+            int size,
+            BiConsumer<T, ShapeSerializer> consumer
+    ) {
         beforeWrite();
         delegate.writeList(schema, state, size, consumer);
     }

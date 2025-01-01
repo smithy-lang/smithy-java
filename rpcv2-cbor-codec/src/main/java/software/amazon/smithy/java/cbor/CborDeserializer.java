@@ -362,7 +362,7 @@ final class CborDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
+    public <T extends List<?>> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
         byte token = parser.currentToken();
         if (token != Token.START_ARRAY) {
             throw badType("list", token);
@@ -379,7 +379,11 @@ final class CborDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer) {
+    public <T extends Map<?, ?>> void readStringMap(
+            Schema schema,
+            T state,
+            MapMemberConsumer<String, T> consumer
+    ) {
         byte token = parser.currentToken();
         if (token != Token.START_OBJECT) {
             throw badType("struct", token);

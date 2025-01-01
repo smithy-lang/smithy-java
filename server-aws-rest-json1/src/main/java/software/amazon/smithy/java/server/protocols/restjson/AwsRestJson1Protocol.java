@@ -16,6 +16,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
+import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -107,7 +108,9 @@ final class AwsRestJson1Protocol extends ServerProtocol {
     }
 
     @Override
-    public CompletableFuture<Void> deserializeInput(Job job) {
+    public CompletableFuture<ShapeDeserializer> getDeserializer(
+            Job job
+    ) {
         if (!job.isHttpJob()) {
             return CompletableFuture.failedFuture(
                     new IllegalStateException("Unsupported Job type. Only HttpJob is supported"));
@@ -128,11 +131,10 @@ final class AwsRestJson1Protocol extends ServerProtocol {
             }
         }
         HttpHeaders headers = httpJob.request().headers();
-        var inputShapeBuilder = job.operation().getApiOperation().inputBuilder();
-        var deser = httpBinding
+        return httpBinding
                 .requestDeserializer()
-                .inputShapeBuilder(inputShapeBuilder)
                 .pathLabelValues(labelValues)
+                .schema(job.operation().getApiOperation().inputSchema())
                 .request(
                         HttpRequest.builder()
                                 .headers(headers)
@@ -141,17 +143,8 @@ final class AwsRestJson1Protocol extends ServerProtocol {
                                 .body(job.request().getDataStream())
                                 .build())
                 .payloadCodec(codec)
-                .payloadMediaType("application/json");
-
-        try {
-            deser.deserialize().get();
-        } catch (Exception e) {
-            //TODO do exception translation.
-            return CompletableFuture.failedFuture(e);
-        }
-
-        job.request().setDeserializedValue(inputShapeBuilder.build());
-        return CompletableFuture.completedFuture(null);
+                .payloadMediaType("application/json")
+                .build();
     }
 
     @Override

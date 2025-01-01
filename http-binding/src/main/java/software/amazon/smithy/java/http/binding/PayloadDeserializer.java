@@ -10,6 +10,8 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.Codec;
@@ -170,7 +172,7 @@ final class PayloadDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
+    public <T extends List<?>> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
         if (!isNull()) {
             try (var deser = createDeserializer()) {
                 deser.readList(schema, state, consumer);
@@ -179,7 +181,11 @@ final class PayloadDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer) {
+    public <T extends Map<?, ?>> void readStringMap(
+            Schema schema,
+            T state,
+            MapMemberConsumer<String, T> consumer
+    ) {
         if (!isNull()) {
             try (var deser = createDeserializer()) {
                 deser.readStringMap(schema, state, consumer);

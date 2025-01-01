@@ -24,7 +24,7 @@ final class HttpQueryStringDeserializer extends BasicStringValueDeserializer {
     }
 
     @Override
-    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
+    public <T extends List<?>> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
         for (String value : values) {
             consumer.accept(state, new HttpQueryStringDeserializer(List.of(value)));
         }

@@ -132,7 +132,7 @@ final class HttpHeaderListDeserializer extends SpecificShapeDeserializer {
     }
 
     @Override
-    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
+    public <T extends List<?>> void readList(Schema schema, T state, ListMemberConsumer<T> listMemberConsumer) {
         for (String value : values) {
             listMemberConsumer.accept(state, new HttpHeaderDeserializer(value));
         }

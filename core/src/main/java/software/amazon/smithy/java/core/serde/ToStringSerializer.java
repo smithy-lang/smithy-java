@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.List;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
@@ -83,7 +84,12 @@ public final class ToStringSerializer implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T extends List<?>> void writeList(
+            Schema schema,
+            T state,
+            int size,
+            BiConsumer<T, ShapeSerializer> consumer
+    ) {
         builder.append('[');
         if (schema.hasTrait(TraitKey.SENSITIVE_TRAIT)) {
             builder.append(REDACTED);

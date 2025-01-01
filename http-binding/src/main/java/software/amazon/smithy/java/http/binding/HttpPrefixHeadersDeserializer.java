@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.http.binding;
 
 import java.util.Locale;
+import java.util.Map;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.SerializationException;
@@ -27,7 +28,11 @@ final class HttpPrefixHeadersDeserializer extends SpecificShapeDeserializer {
     }
 
     @Override
-    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer) {
+    public <T extends Map<?, ?>> void readStringMap(
+            Schema schema,
+            T state,
+            MapMemberConsumer<String, T> consumer
+    ) {
         HttpPrefixHeadersTrait trait = schema.expectTrait(TraitKey.HTTP_PREFIX_HEADERS_TRAIT);
         var prefix = trait.getValue().toLowerCase(Locale.ENGLISH);
         for (var entry : headers) {

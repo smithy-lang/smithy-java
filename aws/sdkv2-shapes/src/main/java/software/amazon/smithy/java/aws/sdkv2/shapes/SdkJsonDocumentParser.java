@@ -102,7 +102,12 @@ final class SdkJsonDocumentParser implements ShapeSerializer {
     }
 
     @Override
-    public <T> void writeList(Schema schema, T state, int size, BiConsumer<T, ShapeSerializer> consumer) {
+    public <T extends List<?>> void writeList(
+            Schema schema,
+            T state,
+            int size,
+            BiConsumer<T, ShapeSerializer> consumer
+    ) {
         List<software.amazon.awssdk.core.document.Document> elements = size == -1
                 ? new ArrayList<>()
                 : new ArrayList<>(size);

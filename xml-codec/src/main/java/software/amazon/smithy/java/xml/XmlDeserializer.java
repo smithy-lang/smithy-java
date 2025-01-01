@@ -11,6 +11,8 @@ import java.nio.ByteBuffer;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 import javax.xml.stream.XMLEventFactory;
 import javax.xml.stream.XMLStreamException;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -204,14 +206,18 @@ final class XmlDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public <T> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
+    public <T extends List<?>> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
         enter(schema);
         innerDeserializer.readList(schema, state, consumer);
         exit();
     }
 
     @Override
-    public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer) {
+    public <T extends Map<?, ?>> void readStringMap(
+            Schema schema,
+            T state,
+            MapMemberConsumer<String, T> consumer
+    ) {
         enter(schema);
         innerDeserializer.readStringMap(schema, state, consumer);
         exit();
@@ -510,7 +516,7 @@ final class XmlDeserializer implements ShapeDeserializer {
         }
 
         @Override
-        public <T> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
+        public <T extends List<?>> void readList(Schema schema, T state, ListMemberConsumer<T> consumer) {
             try {
                 var info = xmlInfo.getListInfo(schema);
                 for (var member = reader.nextMemberElement(); member != null; member = reader.nextMemberElement()) {
@@ -531,7 +537,11 @@ final class XmlDeserializer implements ShapeDeserializer {
         }
 
         @Override
-        public <T> void readStringMap(Schema schema, T state, MapMemberConsumer<String, T> consumer) {
+        public <T extends Map<?, ?>> void readStringMap(
+                Schema schema,
+                T state,
+                MapMemberConsumer<String, T> consumer
+        ) {
             try {
                 var decoder = xmlInfo.getMapInfo(schema);
 

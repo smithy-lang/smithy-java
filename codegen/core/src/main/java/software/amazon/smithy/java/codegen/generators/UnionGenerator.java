@@ -252,6 +252,7 @@ public final class UnionGenerator
         @Override
         protected void generateProperties(JavaWriter writer) {
             writer.write("private ${shape:T} value;");
+            writer.write("private boolean disableChecks;");
         }
 
         @Override
@@ -280,7 +281,7 @@ public final class UnionGenerator
             writer.putContext("illegalArgument", IllegalArgumentException.class);
             writer.write("""
                     private BuildStage setValue(${shape:T} value) {
-                        if (this.value != null) {
+                        if (this.value != null && !this.disableChecks) {
                             if (this.value.type() == Type.$$UNKNOWN) {
                                 throw new ${illegalArgument:T}("Cannot change union from unknown to known variant");
                             }
