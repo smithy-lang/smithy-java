@@ -64,7 +64,6 @@ public class AwsRestJson1ProtocolTests {
                     "RestJsonDeserializeIgnoreType",
                     "RestJsonDateTimeWithNegativeOffset",
                     "RestJsonDateTimeWithPositiveOffset",
-                    "RestJsonDateTimeWithFractionalSeconds",
                     "RestJsonClientPopulatesDefaultsValuesWhenMissingInResponse",
                     "RestJsonClientIgnoresDefaultValuesIfMemberValuesArePresentInResponse",
                     "RestJsonClientPopulatesNestedDefaultsWhenMissingInResponseBody",

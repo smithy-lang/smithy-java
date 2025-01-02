@@ -66,14 +66,8 @@ public class RestJson1ProtocolTests {
     @HttpClientResponseTests
     @ProtocolTestFilter(
             skipTests = {
-                    "RestJsonDateTimeWithFractionalSeconds",
                     "RestJsonInputAndOutputWithQuotedStringHeaders",
                     "HttpPrefixHeadersResponse",
-                    "RestJsonHttpPayloadTraitsWithBlob",
-                    "RestJsonHttpPayloadTraitsWithMediaTypeWithBlob",
-                    "RestJsonEnumPayloadResponse",
-                    "RestJsonStringPayloadResponse",
-                    "RestJsonHttpPayloadWithUnion",
                     "RestJsonInputAndOutputWithQuotedStringHeaders",
                     "DocumentTypeAsPayloadOutput",
                     "DocumentTypeAsPayloadOutputString",

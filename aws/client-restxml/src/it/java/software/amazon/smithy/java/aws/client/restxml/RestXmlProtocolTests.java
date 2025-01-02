@@ -61,10 +61,6 @@ public class RestXmlProtocolTests {
     }
 
     @HttpClientResponseTests
-    @ProtocolTestFilter(
-            skipTests = {
-                    "RestXmlDateTimeWithFractionalSeconds",
-            })
     public void responseTest(Runnable test) {
         test.run();
     }

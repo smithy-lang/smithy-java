@@ -23,14 +23,17 @@ import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.json.TimestampResolver;
 import software.amazon.smithy.model.node.BooleanNode;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.NumberNode;
 import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 /**
  * This is a document format used in smithy protocol tests to model expected modeled values.
@@ -186,9 +189,15 @@ final class ProtocolTestDocument implements Document {
         }
         return node.asNumberNode()
                 .map(NumberNode::getValue)
-                .map(Number::longValue)
-                .map(Instant::ofEpochSecond)
+                .map(ProtocolTestDocument::readNumberTimestamp)
                 .orElseGet(Document.super::asTimestamp);
+    }
+
+    private static Instant readNumberTimestamp(Number number) {
+        // Numbers can come as integral or decimal epoch second values in test params,
+        // use the TimestampResolver to properly handle either case.
+        return TimestampResolver.readTimestamp(number,
+                TimestampFormatter.of(TimestampFormatTrait.Format.EPOCH_SECONDS));
     }
 
     @Override
