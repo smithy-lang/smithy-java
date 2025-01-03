@@ -16,12 +16,11 @@ import software.amazon.smithy.java.protocoltests.harness.TestType;
 @ProtocolTest(
         service = "smithy.protocoltests.rpcv2Cbor#RpcV2Protocol",
         testType = TestType.CLIENT)
-@ProtocolTestFilter(skipOperations = {})
 public class RpcV2CborProtocolTests {
     @HttpClientRequestTests
     @ProtocolTestFilter(
             skipTests = {
-                    // this test is broken and needs to be fixed in smithy
+                    // TODO this test is broken and needs to be fixed in Smithy
                     "RpcV2CborClientPopulatesDefaultValuesInInput",
                     // clientOptional is not respected for client-generated shapes yet
                     "RpcV2CborClientSkipsTopLevelDefaultValuesInInput",
@@ -36,11 +35,7 @@ public class RpcV2CborProtocolTests {
     @HttpClientResponseTests
     @ProtocolTestFilter(
             skipTests = {
-                    "RpcV2CborClientPopulatesDefaultsValuesWhenMissingInResponse",
-                    //Errors are not yet implemented properly
-                    "RpcV2CborInvalidGreetingError",
-                    "RpcV2CborComplexError",
-                    "RpcV2CborEmptyComplexError"
+                    "RpcV2CborClientPopulatesDefaultsValuesWhenMissingInResponse"
             })
     public void responseTest(Runnable test) {
         test.run();

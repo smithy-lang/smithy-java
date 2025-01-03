@@ -16,7 +16,6 @@ import software.amazon.smithy.model.node.Node;
 @ProtocolTest(
         service = "aws.protocoltests.json10#JsonRpc10",
         testType = TestType.CLIENT)
-@ProtocolTestFilter(skipOperations = {})
 public class AwsJson1ProtocolTests {
     @HttpClientRequestTests
     @ProtocolTestFilter(
@@ -51,14 +50,10 @@ public class AwsJson1ProtocolTests {
     @ProtocolTestFilter(
             skipTests = {
                     "AwsJson10ClientPopulatesDefaultsValuesWhenMissingInResponse",
-                    "AwsJson10ClientIgnoresDefaultValuesIfMemberValuesArePresentInResponse",
-                    "AwsJson10FooErrorUsingCode",
-                    "AwsJson10FooErrorUsingCodeAndNamespace",
-                    "AwsJson10FooErrorUsingCodeUriAndNamespace",
-                    "AwsJson10FooErrorWithDunderTypeUriAndNamespace"
+                    "AwsJson10ClientIgnoresDefaultValuesIfMemberValuesArePresentInResponse"
             },
             skipOperations = "aws.protocoltests.json10#OperationWithRequiredMembersWithDefaults")
-    public void responseTest(Runnable test) throws Exception {
+    public void responseTest(Runnable test) {
         test.run();
     }
 }

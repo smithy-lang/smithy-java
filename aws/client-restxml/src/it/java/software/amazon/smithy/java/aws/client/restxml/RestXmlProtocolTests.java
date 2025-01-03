@@ -32,10 +32,6 @@ import software.amazon.smithy.java.protocoltests.harness.TestType;
 @ProtocolTest(
         service = "aws.protocoltests.restxml#RestXml",
         testType = TestType.CLIENT)
-@ProtocolTestFilter(
-        skipOperations = {
-
-        })
 public class RestXmlProtocolTests {
     @HttpClientRequestTests
     @ProtocolTestFilter(
