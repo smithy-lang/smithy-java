@@ -66,10 +66,7 @@ public class RestJson1ProtocolTests {
     @HttpClientResponseTests
     @ProtocolTestFilter(
             skipTests = {
-                    "RestJsonInputAndOutputWithQuotedStringHeaders",
-                    "RestJsonInputAndOutputWithQuotedStringHeaders",
-                    "DocumentTypeAsPayloadOutput",
-                    "DocumentTypeAsPayloadOutputString"
+                    "RestJsonInputAndOutputWithQuotedStringHeaders"
             })
     public void responseTest(Runnable test) {
         test.run();
