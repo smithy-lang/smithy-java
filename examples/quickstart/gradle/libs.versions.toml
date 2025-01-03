@@ -1,6 +1,6 @@
 [versions]
-smithy = "1.51.0"
-smithy-gradle-plugins = "1.1.0"
+smithy = "1.53.0"
+smithy-gradle-plugins = "1.2.0"
 smithy-java = "0.0.1"
 junit5 = "5.11.0"
 
