@@ -33,9 +33,7 @@ public final class SchemaBuilder {
     final ShapeId id;
     final ShapeType type;
     final TraitMap traits;
-
     final List<MemberSchemaBuilder> members;
-
     private Schema builtShape;
 
     SchemaBuilder(ShapeId id, ShapeType type, Trait... traits) {
