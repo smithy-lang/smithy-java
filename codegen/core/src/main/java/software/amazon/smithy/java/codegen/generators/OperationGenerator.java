@@ -55,99 +55,84 @@ public final class OperationGenerator
                     writer.putContext("shape", directive.symbol());
                     var template =
                             """
-                                    public final class ${shape:T} implements ${operationType:C} {
-                                        ${id:C|}
+                                                    public final class ${shape:T} implements ${operationType:C} {
+                                                        ${id:C|}
 
-                                        private ${schema:C|}
+                                                        private ${schema:C|}
 
-                                        ${typeRegistrySection:C|}
+                                                        ${typeRegistrySection:C|}
 
-                                        private static final ${list:T}<${shapeId:T}> SCHEMES = ${list:T}.of(${#schemes}${shapeId:T}.from(${key:S})${^key.last}, ${/key.last}${/schemes});
+                                                        private static final ${list:T}<${shapeId:T}> SCHEMES = ${list:T}.of(${#schemes}${shapeId:T}.from(${key:S})${^key.last}, ${/key.last}${/schemes});
 
-                                        ${?idempotencyTokenMember}private static final ${sdkSchema:T} IDEMPOTENCY_TOKEN_MEMBER = ${inputType:T}.$$SCHEMA.member(${idempotencyTokenMember:S});${/idempotencyTokenMember}
-                                        ${?inputStreamMember}private static final ${sdkSchema:T} INPUT_STREAM_MEMBER = ${inputType:T}.$$SCHEMA.member(${inputStreamMember:S});${/inputStreamMember}
-                                        ${?outputStreamMember}private static final ${sdkSchema:T} OUTPUT_STREAM_MEMBER = ${outputType:T}.$$SCHEMA.member(${outputStreamMember:S});${/outputStreamMember}
+                                                        ${?idempotencyTokenMember}private static final ${sdkSchema:T} IDEMPOTENCY_TOKEN_MEMBER = ${inputType:T}.$$SCHEMA.member(${idempotencyTokenMember:S});${/idempotencyTokenMember}
+                                                        ${?inputStreamMember}private static final ${sdkSchema:T} INPUT_STREAM_MEMBER = ${inputType:T}.$$SCHEMA.member(${inputStreamMember:S});${/inputStreamMember}
+                                                        ${?outputStreamMember}private static final ${sdkSchema:T} OUTPUT_STREAM_MEMBER = ${outputType:T}.$$SCHEMA.member(${outputStreamMember:S});${/outputStreamMember}
 
-                                        @Override
-                                        public ${sdkShapeBuilder:N}<${inputType:T}> inputBuilder() {
-                                            return ${inputType:T}.builder();
-                                        }
+                                                        @Override
+                                                        public ${sdkShapeBuilder:N}<${inputType:T}> inputBuilder() {
+                                                            return ${inputType:T}.builder();
+                                                        }
 
-                                        ${?hasInputEventStream}
-                                        @Override
-                                        public ${supplier:T}<${sdkShapeBuilder:T}<${inputEventType:T}>> inputEventBuilderSupplier() {
-                                            return () -> ${inputEventType:T}.builder();
-                                        }
-                                        ${/hasInputEventStream}
+                                                        ${?hasInputEventStream}
+                                                        @Override
+                                                        public ${supplier:T}<${sdkShapeBuilder:T}<${inputEventType:T}>> inputEventBuilderSupplier() {
+                                                            return () -> ${inputEventType:T}.builder();
+                                                        }
+                                                        ${/hasInputEventStream}
 
-                                        @Override
-                                        public ${sdkShapeBuilder:N}<${outputType:T}> outputBuilder() {
-                                            return ${outputType:T}.builder();
-                                        }
+                                                        @Override
+                                                        public ${sdkShapeBuilder:N}<${outputType:T}> outputBuilder() {
+                                                            return ${outputType:T}.builder();
+                                                        }
 
-                                        ${?hasOutputEventStream}
-                                        @Override
-                                        public ${supplier:T}<${sdkShapeBuilder:T}<${outputEventType:T}>> outputEventBuilderSupplier() {
-                                            return () -> ${outputEventType:T}.builder();
-                                        }
-                                        ${/hasOutputEventStream}
+                                                        ${?hasOutputEventStream}
+                                                        @Override
+                                                        public ${supplier:T}<${sdkShapeBuilder:T}<${outputEventType:T}>> outputEventBuilderSupplier() {
+                                                            return () -> ${outputEventType:T}.builder();
+                                                        }
+                                                        ${/hasOutputEventStream}
 
-                                        @Override
-                                        public ${sdkSchema:N} schema() {
-                                            return $$SCHEMA;
-                                        }
+                                                        @Override
+                                                        public ${sdkSchema:N} schema() {
+                                                            return $$SCHEMA;
+                                                        }
 
-                                        @Override
-                                        public ${sdkSchema:N} inputSchema() {
-                                            return ${inputType:T}.$$SCHEMA;
-                                        }
+                                                        @Override
+                                                        public ${sdkSchema:N} inputSchema() {
+                                                            return ${inputType:T}.$$SCHEMA;
+                                                        }
 
-                                        @Override
-                                        public ${sdkSchema:N} outputSchema() {
-                                            return ${outputType:T}.$$SCHEMA;
-                                        }
+                                                        @Override
+                                                        public ${sdkSchema:N} outputSchema() {
+                                                            return ${outputType:T}.$$SCHEMA;
+                                                        }
 
-                                        @Override
-                                        public ${typeRegistry:N} errorRegistry() {
-                                            return TYPE_REGISTRY;
-                                        }
+                                                        @Override
+                                                        public ${typeRegistry:N} errorRegistry() {
+                                                            return TYPE_REGISTRY;
+                                                        }
 
-                                        @Override
-                                        public ${list:T}<${shapeId:T}> effectiveAuthSchemes() {
-                                            return SCHEMES;
-                                        }
+                                                        @Override
+                                                        public ${list:T}<${shapeId:T}> effectiveAuthSchemes() {
+                                                            return SCHEMES;
+                                                        }
 
-                                        @Override
-                                        public ${sdkSchema:T} inputStreamMember() {
-                                            return ${?inputStreamMember}INPUT_STREAM_MEMBER${/inputStreamMember}${^inputStreamMember}null${/inputStreamMember};
-                                        }
+                                                        @Override
+                                                        public ${sdkSchema:T} inputStreamMember() {
+                                                            return ${?inputStreamMember}INPUT_STREAM_MEMBER${/inputStreamMember}${^inputStreamMember}null${/inputStreamMember};
+                                                        }
 
-                        @Override
-                        public ${sdkSchema:T} idempotencyTokenMember() {
-                            return ${?idempotencyTokenMember}IDEMPOTENCY_TOKEN_MEMBER${/idempotencyTokenMember}${^idempotencyTokenMember}null${/idempotencyTokenMember};
-                        }
-                        ${?hasResource}
-
-                        @Override
-                        public ${resourceType:T} parentResource() {
-                            return ${resource:T}.INSTANCE;
-                        }
-                        ${/hasResource}
-                    }""";
-                writer.putContext("inputType", input);
-                writer.putContext("outputType", output);
-                writer.putContext("id", new IdStringGenerator(writer, shape));
-                writer.putContext("sdkSchema", Schema.class);
-                writer.putContext("shapeId", ShapeId.class);
-                writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
-                writer.putContext("list", List.class);
-                writer.putContext("string", String.class);
-                writer.putContext("set", Set.class);
-                writer.putContext("modeledApiException", ModeledApiException.class);
                                         @Override
                                         public ${sdkSchema:T} idempotencyTokenMember() {
                                             return ${?idempotencyTokenMember}IDEMPOTENCY_TOKEN_MEMBER${/idempotencyTokenMember}${^idempotencyTokenMember}null${/idempotencyTokenMember};
                                         }
+                                        ${?hasResource}
+
+                                        @Override
+                                        public ${resourceType:T} parentResource() {
+                                            return ${resource:T}.INSTANCE;
+                                        }
+                                        ${/hasResource}
                                     }""";
                     writer.putContext("inputType", input);
                     writer.putContext("outputType", output);
@@ -159,7 +144,6 @@ public final class OperationGenerator
                     writer.putContext("string", String.class);
                     writer.putContext("set", Set.class);
                     writer.putContext("modeledApiException", ModeledApiException.class);
-
                     writer.putContext(
                             "operationType",
                             new OperationTypeGenerator(
@@ -229,29 +213,18 @@ public final class OperationGenerator
                             break;
                         }
                     }
+
+                    var bottomUpIndex = BottomUpIndex.of(directive.model());
+                    var resourceOptional = bottomUpIndex.getResourceBinding(directive.service(), shape);
+                    writer.putContext("hasResource", resourceOptional.isPresent());
+                    writer.putContext("resourceType", ApiResource.class);
+                    resourceOptional.ifPresent(
+                            resourceShape -> writer.putContext("resource",
+                                    directive.symbolProvider().toSymbol(resourceShape)));
+
                     writer.write(template);
                     writer.popState();
                 });
-
-                // Add the idempotency token member.
-                for (var member : shape.members()) {
-                    if (member.hasTrait(IdempotencyTokenTrait.class)) {
-                        writer.putContext("idempotencyTokenMember", member.getMemberName());
-                        break;
-                    }
-                }
-
-                var bottomUpIndex = BottomUpIndex.of(directive.model());
-                var resourceOptional = bottomUpIndex.getResourceBinding(directive.service(), shape);
-                writer.putContext("hasResource", resourceOptional.isPresent());
-                writer.putContext("resourceType", ApiResource.class);
-                resourceOptional.ifPresent(
-                    resourceShape -> writer.putContext("resource", directive.symbolProvider().toSymbol(resourceShape))
-                );
-
-                writer.write(template);
-                writer.popState();
-            });
     }
 
     private static List<Symbol> getExceptionSymbols(

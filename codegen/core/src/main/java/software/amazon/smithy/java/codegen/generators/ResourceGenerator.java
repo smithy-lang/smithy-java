@@ -26,103 +26,96 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
 public final class ResourceGenerator
-    implements Consumer<GenerateResourceDirective<CodeGenerationContext, JavaCodegenSettings>> {
+        implements Consumer<GenerateResourceDirective<CodeGenerationContext, JavaCodegenSettings>> {
     @Override
     public void accept(GenerateResourceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         var shape = directive.shape();
 
         directive.context()
-            .writerDelegator()
-            .useShapeWriter(shape, writer -> {
-                writer.pushState(new ClassSection(shape));
-                var template = """
-                    public final class ${shape:T} implements ${resourceType:T} {
-                        public static final ${shape:T} INSTANCE = new ${shape:T}();
-                        ${properties:C|}
-                        ${id:C|}
+                .writerDelegator()
+                .useShapeWriter(shape, writer -> {
+                    writer.pushState(new ClassSection(shape));
+                    var template = """
+                            public final class ${shape:T} implements ${resourceType:T} {
+                                public static final ${shape:T} INSTANCE = new ${shape:T}();
+                                ${properties:C|}
+                                ${id:C|}
 
-                        private ${schema:C}
+                                private ${schema:C}
 
-                        private ${shape:T}() {}
+                                private ${shape:T}() {}
 
-                        @Override
-                        public ${sdkSchema:N} schema() {
-                            return $$SCHEMA;
-                        }
+                                @Override
+                                public ${sdkSchema:N} schema() {
+                                    return $$SCHEMA;
+                                }
 
-                        @Override
-                        public ${map:T}<${string:T}, ${sdkSchema:T}> identifiers() {
-                            return IDENTIFIERS;
-                        }
+                                @Override
+                                public ${map:T}<${string:T}, ${sdkSchema:T}> identifiers() {
+                                    return IDENTIFIERS;
+                                }
 
-                        @Override
-                        public ${map:T}<${string:T}, ${sdkSchema:T}> properties() {
-                            return PROPERTIES;
-                        }
+                                @Override
+                                public ${map:T}<${string:T}, ${sdkSchema:T}> properties() {
+                                    return PROPERTIES;
+                                }
 
-                        ${lifecycleOperations:C|}
+                                ${lifecycleOperations:C|}
 
-                        ${?hasResource}
+                                ${?hasResource}
 
-                        @Override
-                        public ${resourceType:T} parentResource() {
-                            return ${resource:T}.INSTANCE;
-                        }
-                        ${/hasResource}
-                    }""";
-                writer.putContext("shape", directive.symbol());
-                writer.putContext("id", new IdStringGenerator(writer, shape));
-                writer.putContext("sdkSchema", Schema.class);
-                writer.putContext("map", Map.class);
-                writer.putContext("string", String.class);
-                writer.putContext("resourceType", ApiResource.class);
-                writer.putContext(
-                    "properties",
-                    new PropertyGenerator(
-                        writer,
-                        directive.symbolProvider(),
-                        directive.model(),
-                        shape
-                    )
-                );
-                writer.putContext(
-                    "schema",
-                    new SchemaGenerator(
-                        writer,
-                        shape,
-                        directive.symbolProvider(),
-                        directive.model(),
-                        directive.context()
-                    )
-                );
-                writer.putContext(
-                    "lifecycleOperations",
-                    new LifecycleOperationGenerator(
-                        writer,
-                        directive.symbolProvider(),
-                        directive.model(),
-                        shape
-                    )
-                );
+                                @Override
+                                public ${resourceType:T} parentResource() {
+                                    return ${resource:T}.INSTANCE;
+                                }
+                                ${/hasResource}
+                            }""";
+                    writer.putContext("shape", directive.symbol());
+                    writer.putContext("id", new IdStringGenerator(writer, shape));
+                    writer.putContext("sdkSchema", Schema.class);
+                    writer.putContext("map", Map.class);
+                    writer.putContext("string", String.class);
+                    writer.putContext("resourceType", ApiResource.class);
+                    writer.putContext(
+                            "properties",
+                            new PropertyGenerator(
+                                    writer,
+                                    directive.symbolProvider(),
+                                    directive.model(),
+                                    shape));
+                    writer.putContext(
+                            "schema",
+                            new SchemaGenerator(
+                                    writer,
+                                    shape,
+                                    directive.symbolProvider(),
+                                    directive.model(),
+                                    directive.context()));
+                    writer.putContext(
+                            "lifecycleOperations",
+                            new LifecycleOperationGenerator(
+                                    writer,
+                                    directive.symbolProvider(),
+                                    directive.model(),
+                                    shape));
 
-                var bottomUpIndex = BottomUpIndex.of(directive.model());
-                var resourceOptional = bottomUpIndex.getResourceBinding(directive.service(), shape);
-                writer.putContext("hasResource", resourceOptional.isPresent());
-                resourceOptional.ifPresent(
-                    resourceShape -> writer.putContext("resource", directive.symbolProvider().toSymbol(resourceShape))
-                );
+                    var bottomUpIndex = BottomUpIndex.of(directive.model());
+                    var resourceOptional = bottomUpIndex.getResourceBinding(directive.service(), shape);
+                    writer.putContext("hasResource", resourceOptional.isPresent());
+                    resourceOptional.ifPresent(
+                            resourceShape -> writer.putContext("resource",
+                                    directive.symbolProvider().toSymbol(resourceShape)));
 
-                writer.write(template);
-                writer.popState();
-            });
+                    writer.write(template);
+                    writer.popState();
+                });
     }
 
     private record PropertyGenerator(
-        JavaWriter writer,
-        SymbolProvider symbolProvider,
-        Model model,
-        ResourceShape resourceShape
-    ) implements Runnable {
+            JavaWriter writer,
+            SymbolProvider symbolProvider,
+            Model model,
+            ResourceShape resourceShape) implements Runnable {
         @Override
         public void run() {
             Map<String, String> identifiers = new HashMap<>();
@@ -137,13 +130,12 @@ public final class ResourceGenerator
             writer.putContext("ids", identifiers);
             writer.putContext("props", properties);
             writer.write(
-                """
-                    private static final ${map:T}<${string:T}, ${sdkSchema:T}> IDENTIFIERS = ${map:T}.of(${#ids}${key:S}, ${value:L}${^key.last},
-                        ${/key.last}${/ids});
-                    private static final ${map:T}<${string:T}, ${sdkSchema:T}> PROPERTIES = ${map:T}.of(${#props}${key:S}, ${value:L}${^key.last},
-                        ${/key.last}${/props});
                     """
-            );
+                            private static final ${map:T}<${string:T}, ${sdkSchema:T}> IDENTIFIERS = ${map:T}.of(${#ids}${key:S}, ${value:L}${^key.last},
+                                ${/key.last}${/ids});
+                            private static final ${map:T}<${string:T}, ${sdkSchema:T}> PROPERTIES = ${map:T}.of(${#props}${key:S}, ${value:L}${^key.last},
+                                ${/key.last}${/props});
+                            """);
             writer.popState();
         }
 
@@ -154,11 +146,10 @@ public final class ResourceGenerator
     }
 
     private record LifecycleOperationGenerator(
-        JavaWriter writer,
-        SymbolProvider symbolProvider,
-        Model model,
-        ResourceShape resourceShape
-    ) implements Runnable {
+            JavaWriter writer,
+            SymbolProvider symbolProvider,
+            Model model,
+            ResourceShape resourceShape) implements Runnable {
 
         @Override
         public void run() {
@@ -179,11 +170,11 @@ public final class ResourceGenerator
             writer.putContext("lifecycleOperation", lifecycleOperation);
             writer.putContext("operation", symbolProvider.toSymbol(operationShape));
             writer.write("""
-                @Override
-                public ${shapeId:T} ${lifecycleOperation:L}() {
-                    return ${operation:T}.$$ID;
-                }
-                """);
+                    @Override
+                    public ${shapeId:T} ${lifecycleOperation:L}() {
+                        return ${operation:T}.$$ID;
+                    }
+                    """);
             writer.newLine();
             writer.popState();
         }
