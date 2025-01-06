@@ -49,10 +49,9 @@ final class NettyServer implements Server {
 
         var handlers = new HandlerAssembler().assembleHandlers(builder.serviceMatcher.getAllServices());
         orchestrator = new OrchestratorGroup(
-            builder.numberOfWorkers,
-            () -> new ErrorHandlingOrchestrator(new SingleThreadOrchestrator(handlers)),
-            OrchestratorGroup.Strategy.roundRobin()
-        );
+                builder.numberOfWorkers,
+                () -> new ErrorHandlingOrchestrator(new SingleThreadOrchestrator(handlers)),
+                OrchestratorGroup.Strategy.roundRobin());
 
         bootstrap.childHandler(new ServerChannelInitializer(orchestrator, protocolResolver));
         int numWorkers = Runtime.getRuntime().availableProcessors() * 2;
@@ -82,9 +81,9 @@ final class NettyServer implements Server {
         for (URI endpoint : endpoints) {
             try {
                 bootstrap.group(bossGroup, workerGroup)
-                    .localAddress(new InetSocketAddress(endpoint.getHost(), endpoint.getPort()))
-                    .bind()
-                    .sync();
+                        .localAddress(new InetSocketAddress(endpoint.getHost(), endpoint.getPort()))
+                        .bind()
+                        .sync();
             } catch (InterruptedException e) {
                 throw new RuntimeException("Unable to start server on " + endpoint, e);
             }
@@ -95,7 +94,7 @@ final class NettyServer implements Server {
     @Override
     public CompletableFuture<Void> shutdown() {
         return toVoidCompletableFuture(bossGroup.shutdownGracefully())
-            .thenCompose(r -> orchestrator.shutdown())
-            .thenCompose(r -> toVoidCompletableFuture(workerGroup.shutdownGracefully()));
+                .thenCompose(r -> orchestrator.shutdown())
+                .thenCompose(r -> toVoidCompletableFuture(workerGroup.shutdownGracefully()));
     }
 }

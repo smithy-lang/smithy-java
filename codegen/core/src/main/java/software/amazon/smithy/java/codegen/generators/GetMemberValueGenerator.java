@@ -22,23 +22,23 @@ record GetMemberValueGenerator(JavaWriter writer, SymbolProvider symbolProvider,
         String template;
         if (shape.members().isEmpty()) {
             template = """
-                @Override
-                @SuppressWarnings("unchecked")
-                public <T> T getMemberValue(${sdkSchema:N} member) {
-                    throw new ${iae:T}("Attempted to get non-existent member: " + member.id());
-                }
-                """;
+                    @Override
+                    @SuppressWarnings("unchecked")
+                    public <T> T getMemberValue(${sdkSchema:N} member) {
+                        throw new ${iae:T}("Attempted to get non-existent member: " + member.id());
+                    }
+                    """;
         } else {
             template = """
-                @Override
-                @SuppressWarnings("unchecked")
-                public <T> T getMemberValue(${sdkSchema:N} member) {
-                    return switch (member.memberIndex()) {
-                        ${cases:C|}
-                        default -> throw new ${iae:T}("Attempted to get non-existent member: " + member.id());
-                    };
-                }
-                """;
+                    @Override
+                    @SuppressWarnings("unchecked")
+                    public <T> T getMemberValue(${sdkSchema:N} member) {
+                        return switch (member.memberIndex()) {
+                            ${cases:C|}
+                            default -> throw new ${iae:T}("Attempted to get non-existent member: " + member.id());
+                        };
+                    }
+                    """;
         }
         writer.putContext("sdkSchema", Schema.class);
         writer.putContext("cases", writer.consumer(this::generateMemberSwitchCases));
@@ -59,21 +59,18 @@ record GetMemberValueGenerator(JavaWriter writer, SymbolProvider symbolProvider,
             if (shape.getType() == ShapeType.UNION) {
                 // Unions need to access the member value using a getter, since subtypes provide the values.
                 writer.write(
-                    "case $L -> (T) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, ${memberName:L}());",
-                    idx
-                );
+                        "case $L -> (T) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, ${memberName:L}());",
+                        idx);
             } else if (isError && member.getMemberName().equalsIgnoreCase("message")) {
                 // Exception message values have to use a special getter.
                 writer.write(
-                    "case $L -> (T) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, getMessage());",
-                    idx
-                );
+                        "case $L -> (T) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, getMessage());",
+                        idx);
             } else {
                 // Other values can just skip the getter.
                 writer.write(
-                    "case $L -> (T) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, ${memberName:L});",
-                    idx
-                );
+                        "case $L -> (T) ${schemaUtilsClass:T}.validateSameMember(${memberSchema:L}, member, ${memberName:L});",
+                        idx);
             }
             writer.popState();
         }

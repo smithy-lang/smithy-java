@@ -106,12 +106,12 @@ public final class RequestOverrideConfig {
      */
     public Builder toBuilder() {
         Builder builder = builder()
-            .protocol(protocol)
-            .endpointResolver(endpointResolver)
-            .authSchemeResolver(authSchemeResolver)
-            .identityResolvers(identityResolvers)
-            .retryStrategy(retryStrategy)
-            .retryScope(retryScope);
+                .protocol(protocol)
+                .endpointResolver(endpointResolver)
+                .authSchemeResolver(authSchemeResolver)
+                .identityResolvers(identityResolvers)
+                .retryStrategy(retryStrategy)
+                .retryScope(retryScope);
         interceptors.forEach(builder::addInterceptor);
         supportedAuthSchemes.forEach(builder::putSupportedAuthSchemes);
         return builder;

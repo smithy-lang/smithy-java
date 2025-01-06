@@ -76,14 +76,14 @@ final class Log4j2Logger extends ExtendedLoggerWrapper implements InternalLogger
 
     @Override
     public void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5
     ) {
         log(convert(level), message, p0, p1, p2, p3, p4, p5);
 
@@ -91,15 +91,15 @@ final class Log4j2Logger extends ExtendedLoggerWrapper implements InternalLogger
 
     @Override
     public void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6
     ) {
         log(convert(level), message, p0, p1, p2, p3, p4, p5, p6);
 
@@ -107,16 +107,16 @@ final class Log4j2Logger extends ExtendedLoggerWrapper implements InternalLogger
 
     @Override
     public void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7
     ) {
         log(convert(level), message, p0, p1, p2, p3, p4, p5, p6, p7);
 
@@ -124,17 +124,17 @@ final class Log4j2Logger extends ExtendedLoggerWrapper implements InternalLogger
 
     @Override
     public void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     ) {
         log(convert(level), message, p0, p1, p2, p3, p4, p5, p6, p7, p8);
 
@@ -142,18 +142,18 @@ final class Log4j2Logger extends ExtendedLoggerWrapper implements InternalLogger
 
     @Override
     public void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     ) {
         log(convert(level), message, p0, p1, p2, p3, p4, p5, p6, p7, p9);
     }

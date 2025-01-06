@@ -15,8 +15,8 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public record GetFoosOutput(ResultWrapper result) implements SerializableStruct {
     private static final ShapeId ID = ShapeId.from("smithy.example#GetFoosOutput");
     static final Schema SCHEMA = Schema.structureBuilder(ID)
-        .putMember("result", ResultWrapper.SCHEMA)
-        .build();
+            .putMember("result", ResultWrapper.SCHEMA)
+            .build();
     private static final Schema SCHEMA_RESULT = SCHEMA.member("result");
 
     @Override

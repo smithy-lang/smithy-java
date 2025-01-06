@@ -17,16 +17,16 @@ import org.junit.jupiter.api.extension.ParameterResolver;
 interface ProtocolTestParameterResolver extends ParameterResolver {
     @Override
     default boolean supportsParameter(
-        ParameterContext paramCtx,
-        ExtensionContext extCtx
+            ParameterContext paramCtx,
+            ExtensionContext extCtx
     ) throws ParameterResolutionException {
         return paramCtx.getParameter().getType().equals(Runnable.class);
     }
 
     @Override
     default Object resolveParameter(
-        ParameterContext paramCtx,
-        ExtensionContext extContext
+            ParameterContext paramCtx,
+            ExtensionContext extContext
     ) throws ParameterResolutionException {
         return (Runnable) this::test;
     }

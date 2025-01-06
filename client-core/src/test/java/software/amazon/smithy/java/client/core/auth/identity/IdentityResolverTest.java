@@ -30,13 +30,11 @@ public class IdentityResolverTest {
     @Test
     void testIdentityResolverChainContinuesOnIdentityNotFound() {
         var resolver = IdentityResolver.chain(
-            List.of(
-                EmptyResolver.INSTANCE,
-                EmptyResolver.INSTANCE,
-                EmptyResolver.INSTANCE,
-                TEST_RESOLVER
-            )
-        );
+                List.of(
+                        EmptyResolver.INSTANCE,
+                        EmptyResolver.INSTANCE,
+                        EmptyResolver.INSTANCE,
+                        TEST_RESOLVER));
         var result = resolver.resolveIdentity(AuthProperties.empty()).join();
         assertEquals(result, IdentityResult.of(TEST_IDENTITY));
     }
@@ -44,38 +42,31 @@ public class IdentityResolverTest {
     @Test
     void testIdentityResolverFailsOutOnUnknownError() {
         var resolver = IdentityResolver.chain(
-            List.of(
-                EmptyResolver.INSTANCE,
-                EmptyResolver.INSTANCE,
-                FailingResolver.INSTANCE
-            )
-        );
+                List.of(
+                        EmptyResolver.INSTANCE,
+                        EmptyResolver.INSTANCE,
+                        FailingResolver.INSTANCE));
         var exc = assertThrows(
-            CompletionException.class,
-            () -> resolver.resolveIdentity(AuthProperties.empty()).join()
-        );
+                CompletionException.class,
+                () -> resolver.resolveIdentity(AuthProperties.empty()).join());
         assertTrue(exc.getMessage().contains("BAD!"));
     }
 
     @Test
     void testIdentityResolverAggregatesExceptions() {
         var resolver = IdentityResolver.chain(
-            List.of(
-                EmptyResolver.INSTANCE,
-                EmptyResolver.INSTANCE,
-                EmptyResolver.INSTANCE
-            )
-        );
+                List.of(
+                        EmptyResolver.INSTANCE,
+                        EmptyResolver.INSTANCE,
+                        EmptyResolver.INSTANCE));
         var result = resolver.resolveIdentity(AuthProperties.empty()).join();
 
         assertTrue(
-            result.error()
-                .contains(
-                    "[IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.client.core.auth.identity.IdentityResolverTest$EmptyResolver], "
-                        + "IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.client.core.auth.identity.IdentityResolverTest$EmptyResolver], "
-                        + "IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.client.core.auth.identity.IdentityResolverTest$EmptyResolver]]"
-                )
-        );
+                result.error()
+                        .contains(
+                                "[IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.client.core.auth.identity.IdentityResolverTest$EmptyResolver], "
+                                        + "IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.client.core.auth.identity.IdentityResolverTest$EmptyResolver], "
+                                        + "IdentityResult[error='No token. Womp Womp.', resolver=software.amazon.smithy.java.client.core.auth.identity.IdentityResolverTest$EmptyResolver]]"));
 
         var e = assertThrows(IdentityNotFoundException.class, result::unwrap);
 

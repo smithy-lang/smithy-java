@@ -16,8 +16,7 @@ import software.amazon.smithy.model.node.ObjectNode;
 
 public class RelativeDeprecationFilteringTest extends AbstractCodegenFileTest {
     private static final URL TEST_FILE = Objects.requireNonNull(
-        RelativeDeprecationFilteringTest.class.getResource("relative-deprecated-test.smithy")
-    );
+            RelativeDeprecationFilteringTest.class.getResource("relative-deprecated-test.smithy"));
 
     @Override
     protected URL testFile() {
@@ -26,11 +25,11 @@ public class RelativeDeprecationFilteringTest extends AbstractCodegenFileTest {
 
     protected ObjectNode settings() {
         return ObjectNode.builder()
-            .withMember("service", "smithy.java.codegen#TestService")
-            .withMember("namespace", "test.smithy.codegen")
-            .withMember("relativeDate", "1990-01-01")
-            .withMember("relativeVersion", "1.1.0")
-            .build();
+                .withMember("service", "smithy.java.codegen#TestService")
+                .withMember("namespace", "test.smithy.codegen")
+                .withMember("relativeDate", "1990-01-01")
+                .withMember("relativeVersion", "1.1.0")
+                .build();
     }
 
     @Test
@@ -44,8 +43,7 @@ public class RelativeDeprecationFilteringTest extends AbstractCodegenFileTest {
     @Test
     void expectedFilteredDateDoesNotExist() {
         var fileStringOptional = manifest.getFileString(
-            Paths.get("/test/smithy/codegen/model/DeprecatedOperationDate.java")
-        );
+                Paths.get("/test/smithy/codegen/model/DeprecatedOperationDate.java"));
         assertTrue(fileStringOptional.isEmpty());
     }
 
@@ -59,8 +57,7 @@ public class RelativeDeprecationFilteringTest extends AbstractCodegenFileTest {
     @Test
     void expectedFilteredVersionDoesNotExist() {
         var fileStringOptional = manifest.getFileString(
-            Paths.get("/test/smithy/codegen/model/DeprecatedOperationVersion.java")
-        );
+                Paths.get("/test/smithy/codegen/model/DeprecatedOperationVersion.java"));
         assertTrue(fileStringOptional.isEmpty());
     }
 }

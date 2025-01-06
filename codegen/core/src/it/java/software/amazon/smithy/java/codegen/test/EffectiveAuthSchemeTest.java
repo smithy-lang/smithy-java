@@ -21,9 +21,8 @@ public class EffectiveAuthSchemeTest {
     void generatedOperationHaveExpectedSchemes() {
         assertEquals(new NoAuth().effectiveAuthSchemes(), List.of(NoAuthTrait.ID));
         assertEquals(
-            new AllAuth().effectiveAuthSchemes(),
-            List.of(HttpApiKeyAuthTrait.ID, HttpBasicAuthTrait.ID)
-        );
+                new AllAuth().effectiveAuthSchemes(),
+                List.of(HttpApiKeyAuthTrait.ID, HttpBasicAuthTrait.ID));
         assertEquals(new ScopedAuth().effectiveAuthSchemes(), List.of(HttpBasicAuthTrait.ID));
     }
 }

@@ -19,9 +19,10 @@ public class OperationHandler implements Handler {
         SerializableStruct inputShape = job.request().getDeserializedValue();
         CompletableFuture<Void> future = new CompletableFuture<>();
         if (operation.isAsync()) {
-            CompletableFuture<? extends SerializableStruct> response = (CompletableFuture<? extends SerializableStruct>) operation
-                .asyncFunction()
-                .apply(inputShape, null); //TODO add request context.
+            CompletableFuture<? extends SerializableStruct> response =
+                    (CompletableFuture<? extends SerializableStruct>) operation
+                            .asyncFunction()
+                            .apply(inputShape, null); //TODO add request context.
             response.whenComplete((result, error) -> {
                 SerializableStruct output = result;
                 if (error != null) {

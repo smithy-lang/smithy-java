@@ -23,9 +23,9 @@ final class CreateOrder implements CreateOrderOperation {
         OrderTracker.putOrder(new Order(id, input.coffeeType(), OrderStatus.IN_PROGRESS));
 
         return CreateOrderOutput.builder()
-            .id(id.toString())
-            .coffeeType(input.coffeeType())
-            .status(OrderStatus.IN_PROGRESS)
-            .build();
+                .id(id.toString())
+                .coffeeType(input.coffeeType())
+                .status(OrderStatus.IN_PROGRESS)
+                .build();
     }
 }

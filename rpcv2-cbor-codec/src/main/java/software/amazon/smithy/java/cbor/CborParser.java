@@ -16,33 +16,35 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 @SmithyInternalApi
 public final class CborParser {
     public static final class Token {
-        public static int version() { return 1; }
+        public static int version() {
+            return 1;
+        }
 
         // high bit toggle to indicate a tagged item
         public static final byte TAG_FLAG = 1 << 4;
 
         // the first group of simple types directly map to their cbor major types for simpler reading routines
-        public static final byte POS_INT = TYPE_POSINT;            // 0b00000
-        public static final byte NEG_INT = TYPE_NEGINT;            // 0b00001
-        public static final byte BYTE_STRING = TYPE_BYTESTRING;        // 0b00010
-        public static final byte TEXT_STRING = TYPE_TEXTSTRING;        // 0b00011
+        public static final byte POS_INT = TYPE_POSINT; // 0b00000
+        public static final byte NEG_INT = TYPE_NEGINT; // 0b00001
+        public static final byte BYTE_STRING = TYPE_BYTESTRING; // 0b00010
+        public static final byte TEXT_STRING = TYPE_TEXTSTRING; // 0b00011
 
         // types that require explicit method invocations on ReadTranslator
         // these values must be contiguous for efficient lookup table generation
-        public static final byte NULL = 4;                      // 0b00100
-        public static final byte KEY = 5;                      // 0b00101
-        public static final byte START_OBJECT = 6;                      // 0b00110
-        public static final byte START_ARRAY = 7;                      // 0b00111
-        public static final byte END_OBJECT = 8;                      // 0b01000
-        public static final byte END_ARRAY = 9;                      // 0b01001
+        public static final byte NULL = 4; // 0b00100
+        public static final byte KEY = 5; // 0b00101
+        public static final byte START_OBJECT = 6; // 0b00110
+        public static final byte START_ARRAY = 7; // 0b00111
+        public static final byte END_OBJECT = 8; // 0b01000
+        public static final byte END_ARRAY = 9; // 0b01001
 
         // the second group of simple types have arbitrary values and can pretty much be anything
-        public static final byte POS_BIGINT = 10;                     // 0b01010
-        public static final byte NEG_BIGINT = 11;                     // 0b01011
-        public static final byte FLOAT = 12;                     // 0b01100
+        public static final byte POS_BIGINT = 10; // 0b01010
+        public static final byte NEG_BIGINT = 11; // 0b01011
+        public static final byte FLOAT = 12; // 0b01100
         // gap: we used to have a bigfloat token, but we never supported that type
-        public static final byte BIG_DECIMAL = 14;                     // 0b01110
-        public static final byte TRUE = 15;                     // 0b01111
+        public static final byte BIG_DECIMAL = 14; // 0b01110
+        public static final byte TRUE = 15; // 0b01111
         public static final byte FALSE = TRUE | TAG_FLAG; // 0b11111 (31)
 
         // tag types are the type of the tagged data with the high bit set
@@ -94,45 +96,46 @@ public final class CborParser {
                 case END_OBJECT:
                     return "END_OBJECT";
             }
-            if (token == FINISHED) return "FINISHED";
+            if (token == FINISHED)
+                return "FINISHED";
             throw new BadCborException("unknown token " + token);
         }
     }
 
     static final int MAJOR_TYPE_SHIFT = 5,
-        MAJOR_TYPE_MASK = 0b111_00000,
-        MINOR_TYPE_MASK = 0b0001_1111;
+            MAJOR_TYPE_MASK = 0b111_00000,
+            MINOR_TYPE_MASK = 0b0001_1111;
 
     static final byte TYPE_POSINT = 0,
-        TYPE_NEGINT = 1,
-        TYPE_BYTESTRING = 2,
-        TYPE_TEXTSTRING = 3,
-        TYPE_ARRAY = 4,
-        TYPE_MAP = 5,
-        TYPE_TAG = 6,
-        TYPE_SIMPLE = 7;
+            TYPE_NEGINT = 1,
+            TYPE_BYTESTRING = 2,
+            TYPE_TEXTSTRING = 3,
+            TYPE_ARRAY = 4,
+            TYPE_MAP = 5,
+            TYPE_TAG = 6,
+            TYPE_SIMPLE = 7;
 
     static final int ZERO_BYTES = 23,
-        ONE_BYTE = 24,
-        EIGHT_BYTES = 27,
-        INDEFINITE = 31;
+            ONE_BYTE = 24,
+            EIGHT_BYTES = 27,
+            INDEFINITE = 31;
 
     static final int SIMPLE_FALSE = 20,
-        SIMPLE_TRUE = 21,
-        SIMPLE_NULL = 22,
-        SIMPLE_UNDEFINED = 23,
-        SIMPLE_VALUE_1 = 24, // value follows in next 1 byte, currently reserved and unused
-        SIMPLE_HALF_FLOAT = 25,
-        SIMPLE_FLOAT = 26,
-        SIMPLE_DOUBLE = 27;
+            SIMPLE_TRUE = 21,
+            SIMPLE_NULL = 22,
+            SIMPLE_UNDEFINED = 23,
+            SIMPLE_VALUE_1 = 24, // value follows in next 1 byte, currently reserved and unused
+            SIMPLE_HALF_FLOAT = 25,
+            SIMPLE_FLOAT = 26,
+            SIMPLE_DOUBLE = 27;
 
     static final byte SIMPLE_STREAM_BREAK = (byte) ((TYPE_SIMPLE << MAJOR_TYPE_SHIFT) | INDEFINITE);
 
     static final byte TAG_TIME_RFC3339 = 0, // expect text string
-        TAG_TIME_EPOCH = 1, // expect integer or float
-        TAG_POS_BIGNUM = 2, // expect byte string
-        TAG_NEG_BIGNUM = 3, // expect byte string
-        TAG_DECIMAL = 4; // expect two-element integer array
+            TAG_TIME_EPOCH = 1, // expect integer or float
+            TAG_POS_BIGNUM = 2, // expect byte string
+            TAG_NEG_BIGNUM = 3, // expect byte string
+            TAG_DECIMAL = 4; // expect two-element integer array
 
     private static final int FLAG_INDEFINITE_LEN = 1 << 31;
     private static final int MASK_LEN = ~FLAG_INDEFINITE_LEN;
@@ -303,7 +306,8 @@ public final class CborParser {
     private byte tag(byte minor) {
         // RFC8949 3.4 permits nested tags, but I see no need to support anything beyond the simple
         // tags that are relevant to the Smithy object model.
-        if (readingTag) throw new BadCborException("nested tags not permitted");
+        if (readingTag)
+            throw new BadCborException("nested tags not permitted");
         // reset increments before calling nextToken. 1 overhead for this tag /immediate value
         overhead = 1;
         itemLength = 0;
@@ -368,7 +372,8 @@ public final class CborParser {
     }
 
     private byte integer(byte major, byte minor) {
-        if (minor == INDEFINITE) throw new BadCborException("numeric type has indefinite length");
+        if (minor == INDEFINITE)
+            throw new BadCborException("numeric type has indefinite length");
         int argLength = argLength(minor);
         if (argLength > 0) {
             overhead = 0;
@@ -501,7 +506,8 @@ public final class CborParser {
         itemLength = 0;
         int scan = ++idx;
         while (true) {
-            if (scan >= len) throw new BadCborException("non-terminating string");
+            if (scan >= len)
+                throw new BadCborException("non-terminating string");
             byte b = buffer[scan];
             if (b == SIMPLE_STREAM_BREAK) {
                 overhead++;
@@ -512,7 +518,8 @@ public final class CborParser {
             if (major != type) {
                 throw new BadCborException("major type misalign: " + type + " " + major);
             }
-            if (minor == INDEFINITE) throw new BadCborException("expected finite length");
+            if (minor == INDEFINITE)
+                throw new BadCborException("expected finite length");
             int argLen = argLength(minor);
             int strLen = readStrLen(buffer, scan, minor, argLen);
             int totalOverhead = argLen + 1;

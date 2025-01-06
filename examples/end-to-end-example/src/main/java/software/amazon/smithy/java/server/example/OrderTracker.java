@@ -24,10 +24,9 @@ final class OrderTracker {
 
         // Start a process to complete the order in the background.
         executor.schedule(
-            () -> ORDERS.put(order.id(), new Order(order.id(), order.type(), OrderStatus.COMPLETED)),
-            5,
-            TimeUnit.SECONDS
-        );
+                () -> ORDERS.put(order.id(), new Order(order.id(), order.type(), OrderStatus.COMPLETED)),
+                5,
+                TimeUnit.SECONDS);
     }
 
     public static Order getOrderById(UUID id) {

@@ -29,9 +29,8 @@ public final class SingleThreadOrchestrator implements ObservableOrchestrator {
         this.handlers = handlers;
         this.queue = new LinkedBlockingDeque<>();
         this.workerThread = new Thread(
-            new ConsumerTask(queue),
-            "SingleThreadOrchestrator-" + ORCHESTRATOR_ID_GENERATOR.getAndIncrement()
-        );
+                new ConsumerTask(queue),
+                "SingleThreadOrchestrator-" + ORCHESTRATOR_ID_GENERATOR.getAndIncrement());
         this.workerThread.setDaemon(true);
         this.workerThread.start();
     }
@@ -64,10 +63,10 @@ public final class SingleThreadOrchestrator implements ObservableOrchestrator {
         private State state = State.BEFORE;
 
         private JobWork(
-            Job job,
-            List<Handler> handlers,
-            BlockingQueue<Runnable> workQueue,
-            CompletableFuture<Void> signal
+                Job job,
+                List<Handler> handlers,
+                BlockingQueue<Runnable> workQueue,
+                CompletableFuture<Void> signal
         ) {
             this.job = job;
             this.queue = new ArrayDeque<>(handlers);

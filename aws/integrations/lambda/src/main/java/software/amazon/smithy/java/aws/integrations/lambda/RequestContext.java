@@ -42,8 +42,7 @@ final class RequestContext {
     }
 
     // This and the setters only exist so that Lambda can use this POJO when serializing the event
-    private RequestContext() {
-    }
+    private RequestContext() {}
 
     private void setRequestId(String requestId) {
         this.requestId = requestId;

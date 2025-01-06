@@ -19,9 +19,9 @@ public final class GetFoosInput implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#GetFoosInput");
     public static final Schema SCHEMA = Schema.structureBuilder(ID)
-        .putMember("maxResults", PreludeSchemas.INTEGER)
-        .putMember("nextToken", PreludeSchemas.STRING)
-        .build();
+            .putMember("maxResults", PreludeSchemas.INTEGER)
+            .putMember("nextToken", PreludeSchemas.STRING)
+            .build();
     public static final Schema SCHEMA_MAX_RESULTS = SCHEMA.member("maxResults");
     public static final Schema SCHEMA_NEXT_TOKEN = SCHEMA.member("nextToken");
 

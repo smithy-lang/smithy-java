@@ -90,9 +90,8 @@ public interface TypeRegistry {
         var builder = createBuilder(shapeId, SerializableStruct.class);
         if (builder == null) {
             throw new UnsupportedOperationException(
-                "Cannot find a registered shape to deserialize document: "
-                    + shapeId
-            );
+                    "Cannot find a registered shape to deserialize document: "
+                            + shapeId);
         }
         return document.asShape(builder);
     }
@@ -182,9 +181,9 @@ public interface TypeRegistry {
          * @param <T> shape type.
          */
         public <T extends SerializableStruct> Builder putType(
-            ShapeId shapeId,
-            Class<T> type,
-            Supplier<ShapeBuilder<T>> supplier
+                ShapeId shapeId,
+                Class<T> type,
+                Supplier<ShapeBuilder<T>> supplier
         ) {
             supplierMap.put(shapeId, new Entry<>(type, supplier));
             return this;

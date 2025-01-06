@@ -120,10 +120,10 @@ public final class ToStringSerializer implements ShapeSerializer {
 
         @Override
         public <T> void writeEntry(
-            Schema keySchema,
-            String key,
-            T state,
-            BiConsumer<T, ShapeSerializer> valueSerializer
+                Schema keySchema,
+                String key,
+                T state,
+                BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
             if (!isFirst) {
                 serializer.builder.append(", ");

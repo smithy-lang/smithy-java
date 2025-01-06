@@ -62,7 +62,8 @@ public final class DynamicClient extends Client {
 
     private final ServiceShape service;
     private final Model model;
-    private final ConcurrentMap<String, ApiOperation<WrappedDocument, WrappedDocument>> operations = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, ApiOperation<WrappedDocument, WrappedDocument>> operations =
+            new ConcurrentHashMap<>();
     private final SchemaConverter schemaConverter;
     private final Map<String, OperationShape> operationNames = new HashMap<>();
     private final TypeRegistry serviceErrorRegistry;
@@ -170,9 +171,9 @@ public final class DynamicClient extends Client {
      * @return the output of the operation.
      */
     public CompletableFuture<Document> callAsync(
-        String operation,
-        Document input,
-        RequestOverrideConfig overrideConfig
+            String operation,
+            Document input,
+            RequestOverrideConfig overrideConfig
     ) {
         var apiOperation = getApiOperation(operation);
         var inputStruct = new WrappedDocument(service.getId(), apiOperation.inputSchema(), input);
@@ -199,12 +200,10 @@ public final class DynamicClient extends Client {
             var shape = operationNames.get(name);
             if (shape == null) {
                 throw new IllegalArgumentException(
-                    String.format(
-                        "Operation '%s' not found in service '%s'",
-                        name,
-                        service.getId()
-                    )
-                );
+                        String.format(
+                                "Operation '%s' not found in service '%s'",
+                                name,
+                                service.getId()));
             }
 
             var operationSchema = schemaConverter.getSchema(shape);
@@ -233,14 +232,13 @@ public final class DynamicClient extends Client {
             }
 
             return new DynamicOperation(
-                service.getId(),
-                operationSchema,
-                inputSchema,
-                outputSchema,
-                Collections.unmodifiableSet(errorSchemas),
-                registry,
-                authSchemes
-            );
+                    service.getId(),
+                    operationSchema,
+                    inputSchema,
+                    outputSchema,
+                    Collections.unmodifiableSet(errorSchemas),
+                    registry,
+                    authSchemes);
         });
     }
 
@@ -274,9 +272,8 @@ public final class DynamicClient extends Client {
 
             if (protocols.isEmpty()) {
                 throw new IllegalArgumentException(
-                    "No protocol() was provided, and not protocol definition traits "
-                        + "were found on service " + service
-                );
+                        "No protocol() was provided, and not protocol definition traits "
+                                + "were found on service " + service);
             }
 
             for (var protocolImpl : ServiceLoader.load(ClientProtocolFactory.class)) {
@@ -288,10 +285,9 @@ public final class DynamicClient extends Client {
             }
 
             throw new IllegalArgumentException(
-                "Could not find any matching protocol implementations for the "
-                    + "following protocol traits attached to service " + service
-                    + ": " + protocols.keySet()
-            );
+                    "Could not find any matching protocol implementations for the "
+                            + "following protocol traits attached to service " + service
+                            + ": " + protocols.keySet());
         }
 
         /**

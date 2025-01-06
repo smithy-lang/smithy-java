@@ -74,100 +74,92 @@ import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
-public final class StructureGenerator<T extends ShapeDirective<StructureShape, CodeGenerationContext, JavaCodegenSettings>>
-    implements Consumer<T> {
+public final class StructureGenerator<
+        T extends ShapeDirective<StructureShape, CodeGenerationContext, JavaCodegenSettings>>
+        implements Consumer<T> {
 
     @Override
     public void accept(T directive) {
         if (directive.shape().hasTrait(UnitTypeTrait.class) || directive.symbol()
-            .getProperty(SymbolProperties.EXTERNAL_TYPE)
-            .isPresent()) {
+                .getProperty(SymbolProperties.EXTERNAL_TYPE)
+                .isPresent()) {
             // Skip Unit structures or external types.
             return;
         }
         var shape = directive.shape();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
-            var template = """
-                public final class ${shape:T} ${^isError}implements ${serializableStruct:T}${/isError}${?isError}extends ${sdkException:T}${/isError} {
-                    ${id:C|}
+            var template =
+                    """
+                            public final class ${shape:T} ${^isError}implements ${serializableStruct:T}${/isError}${?isError}extends ${sdkException:T}${/isError} {
+                                ${id:C|}
 
-                    ${schemas:C|}
+                                ${schemas:C|}
 
-                    ${properties:C|}
+                                ${properties:C|}
 
-                    ${constructor:C|}
+                                ${constructor:C|}
 
-                    ${getters:C|}
+                                ${getters:C|}
 
-                    ${toString:C|}
+                                ${toString:C|}
 
-                    ${equals:C|}
+                                ${equals:C|}
 
-                    ${^isError}${hashCode:C|}${/isError}
+                                ${^isError}${hashCode:C|}${/isError}
 
-                    ${serializer:C|}
+                                ${serializer:C|}
 
-                    ${getMemberValue:C|}
+                                ${getMemberValue:C|}
 
-                    ${toBuilder:C|}
+                                ${toBuilder:C|}
 
-                    ${builder:C|}
-                }
-                """;
+                                ${builder:C|}
+                            }
+                            """;
             writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
             writer.putContext("shape", directive.symbol());
             writer.putContext("serializableStruct", SerializableStruct.class);
             writer.putContext("sdkException", ModeledApiException.class);
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(
-                "schemas",
-                new SchemaGenerator(
-                    writer,
-                    shape,
-                    directive.symbolProvider(),
-                    directive.model(),
-                    directive.context()
-                )
-            );
+                    "schemas",
+                    new SchemaGenerator(
+                            writer,
+                            shape,
+                            directive.symbolProvider(),
+                            directive.model(),
+                            directive.context()));
             writer.putContext(
-                "properties",
-                new PropertyGenerator(writer, shape, directive.symbolProvider(), directive.model())
-            );
+                    "properties",
+                    new PropertyGenerator(writer, shape, directive.symbolProvider(), directive.model()));
             writer.putContext(
-                "constructor",
-                new ConstructorGenerator(writer, shape, directive.symbolProvider(), directive.model())
-            );
+                    "constructor",
+                    new ConstructorGenerator(writer, shape, directive.symbolProvider(), directive.model()));
             writer.putContext(
-                "getters",
-                new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model())
-            );
+                    "getters",
+                    new GetterGenerator(writer, shape, directive.symbolProvider(), directive.model()));
             writer.putContext(
-                "equals",
-                new EqualsGenerator(writer, shape, directive.symbolProvider(), directive.model())
-            );
+                    "equals",
+                    new EqualsGenerator(writer, shape, directive.symbolProvider(), directive.model()));
             writer.putContext("hashCode", new HashCodeGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext("toString", new ToStringGenerator(writer));
             writer.putContext(
-                "serializer",
-                new StructureSerializerGenerator(
-                    writer,
-                    shape,
-                    directive.symbolProvider(),
-                    directive.model(),
-                    directive.service()
-                )
-            );
+                    "serializer",
+                    new StructureSerializerGenerator(
+                            writer,
+                            shape,
+                            directive.symbolProvider(),
+                            directive.model(),
+                            directive.service()));
             writer.putContext(
-                "builder",
-                new StructureBuilderGenerator(
-                    writer,
-                    shape,
-                    directive.symbolProvider(),
-                    directive.model(),
-                    directive.service()
-                )
-            );
+                    "builder",
+                    new StructureBuilderGenerator(
+                            writer,
+                            shape,
+                            directive.symbolProvider(),
+                            directive.model(),
+                            directive.service()));
             writer.putContext("getMemberValue", new GetMemberValueGenerator(writer, directive.symbolProvider(), shape));
             writer.putContext("toBuilder", new ToBuilderGenerator(writer, shape, directive.symbolProvider()));
             writer.write(template);
@@ -176,8 +168,8 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
     }
 
     private record PropertyGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model)
-        implements
-        Runnable {
+            implements
+            Runnable {
         @Override
         public void run() {
             for (var member : shape.members()) {
@@ -190,69 +182,62 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
 
                 writer.write(
-                    "private final transient ${?isNullable}$1B${/isNullable}${^isNullable}$1N${/isNullable} $2L;",
-                    symbolProvider.toSymbol(member),
-                    memberName
-                );
+                        "private final transient ${?isNullable}$1B${/isNullable}${^isNullable}$1N${/isNullable} $2L;",
+                        symbolProvider.toSymbol(member),
+                        memberName);
                 writer.popState();
             }
         }
     }
 
     private record ConstructorGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model)
-        implements Runnable {
+            implements Runnable {
 
         @Override
         public void run() {
             writer.openBlock(
-                "private ${shape:T}(Builder builder) {",
-                "}",
-                () -> {
-                    if (shape.hasTrait(ErrorTrait.class)) {
-                        if (shape.getMember("message").isPresent()) {
-                            writer.write(
-                                "super($$SCHEMA, builder.message, builder.$$cause, builder.$$captureStackTrace, builder.$$deserialized);"
-                            );
-                        } else {
-                            writer.write(
-                                "super($$SCHEMA, null, builder.$$cause, builder.$$captureStackTrace, builder.$$deserialized);"
-                            );
+                    "private ${shape:T}(Builder builder) {",
+                    "}",
+                    () -> {
+                        if (shape.hasTrait(ErrorTrait.class)) {
+                            if (shape.getMember("message").isPresent()) {
+                                writer.write(
+                                        "super($$SCHEMA, builder.message, builder.$$cause, builder.$$captureStackTrace, builder.$$deserialized);");
+                            } else {
+                                writer.write(
+                                        "super($$SCHEMA, null, builder.$$cause, builder.$$captureStackTrace, builder.$$deserialized);");
+                            }
                         }
-                    }
 
-                    for (var member : shape.members()) {
-                        var memberName = symbolProvider.toMemberName(member);
-                        // Special case for error builders. Message is passed to
-                        // the super constructor. No initializer is created.
-                        if (shape.hasTrait(ErrorTrait.class) && memberName.equals("message")) {
-                            continue;
+                        for (var member : shape.members()) {
+                            var memberName = symbolProvider.toMemberName(member);
+                            // Special case for error builders. Message is passed to
+                            // the super constructor. No initializer is created.
+                            if (shape.hasTrait(ErrorTrait.class) && memberName.equals("message")) {
+                                continue;
+                            }
+                            writer.pushState();
+                            writer.putContext("memberName", memberName);
+                            writer.putContext("nullable", CodegenUtils.isNullableMember(model, member));
+                            var target = model.expectShape(member.getTarget());
+                            // Wrap maps and lists with immutable collection
+                            if (target.isMapShape() || target.isListShape()) {
+                                var memberSymbol = symbolProvider.toSymbol(member);
+                                writer.putContext(
+                                        "wrapper",
+                                        memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER));
+                                writer.putContext("collections", Collections.class);
+                                writer.write(
+                                        "this.${memberName:L} = ${?nullable}builder.${memberName:L} == null ? null : ${/nullable}${collections:T}.${wrapper:L}(builder.${memberName:L});");
+                            } else if (target.isBlobShape() && !CodegenUtils.isStreamingBlob(target)) {
+                                writer.write(
+                                        "this.${memberName:L} = ${?nullable}builder.${memberName:L} == null ? null : ${/nullable}builder.${memberName:L}.duplicate();");
+                            } else {
+                                writer.write("this.${memberName:L} = builder.${memberName:L};");
+                            }
+                            writer.popState();
                         }
-                        writer.pushState();
-                        writer.putContext("memberName", memberName);
-                        writer.putContext("nullable", CodegenUtils.isNullableMember(model, member));
-                        var target = model.expectShape(member.getTarget());
-                        // Wrap maps and lists with immutable collection
-                        if (target.isMapShape() || target.isListShape()) {
-                            var memberSymbol = symbolProvider.toSymbol(member);
-                            writer.putContext(
-                                "wrapper",
-                                memberSymbol.expectProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER)
-                            );
-                            writer.putContext("collections", Collections.class);
-                            writer.write(
-                                "this.${memberName:L} = ${?nullable}builder.${memberName:L} == null ? null : ${/nullable}${collections:T}.${wrapper:L}(builder.${memberName:L});"
-                            );
-                        } else if (target.isBlobShape() && !CodegenUtils.isStreamingBlob(target)) {
-                            writer.write(
-                                "this.${memberName:L} = ${?nullable}builder.${memberName:L} == null ? null : ${/nullable}builder.${memberName:L}.duplicate();"
-                            );
-                        } else {
-                            writer.write("this.${memberName:L} = builder.${memberName:L};");
-                        }
-                        writer.popState();
-                    }
-                }
-            );
+                    });
         }
     }
 
@@ -264,10 +249,10 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         private MemberShape member;
 
         private GetterGenerator(
-            JavaWriter writer,
-            Shape shape,
-            SymbolProvider symbolProvider,
-            Model model
+                JavaWriter writer,
+                Shape shape,
+                SymbolProvider symbolProvider,
+                Model model
         ) {
             this.writer = writer;
             this.symbolProvider = symbolProvider;
@@ -298,12 +283,11 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             writer.pushState(new GetterSection(member));
 
             writer.write(
-                """
-                    public ${?isNullable}${member:B}${/isNullable}${^isNullable}${member:N}${/isNullable} ${memberName:L}() {
-                        return ${memberName:L};
-                    }
                     """
-            );
+                            public ${?isNullable}${member:B}${/isNullable}${^isNullable}${member:N}${/isNullable} ${memberName:L}() {
+                                return ${memberName:L};
+                            }
+                            """);
             writer.popState();
             return null;
         }
@@ -326,24 +310,22 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             writer.putContext("empty", shapeSymbol.expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD));
             writer.putContext("collections", Collections.class);
             writer.write(
-                """
-                    public ${member:T} ${memberName:L}() {${?isNullable}
-                        if (${memberName:L} == null) {
-                            return ${collections:T}.${empty:L};
-                        }${/isNullable}
-                        return ${memberName:L};
-                    }
                     """
-            );
+                            public ${member:T} ${memberName:L}() {${?isNullable}
+                                if (${memberName:L} == null) {
+                                    return ${collections:T}.${empty:L};
+                                }${/isNullable}
+                                return ${memberName:L};
+                            }
+                            """);
 
             // Write has-er to allow users to check if a given collection was set. Required collections must be set.
             writer.write(
-                """
-                    public boolean has${memberName:U}() {
-                        return ${?isNullable}${memberName:L} != null${/isNullable}${^isNullable}true${/isNullable};
-                    }
                     """
-            );
+                            public boolean has${memberName:U}() {
+                                return ${?isNullable}${memberName:L} != null${/isNullable}${^isNullable}true${/isNullable};
+                            }
+                            """);
             writer.popState();
         }
 
@@ -354,7 +336,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
     }
 
     private record EqualsGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model)
-        implements Runnable {
+            implements Runnable {
         @Override
         public void run() {
             if (shape.hasTrait(ErrorTrait.class)) {
@@ -362,18 +344,17 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 return;
             }
             writer.write(
-                """
-                    @Override
-                    public boolean equals($T other) {
-                        if (other == this) {
-                            return true;
-                        }
-                        ${C|}
-                    }
-                    """,
-                Object.class,
-                writer.consumer(this::writeMemberEquals)
-            );
+                    """
+                            @Override
+                            public boolean equals($T other) {
+                                if (other == this) {
+                                    return true;
+                                }
+                                ${C|}
+                            }
+                            """,
+                    Object.class,
+                    writer.consumer(this::writeMemberEquals));
         }
 
         private void writeMemberEquals(JavaWriter writer) {
@@ -384,15 +365,14 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 return;
             }
             writer.write(
-                """
-                    if (other == null || getClass() != other.getClass()) {
-                        return false;
-                    }
-                    $1T that = ($1T) other;
-                    return ${2C|};""",
-                symbolProvider.toSymbol(shape),
-                writer.consumer(this::writePropertyEqualityChecks)
-            );
+                    """
+                            if (other == null || getClass() != other.getClass()) {
+                                return false;
+                            }
+                            $1T that = ($1T) other;
+                            return ${2C|};""",
+                    symbolProvider.toSymbol(shape),
+                    writer.consumer(this::writePropertyEqualityChecks));
         }
 
         private void writePropertyEqualityChecks(JavaWriter writer) {
@@ -404,8 +384,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
                 // Use `==` instead of `equals` for unboxed primitives
                 if (memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE)
-                    && !CodegenUtils.isNullableMember(model, member)
-                ) {
+                        && !CodegenUtils.isNullableMember(model, member)) {
                     writer.writeInline("this.${memberName:L} == that.${memberName:L}");
                 } else {
                     Class<?> comparator = CodegenUtils.isJavaArray(memberSymbol) ? Arrays.class : Objects.class;
@@ -420,7 +399,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
     }
 
     private record HashCodeGenerator(JavaWriter writer, Shape shape, SymbolProvider symbolProvider) implements
-        Runnable {
+            Runnable {
 
         @Override
         public void run() {
@@ -430,27 +409,26 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             }
 
             writer.write(
-                """
-                    @Override
-                    public int hashCode() {
-                        ${C|}
-                    }
-                    """,
-                writer.consumer(this::generate)
-            );
+                    """
+                            @Override
+                            public int hashCode() {
+                                ${C|}
+                            }
+                            """,
+                    writer.consumer(this::generate));
         }
 
         private void generate(JavaWriter writer) {
             List<String> arrayMemberNames = shape.members()
-                .stream()
-                .filter(member -> CodegenUtils.isJavaArray(symbolProvider.toSymbol(member)))
-                .map(symbolProvider::toMemberName)
-                .toList();
+                    .stream()
+                    .filter(member -> CodegenUtils.isJavaArray(symbolProvider.toSymbol(member)))
+                    .map(symbolProvider::toMemberName)
+                    .toList();
             List<String> objectMemberNames = shape.members()
-                .stream()
-                .map(symbolProvider::toMemberName)
-                .filter(name -> !arrayMemberNames.contains(name))
-                .toList();
+                    .stream()
+                    .map(symbolProvider::toMemberName)
+                    .filter(name -> !arrayMemberNames.contains(name))
+                    .toList();
             writer.pushState();
             writer.putContext("arr", arrayMemberNames);
             writer.putContext("obj", objectMemberNames);
@@ -460,20 +438,20 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             } else {
                 writer.putContext("arrays", Arrays.class);
                 writer.write(
-                    """
-                        int result = ${objects:T}.hash(${#obj}${value:L}${^key.last}, ${/key.last}${/obj});
-                        result = 31 * result${#arr} + ${arrays:T}.hashCode(${value:L})${/arr};
-                        return result;
                         """
-                );
+                                int result = ${objects:T}.hash(${#obj}${value:L}${^key.last}, ${/key.last}${/obj});
+                                result = 31 * result${#arr} + ${arrays:T}.hashCode(${value:L})${/arr};
+                                return result;
+                                """);
             }
             writer.popState();
         }
     }
 
     private record ToBuilderGenerator(
-        JavaWriter writer, StructureShape shape, SymbolProvider symbolProvider
-    ) implements Runnable {
+            JavaWriter writer,
+            StructureShape shape,
+            SymbolProvider symbolProvider) implements Runnable {
         @Override
         public void run() {
             var members = new LinkedHashSet<>(shape.members().size());
@@ -486,22 +464,21 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             writer.putContext("hasErrorMessage", hasErrorMessage);
             writer.putContext("members", members);
             writer.write(
-                """
-                    /**
-                     * Create a new builder containing all the current property values of this object.
-                     *
-                     * <p><strong>Note:</strong> This method performs only a shallow copy of the original properties.
-                     *
-                     * @return a builder for {@link ${shape:T}}.
-                     */
-                    public Builder toBuilder() {
-                        var builder = new Builder();
-                        ${?hasErrorMessage}builder.message(getMessage());
-                        ${/hasErrorMessage}${#members}builder.${value:L}(this.${value:L});
-                        ${/members}return builder;
-                    }
                     """
-            );
+                            /**
+                             * Create a new builder containing all the current property values of this object.
+                             *
+                             * <p><strong>Note:</strong> This method performs only a shallow copy of the original properties.
+                             *
+                             * @return a builder for {@link ${shape:T}}.
+                             */
+                            public Builder toBuilder() {
+                                var builder = new Builder();
+                                ${?hasErrorMessage}builder.message(getMessage());
+                                ${/hasErrorMessage}${#members}builder.${value:L}(this.${value:L});
+                                ${/members}return builder;
+                            }
+                            """);
             writer.popState();
         }
     }
@@ -509,11 +486,11 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
     private static final class StructureBuilderGenerator extends BuilderGenerator {
 
         StructureBuilderGenerator(
-            JavaWriter writer,
-            Shape shape,
-            SymbolProvider symbolProvider,
-            Model model,
-            ServiceShape service
+                JavaWriter writer,
+                Shape shape,
+                SymbolProvider symbolProvider,
+                Model model,
+                ServiceShape service
         ) {
             super(writer, shape, symbolProvider, model, service);
         }
@@ -552,18 +529,17 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             }
 
             writer.write(
-                """
-                    @Override
-                    public ${sdkShapeBuilder:T}<${shape:T}> errorCorrection() {
-                        if (tracker.allSet()) {
-                            return this;
-                        }
-                        ${C|}
-                        return this;
-                    }
-                    """,
-                writer.consumer(this::writeErrorCorrectionMembers)
-            );
+                    """
+                            @Override
+                            public ${sdkShapeBuilder:T}<${shape:T}> errorCorrection() {
+                                if (tracker.allSet()) {
+                                    return this;
+                                }
+                                ${C|}
+                                return this;
+                            }
+                            """,
+                    writer.consumer(this::writeErrorCorrectionMembers));
         }
 
         private void writeErrorCorrectionMembers(JavaWriter writer) {
@@ -586,16 +562,16 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         }
 
         private static boolean assumeShapeHasErrorCorrectedDefault(
-            Shape target,
-            MemberShape member,
-            SymbolProvider symbolProvider,
-            Model model
+                Shape target,
+                MemberShape member,
+                SymbolProvider symbolProvider,
+                Model model
         ) {
-            return target.isStructureShape() || target.isUnionShape() || CodegenUtils.hasBuiltinDefault(
-                symbolProvider,
-                model,
-                member
-            );
+            return target.isStructureShape() || target.isUnionShape()
+                    || CodegenUtils.hasBuiltinDefault(
+                            symbolProvider,
+                            model,
+                            member);
         }
 
         private static final class ErrorCorrectionVisitor extends ShapeVisitor.Default<Void> implements Runnable {
@@ -633,20 +609,18 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             @Override
             public Void listShape(ListShape listShape) {
                 writer.writeInline(
-                    "$T.$L",
-                    Collections.class,
-                    symbolProvider.toSymbol(listShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)
-                );
+                        "$T.$L",
+                        Collections.class,
+                        symbolProvider.toSymbol(listShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD));
                 return null;
             }
 
             @Override
             public Void mapShape(MapShape mapShape) {
                 writer.writeInline(
-                    "$T.$L",
-                    Collections.class,
-                    symbolProvider.toSymbol(mapShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)
-                );
+                        "$T.$L",
+                        Collections.class,
+                        symbolProvider.toSymbol(mapShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD));
                 return null;
             }
 
@@ -706,15 +680,13 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             var defaultVisitor = new DefaultInitializerGenerator(writer, model, symbolProvider);
             for (var member : shape.members()) {
                 if (member.hasNonNullDefault()
-                    && symbolProvider.toSymbol(member).expectProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT)
-                ) {
+                        && symbolProvider.toSymbol(member).expectProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT)) {
                     defaultVisitor.member = member;
                     writer.write(
-                        "private static final $T $L = $C;",
-                        symbolProvider.toSymbol(member),
-                        CodegenUtils.toDefaultValueName(symbolProvider.toMemberName(member)),
-                        defaultVisitor
-                    );
+                            "private static final $T $L = $C;",
+                            symbolProvider.toSymbol(member),
+                            CodegenUtils.toDefaultValueName(symbolProvider.toMemberName(member)),
+                            defaultVisitor);
                 }
             }
 
@@ -731,17 +703,15 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 writer.putContext("nullable", CodegenUtils.isNullableMember(model, member));
                 writer.putContext("default", member.hasNonNullDefault());
                 writer.putContext(
-                    "static",
-                    symbolProvider.toSymbol(member).expectProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT)
-                );
+                        "static",
+                        symbolProvider.toSymbol(member).expectProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT));
                 defaultVisitor.member = member;
                 writer.write(
-                    "private ${^nullable}$1T${/nullable}${?nullable}$1B${/nullable} $2L${?default} = ${?static}$3L${/static}${^static}$4C${/static}${/default};",
-                    symbolProvider.toSymbol(member),
-                    memberName,
-                    CodegenUtils.toDefaultValueName(memberName),
-                    defaultVisitor
-                );
+                        "private ${^nullable}$1T${/nullable}${?nullable}$1B${/nullable} $2L${?default} = ${?static}$3L${/static}${^static}$4C${/static}${/default};",
+                        symbolProvider.toSymbol(member),
+                        memberName,
+                        CodegenUtils.toDefaultValueName(memberName),
+                        defaultVisitor);
                 writer.popState();
             }
             if (shape.hasTrait(ErrorTrait.class)) {
@@ -766,33 +736,32 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 writer.putContext("schemaName", CodegenUtils.toMemberSchemaName(symbolProvider.toMemberName(member)));
 
                 writer.write(
-                    """
-                        public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
-                            this.${memberName:L} = ${?check}${objects:T}.requireNonNull(${/check}${memberName:L}${?check}, "${memberName:L} cannot be null")${/check};${?tracked}
-                            tracker.setMember(${schemaName:L});${/tracked}
-                            return this;
-                        }
                         """
-                );
+                                public Builder ${memberName:L}(${memberSymbol:T} ${memberName:L}) {
+                                    this.${memberName:L} = ${?check}${objects:T}.requireNonNull(${/check}${memberName:L}${?check}, "${memberName:L} cannot be null")${/check};${?tracked}
+                                    tracker.setMember(${schemaName:L});${/tracked}
+                                    return this;
+                                }
+                                """);
                 writer.popState();
             }
             if (shape.hasTrait(ErrorTrait.class)) {
                 writer.write("""
-                    public Builder withStackTrace() {
-                        this.$$captureStackTrace = true;
-                        return this;
-                    }
+                        public Builder withStackTrace() {
+                            this.$$captureStackTrace = true;
+                            return this;
+                        }
 
-                    public Builder withoutStackTrace() {
-                        this.$$captureStackTrace = false;
-                        return this;
-                    }
+                        public Builder withoutStackTrace() {
+                            this.$$captureStackTrace = false;
+                            return this;
+                        }
 
-                    public Builder withCause(${throwable:T} cause) {
-                        this.$$cause = cause;
-                        return this;
-                    }
-                    """);
+                        public Builder withCause(${throwable:T} cause) {
+                            this.$$cause = cause;
+                            return this;
+                        }
+                        """);
             }
             writer.popState();
         }
@@ -801,16 +770,15 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         protected void generateBuild(JavaWriter writer) {
             writer.pushState();
             writer.putContext(
-                "hasRequiredMembers",
-                shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault)
-            );
+                    "hasRequiredMembers",
+                    shape.members().stream().anyMatch(CodegenUtils::isRequiredWithNoDefault));
             writer.write("""
-                @Override
-                public ${shape:N} build() {${?hasRequiredMembers}
-                    tracker.validate();${/hasRequiredMembers}
-                    return new ${shape:T}(this);
-                }
-                """);
+                    @Override
+                    public ${shape:N} build() {${?hasRequiredMembers}
+                        tracker.validate();${/hasRequiredMembers}
+                        return new ${shape:T}(this);
+                    }
+                    """);
             writer.popState();
         }
 
@@ -818,7 +786,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
          * Adds default values to builder properties.
          */
         private static final class DefaultInitializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> implements
-            Runnable {
+                Runnable {
             private final JavaWriter writer;
             private final Model model;
             private final SymbolProvider symbolProvider;
@@ -826,9 +794,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             private Node defaultValue;
 
             DefaultInitializerGenerator(
-                JavaWriter writer,
-                Model model,
-                SymbolProvider symbolProvider
+                    JavaWriter writer,
+                    Model model,
+                    SymbolProvider symbolProvider
             ) {
                 this.writer = writer;
                 this.model = model;
@@ -855,18 +823,16 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                         writer.write("${dataStream:T}.ofEmpty()");
                     } else {
                         writer.write(
-                            "${dataStream:T}.ofBytes(${b64:T}.getDecoder().decode($S))",
-                            strValue
-                        );
+                                "${dataStream:T}.ofBytes(${b64:T}.getDecoder().decode($S))",
+                                strValue);
                     }
                 } else {
                     if (strValue.isEmpty()) {
                         writer.write("${byteBuf:T}.allocate(0);");
                     } else {
                         writer.write(
-                            "${byteBuf:T}.wrap(${b64:T}.getDecoder().decode($S)).duplicate()",
-                            strValue
-                        );
+                                "${byteBuf:T}.wrap(${b64:T}.getDecoder().decode($S)).duplicate()",
+                                strValue);
                     }
                 }
                 writer.popState();
@@ -885,10 +851,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 // so we do not need to check the default value. See:
                 // https://github.com/smithy-lang/smithy/blob/main/designs/defaults-and-model-evolution.md
                 writer.write(
-                    "$T.$L",
-                    Collections.class,
-                    symbolProvider.toSymbol(listShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)
-                );
+                        "$T.$L",
+                        Collections.class,
+                        symbolProvider.toSymbol(listShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD));
                 return null;
             }
 
@@ -898,10 +863,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 // so we do not need to check the default value. See:
                 // https://github.com/smithy-lang/smithy/blob/main/designs/defaults-and-model-evolution.md
                 writer.write(
-                    "$T.$L",
-                    Collections.class,
-                    symbolProvider.toSymbol(mapShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD)
-                );
+                        "$T.$L",
+                        Collections.class,
+                        symbolProvider.toSymbol(mapShape).expectProperty(SymbolProperties.COLLECTION_EMPTY_METHOD));
                 return null;
             }
 
@@ -931,10 +895,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 for (var entry : shape.getEnumValues().entrySet()) {
                     if (entry.getValue() == value) {
                         writer.write(
-                            "$T.$L",
-                            symbolProvider.toSymbol(member),
-                            CodegenUtils.toUpperSnakeCase(entry.getKey())
-                        );
+                                "$T.$L",
+                                symbolProvider.toSymbol(member),
+                                CodegenUtils.toUpperSnakeCase(entry.getKey()));
                         break;
                     }
                 }
@@ -977,10 +940,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             @Override
             public Void bigDecimalShape(BigDecimalShape bigDecimalShape) {
                 writer.write(
-                    "$T.valueOf($L)",
-                    BigDecimal.class,
-                    defaultValue.expectNumberNode().getValue().doubleValue()
-                );
+                        "$T.valueOf($L)",
+                        BigDecimal.class,
+                        defaultValue.expectNumberNode().getValue().doubleValue());
                 return null;
             }
 
@@ -996,10 +958,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 for (var entry : shape.getEnumValues().entrySet()) {
                     if (entry.getValue().equals(value)) {
                         writer.write(
-                            "$T.$L",
-                            symbolProvider.toSymbol(member),
-                            CodegenUtils.toUpperSnakeCase(entry.getKey())
-                        );
+                                "$T.$L",
+                                symbolProvider.toSymbol(member),
+                                CodegenUtils.toUpperSnakeCase(entry.getKey()));
                         break;
                     }
                 }
@@ -1028,11 +989,9 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                 if (member.hasTrait(TimestampFormatTrait.class)) {
                     value = switch (member.expectTrait(TimestampFormatTrait.class).getFormat()) {
                         case EPOCH_SECONDS -> Instant.ofEpochMilli(
-                            defaultValue.expectNumberNode().getValue().longValue()
-                        );
+                                defaultValue.expectNumberNode().getValue().longValue());
                         case HTTP_DATE -> Instant.from(
-                            DateTimeFormatter.RFC_1123_DATE_TIME.parse(defaultValue.expectStringNode().getValue())
-                        );
+                                DateTimeFormatter.RFC_1123_DATE_TIME.parse(defaultValue.expectStringNode().getValue()));
                         default -> instantFromDefaultTimestamp(defaultValue);
                     };
                 } else {
@@ -1049,8 +1008,7 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                     return Instant.parse(defaultValue.expectStringNode().getValue());
                 }
                 throw new IllegalArgumentException(
-                    "Invalid timestamp value node: " + defaultValue + "Expected string or number"
-                );
+                        "Invalid timestamp value node: " + defaultValue + "Expected string or number");
             }
         }
 

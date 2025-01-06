@@ -23,10 +23,10 @@ public class HttpBearerAuthSignerTest {
     void testBearerAuthSigner() throws ExecutionException, InterruptedException {
         var tokenIdentity = TokenIdentity.create("token");
         var request = HttpRequest.builder()
-            .httpVersion(HttpVersion.HTTP_1_1)
-            .method("PUT")
-            .uri(URI.create("https://www.example.com"))
-            .build();
+                .httpVersion(HttpVersion.HTTP_1_1)
+                .method("PUT")
+                .uri(URI.create("https://www.example.com"))
+                .build();
 
         var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, AuthProperties.empty()).get();
         var authHeader = signedRequest.headers().firstValue("authorization");
@@ -37,11 +37,11 @@ public class HttpBearerAuthSignerTest {
     void overwritesExistingHeader() throws ExecutionException, InterruptedException {
         var tokenIdentity = TokenIdentity.create("token");
         var request = HttpRequest.builder()
-            .httpVersion(HttpVersion.HTTP_1_1)
-            .method("PUT")
-            .headers(HttpHeaders.of(Map.of("Authorization", List.of("FOO", "BAR"))))
-            .uri(URI.create("https://www.example.com"))
-            .build();
+                .httpVersion(HttpVersion.HTTP_1_1)
+                .method("PUT")
+                .headers(HttpHeaders.of(Map.of("Authorization", List.of("FOO", "BAR"))))
+                .uri(URI.create("https://www.example.com"))
+                .build();
 
         var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, AuthProperties.empty()).get();
         var authHeader = signedRequest.headers().firstValue("authorization");

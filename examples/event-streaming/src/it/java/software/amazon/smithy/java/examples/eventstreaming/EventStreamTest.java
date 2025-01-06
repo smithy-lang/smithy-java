@@ -28,14 +28,14 @@ public class EventStreamTest {
     @Test
     public void fizzBuzz() throws InterruptedException {
         var client = FizzBuzzServiceClient.builder()
-            .endpointResolver(EndpointResolver.staticHost("http://localhost:8080"))
-            .build();
+                .endpointResolver(EndpointResolver.staticHost("http://localhost:8080"))
+                .build();
 
         int range = 100;
 
         FizzBuzzInput input = FizzBuzzInput.builder()
-            .stream(new ValueStreamPublisher(range))
-            .build();
+                .stream(new ValueStreamPublisher(range))
+                .build();
         FizzBuzzOutput output = client.fizzBuzz(input);
 
         System.out.println("Initial messages done");
@@ -81,8 +81,7 @@ public class EventStreamTest {
             }
 
             @Override
-            public void onError(Throwable throwable) {
-            }
+            public void onError(Throwable throwable) {}
 
             @Override
             public void onComplete() {
@@ -120,8 +119,8 @@ public class EventStreamTest {
                     }
                     if (count++ < range) {
                         ValueStream value = ValueStream.builder()
-                            .value(Value.builder().value(count).build())
-                            .build();
+                                .value(Value.builder().value(count).build())
+                                .build();
                         System.out.println("sent: " + value);
                         subscriber.onNext(value);
                     } else {

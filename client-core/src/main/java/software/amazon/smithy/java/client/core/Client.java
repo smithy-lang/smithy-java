@@ -76,9 +76,9 @@ public abstract class Client {
      * @return Returns the deserialized output.
      */
     protected <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> call(
-        I input,
-        ApiOperation<I, O> operation,
-        RequestOverrideConfig overrideConfig
+            I input,
+            ApiOperation<I, O> operation,
+            RequestOverrideConfig overrideConfig
     ) {
         // Create a copy of the type registry that adds the errors this operation can encounter.
         TypeRegistry operationRegistry = TypeRegistry.compose(operation.errorRegistry(), typeRegistry);
@@ -185,10 +185,10 @@ public abstract class Client {
         @SuppressWarnings("unchecked")
         public B withConfiguration(ClientConfig config) {
             configBuilder.transport(config.transport())
-                .protocol(config.protocol())
-                .endpointResolver(config.endpointResolver())
-                .authSchemeResolver(config.authSchemeResolver())
-                .identityResolvers(config.identityResolvers());
+                    .protocol(config.protocol())
+                    .endpointResolver(config.endpointResolver())
+                    .authSchemeResolver(config.authSchemeResolver())
+                    .identityResolvers(config.identityResolvers());
             config.interceptors().forEach(configBuilder::addInterceptor);
             config.supportedAuthSchemes().forEach(configBuilder::putSupportedAuthSchemes);
             configBuilder.putAllConfig(config.context());

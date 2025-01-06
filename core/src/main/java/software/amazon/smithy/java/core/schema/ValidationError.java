@@ -35,41 +35,40 @@ public interface ValidationError {
     record UnionValidationFailure(String path, String message, Schema schema) implements ValidationError {}
 
     record TypeValidationFailure(String path, String message, ShapeType actual, Schema schema) implements
-        ValidationError {
+            ValidationError {
         public TypeValidationFailure(String path, ShapeType actual, Schema schema) {
             this(path, "Value must be " + schema.type() + ", but found " + actual, actual, schema);
         }
     }
 
     record RequiredValidationFailure(String path, String message, String missingMember, Schema schema) implements
-        ValidationError {
+            ValidationError {
         public RequiredValidationFailure(String path, String missingMember, Schema schema) {
             this(path, "Value missing required member: " + missingMember, missingMember, schema);
         }
     }
 
     record PatternValidationFailure(String path, String message, String value, Schema schema) implements
-        ValidationError {
+            ValidationError {
         public PatternValidationFailure(String path, String value, Schema schema) {
             this(
-                path,
-                "Value must satisfy regular expression pattern: "
-                    + schema.expectTrait(TraitKey.PATTERN_TRAIT).getPattern(),
-                value,
-                schema
-            );
+                    path,
+                    "Value must satisfy regular expression pattern: "
+                            + schema.expectTrait(TraitKey.PATTERN_TRAIT).getPattern(),
+                    value,
+                    schema);
         }
     }
 
     record EnumValidationFailure(String path, String message, String value, Schema schema) implements
-        ValidationError {
+            ValidationError {
         public EnumValidationFailure(String path, String value, Schema schema) {
             this(path, "Value is not an allowed enum string", value, schema);
         }
     }
 
     record IntEnumValidationFailure(String path, String message, int value, Schema schema) implements
-        ValidationError {
+            ValidationError {
         public IntEnumValidationFailure(String path, int value, Schema schema) {
             this(path, "Value is not an allowed integer enum number", value, schema);
         }
@@ -82,7 +81,7 @@ public interface ValidationError {
     }
 
     record RangeValidationFailure(String path, String message, Number value, Schema schema) implements
-        ValidationError {
+            ValidationError {
         public RangeValidationFailure(String path, Number value, Schema schema) {
             this(path, createMessage(schema), value, schema);
         }
@@ -94,9 +93,9 @@ public interface ValidationError {
                 return "Value must be greater than or equal to " + formatDecimal(schema.minRangeConstraint);
             } else {
                 return "Value must be between " + formatDecimal(schema.minRangeConstraint) + " and "
-                    + formatDecimal(
-                        schema.maxRangeConstraint
-                    ) + ", inclusive";
+                        + formatDecimal(
+                                schema.maxRangeConstraint)
+                        + ", inclusive";
             }
         }
 
@@ -111,7 +110,7 @@ public interface ValidationError {
     }
 
     record LengthValidationFailure(String path, String message, long length, Schema schema) implements
-        ValidationError {
+            ValidationError {
         public LengthValidationFailure(String path, long length, Schema schema) {
             this(path, createMessage(length, schema), length, schema);
         }
@@ -124,7 +123,7 @@ public interface ValidationError {
                 return prefix + " must have length greater than or equal to " + schema.minLengthConstraint;
             } else {
                 return prefix + " must have length between " + schema.minLengthConstraint
-                    + " and " + schema.maxLengthConstraint + ", inclusive";
+                        + " and " + schema.maxLengthConstraint + ", inclusive";
             }
         }
     }

@@ -20,9 +20,8 @@ public class PresenceTrackerTest {
     @ValueSource(ints = {1, 63, 64, 65, 128})
     void throwsUnsetMembers(int requiredFields) {
         var exc = assertThrows(
-            SerializationException.class,
-            () -> PresenceTracker.of(createBigRequiredSchema(requiredFields, requiredFields, 0)).validate()
-        );
+                SerializationException.class,
+                () -> PresenceTracker.of(createBigRequiredSchema(requiredFields, requiredFields, 0)).validate());
         for (var i = 0; i < requiredFields; i++) {
             assertTrue(exc.getMessage().contains("member" + i));
         }
@@ -41,8 +40,7 @@ public class PresenceTrackerTest {
         }
 
         assertEquals(
-            expected,
-            PresenceTracker.of(createBigRequiredSchema(requiredFields, requiredFields, 0)).getClass()
-        );
+                expected,
+                PresenceTracker.of(createBigRequiredSchema(requiredFields, requiredFields, 0)).getClass());
     }
 }

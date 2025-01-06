@@ -31,12 +31,11 @@ record HostLabelEndpointResolver(EndpointResolver delegate) implements EndpointR
     private static Endpoint prefix(Endpoint endpoint, String prefix) {
         try {
             var updatedUri = new URI(
-                endpoint.uri().getScheme().toLowerCase(Locale.US),
-                prefix + endpoint.uri().getHost(),
-                endpoint.uri().getPath(),
-                endpoint.uri().getQuery(),
-                endpoint.uri().getFragment()
-            );
+                    endpoint.uri().getScheme().toLowerCase(Locale.US),
+                    prefix + endpoint.uri().getHost(),
+                    endpoint.uri().getPath(),
+                    endpoint.uri().getQuery(),
+                    endpoint.uri().getFragment());
             return endpoint.toBuilder().uri(updatedUri).build();
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);

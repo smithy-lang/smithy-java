@@ -222,9 +222,9 @@ public interface TimestampFormatter {
         };
 
         private static final DateTimeFormatter HTTP_DATE_FORMAT = DateTimeFormatter
-            .ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'")
-            .withZone(ZoneId.of("UTC"))
-            .withLocale(Locale.US);
+                .ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'")
+                .withZone(ZoneId.of("UTC"))
+                .withLocale(Locale.US);
 
         @Override
         public String toString() {
@@ -263,10 +263,9 @@ public interface TimestampFormatter {
 
         public TimestampSyntaxError(TimestampFormatTrait.Format format, ExpectedType expectedType, Object value) {
             super(
-                "Expected a " + expectedType + " value for a " + format.name() + " timestamp, but found " + value
-                    .getClass()
-                    .getSimpleName()
-            );
+                    "Expected a " + expectedType + " value for a " + format.name() + " timestamp, but found " + value
+                            .getClass()
+                            .getSimpleName());
             this.format = format;
             this.expectedType = expectedType;
             this.value = value;

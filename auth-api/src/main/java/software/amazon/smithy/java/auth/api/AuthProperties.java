@@ -148,8 +148,7 @@ public final class AuthProperties {
     public static final class Builder {
         private Map<Context.Key<?>, Object> properties = new HashMap<>();
 
-        private Builder() {
-        }
+        private Builder() {}
 
         /**
          * Create the {@code AuthProperties} object.

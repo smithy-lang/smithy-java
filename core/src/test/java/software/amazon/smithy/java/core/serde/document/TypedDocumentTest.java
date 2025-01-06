@@ -26,31 +26,30 @@ public class TypedDocumentTest {
 
     private SerializableShape createSerializableShape() {
         var structSchema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
-            .putMember("a", PreludeSchemas.STRING)
-            .putMember("b", PreludeSchemas.STRING)
-            .build();
+                .putMember("a", PreludeSchemas.STRING)
+                .putMember("b", PreludeSchemas.STRING)
+                .build();
 
         return encoder -> {
             encoder.writeStruct(
-                structSchema,
-                new SerializableStruct() {
-                    @Override
-                    public Schema schema() {
-                        return structSchema;
-                    }
+                    structSchema,
+                    new SerializableStruct() {
+                        @Override
+                        public Schema schema() {
+                            return structSchema;
+                        }
 
-                    @Override
-                    public void serializeMembers(ShapeSerializer s) {
-                        s.writeString(schema().member("a"), "1");
-                        s.writeString(schema().member("b"), "2");
-                    }
+                        @Override
+                        public void serializeMembers(ShapeSerializer s) {
+                            s.writeString(schema().member("a"), "1");
+                            s.writeString(schema().member("b"), "2");
+                        }
 
-                    @Override
-                    public <T> T getMemberValue(Schema member) {
-                        return null;
-                    }
-                }
-            );
+                        @Override
+                        public <T> T getMemberValue(Schema member) {
+                            return null;
+                        }
+                    });
         };
     }
 
@@ -61,11 +60,9 @@ public class TypedDocumentTest {
 
         assertThat(result.type(), equalTo(ShapeType.STRUCTURE));
         assertThat(
-            result.toString(),
-            equalTo(
-                "StructureDocument[schema=Schema{id='smithy.example#Struct', type=structure}, members={a=StringDocument[schema=Schema{id='smithy.example#Struct$a', type=string}, value=1], b=StringDocument[schema=Schema{id='smithy.example#Struct$b', type=string}, value=2]}]"
-            )
-        );
+                result.toString(),
+                equalTo(
+                        "StructureDocument[schema=Schema{id='smithy.example#Struct', type=structure}, members={a=StringDocument[schema=Schema{id='smithy.example#Struct$a', type=string}, value=1], b=StringDocument[schema=Schema{id='smithy.example#Struct$b', type=string}, value=2]}]"));
 
         assertThat(result.getMember("a").type(), equalTo(ShapeType.STRING));
         assertThat(result.getMember("a").asString(), equalTo("1"));

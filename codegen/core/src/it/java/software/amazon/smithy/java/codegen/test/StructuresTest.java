@@ -44,27 +44,26 @@ import software.amazon.smithy.java.core.serde.document.Document;
 public class StructuresTest {
     static Stream<SerializableShape> memberTypes() {
         return Stream.of(
-            BooleanMembersInput.builder().requiredBoolean(true).build(),
-            DocumentMembersInput.builder().requiredDoc(Document.of("str")).build(),
-            ListMembersInput.builder().requiredList(List.of("a", "b", "c")).build(),
-            MapMembersInput.builder().requiredMap(Map.of("a", "b")).build(),
-            BigDecimalMembersInput.builder().requiredBigDecimal(BigDecimal.valueOf(1.0)).build(),
-            BigIntegerMembersInput.builder().requiredBigInteger(BigInteger.valueOf(1L)).build(),
-            ByteMembersInput.builder().requiredByte((byte) 1).build(),
-            DoubleMembersInput.builder().requiredDouble(2.0).build(),
-            FloatMembersInput.builder().requiredFloat(1f).build(),
-            IntegerMembersInput.builder().requiredInt(1).build(),
-            LongMembersInput.builder().requiredLongs(1L).build(),
-            ShortMembersInput.builder().requiredShort((short) 1).build(),
-            StringMembersInput.builder().requiredString("required").build(),
-            StructureMembersInput.builder()
-                .requiredStruct(NestedStruct.builder().fieldA("a").fieldB(2).build())
-                .build(),
-            TimestampMembersInput.builder().requiredTimestamp(Instant.ofEpochMilli(111111111L)).build(),
-            UnionMembersInput.builder().requiredUnion(new NestedUnion.AMember("string")).build(),
-            EnumMembersInput.builder().requiredEnum(EnumType.OPTION_ONE).build(),
-            IntEnumMembersInput.builder().requiredEnum(IntEnumType.OPTION_ONE).build()
-        );
+                BooleanMembersInput.builder().requiredBoolean(true).build(),
+                DocumentMembersInput.builder().requiredDoc(Document.of("str")).build(),
+                ListMembersInput.builder().requiredList(List.of("a", "b", "c")).build(),
+                MapMembersInput.builder().requiredMap(Map.of("a", "b")).build(),
+                BigDecimalMembersInput.builder().requiredBigDecimal(BigDecimal.valueOf(1.0)).build(),
+                BigIntegerMembersInput.builder().requiredBigInteger(BigInteger.valueOf(1L)).build(),
+                ByteMembersInput.builder().requiredByte((byte) 1).build(),
+                DoubleMembersInput.builder().requiredDouble(2.0).build(),
+                FloatMembersInput.builder().requiredFloat(1f).build(),
+                IntegerMembersInput.builder().requiredInt(1).build(),
+                LongMembersInput.builder().requiredLongs(1L).build(),
+                ShortMembersInput.builder().requiredShort((short) 1).build(),
+                StringMembersInput.builder().requiredString("required").build(),
+                StructureMembersInput.builder()
+                        .requiredStruct(NestedStruct.builder().fieldA("a").fieldB(2).build())
+                        .build(),
+                TimestampMembersInput.builder().requiredTimestamp(Instant.ofEpochMilli(111111111L)).build(),
+                UnionMembersInput.builder().requiredUnion(new NestedUnion.AMember("string")).build(),
+                EnumMembersInput.builder().requiredEnum(EnumType.OPTION_ONE).build(),
+                IntEnumMembersInput.builder().requiredEnum(IntEnumType.OPTION_ONE).build());
     }
 
     @ParameterizedTest

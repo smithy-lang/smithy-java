@@ -34,26 +34,25 @@ public class UnionTest {
 
     static Stream<SerializableShape> unionTypes() {
         return Stream.of(
-            new UnionType.BooleanValueMember(true),
-            new UnionType.ListValueMember(List.of("a", "b")),
-            new UnionType.MapValueMember(Map.of("a", "b")),
-            new UnionType.BigDecimalValueMember(BigDecimal.ONE),
-            new UnionType.BigIntegerValueMember(BigInteger.ONE),
-            new UnionType.ByteValueMember((byte) 1),
-            new UnionType.DoubleValueMember(2.0),
-            new UnionType.FloatValueMember(2f),
-            new UnionType.IntegerValueMember(1),
-            new UnionType.LongValueMember(1L),
-            new UnionType.ShortValueMember((short) 1),
-            new UnionType.StringValueMember("string"),
-            new UnionType.BlobValueMember(ByteBuffer.wrap(Base64.getDecoder().decode("c3RyZWFtaW5n"))),
-            new UnionType.StructureValueMember(NestedStruct.builder().build()),
-            new UnionType.TimestampValueMember(Instant.EPOCH),
-            new UnionType.UnionValueMember(new NestedUnion.BMember(1)),
-            new UnionType.EnumValueMember(NestedEnum.A),
-            new UnionType.IntEnumValueMember(NestedIntEnum.A),
-            new UnionType.UnitValueMember()
-        );
+                new UnionType.BooleanValueMember(true),
+                new UnionType.ListValueMember(List.of("a", "b")),
+                new UnionType.MapValueMember(Map.of("a", "b")),
+                new UnionType.BigDecimalValueMember(BigDecimal.ONE),
+                new UnionType.BigIntegerValueMember(BigInteger.ONE),
+                new UnionType.ByteValueMember((byte) 1),
+                new UnionType.DoubleValueMember(2.0),
+                new UnionType.FloatValueMember(2f),
+                new UnionType.IntegerValueMember(1),
+                new UnionType.LongValueMember(1L),
+                new UnionType.ShortValueMember((short) 1),
+                new UnionType.StringValueMember("string"),
+                new UnionType.BlobValueMember(ByteBuffer.wrap(Base64.getDecoder().decode("c3RyZWFtaW5n"))),
+                new UnionType.StructureValueMember(NestedStruct.builder().build()),
+                new UnionType.TimestampValueMember(Instant.EPOCH),
+                new UnionType.UnionValueMember(new NestedUnion.BMember(1)),
+                new UnionType.EnumValueMember(NestedEnum.A),
+                new UnionType.IntEnumValueMember(NestedIntEnum.A),
+                new UnionType.UnitValueMember());
     }
 
     @ParameterizedTest

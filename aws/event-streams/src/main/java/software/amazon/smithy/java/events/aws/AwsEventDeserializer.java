@@ -22,9 +22,8 @@ public final class AwsEventDeserializer extends SpecificShapeDeserializer {
     @Override
     protected RuntimeException throwForInvalidState(Schema schema) {
         throw new IllegalStateException(
-            "Expected to parse a structure for Json-encoded event stream data,"
-                + " but found " + schema
-        );
+                "Expected to parse a structure for Json-encoded event stream data,"
+                        + " but found " + schema);
     }
 
     @Override

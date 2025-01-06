@@ -49,9 +49,8 @@ public class Slf4jLoggerIsolatedTest {
         assertEquals(ch.qos.logback.classic.Level.ERROR, LIST_APPENDER.list.get(2).getLevel());
         assertEquals("a: test3: b c", LIST_APPENDER.list.get(2).getFormattedMessage());
         assertEquals(
-            NullPointerException.class.getName(),
-            LIST_APPENDER.list.get(2).getThrowableProxy().getClassName()
-        );
+                NullPointerException.class.getName(),
+                LIST_APPENDER.list.get(2).getThrowableProxy().getClassName());
         assertEquals("BANG!", LIST_APPENDER.list.get(2).getThrowableProxy().getMessage());
         assertEquals("FATAL", LIST_APPENDER.list.get(2).getMarkerList().get(0).getName());
     }
@@ -62,13 +61,12 @@ public class Slf4jLoggerIsolatedTest {
         logger.log(InternalLogger.Level.ERROR, "test1");
         logger.log(InternalLogger.Level.WARN, "test2: {}", "abc");
         logger.log(
-            InternalLogger.Level.FATAL,
-            "{}: test3: {} {}",
-            "a",
-            "b",
-            "c",
-            new NullPointerException("BANG!")
-        );
+                InternalLogger.Level.FATAL,
+                "{}: test3: {} {}",
+                "a",
+                "b",
+                "c",
+                new NullPointerException("BANG!"));
 
         assertEquals(ch.qos.logback.classic.Level.ERROR, LIST_APPENDER.list.get(0).getLevel());
         assertEquals("test1", LIST_APPENDER.list.get(0).getFormattedMessage());
@@ -80,9 +78,8 @@ public class Slf4jLoggerIsolatedTest {
         assertEquals(ch.qos.logback.classic.Level.ERROR, LIST_APPENDER.list.get(2).getLevel());
         assertEquals("a: test3: b c", LIST_APPENDER.list.get(2).getFormattedMessage());
         assertEquals(
-            NullPointerException.class.getName(),
-            LIST_APPENDER.list.get(2).getThrowableProxy().getClassName()
-        );
+                NullPointerException.class.getName(),
+                LIST_APPENDER.list.get(2).getThrowableProxy().getClassName());
         assertEquals("BANG!", LIST_APPENDER.list.get(2).getThrowableProxy().getMessage());
         assertEquals("FATAL", LIST_APPENDER.list.get(2).getMarkerList().get(0).getName());
     }

@@ -22,9 +22,9 @@ public class CborSerializerTest {
         var name = "kestrel";
         var bytes = ByteBuffer.wrap(" li'l guy".getBytes(StandardCharsets.UTF_8)).position(1).asReadOnlyBuffer();
         var bird = new CborTestData.BirdBuilder()
-            .name(name)
-            .bytes(bytes.duplicate())
-            .build();
+                .name(name)
+                .bytes(bytes.duplicate())
+                .build();
 
         var ser = CODEC.serialize(bird, SETTINGS);
         var de = new CborTestData.BirdBuilder().deserialize(CODEC.newDeserializer(ser, SETTINGS)).build();

@@ -41,11 +41,10 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(SigV4Signer.class);
     private static final List<String> HEADERS_TO_IGNORE_IN_LOWER_CASE = List.of(
-        "connection",
-        "x-amzn-trace-id",
-        "user-agent",
-        "expect"
-    );
+            "connection",
+            "x-amzn-trace-id",
+            "user-agent",
+            "expect");
 
     private static final int POOL_SIZE = 32;
     private static final int BUFFER_SIZE = 512;
@@ -100,9 +99,9 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
     @Override
     public CompletableFuture<HttpRequest> sign(
-        HttpRequest request,
-        AwsCredentialsIdentity identity,
-        AuthProperties properties
+            HttpRequest request,
+            AwsCredentialsIdentity identity,
+            AuthProperties properties
     ) {
         var region = properties.expect(SigV4Settings.REGION);
         var name = properties.expect(SigV4Settings.SIGNING_NAME);
@@ -114,18 +113,17 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
         return getPayloadHash(request.body()).thenApply(payloadHash -> {
             var signedHeaders = createSignedHeaders(
-                request.method(),
-                request.uri(),
-                request.headers(),
-                payloadHash,
-                region,
-                name,
-                clock.instant(),
-                identity.accessKeyId(),
-                identity.secretAccessKey(),
-                identity.sessionToken(),
-                !request.body().hasKnownLength()
-            );
+                    request.method(),
+                    request.uri(),
+                    request.headers(),
+                    payloadHash,
+                    region,
+                    name,
+                    clock.instant(),
+                    identity.accessKeyId(),
+                    identity.secretAccessKey(),
+                    identity.sessionToken(),
+                    !request.body().hasKnownLength());
             // Don't let the cached buffers grow too large.
             var sb = signingResources.sb;
             if (sb.length() > BUFFER_SIZE) {
@@ -146,17 +144,17 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     private Map<String, List<String>> createSignedHeaders(
-        String method,
-        URI uri,
-        HttpHeaders httpHeaders,
-        String payloadHash,
-        String regionName,
-        String serviceName,
-        Instant signingTimestamp,
-        String accessKeyId,
-        String secretAccessKey,
-        String sessionToken,
-        boolean isStreaming
+            String method,
+            URI uri,
+            HttpHeaders httpHeaders,
+            String payloadHash,
+            String regionName,
+            String serviceName,
+            Instant signingTimestamp,
+            String accessKeyId,
+            String secretAccessKey,
+            String sessionToken,
+            boolean isStreaming
     ) {
         var headers = copyHeaders(httpHeaders);
 
@@ -182,22 +180,20 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
 
         // Build canonicalRequest and compute its signature
         var canonicalRequest = getCanonicalRequest(
-            method,
-            uri,
-            headers,
-            headers.keySet(),
-            signedHeaders,
-            payloadHash,
-            sb
-        );
+                method,
+                uri,
+                headers,
+                headers.keySet(),
+                signedHeaders,
+                payloadHash,
+                sb);
 
         var signingKey = deriveSigningKey(
-            secretAccessKey,
-            dateStamp,
-            regionName,
-            serviceName,
-            signingTimestamp
-        );
+                secretAccessKey,
+                dateStamp,
+                regionName,
+                serviceName,
+                signingTimestamp);
         var scope = createScope(dateStamp, regionName, serviceName, sb);
         var signature = computeSignature(canonicalRequest, scope, requestTime, signingKey, sb);
 
@@ -275,33 +271,33 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     private static String getAuthHeader(
-        String accessKeyId,
-        String scope,
-        String signedHeaderBuilder,
-        String signature,
-        StringBuilder sb
+            String accessKeyId,
+            String scope,
+            String signedHeaderBuilder,
+            String signature,
+            StringBuilder sb
     ) {
         sb.setLength(0);
         sb.append(ALGORITHM)
-            .append(" Credential=")
-            .append(accessKeyId)
-            .append('/')
-            .append(scope)
-            .append(", SignedHeaders=")
-            .append(signedHeaderBuilder)
-            .append(", Signature=")
-            .append(signature);
+                .append(" Credential=")
+                .append(accessKeyId)
+                .append('/')
+                .append(scope)
+                .append(", SignedHeaders=")
+                .append(signedHeaderBuilder)
+                .append(", Signature=")
+                .append(signature);
         return sb.toString();
     }
 
     private byte[] getCanonicalRequest(
-        String method,
-        URI uri,
-        Map<String, List<String>> headers,
-        Set<String> sortedHeaderKeys,
-        String signedHeaders,
-        String payloadHash,
-        StringBuilder sb
+            String method,
+            URI uri,
+            Map<String, List<String>> headers,
+            Set<String> sortedHeaderKeys,
+            String signedHeaders,
+            String payloadHash,
+            StringBuilder sb
     ) {
         sb.setLength(0);
         sb.append(method).append('\n');
@@ -312,8 +308,8 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         addCanonicalizedHeaderString(headers, sortedHeaderKeys, sb);
         sb.append('\n');
         sb.append(signedHeaders)
-            .append('\n')
-            .append(payloadHash);
+                .append('\n')
+                .append(payloadHash);
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
@@ -363,9 +359,9 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     private static void addCanonicalizedHeaderString(
-        Map<String, List<String>> headers,
-        Set<String> sortedHeaderKeys,
-        StringBuilder builder
+            Map<String, List<String>> headers,
+            Set<String> sortedHeaderKeys,
+            StringBuilder builder
     ) {
         for (var headerKey : sortedHeaderKeys) {
             if (HEADERS_TO_IGNORE_IN_LOWER_CASE.contains(headerKey)) {
@@ -436,11 +432,11 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
      * AWS4 uses a series of derived keys, formed by hashing different pieces of data
      */
     private byte[] deriveSigningKey(
-        String secretKey,
-        String dateStamp,
-        String regionName,
-        String serviceName,
-        Instant signingDate
+            String secretKey,
+            String dateStamp,
+            String regionName,
+            String serviceName,
+            Instant signingDate
     ) {
         var cacheKey = new SigningCache.CacheKey(secretKey, regionName, serviceName);
         SigningKey signingKey = SIGNER_CACHE.get(cacheKey);
@@ -454,10 +450,10 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     private byte[] newSigningKey(
-        String secretKey,
-        String dateStamp,
-        String regionName,
-        String serviceName
+            String secretKey,
+            String dateStamp,
+            String regionName,
+            String serviceName
     ) {
         var kSecret = ("AWS4" + secretKey).getBytes(StandardCharsets.UTF_8);
         var kDate = sign(dateStamp, kSecret);
@@ -467,20 +463,20 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     }
 
     private String computeSignature(
-        byte[] canonicalRequest,
-        String scope,
-        String requestTime,
-        byte[] signingKey,
-        StringBuilder sb
+            byte[] canonicalRequest,
+            String scope,
+            String requestTime,
+            byte[] signingKey,
+            StringBuilder sb
     ) {
         sb.setLength(0);
         sb.append(ALGORITHM)
-            .append('\n')
-            .append(requestTime)
-            .append('\n')
-            .append(scope)
-            .append('\n')
-            .append(HexFormat.of().formatHex(hash(canonicalRequest)));
+                .append('\n')
+                .append(requestTime)
+                .append('\n')
+                .append(scope)
+                .append('\n')
+                .append(HexFormat.of().formatHex(hash(canonicalRequest)));
         var toSign = sb.toString();
         return HexFormat.of().formatHex(sign(toSign, signingKey));
     }

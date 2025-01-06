@@ -25,9 +25,9 @@ final class HttpBearerAuthSigner implements Signer<HttpRequest, TokenIdentity> {
 
     @Override
     public CompletableFuture<HttpRequest> sign(
-        HttpRequest request,
-        TokenIdentity identity,
-        AuthProperties properties
+            HttpRequest request,
+            TokenIdentity identity,
+            AuthProperties properties
     ) {
         var headers = new LinkedHashMap<>(request.headers().map());
         var existing = headers.put(AUTHORIZATION_HEADER, List.of(SCHEME + " " + identity.token()));

@@ -282,10 +282,10 @@ final class CborSerializer implements ShapeSerializer {
     private final class CborMapSerializer implements MapSerializer {
         @Override
         public <T> void writeEntry(
-            Schema keySchema,
-            String key,
-            T state,
-            BiConsumer<T, ShapeSerializer> valueSerializer
+                Schema keySchema,
+                String key,
+                T state,
+                BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
             byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
             writeBytes0(TYPE_TEXTSTRING, keyBytes, 0, keyBytes.length);

@@ -48,18 +48,15 @@ public class ProtocolTestProtocolProvider implements ServerProtocolProvider {
         public DelegatingServerProtocol(List<Service> candidateServices) {
             super(candidateServices);
             delegateProtocols = ServiceLoader.load(
-                ServerProtocolProvider.class,
-                ProtocolResolver.class.getClassLoader()
-            )
-                .stream()
-                .map(ServiceLoader.Provider::get)
-                .filter(p -> p.getClass() != ProtocolTestProtocolProvider.class)
-                .collect(
-                    Collectors.toMap(
-                        ServerProtocolProvider::getProtocolId,
-                        s -> s.provideProtocolHandler(candidateServices)
-                    )
-                );
+                    ServerProtocolProvider.class,
+                    ProtocolResolver.class.getClassLoader())
+                    .stream()
+                    .map(ServiceLoader.Provider::get)
+                    .filter(p -> p.getClass() != ProtocolTestProtocolProvider.class)
+                    .collect(
+                            Collectors.toMap(
+                                    ServerProtocolProvider::getProtocolId,
+                                    s -> s.provideProtocolHandler(candidateServices)));
         }
 
         @Override
@@ -69,8 +66,8 @@ public class ProtocolTestProtocolProvider implements ServerProtocolProvider {
 
         @Override
         public ServiceProtocolResolutionResult resolveOperation(
-            ServiceProtocolResolutionRequest request,
-            List<Service> candidates
+                ServiceProtocolResolutionRequest request,
+                List<Service> candidates
         ) {
             String protocolIdHeader = request.headers().firstValue("x-protocol-test-protocol-id");
             if (protocolIdHeader != null) {
@@ -96,7 +93,8 @@ public class ProtocolTestProtocolProvider implements ServerProtocolProvider {
             var protocol = job.request().context().get(PROTOCOL_TO_TEST);
             if (protocol != null) {
                 job.request()
-                    .setDeserializedValue(job.operation().getApiOperation().inputBuilder().errorCorrection().build());
+                        .setDeserializedValue(
+                                job.operation().getApiOperation().inputBuilder().errorCorrection().build());
                 return CompletableFuture.completedFuture(null);
             }
             throw new IllegalStateException("Should not be invoked if no protocol was selected");

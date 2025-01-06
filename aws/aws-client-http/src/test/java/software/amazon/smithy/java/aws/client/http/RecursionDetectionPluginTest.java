@@ -53,14 +53,14 @@ public class RecursionDetectionPluginTest {
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var builder = DynamicClient.builder()
-            .service(TestHarness.SERVICE)
-            .model(TestHarness.MODEL)
-            .protocol(new AwsJson1Protocol(TestHarness.SERVICE))
-            .addPlugin(mock)
-            .addPlugin(recursionDetectionPlugin)
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
-            .addPlugin(new AmzSdkRequestPlugin());
+                .service(TestHarness.SERVICE)
+                .model(TestHarness.MODEL)
+                .protocol(new AwsJson1Protocol(TestHarness.SERVICE))
+                .addPlugin(mock)
+                .addPlugin(recursionDetectionPlugin)
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
+                .addPlugin(new AmzSdkRequestPlugin());
 
         if (interceptor != null) {
             builder.addInterceptor(interceptor);

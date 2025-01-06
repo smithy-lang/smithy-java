@@ -30,7 +30,7 @@ public final class SystemPropertiesIdentityResolver implements AwsCredentialsRes
     private static final String SECRET_KEY_PROPERTY = "aws.secretAccessKey";
     private static final String SESSION_TOKEN_PROPERTY = "aws.sessionToken";
     private static final String ERROR_MESSAGE = "Could not resolve AWS identity from the aws.accessKeyId and "
-        + "aws.secretAccessKey system properties";
+            + "aws.secretAccessKey system properties";
 
     @Override
     public CompletableFuture<IdentityResult<AwsCredentialsIdentity>> resolveIdentity(AuthProperties requestProperties) {
@@ -40,14 +40,11 @@ public final class SystemPropertiesIdentityResolver implements AwsCredentialsRes
 
         if (accessKey != null && secretKey != null) {
             return CompletableFuture.completedFuture(
-                IdentityResult.of(
-                    AwsCredentialsIdentity.create(
-                        accessKey,
-                        secretKey,
-                        sessionToken
-                    )
-                )
-            );
+                    IdentityResult.of(
+                            AwsCredentialsIdentity.create(
+                                    accessKey,
+                                    secretKey,
+                                    sessionToken)));
         }
 
         return CompletableFuture.completedFuture(IdentityResult.ofError(getClass(), ERROR_MESSAGE));

@@ -75,9 +75,8 @@ public final class IdentityResult<IdentityT extends Identity> {
     public IdentityT unwrap() {
         if (identity == null) {
             throw new IdentityNotFoundException(
-                "Unable to resolve an identity: " + error
-                    + " (" + resolver.getName() + ")"
-            );
+                    "Unable to resolve an identity: " + error
+                            + " (" + resolver.getName() + ")");
         } else {
             return identity;
         }

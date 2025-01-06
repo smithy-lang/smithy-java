@@ -55,21 +55,20 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllCallback {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ProtocolTestExtension.class);
     private static final Model BASE_MODEL = Model.assembler(ProtocolTestExtension.class.getClassLoader())
-        .discoverModels(ProtocolTestExtension.class.getClassLoader())
-        .assemble()
-        .unwrap();
+            .discoverModels(ProtocolTestExtension.class.getClassLoader())
+            .assemble()
+            .unwrap();
     private static final ModelTransformer transformer = ModelTransformer.create();
     private static final ExtensionContext.Namespace namespace = ExtensionContext.Namespace.create(
-        ProtocolTestExtension.class
-    );
+            ProtocolTestExtension.class);
     private static final Map<ShapeId, ClientProtocolFactory> protocolFactories = new HashMap<>();
     private static final Map<ShapeId, AuthSchemeFactory> authSchemeFactories = new HashMap<>();
 
     static {
         ServiceLoader.load(ClientProtocolFactory.class)
-            .forEach(factory -> protocolFactories.put(factory.id(), factory));
+                .forEach(factory -> protocolFactories.put(factory.id(), factory));
         ServiceLoader.load(AuthSchemeFactory.class)
-            .forEach(factory -> authSchemeFactories.put(factory.schemeId(), factory));
+                .forEach(factory -> authSchemeFactories.put(factory.schemeId(), factory));
     }
 
     private static final String SHARED_DATA_KEY = "protocol-test-shared-data";
@@ -80,18 +79,16 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
     public void beforeAll(ExtensionContext context) throws Exception {
         var testClass = context.getRequiredTestClass();
         var protocolTestAnnotation = Objects.requireNonNull(
-            testClass.getAnnotation(ProtocolTest.class),
-            "`@ProtocolTest` annotation not found."
-        );
+                testClass.getAnnotation(ProtocolTest.class),
+                "`@ProtocolTest` annotation not found.");
         var serviceId = ShapeId.from(protocolTestAnnotation.service());
         var testType = protocolTestAnnotation.testType();
 
         var filter = TestFilter.fromAnnotation(testClass.getAnnotation(ProtocolTestFilter.class));
         context.getStore(namespace.append(context.getUniqueId()))
-            .put(
-                TEST_FILTER_KEY,
-                filter
-            );
+                .put(
+                        TEST_FILTER_KEY,
+                        filter);
 
         // Apply basic service transforms
         ServiceShape service = BASE_MODEL.expectShape(serviceId).asServiceShape().orElseThrow();
@@ -114,26 +111,26 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                 }
                 // Store shared data for use by tests
                 context.getStore(namespace.append(context.getUniqueId()))
-                    .put(
-                        SHARED_DATA_KEY,
-                        new SharedClientTestData(
-                            mockClientBuilder.build(),
-                            protocols,
-                            testOperations
-                        )
-                    );
+                        .put(
+                                SHARED_DATA_KEY,
+                                new SharedClientTestData(
+                                        mockClientBuilder.build(),
+                                        protocols,
+                                        testOperations));
             }
             case SERVER -> {
                 var symbolProvider = SymbolProvider.cache(
-                    new ServiceJavaSymbolProvider(serviceModel, service, serviceId.getNamespace(), serviceId.getName())
-                );
+                        new ServiceJavaSymbolProvider(serviceModel,
+                                service,
+                                serviceId.getNamespace(),
+                                serviceId.getName()));
                 Map<Class<?>, MockOperation> mockOperationMap = new HashMap<>();
                 var serverTestOperations = new ArrayList<ServerTestOperation>();
                 for (var testOperation : testOperations) {
                     var operationShape = serviceModel.expectShape(testOperation.id());
                     var operationClassName = symbolProvider.toSymbol(operationShape)
-                        .expectProperty(ServerSymbolProperties.STUB_OPERATION)
-                        .toString();
+                            .expectProperty(ServerSymbolProperties.STUB_OPERATION)
+                            .toString();
                     var operationClass = Class.forName(operationClassName);
                     MockOperation mockOperation = new MockOperation(operationClass);
                     mockOperationMap.put(operationClass, mockOperation);
@@ -144,10 +141,10 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                 Class<?> builderStageClass = serviceClass.getDeclaredMethod("builder").getReturnType();
                 while (!builderStageClass.getSimpleName().endsWith("BuildStage")) {
                     var addMethod = Arrays.stream(builderStageClass.getDeclaredMethods())
-                        .filter(m -> m.getParameterCount() == 1)
-                        .filter(m -> mockOperationMap.containsKey(m.getParameterTypes()[0]))
-                        .findFirst()
-                        .orElseThrow();
+                            .filter(m -> m.getParameterCount() == 1)
+                            .filter(m -> mockOperationMap.containsKey(m.getParameterTypes()[0]))
+                            .findFirst()
+                            .orElseThrow();
                     addMethod.invoke(builder, mockOperationMap.get(addMethod.getParameterTypes()[0]).getMock());
                     builderStageClass = addMethod.getReturnType();
                 }
@@ -157,19 +154,17 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                 var endpoint = URI.create("http://localhost:" + getFreePort());
 
                 context.getStore(namespace.append(context.getUniqueId()))
-                    .put(
-                        SHARED_DATA_KEY,
-                        new SharedServerTestData(
-                            serverTestOperations,
-                            protocols,
-                            endpoint
-                        )
-                    );
+                        .put(
+                                SHARED_DATA_KEY,
+                                new SharedServerTestData(
+                                        serverTestOperations,
+                                        protocols,
+                                        endpoint));
 
                 var server = Server.builder()
-                    .endpoints(endpoint)
-                    .addService(createdService)
-                    .build();
+                        .endpoints(endpoint)
+                        .addService(createdService)
+                        .build();
                 server.start();
                 afterAll = () -> {
                     try {
@@ -191,12 +186,12 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
 
     static <T> T getSharedTestData(ExtensionContext context, Class<T> clazz) {
         return context.getStore(namespace.append(context.getUniqueId()))
-            .get(SHARED_DATA_KEY, clazz);
+                .get(SHARED_DATA_KEY, clazz);
     }
 
     static TestFilter getTestFilter(ExtensionContext context) {
         return context.getStore(namespace.append(context.getUniqueId()))
-            .get(TEST_FILTER_KEY, TestFilter.class);
+                .get(TEST_FILTER_KEY, TestFilter.class);
     }
 
     /**
@@ -205,19 +200,18 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
      * @param mockClient
      */
     record SharedClientTestData(
-        MockClient mockClient,
-        Map<ShapeId, ClientProtocol<?, ?>> protocols,
-        List<HttpTestOperation> operations
-    ) {
+            MockClient mockClient,
+            Map<ShapeId, ClientProtocol<?, ?>> protocols,
+            List<HttpTestOperation> operations) {
         ClientProtocol<?, ?> getProtocol(ShapeId shapeId) {
             return protocols.get(shapeId);
         }
     }
 
     record SharedServerTestData(
-        List<ServerTestOperation> testOperations,
-        Map<ShapeId, ClientProtocol<?, ?>> protocols, URI endpoint
-    ) {
+            List<ServerTestOperation> testOperations,
+            Map<ShapeId, ClientProtocol<?, ?>> protocols,
+            URI endpoint) {
 
     }
 
@@ -255,10 +249,9 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
 
         if (protocols.isEmpty()) {
             LOGGER.error(
-                "Service {} has no protocol implementations. Expected one of: {}",
-                service.getId(),
-                protocolTraits.keySet()
-            );
+                    "Service {} has no protocol implementations. Expected one of: {}",
+                    service.getId(),
+                    protocolTraits.keySet());
             throw new UnsupportedOperationException("No protocol implementations found for " + service.getId());
         }
 
@@ -288,15 +281,15 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
     }
 
     private static List<HttpTestOperation> getTestOperations(
-        Model serviceModel,
-        ServiceShape service,
-        TestType testType
+            Model serviceModel,
+            ServiceShape service,
+            TestType testType
     ) {
         List<HttpTestOperation> result = new ArrayList<>();
 
         Predicate<HttpMessageTestCase> testTypeFiler = tc -> tc.getAppliesTo()
-            .map(ap -> ap.equals(testType.appliesTo))
-            .orElse(true);
+                .map(ap -> ap.equals(testType.appliesTo))
+                .orElse(true);
 
         var symbolProvider = new JavaSymbolProvider(serviceModel, service, service.toShapeId().getNamespace());
         for (var operationId : service.getOperations()) {
@@ -308,15 +301,14 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                 List<HttpResponseProtocolTestCase> responseTestsCases = new ArrayList<>();
                 List<HttpMalformedRequestTestCase> malformedRequestTestCases = new ArrayList<>();
                 operation.getTrait(HttpRequestTestsTrait.class)
-                    .map(HttpRequestTestsTrait::getTestCases)
-                    .map(l -> l.stream().filter(testTypeFiler).toList())
-                    .ifPresent(requestTestsCases::addAll);
+                        .map(HttpRequestTestsTrait::getTestCases)
+                        .map(l -> l.stream().filter(testTypeFiler).toList())
+                        .ifPresent(requestTestsCases::addAll);
                 operation.getTrait(HttpResponseTestsTrait.class).ifPresent(httpResponseTestsTrait -> {
                     for (var testCase : httpResponseTestsTrait.getTestCases()) {
                         if (testTypeFiler.test(testCase)) {
                             responseTestsCases.add(
-                                new HttpResponseProtocolTestCase(testCase, false, apiOperation::outputBuilder)
-                            );
+                                    new HttpResponseProtocolTestCase(testCase, false, apiOperation::outputBuilder));
                         }
                     }
                 });
@@ -330,29 +322,25 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                         for (var testCase : httpResponseTestsTrait.getTestCases()) {
                             if (testTypeFiler.test(testCase)) {
                                 responseTestsCases.add(
-                                    new HttpResponseProtocolTestCase(
-                                        testCase,
-                                        true,
-                                        getApiExceptionBuilder(symbolProvider, errorShape)
-                                    )
-                                );
+                                        new HttpResponseProtocolTestCase(
+                                                testCase,
+                                                true,
+                                                getApiExceptionBuilder(symbolProvider, errorShape)));
                             }
                         }
                     });
                 }
                 operation.getTrait(HttpMalformedRequestTestsTrait.class)
-                    .map(HttpMalformedRequestTestsTrait::getTestCases)
-                    .ifPresent(malformedRequestTestCases::addAll);
+                        .map(HttpMalformedRequestTestsTrait::getTestCases)
+                        .ifPresent(malformedRequestTestCases::addAll);
                 result.add(
-                    new HttpTestOperation(
-                        operationId.toShapeId(),
-                        service.getId(),
-                        apiOperation,
-                        requestTestsCases,
-                        responseTestsCases,
-                        malformedRequestTestCases
-                    )
-                );
+                        new HttpTestOperation(
+                                operationId.toShapeId(),
+                                service.getId(),
+                                apiOperation,
+                                requestTestsCases,
+                                responseTestsCases,
+                                malformedRequestTestCases));
             }
         }
 
@@ -367,15 +355,17 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
         try {
             var fqn = provider.toSymbol(shape).getFullName();
             return CodegenUtils.getImplementationByName(ApiOperation.class, fqn).getDeclaredConstructor().newInstance();
-        } catch (InvocationTargetException | InstantiationException | IllegalAccessException
-            | NoSuchMethodException e) {
+        } catch (InvocationTargetException
+                | InstantiationException
+                | IllegalAccessException
+                | NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
     }
 
     private static Supplier<ShapeBuilder<? extends SerializableStruct>> getApiExceptionBuilder(
-        SymbolProvider provider,
-        Shape shape
+            SymbolProvider provider,
+            Shape shape
     ) {
         try {
             var fqn = provider.toSymbol(shape).getFullName();
@@ -386,8 +376,9 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
             } else {
                 throw new IllegalArgumentException(exceptionClazz + "is not a ModeledApiException");
             }
-        } catch (InvocationTargetException | IllegalAccessException
-            | NoSuchMethodException e) {
+        } catch (InvocationTargetException
+                | IllegalAccessException
+                | NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
     }

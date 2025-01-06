@@ -36,53 +36,44 @@ import software.amazon.smithy.java.io.uri.QueryStringBuilder;
 @BenchmarkMode(Mode.AverageTime)
 public class SigV4SignerTrials {
     private static final AwsCredentialsIdentity TEST_IDENTITY = AwsCredentialsIdentity.create(
-        "access-key",
-        "secret-key"
-    );
+            "access-key",
+            "secret-key");
     private static final AuthProperties TEST_PROPERTIES = AuthProperties.builder()
-        .put(SigV4Settings.SIGNING_NAME, "service")
-        .put(SigV4Settings.REGION, "us-east-1")
-        .build();
+            .put(SigV4Settings.SIGNING_NAME, "service")
+            .put(SigV4Settings.REGION, "us-east-1")
+            .build();
     private static final Map<String, HttpRequest> CASES = Map.ofEntries(
-        Map.entry(
-            "put_no_headers_no_query_no_body",
-            parsePostRequest(Collections.emptyMap(), Collections.emptyMap(), null)
-        ),
-        Map.entry(
-            "put_with_headers_no_query_with_body",
-            parsePostRequest(Collections.emptyMap(), Collections.emptyMap(), "body of the messsssssssssssssage")
-        ),
-        Map.entry(
-            "put_no_headers_with_query_no_body",
-            parsePostRequest(Map.of("A", "b", "key", "value"), Collections.emptyMap(), null)
-        ),
-        Map.entry(
-            "put_with_headers_no_query_no_body",
-            parsePostRequest(
-                Collections.emptyMap(),
-                Map.of("x-test", List.of("value"), "x-other", List.of("stuff")),
-                null
-            )
-        ),
-        Map.entry(
-            "put_with_headers_with_query_with_body",
-            parsePostRequest(
-                Map.of("A", "b", "key", "value"),
-                Map.of("x-test", List.of("value"), "x-other", List.of("stuff")),
-                "body of the messsssssssssssssage"
-            )
-        )
-    );
+            Map.entry(
+                    "put_no_headers_no_query_no_body",
+                    parsePostRequest(Collections.emptyMap(), Collections.emptyMap(), null)),
+            Map.entry(
+                    "put_with_headers_no_query_with_body",
+                    parsePostRequest(Collections.emptyMap(),
+                            Collections.emptyMap(),
+                            "body of the messsssssssssssssage")),
+            Map.entry(
+                    "put_no_headers_with_query_no_body",
+                    parsePostRequest(Map.of("A", "b", "key", "value"), Collections.emptyMap(), null)),
+            Map.entry(
+                    "put_with_headers_no_query_no_body",
+                    parsePostRequest(
+                            Collections.emptyMap(),
+                            Map.of("x-test", List.of("value"), "x-other", List.of("stuff")),
+                            null)),
+            Map.entry(
+                    "put_with_headers_with_query_with_body",
+                    parsePostRequest(
+                            Map.of("A", "b", "key", "value"),
+                            Map.of("x-test", List.of("value"), "x-other", List.of("stuff")),
+                            "body of the messsssssssssssssage")));
 
-    @Param(
-        {
+    @Param({
             "put_no_headers_no_query_no_body",
             "put_with_headers_no_query_with_body",
             "put_no_headers_with_query_no_body",
             "put_with_headers_no_query_no_body",
             "put_with_headers_with_query_with_body"
-        }
-    )
+    })
     private String testName;
 
     @Param({"yes", "no"})
@@ -123,9 +114,9 @@ public class SigV4SignerTrials {
     }
 
     private static HttpRequest parsePostRequest(
-        Map<String, String> queryParameters,
-        Map<String, List<String>> headers,
-        String body
+            Map<String, String> queryParameters,
+            Map<String, List<String>> headers,
+            String body
     ) {
         var httpHeaders = HttpHeaders.of(headers);
         var uriString = "http://example.com";
@@ -135,11 +126,11 @@ public class SigV4SignerTrials {
             uriString += "?" + queryBuilder;
         }
         return HttpRequest.builder()
-            .method("POST")
-            .httpVersion(HttpVersion.HTTP_1_1)
-            .uri(URI.create(uriString))
-            .headers(httpHeaders)
-            .body(body != null ? DataStream.ofBytes(body.getBytes(StandardCharsets.UTF_8)) : null)
-            .build();
+                .method("POST")
+                .httpVersion(HttpVersion.HTTP_1_1)
+                .uri(URI.create(uriString))
+                .headers(httpHeaders)
+                .body(body != null ? DataStream.ofBytes(body.getBytes(StandardCharsets.UTF_8)) : null)
+                .build();
     }
 }

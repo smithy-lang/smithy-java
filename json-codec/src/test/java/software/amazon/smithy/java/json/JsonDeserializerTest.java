@@ -314,8 +314,7 @@ public class JsonDeserializerTest {
     public void skipsUnknownMembers() {
         try (var codec = JsonCodec.builder().useJsonName(true).build()) {
             var de = codec.createDeserializer(
-                "{\"name\":\"Sam\",\"Ignore\":[1,2,3],\"Color\":\"rainbow\"}".getBytes(StandardCharsets.UTF_8)
-            );
+                    "{\"name\":\"Sam\",\"Ignore\":[1,2,3],\"Color\":\"rainbow\"}".getBytes(StandardCharsets.UTF_8));
             Set<String> members = new LinkedHashSet<>();
 
             de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
@@ -351,9 +350,8 @@ public class JsonDeserializerTest {
 
     public static List<Arguments> deserializesBirdWithJsonNameOrNotSource() {
         return List.of(
-            Arguments.of(true, "{\"name\":\"Sam\",\"Color\":\"red\"}"),
-            Arguments.of(false, "{\"name\":\"Sam\",\"color\":\"red\"}")
-        );
+                Arguments.of(true, "{\"name\":\"Sam\",\"Color\":\"red\"}"),
+                Arguments.of(false, "{\"name\":\"Sam\",\"color\":\"red\"}"));
     }
 
     @Test
@@ -375,12 +373,12 @@ public class JsonDeserializerTest {
     @ParameterizedTest
     @MethodSource("deserializesWithTimestampFormatSource")
     public void deserializesWithTimestampFormat(
-        boolean useTrait,
-        TimestampFormatTrait trait,
-        TimestampFormatter defaultFormat,
-        String json
+            boolean useTrait,
+            TimestampFormatTrait trait,
+            TimestampFormatter defaultFormat,
+            String json
     ) {
-        Trait[] traits = trait == null ? new Trait[0] : new Trait[]{trait};
+        Trait[] traits = trait == null ? new Trait[0] : new Trait[] {trait};
         var schema = Schema.createTimestamp(ShapeId.from("smithy.foo#Time"), traits);
 
         var codecBuilder = JsonCodec.builder().useTimestampFormat(useTrait);
@@ -398,41 +396,35 @@ public class JsonDeserializerTest {
         var epochSeconds = Double.toString(((double) Instant.EPOCH.toEpochMilli()) / 1000);
 
         return List.of(
-            // boolean useTrait, TimestampFormatTrait trait, TimestampFormatter defaultFormat, String json
-            Arguments.of(false, null, null, epochSeconds),
-            Arguments.of(false, new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS), null, epochSeconds),
-            Arguments.of(
-                false,
-                new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
-                TimestampFormatter.Prelude.EPOCH_SECONDS,
-                epochSeconds
-            ),
-            Arguments.of(
-                true,
-                new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
-                TimestampFormatter.Prelude.EPOCH_SECONDS,
-                epochSeconds
-            ),
-            Arguments.of(true, new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS), null, epochSeconds),
-            Arguments.of(
-                true,
-                new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
-                TimestampFormatter.Prelude.DATE_TIME,
-                epochSeconds
-            ),
-            Arguments.of(
-                false,
-                new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
-                TimestampFormatter.Prelude.DATE_TIME,
-                "\"" + Instant.EPOCH + "\""
-            ),
-            Arguments.of(
-                true,
-                new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME),
-                TimestampFormatter.Prelude.EPOCH_SECONDS,
-                "\"" + Instant.EPOCH + "\""
-            )
-        );
+                // boolean useTrait, TimestampFormatTrait trait, TimestampFormatter defaultFormat, String json
+                Arguments.of(false, null, null, epochSeconds),
+                Arguments.of(false, new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS), null, epochSeconds),
+                Arguments.of(
+                        false,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
+                        TimestampFormatter.Prelude.EPOCH_SECONDS,
+                        epochSeconds),
+                Arguments.of(
+                        true,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
+                        TimestampFormatter.Prelude.EPOCH_SECONDS,
+                        epochSeconds),
+                Arguments.of(true, new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS), null, epochSeconds),
+                Arguments.of(
+                        true,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
+                        TimestampFormatter.Prelude.DATE_TIME,
+                        epochSeconds),
+                Arguments.of(
+                        false,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
+                        TimestampFormatter.Prelude.DATE_TIME,
+                        "\"" + Instant.EPOCH + "\""),
+                Arguments.of(
+                        true,
+                        new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME),
+                        TimestampFormatter.Prelude.EPOCH_SECONDS,
+                        "\"" + Instant.EPOCH + "\""));
     }
 
     @Test
@@ -450,8 +442,7 @@ public class JsonDeserializerTest {
     public void ignoresTypeOnUnions() {
         try (var codec = JsonCodec.builder().build()) {
             var de = codec.createDeserializer(
-                "{\"__type\":\"foo\", \"booleanValue\":true}".getBytes(StandardCharsets.UTF_8)
-            );
+                    "{\"__type\":\"foo\", \"booleanValue\":true}".getBytes(StandardCharsets.UTF_8));
             Set<String> members = new LinkedHashSet<>();
 
             de.readStruct(JsonTestData.UNION, members, new ShapeDeserializer.StructMemberConsumer<>() {

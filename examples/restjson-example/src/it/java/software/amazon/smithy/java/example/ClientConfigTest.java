@@ -50,9 +50,9 @@ public class ClientConfigTest {
     @Test
     public void vanillaClient() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .addInterceptor(requestCapturingInterceptor)
-            .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
-            .build();
+                .addInterceptor(requestCapturingInterceptor)
+                .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
+                .build();
         callOperation(client);
         HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().toString()).startsWith("http://httpbin.org/anything/");
@@ -61,8 +61,8 @@ public class ClientConfigTest {
     @Test
     public void clientWithDefaults() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
-            .addInterceptor(requestCapturingInterceptor)
-            .build();
+                .addInterceptor(requestCapturingInterceptor)
+                .build();
         callOperation(client);
         HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().getHost()).isEqualTo("global.example.com");
@@ -71,9 +71,9 @@ public class ClientConfigTest {
     @Test
     public void clientWithDefaults_EndpointResolverOverridden() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
-            .addInterceptor(requestCapturingInterceptor)
-            .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
-            .build();
+                .addInterceptor(requestCapturingInterceptor)
+                .endpointResolver(EndpointResolver.staticHost("http://httpbin.org/anything"))
+                .build();
         callOperation(client);
         HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().toString()).startsWith("http://httpbin.org/anything/");
@@ -82,9 +82,9 @@ public class ClientConfigTest {
     @Test
     public void clientWithDefaults_RegionKeyOverridden() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
-            .addInterceptor(requestCapturingInterceptor)
-            .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
-            .build();
+                .addInterceptor(requestCapturingInterceptor)
+                .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
+                .build();
         callOperation(client);
         HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
@@ -93,10 +93,10 @@ public class ClientConfigTest {
     @Test
     public void clientWithDefaults_RegionKeyOverridden_DefaultPluginExplicitlyReAdded() {
         PersonDirectoryClient client = PersonDirectoryClientWithDefaults.builder()
-            .addInterceptor(requestCapturingInterceptor)
-            .addPlugin(new RegionAwareServicePlugin())
-            .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
-            .build();
+                .addInterceptor(requestCapturingInterceptor)
+                .addPlugin(new RegionAwareServicePlugin())
+                .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
+                .build();
         callOperation(client);
         HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
@@ -105,9 +105,9 @@ public class ClientConfigTest {
     @Test
     public void vanillaClient_RegionPluginExplicitlyAdded() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .addInterceptor(requestCapturingInterceptor)
-            .addPlugin(new RegionAwareServicePlugin())
-            .build();
+                .addInterceptor(requestCapturingInterceptor)
+                .addPlugin(new RegionAwareServicePlugin())
+                .build();
         callOperation(client);
         HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().getHost()).isEqualTo("global.example.com");
@@ -116,10 +116,10 @@ public class ClientConfigTest {
     @Test
     public void vanillaClient_RegionPluginExplicitlyAdded_RegionKeyOverridden() {
         PersonDirectoryClient client = PersonDirectoryClient.builder()
-            .addInterceptor(requestCapturingInterceptor)
-            .addPlugin(new RegionAwareServicePlugin())
-            .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
-            .build();
+                .addInterceptor(requestCapturingInterceptor)
+                .addPlugin(new RegionAwareServicePlugin())
+                .putConfig(RegionAwareServicePlugin.REGION, "us-west-2")
+                .build();
         callOperation(client);
         HttpRequest request = requestCapturingInterceptor.lastCapturedRequest();
         assertThat(request.uri().getHost()).isEqualTo("us-west-2.example.com");
@@ -150,7 +150,7 @@ public class ClientConfigTest {
         }
 
         static final class Builder extends
-            Client.Builder<PersonDirectoryClient, PersonDirectoryClientWithDefaults.Builder> {
+                Client.Builder<PersonDirectoryClient, PersonDirectoryClientWithDefaults.Builder> {
 
             private Builder() {
                 ClientConfig.Builder configBuilder = configBuilder();
@@ -190,21 +190,20 @@ public class ClientConfigTest {
             public CompletableFuture<Endpoint> resolveEndpoint(EndpointResolverParams params) {
                 String region = params.context().get(REGION);
                 return CompletableFuture.completedFuture(
-                    Endpoint.builder()
-                        .uri("http://" + region + ".example.com")
-                        .build()
-                );
+                        Endpoint.builder()
+                                .uri("http://" + region + ".example.com")
+                                .build());
             }
         }
     }
 
     private static void callOperation(PersonDirectoryClient client) {
         PutPersonInput input = PutPersonInput.builder()
-            .name("Michael")
-            .age(999)
-            .favoriteColor("Green")
-            .birthday(Instant.now())
-            .build();
+                .name("Michael")
+                .age(999)
+                .favoriteColor("Green")
+                .birthday(Instant.now())
+                .build();
 
         try {
             client.putPerson(input);

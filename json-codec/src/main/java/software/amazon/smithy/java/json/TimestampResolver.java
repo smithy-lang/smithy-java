@@ -48,8 +48,7 @@ public sealed interface TimestampResolver {
             return format.readFromString(s, true);
         }
         throw new SerializationException(
-            "Expected a timestamp, but found " + any.getClass().getSimpleName()
-        );
+                "Expected a timestamp, but found " + any.getClass().getSimpleName());
     }
 
     /**

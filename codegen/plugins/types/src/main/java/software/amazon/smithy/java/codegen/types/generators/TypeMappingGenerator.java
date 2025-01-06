@@ -20,15 +20,14 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
 public final class TypeMappingGenerator
-    implements Consumer<CustomizeDirective<CodeGenerationContext, JavaCodegenSettings>> {
+        implements Consumer<CustomizeDirective<CodeGenerationContext, JavaCodegenSettings>> {
     private static final String PROPERTY_FILE = "META-INF/smithy-java/type-mappings.properties";
     private static final String SYNTHETIC_NAMESPACE = "smithy.synthetic";
     private static final EnumSet<ShapeType> GENERATED_TYPES = EnumSet.of(
-        ShapeType.STRUCTURE,
-        ShapeType.UNION,
-        ShapeType.ENUM,
-        ShapeType.INT_ENUM
-    );
+            ShapeType.STRUCTURE,
+            ShapeType.UNION,
+            ShapeType.ENUM,
+            ShapeType.INT_ENUM);
 
     @Override
     public void accept(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
@@ -55,9 +54,9 @@ public final class TypeMappingGenerator
         directive.context().writerDelegator().useFileWriter(PROPERTY_FILE, writer -> {
             // Add a helpful header
             writer.writeWithNoFormatting("""
-                # This file maps Smithy shape ID's to concrete java class implementations
-                # WARNING: This file is code generated. Do not modify by hand.
-                """);
+                    # This file maps Smithy shape ID's to concrete java class implementations
+                    # WARNING: This file is code generated. Do not modify by hand.
+                    """);
             for (var entry : symbolMap.entrySet()) {
                 writer.write("$L=$L", entry.getKey(), entry.getValue());
             }

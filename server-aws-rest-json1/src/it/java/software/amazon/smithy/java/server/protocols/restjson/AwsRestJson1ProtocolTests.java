@@ -14,82 +14,77 @@ import software.amazon.smithy.java.protocoltests.harness.*;
 import software.amazon.smithy.model.node.Node;
 
 @ProtocolTest(
-    service = "aws.protocoltests.restjson#RestJson",
-    testType = TestType.SERVER
-)
+        service = "aws.protocoltests.restjson#RestJson",
+        testType = TestType.SERVER)
 public class AwsRestJson1ProtocolTests {
 
     @HttpServerRequestTests
     @ProtocolTestFilter(
-        skipTests = {
-            "RestJsonNullAndEmptyHeaders",
-            "RestJsonSupportsNaNFloatLabels",
-            "RestJsonOmitsEmptyListQueryValues",
-            "RestJsonQueryIdempotencyTokenAutoFill",
-            "RestJsonQueryPrecedence",
-            "RestJsonQueryParamsStringListMap",
-            "RestJsonRecursiveShapes",
-            "RestJsonSerializesDenseSetMap",
-            "RestJsonEndpointTraitWithHostLabel",
-            "RestJsonHostWithPath",
-            "RestJsonHttpWithEmptyStructurePayload",
-            "RestJsonHttpWithHeadersButNoPayload",
-            "RestJsonHttpPostWithNoModeledBody",
-            "RestJsonHttpWithPostHeaderMemberNoModeledBody",
-            "RestJsonHttpPostWithNoInput",
-            "SDKAppliedContentEncoding_restJson1",
-            "SDKAppendedGzipAfterProvidedEncoding_restJson1",
-            "RestJsonClientPopulatesDefaultValuesInInput",
-            "RestJsonClientUsesExplicitlyProvidedMemberValuesOverDefaults",
-            "RestJsonMustSupportParametersInContentType", //hangs on the client side some reason
-            "RestJsonServerPopulatesDefaultsWhenMissingInRequestBody",
+            skipTests = {
+                    "RestJsonNullAndEmptyHeaders",
+                    "RestJsonSupportsNaNFloatLabels",
+                    "RestJsonOmitsEmptyListQueryValues",
+                    "RestJsonQueryIdempotencyTokenAutoFill",
+                    "RestJsonQueryPrecedence",
+                    "RestJsonQueryParamsStringListMap",
+                    "RestJsonRecursiveShapes",
+                    "RestJsonSerializesDenseSetMap",
+                    "RestJsonEndpointTraitWithHostLabel",
+                    "RestJsonHostWithPath",
+                    "RestJsonHttpWithEmptyStructurePayload",
+                    "RestJsonHttpWithHeadersButNoPayload",
+                    "RestJsonHttpPostWithNoModeledBody",
+                    "RestJsonHttpWithPostHeaderMemberNoModeledBody",
+                    "RestJsonHttpPostWithNoInput",
+                    "SDKAppliedContentEncoding_restJson1",
+                    "SDKAppendedGzipAfterProvidedEncoding_restJson1",
+                    "RestJsonClientPopulatesDefaultValuesInInput",
+                    "RestJsonClientUsesExplicitlyProvidedMemberValuesOverDefaults",
+                    "RestJsonMustSupportParametersInContentType", //hangs on the client side some reason
+                    "RestJsonServerPopulatesDefaultsWhenMissingInRequestBody",
 
-            // Header splitting needs work.
-            "RestJsonInputAndOutputWithQuotedStringHeaders",
-        },
-        skipOperations = {
-            "aws.protocoltests.restjson#DocumentType",
-            "aws.protocoltests.restjson#DocumentTypeAsMapValue",
-            "aws.protocoltests.restjson#DocumentTypeAsPayload",
-            "aws.protocoltests.restjson#JsonUnions",
-            "aws.protocoltests.restjson#PostUnionWithJsonName",
-        }
-    )
+                    // Header splitting needs work.
+                    "RestJsonInputAndOutputWithQuotedStringHeaders",
+            },
+            skipOperations = {
+                    "aws.protocoltests.restjson#DocumentType",
+                    "aws.protocoltests.restjson#DocumentTypeAsMapValue",
+                    "aws.protocoltests.restjson#DocumentTypeAsPayload",
+                    "aws.protocoltests.restjson#JsonUnions",
+                    "aws.protocoltests.restjson#PostUnionWithJsonName",
+            })
     public void requestTest(Runnable test) {
         test.run();
     }
 
     @HttpServerResponseTests
     @ProtocolTestFilter(
-        skipTests = {
-            "MediaTypeHeaderOutputBase64",
-            "RestJsonDeserializeIgnoreType",
-            "RestJsonDateTimeWithNegativeOffset",
-            "RestJsonDateTimeWithPositiveOffset",
-            "RestJsonDateTimeWithFractionalSeconds",
-            "RestJsonClientPopulatesDefaultsValuesWhenMissingInResponse",
-            "RestJsonClientIgnoresDefaultValuesIfMemberValuesArePresentInResponse",
-            "RestJsonClientPopulatesNestedDefaultsWhenMissingInResponseBody",
-            "RestJsonDoesntDeserializeNullStructureValues",
-            "RestJsonEnumPayloadResponse",
-            "RestJsonStreamingTraitsWithBlob",
-            "RestJsonStreamingTraitsWithMediaTypeWithBlob",
-            "RestJsonDeserializesDenseSetMapAndSkipsNull",
-            "RestJsonServerPopulatesDefaultsInResponseWhenMissingInParams",
-            "RestJsonInvalidGreetingError"
+            skipTests = {
+                    "MediaTypeHeaderOutputBase64",
+                    "RestJsonDeserializeIgnoreType",
+                    "RestJsonDateTimeWithNegativeOffset",
+                    "RestJsonDateTimeWithPositiveOffset",
+                    "RestJsonClientPopulatesDefaultsValuesWhenMissingInResponse",
+                    "RestJsonClientIgnoresDefaultValuesIfMemberValuesArePresentInResponse",
+                    "RestJsonClientPopulatesNestedDefaultsWhenMissingInResponseBody",
+                    "RestJsonDoesntDeserializeNullStructureValues",
+                    "RestJsonEnumPayloadResponse",
+                    "RestJsonStreamingTraitsWithBlob",
+                    "RestJsonStreamingTraitsWithMediaTypeWithBlob",
+                    "RestJsonDeserializesDenseSetMapAndSkipsNull",
+                    "RestJsonServerPopulatesDefaultsInResponseWhenMissingInParams",
+                    "RestJsonInvalidGreetingError"
 
-        }
-    )
+            })
     public void responseTest(DataStream expected, DataStream actual) {
         assertThat(expected.hasKnownLength())
-            .isTrue()
-            .isSameAs(actual.hasKnownLength());
+                .isTrue()
+                .isSameAs(actual.hasKnownLength());
 
         String actualJson = new String(ByteBufferUtils.getBytes(actual.waitForByteBuffer()), StandardCharsets.UTF_8);
         String expectedJson = new String(
-            ByteBufferUtils.getBytes(expected.waitForByteBuffer()),
-            StandardCharsets.UTF_8
-        );
+                ByteBufferUtils.getBytes(expected.waitForByteBuffer()),
+                StandardCharsets.UTF_8);
         if (expected.contentLength() == 0) {
             assertThat(actualJson).isIn("", "{}");
             return;

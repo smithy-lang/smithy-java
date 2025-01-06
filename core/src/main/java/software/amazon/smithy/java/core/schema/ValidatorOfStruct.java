@@ -33,8 +33,7 @@ final class ValidatorOfStruct implements ShapeSerializer {
         if (!tracker.allSet()) {
             for (var member : tracker.getMissingMembers()) {
                 validator.addError(
-                    new ValidationError.RequiredValidationFailure(validator.createPath(), member, schema)
-                );
+                        new ValidationError.RequiredValidationFailure(validator.createPath(), member, schema));
             }
         }
     }

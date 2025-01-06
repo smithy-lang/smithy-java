@@ -46,10 +46,10 @@ public interface ClientProtocol<RequestT, ResponseT> {
      * @return Returns the request to send.
      */
     <I extends SerializableStruct, O extends SerializableStruct> RequestT createRequest(
-        ApiOperation<I, O> operation,
-        I input,
-        Context context,
-        URI endpoint
+            ApiOperation<I, O> operation,
+            I input,
+            Context context,
+            URI endpoint
     );
 
     /**
@@ -82,10 +82,10 @@ public interface ClientProtocol<RequestT, ResponseT> {
      * @throws ApiException if an error occurs, including deserialized modeled errors and protocol errors.
      */
     <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
-        ApiOperation<I, O> operation,
-        Context context,
-        TypeRegistry errorRegistry,
-        RequestT request,
-        ResponseT response
+            ApiOperation<I, O> operation,
+            Context context,
+            TypeRegistry errorRegistry,
+            RequestT request,
+            ResponseT response
     );
 }

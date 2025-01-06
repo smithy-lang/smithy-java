@@ -22,19 +22,18 @@ public final class TestServerJavaCodegenRunner {
     public static void main(String[] args) {
         JavaServerCodegenPlugin plugin = new JavaServerCodegenPlugin();
         Model model = Model.assembler(TestServerJavaCodegenRunner.class.getClassLoader())
-            .discoverModels(TestServerJavaCodegenRunner.class.getClassLoader())
-            .assemble()
-            .unwrap();
+                .discoverModels(TestServerJavaCodegenRunner.class.getClassLoader())
+                .assemble()
+                .unwrap();
         PluginContext context = PluginContext.builder()
-            .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
-            .settings(
-                ObjectNode.builder()
-                    .withMember("service", "smithy.java.codegen.server.test#TestService")
-                    .withMember("namespace", "smithy.java.codegen.server.test")
-                    .build()
-            )
-            .model(model)
-            .build();
+                .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
+                .settings(
+                        ObjectNode.builder()
+                                .withMember("service", "smithy.java.codegen.server.test#TestService")
+                                .withMember("namespace", "smithy.java.codegen.server.test")
+                                .build())
+                .model(model)
+                .build();
         plugin.execute(context);
     }
 }

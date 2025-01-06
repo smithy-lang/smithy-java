@@ -34,7 +34,7 @@ import software.amazon.smithy.utils.StringUtils;
 
 @SmithyInternalApi
 public final class ClientImplementationGenerator
-    implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
+        implements Consumer<GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     @Override
     public void accept(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
@@ -45,28 +45,28 @@ public final class ClientImplementationGenerator
     }
 
     public static void writeForSymbol(
-        Symbol symbol,
-        GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive
+            Symbol symbol,
+            GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive
     ) {
         var impl = symbol.expectProperty(ClientSymbolProperties.CLIENT_IMPL);
         directive.context().writerDelegator().useFileWriter(impl.getDefinitionFile(), impl.getNamespace(), writer -> {
             writer.pushState(new ClassSection(directive.shape(), ApplyDocumentation.NONE));
             var template = """
-                final class ${impl:T} extends ${client:T} implements ${interface:T} {${?implicitErrors}
-                    ${typeRegistry:C|}${/implicitErrors}
+                    final class ${impl:T} extends ${client:T} implements ${interface:T} {${?implicitErrors}
+                        ${typeRegistry:C|}${/implicitErrors}
 
-                    ${impl:T}(${interface:T}.Builder builder) {
-                        super(builder);
+                        ${impl:T}(${interface:T}.Builder builder) {
+                            super(builder);
+                        }
+
+                        ${operations:C|}
+
+                        ${?implicitErrors}@Override
+                        protected ${typeRegistryClass:T} typeRegistry() {
+                            return TYPE_REGISTRY;
+                        }${/implicitErrors}
                     }
-
-                    ${operations:C|}
-
-                    ${?implicitErrors}@Override
-                    protected ${typeRegistryClass:T} typeRegistry() {
-                        return TYPE_REGISTRY;
-                    }${/implicitErrors}
-                }
-                """;
+                    """;
             writer.putContext("client", Client.class);
             writer.putContext("interface", symbol);
             writer.putContext("impl", impl);
@@ -74,47 +74,47 @@ public final class ClientImplementationGenerator
             writer.putContext("typeRegistryClass", TypeRegistry.class);
             writer.putContext("completionException", CompletionException.class);
             var errorSymbols = getImplicitErrorSymbols(
-                directive.symbolProvider(),
-                directive.model(),
-                directive.service()
-            );
-            writer.putContext("implicitErrors", !errorSymbols.isEmpty());
-            writer.putContext(
-                "typeRegistry",
-                new TypeRegistryGenerator(writer, errorSymbols)
-            );
-            writer.putContext(
-                "operations",
-                new OperationMethodGenerator(
-                    writer,
-                    directive.shape(),
                     directive.symbolProvider(),
                     directive.model(),
-                    symbol.expectProperty(ClientSymbolProperties.ASYNC)
-                )
-            );
+                    directive.service());
+            writer.putContext("implicitErrors", !errorSymbols.isEmpty());
+            writer.putContext(
+                    "typeRegistry",
+                    new TypeRegistryGenerator(writer, errorSymbols));
+            writer.putContext(
+                    "operations",
+                    new OperationMethodGenerator(
+                            writer,
+                            directive.shape(),
+                            directive.symbolProvider(),
+                            directive.model(),
+                            symbol.expectProperty(ClientSymbolProperties.ASYNC)));
             writer.write(template);
             writer.popState();
         });
     }
 
     private record OperationMethodGenerator(
-        JavaWriter writer, ServiceShape service, SymbolProvider symbolProvider, Model model, boolean async
-    ) implements Runnable {
+            JavaWriter writer,
+            ServiceShape service,
+            SymbolProvider symbolProvider,
+            Model model,
+            boolean async) implements Runnable {
 
         @Override
         public void run() {
             writer.pushState();
-            var template = """
-                @Override
-                public ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig) {${^async}
-                    try {
-                        ${/async}return call(input, new ${operation:T}(), overrideConfig)${^async}.join()${/async};${^async}
-                    } catch (${completionException:T} e) {
-                        throw unwrapAndThrow(e);
-                    }${/async}
-                }
-                """;
+            var template =
+                    """
+                            @Override
+                            public ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig) {${^async}
+                                try {
+                                    ${/async}return call(input, new ${operation:T}(), overrideConfig)${^async}.join()${/async};${^async}
+                                } catch (${completionException:T} e) {
+                                    throw unwrapAndThrow(e);
+                                }${/async}
+                            }
+                            """;
             writer.putContext("async", async);
             writer.putContext("overrideConfig", RequestOverrideConfig.class);
             var opIndex = OperationIndex.of(model);
@@ -133,9 +133,9 @@ public final class ClientImplementationGenerator
 
     // TODO: Move into common CodegenUtils once ImplicitError index is available from smithy-model
     private static List<Symbol> getImplicitErrorSymbols(
-        SymbolProvider symbolProvider,
-        Model model,
-        ServiceShape service
+            SymbolProvider symbolProvider,
+            Model model,
+            ServiceShape service
     ) {
         var implicitIndex = ImplicitErrorIndex.of(model);
         List<Symbol> symbols = new ArrayList<>();

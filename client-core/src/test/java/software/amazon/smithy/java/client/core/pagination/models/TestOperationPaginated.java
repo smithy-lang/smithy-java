@@ -15,14 +15,13 @@ import software.amazon.smithy.model.traits.PaginatedTrait;
 
 public final class TestOperationPaginated implements ApiOperation<GetFoosInput, GetFoosOutput> {
     private static final Schema SCHEMA = Schema.createOperation(
-        ShapeId.from("foo.bar#operationA"),
-        PaginatedTrait.builder()
-            .inputToken("nextToken")
-            .outputToken("result.nextToken")
-            .items("result.foos")
-            .pageSize("maxResults")
-            .build()
-    );
+            ShapeId.from("foo.bar#operationA"),
+            PaginatedTrait.builder()
+                    .inputToken("nextToken")
+                    .outputToken("result.nextToken")
+                    .items("result.foos")
+                    .pageSize("maxResults")
+                    .build());
 
     @Override
     public ShapeBuilder<GetFoosInput> inputBuilder() {

@@ -88,11 +88,11 @@ public final class UriTreeMatcherMap<T> implements UriMatcherMap<T> {
         private final int queryRank;
 
         TreeMatch(
-            Supplier<Map<String, String>> pathLabelsSupplier,
-            Match queryMatch,
-            T value,
-            int pathRank,
-            int queryRank
+                Supplier<Map<String, String>> pathLabelsSupplier,
+                Match queryMatch,
+                T value,
+                int pathRank,
+                int queryRank
         ) {
             this.pathLabelsSupplier = new MemoizingSupplier<>(pathLabelsSupplier);
             this.queryMatch = Objects.requireNonNull(queryMatch);
@@ -150,17 +150,16 @@ public final class UriTreeMatcherMap<T> implements UriMatcherMap<T> {
 
         ParsedUri(String uri, boolean allowEmptyPathSegments) {
             this(
-                QueryStringParser.getQuery(uri),
-                getPathSegments(QueryStringParser.getRawPath(uri), allowEmptyPathSegments),
-                allowEmptyPathSegments
-            );
+                    QueryStringParser.getQuery(uri),
+                    getPathSegments(QueryStringParser.getRawPath(uri), allowEmptyPathSegments),
+                    allowEmptyPathSegments);
         }
 
         ParsedUri(String query, List<String> segments, boolean allowEmptyPathSegments) {
             this.query = query;
             this.queryValuesSupplier = query == null
-                ? Collections::emptyMap
-                : new MemoizingSupplier<>(() -> QueryStringParser.toMapOfLists(query));
+                    ? Collections::emptyMap
+                    : new MemoizingSupplier<>(() -> QueryStringParser.toMapOfLists(query));
             this.segments = segments;
             this.allowEmptyPathSegments = allowEmptyPathSegments;
         }

@@ -9,10 +9,10 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValidation,
-    ValidatorOfString.EnumStringValidator,
-    ValidatorOfString.LengthStringValidator,
-    ValidatorOfString.PatternStringValidator,
-    ValidatorOfString.CompositeStringValidator {
+        ValidatorOfString.EnumStringValidator,
+        ValidatorOfString.LengthStringValidator,
+        ValidatorOfString.PatternStringValidator,
+        ValidatorOfString.CompositeStringValidator {
 
     abstract void apply(Schema schema, String value, Validator.ShapeValidator validator);
 
@@ -82,17 +82,14 @@ abstract sealed class ValidatorOfString permits ValidatorOfString.NoStringValida
                 // with ^ and $ to get the same behavior as #match().
                 if (!pattern.matcher(value).find()) {
                     validator.addError(
-                        new ValidationError.PatternValidationFailure(validator.createPath(), value, schema)
-                    );
+                            new ValidationError.PatternValidationFailure(validator.createPath(), value, schema));
                 }
             } catch (StackOverflowError e) {
                 throw new StackOverflowError(
-                    String.format(
-                        "Pattern '%s' is too expensive to evaluate against given input. Please "
-                            + "refactor your pattern to be more performant",
-                        pattern
-                    )
-                );
+                        String.format(
+                                "Pattern '%s' is too expensive to evaluate against given input. Please "
+                                        + "refactor your pattern to be more performant",
+                                pattern));
             }
         }
     }

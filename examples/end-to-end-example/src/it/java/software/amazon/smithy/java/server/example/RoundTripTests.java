@@ -58,9 +58,9 @@ public class RoundTripTests {
     @BeforeEach
     void setupClient() {
         client = CoffeeShopClient.builder()
-            .endpointResolver(EndpointResolver.staticEndpoint(BasicServerExample.endpoint))
-            .addIdentityResolver(new TokenIdentityResolver())
-            .build();
+                .endpointResolver(EndpointResolver.staticEndpoint(BasicServerExample.endpoint))
+                .addIdentityResolver(new TokenIdentityResolver())
+                .build();
     }
 
     @Test
@@ -102,7 +102,7 @@ public class RoundTripTests {
     private static final class TokenIdentityResolver implements IdentityResolver<TokenIdentity> {
         @Override
         public CompletableFuture<IdentityResult<TokenIdentity>> resolveIdentity(
-            AuthProperties requestProperties
+                AuthProperties requestProperties
         ) {
             // TODO: Update to demonstrate token refresh once interceptors supported by server.
             return CompletableFuture.completedFuture(IdentityResult.of(TokenIdentity.create("woo")));

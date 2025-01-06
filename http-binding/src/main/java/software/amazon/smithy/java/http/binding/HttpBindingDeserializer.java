@@ -77,20 +77,17 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                     var labelValue = requestPathLabels.get(member.memberName());
                     if (labelValue == null) {
                         throw new IllegalStateException(
-                            "Expected a label value for " + member.memberName()
-                                + " but it was null."
-                        );
+                                "Expected a label value for " + member.memberName()
+                                        + " but it was null.");
                     }
                     structMemberConsumer.accept(
-                        state,
-                        member,
-                        new HttpPathLabelDeserializer(labelValue)
-                    );
+                            state,
+                            member,
+                            new HttpPathLabelDeserializer(labelValue));
                 }
                 case QUERY -> {
                     var paramValue = queryStringParameters.get(
-                        member.expectTrait(TraitKey.HTTP_QUERY_TRAIT).getValue()
-                    );
+                            member.expectTrait(TraitKey.HTTP_QUERY_TRAIT).getValue());
                     if (paramValue != null) {
                         structMemberConsumer.accept(state, member, new HttpQueryStringDeserializer(paramValue));
                     }
@@ -113,7 +110,8 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
                 }
                 case PREFIX_HEADERS ->
                     structMemberConsumer.accept(state, member, new HttpPrefixHeadersDeserializer(headers));
-                case BODY -> {} // handled below
+                case BODY -> {
+                } // handled below
                 case PAYLOAD -> {
                     if (isEventStream(member)) {
                         structMemberConsumer.accept(state, member, new SpecificShapeDeserializer() {
@@ -184,8 +182,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
             // Validate the media-type matches the codec.
             if (!contentType.equals(payloadMediaType)) {
                 throw new SerializationException(
-                    "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec
-                );
+                        "Unexpected Content-Type '" + contentType + "' for protocol " + payloadCodec);
             }
         }
     }

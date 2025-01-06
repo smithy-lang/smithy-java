@@ -10,7 +10,7 @@ import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 
 record TraitInitializerGenerator(JavaWriter writer, Shape shape, CodeGenerationContext context) implements
-    Runnable {
+        Runnable {
 
     @Override
     public void run() {

@@ -37,8 +37,8 @@ public final class ApplyModelRetryInfoPlugin implements ClientPlugin {
 
         @Override
         public <O extends SerializableStruct> O modifyBeforeAttemptCompletion(
-            OutputHook<?, O, ?, ?> hook,
-            RuntimeException error
+                OutputHook<?, O, ?, ?> hook,
+                RuntimeException error
         ) {
             if (error instanceof ApiException ae && ae.isRetrySafe() == RetrySafety.MAYBE) {
                 applyRetryInfoFromModel(hook.operation().schema(), ae);
@@ -50,7 +50,7 @@ public final class ApplyModelRetryInfoPlugin implements ClientPlugin {
     static void applyRetryInfoFromModel(Schema operationSchema, ApiException e) {
         // If the operation is readonly or idempotent, then it's safe to retry (other checks can disqualify later).
         var isRetryable = operationSchema.hasTrait(TraitKey.READ_ONLY_TRAIT)
-            || operationSchema.hasTrait(TraitKey.IDEMPOTENT_TRAIT);
+                || operationSchema.hasTrait(TraitKey.IDEMPOTENT_TRAIT);
 
         if (isRetryable) {
             e.isRetrySafe(RetrySafety.YES);

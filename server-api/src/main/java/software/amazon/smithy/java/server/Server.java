@@ -23,10 +23,10 @@ public interface Server {
         ServerProvider selected = null;
         InternalLogger logger = InternalLogger.getLogger(Server.class);
         List<ServerProvider> providers = ServiceLoader.load(ServerProvider.class)
-            .stream()
-            .map(ServiceLoader.Provider::get)
-            .peek(p -> logger.debug("Discovered server provider {}:{}", p.name(), p.getClass()))
-            .toList();
+                .stream()
+                .map(ServiceLoader.Provider::get)
+                .peek(p -> logger.debug("Discovered server provider {}:{}", p.name(), p.getClass()))
+                .toList();
         for (var provider : providers) {
             if (provider.name().equals(name)) {
                 selected = provider;
@@ -37,18 +37,15 @@ public interface Server {
                 selected = provider;
             } else if (provider.priority() == selected.priority()) {
                 throw new IllegalStateException(
-                    String.format(
-                        "Found multiple server providers with same priority (%s) , (%s))",
-                        provider.name(),
-                        selected.name()
-                    )
-                );
+                        String.format(
+                                "Found multiple server providers with same priority (%s) , (%s))",
+                                provider.name(),
+                                selected.name()));
             }
         }
         return Objects.requireNonNull(
-            selected,
-            "Couldn't find a server provider" + (name != null ? " for " + name : "")
-        ).serverBuilder();
+                selected,
+                "Couldn't find a server provider" + (name != null ? " for " + name : "")).serverBuilder();
     }
 
     void start();

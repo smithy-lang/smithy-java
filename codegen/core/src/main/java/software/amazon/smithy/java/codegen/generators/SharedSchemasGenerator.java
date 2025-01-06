@@ -28,7 +28,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  */
 @SmithyInternalApi
 public final class SharedSchemasGenerator
-    implements Consumer<CustomizeDirective<CodeGenerationContext, JavaCodegenSettings>> {
+        implements Consumer<CustomizeDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     // Types that generate their own schemas
     private static final EnumSet<ShapeType> EXCLUDED_TYPES = EnumSet.of(
@@ -45,47 +45,48 @@ public final class SharedSchemasGenerator
     @Override
     public void accept(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         directive.context()
-            .writerDelegator()
-            .useFileWriter(
-                getFilename(directive.settings()),
-                CodegenUtils.getModelNamespace(directive.settings()),
-                writer -> {
-                    var common = getCommonShapes(directive.connectedShapes().values(), directive.model());
-                    writer.pushState();
-                    var template = """
-                        /**
-                         * Defines shared shapes across the model package that are not part of another code-generated type.
-                         */
-                        final class SharedSchemas {
-                            ${#builders}${value:C|}
-                            ${/builders}${#schemas}
-                            ${value:C|}
-                            ${/schemas}
+                .writerDelegator()
+                .useFileWriter(
+                        getFilename(directive.settings()),
+                        CodegenUtils.getModelNamespace(directive.settings()),
+                        writer -> {
+                            var common = getCommonShapes(directive.connectedShapes().values(), directive.model());
+                            writer.pushState();
+                            var template =
+                                    """
+                                            /**
+                                             * Defines shared shapes across the model package that are not part of another code-generated type.
+                                             */
+                                            final class SharedSchemas {
+                                                ${#builders}${value:C|}
+                                                ${/builders}${#schemas}
+                                                ${value:C|}
+                                                ${/schemas}
 
-                            private SharedSchemas() {}
-                        }
-                        """;
-                    var builders = common.stream()
-                        .filter(s -> CodegenUtils.recursiveShape(directive.model(), s))
-                        .map(s -> new SchemaBuilderGenerator(writer, s, directive.model(), directive.context()))
-                        .toList();
-                    var schemas = common.stream()
-                        .map(
-                            s -> new SchemaGenerator(
-                                writer,
-                                s,
-                                directive.symbolProvider(),
-                                directive.model(),
-                                directive.context()
-                            )
-                        )
-                        .toList();
-                    writer.putContext("schemas", schemas);
-                    writer.putContext("builders", builders);
-                    writer.write(template);
-                    writer.popState();
-                }
-            );
+                                                private SharedSchemas() {}
+                                            }
+                                            """;
+                            var builders = common.stream()
+                                    .filter(s -> CodegenUtils.recursiveShape(directive.model(), s))
+                                    .map(s -> new SchemaBuilderGenerator(writer,
+                                            s,
+                                            directive.model(),
+                                            directive.context()))
+                                    .toList();
+                            var schemas = common.stream()
+                                    .map(
+                                            s -> new SchemaGenerator(
+                                                    writer,
+                                                    s,
+                                                    directive.symbolProvider(),
+                                                    directive.model(),
+                                                    directive.context()))
+                                    .toList();
+                            writer.putContext("schemas", schemas);
+                            writer.putContext("builders", builders);
+                            writer.write(template);
+                            writer.popState();
+                        });
     }
 
     /**
@@ -96,10 +97,10 @@ public final class SharedSchemasGenerator
     private static Set<Shape> getCommonShapes(Collection<Shape> connectedShapes, Model model) {
         var index = TopologicalIndex.of(model);
         return Stream.concat(index.getOrderedShapes().stream(), index.getRecursiveShapes().stream())
-            .filter(connectedShapes::contains)
-            .filter(s -> !EXCLUDED_TYPES.contains(s.getType()))
-            .filter(s -> !Prelude.isPreludeShape(s))
-            .collect(Collectors.toCollection(LinkedHashSet::new));
+                .filter(connectedShapes::contains)
+                .filter(s -> !EXCLUDED_TYPES.contains(s.getType()))
+                .filter(s -> !Prelude.isPreludeShape(s))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private static String getFilename(JavaCodegenSettings settings) {

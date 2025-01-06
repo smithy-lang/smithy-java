@@ -40,29 +40,28 @@ public class ToStringSerializerTest {
         tags.put("c", List.of());
 
         var person = Person.builder()
-            .name("Mike")
-            .age(102)
-            .birthday(Instant.EPOCH)
-            .binary(wrap("hello".getBytes(StandardCharsets.UTF_8)))
-            .queryParams(Map.of("a", List.of("1", "2")))
-            .build();
+                .name("Mike")
+                .age(102)
+                .birthday(Instant.EPOCH)
+                .binary(wrap("hello".getBytes(StandardCharsets.UTF_8)))
+                .queryParams(Map.of("a", List.of("1", "2")))
+                .build();
 
         assertThat(
-            person.toString(),
-            equalTo("Person[name=Mike, age=102, binary=68656c6c6f, birthday=*REDACTED*, queryParams={a=[1, 2]}]")
-        );
+                person.toString(),
+                equalTo("Person[name=Mike, age=102, binary=68656c6c6f, birthday=*REDACTED*, queryParams={a=[1, 2]}]"));
     }
 
     @Test
     public void redactsSensitiveKeys() {
         var mapMemberSchema = Schema.createString(ShapeId.from("smithy.example#Str"), new SensitiveTrait());
         var mapSchema = Schema.mapBuilder(ShapeId.from("smithy.example#Map"))
-            .putMember("key", mapMemberSchema)
-            .putMember("value", mapMemberSchema)
-            .build();
+                .putMember("key", mapMemberSchema)
+                .putMember("value", mapMemberSchema)
+                .build();
         var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
-            .putMember("foo", mapSchema)
-            .build();
+                .putMember("foo", mapSchema)
+                .build();
 
         var str = ToStringSerializer.serialize(e -> {
             e.writeStruct(schema, TestHelper.create(schema, (s, ser) -> {
@@ -84,8 +83,8 @@ public class ToStringSerializerTest {
     public void redactsSensitiveBlobs() {
         var blobSchema = Schema.createBlob(ShapeId.from("smithy.example#Blob"), new SensitiveTrait());
         var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
-            .putMember("foo", blobSchema)
-            .build();
+                .putMember("foo", blobSchema)
+                .build();
 
         var str = ToStringSerializer.serialize(e -> {
             e.writeStruct(schema, TestHelper.create(schema, (s, ser) -> {
@@ -99,12 +98,12 @@ public class ToStringSerializerTest {
     @Test
     public void redactsFullListIfSensitive() {
         var mapSchema = Schema.mapBuilder(ShapeId.from("smithy.example#Map"))
-            .putMember("key", PreludeSchemas.STRING)
-            .putMember("value", PreludeSchemas.STRING)
-            .build();
+                .putMember("key", PreludeSchemas.STRING)
+                .putMember("value", PreludeSchemas.STRING)
+                .build();
         var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
-            .putMember("foo", mapSchema, new SensitiveTrait())
-            .build();
+                .putMember("foo", mapSchema, new SensitiveTrait())
+                .build();
 
         var str = ToStringSerializer.serialize(e -> {
             e.writeStruct(schema, TestHelper.create(schema, (s, ser) -> {
@@ -123,11 +122,11 @@ public class ToStringSerializerTest {
     @Test
     public void redactsFullMapIfSensitive() {
         var listSchema = Schema.listBuilder(ShapeId.from("smithy.example#Map"))
-            .putMember("member", PreludeSchemas.STRING)
-            .build();
+                .putMember("member", PreludeSchemas.STRING)
+                .build();
         var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
-            .putMember("foo", listSchema, new SensitiveTrait())
-            .build();
+                .putMember("foo", listSchema, new SensitiveTrait())
+                .build();
 
         var str = ToStringSerializer.serialize(e -> {
             e.writeStruct(schema, TestHelper.create(schema, (s, ser) -> {
@@ -143,11 +142,11 @@ public class ToStringSerializerTest {
     @Test
     public void redactsFullStructIfSensitive() {
         var nestedStruct = Schema.structureBuilder(ShapeId.from("smithy.example#Nested"))
-            .putMember("bar", PreludeSchemas.STRING)
-            .build();
+                .putMember("bar", PreludeSchemas.STRING)
+                .build();
         var schema = Schema.structureBuilder(ShapeId.from("smithy.example#Struct"))
-            .putMember("foo", nestedStruct, new SensitiveTrait())
-            .build();
+                .putMember("foo", nestedStruct, new SensitiveTrait())
+                .build();
 
         var str = ToStringSerializer.serialize(e -> {
             e.writeStruct(schema, TestHelper.create(schema, (s, ser) -> {

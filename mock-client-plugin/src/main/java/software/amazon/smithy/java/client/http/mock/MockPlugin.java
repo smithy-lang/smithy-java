@@ -56,12 +56,11 @@ public final class MockPlugin implements ClientPlugin {
     private static final Context.Key<CurrentRequest> CURRENT_REQUEST = Context.key("CURRENT_REQUEST");
 
     private static final Map<ShapeId, ServerProtocolProvider> SERVER_PROTOCOL_HANDLERS = ServiceLoader.load(
-        ServerProtocolProvider.class,
-        ProtocolResolver.class.getClassLoader()
-    )
-        .stream()
-        .map(ServiceLoader.Provider::get)
-        .collect(Collectors.toMap(ServerProtocolProvider::getProtocolId, Function.identity()));
+            ServerProtocolProvider.class,
+            ProtocolResolver.class.getClassLoader())
+            .stream()
+            .map(ServiceLoader.Provider::get)
+            .collect(Collectors.toMap(ServerProtocolProvider::getProtocolId, Function.identity()));
 
     private final List<Function<MatcherRequest, MockedResult>> matchers = new ArrayList<>();
     private final List<MockedRequest> requests = Collections.synchronizedList(new ArrayList<>());
@@ -170,19 +169,18 @@ public final class MockPlugin implements ClientPlugin {
 
         @Override
         public <I extends SerializableStruct, O extends SerializableStruct> HttpRequest createRequest(
-            ApiOperation<I, O> operation,
-            I input,
-            Context context,
-            URI endpoint
+                ApiOperation<I, O> operation,
+                I input,
+                Context context,
+                URI endpoint
         ) {
             var serviceOperation = Operation.of(
-                operation.schema().id().getName(),
-                (i, c) -> {
-                    throw new UnsupportedOperationException();
-                },
-                operation,
-                mockService
-            );
+                    operation.schema().id().getName(),
+                    (i, c) -> {
+                        throw new UnsupportedOperationException();
+                    },
+                    operation,
+                    mockService);
             var currentRequest = new CurrentRequest(serviceOperation, new MockedRequest(input, null), delegate);
             context.put(CURRENT_REQUEST, currentRequest);
             return delegate.createRequest(operation, input, context, endpoint);
@@ -195,11 +193,11 @@ public final class MockPlugin implements ClientPlugin {
 
         @Override
         public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
-            ApiOperation<I, O> operation,
-            Context context,
-            TypeRegistry typeRegistry,
-            HttpRequest request,
-            HttpResponse response
+                ApiOperation<I, O> operation,
+                Context context,
+                TypeRegistry typeRegistry,
+                HttpRequest request,
+                HttpResponse response
         ) {
             return delegate.deserializeResponse(operation, context, typeRegistry, request, response);
         }
@@ -225,11 +223,10 @@ public final class MockPlugin implements ClientPlugin {
 
             MockedResult result = null;
             var matcherRequest = new MatcherRequest(
-                context,
-                currentRequest.operation().getApiOperation(),
-                currentRequest.request().input(),
-                request
-            );
+                    context,
+                    currentRequest.operation().getApiOperation(),
+                    currentRequest.request().input(),
+                    request);
             for (var matcher : matchers) {
                 result = matcher.apply(matcherRequest);
                 if (result != null) {
@@ -254,15 +251,14 @@ public final class MockPlugin implements ClientPlugin {
     }
 
     private CompletableFuture<HttpResponse> replyWithMockOutput(
-        CurrentRequest currentRequest,
-        MockedResult.Output output
+            CurrentRequest currentRequest,
+            MockedResult.Output output
     ) {
         var cRequest = currentRequest.request().request();
         var serverRequest = new software.amazon.smithy.java.server.core.HttpRequest(
-            cRequest.headers(),
-            cRequest.uri(),
-            cRequest.method()
-        );
+                cRequest.headers(),
+                cRequest.uri(),
+                cRequest.method());
 
         // Use the explicitly provided protocol if set, otherwise try to find the matching server protocol.
         var protocol = output.protocol();
@@ -283,10 +279,10 @@ public final class MockPlugin implements ClientPlugin {
 
         return future.thenApply(ignored -> {
             return HttpResponse.builder()
-                .statusCode(response.getStatusCode())
-                .headers(response.headers())
-                .body(response.getSerializedValue())
-                .build();
+                    .statusCode(response.getStatusCode())
+                    .headers(response.headers())
+                    .body(response.getSerializedValue())
+                    .build();
         });
     }
 

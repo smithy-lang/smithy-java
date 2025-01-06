@@ -39,56 +39,56 @@ public class SchemaInterceptingSerializerTest {
     @BeforeAll
     public static void setup() {
         model = Model.assembler()
-            .addUnparsedModel("test.smithy", """
-                $version: "2"
-                namespace smithy.example
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
 
-                document MyDocument
-                string MyString
-                boolean MyBoolean
-                timestamp MyTimestamp
-                blob MyBlob
-                byte MyByte
-                short MyShort
-                integer MyInteger
-                long MyLong
-                float MyFloat
-                double MyDouble
-                bigInteger MyBigInteger
-                bigDecimal MyBigDecimal
+                        document MyDocument
+                        string MyString
+                        boolean MyBoolean
+                        timestamp MyTimestamp
+                        blob MyBlob
+                        byte MyByte
+                        short MyShort
+                        integer MyInteger
+                        long MyLong
+                        float MyFloat
+                        double MyDouble
+                        bigInteger MyBigInteger
+                        bigDecimal MyBigDecimal
 
-                intEnum MyIntEnum {
-                    foo = 1
-                    bar = 2
-                }
+                        intEnum MyIntEnum {
+                            foo = 1
+                            bar = 2
+                        }
 
-                enum MyEnum {
-                    foo = "a"
-                    bar = "b"
-                }
+                        enum MyEnum {
+                            foo = "a"
+                            bar = "b"
+                        }
 
-                @sparse
-                list SimpleList {
-                    member: String
-                }
+                        @sparse
+                        list SimpleList {
+                            member: String
+                        }
 
-                map SimpleMap {
-                    key: MyString
-                    value: MyString
-                }
+                        map SimpleMap {
+                            key: MyString
+                            value: MyString
+                        }
 
-                map DocumentMap {
-                    key: MyString
-                    value: MyDocument
-                }
+                        map DocumentMap {
+                            key: MyString
+                            value: MyDocument
+                        }
 
-                structure SimpleStruct {
-                    foo: String
-                    baz: SimpleStruct
-                }
-                """)
-            .assemble()
-            .unwrap();
+                        structure SimpleStruct {
+                            foo: String
+                            baz: SimpleStruct
+                        }
+                        """)
+                .assemble()
+                .unwrap();
     }
 
     @MethodSource("interceptsWithSchemaProvider")
@@ -114,20 +114,19 @@ public class SchemaInterceptingSerializerTest {
     static List<Arguments> interceptsWithSchemaProvider() {
         var bytes = ByteBuffer.wrap("hi".getBytes(StandardCharsets.UTF_8));
         return List.of(
-            Arguments.arguments("MyBoolean", Document.of(true)),
-            Arguments.arguments("MyString", Document.of("hi")),
-            Arguments.arguments("MyByte", Document.of((byte) 1)),
-            Arguments.arguments("MyShort", Document.of((short) 1)),
-            Arguments.arguments("MyInteger", Document.of(1)),
-            Arguments.arguments("MyLong", Document.of(1L)),
-            Arguments.arguments("MyFloat", Document.of(1f)),
-            Arguments.arguments("MyDouble", Document.of(1d)),
-            Arguments.arguments("MyBigDecimal", Document.of(BigDecimal.ONE)),
-            Arguments.arguments("MyBigInteger", Document.of(BigInteger.ONE)),
-            Arguments.arguments("MyTimestamp", Document.of(Instant.EPOCH)),
-            Arguments.arguments("MyBlob", Document.of(bytes)),
-            Arguments.arguments("MyDocument", Document.of("hi"))
-        );
+                Arguments.arguments("MyBoolean", Document.of(true)),
+                Arguments.arguments("MyString", Document.of("hi")),
+                Arguments.arguments("MyByte", Document.of((byte) 1)),
+                Arguments.arguments("MyShort", Document.of((short) 1)),
+                Arguments.arguments("MyInteger", Document.of(1)),
+                Arguments.arguments("MyLong", Document.of(1L)),
+                Arguments.arguments("MyFloat", Document.of(1f)),
+                Arguments.arguments("MyDouble", Document.of(1d)),
+                Arguments.arguments("MyBigDecimal", Document.of(BigDecimal.ONE)),
+                Arguments.arguments("MyBigInteger", Document.of(BigInteger.ONE)),
+                Arguments.arguments("MyTimestamp", Document.of(Instant.EPOCH)),
+                Arguments.arguments("MyBlob", Document.of(bytes)),
+                Arguments.arguments("MyDocument", Document.of("hi")));
     }
 
     @Test
@@ -135,10 +134,9 @@ public class SchemaInterceptingSerializerTest {
         var converter = new SchemaConverter(model);
         var listSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleList")));
         var wrapped = new WrappedDocument(
-            ShapeId.from("smithy.example#S"),
-            listSchema,
-            Document.of(Arrays.asList(Document.of("a"), null))
-        );
+                ShapeId.from("smithy.example#S"),
+                listSchema,
+                Document.of(Arrays.asList(Document.of("a"), null)));
 
         wrapped.serialize(new SpecificShapeSerializer() {
             @Override
@@ -165,10 +163,9 @@ public class SchemaInterceptingSerializerTest {
         var converter = new SchemaConverter(model);
         var mapSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleMap")));
         var wrapped = new WrappedDocument(
-            ShapeId.from("smithy.example#S"),
-            mapSchema,
-            Document.ofObject(Map.of("foo", "bar"))
-        );
+                ShapeId.from("smithy.example#S"),
+                mapSchema,
+                Document.ofObject(Map.of("foo", "bar")));
 
         wrapped.serialize(new SpecificShapeSerializer() {
             @Override
@@ -178,10 +175,10 @@ public class SchemaInterceptingSerializerTest {
                 consumer.accept(mapState, new MapSerializer() {
                     @Override
                     public <T> void writeEntry(
-                        Schema keySchema,
-                        String key,
-                        T state,
-                        BiConsumer<T, ShapeSerializer> valueSerializer
+                            Schema keySchema,
+                            String key,
+                            T state,
+                            BiConsumer<T, ShapeSerializer> valueSerializer
                     ) {
                         assertThat(keySchema, equalTo(mapSchema.mapKeyMember()));
                         assertThat(key, equalTo("foo"));
@@ -204,10 +201,9 @@ public class SchemaInterceptingSerializerTest {
         var converter = new SchemaConverter(model);
         var mapSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#DocumentMap")));
         var wrapped = new WrappedDocument(
-            ShapeId.from("smithy.example#S"),
-            mapSchema,
-            Document.ofObject(Map.of("foo", "bar"))
-        );
+                ShapeId.from("smithy.example#S"),
+                mapSchema,
+                Document.ofObject(Map.of("foo", "bar")));
 
         wrapped.serialize(new SpecificShapeSerializer() {
             @Override
@@ -217,10 +213,10 @@ public class SchemaInterceptingSerializerTest {
                 consumer.accept(mapState, new MapSerializer() {
                     @Override
                     public <T> void writeEntry(
-                        Schema keySchema,
-                        String key,
-                        T state,
-                        BiConsumer<T, ShapeSerializer> valueSerializer
+                            Schema keySchema,
+                            String key,
+                            T state,
+                            BiConsumer<T, ShapeSerializer> valueSerializer
                     ) {
                         assertThat(keySchema, equalTo(mapSchema.mapKeyMember()));
                         assertThat(key, equalTo("foo"));
@@ -243,17 +239,14 @@ public class SchemaInterceptingSerializerTest {
         var converter = new SchemaConverter(model);
         var structSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
         var wrapped = new WrappedDocument(
-            ShapeId.from("smithy.example#S"),
-            structSchema,
-            Document.ofObject(
-                Map.of(
-                    "foo",
-                    "bar",
-                    "baz",
-                    Document.ofObject(Map.of("foo", "hi"))
-                )
-            )
-        );
+                ShapeId.from("smithy.example#S"),
+                structSchema,
+                Document.ofObject(
+                        Map.of(
+                                "foo",
+                                "bar",
+                                "baz",
+                                Document.ofObject(Map.of("foo", "hi")))));
 
         wrapped.serialize(new SpecificShapeSerializer() {
             @Override

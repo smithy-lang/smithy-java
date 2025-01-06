@@ -70,11 +70,11 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
     @Override
     public String toString() {
         return "SmithyModifiableHttpRequestImpl{"
-            + "uri=" + uri
-            + ", method='" + method + '\''
-            + ", httpVersion=" + httpVersion
-            + ", headers=" + headers
-            + ", body=" + body + '}';
+                + "uri=" + uri
+                + ", method='" + method + '\''
+                + ", httpVersion=" + httpVersion
+                + ", headers=" + headers
+                + ", body=" + body + '}';
     }
 
     @Override
@@ -87,10 +87,10 @@ final class ModifiableHttpRequestImpl implements ModifiableHttpRequest {
         }
         ModifiableHttpRequestImpl that = (ModifiableHttpRequestImpl) o;
         return uri.equals(that.uri)
-            && method.equals(that.method)
-            && httpVersion == that.httpVersion
-            && headers.equals(that.headers)
-            && body.equals(that.body);
+                && method.equals(that.method)
+                && httpVersion == that.httpVersion
+                && headers.equals(that.headers)
+                && body.equals(that.body);
     }
 
     @Override

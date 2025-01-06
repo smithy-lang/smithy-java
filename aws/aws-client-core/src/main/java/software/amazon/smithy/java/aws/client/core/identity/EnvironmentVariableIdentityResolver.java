@@ -28,7 +28,7 @@ public final class EnvironmentVariableIdentityResolver implements AwsCredentials
     private static final String SECRET_KEY_PROPERTY = "AWS_SECRET_ACCESS_KEY";
     private static final String SESSION_TOKEN_PROPERTY = "AWS_SESSION_TOKEN";
     private static final String ERROR_MESSAGE = "Could not resolve an AWS identity using the AWS_ACCESS_KEY_ID and "
-        + "AWS_SECRET_ACCESS_KEY environment variables";
+            + "AWS_SECRET_ACCESS_KEY environment variables";
 
     @Override
     public CompletableFuture<IdentityResult<AwsCredentialsIdentity>> resolveIdentity(AuthProperties requestProperties) {
@@ -41,7 +41,6 @@ public final class EnvironmentVariableIdentityResolver implements AwsCredentials
         }
 
         return CompletableFuture.completedFuture(
-            IdentityResult.of(AwsCredentialsIdentity.create(accessKey, secretKey, sessionToken))
-        );
+                IdentityResult.of(AwsCredentialsIdentity.create(accessKey, secretKey, sessionToken)));
     }
 }

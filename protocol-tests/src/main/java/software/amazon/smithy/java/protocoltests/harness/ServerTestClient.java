@@ -35,12 +35,12 @@ final class ServerTestClient {
         var bodyPublisher = java.net.http.HttpRequest.BodyPublishers.fromPublisher(request.body());
 
         java.net.http.HttpRequest.Builder httpRequestBuilder = java.net.http.HttpRequest.newBuilder()
-            .version(switch (request.httpVersion()) {
-                case HTTP_1_1 -> HttpClient.Version.HTTP_1_1;
-                case HTTP_2 -> HttpClient.Version.HTTP_2;
-            })
-            .method(request.method(), bodyPublisher)
-            .uri(request.uri());
+                .version(switch (request.httpVersion()) {
+                    case HTTP_1_1 -> HttpClient.Version.HTTP_1_1;
+                    case HTTP_2 -> HttpClient.Version.HTTP_2;
+                })
+                .method(request.method(), bodyPublisher)
+                .uri(request.uri());
 
         for (var entry : request.headers()) {
             for (var value : entry.getValue()) {
@@ -52,14 +52,13 @@ final class ServerTestClient {
 
         try {
             var response = httpClient.send(
-                httpRequestBuilder.build(),
-                java.net.http.HttpResponse.BodyHandlers.ofByteArray()
-            );
+                    httpRequestBuilder.build(),
+                    java.net.http.HttpResponse.BodyHandlers.ofByteArray());
             return HttpResponse.builder()
-                .statusCode(response.statusCode())
-                .body(DataStream.ofBytes(response.body()))
-                .headers(HttpHeaders.of(response.headers().map()))
-                .build();
+                    .statusCode(response.statusCode())
+                    .body(DataStream.ofBytes(response.body()))
+                    .headers(HttpHeaders.of(response.headers().map()))
+                    .build();
 
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);

@@ -47,13 +47,13 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     private final String schemaName;
 
     DeserializerGenerator(
-        JavaWriter writer,
-        Shape shape,
-        SymbolProvider symbolProvider,
-        Model model,
-        ServiceShape service,
-        String deserializer,
-        String schemaName
+            JavaWriter writer,
+            Shape shape,
+            SymbolProvider symbolProvider,
+            Model model,
+            ServiceShape service,
+            String deserializer,
+            String schemaName
     ) {
         this.writer = writer;
         this.shape = shape;
@@ -92,18 +92,16 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     @Override
     public Void listShape(ListShape listShape) {
         writer.write(
-            "SharedSerde.deserialize$L(${schemaName:L}, ${deserializer:L})",
-            CodegenUtils.getDefaultName(listShape, service)
-        );
+                "SharedSerde.deserialize$L(${schemaName:L}, ${deserializer:L})",
+                CodegenUtils.getDefaultName(listShape, service));
         return null;
     }
 
     @Override
     public Void mapShape(MapShape mapShape) {
         writer.write(
-            "SharedSerde.deserialize$L(${schemaName:L}, ${deserializer:L})",
-            CodegenUtils.getDefaultName(mapShape, service)
-        );
+                "SharedSerde.deserialize$L(${schemaName:L}, ${deserializer:L})",
+                CodegenUtils.getDefaultName(mapShape, service));
         return null;
     }
 
@@ -193,9 +191,9 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
     public Void unionShape(UnionShape unionShape) {
         if (unionShape.hasTrait(StreamingTrait.class)) {
             Symbol flowPublisherType = CodegenUtils.fromClass(Flow.Publisher.class)
-                .toBuilder()
-                .addReference(symbolProvider.toSymbol(unionShape))
-                .build();
+                    .toBuilder()
+                    .addReference(symbolProvider.toSymbol(unionShape))
+                    .build();
             writer.write("($T) ${deserializer:L}.readEventStream(${schemaName:L})", flowPublisherType);
         } else {
             delegateDeser();
@@ -211,9 +209,8 @@ final class DeserializerGenerator extends ShapeVisitor.DataShapeVisitor<Void> im
 
     private void delegateDeser() {
         writer.write(
-            "$T.builder().deserializeMember(${deserializer:L}, ${schemaName:L}).build()",
-            symbolProvider.toSymbol(shape)
-        );
+                "$T.builder().deserializeMember(${deserializer:L}, ${schemaName:L}).build()",
+                symbolProvider.toSymbol(shape));
     }
 
     @Override

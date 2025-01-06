@@ -14,8 +14,8 @@ public final class DefaultTransforms {
     private DefaultTransforms() {}
 
     public static void apply(
-        CodegenDirector<JavaWriter, JavaCodegenIntegration, CodeGenerationContext, JavaCodegenSettings> runner,
-        JavaCodegenSettings settings
+            CodegenDirector<JavaWriter, JavaCodegenIntegration, CodeGenerationContext, JavaCodegenSettings> runner,
+            JavaCodegenSettings settings
     ) {
         runner.changeStringEnumsToEnumShapes(true);
         runner.flattenPaginationInfoIntoOperations();

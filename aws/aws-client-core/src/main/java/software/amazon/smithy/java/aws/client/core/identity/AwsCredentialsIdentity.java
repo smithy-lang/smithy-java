@@ -73,16 +73,15 @@ public interface AwsCredentialsIdentity extends Identity {
      * @return the created identity.
      */
     static AwsCredentialsIdentity create(
-        String accessKeyId,
-        String secretAccessKey,
-        String sessionToken,
-        Instant expirationTime
+            String accessKeyId,
+            String secretAccessKey,
+            String sessionToken,
+            Instant expirationTime
     ) {
         return new AwsCredentialsIdentityRecord(
-            Objects.requireNonNull(accessKeyId, "accessKeyId is null"),
-            Objects.requireNonNull(secretAccessKey, "secretAccessKey is null"),
-            sessionToken,
-            expirationTime
-        );
+                Objects.requireNonNull(accessKeyId, "accessKeyId is null"),
+                Objects.requireNonNull(secretAccessKey, "secretAccessKey is null"),
+                sessionToken,
+                expirationTime);
     }
 }

@@ -38,53 +38,51 @@ public class AmzSdkRequestPluginTest {
         var mock = MockPlugin.builder().addQueue(mockQueue).build();
 
         var client = DynamicClient.builder()
-            .service(TestHarness.SERVICE)
-            .model(TestHarness.MODEL)
-            .protocol(new AwsJson1Protocol(TestHarness.SERVICE))
-            .addPlugin(mock)
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
-            .addPlugin(new AmzSdkRequestPlugin())
-            .retryStrategy(new RetryStrategy() {
-                @Override
-                public AcquireInitialTokenResponse acquireInitialToken(AcquireInitialTokenRequest request) {
-                    return new AcquireInitialTokenResponse(new Token(), Duration.ZERO);
-                }
+                .service(TestHarness.SERVICE)
+                .model(TestHarness.MODEL)
+                .protocol(new AwsJson1Protocol(TestHarness.SERVICE))
+                .addPlugin(mock)
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
+                .addPlugin(new AmzSdkRequestPlugin())
+                .retryStrategy(new RetryStrategy() {
+                    @Override
+                    public AcquireInitialTokenResponse acquireInitialToken(AcquireInitialTokenRequest request) {
+                        return new AcquireInitialTokenResponse(new Token(), Duration.ZERO);
+                    }
 
-                @Override
-                public RefreshRetryTokenResponse refreshRetryToken(RefreshRetryTokenRequest request) {
-                    return new RefreshRetryTokenResponse(new Token(), Duration.ZERO);
-                }
+                    @Override
+                    public RefreshRetryTokenResponse refreshRetryToken(RefreshRetryTokenRequest request) {
+                        return new RefreshRetryTokenResponse(new Token(), Duration.ZERO);
+                    }
 
-                @Override
-                public RecordSuccessResponse recordSuccess(RecordSuccessRequest request) {
-                    return new RecordSuccessResponse(request.token());
-                }
+                    @Override
+                    public RecordSuccessResponse recordSuccess(RecordSuccessRequest request) {
+                        return new RecordSuccessResponse(request.token());
+                    }
 
-                @Override
-                public int maxAttempts() {
-                    return 3;
-                }
+                    @Override
+                    public int maxAttempts() {
+                        return 3;
+                    }
 
-                @Override
-                public Builder toBuilder() {
-                    throw new UnsupportedOperationException();
-                }
-            })
-            .build();
+                    @Override
+                    public Builder toBuilder() {
+                        throw new UnsupportedOperationException();
+                    }
+                })
+                .build();
 
         mockQueue.enqueue(
-            HttpResponse.builder()
-                .statusCode(429)
-                .body(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
-                .build()
-        );
+                HttpResponse.builder()
+                        .statusCode(429)
+                        .body(DataStream.ofString("{\"__type\":\"InvalidSprocketId\"}"))
+                        .build());
         mockQueue.enqueue(
-            HttpResponse.builder()
-                .statusCode(200)
-                .body(DataStream.ofString("{\"id\":\"1\"}"))
-                .build()
-        );
+                HttpResponse.builder()
+                        .statusCode(200)
+                        .body(DataStream.ofString("{\"id\":\"1\"}"))
+                        .build());
 
         client.call("CreateSprocket");
 

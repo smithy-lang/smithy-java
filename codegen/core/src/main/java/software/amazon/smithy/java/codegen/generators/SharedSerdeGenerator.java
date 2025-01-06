@@ -17,29 +17,27 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  */
 @SmithyInternalApi
 public final class SharedSerdeGenerator
-    implements Consumer<CustomizeDirective<CodeGenerationContext, JavaCodegenSettings>> {
+        implements Consumer<CustomizeDirective<CodeGenerationContext, JavaCodegenSettings>> {
 
     @Override
     public void accept(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         directive.context()
-            .writerDelegator()
-            .useFileWriter(
-                CodegenUtils.getSerdeFileName(directive.settings()),
-                CodegenUtils.getModelNamespace(directive.settings()),
-                writer -> writer.write(
-                    """
-                        /**
-                         * Defines shared serialization and deserialization methods for map and list shapes.
-                         */
-                        final class SharedSerde {
+                .writerDelegator()
+                .useFileWriter(
+                        CodegenUtils.getSerdeFileName(directive.settings()),
+                        CodegenUtils.getModelNamespace(directive.settings()),
+                        writer -> writer.write(
+                                """
+                                        /**
+                                         * Defines shared serialization and deserialization methods for map and list shapes.
+                                         */
+                                        final class SharedSerde {
 
-                            ${L@sharedSerde|}
+                                            ${L@sharedSerde|}
 
-                            private SharedSerde() {}
-                        }
-                        """,
-                    ""
-                )
-            );
+                                            private SharedSerde() {}
+                                        }
+                                        """,
+                                ""));
     }
 }

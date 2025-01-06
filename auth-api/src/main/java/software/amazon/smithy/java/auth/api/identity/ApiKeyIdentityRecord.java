@@ -5,5 +5,4 @@
 
 package software.amazon.smithy.java.auth.api.identity;
 
-record ApiKeyIdentityRecord(String apiKey) implements ApiKeyIdentity {
-}
+record ApiKeyIdentityRecord(String apiKey) implements ApiKeyIdentity {}

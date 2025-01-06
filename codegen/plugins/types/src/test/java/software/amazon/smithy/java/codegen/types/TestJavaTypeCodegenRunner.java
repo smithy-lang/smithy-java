@@ -22,18 +22,17 @@ public final class TestJavaTypeCodegenRunner {
     public static void main(String[] args) {
         JavaTypeCodegenPlugin plugin = new JavaTypeCodegenPlugin();
         Model model = Model.assembler(TestJavaTypeCodegenRunner.class.getClassLoader())
-            .discoverModels(TestJavaTypeCodegenRunner.class.getClassLoader())
-            .assemble()
-            .unwrap();
+                .discoverModels(TestJavaTypeCodegenRunner.class.getClassLoader())
+                .assemble()
+                .unwrap();
         PluginContext context = PluginContext.builder()
-            .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
-            .settings(
-                ObjectNode.builder()
-                    .withMember("namespace", "smithy.java.codegen.server.test")
-                    .build()
-            )
-            .model(model)
-            .build();
+                .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
+                .settings(
+                        ObjectNode.builder()
+                                .withMember("namespace", "smithy.java.codegen.server.test")
+                                .build())
+                .model(model)
+                .build();
         plugin.execute(context);
     }
 }

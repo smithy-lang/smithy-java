@@ -18,10 +18,9 @@ public class EnvironmentVariableIdentityResolverTest {
         var resolver = new EnvironmentVariableIdentityResolver();
         var value = resolver.resolveIdentity(AuthProperties.empty()).get();
         var expected = AwsCredentialsIdentity.create(
-            "env_access_key",
-            "env_secret_key",
-            "env_token"
-        );
+                "env_access_key",
+                "env_secret_key",
+                "env_token");
 
         assertEquals(expected, value.unwrap());
     }

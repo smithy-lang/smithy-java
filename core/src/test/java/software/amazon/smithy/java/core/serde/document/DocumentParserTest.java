@@ -19,8 +19,8 @@ public class DocumentParserTest {
     @Test
     public void doesNotDropNullListValues() {
         Schema list = Schema.listBuilder(ShapeId.from("foo#Bar"))
-            .putMember("member", PreludeSchemas.STRING)
-            .build();
+                .putMember("member", PreludeSchemas.STRING)
+                .build();
 
         DocumentParser parser = new DocumentParser();
         parser.writeList(list, null, 4, (_ignore, ser) -> {

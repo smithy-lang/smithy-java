@@ -57,9 +57,8 @@ final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
 
     private static class NullIdentityResolver implements IdentityResolver<Identity> {
         public static final CompletableFuture<IdentityResult<Identity>> NULL_IDENTITY = CompletableFuture
-            .completedFuture(
-                IdentityResult.of(new Identity() {})
-            );
+                .completedFuture(
+                        IdentityResult.of(new Identity() {}));
 
         @Override
         public CompletableFuture<IdentityResult<Identity>> resolveIdentity(AuthProperties requestProperties) {

@@ -20,21 +20,19 @@ final class ComparisonUtils {
 
     static RecursiveComparisonConfiguration getComparisonConfig() {
         return RecursiveComparisonConfiguration.builder()
-            // Compare data streams by contained data
-            .withComparatorForType(
-                Comparator.comparing(d -> new StringBuildingSubscriber(d).getResult()),
-                DataStream.class
-            )
-            .withComparatorForType(
-                Comparator.comparing(ByteBufferUtils::getBytes, Arrays::compare),
-                ByteBuffer.class
-            )
-            // Compare doubles and floats as longs so NaN's will be equatable
-            .withComparatorForType(nanPermittingDoubleComparator(), Double.class)
-            .withComparatorForType(nanPermittingFloatComparator(), Float.class)
-            .withComparatorForType((a, b) -> Document.equals(a, b) ? 0 : 1, Document.class)
-            .withIgnoredFieldsOfTypes(RetrySafety.class)
-            .build();
+                // Compare data streams by contained data
+                .withComparatorForType(
+                        Comparator.comparing(d -> new StringBuildingSubscriber(d).getResult()),
+                        DataStream.class)
+                .withComparatorForType(
+                        Comparator.comparing(ByteBufferUtils::getBytes, Arrays::compare),
+                        ByteBuffer.class)
+                // Compare doubles and floats as longs so NaN's will be equatable
+                .withComparatorForType(nanPermittingDoubleComparator(), Double.class)
+                .withComparatorForType(nanPermittingFloatComparator(), Float.class)
+                .withComparatorForType((a, b) -> Document.equals(a, b) ? 0 : 1, Document.class)
+                .withIgnoredFieldsOfTypes(RetrySafety.class)
+                .build();
     }
 
     private static Comparator<Double> nanPermittingDoubleComparator() {

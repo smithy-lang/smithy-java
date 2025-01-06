@@ -22,9 +22,9 @@ public final class SchemaUtils {
      * @return the filtered struct.
      */
     public static SerializableStruct withFilteredMembers(
-        Schema schema,
-        SerializableStruct struct,
-        Predicate<Schema> memberPredicate
+            Schema schema,
+            SerializableStruct struct,
+            Predicate<Schema> memberPredicate
     ) {
         return new SerializableStruct() {
             @Override
@@ -69,8 +69,7 @@ public final class SchemaUtils {
 
     private static RuntimeException illegalMemberAccess(Schema parent, Schema member) {
         return new IllegalArgumentException(
-            "Attempted to access a non-existent member of " + parent.id() + ": " + member.id()
-        );
+                "Attempted to access a non-existent member of " + parent.id() + ": " + member.id());
     }
 
     /**
@@ -88,9 +87,8 @@ public final class SchemaUtils {
             return value;
         }
         throw new IllegalArgumentException(
-            "Attempted to read or write a non-existent member of " + expected.id()
-                + ": " + actual.id()
-        );
+                "Attempted to read or write a non-existent member of " + expected.id()
+                        + ": " + actual.id());
     }
 
     /**

@@ -23,7 +23,7 @@ import software.amazon.smithy.model.traits.Trait;
  * <p>Note: when creating a structure schema, all required members must come before optional members.
  */
 public abstract sealed class Schema implements MemberLookup
-    permits RootSchema, MemberSchema, DeferredRootSchema, DeferredMemberSchema {
+        permits RootSchema, MemberSchema, DeferredRootSchema, DeferredMemberSchema {
 
     private final ShapeType type;
     private final ShapeId id;
@@ -81,11 +81,11 @@ public abstract sealed class Schema implements MemberLookup
     private final int hash;
 
     Schema(
-        ShapeType type,
-        ShapeId id,
-        TraitMap traits,
-        List<MemberSchemaBuilder> members,
-        Set<String> stringEnumValues
+            ShapeType type,
+            ShapeId id,
+            TraitMap traits,
+            List<MemberSchemaBuilder> members,
+            Set<String> stringEnumValues
     ) {
         this.type = type;
         this.id = id;
@@ -121,11 +121,10 @@ public abstract sealed class Schema implements MemberLookup
         // Only use the slow version of required member validation if there are > 64 required members.
         this.requiredMemberCount = SchemaBuilder.computeRequiredMemberCount(type, members);
         this.requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(
-            type,
-            requiredMemberCount,
-            members,
-            m -> m.requiredByValidationBitmask
-        );
+                type,
+                requiredMemberCount,
+                members,
+                m -> m.requiredByValidationBitmask);
 
         this.hash = computeHash(this);
     }
@@ -154,18 +153,16 @@ public abstract sealed class Schema implements MemberLookup
         // Compute the expected bitfield, and adjust how it's computed based on if the target is a builder or not.
         if (builder.target != null) {
             this.requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(
-                type,
-                requiredMemberCount,
-                builder.target.members(),
-                m -> m.requiredByValidationBitmask
-            );
+                    type,
+                    requiredMemberCount,
+                    builder.target.members(),
+                    m -> m.requiredByValidationBitmask);
         } else {
             this.requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(
-                type,
-                requiredMemberCount,
-                builder.targetBuilder.members,
-                m -> m.requiredByValidationBitmask
-            );
+                    type,
+                    requiredMemberCount,
+                    builder.targetBuilder.members,
+                    m -> m.requiredByValidationBitmask);
         }
 
         this.hash = computeHash(this);
@@ -198,13 +195,12 @@ public abstract sealed class Schema implements MemberLookup
 
     public static Schema createIntEnum(ShapeId id, Set<Integer> values, Trait... traits) {
         return new RootSchema(
-            ShapeType.INT_ENUM,
-            id,
-            TraitMap.create(traits),
-            Collections.emptyList(),
-            Collections.emptySet(),
-            values
-        );
+                ShapeType.INT_ENUM,
+                id,
+                TraitMap.create(traits),
+                Collections.emptyList(),
+                Collections.emptySet(),
+                values);
     }
 
     public static Schema createLong(ShapeId id, Trait... traits) {
@@ -233,13 +229,12 @@ public abstract sealed class Schema implements MemberLookup
 
     public static Schema createEnum(ShapeId id, Set<String> values, Trait... traits) {
         return new RootSchema(
-            ShapeType.ENUM,
-            id,
-            TraitMap.create(traits),
-            Collections.emptyList(),
-            values,
-            Collections.emptySet()
-        );
+                ShapeType.ENUM,
+                id,
+                TraitMap.create(traits),
+                Collections.emptyList(),
+                values,
+                Collections.emptySet());
     }
 
     public static Schema createBlob(ShapeId id, Trait... traits) {
@@ -296,10 +291,10 @@ public abstract sealed class Schema implements MemberLookup
         }
         var o = (Schema) obj;
         return type == o.type
-            && id.equals(o.id)
-            && traits.equals(o.traits)
-            && members().equals(o.members())
-            && memberIndex == o.memberIndex;
+                && id.equals(o.id)
+                && traits.equals(o.traits)
+                && members().equals(o.members())
+                && memberIndex == o.memberIndex;
     }
 
     @Override

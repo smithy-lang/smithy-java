@@ -27,9 +27,8 @@ import software.amazon.smithy.java.core.testmodels.ValidatedPojo;
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Measurement(
-    iterations = 3,
-    time = 3
-)
+        iterations = 3,
+        time = 3)
 @BenchmarkMode(Mode.AverageTime)
 public class ValidatorBench {
 
@@ -46,18 +45,16 @@ public class ValidatorBench {
         unvalidatedPojo = UnvalidatedPojo.builder().string("hi").integer(1).boxedInteger(2).build();
 
         pojoWithValidatedCollection = PojoWithValidatedCollection.builder()
-            .list(List.of(validatedPojo, validatedPojo, validatedPojo))
-            .map(
-                Map.of(
-                    "abc",
-                    validatedPojo,
-                    "def",
-                    validatedPojo,
-                    "hij",
-                    validatedPojo
-                )
-            )
-            .build();
+                .list(List.of(validatedPojo, validatedPojo, validatedPojo))
+                .map(
+                        Map.of(
+                                "abc",
+                                validatedPojo,
+                                "def",
+                                validatedPojo,
+                                "hij",
+                                validatedPojo))
+                .build();
         validator = Validator.builder().build();
     }
 

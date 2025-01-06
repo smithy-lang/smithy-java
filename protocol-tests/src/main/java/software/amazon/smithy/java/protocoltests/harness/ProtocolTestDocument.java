@@ -23,14 +23,17 @@ import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
 import software.amazon.smithy.java.io.datastream.DataStream;
+import software.amazon.smithy.java.json.TimestampResolver;
 import software.amazon.smithy.model.node.BooleanNode;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.NumberNode;
 import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 /**
  * This is a document format used in smithy protocol tests to model expected modeled values.
@@ -38,10 +41,10 @@ import software.amazon.smithy.model.shapes.ShapeType;
 final class ProtocolTestDocument implements Document {
 
     private static final Schema STRING_MAP_KEY = Schema.structureBuilder(PreludeSchemas.DOCUMENT.id())
-        .putMember("key", PreludeSchemas.STRING)
-        .build()
-        .members()
-        .get(0);
+            .putMember("key", PreludeSchemas.STRING)
+            .build()
+            .members()
+            .get(0);
     private final Node node;
     private final ShapeType type;
     private final Schema schema;
@@ -133,9 +136,9 @@ final class ProtocolTestDocument implements Document {
             }
         }
         return node.asNumberNode()
-            .map(NumberNode::getValue)
-            .map(Number::doubleValue)
-            .orElseGet(Document.super::asDouble);
+                .map(NumberNode::getValue)
+                .map(Number::doubleValue)
+                .orElseGet(Document.super::asDouble);
     }
 
     @Override
@@ -144,9 +147,9 @@ final class ProtocolTestDocument implements Document {
             return null;
         }
         return node.asNumberNode()
-            .map(NumberNode::getValue)
-            .map(n -> BigInteger.valueOf(n.longValue()))
-            .orElseGet(Document.super::asBigInteger);
+                .map(NumberNode::getValue)
+                .map(n -> BigInteger.valueOf(n.longValue()))
+                .orElseGet(Document.super::asBigInteger);
     }
 
     @Override
@@ -155,8 +158,8 @@ final class ProtocolTestDocument implements Document {
             return null;
         }
         return node.asNumberNode()
-            .flatMap(NumberNode::asBigDecimal)
-            .orElseGet(Document.super::asBigDecimal);
+                .flatMap(NumberNode::asBigDecimal)
+                .orElseGet(Document.super::asBigDecimal);
     }
 
     @Override
@@ -185,10 +188,16 @@ final class ProtocolTestDocument implements Document {
             return null;
         }
         return node.asNumberNode()
-            .map(NumberNode::getValue)
-            .map(Number::longValue)
-            .map(Instant::ofEpochSecond)
-            .orElseGet(Document.super::asTimestamp);
+                .map(NumberNode::getValue)
+                .map(ProtocolTestDocument::readNumberTimestamp)
+                .orElseGet(Document.super::asTimestamp);
+    }
+
+    private static Instant readNumberTimestamp(Number number) {
+        // Numbers can come as integral or decimal epoch second values in test params,
+        // use the TimestampResolver to properly handle either case.
+        return TimestampResolver.readTimestamp(number,
+                TimestampFormatter.of(TimestampFormatTrait.Format.EPOCH_SECONDS));
     }
 
     @Override
@@ -219,9 +228,8 @@ final class ProtocolTestDocument implements Document {
             Map<String, Document> result = new LinkedHashMap<>();
             for (var entry : node.expectObjectNode().getMembers().entrySet()) {
                 result.put(
-                    entry.getKey().getValue(),
-                    new ProtocolTestDocument(entry.getValue(), contentType)
-                );
+                        entry.getKey().getValue(),
+                        new ProtocolTestDocument(entry.getValue(), contentType));
             }
             return result;
         }
@@ -255,11 +263,10 @@ final class ProtocolTestDocument implements Document {
             case MAP -> encoder.writeMap(schema, asStringMap(), asStringMap().size(), (values, mapSerializer) -> {
                 for (var entry : values.entrySet()) {
                     mapSerializer.writeEntry(
-                        STRING_MAP_KEY,
-                        entry.getKey(),
-                        entry.getValue(),
-                        Document::serializeContents
-                    );
+                            STRING_MAP_KEY,
+                            entry.getKey(),
+                            entry.getValue(),
+                            Document::serializeContents);
                 }
             });
             case LIST -> encoder.writeList(schema, asList(), asList().size(), (list, c) -> {
@@ -279,8 +286,10 @@ final class ProtocolTestDocument implements Document {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         ProtocolTestDocument that = (ProtocolTestDocument) o;
         return Objects.equals(node, that.node) && type == that.type && Objects.equals(schema, that.schema);
     }
@@ -293,10 +302,10 @@ final class ProtocolTestDocument implements Document {
     @Override
     public String toString() {
         return "ProtocolTestDocument{" +
-            "node=" + node +
-            ", type=" + type +
-            ", schema=" + schema +
-            '}';
+                "node=" + node +
+                ", type=" + type +
+                ", schema=" + schema +
+                '}';
     }
 
     /**
@@ -320,9 +329,9 @@ final class ProtocolTestDocument implements Document {
 
         @Override
         public <T> void readStruct(
-            Schema schema,
-            T state,
-            ShapeDeserializer.StructMemberConsumer<T> structMemberConsumer
+                Schema schema,
+                T state,
+                ShapeDeserializer.StructMemberConsumer<T> structMemberConsumer
         ) {
             for (var member : schema.members()) {
                 var nextValue = jsonDocument.getMember(member.memberName());

@@ -33,26 +33,26 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public class SdkDocumentWriterTest {
 
     private static final Model MODEL = Model.assembler()
-        .addUnparsedModel("test.smithy", """
-            $version: "2"
-            namespace smithy.example
+            .addUnparsedModel("test.smithy", """
+                    $version: "2"
+                    namespace smithy.example
 
-            @aws.protocols#restJson1
-            service Sprockets {}
+                    @aws.protocols#restJson1
+                    service Sprockets {}
 
-            structure Foo {
-                bar: String
+                    structure Foo {
+                        bar: String
 
-                @jsonName("BAZ")
-                baz: Integer
+                        @jsonName("BAZ")
+                        baz: Integer
 
-                @timestampFormat("date-time")
-                date: Timestamp
-            }
-            """)
-        .discoverModels()
-        .assemble()
-        .unwrap();
+                        @timestampFormat("date-time")
+                        date: Timestamp
+                    }
+                    """)
+            .discoverModels()
+            .assemble()
+            .unwrap();
 
     private static final ShapeId SERVICE = ShapeId.from("smithy.example#Sprockets");
 
@@ -69,117 +69,90 @@ public class SdkDocumentWriterTest {
         result.add(Arguments.of(Document.of(10), software.amazon.awssdk.core.document.Document.fromNumber(10)));
 
         result.add(
-            Arguments.of(
-                Document.of("hi"),
-                software.amazon.awssdk.core.document.Document.fromString("hi")
-            )
-        );
+                Arguments.of(
+                        Document.of("hi"),
+                        software.amazon.awssdk.core.document.Document.fromString("hi")));
 
         result.add(
-            Arguments.of(
-                Document.of(true),
-                software.amazon.awssdk.core.document.Document.fromBoolean(true)
-            )
-        );
+                Arguments.of(
+                        Document.of(true),
+                        software.amazon.awssdk.core.document.Document.fromBoolean(true)));
 
         result.add(
-            Arguments.of(
-                Document.of(List.of(Document.of("hi"), Document.of(10))),
-                software.amazon.awssdk.core.document.Document.fromList(
-                    List.of(
-                        software.amazon.awssdk.core.document.Document.fromString("hi"),
-                        software.amazon.awssdk.core.document.Document.fromNumber(10)
-                    )
-                )
-            )
-        );
+                Arguments.of(
+                        Document.of(List.of(Document.of("hi"), Document.of(10))),
+                        software.amazon.awssdk.core.document.Document.fromList(
+                                List.of(
+                                        software.amazon.awssdk.core.document.Document.fromString("hi"),
+                                        software.amazon.awssdk.core.document.Document.fromNumber(10)))));
 
         result.add(
-            Arguments.of(
-                Document.of(sparseList()),
-                software.amazon.awssdk.core.document.Document.fromList(
-                    List.of(software.amazon.awssdk.core.document.Document.fromNull())
-                )
-            )
-        );
+                Arguments.of(
+                        Document.of(sparseList()),
+                        software.amazon.awssdk.core.document.Document.fromList(
+                                List.of(software.amazon.awssdk.core.document.Document.fromNull()))));
 
         result.add(
-            Arguments.of(
-                Document.of("hi".getBytes(StandardCharsets.UTF_8)),
-                software.amazon.awssdk.core.document.Document.fromString(
-                    ByteBufferUtils.base64Encode(ByteBuffer.wrap("hi".getBytes(StandardCharsets.UTF_8)))
-                )
-            )
-        );
+                Arguments.of(
+                        Document.of("hi".getBytes(StandardCharsets.UTF_8)),
+                        software.amazon.awssdk.core.document.Document.fromString(
+                                ByteBufferUtils.base64Encode(ByteBuffer.wrap("hi".getBytes(StandardCharsets.UTF_8))))));
 
         result.add(
-            Arguments.of(
-                Document.of(Instant.EPOCH),
-                software.amazon.awssdk.core.document.Document.fromNumber(0.0)
-            )
-        );
+                Arguments.of(
+                        Document.of(Instant.EPOCH),
+                        software.amazon.awssdk.core.document.Document.fromNumber(0.0)));
 
         result.add(
-            Arguments.of(
-                Document.of(Map.of("hi", Document.of("there"))),
-                software.amazon.awssdk.core.document.Document.fromMap(
-                    Map.of("hi", software.amazon.awssdk.core.document.Document.fromString("there"))
-                )
-            )
-        );
+                Arguments.of(
+                        Document.of(Map.of("hi", Document.of("there"))),
+                        software.amazon.awssdk.core.document.Document.fromMap(
+                                Map.of("hi", software.amazon.awssdk.core.document.Document.fromString("there")))));
 
         result.add(
-            Arguments.of(
-                null,
-                software.amazon.awssdk.core.document.Document.fromNull()
-            )
-        );
+                Arguments.of(
+                        null,
+                        software.amazon.awssdk.core.document.Document.fromNull()));
 
         var client = createClient();
         var foo = createFoo(client);
         result.add(
-            Arguments.of(
-                foo,
-                software.amazon.awssdk.core.document.Document.fromMap(
-                    Map.of(
-                        "bar",
-                        software.amazon.awssdk.core.document.Document.fromString("a"),
-                        "BAZ",
-                        software.amazon.awssdk.core.document.Document.fromString("b"),
-                        "date",
-                        software.amazon.awssdk.core.document.Document.fromString(Instant.EPOCH.toString())
-                    )
-                )
-            )
-        );
+                Arguments.of(
+                        foo,
+                        software.amazon.awssdk.core.document.Document.fromMap(
+                                Map.of(
+                                        "bar",
+                                        software.amazon.awssdk.core.document.Document.fromString("a"),
+                                        "BAZ",
+                                        software.amazon.awssdk.core.document.Document.fromString("b"),
+                                        "date",
+                                        software.amazon.awssdk.core.document.Document
+                                                .fromString(Instant.EPOCH.toString())))));
 
         return result;
     }
 
     private static DynamicClient createClient() {
         return DynamicClient.builder()
-            .protocol(new RestJsonClientProtocol(SERVICE))
-            .model(MODEL)
-            .service(SERVICE)
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .endpointResolver(EndpointResolver.staticHost("localhost"))
-            .build();
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .model(MODEL)
+                .service(SERVICE)
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .endpointResolver(EndpointResolver.staticHost("localhost"))
+                .build();
     }
 
     private static SerializableStruct createFoo(DynamicClient client) {
         return client.createStruct(
-            ShapeId.from("smithy.example#Foo"),
-            Document.of(
-                Map.of(
-                    "bar",
-                    Document.of("a"),
-                    "baz",
-                    Document.of("b"),
-                    "date",
-                    Document.of(Instant.EPOCH)
-                )
-            )
-        );
+                ShapeId.from("smithy.example#Foo"),
+                Document.of(
+                        Map.of(
+                                "bar",
+                                Document.of("a"),
+                                "baz",
+                                Document.of("b"),
+                                "date",
+                                Document.of(Instant.EPOCH))));
     }
 
     @Test
@@ -190,20 +163,16 @@ public class SdkDocumentWriterTest {
         var result = AwsJsonProtocols.AWS_JSON_1_1.smithyToSdk((Document) foo);
 
         assertThat(
-            result,
-            equalTo(
-                software.amazon.awssdk.core.document.Document.fromMap(
-                    Map.of(
-                        "bar",
-                        software.amazon.awssdk.core.document.Document.fromString("a"),
-                        "baz",
-                        software.amazon.awssdk.core.document.Document.fromString("b"),
-                        "date",
-                        software.amazon.awssdk.core.document.Document.fromNumber(0.0)
-                    )
-                )
-            )
-        );
+                result,
+                equalTo(
+                        software.amazon.awssdk.core.document.Document.fromMap(
+                                Map.of(
+                                        "bar",
+                                        software.amazon.awssdk.core.document.Document.fromString("a"),
+                                        "baz",
+                                        software.amazon.awssdk.core.document.Document.fromString("b"),
+                                        "date",
+                                        software.amazon.awssdk.core.document.Document.fromNumber(0.0)))));
     }
 
     private static <T> List<T> sparseList() {

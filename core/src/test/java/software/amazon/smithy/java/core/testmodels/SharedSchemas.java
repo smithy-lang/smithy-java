@@ -16,18 +16,17 @@ import software.amazon.smithy.model.traits.SensitiveTrait;
 public final class SharedSchemas {
 
     public static final Schema BIRTHDAY = Schema.createTimestamp(
-        ShapeId.from("smithy.example#Birthday"),
-        new SensitiveTrait()
-    );
+            ShapeId.from("smithy.example#Birthday"),
+            new SensitiveTrait());
 
     public static final Schema LIST_OF_STRING = Schema.listBuilder(ShapeId.from("smithy.example#ListOfString"))
-        .putMember("member", PreludeSchemas.STRING)
-        .build();
+            .putMember("member", PreludeSchemas.STRING)
+            .build();
 
     public static final Schema MAP_LIST_STRING = Schema.mapBuilder(ShapeId.from("smithy.example#StringsMap"))
-        .putMember("key", PreludeSchemas.STRING)
-        .putMember("value", LIST_OF_STRING)
-        .build();
+            .putMember("key", PreludeSchemas.STRING)
+            .putMember("value", LIST_OF_STRING)
+            .build();
 
     private SharedSchemas() {}
 }

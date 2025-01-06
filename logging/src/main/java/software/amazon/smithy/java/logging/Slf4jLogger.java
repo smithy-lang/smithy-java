@@ -109,14 +109,14 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5
     ) {
         if (isEnabled(level)) {
             logBuilder(level).log(message, p0, p1, p2, p3, p4, p5);
@@ -125,15 +125,15 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6
     ) {
         if (isEnabled(level)) {
             logBuilder(level).log(message, p0, p1, p2, p3, p4, p5, p6);
@@ -142,16 +142,16 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7
     ) {
         if (isEnabled(level)) {
             logBuilder(level).log(message, p0, p1, p2, p3, p4, p5, p6, p7);
@@ -160,17 +160,17 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     ) {
         if (isEnabled(level)) {
             logBuilder(level).log(message, p0, p1, p2, p3, p4, p5, p6, p7, p8);
@@ -179,18 +179,18 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     ) {
         if (isEnabled(level)) {
             logBuilder(level).log(message, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9);
@@ -262,15 +262,15 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void trace(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7
     ) {
         if (log.isTraceEnabled()) {
             log.trace(message, p0, p1, p2, p3, p4, p5, p6, p7);
@@ -279,16 +279,16 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void trace(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     ) {
         if (log.isTraceEnabled()) {
             log.trace(message, p0, p1, p2, p3, p4, p5, p6, p7, p8);
@@ -297,17 +297,17 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void trace(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     ) {
         if (log.isTraceEnabled()) {
             log.trace(message, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9);
@@ -379,15 +379,15 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void debug(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7
     ) {
         if (log.isDebugEnabled()) {
             log.debug(message, p0, p1, p2, p3, p4, p5, p6, p7);
@@ -396,16 +396,16 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void debug(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     ) {
         if (log.isDebugEnabled()) {
             log.debug(message, p0, p1, p2, p3, p4, p5, p6, p7, p8);
@@ -414,17 +414,17 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void debug(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     ) {
         if (log.isDebugEnabled()) {
             log.debug(message, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9);
@@ -496,15 +496,15 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void info(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7
     ) {
         if (log.isInfoEnabled()) {
             log.info(message, p0, p1, p2, p3, p4, p5, p6, p7);
@@ -513,16 +513,16 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void info(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     ) {
         if (log.isInfoEnabled()) {
             log.info(message, p0, p1, p2, p3, p4, p5, p6, p7, p8);
@@ -531,17 +531,17 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void info(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     ) {
         if (log.isInfoEnabled()) {
             log.info(message, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9);
@@ -613,15 +613,15 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void warn(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7
     ) {
         if (log.isWarnEnabled()) {
             log.warn(message, p0, p1, p2, p3, p4, p5, p6, p7);
@@ -630,16 +630,16 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void warn(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     ) {
         if (log.isWarnEnabled()) {
             log.warn(message, p0, p1, p2, p3, p4, p5, p6, p7, p8);
@@ -648,17 +648,17 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void warn(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     ) {
         if (log.isWarnEnabled()) {
             log.warn(message, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9);
@@ -732,15 +732,15 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void error(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7
     ) {
         if (log.isErrorEnabled()) {
             log.error(message, p0, p1, p2, p3, p4, p5, p6, p7);
@@ -749,16 +749,16 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void error(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     ) {
         if (log.isErrorEnabled()) {
             log.error(message, p0, p1, p2, p3, p4, p5, p6, p7, p8);
@@ -767,17 +767,17 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void error(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     ) {
         if (log.isErrorEnabled()) {
             log.error(message, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9);
@@ -849,15 +849,15 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void fatal(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7
     ) {
         if (log.isErrorEnabled(FATAL)) {
             log.error(FATAL, message, p0, p1, p2, p3, p4, p5, p6, p7);
@@ -866,16 +866,16 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void fatal(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     ) {
         if (log.isErrorEnabled(FATAL)) {
             log.error(FATAL, message, p0, p1, p2, p3, p4, p5, p6, p7, p8);
@@ -884,17 +884,17 @@ final class Slf4jLogger implements InternalLogger {
 
     @Override
     public void fatal(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     ) {
         if (log.isErrorEnabled(FATAL)) {
             log.error(FATAL, message, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9);

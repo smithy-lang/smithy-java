@@ -24,9 +24,10 @@ public class ServiceMatcher {
         this.routes = routes;
         if (routes.size() == 1) {
             var def = routes.get(0);
-            if (def.getHostName() == null && def.getPort() == null && def.getProtocol() == null && "/".equals(
-                def.getPathPrefix()
-            )) {
+            if (def.getHostName() == null && def.getPort() == null
+                    && def.getProtocol() == null
+                    && "/".equals(
+                            def.getPathPrefix())) {
                 defaultServices = def.getServices();
             } else {
                 defaultServices = null;

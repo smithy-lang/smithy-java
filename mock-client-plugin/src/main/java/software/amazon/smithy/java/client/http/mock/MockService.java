@@ -20,7 +20,7 @@ import software.amazon.smithy.java.server.Service;
 final class MockService implements Service {
     @Override
     public <I extends SerializableStruct, O extends SerializableStruct> Operation<I, O> getOperation(
-        String operationName
+            String operationName
     ) {
         throw new UnsupportedOperationException();
     }

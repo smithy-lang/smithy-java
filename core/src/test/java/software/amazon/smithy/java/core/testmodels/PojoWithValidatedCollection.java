@@ -26,19 +26,19 @@ public final class PojoWithValidatedCollection implements SerializableStruct {
 
     private static final ShapeId MAP_OF_VALIDATED_POJO_ID = ShapeId.from("smithy.example#MapOfValidatedPojo");
     private static final Schema MAP_OF_VALIDATED_POJO = Schema.mapBuilder(MAP_OF_VALIDATED_POJO_ID)
-        .putMember("key", PreludeSchemas.STRING)
-        .putMember("value", ValidatedPojo.SCHEMA)
-        .build();
+            .putMember("key", PreludeSchemas.STRING)
+            .putMember("value", ValidatedPojo.SCHEMA)
+            .build();
     private static final Schema MAP_OF_VALIDATED_POJO_KEY = MAP_OF_VALIDATED_POJO.member("key");
     private static final Schema LIST_OF_VALIDATED_POJO = Schema
-        .listBuilder(ShapeId.from("smithy.example#ListOfValidatedPojo"))
-        .putMember("member", ValidatedPojo.SCHEMA)
-        .build();
+            .listBuilder(ShapeId.from("smithy.example#ListOfValidatedPojo"))
+            .putMember("member", ValidatedPojo.SCHEMA)
+            .build();
 
     static final Schema SCHEMA = Schema.structureBuilder(ID)
-        .putMember("map", MAP_OF_VALIDATED_POJO, new RequiredTrait())
-        .putMember("list", LIST_OF_VALIDATED_POJO, new RequiredTrait())
-        .build();
+            .putMember("map", MAP_OF_VALIDATED_POJO, new RequiredTrait())
+            .putMember("list", LIST_OF_VALIDATED_POJO, new RequiredTrait())
+            .build();
     private static final Schema SCHEMA_MAP = SCHEMA.member("map");
     private static final Schema SCHEMA_LIST = SCHEMA.member("list");
 

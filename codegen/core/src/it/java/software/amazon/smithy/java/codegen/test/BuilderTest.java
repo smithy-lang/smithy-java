@@ -18,22 +18,22 @@ public class BuilderTest {
     @Test
     public void testToBuilderList() {
         ListMembersInput original = ListMembersInput.builder()
-            .requiredList(List.of("A"))
-            .build();
+                .requiredList(List.of("A"))
+                .build();
         var copy = original.toBuilder().optionalList(List.of("1")).build();
         assertThat(copy)
-            .returns(original.requiredList(), ListMembersInput::requiredList)
-            .returns(List.of("1"), ListMembersInput::optionalList);
+                .returns(original.requiredList(), ListMembersInput::requiredList)
+                .returns(List.of("1"), ListMembersInput::optionalList);
     }
 
     @Test
     public void testToBuilderMap() {
         MapMembersInput original = MapMembersInput.builder()
-            .requiredMap(Map.of("A", "B"))
-            .build();
+                .requiredMap(Map.of("A", "B"))
+                .build();
         var copy = original.toBuilder().optionalMap(Map.of("1", "2")).build();
         assertThat(copy)
-            .returns(original.requiredMap(), MapMembersInput::requiredMap)
-            .returns(Map.of("1", "2"), MapMembersInput::optionalMap);
+                .returns(original.requiredMap(), MapMembersInput::requiredMap)
+                .returns(Map.of("1", "2"), MapMembersInput::optionalMap);
     }
 }

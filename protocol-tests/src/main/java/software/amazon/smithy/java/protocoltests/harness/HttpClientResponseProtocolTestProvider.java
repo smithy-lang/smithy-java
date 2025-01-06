@@ -38,7 +38,7 @@ import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
  * usage instructions.
  */
 final class HttpClientResponseProtocolTestProvider extends
-    ProtocolTestProvider<HttpClientResponseTests, ProtocolTestExtension.SharedClientTestData> {
+        ProtocolTestProvider<HttpClientResponseTests, ProtocolTestExtension.SharedClientTestData> {
 
     @Override
     protected Class<HttpClientResponseTests> getAnnotationType() {
@@ -53,63 +53,63 @@ final class HttpClientResponseProtocolTestProvider extends
     @Override
     @SuppressWarnings("unchecked")
     protected Stream<TestTemplateInvocationContext> generateProtocolTests(
-        ProtocolTestExtension.SharedClientTestData store,
-        HttpClientResponseTests annotation,
-        TestFilter filter
+            ProtocolTestExtension.SharedClientTestData store,
+            HttpClientResponseTests annotation,
+            TestFilter filter
     ) {
         return store.operations()
-            .stream()
-            .flatMap(
-                operation -> operation.responseTestCases()
-                    .stream()
-                    .map(protocolTestCase -> {
-                        var testCase = protocolTestCase.responseTestCase();
-                        if (filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)) {
-                            return new IgnoredTestCase(testCase);
-                        }
-                        boolean isErrorTestCase = protocolTestCase.isErrorTest();
-                        // Get specific values to use for this test case's context
-                        var testProtocol = store.getProtocol(testCase.getProtocol());
-                        var testResolver = testCase.getAuthScheme().isEmpty()
-                            ? AuthSchemeResolver.NO_AUTH
-                            : (AuthSchemeResolver) p -> List.of(new AuthSchemeOption(testCase.getAuthScheme().get()));
-                        var testTransport = new TestTransport(testCase);
+                .stream()
+                .flatMap(
+                        operation -> operation.responseTestCases()
+                                .stream()
+                                .map(protocolTestCase -> {
+                                    var testCase = protocolTestCase.responseTestCase();
+                                    if (filter.skipOperation(operation.id()) || filter.skipTestCase(testCase)) {
+                                        return new IgnoredTestCase(testCase);
+                                    }
+                                    boolean isErrorTestCase = protocolTestCase.isErrorTest();
+                                    // Get specific values to use for this test case's context
+                                    var testProtocol = store.getProtocol(testCase.getProtocol());
+                                    var testResolver = testCase.getAuthScheme().isEmpty()
+                                            ? AuthSchemeResolver.NO_AUTH
+                                            : (AuthSchemeResolver) p -> List
+                                                    .of(new AuthSchemeOption(testCase.getAuthScheme().get()));
+                                    var testTransport = new TestTransport(testCase);
 
-                        var placeholderTransport = (MockClient.PlaceHolderTransport<HttpRequest, HttpResponse>) store
-                            .mockClient()
-                            .config()
-                            .transport();
-                        placeholderTransport.setTransport(testTransport);
+                                    var placeholderTransport =
+                                            (MockClient.PlaceHolderTransport<HttpRequest, HttpResponse>) store
+                                                    .mockClient()
+                                                    .config()
+                                                    .transport();
+                                    placeholderTransport.setTransport(testTransport);
 
-                        var overrideBuilder = RequestOverrideConfig.builder()
-                            .protocol(testProtocol)
-                            .authSchemeResolver(testResolver);
-                        var input = operation.operationModel().inputBuilder().errorCorrection().build();
-                        var outputBuilder = protocolTestCase.outputBuilder().get();
-                        new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
-                            .deserializeInto(outputBuilder);
-                        return new ResponseTestInvocationContext(
-                            testCase,
-                            store.mockClient(),
-                            operation.operationModel(),
-                            input,
-                            outputBuilder.build(),
-                            overrideBuilder.build(),
-                            isErrorTestCase
-                        );
-                    })
-            );
+                                    var overrideBuilder = RequestOverrideConfig.builder()
+                                            .protocol(testProtocol)
+                                            .authSchemeResolver(testResolver);
+                                    var input = operation.operationModel().inputBuilder().errorCorrection().build();
+                                    var outputBuilder = protocolTestCase.outputBuilder().get();
+                                    new ProtocolTestDocument(testCase.getParams(),
+                                            testCase.getBodyMediaType().orElse(null))
+                                            .deserializeInto(outputBuilder);
+                                    return new ResponseTestInvocationContext(
+                                            testCase,
+                                            store.mockClient(),
+                                            operation.operationModel(),
+                                            input,
+                                            outputBuilder.build(),
+                                            overrideBuilder.build(),
+                                            isErrorTestCase);
+                                }));
     }
 
     record ResponseTestInvocationContext(
-        HttpResponseTestCase testCase,
-        MockClient mockClient,
-        ApiOperation apiOperation,
-        SerializableStruct input,
-        SerializableStruct expectedOutput,
-        RequestOverrideConfig overrideConfig,
-        boolean isErrorTestCase
-    ) implements TestTemplateInvocationContext {
+            HttpResponseTestCase testCase,
+            MockClient mockClient,
+            ApiOperation apiOperation,
+            SerializableStruct input,
+            SerializableStruct expectedOutput,
+            RequestOverrideConfig overrideConfig,
+            boolean isErrorTestCase) implements TestTemplateInvocationContext {
 
         @Override
         public String getDisplayName(int invocationIndex) {
@@ -133,20 +133,20 @@ final class HttpClientResponseProtocolTestProvider extends
                     }
                 }
                 assertThat(actualOutput)
-                    .usingRecursiveComparison(ComparisonUtils.getComparisonConfig())
-                    .isEqualTo(expectedOutput);
+                        .usingRecursiveComparison(ComparisonUtils.getComparisonConfig())
+                        .isEqualTo(expectedOutput);
             });
         }
     }
 
     private record TestTransport(HttpResponseTestCase testCase) implements
-        ClientTransport<HttpRequest, HttpResponse> {
+            ClientTransport<HttpRequest, HttpResponse> {
 
         @Override
         public CompletableFuture<HttpResponse> send(Context context, HttpRequest request) {
             var builder = HttpResponse.builder()
-                .httpVersion(HttpVersion.HTTP_1_1)
-                .statusCode(testCase.getCode());
+                    .httpVersion(HttpVersion.HTTP_1_1)
+                    .statusCode(testCase.getCode());
 
             // Add headers
             Map<String, List<String>> headerMap = new HashMap<>();

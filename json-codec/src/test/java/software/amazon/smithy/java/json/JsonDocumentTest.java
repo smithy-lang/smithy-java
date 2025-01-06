@@ -197,27 +197,26 @@ public class JsonDocumentTest {
 
     public static List<Arguments> failToConvertSource() {
         return List.of(
-            Arguments.of("1", (Consumer<Document>) Document::asBoolean),
-            Arguments.of("1", (Consumer<Document>) Document::asBlob),
-            Arguments.of("1", (Consumer<Document>) Document::asString),
-            Arguments.of("1", (Consumer<Document>) Document::asList),
-            Arguments.of("1", (Consumer<Document>) Document::asStringMap),
-            Arguments.of("1", (Consumer<Document>) Document::asBlob),
+                Arguments.of("1", (Consumer<Document>) Document::asBoolean),
+                Arguments.of("1", (Consumer<Document>) Document::asBlob),
+                Arguments.of("1", (Consumer<Document>) Document::asString),
+                Arguments.of("1", (Consumer<Document>) Document::asList),
+                Arguments.of("1", (Consumer<Document>) Document::asStringMap),
+                Arguments.of("1", (Consumer<Document>) Document::asBlob),
 
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asBoolean),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asList),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asStringMap),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asBlob),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asBoolean),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asByte),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asShort),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asInteger),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asLong),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asFloat),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asDouble),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asBigInteger),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asBigDecimal)
-        );
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asBoolean),
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asList),
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asStringMap),
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asBlob),
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asBoolean),
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asByte),
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asShort),
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asInteger),
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asLong),
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asFloat),
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asDouble),
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asBigInteger),
+                Arguments.of("\"1\"", (Consumer<Document>) Document::asBigDecimal));
     }
 
     @ParameterizedTest
@@ -250,13 +249,12 @@ public class JsonDocumentTest {
 
     public static List<Arguments> serializeContentSource() {
         return List.of(
-            Arguments.of("true"),
-            Arguments.of("false"),
-            Arguments.of("1"),
-            Arguments.of("1.1"),
-            Arguments.of("[1,2,3]"),
-            Arguments.of("{\"a\":1,\"b\":[1,true,-20,\"hello\"]}")
-        );
+                Arguments.of("true"),
+                Arguments.of("false"),
+                Arguments.of("1"),
+                Arguments.of("1.1"),
+                Arguments.of("[1,2,3]"),
+                Arguments.of("{\"a\":1,\"b\":[1,true,-20,\"hello\"]}"));
     }
 
     @Test
@@ -299,15 +297,15 @@ public class JsonDocumentTest {
         private static final ShapeId ID = ShapeId.from("smithy.example#Foo");
 
         private static final Schema NUMBERS_LIST = Schema.listBuilder(ShapeId.from("smithy.example#Numbers"))
-            .putMember("member", PreludeSchemas.INTEGER)
-            .build();
+                .putMember("member", PreludeSchemas.INTEGER)
+                .build();
 
         private static final Schema SCHEMA = Schema.structureBuilder(ID)
-            .putMember("name", PreludeSchemas.STRING)
-            .putMember("binary", PreludeSchemas.BLOB, new JsonNameTrait("BINARY"))
-            .putMember("date", PreludeSchemas.TIMESTAMP, new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
-            .putMember("numbers", NUMBERS_LIST)
-            .build();
+                .putMember("name", PreludeSchemas.STRING)
+                .putMember("binary", PreludeSchemas.BLOB, new JsonNameTrait("BINARY"))
+                .putMember("date", PreludeSchemas.TIMESTAMP, new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
+                .putMember("numbers", NUMBERS_LIST)
+                .build();
 
         private static final Schema NAME = SCHEMA.member("name");
         private static final Schema BINARY = SCHEMA.member("binary");
@@ -384,29 +382,28 @@ public class JsonDocumentTest {
 
     public static List<Arguments> checkEqualitySource() {
         return List.of(
-            Arguments.of("1", "1", true),
-            Arguments.of("1", "1.1", false),
-            Arguments.of("true", "true", true),
-            Arguments.of("true", "false", false),
-            Arguments.of("1", "false", false),
-            Arguments.of("1", "\"1\"", false),
-            Arguments.of("\"foo\"", "\"foo\"", true),
-            Arguments.of("[\"foo\"]", "[\"foo\"]", true),
-            Arguments.of("{\"foo\":\"foo\"}", "{\"foo\":\"foo\"}", true),
-            Arguments.of("{\"foo\":\"foo\"}", "{\"foo\":\"bar\"}", false)
-        );
+                Arguments.of("1", "1", true),
+                Arguments.of("1", "1.1", false),
+                Arguments.of("true", "true", true),
+                Arguments.of("true", "false", false),
+                Arguments.of("1", "false", false),
+                Arguments.of("1", "\"1\"", false),
+                Arguments.of("\"foo\"", "\"foo\"", true),
+                Arguments.of("[\"foo\"]", "[\"foo\"]", true),
+                Arguments.of("{\"foo\":\"foo\"}", "{\"foo\":\"foo\"}", true),
+                Arguments.of("{\"foo\":\"foo\"}", "{\"foo\":\"bar\"}", false));
     }
 
     @Test
     public void onlyEqualIfBothUseTimestampFormat() {
         var de1 = JsonCodec.builder()
-            .useTimestampFormat(true)
-            .build()
-            .createDeserializer("1".getBytes(StandardCharsets.UTF_8));
+                .useTimestampFormat(true)
+                .build()
+                .createDeserializer("1".getBytes(StandardCharsets.UTF_8));
         var de2 = JsonCodec.builder()
-            .useTimestampFormat(false)
-            .build()
-            .createDeserializer("1".getBytes(StandardCharsets.UTF_8));
+                .useTimestampFormat(false)
+                .build()
+                .createDeserializer("1".getBytes(StandardCharsets.UTF_8));
 
         var leftValue = de1.readDocument();
         var rightValue = de2.readDocument();
@@ -417,13 +414,13 @@ public class JsonDocumentTest {
     @Test
     public void onlyEqualIfBothUseJsonName() {
         var de1 = JsonCodec.builder()
-            .useJsonName(true)
-            .build()
-            .createDeserializer("1".getBytes(StandardCharsets.UTF_8));
+                .useJsonName(true)
+                .build()
+                .createDeserializer("1".getBytes(StandardCharsets.UTF_8));
         var de2 = JsonCodec.builder()
-            .useJsonName(false)
-            .build()
-            .createDeserializer("1".getBytes(StandardCharsets.UTF_8));
+                .useJsonName(false)
+                .build()
+                .createDeserializer("1".getBytes(StandardCharsets.UTF_8));
 
         var leftValue = de1.readDocument();
         var rightValue = de2.readDocument();

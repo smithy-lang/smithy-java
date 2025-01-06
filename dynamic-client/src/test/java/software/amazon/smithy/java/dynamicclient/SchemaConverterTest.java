@@ -27,66 +27,66 @@ public class SchemaConverterTest {
     @BeforeAll
     public static void setup() {
         model = Model.assembler()
-            .addUnparsedModel("test.smithy", """
-                $version: "2"
-                namespace smithy.example
+                .addUnparsedModel("test.smithy", """
+                        $version: "2"
+                        namespace smithy.example
 
-                document MyDocument
-                string MyString
-                boolean MyBoolean
-                timestamp MyTimestamp
-                blob MyBlob
-                byte MyByte
-                short MyShort
-                integer MyInteger
-                long MyLong
-                float MyFloat
-                double MyDouble
-                bigInteger MyBigInteger
-                bigDecimal MyBigDecimal
+                        document MyDocument
+                        string MyString
+                        boolean MyBoolean
+                        timestamp MyTimestamp
+                        blob MyBlob
+                        byte MyByte
+                        short MyShort
+                        integer MyInteger
+                        long MyLong
+                        float MyFloat
+                        double MyDouble
+                        bigInteger MyBigInteger
+                        bigDecimal MyBigDecimal
 
-                intEnum MyIntEnum {
-                    foo = 1
-                    bar = 2
-                }
+                        intEnum MyIntEnum {
+                            foo = 1
+                            bar = 2
+                        }
 
-                enum MyEnum {
-                    foo = "a"
-                    bar = "b"
-                }
+                        enum MyEnum {
+                            foo = "a"
+                            bar = "b"
+                        }
 
-                list SimpleList {
-                    member: String
-                }
+                        list SimpleList {
+                            member: String
+                        }
 
-                map SimpleMap {
-                    key: MyString
-                    value: MyDocument
-                }
+                        map SimpleMap {
+                            key: MyString
+                            value: MyDocument
+                        }
 
-                structure SimpleStruct {
-                    foo: String
-                }
+                        structure SimpleStruct {
+                            foo: String
+                        }
 
-                union SimpleUnion {
-                    foo: String
-                }
+                        union SimpleUnion {
+                            foo: String
+                        }
 
-                list RecursiveList {
-                    member: RecursiveStructure
-                }
+                        list RecursiveList {
+                            member: RecursiveStructure
+                        }
 
-                map RecursiveMap {
-                    key: String
-                    value: RecursiveStructure
-                }
+                        map RecursiveMap {
+                            key: String
+                            value: RecursiveStructure
+                        }
 
-                structure RecursiveStructure {
-                    foo: RecursiveStructure
-                }
-                """)
-            .assemble()
-            .unwrap();
+                        structure RecursiveStructure {
+                            foo: RecursiveStructure
+                        }
+                        """)
+                .assemble()
+                .unwrap();
     }
 
     @MethodSource("convertsSimpleSchemasSource")
@@ -101,22 +101,21 @@ public class SchemaConverterTest {
 
     static List<Arguments> convertsSimpleSchemasSource() {
         return List.of(
-            Arguments.of(ShapeType.DOCUMENT, "MyDocument"),
-            Arguments.of(ShapeType.STRING, "MyString"),
-            Arguments.of(ShapeType.BOOLEAN, "MyBoolean"),
-            Arguments.of(ShapeType.TIMESTAMP, "MyTimestamp"),
-            Arguments.of(ShapeType.BLOB, "MyBlob"),
-            Arguments.of(ShapeType.BYTE, "MyByte"),
-            Arguments.of(ShapeType.SHORT, "MyShort"),
-            Arguments.of(ShapeType.INTEGER, "MyInteger"),
-            Arguments.of(ShapeType.LONG, "MyLong"),
-            Arguments.of(ShapeType.FLOAT, "MyFloat"),
-            Arguments.of(ShapeType.DOUBLE, "MyDouble"),
-            Arguments.of(ShapeType.BIG_INTEGER, "MyBigInteger"),
-            Arguments.of(ShapeType.BIG_DECIMAL, "MyBigDecimal"),
-            Arguments.of(ShapeType.ENUM, "MyEnum"),
-            Arguments.of(ShapeType.INT_ENUM, "MyIntEnum")
-        );
+                Arguments.of(ShapeType.DOCUMENT, "MyDocument"),
+                Arguments.of(ShapeType.STRING, "MyString"),
+                Arguments.of(ShapeType.BOOLEAN, "MyBoolean"),
+                Arguments.of(ShapeType.TIMESTAMP, "MyTimestamp"),
+                Arguments.of(ShapeType.BLOB, "MyBlob"),
+                Arguments.of(ShapeType.BYTE, "MyByte"),
+                Arguments.of(ShapeType.SHORT, "MyShort"),
+                Arguments.of(ShapeType.INTEGER, "MyInteger"),
+                Arguments.of(ShapeType.LONG, "MyLong"),
+                Arguments.of(ShapeType.FLOAT, "MyFloat"),
+                Arguments.of(ShapeType.DOUBLE, "MyDouble"),
+                Arguments.of(ShapeType.BIG_INTEGER, "MyBigInteger"),
+                Arguments.of(ShapeType.BIG_DECIMAL, "MyBigDecimal"),
+                Arguments.of(ShapeType.ENUM, "MyEnum"),
+                Arguments.of(ShapeType.INT_ENUM, "MyIntEnum"));
     }
 
     @MethodSource("convertsAggregateSchemasSource")
@@ -132,13 +131,12 @@ public class SchemaConverterTest {
 
     static List<Arguments> convertsAggregateSchemasSource() {
         return List.of(
-            Arguments.of(ShapeType.LIST, "SimpleList"),
-            Arguments.of(ShapeType.MAP, "SimpleMap"),
-            Arguments.of(ShapeType.STRUCTURE, "SimpleStruct"),
-            Arguments.of(ShapeType.UNION, "SimpleUnion"),
-            Arguments.of(ShapeType.LIST, "RecursiveList"),
-            Arguments.of(ShapeType.MAP, "RecursiveMap"),
-            Arguments.of(ShapeType.STRUCTURE, "RecursiveStructure")
-        );
+                Arguments.of(ShapeType.LIST, "SimpleList"),
+                Arguments.of(ShapeType.MAP, "SimpleMap"),
+                Arguments.of(ShapeType.STRUCTURE, "SimpleStruct"),
+                Arguments.of(ShapeType.UNION, "SimpleUnion"),
+                Arguments.of(ShapeType.LIST, "RecursiveList"),
+                Arguments.of(ShapeType.MAP, "RecursiveMap"),
+                Arguments.of(ShapeType.STRUCTURE, "RecursiveStructure"));
     }
 }

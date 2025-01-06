@@ -22,10 +22,9 @@ import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
  * @param malformedRequestTestCases A list of malformed test cases attached to the operation.
  */
 record HttpTestOperation(
-    ShapeId id,
-    ShapeId serviceId,
-    ApiOperation<?, ?> operationModel,
-    List<HttpRequestTestCase> requestTestCases,
-    List<HttpResponseProtocolTestCase> responseTestCases,
-    List<HttpMalformedRequestTestCase> malformedRequestTestCases
-) {}
+        ShapeId id,
+        ShapeId serviceId,
+        ApiOperation<?, ?> operationModel,
+        List<HttpRequestTestCase> requestTestCases,
+        List<HttpResponseProtocolTestCase> responseTestCases,
+        List<HttpMalformedRequestTestCase> malformedRequestTestCases) {}

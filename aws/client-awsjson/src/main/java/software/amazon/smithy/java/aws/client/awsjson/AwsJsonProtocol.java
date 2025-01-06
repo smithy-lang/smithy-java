@@ -45,54 +45,51 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
         this.codec = JsonCodec.builder().defaultNamespace(service.getNamespace()).build();
 
         this.errorDeserializer = HttpErrorDeserializer.builder()
-            .codec(codec)
-            .serviceId(service)
-            .headerErrorExtractor(new AmznErrorHeaderExtractor())
-            .build();
+                .codec(codec)
+                .serviceId(service)
+                .headerErrorExtractor(new AmznErrorHeaderExtractor())
+                .build();
     }
 
     protected abstract String contentType();
 
     @Override
     public <I extends SerializableStruct, O extends SerializableStruct> HttpRequest createRequest(
-        ApiOperation<I, O> operation,
-        I input,
-        Context context,
-        URI endpoint
+            ApiOperation<I, O> operation,
+            I input,
+            Context context,
+            URI endpoint
     ) {
         var target = service.getName() + "." + operation.schema().id().getName();
         var builder = HttpRequest.builder();
         builder.method("POST");
         builder.uri(endpoint);
         builder.headers(
-            HttpHeaders.of(
-                Map.of(
-                    "x-amz-target",
-                    List.of(target),
-                    "content-type",
-                    List.of(contentType())
-                )
-            )
-        );
+                HttpHeaders.of(
+                        Map.of(
+                                "x-amz-target",
+                                List.of(target),
+                                "content-type",
+                                List.of(contentType()))));
 
         return builder.body(DataStream.ofByteBuffer(codec.serialize(input), contentType())).build();
     }
 
     @Override
     public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
-        ApiOperation<I, O> operation,
-        Context context,
-        TypeRegistry typeRegistry,
-        HttpRequest request,
-        HttpResponse response
+            ApiOperation<I, O> operation,
+            Context context,
+            TypeRegistry typeRegistry,
+            HttpRequest request,
+            HttpResponse response
     ) {
         // Is it an error?
         if (response.statusCode() != 200) {
             return errorDeserializer
-                .createError(context, operation.schema().id(), typeRegistry, response)
-                .thenApply(e -> {
-                    throw e;
-                });
+                    .createError(context, operation.schema().id(), typeRegistry, response)
+                    .thenApply(e -> {
+                        throw e;
+                    });
         }
 
         var builder = operation.outputBuilder();

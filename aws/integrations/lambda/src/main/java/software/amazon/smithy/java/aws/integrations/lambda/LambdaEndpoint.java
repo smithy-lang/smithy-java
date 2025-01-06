@@ -102,8 +102,8 @@ public final class LambdaEndpoint implements RequestHandler<ProxyRequest, ProxyR
         }
         URI uri;
         if (proxyRequest.getMultiValueQueryStringParameters() != null && !proxyRequest
-            .getMultiValueQueryStringParameters()
-            .isEmpty()) {
+                .getMultiValueQueryStringParameters()
+                .isEmpty()) {
             // TODO: handle single-value params?
             // -- APIGW puts the actual params in both, but only the latest param per key
             Map<String, List<String>> params = proxyRequest.getMultiValueQueryStringParameters();
@@ -140,8 +140,10 @@ public final class LambdaEndpoint implements RequestHandler<ProxyRequest, ProxyR
 
     private static HttpJob getJob(HttpRequest request, ProtocolResolver resolver) {
         ServiceProtocolResolutionResult resolutionResult = resolver.resolve(
-            new ServiceProtocolResolutionRequest(request.uri(), request.headers(), request.context(), request.method())
-        );
+                new ServiceProtocolResolutionRequest(request.uri(),
+                        request.headers(),
+                        request.context(),
+                        request.method()));
         HttpResponse response = new HttpResponse((ModifiableHttpHeaders) request.headers());
         HttpJob job = new HttpJob(resolutionResult.operation(), resolutionResult.protocol(), request, response);
         return job;
@@ -150,8 +152,8 @@ public final class LambdaEndpoint implements RequestHandler<ProxyRequest, ProxyR
     private static ProxyResponse getResponse(HttpResponse httpResponse, boolean shouldBase64Encode) {
         // TODO: Add response headers
         ProxyResponse.Builder builder = ProxyResponse.builder()
-            .multiValueHeaders(httpResponse.headers().map())
-            .statusCode(httpResponse.getStatusCode());
+                .multiValueHeaders(httpResponse.headers().map())
+                .statusCode(httpResponse.getStatusCode());
 
         DataStream val = httpResponse.getSerializedValue();
         if (val != null) {

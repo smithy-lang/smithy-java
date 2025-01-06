@@ -19,9 +19,9 @@ final class CustomAuthSigner implements Signer<HttpRequest, TokenIdentity> {
 
     @Override
     public CompletableFuture<HttpRequest> sign(
-        HttpRequest request,
-        TokenIdentity identity,
-        AuthProperties properties
+            HttpRequest request,
+            TokenIdentity identity,
+            AuthProperties properties
     ) {
         var headers = request.headers().toModifiable();
         headers.putHeader(AUTHORIZATION_HEADER, identity.token());

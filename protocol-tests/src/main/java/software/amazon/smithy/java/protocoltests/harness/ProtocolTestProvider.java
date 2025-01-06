@@ -46,16 +46,14 @@ abstract class ProtocolTestProvider<T extends Annotation, D> implements TestTemp
         var store = ProtocolTestExtension.getSharedTestData(outerContext, getSharedTestDataType());
         if (store == null) {
             throw new IllegalStateException(
-                "Cannot execute protocol tests as no shared data store was found. Add "
-                    + "`ProtocolTest` annotation to test class to initialize data store."
-            );
+                    "Cannot execute protocol tests as no shared data store was found. Add "
+                            + "`ProtocolTest` annotation to test class to initialize data store.");
         }
 
         return generateProtocolTests(
-            store,
-            context.getRequiredTestMethod().getAnnotation(getAnnotationType()),
-            filter.combine(outerFilter)
-        );
+                store,
+                context.getRequiredTestMethod().getAnnotation(getAnnotationType()),
+                filter.combine(outerFilter));
     }
 
     protected abstract Class<T> getAnnotationType();
@@ -63,8 +61,8 @@ abstract class ProtocolTestProvider<T extends Annotation, D> implements TestTemp
     protected abstract Class<D> getSharedTestDataType();
 
     protected abstract Stream<TestTemplateInvocationContext> generateProtocolTests(
-        D testData,
-        T annotation,
-        TestFilter filter
+            D testData,
+            T annotation,
+            TestFilter filter
     );
 }

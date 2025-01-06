@@ -53,14 +53,13 @@ final class MemberSchemaBuilder {
 
         this.isRequiredByValidation = computeIsRequired();
         this.validationState = SchemaBuilder.ValidationState.of(
-            type,
-            this.traits,
-            target == null ? Collections.emptySet() : target.stringEnumValues()
-        );
+                type,
+                this.traits,
+                target == null ? Collections.emptySet() : target.stringEnumValues());
 
         requiredMemberCount = target != null
-            ? target.requiredMemberCount
-            : SchemaBuilder.computeRequiredMemberCount(type, targetBuilder.members);
+                ? target.requiredMemberCount
+                : SchemaBuilder.computeRequiredMemberCount(type, targetBuilder.members);
     }
 
     private void validateTarget(ShapeId targetId, boolean isMember) {

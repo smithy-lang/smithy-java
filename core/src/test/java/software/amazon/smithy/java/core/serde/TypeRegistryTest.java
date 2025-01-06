@@ -23,8 +23,8 @@ public class TypeRegistryTest {
     @Test
     public void deserializesFromRegistryToSpecificClass() {
         TypeRegistry registry = TypeRegistry.builder()
-            .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
-            .build();
+                .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
+                .build();
 
         assertThat(registry.createBuilder(ShapeId.from("smithy.example#Foo"), Person.class), is(nullValue()));
         assertThat(registry.createBuilder(ShapeId.from("smithy.example#Person"), Person.class), not(nullValue()));
@@ -33,8 +33,8 @@ public class TypeRegistryTest {
     @Test
     public void deserializesFromRegistryWithJustId() {
         TypeRegistry registry = TypeRegistry.builder()
-            .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
-            .build();
+                .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
+                .build();
 
         assertThat(registry.createBuilder(ShapeId.from("smithy.example#Person")), not(nullValue()));
         assertThat(registry.createBuilder(ShapeId.from("smithy.example#Foo")), is(nullValue()));
@@ -43,24 +43,23 @@ public class TypeRegistryTest {
     @Test
     public void throwsIfTypeIsIncompatible() {
         TypeRegistry registry = TypeRegistry.builder()
-            .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
-            .build();
+                .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
+                .build();
 
         Assertions.assertThrows(
-            SerializationException.class,
-            () -> registry.createBuilder(ShapeId.from("smithy.example#Person"), Bird.class)
-        );
+                SerializationException.class,
+                () -> registry.createBuilder(ShapeId.from("smithy.example#Person"), Bird.class));
     }
 
     @Test
     public void composesRegistries() {
         TypeRegistry a = TypeRegistry.builder()
-            .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
-            .build();
+                .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
+                .build();
 
         TypeRegistry b = TypeRegistry.builder()
-            .putType(ShapeId.from("smithy.example#Bird"), Bird.class, Bird::builder)
-            .build();
+                .putType(ShapeId.from("smithy.example#Bird"), Bird.class, Bird::builder)
+                .build();
 
         TypeRegistry registry = TypeRegistry.compose(a, b);
 
@@ -72,8 +71,8 @@ public class TypeRegistryTest {
     @Test
     public void deserializesDocumentsFromRegistry() {
         TypeRegistry registry = TypeRegistry.builder()
-            .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
-            .build();
+                .putType(ShapeId.from("smithy.example#Person"), Person.class, Person::builder)
+                .build();
         var person = Person.builder().name("Phreddie").build();
         var document = Document.of(person);
         var deserialized = registry.deserialize(document);

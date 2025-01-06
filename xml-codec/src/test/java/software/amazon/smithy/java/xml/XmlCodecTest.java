@@ -29,16 +29,16 @@ public class XmlCodecTest {
     @Test
     public void deserializesXml() {
         var xml = """
-            <Foo>
-                <date>2006-03-01T00:00:00Z</date>
-                <name>Hello</name>
-                <numbers>
-                    <member>1</member>
-                    <member>2</member>
-                    <member>3</member>
-                </numbers>
-            </Foo>
-            """;
+                <Foo>
+                    <date>2006-03-01T00:00:00Z</date>
+                    <name>Hello</name>
+                    <numbers>
+                        <member>1</member>
+                        <member>2</member>
+                        <member>3</member>
+                    </numbers>
+                </Foo>
+                """;
 
         try (var codec = XmlCodec.builder().build()) {
             var pojo = codec.deserializeShape(xml, new TestPojo.Builder());
@@ -59,11 +59,9 @@ public class XmlCodecTest {
 
             var xml = codec.serializeToString(pojo);
             assertThat(
-                xml,
-                equalTo(
-                    "<Foo><name>Hello</name><date>2006-03-01T00:00:00Z</date><numbers><member>1</member><member>2</member><member>3</member></numbers></Foo>"
-                )
-            );
+                    xml,
+                    equalTo(
+                            "<Foo><name>Hello</name><date>2006-03-01T00:00:00Z</date><numbers><member>1</member><member>2</member><member>3</member></numbers></Foo>"));
         }
     }
 
@@ -72,15 +70,15 @@ public class XmlCodecTest {
         private static final ShapeId ID = ShapeId.from("smithy.example#Foo");
 
         private static final Schema NUMBERS_LIST = Schema.listBuilder(ShapeId.from("smithy.example#Numbers"))
-            .putMember("member", PreludeSchemas.INTEGER)
-            .build();
+                .putMember("member", PreludeSchemas.INTEGER)
+                .build();
 
         private static final Schema SCHEMA = Schema.structureBuilder(ID)
-            .putMember("name", PreludeSchemas.STRING)
-            .putMember("binary", PreludeSchemas.BLOB, new JsonNameTrait("BINARY"))
-            .putMember("date", PreludeSchemas.TIMESTAMP, new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
-            .putMember("numbers", NUMBERS_LIST)
-            .build();
+                .putMember("name", PreludeSchemas.STRING)
+                .putMember("binary", PreludeSchemas.BLOB, new JsonNameTrait("BINARY"))
+                .putMember("date", PreludeSchemas.TIMESTAMP, new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME))
+                .putMember("numbers", NUMBERS_LIST)
+                .build();
 
         private static final Schema NAME = SCHEMA.member("name");
         private static final Schema BINARY = SCHEMA.member("binary");

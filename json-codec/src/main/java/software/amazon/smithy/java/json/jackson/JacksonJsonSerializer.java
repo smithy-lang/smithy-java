@@ -32,8 +32,8 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     private final ShapeSerializer structSerializer = new JsonStructSerializer();
 
     JacksonJsonSerializer(
-        JsonGenerator generator,
-        JsonSettings settings
+            JsonGenerator generator,
+            JsonSettings settings
     ) {
         this.generator = generator;
         this.settings = settings;
@@ -254,10 +254,10 @@ final class JacksonJsonSerializer implements ShapeSerializer {
     private final class JsonMapSerializer implements MapSerializer {
         @Override
         public <T> void writeEntry(
-            Schema keySchema,
-            String key,
-            T state,
-            BiConsumer<T, ShapeSerializer> valueSerializer
+                Schema keySchema,
+                String key,
+                T state,
+                BiConsumer<T, ShapeSerializer> valueSerializer
         ) {
             try {
                 generator.writeFieldName(key);

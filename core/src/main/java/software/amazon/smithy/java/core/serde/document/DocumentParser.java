@@ -126,10 +126,10 @@ public final class DocumentParser implements ShapeSerializer {
 
         @Override
         public <U> void writeEntry(
-            Schema keySchema,
-            String key,
-            U keyState,
-            BiConsumer<U, ShapeSerializer> valueSerializer
+                Schema keySchema,
+                String key,
+                U keyState,
+                BiConsumer<U, ShapeSerializer> valueSerializer
         ) {
             DocumentParser valueParser = new DocumentParser();
             valueSerializer.accept(keyState, valueParser);

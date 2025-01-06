@@ -19,7 +19,6 @@ import software.amazon.smithy.utils.CodeSection;
  * @param operation Operation that java docs are being added to.
  */
 public record OperationSection(
-    OperationShape operation,
-    SymbolProvider symbolProvider,
-    Model model
-) implements CodeSection, DocumentedSection {}
+        OperationShape operation,
+        SymbolProvider symbolProvider,
+        Model model) implements CodeSection, DocumentedSection {}

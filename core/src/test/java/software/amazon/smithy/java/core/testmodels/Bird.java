@@ -18,8 +18,8 @@ public final class Bird implements SerializableStruct {
 
     public static final ShapeId ID = ShapeId.from("smithy.example#Bird");
     public static final Schema SCHEMA = Schema.structureBuilder(ID)
-        .putMember("name", PreludeSchemas.STRING)
-        .build();
+            .putMember("name", PreludeSchemas.STRING)
+            .build();
     public static final Schema SCHEMA_NAME = SCHEMA.member("name");
 
     private final String name;

@@ -57,11 +57,11 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
     private final CodeGenerationContext context;
 
     public SchemaGenerator(
-        JavaWriter writer,
-        Shape shape,
-        SymbolProvider symbolProvider,
-        Model model,
-        CodeGenerationContext context
+            JavaWriter writer,
+            Shape shape,
+            SymbolProvider symbolProvider,
+            Model model,
+            CodeGenerationContext context
     ) {
         this.writer = writer;
         this.shape = shape;
@@ -87,68 +87,61 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
     @Override
     public Void blobShape(BlobShape blobShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBlob(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBlob(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
     @Override
     public Void booleanShape(BooleanShape booleanShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBoolean(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBoolean(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
     @Override
     public Void listShape(ListShape shape) {
         writer.write(
-            """
-                static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.listBuilder(${shapeId:T}.from(${id:S})${traits:C})${/recursive}
-                    ${C|}
-                    .build();
-                """,
-            (Runnable) () -> shape.getMember().accept(this)
-        );
+                """
+                        static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.listBuilder(${shapeId:T}.from(${id:S})${traits:C})${/recursive}
+                            ${C|}
+                            .build();
+                        """,
+                (Runnable) () -> shape.getMember().accept(this));
         return null;
     }
 
     @Override
     public Void mapShape(MapShape shape) {
         writer.write(
-            """
-                static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.mapBuilder(${shapeId:T}.from(${id:S})${traits:C})${/recursive}
-                    ${C|}
-                    ${C|}
-                    .build();
-                """,
-            (Runnable) () -> shape.getKey().accept(this),
-            (Runnable) () -> shape.getValue().accept(this)
-        );
+                """
+                        static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.mapBuilder(${shapeId:T}.from(${id:S})${traits:C})${/recursive}
+                            ${C|}
+                            ${C|}
+                            .build();
+                        """,
+                (Runnable) () -> shape.getKey().accept(this),
+                (Runnable) () -> shape.getValue().accept(this));
         return null;
     }
 
     @Override
     public Void byteShape(ByteShape byteShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createByte(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createByte(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
     @Override
     public Void shortShape(ShortShape shortShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createShort(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createShort(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
     @Override
     public Void integerShape(IntegerShape integerShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createInteger(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createInteger(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
@@ -157,58 +150,52 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
         writer.putContext("variants", shape.members().stream().map(symbolProvider::toMemberName).toList());
         writer.putContext("set", Set.class);
         writer.write("""
-            public static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createIntEnum($$ID,
-                ${set:T}.of(${#variants}${value:L}.value${^key.last}, ${/key.last}${/variants})${traits:C}
-            );
-            """);
+                public static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createIntEnum($$ID,
+                    ${set:T}.of(${#variants}${value:L}.value${^key.last}, ${/key.last}${/variants})${traits:C}
+                );
+                """);
         return null;
     }
 
     @Override
     public Void longShape(LongShape longShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createLong(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createLong(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
     @Override
     public Void floatShape(FloatShape floatShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createFloat(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createFloat(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
     @Override
     public Void documentShape(DocumentShape documentShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createDocument(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createDocument(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
     @Override
     public Void doubleShape(DoubleShape doubleShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createDouble(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createDouble(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
     @Override
     public Void bigIntegerShape(BigIntegerShape bigIntegerShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBigInteger(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBigInteger(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
     @Override
     public Void bigDecimalShape(BigDecimalShape bigDecimalShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBigDecimal(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createBigDecimal(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
@@ -217,10 +204,10 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
         writer.putContext("variants", shape.members().stream().map(symbolProvider::toMemberName).toList());
         writer.putContext("set", Set.class);
         writer.write("""
-            public static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createEnum($$ID,
-                ${set:T}.of(${#variants}${value:L}.value${^key.last}, ${/key.last}${/variants})${traits:C}
-            );
-            """);
+                public static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createEnum($$ID,
+                    ${set:T}.of(${#variants}${value:L}.value${^key.last}, ${/key.last}${/variants})${traits:C}
+                );
+                """);
         return null;
     }
 
@@ -241,15 +228,14 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
         writer.putContext("hasMembers", !shape.members().isEmpty());
         writer.putContext("builderMethod", builderMethod);
         writer.write(
-            """
-                ${?recursive}${C}
-                ${/recursive}public static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.${builderMethod:L}($$ID${traits:C})${/recursive}${?hasMembers}
-                    ${C|}
-                    ${/hasMembers}.build();
-                """,
-            new SchemaBuilderGenerator(writer, shape, model, context),
-            (Runnable) () -> shape.members().forEach(m -> m.accept(this))
-        );
+                """
+                        ${?recursive}${C}
+                        ${/recursive}public static final ${schemaClass:T} ${name:L} = ${?recursive}${name:L}_BUILDER${/recursive}${^recursive}${schemaClass:T}.${builderMethod:L}($$ID${traits:C})${/recursive}${?hasMembers}
+                            ${C|}
+                            ${/hasMembers}.build();
+                        """,
+                new SchemaBuilderGenerator(writer, shape, model, context),
+                (Runnable) () -> shape.members().forEach(m -> m.accept(this)));
 
         // Write a static property for faster access to each member schema.
         for (var member : shape.members()) {
@@ -283,16 +269,14 @@ public final class SchemaGenerator implements ShapeVisitor<Void>, Runnable {
     @Override
     public Void timestampShape(TimestampShape timestampShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createTimestamp(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createTimestamp(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 
     @Override
     public Void stringShape(StringShape stringShape) {
         writer.write(
-            "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createString(${shapeId:T}.from(${id:S})${traits:C});"
-        );
+                "static final ${schemaClass:T} ${name:L} = ${schemaClass:T}.createString(${shapeId:T}.from(${id:S})${traits:C});");
         return null;
     }
 

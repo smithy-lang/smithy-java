@@ -31,42 +31,42 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public class InjectIdempotencyTokenPluginTest {
 
     private static final Model MODEL = Model.assembler()
-        .addUnparsedModel("test.smithy", """
-            $version: "2"
-            namespace smithy.example
+            .addUnparsedModel("test.smithy", """
+                    $version: "2"
+                    namespace smithy.example
 
-            @aws.protocols#restJson1
-            service Sprockets {
-                operations: [CreateSprocket, CreateSprocketNoToken]
-            }
+                    @aws.protocols#restJson1
+                    service Sprockets {
+                        operations: [CreateSprocket, CreateSprocketNoToken]
+                    }
 
-            @http(method: "POST", uri: "/{id}")
-            operation CreateSprocket {
-                input := {
-                    @required
-                    @httpLabel
-                    id: String
+                    @http(method: "POST", uri: "/{id}")
+                    operation CreateSprocket {
+                        input := {
+                            @required
+                            @httpLabel
+                            id: String
 
-                    @idempotencyToken
-                    @httpHeader("x-token")
-                    token: String
-                }
-                output := {}
-            }
+                            @idempotencyToken
+                            @httpHeader("x-token")
+                            token: String
+                        }
+                        output := {}
+                    }
 
-            @http(method: "POST", uri: "/no-token/{id}")
-            operation CreateSprocketNoToken {
-                input := {
-                    @required
-                    @httpLabel
-                    id: String
-                }
-                output := {}
-            }
-            """)
-        .discoverModels()
-        .assemble()
-        .unwrap();
+                    @http(method: "POST", uri: "/no-token/{id}")
+                    operation CreateSprocketNoToken {
+                        input := {
+                            @required
+                            @httpLabel
+                            id: String
+                        }
+                        output := {}
+                    }
+                    """)
+            .discoverModels()
+            .assemble()
+            .unwrap();
 
     private static final ShapeId SERVICE = ShapeId.from("smithy.example#Sprockets");
 
@@ -80,26 +80,24 @@ public class InjectIdempotencyTokenPluginTest {
 
     private String callAndGetToken(String operation, Document input) {
         var mock = MockPlugin.builder()
-            .addMatcher(
-                request -> new MockedResult.Response(
-                    HttpResponse.builder()
-                        .statusCode(200)
-                        .headers(HttpHeaders.of(Map.of("content-type", List.of("application/json"))))
-                        .body(DataStream.ofString("{}"))
-                        .build()
-                )
-            )
-            .build();
+                .addMatcher(
+                        request -> new MockedResult.Response(
+                                HttpResponse.builder()
+                                        .statusCode(200)
+                                        .headers(HttpHeaders.of(Map.of("content-type", List.of("application/json"))))
+                                        .body(DataStream.ofString("{}"))
+                                        .build()))
+                .build();
 
         var client = DynamicClient.builder()
-            .service(SERVICE)
-            .model(MODEL)
-            .addPlugin(mock)
-            .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
-            .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
-            .addPlugin(new InjectIdempotencyTokenPlugin())
-            .addPlugin(mock)
-            .build();
+                .service(SERVICE)
+                .model(MODEL)
+                .addPlugin(mock)
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
+                .addPlugin(new InjectIdempotencyTokenPlugin())
+                .addPlugin(mock)
+                .build();
 
         client.call(operation, Document.of(input));
         assertThat(mock.getRequests(), not(empty()));

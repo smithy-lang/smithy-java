@@ -44,23 +44,20 @@ import software.amazon.smithy.utils.StringUtils;
 @SmithyInternalApi
 public final class CodegenUtils {
     private static final URL RESERVED_WORDS_FILE = Objects.requireNonNull(
-        CodegenUtils.class.getResource("reserved-words.txt")
-    );
+            CodegenUtils.class.getResource("reserved-words.txt"));
     private static final URL OBJECT_RESERVED_MEMBERS_FILE = Objects.requireNonNull(
-        CodegenUtils.class.getResource("object-reserved-members.txt")
-    );
+            CodegenUtils.class.getResource("object-reserved-members.txt"));
     private static final URL SMITHY_RESERVED_MEMBERS_FILE = Objects.requireNonNull(
-        CodegenUtils.class.getResource("smithy-reserved-members.txt")
-    );
+            CodegenUtils.class.getResource("smithy-reserved-members.txt"));
 
     public static final ReservedWords SHAPE_ESCAPER = new ReservedWordsBuilder()
-        .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Shape")
-        .build();
+            .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Shape")
+            .build();
     public static final ReservedWords MEMBER_ESCAPER = new ReservedWordsBuilder()
-        .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Member")
-        .loadCaseInsensitiveWords(OBJECT_RESERVED_MEMBERS_FILE, word -> word + "Member")
-        .loadCaseInsensitiveWords(SMITHY_RESERVED_MEMBERS_FILE, word -> word + "Member")
-        .build();
+            .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Member")
+            .loadCaseInsensitiveWords(OBJECT_RESERVED_MEMBERS_FILE, word -> word + "Member")
+            .loadCaseInsensitiveWords(SMITHY_RESERVED_MEMBERS_FILE, word -> word + "Member")
+            .build();
 
     private static final String SCHEMA_STATIC_NAME = "$SCHEMA";
     private static final EnumSet<ShapeType> SHAPES_WITH_INNER_SCHEMA = EnumSet.of(
@@ -72,15 +69,14 @@ public final class CodegenUtils {
         ShapeType.UNION,
         ShapeType.STRUCTURE
     );
+
     // Semver regex from spec.
     // See: https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
     private static final Pattern SEMVER_REGEX = Pattern.compile(
-        "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
-    );
+            "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$");
     // YYYY-MM-DD calendar date with optional hyphens.
     private static final Pattern ISO_8601_DATE_REGEX = Pattern.compile(
-        "^([0-9]{4})-?(1[0-2]|0[1-9])-?(3[01]|0[1-9]|[12][0-9])$"
-    );
+            "^([0-9]{4})-?(1[0-2]|0[1-9])-?(3[01]|0[1-9]|[12][0-9])$");
 
     private CodegenUtils() {
         // Utility class should not be instantiated
@@ -94,11 +90,11 @@ public final class CodegenUtils {
      */
     public static Symbol fromClass(Class<?> clazz) {
         return Symbol.builder()
-            .name(clazz.getSimpleName())
-            .namespace(clazz.getCanonicalName().replace("." + clazz.getSimpleName(), ""), ".")
-            .putProperty(SymbolProperties.IS_PRIMITIVE, clazz.isPrimitive())
-            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, true)
-            .build();
+                .name(clazz.getSimpleName())
+                .namespace(clazz.getCanonicalName().replace("." + clazz.getSimpleName(), ""), ".")
+                .putProperty(SymbolProperties.IS_PRIMITIVE, clazz.isPrimitive())
+                .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, true)
+                .build();
     }
 
     /**
@@ -110,10 +106,10 @@ public final class CodegenUtils {
      */
     public static Symbol fromBoxedClass(Class<?> unboxed, Class<?> boxed) {
         return fromClass(unboxed).toBuilder()
-            .putProperty(SymbolProperties.IS_PRIMITIVE, true)
-            .putProperty(SymbolProperties.BOXED_TYPE, fromClass(boxed))
-            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
-            .build();
+                .putProperty(SymbolProperties.IS_PRIMITIVE, true)
+                .putProperty(SymbolProperties.BOXED_TYPE, fromClass(boxed))
+                .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
+                .build();
     }
 
     /**
@@ -178,7 +174,7 @@ public final class CodegenUtils {
      */
     public static boolean isNullableMember(Model model, MemberShape member) {
         return member.hasTrait(ClientOptionalTrait.class)
-            || NullableIndex.of(model).isMemberNullable(member, NullableIndex.CheckMode.SERVER);
+                || NullableIndex.of(model).isMemberNullable(member, NullableIndex.CheckMode.SERVER);
     }
 
     /**
@@ -191,9 +187,9 @@ public final class CodegenUtils {
      */
     public static ShapeId getOriginalId(Shape shape) {
         return shape
-            .getTrait(OriginalShapeIdTrait.class)
-            .map(OriginalShapeIdTrait::getOriginalId)
-            .orElse(shape.getId());
+                .getTrait(OriginalShapeIdTrait.class)
+                .map(OriginalShapeIdTrait::getOriginalId)
+                .orElse(shape.getId());
     }
 
     /**
@@ -230,19 +226,18 @@ public final class CodegenUtils {
      * @param shape shape to write Schema type for.
      */
     public static String getSchemaType(
-        JavaWriter writer,
-        SymbolProvider provider,
-        Shape shape
+            JavaWriter writer,
+            SymbolProvider provider,
+            Shape shape
     ) {
         if (Prelude.isPreludeShape(shape) && !shape.hasTrait(UnitTypeTrait.class)) {
             return writer.format("$T.$L", PreludeSchemas.class, shape.getType().name());
         } else if (SHAPES_WITH_INNER_SCHEMA.contains(shape.getType())) {
             // Shapes that generate a class have their schemas as static properties on that class
             return writer.format(
-                "$T.$L",
-                provider.toSymbol(shape),
-                shape.hasTrait(UnitTypeTrait.class) ? "SCHEMA" : "$SCHEMA"
-            );
+                    "$T.$L",
+                    provider.toSymbol(shape),
+                    shape.hasTrait(UnitTypeTrait.class) ? "SCHEMA" : "$SCHEMA");
         }
         return writer.format("SharedSchemas.$L", toSchemaName(shape));
     }
@@ -255,15 +250,14 @@ public final class CodegenUtils {
      */
     public static List<MemberShape> getSortedMembers(Shape shape) {
         return shape.members()
-            .stream()
-            .sorted(
-                (a, b) -> {
-                    int aRequiredWithNoDefault = isRequiredWithNoDefault(a) ? 1 : 0;
-                    int bRequiredWithNoDefault = isRequiredWithNoDefault(b) ? 1 : 0;
-                    return bRequiredWithNoDefault - aRequiredWithNoDefault;
-                }
-            )
-            .collect(Collectors.toList());
+                .stream()
+                .sorted(
+                        (a, b) -> {
+                            int aRequiredWithNoDefault = isRequiredWithNoDefault(a) ? 1 : 0;
+                            int bRequiredWithNoDefault = isRequiredWithNoDefault(b) ? 1 : 0;
+                            return bRequiredWithNoDefault - aRequiredWithNoDefault;
+                        })
+                .collect(Collectors.toList());
     }
 
     /**
@@ -285,7 +279,7 @@ public final class CodegenUtils {
      */
     public static boolean requiresSetterNullCheck(SymbolProvider provider, MemberShape memberShape) {
         return (memberShape.isRequired() || memberShape.hasNonNullDefault())
-            && !provider.toSymbol(memberShape).expectProperty(SymbolProperties.IS_PRIMITIVE);
+                && !provider.toSymbol(memberShape).expectProperty(SymbolProperties.IS_PRIMITIVE);
     }
 
     /**
@@ -299,8 +293,8 @@ public final class CodegenUtils {
     public static boolean hasBuiltinDefault(SymbolProvider provider, Model model, MemberShape memberShape) {
         var target = model.expectShape(memberShape.getTarget());
         return (provider.toSymbol(memberShape).expectProperty(SymbolProperties.IS_PRIMITIVE)
-            || target.isDocumentShape())
-            && !target.isBlobShape();
+                || target.isDocumentShape())
+                && !target.isBlobShape();
     }
 
     /**
@@ -362,8 +356,8 @@ public final class CodegenUtils {
      */
     public static Symbol getInnerTypeEnumSymbol(Symbol symbol) {
         return symbol.toBuilder()
-            .name("Type")
-            .build();
+                .name("Type")
+                .build();
     }
 
     /**
@@ -382,10 +376,10 @@ public final class CodegenUtils {
             return false;
         }
         return closure.stream()
-            .map(PathFinder.Path::getShapes)
-            .flatMap(List::stream)
-            .filter(shape::equals)
-            .count() > 1;
+                .map(PathFinder.Path::getShapes)
+                .flatMap(List::stream)
+                .filter(shape::equals)
+                .count() > 1;
     }
 
     /**

@@ -20,11 +20,11 @@ public final class Operation<I extends SerializableStruct, O extends Serializabl
     private final Service service;
 
     private Operation(
-        String name,
-        BiFunction<I, RequestContext, O> operation,
-        BiFunction<I, RequestContext, CompletableFuture<O>> asyncOperation,
-        ApiOperation<I, O> sdkOperation,
-        Service service
+            String name,
+            BiFunction<I, RequestContext, O> operation,
+            BiFunction<I, RequestContext, CompletableFuture<O>> asyncOperation,
+            ApiOperation<I, O> sdkOperation,
+            Service service
     ) {
         if (operation != null && asyncOperation != null) {
             throw new IllegalArgumentException("At least one of operation and asyncOperation must be null");
@@ -43,19 +43,19 @@ public final class Operation<I extends SerializableStruct, O extends Serializabl
     }
 
     public static <I extends SerializableStruct, O extends SerializableStruct> Operation<I, O> of(
-        String name,
-        BiFunction<I, RequestContext, O> operation,
-        ApiOperation<I, O> sdkOperation,
-        Service service
+            String name,
+            BiFunction<I, RequestContext, O> operation,
+            ApiOperation<I, O> sdkOperation,
+            Service service
     ) {
         return new Operation<>(name, operation, null, sdkOperation, service);
     }
 
     public static <I extends SerializableStruct, O extends SerializableStruct> Operation<I, O> ofAsync(
-        String name,
-        BiFunction<I, RequestContext, CompletableFuture<O>> operation,
-        ApiOperation<I, O> sdkOperation,
-        Service service
+            String name,
+            BiFunction<I, RequestContext, CompletableFuture<O>> operation,
+            ApiOperation<I, O> sdkOperation,
+            Service service
     ) {
         return new Operation<>(name, null, operation, sdkOperation, service);
     }

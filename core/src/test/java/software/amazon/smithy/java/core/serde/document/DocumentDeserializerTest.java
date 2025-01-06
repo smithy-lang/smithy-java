@@ -24,17 +24,15 @@ public class DocumentDeserializerTest {
         Person.Builder builder = Person.builder();
 
         var document = Document.of(
-            Map.of(
-                "name",
-                Document.of("Savage Bob"),
-                "age",
-                Document.of(100),
-                "birthday",
-                Document.of(Instant.EPOCH),
-                "binary",
-                Document.of(wrap("hi".getBytes(StandardCharsets.UTF_8)))
-            )
-        );
+                Map.of(
+                        "name",
+                        Document.of("Savage Bob"),
+                        "age",
+                        Document.of(100),
+                        "birthday",
+                        Document.of(Instant.EPOCH),
+                        "binary",
+                        Document.of(wrap("hi".getBytes(StandardCharsets.UTF_8)))));
 
         var person = document.asShape(builder);
 
@@ -47,11 +45,11 @@ public class DocumentDeserializerTest {
     @Test
     public void deserializesStructIntoBuilder() {
         Person person = Person.builder()
-            .name("Savage Bob")
-            .age(100)
-            .birthday(Instant.EPOCH)
-            .binary(wrap("hi".getBytes(StandardCharsets.UTF_8)))
-            .build();
+                .name("Savage Bob")
+                .age(100)
+                .birthday(Instant.EPOCH)
+                .binary(wrap("hi".getBytes(StandardCharsets.UTF_8)))
+                .build();
 
         var bobDocument = Document.of(person);
         var personCopy = bobDocument.asShape(Person.builder());
@@ -65,9 +63,8 @@ public class DocumentDeserializerTest {
     @Test
     public void discriminatorThrowsWithNiceMessageWhenTextIsNull() {
         var e = Assertions.assertThrows(
-            DiscriminatorException.class,
-            () -> DocumentDeserializer.parseDiscriminator(null, null)
-        );
+                DiscriminatorException.class,
+                () -> DocumentDeserializer.parseDiscriminator(null, null));
 
         assertThat(e.getMessage(), equalTo("Unable to find a document discriminator"));
     }
@@ -75,30 +72,25 @@ public class DocumentDeserializerTest {
     @Test
     public void discriminatorThrowsWhenShapeIdInvalid() {
         var e = Assertions.assertThrows(
-            DiscriminatorException.class,
-            () -> DocumentDeserializer.parseDiscriminator("com.foo#Bar!!", null)
-        );
+                DiscriminatorException.class,
+                () -> DocumentDeserializer.parseDiscriminator("com.foo#Bar!!", null));
 
         assertThat(
-            e.getMessage(),
-            equalTo("Unable to parse the document discriminator into a valid shape ID: com.foo#Bar!!")
-        );
+                e.getMessage(),
+                equalTo("Unable to parse the document discriminator into a valid shape ID: com.foo#Bar!!"));
     }
 
     @Test
     public void discriminatorThrowsWhenShapeIdInvalidAndRelative() {
         var e = Assertions.assertThrows(
-            DiscriminatorException.class,
-            () -> DocumentDeserializer.parseDiscriminator("Bar", null)
-        );
+                DiscriminatorException.class,
+                () -> DocumentDeserializer.parseDiscriminator("Bar", null));
 
         assertThat(
-            e.getMessage(),
-            equalTo(
-                "Attempted to parse a document discriminator that only provides a "
-                    + "shape name, but no default namespace was configured: Bar"
-            )
-        );
+                e.getMessage(),
+                equalTo(
+                        "Attempted to parse a document discriminator that only provides a "
+                                + "shape name, but no default namespace was configured: Bar"));
     }
 
     @Test

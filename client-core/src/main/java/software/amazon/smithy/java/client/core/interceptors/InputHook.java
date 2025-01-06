@@ -94,9 +94,9 @@ public sealed class InputHook<I extends SerializableStruct, O extends Serializab
      */
     @SuppressWarnings("unchecked")
     public <R extends SerializableStruct, T> I mapInput(
-        Class<R> predicateType,
-        T state,
-        BiFunction<InputHook<R, ?>, T, R> mapper
+            Class<R> predicateType,
+            T state,
+            BiFunction<InputHook<R, ?>, T, R> mapper
     ) {
         if (predicateType.isInstance(input)) {
             return (I) mapper.apply((InputHook<R, ?>) this, state);

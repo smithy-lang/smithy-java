@@ -14,10 +14,10 @@ public final class HttpJob extends DefaultJob {
     private final HttpResponse response;
 
     public HttpJob(
-        Operation<? extends SerializableStruct, ? extends SerializableStruct> operation,
-        ServerProtocol protocol,
-        HttpRequest request,
-        HttpResponse response
+            Operation<? extends SerializableStruct, ? extends SerializableStruct> operation,
+            ServerProtocol protocol,
+            HttpRequest request,
+            HttpResponse response
     ) {
         super(operation, protocol);
         this.request = request;

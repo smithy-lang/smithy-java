@@ -129,8 +129,8 @@ final class HttpQuerySerializer extends SpecificShapeSerializer {
         if (queryTrait != null) {
             var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
             TimestampFormatter formatter = trait != null
-                ? TimestampFormatter.of(trait)
-                : TimestampFormatter.Prelude.DATE_TIME;
+                    ? TimestampFormatter.of(trait)
+                    : TimestampFormatter.Prelude.DATE_TIME;
             writeQuery(queryTrait, formatter.writeString(value));
         }
     }

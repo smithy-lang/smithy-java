@@ -71,8 +71,8 @@ public final class AuthSchemeResolverParams {
         }
         AuthSchemeResolverParams params = (AuthSchemeResolverParams) o;
         return Objects.equals(protocolId, params.protocolId)
-            && Objects.equals(operation, params.operation)
-            && Objects.equals(context, params.context);
+                && Objects.equals(operation, params.operation)
+                && Objects.equals(context, params.context);
     }
 
     @Override
@@ -89,8 +89,7 @@ public final class AuthSchemeResolverParams {
         private ApiOperation<?, ?> operation;
         private Context context;
 
-        private Builder() {
-        }
+        private Builder() {}
 
         /**
          * Build the params.

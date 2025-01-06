@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.server.core;
 
 public sealed interface ObservableOrchestrator extends Orchestrator permits SingleThreadOrchestrator,
-    OrchestratorGroup, DelegatingObservableOrchestrator {
+        OrchestratorGroup, DelegatingObservableOrchestrator {
 
     int inflightJobs();
 }

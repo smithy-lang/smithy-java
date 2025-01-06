@@ -58,9 +58,9 @@ public interface Paginator<O extends SerializableStruct> extends PaginatorSettin
      * @param <O> Operation output shape type.
      */
     static <I extends SerializableStruct, O extends SerializableStruct> Paginator<O> paginate(
-        I input,
-        ApiOperation<I, O> operation,
-        Paginatable<I, O> call
+            I input,
+            ApiOperation<I, O> operation,
+            Paginatable<I, O> call
     ) {
         return new DefaultSyncPaginator<>(input, operation, call);
     }

@@ -43,14 +43,13 @@ public class NumberDocumentTest {
 
     public static List<Arguments> defaultSerializationProvider() {
         return List.of(
-            Arguments.of((byte) 1, ShapeType.BYTE),
-            Arguments.of((short) 1, ShapeType.SHORT),
-            Arguments.of(1, ShapeType.INTEGER),
-            Arguments.of(1L, ShapeType.LONG),
-            Arguments.of(1F, ShapeType.FLOAT),
-            Arguments.of(1D, ShapeType.DOUBLE),
-            Arguments.of(BigInteger.ONE, ShapeType.BIG_INTEGER),
-            Arguments.of(BigDecimal.ONE, ShapeType.BIG_DECIMAL)
-        );
+                Arguments.of((byte) 1, ShapeType.BYTE),
+                Arguments.of((short) 1, ShapeType.SHORT),
+                Arguments.of(1, ShapeType.INTEGER),
+                Arguments.of(1L, ShapeType.LONG),
+                Arguments.of(1F, ShapeType.FLOAT),
+                Arguments.of(1D, ShapeType.DOUBLE),
+                Arguments.of(BigInteger.ONE, ShapeType.BIG_INTEGER),
+                Arguments.of(BigDecimal.ONE, ShapeType.BIG_DECIMAL));
     }
 }

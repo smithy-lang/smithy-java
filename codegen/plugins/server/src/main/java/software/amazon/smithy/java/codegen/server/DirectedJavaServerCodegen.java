@@ -36,31 +36,29 @@ import software.amazon.smithy.java.codegen.server.generators.OperationInterfaceG
 import software.amazon.smithy.java.codegen.server.generators.ServiceGenerator;
 
 final class DirectedJavaServerCodegen
-    implements DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
+        implements DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
 
     @Override
     public SymbolProvider createSymbolProvider(
-        CreateSymbolProviderDirective<JavaCodegenSettings> directive
+            CreateSymbolProviderDirective<JavaCodegenSettings> directive
     ) {
         return new ServiceJavaSymbolProvider(
-            directive.model(),
-            directive.service(),
-            directive.settings().packageNamespace(),
-            directive.settings().name()
-        );
+                directive.model(),
+                directive.service(),
+                directive.settings().packageNamespace(),
+                directive.settings().name());
     }
 
     @Override
     public CodeGenerationContext createContext(
-        CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive
+            CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive
     ) {
         return new CodeGenerationContext(
-            directive.model(),
-            directive.settings(),
-            directive.symbolProvider(),
-            directive.fileManifest(),
-            directive.integrations()
-        );
+                directive.model(),
+                directive.settings(),
+                directive.symbolProvider(),
+                directive.fileManifest(),
+                directive.integrations());
     }
 
     @Override

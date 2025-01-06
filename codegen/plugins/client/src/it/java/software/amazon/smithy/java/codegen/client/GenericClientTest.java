@@ -46,10 +46,10 @@ public class GenericClientTest {
     @Test
     public void echoTest() {
         var client = TestServiceClient.builder()
-            .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
-            .endpointResolver(ENDPOINT_RESOLVER)
-            .value(5L)
-            .build();
+                .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
+                .endpointResolver(ENDPOINT_RESOLVER)
+                .value(5L)
+                .build();
 
         var value = "hello world";
         var input = EchoInput.builder().string(value).build();
@@ -64,9 +64,8 @@ public class GenericClientTest {
             @Override
             public <RequestT> RequestT modifyBeforeTransmit(RequestHook<?, ?, RequestT> hook) {
                 return hook.mapRequest(
-                    HttpRequest.class,
-                    h -> h.request().toBuilder().withAddedHeader("X-Foo", "Bar").build()
-                );
+                        HttpRequest.class,
+                        h -> h.request().toBuilder().withAddedHeader("X-Foo", "Bar").build());
             }
 
             @Override
@@ -80,11 +79,11 @@ public class GenericClientTest {
         };
 
         var client = TestServiceClient.builder()
-            .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
-            .endpointResolver(ENDPOINT_RESOLVER)
-            .addInterceptor(interceptor)
-            .value(2.2)
-            .build();
+                .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
+                .endpointResolver(ENDPOINT_RESOLVER)
+                .addInterceptor(interceptor)
+                .value(2.2)
+                .build();
 
         var echoedString = "hello world";
         var input = EchoInput.builder().string(echoedString).build();
@@ -114,22 +113,22 @@ public class GenericClientTest {
             }
         };
         var client = TestServiceClient.builder()
-            .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
-            .endpointResolver(ENDPOINT_RESOLVER)
-            .addInterceptor(interceptor)
-            .value(2L)
-            .multiValue("a", "b")
-            .multiVarargs("string", "a", "b", "c")
-            .singleVarargs("a", "b", "c", "d")
-            .nested(1)
-            .build();
+                .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
+                .endpointResolver(ENDPOINT_RESOLVER)
+                .addInterceptor(interceptor)
+                .value(2L)
+                .multiValue("a", "b")
+                .multiVarargs("string", "a", "b", "c")
+                .singleVarargs("a", "b", "c", "d")
+                .nested(1)
+                .build();
         var override = TestServiceClient.requestOverrideBuilder()
-            .value(4L)
-            .multiValue("override1", "override2")
-            .multiVarargs("stringOverride", "aOverride", "bOverride")
-            .singleVarargs("e", "f", "g", "h")
-            .nested(2)
-            .build();
+                .value(4L)
+                .multiValue("override1", "override2")
+                .multiVarargs("stringOverride", "aOverride", "bOverride")
+                .singleVarargs("e", "f", "g", "h")
+                .nested(2)
+                .build();
         var value = "hello world";
         var input = EchoInput.builder().string(value).build();
         client.echo(input, override);
@@ -138,14 +137,14 @@ public class GenericClientTest {
     @Test
     public void correctlyAppliesDefaultPlugins() {
         var client = TestServiceClient.builder()
-            .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
-            .endpointResolver(ENDPOINT_RESOLVER)
-            .value(2L)
-            .multiValue("a", "b")
-            .multiVarargs("string", "a", "b", "c")
-            .singleVarargs("a", "b", "c", "d")
-            .nested(1)
-            .build();
+                .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
+                .endpointResolver(ENDPOINT_RESOLVER)
+                .value(2L)
+                .multiValue("a", "b")
+                .multiVarargs("string", "a", "b", "c")
+                .singleVarargs("a", "b", "c", "d")
+                .nested(1)
+                .build();
         var context = client.config().context();
         assertEquals("CONSTANT", context.expect(TestClientPlugin.CONSTANT_KEY));
         assertEquals(BigDecimal.valueOf(2L), context.expect(TestSettings.VALUE_KEY));

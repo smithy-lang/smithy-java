@@ -40,12 +40,12 @@ final class RootSchema extends Schema {
     }
 
     RootSchema(
-        ShapeType type,
-        ShapeId id,
-        TraitMap traits,
-        List<MemberSchemaBuilder> memberBuilders,
-        Set<String> stringEnumValues,
-        Set<Integer> intEnumValues
+            ShapeType type,
+            ShapeId id,
+            TraitMap traits,
+            List<MemberSchemaBuilder> memberBuilders,
+            Set<String> stringEnumValues,
+            Set<Integer> intEnumValues
     ) {
         super(type, id, traits, memberBuilders, stringEnumValues);
         this.stringEnumValues = Collections.unmodifiableSet(stringEnumValues);

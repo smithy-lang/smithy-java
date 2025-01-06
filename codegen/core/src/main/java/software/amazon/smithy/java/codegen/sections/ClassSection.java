@@ -15,7 +15,7 @@ import software.amazon.smithy.utils.CodeSection;
  * @param applyDocumentation Whether and how documentation is applied.
  */
 public record ClassSection(Shape shape, ApplyDocumentation applyDocumentation) implements CodeSection,
-    DocumentedSection {
+        DocumentedSection {
     public ClassSection(Shape shape) {
         this(shape, ApplyDocumentation.DOCUMENT);
     }

@@ -26,11 +26,10 @@ public class MapDocumentTest {
     @Test
     public void createsDocument() {
         Map<String, Document> entries = Map.of(
-            "a",
-            Document.of(true),
-            "b",
-            Document.of(false)
-        );
+                "a",
+                Document.of(true),
+                "b",
+                Document.of(false));
         var map = Document.of(entries);
 
         assertThat(map.type(), is(ShapeType.MAP));
@@ -70,10 +69,10 @@ public class MapDocumentTest {
                 consumer.accept(state, new MapSerializer() {
                     @Override
                     public <K> void writeEntry(
-                        Schema keySchema,
-                        String key,
-                        K mapState,
-                        BiConsumer<K, ShapeSerializer> valueSerializer
+                            Schema keySchema,
+                            String key,
+                            K mapState,
+                            BiConsumer<K, ShapeSerializer> valueSerializer
                     ) {
                         keys.add(key);
                         valueSerializer.accept(mapState, new SpecificShapeSerializer() {

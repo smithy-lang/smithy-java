@@ -29,12 +29,12 @@ public abstract class ModeledApiException extends ApiException implements Serial
     }
 
     protected ModeledApiException(
-        Schema schema,
-        String message,
-        Fault errorType,
-        Throwable cause,
-        Boolean captureStackTrace,
-        boolean deserialized
+            Schema schema,
+            String message,
+            Fault errorType,
+            Throwable cause,
+            Boolean captureStackTrace,
+            boolean deserialized
     ) {
         super(message, cause, errorType, captureStackTrace);
         this.schema = schema;
@@ -42,11 +42,11 @@ public abstract class ModeledApiException extends ApiException implements Serial
     }
 
     protected ModeledApiException(
-        Schema schema,
-        String message,
-        Throwable cause,
-        Boolean captureStackTrace,
-        boolean deserialized
+            Schema schema,
+            String message,
+            Throwable cause,
+            Boolean captureStackTrace,
+            boolean deserialized
     ) {
         super(message, cause, captureStackTrace);
         this.schema = schema;
@@ -59,12 +59,12 @@ public abstract class ModeledApiException extends ApiException implements Serial
     }
 
     protected ModeledApiException(
-        Schema schema,
-        String message,
-        Throwable cause,
-        Fault errorType,
-        Boolean captureStackTrace,
-        boolean deserialized
+            Schema schema,
+            String message,
+            Throwable cause,
+            Fault errorType,
+            Boolean captureStackTrace,
+            boolean deserialized
     ) {
         super(message, cause, errorType, captureStackTrace);
         this.schema = schema;

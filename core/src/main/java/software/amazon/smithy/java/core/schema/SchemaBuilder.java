@@ -138,22 +138,20 @@ public final class SchemaBuilder {
 
         if (hasRecursive) {
             builtShape = new DeferredRootSchema(
-                type,
-                id,
-                traits,
-                new ArrayList<>(members),
-                Collections.emptySet(),
-                Collections.emptySet()
-            );
+                    type,
+                    id,
+                    traits,
+                    new ArrayList<>(members),
+                    Collections.emptySet(),
+                    Collections.emptySet());
         } else {
             builtShape = new RootSchema(
-                type,
-                id,
-                traits,
-                new ArrayList<>(members),
-                Collections.emptySet(),
-                Collections.emptySet()
-            );
+                    type,
+                    id,
+                    traits,
+                    new ArrayList<>(members),
+                    Collections.emptySet(),
+                    Collections.emptySet());
         }
 
         return builtShape;
@@ -192,10 +190,10 @@ public final class SchemaBuilder {
     }
 
     static <T> long computeRequiredBitField(
-        ShapeType type,
-        int requiredMemberCount,
-        Iterable<T> members,
-        Function<T, Long> bitMaskGetter
+            ShapeType type,
+            int requiredMemberCount,
+            Iterable<T> members,
+            Function<T, Long> bitMaskGetter
     ) {
         if ((requiredMemberCount > 0) && (requiredMemberCount <= 64) && type == ShapeType.STRUCTURE) {
             long setFields = 0L;
@@ -209,16 +207,15 @@ public final class SchemaBuilder {
     }
 
     record ValidationState(
-        long minLengthConstraint,
-        long maxLengthConstraint,
-        BigDecimal minRangeConstraint,
-        BigDecimal maxRangeConstraint,
-        long minLongConstraint,
-        long maxLongConstraint,
-        double minDoubleConstraint,
-        double maxDoubleConstraint,
-        ValidatorOfString stringValidation
-    ) {
+            long minLengthConstraint,
+            long maxLengthConstraint,
+            BigDecimal minRangeConstraint,
+            BigDecimal maxRangeConstraint,
+            long minLongConstraint,
+            long maxLongConstraint,
+            double minDoubleConstraint,
+            double maxDoubleConstraint,
+            ValidatorOfString stringValidation) {
         static ValidationState of(ShapeType type, TraitMap traits, Set<String> stringEnum) {
             long minLengthConstraint;
             long maxLengthConstraint;
@@ -243,10 +240,9 @@ public final class SchemaBuilder {
             // If the shape is a string or enum, pre-compute necessary validation (or no-op if not a string/enum).
             if (type == ShapeType.STRING || type == ShapeType.ENUM) {
                 stringValidation = createStringValidator(
-                    stringEnum,
-                    lengthTrait,
-                    traits.get(TraitKey.PATTERN_TRAIT)
-                );
+                        stringEnum,
+                        lengthTrait,
+                        traits.get(TraitKey.PATTERN_TRAIT));
             } else {
                 stringValidation = ValidatorOfString.of(Collections.emptyList());
             }
@@ -292,21 +288,21 @@ public final class SchemaBuilder {
                     minLongConstraint = Long.MIN_VALUE;
                     maxLongConstraint = Long.MAX_VALUE;
                     minDoubleConstraint = minRangeConstraint == null
-                        ? Float.MIN_VALUE
-                        : minRangeConstraint.floatValue();
+                            ? Float.MIN_VALUE
+                            : minRangeConstraint.floatValue();
                     maxDoubleConstraint = maxRangeConstraint == null
-                        ? Float.MAX_VALUE
-                        : maxRangeConstraint.floatValue();
+                            ? Float.MAX_VALUE
+                            : maxRangeConstraint.floatValue();
                 }
                 case DOUBLE -> {
                     minLongConstraint = Long.MIN_VALUE;
                     maxLongConstraint = Long.MAX_VALUE;
                     minDoubleConstraint = minRangeConstraint == null
-                        ? Double.MIN_VALUE
-                        : minRangeConstraint.doubleValue();
+                            ? Double.MIN_VALUE
+                            : minRangeConstraint.doubleValue();
                     maxDoubleConstraint = maxRangeConstraint == null
-                        ? Double.MAX_VALUE
-                        : maxRangeConstraint.doubleValue();
+                            ? Double.MAX_VALUE
+                            : maxRangeConstraint.doubleValue();
                 }
                 default -> {
                     minLongConstraint = Long.MIN_VALUE;
@@ -317,33 +313,30 @@ public final class SchemaBuilder {
             }
 
             return new ValidationState(
-                minLengthConstraint,
-                maxLengthConstraint,
-                minRangeConstraint,
-                maxRangeConstraint,
-                minLongConstraint,
-                maxLongConstraint,
-                minDoubleConstraint,
-                maxDoubleConstraint,
-                stringValidation
-            );
+                    minLengthConstraint,
+                    maxLengthConstraint,
+                    minRangeConstraint,
+                    maxRangeConstraint,
+                    minLongConstraint,
+                    maxLongConstraint,
+                    minDoubleConstraint,
+                    maxDoubleConstraint,
+                    stringValidation);
         }
     }
 
     static ValidatorOfString createStringValidator(
-        Set<String> enumValues,
-        LengthTrait lengthTrait,
-        PatternTrait patternTrait
+            Set<String> enumValues,
+            LengthTrait lengthTrait,
+            PatternTrait patternTrait
     ) {
         List<ValidatorOfString> stringValidators = new ArrayList<>();
 
         if (lengthTrait != null) {
             stringValidators.add(
-                new ValidatorOfString.LengthStringValidator(
-                    lengthTrait.getMin().orElse(Long.MIN_VALUE),
-                    lengthTrait.getMax().orElse(Long.MAX_VALUE)
-                )
-            );
+                    new ValidatorOfString.LengthStringValidator(
+                            lengthTrait.getMin().orElse(Long.MIN_VALUE),
+                            lengthTrait.getMax().orElse(Long.MAX_VALUE)));
         }
 
         if (!enumValues.isEmpty()) {
@@ -380,11 +373,10 @@ public final class SchemaBuilder {
             case 0 -> Collections.emptyMap();
             case 1 -> Collections.singletonMap(members.get(0).memberName(), members.get(0));
             case 2 -> new Map2<>(
-                members.get(0).memberName(),
-                members.get(0),
-                members.get(1).memberName(),
-                members.get(1)
-            );
+                    members.get(0).memberName(),
+                    members.get(0),
+                    members.get(1).memberName(),
+                    members.get(1));
             default -> {
                 Map.Entry<String, Schema>[] entries = new Map.Entry[members.size()];
                 for (var i = 0; i < members.size(); i++) {
@@ -411,9 +403,8 @@ public final class SchemaBuilder {
             this.secondKey = secondKey;
             this.secondValue = secondValue;
             this.entries = Set.of(
-                new SimpleImmutableEntry<>(firstKey, firstValue),
-                new SimpleImmutableEntry<>(secondKey, secondValue)
-            );
+                    new SimpleImmutableEntry<>(firstKey, firstValue),
+                    new SimpleImmutableEntry<>(secondKey, secondValue));
         }
 
         @Override

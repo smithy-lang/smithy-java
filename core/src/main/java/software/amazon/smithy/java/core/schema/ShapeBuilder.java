@@ -48,8 +48,7 @@ public interface ShapeBuilder<T extends SerializableShape> {
      */
     default void setMemberValue(Schema member, Object value) {
         throw new IllegalArgumentException(
-            "Attempted to set non-existent member of " + schema().id() + ": " + member.id()
-        );
+                "Attempted to set non-existent member of " + schema().id() + ": " + member.id());
     }
 
     /**

@@ -8,7 +8,7 @@ package software.amazon.smithy.java.logging;
 public sealed interface InternalLogger permits Log4j2Logger, Slf4jLogger, JclLogger, JdkSystemLogger {
 
     sealed interface Factory permits Log4j2Logger.Factory, Slf4jLogger.Factory, JclLogger.Factory,
-        JdkSystemLogger.Factory {
+            JdkSystemLogger.Factory {
         InternalLogger getLogger(String name);
     }
 
@@ -92,57 +92,57 @@ public sealed interface InternalLogger permits Log4j2Logger, Slf4jLogger, JclLog
     void log(Level level, String message, Object p0, Object p1, Object p2, Object p3, Object p4, Object p5);
 
     void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6
     );
 
     void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7
     );
 
     void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     );
 
     void log(
-        Level level,
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            Level level,
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     );
 
     void trace(String message, Object... params);
@@ -166,30 +166,30 @@ public sealed interface InternalLogger permits Log4j2Logger, Slf4jLogger, JclLog
     void trace(String message, Object p0, Object p1, Object p2, Object p3, Object p4, Object p5, Object p6, Object p7);
 
     void trace(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     );
 
     void trace(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     );
 
     void debug(String message, Object... params);
@@ -213,30 +213,30 @@ public sealed interface InternalLogger permits Log4j2Logger, Slf4jLogger, JclLog
     void debug(String message, Object p0, Object p1, Object p2, Object p3, Object p4, Object p5, Object p6, Object p7);
 
     void debug(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     );
 
     void debug(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     );
 
     void info(String message, Object... params);
@@ -260,30 +260,30 @@ public sealed interface InternalLogger permits Log4j2Logger, Slf4jLogger, JclLog
     void info(String message, Object p0, Object p1, Object p2, Object p3, Object p4, Object p5, Object p6, Object p7);
 
     void info(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     );
 
     void info(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     );
 
     void warn(String message, Object... params);
@@ -307,30 +307,30 @@ public sealed interface InternalLogger permits Log4j2Logger, Slf4jLogger, JclLog
     void warn(String message, Object p0, Object p1, Object p2, Object p3, Object p4, Object p5, Object p6, Object p7);
 
     void warn(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     );
 
     void warn(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     );
 
     void error(String message, Object... params);
@@ -354,30 +354,30 @@ public sealed interface InternalLogger permits Log4j2Logger, Slf4jLogger, JclLog
     void error(String message, Object p0, Object p1, Object p2, Object p3, Object p4, Object p5, Object p6, Object p7);
 
     void error(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     );
 
     void error(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     );
 
     void fatal(String message, Object... params);
@@ -401,30 +401,30 @@ public sealed interface InternalLogger permits Log4j2Logger, Slf4jLogger, JclLog
     void fatal(String message, Object p0, Object p1, Object p2, Object p3, Object p4, Object p5, Object p6, Object p7);
 
     void fatal(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8
     );
 
     void fatal(
-        String message,
-        Object p0,
-        Object p1,
-        Object p2,
-        Object p3,
-        Object p4,
-        Object p5,
-        Object p6,
-        Object p7,
-        Object p8,
-        Object p9
+            String message,
+            Object p0,
+            Object p1,
+            Object p2,
+            Object p3,
+            Object p4,
+            Object p5,
+            Object p6,
+            Object p7,
+            Object p8,
+            Object p9
     );
 
     boolean isTraceEnabled();

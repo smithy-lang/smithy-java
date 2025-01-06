@@ -19,12 +19,11 @@ import software.amazon.smithy.java.client.core.pagination.models.TestOperationPa
 
 public class PaginationTest {
     private static final List<GetFoosOutput> BASE_EXPECTED_RESULTS = List.of(
-        new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1"))),
-        new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1"))),
-        new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1"))),
-        new GetFoosOutput(new ResultWrapper("final", List.of("foo0", "foo1"))),
-        new GetFoosOutput(new ResultWrapper(null, List.of("foo0", "foo1")))
-    );
+            new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1"))),
+            new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1"))),
+            new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1"))),
+            new GetFoosOutput(new ResultWrapper("final", List.of("foo0", "foo1"))),
+            new GetFoosOutput(new ResultWrapper(null, List.of("foo0", "foo1"))));
     private MockClient mockClient;
 
     @BeforeEach
@@ -66,10 +65,9 @@ public class PaginationTest {
             results.add(output);
         }
         var expectedResult = List.of(
-            new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
-            new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))),
-            new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1")))
-        );
+                new GetFoosOutput(new ResultWrapper("first", List.of("foo0", "foo1", "foo2", "foo3"))),
+                new GetFoosOutput(new ResultWrapper("second", List.of("foo0", "foo1", "foo2", "foo3"))),
+                new GetFoosOutput(new ResultWrapper("third", List.of("foo0", "foo1"))));
         assertThat(results, contains(expectedResult.toArray()));
     }
 }

@@ -31,23 +31,23 @@ final class XmlDeserializer implements ShapeDeserializer {
     private final boolean isTopLevel;
 
     static XmlDeserializer topLevel(
-        XmlInfo xmlInfo,
-        XMLEventFactory eventFactory,
-        XmlReader reader
+            XmlInfo xmlInfo,
+            XMLEventFactory eventFactory,
+            XmlReader reader
     ) throws XMLStreamException {
         return new XmlDeserializer(xmlInfo, eventFactory, reader, true);
     }
 
     static XmlDeserializer flattened(
-        XmlInfo xmlInfo,
-        XMLEventFactory eventFactory,
-        XmlReader reader
+            XmlInfo xmlInfo,
+            XMLEventFactory eventFactory,
+            XmlReader reader
     ) throws XMLStreamException {
         return new XmlDeserializer(xmlInfo, eventFactory, reader, false);
     }
 
     private XmlDeserializer(XmlInfo xmlInfo, XMLEventFactory eventFactory, XmlReader reader, boolean isTopLevel)
-        throws XMLStreamException {
+            throws XMLStreamException {
         this.xmlInfo = xmlInfo;
         this.reader = reader;
         this.isTopLevel = isTopLevel;
@@ -246,9 +246,9 @@ final class XmlDeserializer implements ShapeDeserializer {
     static SerializationException error(XmlReader reader, String message, Exception previous) {
         var location = reader.getLocation();
         String msg = location == null
-            ? ("Error reading XML: " + message)
-            : ("Error reading XML near line " + location.getLineNumber()
-                + ", column " + location.getColumnNumber() + ": " + message);
+                ? ("Error reading XML: " + message)
+                : ("Error reading XML near line " + location.getLineNumber()
+                        + ", column " + location.getColumnNumber() + ": " + message);
         return new SerializationException(msg, previous);
     }
 
@@ -473,15 +473,14 @@ final class XmlDeserializer implements ShapeDeserializer {
                     Schema elementSchema = decoder.elements.get(member);
                     if (elementSchema != null) {
                         decoder.readMember(
-                            flattenedState,
-                            eventFactory,
-                            this,
-                            reader,
-                            state,
-                            consumer,
-                            member,
-                            elementSchema
-                        );
+                                flattenedState,
+                                eventFactory,
+                                this,
+                                reader,
+                                state,
+                                consumer,
+                                member,
+                                elementSchema);
                         reader.closeElement();
                     } else {
                         consumer.unknownMember(state, member);
@@ -517,13 +516,11 @@ final class XmlDeserializer implements ShapeDeserializer {
                 for (var member = reader.nextMemberElement(); member != null; member = reader.nextMemberElement()) {
                     if (!member.equals(info.memberName)) {
                         throw error(
-                            String.format(
-                                "Expected list item '%s' but found '%s': %s",
-                                info.memberName,
-                                member,
-                                reader
-                            )
-                        );
+                                String.format(
+                                        "Expected list item '%s' but found '%s': %s",
+                                        info.memberName,
+                                        member,
+                                        reader));
                     }
                     consumer.accept(state, this);
                     reader.closeElement(); // Close the list member.

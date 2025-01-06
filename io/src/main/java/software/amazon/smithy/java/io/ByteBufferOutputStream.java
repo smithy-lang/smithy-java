@@ -74,13 +74,12 @@ public final class ByteBufferOutputStream extends OutputStream {
         int minGrowth = minCapacity - oldCapacity;
         if (minGrowth > 0) {
             buf = Arrays.copyOf(
-                buf,
-                newLength(
-                    oldCapacity,
-                    minGrowth,
-                    oldCapacity /* preferred growth */
-                )
-            );
+                    buf,
+                    newLength(
+                            oldCapacity,
+                            minGrowth,
+                            oldCapacity /* preferred growth */
+                    ));
         }
     }
 
@@ -98,8 +97,7 @@ public final class ByteBufferOutputStream extends OutputStream {
         int minLength = oldLength + minGrowth;
         if (minLength < 0) { // overflow
             throw new OutOfMemoryError(
-                "Required array length " + oldLength + " + " + minGrowth + " is too large"
-            );
+                    "Required array length " + oldLength + " + " + minGrowth + " is too large");
         } else if (minLength <= SOFT_MAX_ARRAY_LENGTH) {
             return SOFT_MAX_ARRAY_LENGTH;
         } else {

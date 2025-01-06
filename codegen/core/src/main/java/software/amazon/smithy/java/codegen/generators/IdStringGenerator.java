@@ -26,9 +26,8 @@ public record IdStringGenerator(JavaWriter writer, Shape shape) implements Runna
         // Use the original shape ID here instead of any potentially renamed input or output shapes.
         // This is critical for shape serialization in protocols like XML.
         writer.write(
-            "public static final ${shapeId:T} $$ID = ${shapeId:T}.from($S);",
-            CodegenUtils.getOriginalId(shape)
-        );
+                "public static final ${shapeId:T} $$ID = ${shapeId:T}.from($S);",
+                CodegenUtils.getOriginalId(shape));
         writer.popState();
     }
 }

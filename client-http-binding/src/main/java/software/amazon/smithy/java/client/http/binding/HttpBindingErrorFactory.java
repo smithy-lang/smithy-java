@@ -34,16 +34,16 @@ public final class HttpBindingErrorFactory implements HttpErrorDeserializer.Know
 
     @Override
     public CompletableFuture<ModeledApiException> createError(
-        Context context,
-        Codec codec,
-        HttpResponse response,
-        ShapeBuilder<ModeledApiException> builder
+            Context context,
+            Codec codec,
+            HttpResponse response,
+            ShapeBuilder<ModeledApiException> builder
     ) {
         return httpBinding.responseDeserializer()
-            .payloadCodec(codec)
-            .errorShapeBuilder(builder)
-            .response(response)
-            .deserialize()
-            .thenApply(ignore -> builder.errorCorrection().build());
+                .payloadCodec(codec)
+                .errorShapeBuilder(builder)
+                .response(response)
+                .deserialize()
+                .thenApply(ignore -> builder.errorCorrection().build());
     }
 }

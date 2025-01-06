@@ -23,24 +23,23 @@ final class Assertions {
     private Assertions() {}
 
     private static final Set<Character> HEADER_DELIMS = Set.of(
-        '"',
-        '(',
-        ')',
-        ',',
-        '/',
-        ':',
-        ';',
-        '<',
-        '=',
-        '>',
-        '?',
-        '@',
-        '[',
-        '\\',
-        ']',
-        '{',
-        '}'
-    );
+            '"',
+            '(',
+            ')',
+            ',',
+            '/',
+            ':',
+            ';',
+            '<',
+            '=',
+            '>',
+            '?',
+            '@',
+            '[',
+            '\\',
+            ']',
+            '{',
+            '}');
 
     static void assertUriEquals(URI uri, String expected) {
         assertEquals(expected, uri.getRawPath());
@@ -57,10 +56,9 @@ final class Assertions {
             assertNotNull(headerValues);
             var converted = convertHeaderToString(headerEntry.getKey(), headerValues);
             assertEquals(
-                headerEntry.getValue(),
-                converted,
-                "Mismatch for header \"%s\"".formatted(headerEntry.getKey())
-            );
+                    headerEntry.getValue(),
+                    converted,
+                    "Mismatch for header \"%s\"".formatted(headerEntry.getKey()));
         }
     }
 
@@ -70,7 +68,7 @@ final class Assertions {
         }
         return values.stream().map(value -> {
             if (value.chars()
-                .anyMatch(c -> HEADER_DELIMS.contains((char) c) || Character.isWhitespace((char) c))) {
+                    .anyMatch(c -> HEADER_DELIMS.contains((char) c) || Character.isWhitespace((char) c))) {
                 return '"' + value.replaceAll("[\\s\"]", "\\\\$0") + '"';
             }
             return value;

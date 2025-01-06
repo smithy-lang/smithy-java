@@ -46,9 +46,8 @@ final class NoRetryImpl implements RetryStrategy {
             public Builder maxAttempts(int maxAttempts) {
                 if (maxAttempts != 1) {
                     throw new UnsupportedOperationException(
-                        "Cannot set maxAttempts to anything other than 1 with a "
-                            + "no-retry strategy"
-                    );
+                            "Cannot set maxAttempts to anything other than 1 with a "
+                                    + "no-retry strategy");
                 }
                 return this;
             }

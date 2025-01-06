@@ -37,9 +37,8 @@ public final class ImplicitErrorIndex implements KnowledgeIndex {
                 if (traitShape.hasTrait(ImplicitErrorsTrait.class)) {
                     var implicitErrorsTrait = traitShape.expectTrait(ImplicitErrorsTrait.class);
                     var implicitErrorList = serviceImplicitErrorMap.computeIfAbsent(
-                        service.toShapeId(),
-                        k -> new HashSet<>()
-                    );
+                            service.toShapeId(),
+                            k -> new HashSet<>());
                     implicitErrorList.addAll(implicitErrorsTrait.getValues());
                     implicitErrors.addAll(implicitErrorsTrait.getValues());
                 }

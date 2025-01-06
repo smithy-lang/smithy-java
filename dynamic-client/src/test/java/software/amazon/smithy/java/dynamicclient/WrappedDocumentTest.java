@@ -40,8 +40,8 @@ public class WrappedDocumentTest {
     @Test
     public void wrapsDelegate() {
         var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
-            .putMember("foo", PreludeSchemas.STRING)
-            .build();
+                .putMember("foo", PreludeSchemas.STRING)
+                .build();
         var document = Document.ofObject(Map.of("__type", "foo#Bar", "foo", "bar"));
 
         var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
@@ -54,8 +54,8 @@ public class WrappedDocumentTest {
     @Test
     public void unwrapsValuesWhenGettingMemberValue() {
         var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
-            .putMember("foo", PreludeSchemas.STRING)
-            .build();
+                .putMember("foo", PreludeSchemas.STRING)
+                .build();
         var document = Document.ofObject(Map.of("__type", "foo#Bar", "foo", "bar"));
         var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
 
@@ -65,8 +65,8 @@ public class WrappedDocumentTest {
     @Test
     public void returnsNullWhenMemberDoesNotExist() {
         var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
-            .putMember("foo", PreludeSchemas.STRING)
-            .build();
+                .putMember("foo", PreludeSchemas.STRING)
+                .build();
         var document = Document.of(Map.of());
         var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
 
@@ -77,8 +77,8 @@ public class WrappedDocumentTest {
     @Test
     public void callsDelegateIfNoDiscriminatorFound() {
         var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
-            .putMember("foo", PreludeSchemas.STRING)
-            .build();
+                .putMember("foo", PreludeSchemas.STRING)
+                .build();
         var document = Document.ofObject(Map.of("foo", "bar"));
 
         var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
@@ -89,8 +89,8 @@ public class WrappedDocumentTest {
     @Test
     public void getMemberWrapsToo() {
         var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
-            .putMember("foo", PreludeSchemas.STRING)
-            .build();
+                .putMember("foo", PreludeSchemas.STRING)
+                .build();
         var document = Document.ofObject(Map.of("foo", "bar"));
 
         var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
@@ -112,92 +112,78 @@ public class WrappedDocumentTest {
     static List<Arguments> convertsToTypeProvider() {
         var bytes = ByteBuffer.wrap("hi".getBytes(StandardCharsets.UTF_8));
         return List.of(
-            Arguments.arguments(
-                PreludeSchemas.BOOLEAN,
-                Document.of(true),
-                true,
-                (Function<Document, Object>) Document::asBoolean
-            ),
-            Arguments.arguments(
-                PreludeSchemas.STRING,
-                Document.of("hi"),
-                "hi",
-                (Function<Document, Object>) Document::asString
-            ),
-            Arguments.arguments(
-                PreludeSchemas.BYTE,
-                Document.of((byte) 1),
-                (byte) 1,
-                (Function<Document, Object>) Document::asByte
-            ),
-            Arguments.arguments(
-                PreludeSchemas.SHORT,
-                Document.of((short) 1),
-                (short) 1,
-                (Function<Document, Object>) Document::asShort
-            ),
-            Arguments.arguments(
-                PreludeSchemas.INTEGER,
-                Document.of(1),
-                1,
-                (Function<Document, Object>) Document::asInteger
-            ),
-            Arguments.arguments(
-                PreludeSchemas.LONG,
-                Document.of(1L),
-                1L,
-                (Function<Document, Object>) Document::asLong
-            ),
-            Arguments.arguments(
-                PreludeSchemas.FLOAT,
-                Document.of(1f),
-                1f,
-                (Function<Document, Object>) Document::asFloat
-            ),
-            Arguments.arguments(
-                PreludeSchemas.DOUBLE,
-                Document.of(1d),
-                1d,
-                (Function<Document, Object>) Document::asDouble
-            ),
-            Arguments.arguments(
-                PreludeSchemas.BIG_DECIMAL,
-                Document.of(BigDecimal.ONE),
-                BigDecimal.ONE,
-                (Function<Document, Object>) Document::asBigDecimal
-            ),
-            Arguments.arguments(
-                PreludeSchemas.BIG_INTEGER,
-                Document.of(BigInteger.ONE),
-                BigInteger.ONE,
-                (Function<Document, Object>) Document::asBigInteger
-            ),
-            Arguments.arguments(
-                PreludeSchemas.TIMESTAMP,
-                Document.of(Instant.EPOCH),
-                Instant.EPOCH,
-                (Function<Document, Object>) Document::asTimestamp
-            ),
-            Arguments.arguments(
-                PreludeSchemas.BIG_INTEGER,
-                Document.of(BigInteger.ONE),
-                BigInteger.ONE,
-                (Function<Document, Object>) Document::asNumber
-            ),
-            Arguments.arguments(
-                PreludeSchemas.BLOB,
-                Document.of(bytes),
-                bytes,
-                (Function<Document, Object>) Document::asBlob
-            )
-        );
+                Arguments.arguments(
+                        PreludeSchemas.BOOLEAN,
+                        Document.of(true),
+                        true,
+                        (Function<Document, Object>) Document::asBoolean),
+                Arguments.arguments(
+                        PreludeSchemas.STRING,
+                        Document.of("hi"),
+                        "hi",
+                        (Function<Document, Object>) Document::asString),
+                Arguments.arguments(
+                        PreludeSchemas.BYTE,
+                        Document.of((byte) 1),
+                        (byte) 1,
+                        (Function<Document, Object>) Document::asByte),
+                Arguments.arguments(
+                        PreludeSchemas.SHORT,
+                        Document.of((short) 1),
+                        (short) 1,
+                        (Function<Document, Object>) Document::asShort),
+                Arguments.arguments(
+                        PreludeSchemas.INTEGER,
+                        Document.of(1),
+                        1,
+                        (Function<Document, Object>) Document::asInteger),
+                Arguments.arguments(
+                        PreludeSchemas.LONG,
+                        Document.of(1L),
+                        1L,
+                        (Function<Document, Object>) Document::asLong),
+                Arguments.arguments(
+                        PreludeSchemas.FLOAT,
+                        Document.of(1f),
+                        1f,
+                        (Function<Document, Object>) Document::asFloat),
+                Arguments.arguments(
+                        PreludeSchemas.DOUBLE,
+                        Document.of(1d),
+                        1d,
+                        (Function<Document, Object>) Document::asDouble),
+                Arguments.arguments(
+                        PreludeSchemas.BIG_DECIMAL,
+                        Document.of(BigDecimal.ONE),
+                        BigDecimal.ONE,
+                        (Function<Document, Object>) Document::asBigDecimal),
+                Arguments.arguments(
+                        PreludeSchemas.BIG_INTEGER,
+                        Document.of(BigInteger.ONE),
+                        BigInteger.ONE,
+                        (Function<Document, Object>) Document::asBigInteger),
+                Arguments.arguments(
+                        PreludeSchemas.TIMESTAMP,
+                        Document.of(Instant.EPOCH),
+                        Instant.EPOCH,
+                        (Function<Document, Object>) Document::asTimestamp),
+                Arguments.arguments(
+                        PreludeSchemas.BIG_INTEGER,
+                        Document.of(BigInteger.ONE),
+                        BigInteger.ONE,
+                        (Function<Document, Object>) Document::asNumber),
+                Arguments.arguments(
+                        PreludeSchemas.BLOB,
+                        Document.of(bytes),
+                        bytes,
+                        (Function<Document, Object>) Document::asBlob));
     }
 
     @Test
     public void convertingToListWrapsValuesInSchemas() {
         var schema = Schema.listBuilder(ShapeId.from("foo#Bar"))
-            .putMember("member", PreludeSchemas.STRING)
-            .build();
+                .putMember("member", PreludeSchemas.STRING)
+                .build();
         var document = Document.ofObject(List.of("a", "b"));
 
         var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
@@ -214,9 +200,9 @@ public class WrappedDocumentTest {
     @Test
     public void convertingToMapWrapsValuesInSchemas() {
         var schema = Schema.mapBuilder(ShapeId.from("foo#Bar"))
-            .putMember("key", PreludeSchemas.STRING)
-            .putMember("value", PreludeSchemas.STRING)
-            .build();
+                .putMember("key", PreludeSchemas.STRING)
+                .putMember("value", PreludeSchemas.STRING)
+                .build();
         var document = Document.ofObject(Map.of("a", "b"));
 
         var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
@@ -232,9 +218,9 @@ public class WrappedDocumentTest {
     @Test
     public void convertingToStructMapWrapsValuesInSchemas() {
         var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
-            .putMember("a", PreludeSchemas.STRING)
-            .putMember("b", PreludeSchemas.STRING)
-            .build();
+                .putMember("a", PreludeSchemas.STRING)
+                .putMember("b", PreludeSchemas.STRING)
+                .build();
         var document = Document.ofObject(Map.of("a", "a", "b", "b", "c", "c"));
 
         var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
@@ -257,10 +243,9 @@ public class WrappedDocumentTest {
     @Test
     public void serializesDocumentLikeShape() {
         var wrapped = new WrappedDocument(
-            ShapeId.from("smithy.example#S"),
-            PreludeSchemas.STRING,
-            Document.of("hi")
-        );
+                ShapeId.from("smithy.example#S"),
+                PreludeSchemas.STRING,
+                Document.of("hi"));
         Schema[] set = new Schema[1];
 
         wrapped.serialize(new SpecificShapeSerializer() {
@@ -276,9 +261,9 @@ public class WrappedDocumentTest {
     @Test
     public void serializesStructDocumentLikeStruct() {
         var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
-            .putMember("a", PreludeSchemas.STRING)
-            .putMember("b", PreludeSchemas.STRING)
-            .build();
+                .putMember("a", PreludeSchemas.STRING)
+                .putMember("b", PreludeSchemas.STRING)
+                .build();
         var document = Document.ofObject(Map.of("a", "a", "b", "b", "c", "c"));
         var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
         Schema[] set = new Schema[3];
@@ -304,9 +289,9 @@ public class WrappedDocumentTest {
     @Test
     public void serializesUnionDocumentLikeUnion() {
         var schema = Schema.unionBuilder(ShapeId.from("foo#Bar"))
-            .putMember("a", PreludeSchemas.STRING)
-            .putMember("b", PreludeSchemas.STRING)
-            .build();
+                .putMember("a", PreludeSchemas.STRING)
+                .putMember("b", PreludeSchemas.STRING)
+                .build();
         var document = Document.ofObject(Map.of("a", "a"));
         var sd = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, document);
         Schema[] set = new Schema[2];

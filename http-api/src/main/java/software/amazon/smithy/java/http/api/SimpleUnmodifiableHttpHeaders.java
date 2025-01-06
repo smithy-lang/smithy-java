@@ -114,9 +114,9 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
     // Because of this, when creating HttpHeaders from the returned maps, there's no need to copy the map.
 
     static Map<String, List<String>> addHeaders(
-        HttpHeaders original,
-        Map<String, List<String>> mutatedHeaders,
-        Map<String, List<String>> from
+            HttpHeaders original,
+            Map<String, List<String>> mutatedHeaders,
+            Map<String, List<String>> from
     ) {
         if (mutatedHeaders == null) {
             if (original.isEmpty()) {
@@ -126,16 +126,16 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
         }
         for (var entry : from.entrySet()) {
             mutatedHeaders.computeIfAbsent(entry.getKey(), k -> new ArrayList<>())
-                .addAll(copyAndTrimValues(entry.getValue()));
+                    .addAll(copyAndTrimValues(entry.getValue()));
         }
         return mutatedHeaders;
     }
 
     static Map<String, List<String>> addHeader(
-        HttpHeaders original,
-        Map<String, List<String>> mutatedHeaders,
-        String field,
-        String value
+            HttpHeaders original,
+            Map<String, List<String>> mutatedHeaders,
+            String field,
+            String value
     ) {
         if (mutatedHeaders == null) {
             mutatedHeaders = SimpleUnmodifiableHttpHeaders.copyHeaders(original.map());
@@ -155,9 +155,9 @@ final class SimpleUnmodifiableHttpHeaders implements HttpHeaders {
     }
 
     static Map<String, List<String>> replaceHeaders(
-        HttpHeaders original,
-        Map<String, List<String>> mutated,
-        Map<String, List<String>> replace
+            HttpHeaders original,
+            Map<String, List<String>> mutated,
+            Map<String, List<String>> replace
     ) {
         if (mutated == null) {
             mutated = SimpleUnmodifiableHttpHeaders.copyHeaders(original.map());

@@ -23,27 +23,26 @@ public final class DocumentUtils {
     private DocumentUtils() {}
 
     private static final Map<Class<? extends Number>, Schema> NUMBER_MAPPING = Map.of(
-        AtomicLong.class,
-        PreludeSchemas.LONG,
-        AtomicInteger.class,
-        PreludeSchemas.INTEGER,
-        Byte.class,
-        PreludeSchemas.BYTE,
-        Short.class,
-        PreludeSchemas.SHORT,
-        Integer.class,
-        PreludeSchemas.INTEGER,
-        Long.class,
-        PreludeSchemas.LONG,
-        Float.class,
-        PreludeSchemas.FLOAT,
-        Double.class,
-        PreludeSchemas.DOUBLE,
-        BigInteger.class,
-        PreludeSchemas.BIG_INTEGER,
-        BigDecimal.class,
-        PreludeSchemas.BIG_DECIMAL
-    );
+            AtomicLong.class,
+            PreludeSchemas.LONG,
+            AtomicInteger.class,
+            PreludeSchemas.INTEGER,
+            Byte.class,
+            PreludeSchemas.BYTE,
+            Short.class,
+            PreludeSchemas.SHORT,
+            Integer.class,
+            PreludeSchemas.INTEGER,
+            Long.class,
+            PreludeSchemas.LONG,
+            Float.class,
+            PreludeSchemas.FLOAT,
+            Double.class,
+            PreludeSchemas.DOUBLE,
+            BigInteger.class,
+            PreludeSchemas.BIG_INTEGER,
+            BigDecimal.class,
+            PreludeSchemas.BIG_DECIMAL);
 
     public static void serializeNumber(ShapeSerializer serializer, Schema schema, Number value) {
         switch (schema.type()) {
@@ -65,11 +64,12 @@ public final class DocumentUtils {
         } else if (number instanceof BigInteger b) {
             return new BigDecimal(b);
         } else if (number instanceof Integer || number instanceof Long
-            || number instanceof Byte || number instanceof Short) {
-                return BigDecimal.valueOf(number.longValue());
-            } else {
-                return BigDecimal.valueOf(number.doubleValue());
-            }
+                || number instanceof Byte
+                || number instanceof Short) {
+            return BigDecimal.valueOf(number.longValue());
+        } else {
+            return BigDecimal.valueOf(number.doubleValue());
+        }
     }
 
     private static BigInteger toBigInteger(Number number) {
@@ -93,12 +93,10 @@ public final class DocumentUtils {
             return PreludeSchemas.BIG_DECIMAL;
         } else {
             throw new IllegalArgumentException(
-                String.format(
-                    "Unsupported Number: %s; expected one of %s",
-                    value.getClass(),
-                    NUMBER_MAPPING.keySet()
-                )
-            );
+                    String.format(
+                            "Unsupported Number: %s; expected one of %s",
+                            value.getClass(),
+                            NUMBER_MAPPING.keySet()));
         }
     }
 
@@ -121,8 +119,8 @@ public final class DocumentUtils {
             // When the values have a BigDecimal or BigInteger, normalize them both to BigDecimal. This is used even
             // for BigInteger to avoid dropping decimals from doubles or floats (e.g., 10.01 != 10).
             return DocumentUtils.toBigDecimal(a)
-                .stripTrailingZeros()
-                .compareTo(DocumentUtils.toBigDecimal(b).stripTrailingZeros()) == 0;
+                    .stripTrailingZeros()
+                    .compareTo(DocumentUtils.toBigDecimal(b).stripTrailingZeros()) == 0;
         } else if (a instanceof Double || b instanceof Double || a instanceof Float || b instanceof Float) {
             // Treat floats as double to allow for comparing larger values from rhs, like longs.
             return a.doubleValue() == b.doubleValue();
@@ -133,7 +131,8 @@ public final class DocumentUtils {
 
     private static boolean isBig(Number a, Number b) {
         return a instanceof BigDecimal || b instanceof BigDecimal
-            || a instanceof BigInteger || b instanceof BigInteger;
+                || a instanceof BigInteger
+                || b instanceof BigInteger;
     }
 
     /**
@@ -157,19 +156,17 @@ public final class DocumentUtils {
         try {
             // Make sure it's part of the schema.
             var value = SchemaUtils.validateMemberInSchema(
-                containerSchema,
-                member,
-                container.getMember(member.memberName())
-            );
+                    containerSchema,
+                    member,
+                    container.getMember(member.memberName()));
             // If it's a document, unwrap it.
             // This should work for most use cases of DynamicClient, but this won't perfectly interoperate with all
             // use-cases or be a stand-in when an actual type is expected.
             return (T) (value != null ? value.asObject() : null);
         } catch (ClassCastException e) {
             throw new ClassCastException(
-                "Unable to cast document member `" + member.id() + "` from document with schema `" + containerSchema
-                    .id() + "`: " + e.getMessage()
-            );
+                    "Unable to cast document member `" + member.id() + "` from document with schema `" + containerSchema
+                            .id() + "`: " + e.getMessage());
         }
     }
 }

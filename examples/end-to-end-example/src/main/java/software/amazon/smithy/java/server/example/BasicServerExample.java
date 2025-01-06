@@ -16,15 +16,14 @@ public class BasicServerExample implements Runnable {
     @Override
     public void run() {
         Server server = Server.builder()
-            .endpoints(endpoint)
-            .addService(
-                CoffeeShop.builder()
-                    .addCreateOrderOperation(new CreateOrder())
-                    .addGetMenuOperation(new GetMenu())
-                    .addGetOrderOperation(new GetOrder())
-                    .build()
-            )
-            .build();
+                .endpoints(endpoint)
+                .addService(
+                        CoffeeShop.builder()
+                                .addCreateOrderOperation(new CreateOrder())
+                                .addGetMenuOperation(new GetMenu())
+                                .addGetOrderOperation(new GetOrder())
+                                .build())
+                .build();
         System.out.println("Starting server...");
         server.start();
         try {

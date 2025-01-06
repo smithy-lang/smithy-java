@@ -32,7 +32,8 @@ public final class JavaServerCodegenPlugin implements SmithyBuildPlugin {
 
     @Override
     public void execute(PluginContext context) {
-        CodegenDirector<JavaWriter, JavaCodegenIntegration, CodeGenerationContext, JavaCodegenSettings> runner = new CodegenDirector<>();
+        CodegenDirector<JavaWriter, JavaCodegenIntegration, CodeGenerationContext, JavaCodegenSettings> runner =
+                new CodegenDirector<>();
 
         var settings = JavaCodegenSettings.fromNode(context.getSettings());
         LOGGER.info("Generating Smithy-Java client for service [{}]...", settings.service());

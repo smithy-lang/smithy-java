@@ -11,8 +11,7 @@ import java.util.Base64;
 
 public final class ByteBufferUtils {
 
-    private ByteBufferUtils() {
-    }
+    private ByteBufferUtils() {}
 
     public static String base64Encode(ByteBuffer buffer) {
         byte[] bytes;

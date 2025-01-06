@@ -22,9 +22,9 @@ public abstract class ServerBuilder<T extends ServerBuilder<T>> {
         if (routes.isEmpty()) {
             for (var entry : servicePathMappings.entrySet()) {
                 var serviceMatcher = Route.builder()
-                    .pathPrefix(entry.getKey())
-                    .services(entry.getValue())
-                    .build();
+                        .pathPrefix(entry.getKey())
+                        .services(entry.getValue())
+                        .build();
                 routes.add(serviceMatcher);
             }
         }
@@ -47,8 +47,7 @@ public abstract class ServerBuilder<T extends ServerBuilder<T>> {
     public final T addService(String path, Service service) {
         if (!routes.isEmpty()) {
             throw new IllegalStateException(
-                "Either use addService(ServiceDefinition...) or addService(Service...), not both"
-            );
+                    "Either use addService(ServiceDefinition...) or addService(Service...), not both");
         }
         servicePathMappings.computeIfAbsent(path, k -> new ArrayList<>()).add(service);
         return self();
@@ -61,8 +60,7 @@ public abstract class ServerBuilder<T extends ServerBuilder<T>> {
     public final T addService(Route route) {
         if (!servicePathMappings.isEmpty()) {
             throw new IllegalStateException(
-                "Either use addService(ServiceDefinition...) or addService(Service...), not both"
-            );
+                    "Either use addService(ServiceDefinition...) or addService(Service...), not both");
         }
         routes.add(Objects.requireNonNull(route, "A non-null service matcher is required"));
         return self();

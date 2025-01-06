@@ -42,17 +42,17 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
         super(Rpcv2CborTrait.ID);
         this.service = service;
         this.errorDeserializer = HttpErrorDeserializer.builder()
-            .codec(CBOR_CODEC)
-            .serviceId(service)
-            .build();
+                .codec(CBOR_CODEC)
+                .serviceId(service)
+                .build();
     }
 
     @Override
     public <I extends SerializableStruct, O extends SerializableStruct> HttpRequest createRequest(
-        ApiOperation<I, O> operation,
-        I input,
-        Context context,
-        URI endpoint
+            ApiOperation<I, O> operation,
+            I input,
+            Context context,
+            URI endpoint
     ) {
         var target = "/service/" + service.getName() + "/operation/" + operation.schema().id().getName();
 
@@ -61,11 +61,10 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
         if (Unit.ID.equals(operation.inputSchema().id())) {
             // Top-level Unit types do not get serialized
             headers = Map.of(
-                "smithy-protocol",
-                SMITHY_PROTOCOL,
-                "Accept",
-                CONTENT_TYPE
-            );
+                    "smithy-protocol",
+                    SMITHY_PROTOCOL,
+                    "Accept",
+                    CONTENT_TYPE);
             body = DataStream.ofEmpty();
         } else {
             var sink = new ByteBufferOutputStream();
@@ -73,37 +72,36 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
                 input.serialize(serializer);
             }
             headers = Map.of(
-                "Content-Type",
-                CONTENT_TYPE,
-                "smithy-protocol",
-                SMITHY_PROTOCOL,
-                "Accept",
-                CONTENT_TYPE
-            );
+                    "Content-Type",
+                    CONTENT_TYPE,
+                    "smithy-protocol",
+                    SMITHY_PROTOCOL,
+                    "Accept",
+                    CONTENT_TYPE);
             body = DataStream.ofByteBuffer(sink.toByteBuffer(), "application/cbor");
         }
 
         return HttpRequest.builder()
-            .method("POST")
-            .uri(endpoint.resolve(target))
-            .headers(HttpHeaders.of(headers))
-            .body(body)
-            .build();
+                .method("POST")
+                .uri(endpoint.resolve(target))
+                .headers(HttpHeaders.of(headers))
+                .body(body)
+                .build();
     }
 
     @Override
     public <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
-        ApiOperation<I, O> operation,
-        Context context,
-        TypeRegistry typeRegistry,
-        HttpRequest request,
-        HttpResponse response
+            ApiOperation<I, O> operation,
+            Context context,
+            TypeRegistry typeRegistry,
+            HttpRequest request,
+            HttpResponse response
     ) {
         if (response.statusCode() != 200) {
             return errorDeserializer.createError(context, operation.schema().id(), typeRegistry, response)
-                .thenApply(e -> {
-                    throw e;
-                });
+                    .thenApply(e -> {
+                        throw e;
+                    });
         }
 
         var builder = operation.outputBuilder();
@@ -113,8 +111,8 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
         }
 
         return content.asByteBuffer()
-            .thenApply(bytes -> CBOR_CODEC.deserializeShape(bytes, builder))
-            .toCompletableFuture();
+                .thenApply(bytes -> CBOR_CODEC.deserializeShape(bytes, builder))
+                .toCompletableFuture();
     }
 
     public static final class Factory implements ClientProtocolFactory<Rpcv2CborTrait> {
@@ -126,11 +124,9 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
         @Override
         public ClientProtocol<?, ?> createProtocol(ProtocolSettings settings, Rpcv2CborTrait trait) {
             return new RpcV2CborProtocol(
-                Objects.requireNonNull(
-                    settings.service(),
-                    "service is a required protocol setting"
-                )
-            );
+                    Objects.requireNonNull(
+                            settings.service(),
+                            "service is a required protocol setting"));
         }
     }
 }

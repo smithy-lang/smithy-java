@@ -48,8 +48,8 @@ final class PayloadSerializer implements ShapeSerializer {
 
     @Override
     public void writeEventStream(
-        Schema schema,
-        Flow.Publisher<? extends SerializableStruct> value
+            Schema schema,
+            Flow.Publisher<? extends SerializableStruct> value
     ) {
         payloadWritten = true;
         serializer.setEventStream(value);

@@ -23,10 +23,10 @@ public class AwsEventEncoderFactory implements EventEncoderFactory<AwsEventFrame
     private final Function<Throwable, EventStreamingException> exceptionHandler;
 
     private AwsEventEncoderFactory(
-        Schema schema,
-        Codec codec,
-        String payloadMediaType,
-        Function<Throwable, EventStreamingException> exceptionHandler
+            Schema schema,
+            Codec codec,
+            String payloadMediaType,
+            Function<Throwable, EventStreamingException> exceptionHandler
     ) {
         this.schema = schema.isMember() ? schema.memberTarget() : schema;
         this.codec = codec;
@@ -35,19 +35,19 @@ public class AwsEventEncoderFactory implements EventEncoderFactory<AwsEventFrame
     }
 
     public static AwsEventEncoderFactory forInputStream(
-        InputEventStreamingApiOperation<?, ?, ?> operation,
-        Codec codec,
-        String payloadMediaType,
-        Function<Throwable, EventStreamingException> exceptionHandler
+            InputEventStreamingApiOperation<?, ?, ?> operation,
+            Codec codec,
+            String payloadMediaType,
+            Function<Throwable, EventStreamingException> exceptionHandler
     ) {
         return new AwsEventEncoderFactory(operation.inputStreamMember(), codec, payloadMediaType, exceptionHandler);
     }
 
     public static AwsEventEncoderFactory forOutputStream(
-        OutputEventStreamingApiOperation<?, ?, ?> operation,
-        Codec codec,
-        String payloadMediaType,
-        Function<Throwable, EventStreamingException> exceptionHandler
+            OutputEventStreamingApiOperation<?, ?, ?> operation,
+            Codec codec,
+            String payloadMediaType,
+            Function<Throwable, EventStreamingException> exceptionHandler
     ) {
         return new AwsEventEncoderFactory(operation.outputStreamMember(), codec, payloadMediaType, exceptionHandler);
     }

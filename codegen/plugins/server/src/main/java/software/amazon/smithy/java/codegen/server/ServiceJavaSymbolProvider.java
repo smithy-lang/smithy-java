@@ -35,25 +35,25 @@ public final class ServiceJavaSymbolProvider extends JavaSymbolProvider {
         String asyncStubName = stubName + "Async";
         String operationFieldName = StringUtils.uncapitalize(baseSymbol.getName());
         var stubSymbol = Symbol.builder()
-            .name(stubName)
-            .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-            .namespace(format("%s.service", packageNamespace()), ".")
-            .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), stubName))
-            .build();
+                .name(stubName)
+                .putProperty(SymbolProperties.IS_PRIMITIVE, false)
+                .namespace(format("%s.service", packageNamespace()), ".")
+                .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), stubName))
+                .build();
         var asyncStubSymbol = Symbol.builder()
-            .name(asyncStubName)
-            .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-            .namespace(format("%s.service", packageNamespace()), ".")
-            .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), asyncStubName))
-            .build();
+                .name(asyncStubName)
+                .putProperty(SymbolProperties.IS_PRIMITIVE, false)
+                .namespace(format("%s.service", packageNamespace()), ".")
+                .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), asyncStubName))
+                .build();
         var apiOperationSymbol = super.operationShape(operationShape);
         return baseSymbol.toBuilder()
-            .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-            .putProperty(ServerSymbolProperties.OPERATION_FIELD_NAME, operationFieldName)
-            .putProperty(ServerSymbolProperties.ASYNC_STUB_OPERATION, asyncStubSymbol)
-            .putProperty(ServerSymbolProperties.STUB_OPERATION, stubSymbol)
-            .putProperty(ServerSymbolProperties.API_OPERATION, apiOperationSymbol)
-            .build();
+                .putProperty(SymbolProperties.IS_PRIMITIVE, false)
+                .putProperty(ServerSymbolProperties.OPERATION_FIELD_NAME, operationFieldName)
+                .putProperty(ServerSymbolProperties.ASYNC_STUB_OPERATION, asyncStubSymbol)
+                .putProperty(ServerSymbolProperties.STUB_OPERATION, stubSymbol)
+                .putProperty(ServerSymbolProperties.API_OPERATION, apiOperationSymbol)
+                .build();
     }
 
     @Override
@@ -63,10 +63,10 @@ public final class ServiceJavaSymbolProvider extends JavaSymbolProvider {
 
     private Symbol getServerJavaClassSymbol() {
         return Symbol.builder()
-            .name(serviceName)
-            .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-            .namespace(format("%s.service", packageNamespace()), ".")
-            .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), serviceName))
-            .build();
+                .name(serviceName)
+                .putProperty(SymbolProperties.IS_PRIMITIVE, false)
+                .namespace(format("%s.service", packageNamespace()), ".")
+                .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), serviceName))
+                .build();
     }
 }

@@ -116,10 +116,10 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
     public Symbol blobShape(BlobShape blobShape) {
         var type = blobShape.hasTrait(StreamingTrait.class) ? DataStream.class : ByteBuffer.class;
         return CodegenUtils.fromClass(type)
-            .toBuilder()
-            .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
-            .build();
+                .toBuilder()
+                .putProperty(SymbolProperties.IS_PRIMITIVE, false)
+                .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
+                .build();
     }
 
     @Override
@@ -130,26 +130,26 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
     @Override
     public Symbol listShape(ListShape listShape) {
         return CodegenUtils.fromClass(List.class)
-            .toBuilder()
-            .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, "unmodifiableList")
-            .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, ArrayList.class)
-            .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptyList()")
-            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
-            .addReference(listShape.getMember().accept(this))
-            .build();
+                .toBuilder()
+                .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, "unmodifiableList")
+                .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, ArrayList.class)
+                .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptyList()")
+                .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
+                .addReference(listShape.getMember().accept(this))
+                .build();
     }
 
     @Override
     public Symbol mapShape(MapShape mapShape) {
         return CodegenUtils.fromClass(Map.class)
-            .toBuilder()
-            .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, "unmodifiableMap")
-            .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashMap.class)
-            .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptyMap()")
-            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
-            .addReference(mapShape.getKey().accept(this))
-            .addReference(mapShape.getValue().accept(this))
-            .build();
+                .toBuilder()
+                .putProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER, "unmodifiableMap")
+                .putProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS, LinkedHashMap.class)
+                .putProperty(SymbolProperties.COLLECTION_EMPTY_METHOD, "emptyMap()")
+                .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
+                .addReference(mapShape.getKey().accept(this))
+                .addReference(mapShape.getValue().accept(this))
+                .build();
     }
 
     @Override
@@ -170,9 +170,9 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
     @Override
     public Symbol intEnumShape(IntEnumShape shape) {
         return getJavaClassSymbol(shape).toBuilder()
-            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
-            .putProperty(SymbolProperties.ENUM_VALUE_TYPE, integerShape(shape))
-            .build();
+                .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
+                .putProperty(SymbolProperties.ENUM_VALUE_TYPE, integerShape(shape))
+                .build();
     }
 
     @Override
@@ -218,18 +218,16 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
     @Override
     public Symbol memberShape(MemberShape memberShape) {
         var target = model.getShape(memberShape.getTarget())
-            .orElseThrow(
-                () -> new CodegenException(
-                    "Could not find shape " + memberShape.getTarget() + " targeted by "
-                        + memberShape
-                )
-            );
+                .orElseThrow(
+                        () -> new CodegenException(
+                                "Could not find shape " + memberShape.getTarget() + " targeted by "
+                                        + memberShape));
 
         if (CodegenUtils.isEventStream(target)) {
             return CodegenUtils.fromClass(Flow.Publisher.class)
-                .toBuilder()
-                .addReference(toSymbol(target))
-                .build();
+                    .toBuilder()
+                    .addReference(toSymbol(target))
+                    .build();
         }
         return toSymbol(target);
     }
@@ -257,9 +255,9 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
     @Override
     public Symbol enumShape(EnumShape shape) {
         return getJavaClassSymbol(shape).toBuilder()
-            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
-            .putProperty(SymbolProperties.ENUM_VALUE_TYPE, stringShape(shape))
-            .build();
+                .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, false)
+                .putProperty(SymbolProperties.ENUM_VALUE_TYPE, stringShape(shape))
+                .build();
     }
 
     @Override
@@ -286,11 +284,11 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
     private Symbol getJavaClassSymbol(Shape shape) {
         String name = CodegenUtils.getDefaultName(shape, service);
         return Symbol.builder()
-            .name(name)
-            .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-            .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, true)
-            .namespace(format("%s.model", packageNamespace), ".")
-            .declarationFile(format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name))
-            .build();
+                .name(name)
+                .putProperty(SymbolProperties.IS_PRIMITIVE, false)
+                .putProperty(SymbolProperties.REQUIRES_STATIC_DEFAULT, true)
+                .namespace(format("%s.model", packageNamespace), ".")
+                .declarationFile(format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name))
+                .build();
     }
 }

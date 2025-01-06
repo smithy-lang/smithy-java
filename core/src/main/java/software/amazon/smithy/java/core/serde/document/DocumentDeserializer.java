@@ -42,16 +42,14 @@ public class DocumentDeserializer implements ShapeDeserializer {
         } catch (ShapeIdSyntaxException e) {
             if (defaultNamespace == null && !text.contains("#")) {
                 throw new DiscriminatorException(
-                    "Attempted to parse a document discriminator that only provides a "
-                        + "shape name, but no default namespace was configured: " + text,
-                    e
-                );
+                        "Attempted to parse a document discriminator that only provides a "
+                                + "shape name, but no default namespace was configured: " + text,
+                        e);
             } else {
                 throw new DiscriminatorException(
-                    "Unable to parse the document discriminator into a valid shape ID: "
-                        + text,
-                    e
-                );
+                        "Unable to parse the document discriminator into a valid shape ID: "
+                                + text,
+                        e);
             }
         }
     }

@@ -17,7 +17,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 
 @SmithyInternalApi
 public abstract class DeferredSymbolWriter<W extends SymbolWriter<W, I>, I extends ImportContainer> extends
-    SymbolWriter<W, I> {
+        SymbolWriter<W, I> {
 
     protected final Map<String, Set<Symbol>> symbolTable = new HashMap<>();
 

@@ -31,13 +31,13 @@ final class HttpPrefixHeadersSerializer extends SpecificShapeSerializer {
     }
 
     private record PrefixHeadersMapSerializer(String prefix, BiConsumer<String, String> headerConsumer) implements
-        MapSerializer {
+            MapSerializer {
         @Override
         public <K> void writeEntry(
-            Schema keySchema,
-            String key,
-            K keyState,
-            BiConsumer<K, ShapeSerializer> valueSerializer
+                Schema keySchema,
+                String key,
+                K keyState,
+                BiConsumer<K, ShapeSerializer> valueSerializer
         ) {
             valueSerializer.accept(keyState, new SpecificShapeSerializer() {
                 @Override

@@ -35,7 +35,7 @@ import software.amazon.smithy.java.retries.api.RetryStrategy;
 public final class ClientConfig {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ClientConfig.class);
     private static final List<ClientTransportFactory<?, ?>> TRANSPORT_FACTORIES = ClientTransportFactory
-        .load(ClientConfig.class.getClassLoader());
+            .load(ClientConfig.class.getClassLoader());
     private static final AuthScheme<Object, Identity> NO_AUTH_AUTH_SCHEME = AuthScheme.noAuthAuthScheme();
 
     private final Builder originalBuilder;
@@ -99,10 +99,9 @@ public final class ClientConfig {
             }
         }
         throw new IllegalArgumentException(
-            "No compatible transport found for protocol '" + protocol + "'. "
-                + "Add a compatible ClientTransportFactory Service provider to the classpath, "
-                + "or add a compatible transport to the client builder."
-        );
+                "No compatible transport found for protocol '" + protocol + "'. "
+                        + "Add a compatible ClientTransportFactory Service provider to the classpath, "
+                        + "or add a compatible transport to the client builder.");
     }
 
     /**

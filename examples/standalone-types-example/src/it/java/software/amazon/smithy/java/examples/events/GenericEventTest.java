@@ -23,19 +23,18 @@ import software.amazon.smithy.java.example.events.model.ReturnEvent;
 
 public class GenericEventTest {
     private final TypeRegistry typeRegistry = TypeRegistry.builder()
-        .putType(NewOrderEvent.$ID, NewOrderEvent.class, NewOrderEvent::builder)
-        .putType(QueryEvent.$ID, QueryEvent.class, QueryEvent::builder)
-        .putType(ReturnEvent.$ID, ReturnEvent.class, ReturnEvent::builder)
-        .build();
+            .putType(NewOrderEvent.$ID, NewOrderEvent.class, NewOrderEvent::builder)
+            .putType(QueryEvent.$ID, QueryEvent.class, QueryEvent::builder)
+            .putType(ReturnEvent.$ID, ReturnEvent.class, ReturnEvent::builder)
+            .build();
     private final Instant now = Instant.now();
     private final List<SerializableShape> inputs = List.of(
-        NewOrderEvent.builder().quantity(2).itemId("one").timestamp(now).build(),
-        QueryEvent.builder().itemId("one").timestamp(now.plusMillis(1)).build(),
-        QueryEvent.builder().itemId("two").timestamp(now.plusMillis(2)).build(),
-        ReturnEvent.builder().quantity(1).reason("because").itemId("one").timestamp(now.plusMillis(4)).build(),
-        QueryEvent.builder().itemId("two").timestamp(now.plusMillis(6)).build(),
-        NewOrderEvent.builder().quantity(1).itemId("two").timestamp(now.plusMillis(7)).build()
-    );
+            NewOrderEvent.builder().quantity(2).itemId("one").timestamp(now).build(),
+            QueryEvent.builder().itemId("one").timestamp(now.plusMillis(1)).build(),
+            QueryEvent.builder().itemId("two").timestamp(now.plusMillis(2)).build(),
+            ReturnEvent.builder().quantity(1).reason("because").itemId("one").timestamp(now.plusMillis(4)).build(),
+            QueryEvent.builder().itemId("two").timestamp(now.plusMillis(6)).build(),
+            NewOrderEvent.builder().quantity(1).itemId("two").timestamp(now.plusMillis(7)).build());
 
     @Test
     void mockEventSystem() {

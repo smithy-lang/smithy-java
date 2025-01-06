@@ -66,10 +66,10 @@ public final class UserAgentPlugin implements ClientPlugin {
             }
 
             STATIC_SEGMENT = "smithy-java/" + Version.VERSION
-                + " ua/" + UA_VERSION
-                + " os/" + getOsFamily() + "#" + sanitizeValue(System.getProperty("os.version"))
-                + " lang/java#" + sanitizeValue(System.getProperty("java.version"))
-                + ' ';
+                    + " ua/" + UA_VERSION
+                    + " os/" + getOsFamily() + "#" + sanitizeValue(System.getProperty("os.version"))
+                    + " lang/java#" + sanitizeValue(System.getProperty("java.version"))
+                    + ' ';
         }
 
         @Override
@@ -77,9 +77,9 @@ public final class UserAgentPlugin implements ClientPlugin {
             return hook.mapRequest(HttpRequest.class, h -> {
                 if (!h.request().headers().hasHeader("user-agent")) {
                     return h.request()
-                        .toBuilder()
-                        .withReplacedHeader("user-agent", List.of(createUa(h.context())))
-                        .build();
+                            .toBuilder()
+                            .withReplacedHeader("user-agent", List.of(createUa(h.context())))
+                            .build();
                 }
                 return h.request();
             });

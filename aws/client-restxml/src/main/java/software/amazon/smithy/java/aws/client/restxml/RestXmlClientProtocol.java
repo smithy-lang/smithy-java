@@ -43,11 +43,11 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
 
         this.codec = XmlCodec.builder().build();
         this.errorDeserializer = HttpErrorDeserializer.builder()
-            .codec(codec)
-            .serviceId(service)
-            .knownErrorFactory(new HttpBindingErrorFactory(httpBinding()))
-            .headerErrorExtractor(new AmznErrorHeaderExtractor())
-            .build();
+                .codec(codec)
+                .serviceId(service)
+                .knownErrorFactory(new HttpBindingErrorFactory(httpBinding()))
+                .headerErrorExtractor(new AmznErrorHeaderExtractor())
+                .build();
     }
 
     @Override
@@ -72,20 +72,19 @@ public final class RestXmlClientProtocol extends HttpBindingClientProtocol<AwsEv
 
     @Override
     protected EventEncoderFactory<AwsEventFrame> getEventEncoderFactory(
-        InputEventStreamingApiOperation<?, ?, ?> inputOperation
+            InputEventStreamingApiOperation<?, ?, ?> inputOperation
     ) {
         // TODO: this is where you'd plumb through Sigv4 support, another frame transformer?
         return AwsEventEncoderFactory.forInputStream(
-            inputOperation,
-            codec(),
-            payloadMediaType(),
-            (e) -> new EventStreamingException("InternalServerException", "Internal Server Error")
-        );
+                inputOperation,
+                codec(),
+                payloadMediaType(),
+                (e) -> new EventStreamingException("InternalServerException", "Internal Server Error"));
     }
 
     @Override
     protected EventDecoderFactory<AwsEventFrame> getEventDecoderFactory(
-        OutputEventStreamingApiOperation<?, ?, ?> outputOperation
+            OutputEventStreamingApiOperation<?, ?, ?> outputOperation
     ) {
         return AwsEventDecoderFactory.forOutputStream(outputOperation, codec(), f -> f);
     }

@@ -44,8 +44,8 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
 
     @Override
     public ShapeDeserializer newDeserializer(
-        byte[] source,
-        JsonSettings settings
+            byte[] source,
+            JsonSettings settings
     ) {
         try {
             return new JacksonJsonDeserializer(FACTORY.createParser(source), settings);
@@ -67,8 +67,8 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
 
     @Override
     public ShapeSerializer newSerializer(
-        OutputStream sink,
-        JsonSettings settings
+            OutputStream sink,
+            JsonSettings settings
     ) {
         try {
             return new JacksonJsonSerializer(FACTORY.createGenerator(sink), settings);

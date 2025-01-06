@@ -16,7 +16,7 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 
 final class DefaultAsyncPaginator<I extends SerializableStruct, O extends SerializableStruct> implements
-    AsyncPaginator<O> {
+        AsyncPaginator<O> {
 
     private final PaginatableAsync<I, O> call;
     private final PaginationInputSetter<I> inputFactory;
@@ -42,11 +42,10 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
         var itemsPath = trait.getItems().orElse(null);
 
         this.inputFactory = new PaginationInputSetter<>(
-            input,
-            operation,
-            inputTokenMember,
-            pageSizeMember
-        );
+                input,
+                operation,
+                inputTokenMember,
+                pageSizeMember);
 
         if (pageSizeMember != null) {
             var pageSizeSchema = input.schema().member(pageSizeMember);
@@ -54,10 +53,9 @@ final class DefaultAsyncPaginator<I extends SerializableStruct, O extends Serial
         }
 
         this.extractor = new PaginationTokenExtractor(
-            operation.outputSchema(),
-            outputTokenPath,
-            itemsPath
-        );
+                operation.outputSchema(),
+                outputTokenPath,
+                itemsPath);
     }
 
     @Override

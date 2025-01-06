@@ -26,15 +26,15 @@ public class TraitsTest {
 
     private static List<Arguments> memberSchemaSource() {
         return List.of(
-            Arguments.of("stringDefault", DefaultTrait.class, new DefaultTrait(Node.from("string"))),
-            Arguments.of("stringWithLength", LengthTrait.class, LengthTrait.builder().min(10L).build()),
-            Arguments.of("numberWithRange", RangeTrait.class, RangeTrait.builder().max(new BigDecimal("100")).build()),
-            Arguments.of(
-                "xmlNamespaced",
-                XmlNamespaceTrait.class,
-                XmlNamespaceTrait.builder().uri("http://foo.com").build()
-            )
-        );
+                Arguments.of("stringDefault", DefaultTrait.class, new DefaultTrait(Node.from("string"))),
+                Arguments.of("stringWithLength", LengthTrait.class, LengthTrait.builder().min(10L).build()),
+                Arguments.of("numberWithRange",
+                        RangeTrait.class,
+                        RangeTrait.builder().max(new BigDecimal("100")).build()),
+                Arguments.of(
+                        "xmlNamespaced",
+                        XmlNamespaceTrait.class,
+                        XmlNamespaceTrait.builder().uri("http://foo.com").build()));
     }
 
     @ParameterizedTest

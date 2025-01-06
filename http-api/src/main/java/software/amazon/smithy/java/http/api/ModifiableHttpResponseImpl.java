@@ -58,10 +58,10 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
     @Override
     public String toString() {
         return "SmithyModifiableHttpResponseImpl{"
-            + "body=" + body
-            + ", statusCode=" + statusCode
-            + ", httpVersion=" + httpVersion
-            + ", headers=" + headers + '}';
+                + "body=" + body
+                + ", statusCode=" + statusCode
+                + ", httpVersion=" + httpVersion
+                + ", headers=" + headers + '}';
     }
 
     @Override
@@ -74,9 +74,9 @@ final class ModifiableHttpResponseImpl implements ModifiableHttpResponse {
         }
         ModifiableHttpResponseImpl that = (ModifiableHttpResponseImpl) o;
         return statusCode == that.statusCode
-            && httpVersion == that.httpVersion
-            && headers.equals(that.headers)
-            && body.equals(that.body);
+                && httpVersion == that.httpVersion
+                && headers.equals(that.headers)
+                && body.equals(that.body);
     }
 
     @Override

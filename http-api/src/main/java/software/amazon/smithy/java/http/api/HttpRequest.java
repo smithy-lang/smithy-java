@@ -39,11 +39,11 @@ public interface HttpRequest extends HttpMessage {
      */
     default Builder toBuilder() {
         return builder()
-            .method(method())
-            .uri(uri())
-            .headers(headers())
-            .body(body())
-            .httpVersion(httpVersion());
+                .method(method())
+                .uri(uri())
+                .headers(headers())
+                .body(body())
+                .httpVersion(httpVersion());
     }
 
     /**

@@ -17,10 +17,10 @@ public class SmithyHttpMessageTest {
     @Test
     public void canAddHeadersToImmutableHeaders() throws Exception {
         var r = HttpRequest.builder()
-            .method("GET")
-            .uri(new URI("https://example.com"))
-            .headers(HttpHeaders.of(Map.of("foo", List.of("bar"))))
-            .build();
+                .method("GET")
+                .uri(new URI("https://example.com"))
+                .headers(HttpHeaders.of(Map.of("foo", List.of("bar"))))
+                .build();
 
         var builder = r.toBuilder();
         builder.withAddedHeader("foo", "bar2");

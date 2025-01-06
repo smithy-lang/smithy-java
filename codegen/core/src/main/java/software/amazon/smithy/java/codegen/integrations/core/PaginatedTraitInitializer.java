@@ -23,12 +23,11 @@ final class PaginatedTraitInitializer implements TraitInitializer<PaginatedTrait
         writer.putContext("items", paginatedTrait.getItems());
         writer.putContext("paginated", PaginatedTrait.class);
         writer.writeInline(
-            "${paginated:T}.builder()"
-                + "${?input}.inputToken(${input:S})${/input}"
-                + "${?output}.outputToken(${output:S})${/output}"
-                + "${?items}.items(${items:S})${/items}"
-                + "${?pageSize}.pageSize(${pageSize:S})${/pageSize}"
-                + ".build()"
-        );
+                "${paginated:T}.builder()"
+                        + "${?input}.inputToken(${input:S})${/input}"
+                        + "${?output}.outputToken(${output:S})${/output}"
+                        + "${?items}.items(${items:S})${/items}"
+                        + "${?pageSize}.pageSize(${pageSize:S})${/pageSize}"
+                        + ".build()");
     }
 }

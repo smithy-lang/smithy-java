@@ -50,22 +50,21 @@ public final class JavaCodegenSettings {
     private static final String RUNTIME_TRAITS = "runtimeTraits";
     private static final String RUNTIME_TRAITS_SELECTOR = "runtimeTraitsSelector";
     private static final List<String> PROPERTIES = List.of(
-        SERVICE,
-        NAME,
-        NAMESPACE,
-        HEADER_FILE,
-        NON_NULL_ANNOTATION,
-        DEFAULT_PROTOCOL,
-        TRANSPORT,
-        DEFAULT_PLUGINS,
-        DEFAULT_SETTINGS,
-        RELATIVE_DATE,
-        RELATIVE_VERSION,
-        EDITION,
-        USE_EXTERNAL_TYPES,
-        RUNTIME_TRAITS,
-        RUNTIME_TRAITS_SELECTOR
-    );
+            SERVICE,
+            NAME,
+            NAMESPACE,
+            HEADER_FILE,
+            NON_NULL_ANNOTATION,
+            DEFAULT_PROTOCOL,
+            TRANSPORT,
+            DEFAULT_PLUGINS,
+            DEFAULT_SETTINGS,
+            RELATIVE_DATE,
+            RELATIVE_VERSION,
+            EDITION,
+            USE_EXTERNAL_TYPES,
+            RUNTIME_TRAITS,
+            RUNTIME_TRAITS_SELECTOR);
 
     private final ShapeId service;
     private final String name;
@@ -113,21 +112,21 @@ public final class JavaCodegenSettings {
     public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
         var builder = new Builder();
         settingsNode.warnIfAdditionalProperties(PROPERTIES)
-            .expectStringMember(SERVICE, builder::service)
-            .getStringMember(NAME, builder::name)
-            .expectStringMember(NAMESPACE, builder::packageNamespace)
-            .getStringMember(HEADER_FILE, builder::headerFilePath)
-            .getStringMember(NON_NULL_ANNOTATION, builder::nonNullAnnotation)
-            .getStringMember(DEFAULT_PROTOCOL, builder::defaultProtocol)
-            .getObjectMember(TRANSPORT, builder::transportNode)
-            .getArrayMember(DEFAULT_PLUGINS, n -> n.expectStringNode().getValue(), builder::defaultPlugins)
-            .getArrayMember(DEFAULT_SETTINGS, n -> n.expectStringNode().getValue(), builder::defaultSettings)
-            .getStringMember(RELATIVE_DATE, builder::relativeDate)
-            .getStringMember(RELATIVE_VERSION, builder::relativeVersion)
-            .getStringMember(EDITION, builder::edition)
-            .getBooleanMember(USE_EXTERNAL_TYPES, builder::useExternalTypes)
-            .getArrayMember(RUNTIME_TRAITS, n -> n.expectStringNode().expectShapeId(), builder::runtimeTraits)
-            .getStringMember(RUNTIME_TRAITS_SELECTOR, builder::runtimeTraitsSelector);
+                .expectStringMember(SERVICE, builder::service)
+                .getStringMember(NAME, builder::name)
+                .expectStringMember(NAMESPACE, builder::packageNamespace)
+                .getStringMember(HEADER_FILE, builder::headerFilePath)
+                .getStringMember(NON_NULL_ANNOTATION, builder::nonNullAnnotation)
+                .getStringMember(DEFAULT_PROTOCOL, builder::defaultProtocol)
+                .getObjectMember(TRANSPORT, builder::transportNode)
+                .getArrayMember(DEFAULT_PLUGINS, n -> n.expectStringNode().getValue(), builder::defaultPlugins)
+                .getArrayMember(DEFAULT_SETTINGS, n -> n.expectStringNode().getValue(), builder::defaultSettings)
+                .getStringMember(RELATIVE_DATE, builder::relativeDate)
+                .getStringMember(RELATIVE_VERSION, builder::relativeVersion)
+                .getStringMember(EDITION, builder::edition)
+                .getBooleanMember(USE_EXTERNAL_TYPES, builder::useExternalTypes)
+                .getArrayMember(RUNTIME_TRAITS, n -> n.expectStringNode().expectShapeId(), builder::runtimeTraits)
+                .getStringMember(RUNTIME_TRAITS_SELECTOR, builder::runtimeTraitsSelector);
 
         builder.sourceLocation(settingsNode.getSourceLocation().getFilename());
 
@@ -217,10 +216,10 @@ public final class JavaCodegenSettings {
         String name = parts[parts.length - 1];
         String namespace = fullyQualifiedName.substring(0, fullyQualifiedName.length() - name.length() - 1);
         return Symbol.builder()
-            .name(name)
-            .namespace(namespace, ".")
-            .putProperty(SymbolProperties.IS_PRIMITIVE, false)
-            .build();
+                .name(name)
+                .namespace(namespace, ".")
+                .putProperty(SymbolProperties.IS_PRIMITIVE, false)
+                .build();
     }
 
     private static String getHeader(String headerFile, String sourceLocation) {
@@ -281,16 +280,15 @@ public final class JavaCodegenSettings {
         public Builder transportNode(ObjectNode transportNode) {
             if (transportNode.getMembers().size() > 1) {
                 throw new CodegenException(
-                    "Only a single transport can be configured at a time. Found "
-                        + transportNode.getMembers().keySet()
-                );
+                        "Only a single transport can be configured at a time. Found "
+                                + transportNode.getMembers().keySet());
             }
             transportName = transportNode.getMembers()
-                .keySet()
-                .stream()
-                .findFirst()
-                .map(StringNode::getValue)
-                .orElse(null);
+                    .keySet()
+                    .stream()
+                    .findFirst()
+                    .map(StringNode::getValue)
+                    .orElse(null);
             transportSettings = transportNode.expectObjectMember(transportName);
             return this;
         }
@@ -323,10 +321,9 @@ public final class JavaCodegenSettings {
         public Builder relativeDate(String relativeDate) {
             if (!CodegenUtils.isISO8601Date(relativeDate)) {
                 throw new IllegalArgumentException(
-                    "Provided relativeDate: `"
-                        + relativeDate
-                        + "` does not match semver format."
-                );
+                        "Provided relativeDate: `"
+                                + relativeDate
+                                + "` does not match semver format.");
             }
             this.relativeDate = relativeDate;
             return this;
@@ -335,10 +332,9 @@ public final class JavaCodegenSettings {
         public Builder relativeVersion(String relativeVersion) {
             if (!CodegenUtils.isSemVer(relativeVersion)) {
                 throw new IllegalArgumentException(
-                    "Provided relativeVersion: `"
-                        + relativeVersion
-                        + "` does not match semver format."
-                );
+                        "Provided relativeVersion: `"
+                                + relativeVersion
+                                + "` does not match semver format.");
             }
             this.relativeVersion = relativeVersion;
             return this;

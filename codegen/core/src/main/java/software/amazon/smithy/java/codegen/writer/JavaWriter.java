@@ -67,18 +67,17 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
         putNameContext();
         setExpressionStart(PLACEHOLDER_FORMAT_CHAR);
         return format(
-            """
-                £L
-                package £L;
+                """
+                        £L
+                        package £L;
 
-                £L
-                £L
-                """,
-            settings.header(),
-            packageNamespace,
-            getImportContainer(),
-            super.toString()
-        );
+                        £L
+                        £L
+                        """,
+                settings.header(),
+                packageNamespace,
+                getImportContainer(),
+                super.toString());
     }
 
     public void newLine() {
@@ -145,9 +144,8 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
             // Add type references as type references (ex. `Map<KeyType, ValueType>`)
             putContext("refs", typeSymbol.getReferences());
             String output = format(
-                "$L<${#refs}${value:B}${^key.last}, ${/key.last}${/refs}>",
-                getPlaceholder(typeSymbol)
-            );
+                    "$L<${#refs}${value:B}${^key.last}, ${/key.last}${/refs}>",
+                    getPlaceholder(typeSymbol));
             removeContext("refs");
             return output;
         }
@@ -191,9 +189,8 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
             return r.getSymbol();
         } else {
             throw new IllegalArgumentException(
-                "Invalid type provided for " + formatChar + ". Expected a Symbol or Class"
-                    + " but found: `" + type + "`."
-            );
+                    "Invalid type provided for " + formatChar + ". Expected a Symbol or Class"
+                            + " but found: `" + type + "`.");
         }
     }
 
@@ -207,9 +204,8 @@ public final class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImpor
                 return StringUtils.capitalize(s);
             }
             throw new IllegalArgumentException(
-                "Invalid type provided for $U. Expected a String but found: `"
-                    + type + "`."
-            );
+                    "Invalid type provided for $U. Expected a String but found: `"
+                            + type + "`.");
         }
     }
 

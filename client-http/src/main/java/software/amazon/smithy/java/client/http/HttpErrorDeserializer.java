@@ -55,9 +55,9 @@ public final class HttpErrorDeserializer {
     @FunctionalInterface
     public interface UnknownErrorFactory {
         CompletableFuture<ApiException> createError(
-            ApiException.Fault fault,
-            String message,
-            HttpResponse response
+                ApiException.Fault fault,
+                String message,
+                HttpResponse response
         );
     }
 
@@ -76,10 +76,10 @@ public final class HttpErrorDeserializer {
          * @return the created error.
          */
         CompletableFuture<ModeledApiException> createError(
-            Context context,
-            Codec codec,
-            HttpResponse response,
-            ShapeBuilder<ModeledApiException> builder
+                Context context,
+                Codec codec,
+                HttpResponse response,
+                ShapeBuilder<ModeledApiException> builder
         );
 
         /**
@@ -99,20 +99,19 @@ public final class HttpErrorDeserializer {
          * @return the created error.
          */
         default CompletableFuture<ModeledApiException> createErrorFromDocument(
-            Context context,
-            Codec codec,
-            HttpResponse response,
-            ByteBuffer responsePayload,
-            Document parsedDocument,
-            ShapeBuilder<ModeledApiException> builder
+                Context context,
+                Codec codec,
+                HttpResponse response,
+                ByteBuffer responsePayload,
+                Document parsedDocument,
+                ShapeBuilder<ModeledApiException> builder
         ) {
             return createError(
-                context,
-                codec,
-                // Make a new response that uses the previously read response payload.
-                response.toBuilder().body(DataStream.ofByteBuffer(responsePayload)).build(),
-                builder
-            );
+                    context,
+                    codec,
+                    // Make a new response that uses the previously read response payload.
+                    response.toBuilder().body(DataStream.ofByteBuffer(responsePayload)).build(),
+                    builder);
         }
     }
 
@@ -131,29 +130,29 @@ public final class HttpErrorDeserializer {
 
     // Throws an ApiException.
     private static final UnknownErrorFactory DEFAULT_UNKNOWN_FACTORY = (fault, message, response) -> CompletableFuture
-        .completedFuture(new ApiException(message, fault));
+            .completedFuture(new ApiException(message, fault));
 
     // Deserializes without HTTP bindings.
     private static final KnownErrorFactory DEFAULT_KNOWN_FACTORY = new KnownErrorFactory() {
         @Override
         public CompletableFuture<ModeledApiException> createError(
-            Context context,
-            Codec codec,
-            HttpResponse response,
-            ShapeBuilder<ModeledApiException> builder
+                Context context,
+                Codec codec,
+                HttpResponse response,
+                ShapeBuilder<ModeledApiException> builder
         ) {
             return createDataStream(response).asByteBuffer()
-                .thenApply(bytes -> codec.deserializeShape(bytes, builder));
+                    .thenApply(bytes -> codec.deserializeShape(bytes, builder));
         }
 
         @Override
         public CompletableFuture<ModeledApiException> createErrorFromDocument(
-            Context context,
-            Codec codec,
-            HttpResponse response,
-            ByteBuffer responsePayload,
-            Document parsedDocument,
-            ShapeBuilder<ModeledApiException> builder
+                Context context,
+                Codec codec,
+                HttpResponse response,
+                ByteBuffer responsePayload,
+                Document parsedDocument,
+                ShapeBuilder<ModeledApiException> builder
         ) {
             parsedDocument.deserializeInto(builder);
             var result = builder.errorCorrection().build();
@@ -168,11 +167,11 @@ public final class HttpErrorDeserializer {
     private final KnownErrorFactory knownErrorFactory;
 
     private HttpErrorDeserializer(
-        Codec codec,
-        HeaderErrorExtractor headerErrorExtractor,
-        ShapeId serviceId,
-        UnknownErrorFactory unknownErrorFactory,
-        KnownErrorFactory knownErrorFactory
+            Codec codec,
+            HeaderErrorExtractor headerErrorExtractor,
+            ShapeId serviceId,
+            UnknownErrorFactory unknownErrorFactory,
+            KnownErrorFactory knownErrorFactory
     ) {
         this.codec = Objects.requireNonNull(codec, "Missing codec");
         this.serviceId = Objects.requireNonNull(serviceId, "Missing serviceId");
@@ -186,10 +185,10 @@ public final class HttpErrorDeserializer {
     }
 
     public CompletableFuture<? extends ApiException> createError(
-        Context context,
-        ShapeId operation,
-        TypeRegistry typeRegistry,
-        HttpResponse response
+            Context context,
+            ShapeId operation,
+            TypeRegistry typeRegistry,
+            HttpResponse response
     ) {
         var hasErrorHeader = headerErrorExtractor.hasHeader(response);
 
@@ -204,15 +203,14 @@ public final class HttpErrorDeserializer {
         } else {
             // Look for __type in the payload.
             return makeErrorFromPayload(
-                context,
-                codec,
-                knownErrorFactory,
-                unknownErrorFactory,
-                operation,
-                typeRegistry,
-                response,
-                content
-            );
+                    context,
+                    codec,
+                    knownErrorFactory,
+                    unknownErrorFactory,
+                    operation,
+                    typeRegistry,
+                    response,
+                    content);
         }
     }
 
@@ -221,10 +219,10 @@ public final class HttpErrorDeserializer {
     }
 
     private CompletableFuture<? extends ApiException> makeErrorFromHeader(
-        Context context,
-        ShapeId operation,
-        TypeRegistry typeRegistry,
-        HttpResponse response
+            Context context,
+            ShapeId operation,
+            TypeRegistry typeRegistry,
+            HttpResponse response
     ) {
         // The content can be parsed directly here rather than through an intermediate document like with __type.
         var id = headerErrorExtractor.resolveId(response, serviceId.getNamespace(), typeRegistry);
@@ -239,14 +237,14 @@ public final class HttpErrorDeserializer {
     }
 
     private static CompletableFuture<? extends ApiException> makeErrorFromPayload(
-        Context context,
-        Codec codec,
-        KnownErrorFactory knownErrorFactory,
-        UnknownErrorFactory unknownErrorFactory,
-        ShapeId operationId,
-        TypeRegistry typeRegistry,
-        HttpResponse response,
-        DataStream content
+            Context context,
+            Codec codec,
+            KnownErrorFactory knownErrorFactory,
+            UnknownErrorFactory unknownErrorFactory,
+            ShapeId operationId,
+            TypeRegistry typeRegistry,
+            HttpResponse response,
+            DataStream content
     ) {
         // Read the payload into a JSON document so we can efficiently find __type and then directly
         // deserialize the document into the identified builder.
@@ -258,8 +256,8 @@ public final class HttpErrorDeserializer {
                     var builder = typeRegistry.createBuilder(id, ModeledApiException.class);
                     if (builder != null) {
                         return knownErrorFactory
-                            .createErrorFromDocument(context, codec, response, buffer, document, builder)
-                            .thenApply(e -> e);
+                                .createErrorFromDocument(context, codec, response, buffer, document, builder)
+                                .thenApply(e -> e);
                     }
                     // ignore parsing errors here if the service is returning garbage.
                 } catch (SerializationException | DiscriminatorException ignored) {}
@@ -270,9 +268,9 @@ public final class HttpErrorDeserializer {
     }
 
     private static CompletableFuture<ApiException> createErrorFromHints(
-        ShapeId operationId,
-        HttpResponse response,
-        UnknownErrorFactory unknownErrorFactory
+            ShapeId operationId,
+            HttpResponse response,
+            UnknownErrorFactory unknownErrorFactory
     ) {
         ApiException.Fault fault = ApiException.Fault.ofHttpStatusCode(response.statusCode());
         String message = switch (fault) {
@@ -294,12 +292,11 @@ public final class HttpErrorDeserializer {
 
         public HttpErrorDeserializer build() {
             return new HttpErrorDeserializer(
-                codec,
-                headerErrorExtractor,
-                serviceId,
-                unknownErrorFactory,
-                knownErrorFactory
-            );
+                    codec,
+                    headerErrorExtractor,
+                    serviceId,
+                    unknownErrorFactory,
+                    knownErrorFactory);
         }
 
         /**

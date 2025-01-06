@@ -59,8 +59,8 @@ public final class SigV4AuthScheme implements AuthScheme<HttpRequest, AwsCredent
     @Override
     public AuthProperties getSignerProperties(Context context) {
         var builder = AuthProperties.builder()
-            .put(SigV4Settings.SIGNING_NAME, signingName)
-            .put(SigV4Settings.REGION, context.expect(SigV4Settings.REGION));
+                .put(SigV4Settings.SIGNING_NAME, signingName)
+                .put(SigV4Settings.REGION, context.expect(SigV4Settings.REGION));
         var clock = context.get(SigV4Settings.CLOCK);
         if (clock != null) {
             builder.put(SigV4Settings.CLOCK, clock);

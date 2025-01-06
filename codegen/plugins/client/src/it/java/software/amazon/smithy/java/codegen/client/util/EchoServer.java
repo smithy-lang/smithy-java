@@ -52,12 +52,11 @@ public final class EchoServer {
 
     private static class EchoHandler implements HttpHandler {
         private static final Set<String> STANDARD_HEADERS = Set.of(
-            "user-agent",
-            "content-type",
-            "content-length",
-            "accept",
-            "host"
-        );
+                "user-agent",
+                "content-type",
+                "content-length",
+                "accept",
+                "host");
 
         @Override
         public void handle(HttpExchange httpExchange) throws IOException {
@@ -71,10 +70,10 @@ public final class EchoServer {
             responseHeaders.set("content-type", "application/json");
 
             try (
-                var bos = new ByteArrayOutputStream(); var writer = new BufferedWriter(
-                    new OutputStreamWriter(bos, StandardCharsets.UTF_8)
-                ); var responseBody = httpExchange.getResponseBody()
-            ) {
+                    var bos = new ByteArrayOutputStream();
+                    var writer = new BufferedWriter(
+                            new OutputStreamWriter(bos, StandardCharsets.UTF_8));
+                    var responseBody = httpExchange.getResponseBody()) {
                 var body = httpExchange.getRequestBody().readAllBytes();
                 httpExchange.sendResponseHeaders(200, body.length);
                 responseBody.write(body);

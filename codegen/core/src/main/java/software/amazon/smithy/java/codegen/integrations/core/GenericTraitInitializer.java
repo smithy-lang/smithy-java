@@ -22,7 +22,7 @@ public final class GenericTraitInitializer implements TraitInitializer<Trait> {
     static {
         // Add all trait services to a map, so they can be queried for a provider class
         ServiceLoader.load(TraitService.class, GenericTraitInitializer.class.getClassLoader())
-            .forEach((service) -> serviceMap.put(service.getShapeId(), service.getClass()));
+                .forEach((service) -> serviceMap.put(service.getShapeId(), service.getClass()));
     }
 
     @Override
@@ -37,10 +37,10 @@ public final class GenericTraitInitializer implements TraitInitializer<Trait> {
             throw new UnsupportedOperationException("Could not find trait provider for " + trait);
         }
         var template = """
-            new ${?enclosing}${enclosing:T}.${name:L}${/enclosing}${^enclosing}${type:T}${/enclosing}().createTrait(
-                ${shapeId:T}.from(${id:S}),
-                ${nodeInitializer:C|}
-            )""";
+                new ${?enclosing}${enclosing:T}.${name:L}${/enclosing}${^enclosing}${type:T}${/enclosing}().createTrait(
+                    ${shapeId:T}.from(${id:S}),
+                    ${nodeInitializer:C|}
+                )""";
         writer.putContext("shapeId", ShapeId.class);
         writer.putContext("name", traitProviderClass.getSimpleName());
         writer.putContext("type", traitProviderClass);

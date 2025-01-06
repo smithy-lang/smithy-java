@@ -25,9 +25,9 @@ import software.amazon.smithy.model.node.ObjectNode;
 public class CodegenTest {
     private static final URL testFile = Objects.requireNonNull(CodegenTest.class.getResource("types.smithy"));
     private static final Model model = Model.assembler()
-        .addImport(testFile)
-        .assemble()
-        .unwrap();
+            .addImport(testFile)
+            .assemble()
+            .unwrap();
 
     private final SmithyBuildPlugin plugin = new JavaTypeCodegenPlugin();
     private MockManifest manifest;
@@ -38,10 +38,10 @@ public class CodegenTest {
     public void setup() {
         manifest = new MockManifest();
         contextBuilder = PluginContext.builder()
-            .fileManifest(manifest)
-            .model(model);
+                .fileManifest(manifest)
+                .model(model);
         settingsBuilder = ObjectNode.builder()
-            .withMember("namespace", "test.smithy.codegen.types.test");
+                .withMember("namespace", "test.smithy.codegen.types.test");
     }
 
     @Test
@@ -52,59 +52,53 @@ public class CodegenTest {
         assertFalse(manifest.getFiles().isEmpty());
         assertEquals(manifest.getFiles().size(), 7);
         assertThat(
-            manifest.getFiles(),
-            containsInAnyOrder(
-                Path.of("/test/smithy/codegen/types/test/model/EnumShape.java"),
-                Path.of("/test/smithy/codegen/types/test/model/IntEnumShape.java"),
-                Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
-                Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
-                Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
-                Path.of("/test/smithy/codegen/types/test/model/UnionShape.java"),
-                Path.of("/META-INF/smithy-java/type-mappings.properties")
-            )
-        );
+                manifest.getFiles(),
+                containsInAnyOrder(
+                        Path.of("/test/smithy/codegen/types/test/model/EnumShape.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/IntEnumShape.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/UnionShape.java"),
+                        Path.of("/META-INF/smithy-java/type-mappings.properties")));
     }
 
     @Test
     void respectsSelector() {
         var settings = settingsBuilder
-            .withMember("selector", ":is(structure)")
-            .build();
+                .withMember("selector", ":is(structure)")
+                .build();
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
         assertFalse(manifest.getFiles().isEmpty());
         assertEquals(manifest.getFiles().size(), 4);
         assertThat(
-            manifest.getFiles(),
-            containsInAnyOrder(
-                Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
-                Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
-                Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
-                Path.of("/META-INF/smithy-java/type-mappings.properties")
-            )
-        );
+                manifest.getFiles(),
+                containsInAnyOrder(
+                        Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
+                        Path.of("/META-INF/smithy-java/type-mappings.properties")));
     }
 
     @Test
     void specificShapesAdded() {
         var settings = settingsBuilder
-            .withMember("selector", ":is(structure)")
-            .withMember("shapes", ArrayNode.fromStrings("smithy.java.codegen.types.test#UnionShape"))
-            .build();
+                .withMember("selector", ":is(structure)")
+                .withMember("shapes", ArrayNode.fromStrings("smithy.java.codegen.types.test#UnionShape"))
+                .build();
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
         assertFalse(manifest.getFiles().isEmpty());
         assertEquals(manifest.getFiles().size(), 5);
         assertThat(
-            manifest.getFiles(),
-            containsInAnyOrder(
-                Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
-                Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
-                Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
-                Path.of("/test/smithy/codegen/types/test/model/UnionShape.java"),
-                Path.of("/META-INF/smithy-java/type-mappings.properties")
-            )
-        );
+                manifest.getFiles(),
+                containsInAnyOrder(
+                        Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/UnionShape.java"),
+                        Path.of("/META-INF/smithy-java/type-mappings.properties")));
     }
 
 }

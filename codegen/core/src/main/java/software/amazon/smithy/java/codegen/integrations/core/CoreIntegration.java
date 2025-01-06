@@ -39,9 +39,9 @@ public class CoreIntegration implements JavaCodegenIntegration {
 
     @Override
     public SymbolProvider decorateSymbolProvider(
-        Model model,
-        JavaCodegenSettings settings,
-        SymbolProvider symbolProvider
+            Model model,
+            JavaCodegenSettings settings,
+            SymbolProvider symbolProvider
     ) {
         return new SymbolProvider() {
             @Override
@@ -66,21 +66,20 @@ public class CoreIntegration implements JavaCodegenIntegration {
     @Override
     public List<TraitInitializer<? extends Trait>> traitInitializers() {
         return List.of(
-            new PaginatedTraitInitializer(),
-            new HttpApiKeyAuthTraitInitializer(),
-            new RequestCompressionTraitInitializer(),
-            new DefaultTraitInitializer(),
-            new HttpTraitInitializer(),
-            new HttpErrorTraitInitializer(),
-            new XmlNamespaceTraitInitializer(),
-            new EndpointTraitInitializer(),
-            new RetryableTraitInitializer(),
-            new LengthTraitInitializer(),
-            new RangeTraitInitializer(),
-            new AnnotationTraitInitializer(),
-            new StringTraitInitializer(),
-            new StringListTraitInitializer(),
-            new GenericTraitInitializer()
-        );
+                new PaginatedTraitInitializer(),
+                new HttpApiKeyAuthTraitInitializer(),
+                new RequestCompressionTraitInitializer(),
+                new DefaultTraitInitializer(),
+                new HttpTraitInitializer(),
+                new HttpErrorTraitInitializer(),
+                new XmlNamespaceTraitInitializer(),
+                new EndpointTraitInitializer(),
+                new RetryableTraitInitializer(),
+                new LengthTraitInitializer(),
+                new RangeTraitInitializer(),
+                new AnnotationTraitInitializer(),
+                new StringTraitInitializer(),
+                new StringListTraitInitializer(),
+                new GenericTraitInitializer());
     }
 }

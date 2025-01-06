@@ -30,10 +30,10 @@ final class HttpQueryParamsSerializer extends SpecificShapeSerializer {
     private record MapEntrySerializer(BiConsumer<String, String> queryWriter) implements MapSerializer {
         @Override
         public <K> void writeEntry(
-            Schema keySchema,
-            String key,
-            K keyState,
-            BiConsumer<K, ShapeSerializer> valueSerializer
+                Schema keySchema,
+                String key,
+                K keyState,
+                BiConsumer<K, ShapeSerializer> valueSerializer
         ) {
             valueSerializer.accept(keyState, new SpecificShapeSerializer() {
                 @Override
@@ -43,10 +43,10 @@ final class HttpQueryParamsSerializer extends SpecificShapeSerializer {
 
                 @Override
                 public <L> void writeList(
-                    Schema schema,
-                    L listState,
-                    int size,
-                    BiConsumer<L, ShapeSerializer> consumer
+                        Schema schema,
+                        L listState,
+                        int size,
+                        BiConsumer<L, ShapeSerializer> consumer
                 ) {
                     consumer.accept(listState, new SpecificShapeSerializer() {
                         @Override
