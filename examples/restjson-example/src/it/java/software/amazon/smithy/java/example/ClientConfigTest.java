@@ -132,17 +132,17 @@ public class ClientConfigTest {
 
         @Override
         public GetPersonImageOutput getPersonImage(GetPersonImageInput input, RequestOverrideConfig overrideConfig) {
-            return call(input, new GetPersonImage(), overrideConfig).join();
+            return call(input, GetPersonImage.instance(), overrideConfig).join();
         }
 
         @Override
         public PutPersonOutput putPerson(PutPersonInput input, RequestOverrideConfig overrideConfig) {
-            return call(input, new PutPerson(), overrideConfig).join();
+            return call(input, PutPerson.instance(), overrideConfig).join();
         }
 
         @Override
         public PutPersonImageOutput putPersonImage(PutPersonImageInput input, RequestOverrideConfig overrideConfig) {
-            return call(input, new PutPersonImage(), overrideConfig).join();
+            return call(input, PutPersonImage.instance(), overrideConfig).join();
         }
 
         static PersonDirectoryClientWithDefaults.Builder builder() {

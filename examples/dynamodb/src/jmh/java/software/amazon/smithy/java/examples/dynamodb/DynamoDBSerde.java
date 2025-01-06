@@ -75,7 +75,7 @@ public class DynamoDBSerde {
         @Setup
         public void setup() throws URISyntaxException {
             endpoint = new URI("https://dynamodb.us-east-1.amazonaws.com");
-            operation = new PutItem();
+            operation = PutItem.instance();
             protocol = new AwsJson1Protocol(ShapeId.from("com.amazonaws.dynamodb#DynamoDB_20120810"));
             req = PutItemInput.builder().tableName("a").item(testItem.getValue()).build();
         }
@@ -97,7 +97,7 @@ public class DynamoDBSerde {
             // This isn't actually used, but needed for the protocol implementation.
             endpoint = new URI("https://dynamodb.us-east-1.amazonaws.com");
             req = HttpRequest.builder().method("POST").uri(endpoint).build();
-            operation = new GetItem();
+            operation = GetItem.instance();
             protocol = new AwsJson1Protocol(ShapeId.from("com.amazonaws.dynamodb#DynamoDB_20120810"));
         }
     }
