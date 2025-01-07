@@ -352,14 +352,12 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
     }
 
     private static ApiOperation<?, ?> getApiOperation(SymbolProvider provider, Shape shape) {
+        var fqn = provider.toSymbol(shape).getFullName();
         try {
-            var fqn = provider.toSymbol(shape).getFullName();
-            return CodegenUtils.getImplementationByName(ApiOperation.class, fqn).getDeclaredConstructor().newInstance();
-        } catch (InvocationTargetException
-                | InstantiationException
-                | IllegalAccessException
-                | NoSuchMethodException e) {
-            throw new RuntimeException(e);
+            var method = CodegenUtils.getClassForName(fqn).getMethod("instance");
+            return (ApiOperation<?, ?>) method.invoke(null);
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
+            throw new IllegalStateException("Could not instantiate ApiOperation: " + fqn, e);
         }
     }
 

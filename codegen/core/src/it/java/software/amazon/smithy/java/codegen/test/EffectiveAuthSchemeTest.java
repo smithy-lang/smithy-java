@@ -19,10 +19,10 @@ import software.amazon.smithy.model.traits.synthetic.NoAuthTrait;
 public class EffectiveAuthSchemeTest {
     @Test
     void generatedOperationHaveExpectedSchemes() {
-        assertEquals(new NoAuth().effectiveAuthSchemes(), List.of(NoAuthTrait.ID));
+        assertEquals(NoAuth.instance().effectiveAuthSchemes(), List.of(NoAuthTrait.ID));
         assertEquals(
-                new AllAuth().effectiveAuthSchemes(),
+                AllAuth.instance().effectiveAuthSchemes(),
                 List.of(HttpApiKeyAuthTrait.ID, HttpBasicAuthTrait.ID));
-        assertEquals(new ScopedAuth().effectiveAuthSchemes(), List.of(HttpBasicAuthTrait.ID));
+        assertEquals(ScopedAuth.instance().effectiveAuthSchemes(), List.of(HttpBasicAuthTrait.ID));
     }
 }

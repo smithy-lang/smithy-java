@@ -321,7 +321,7 @@ public final class ClientInterfaceGenerator
                      * @return Paginator that can be used to retrieval paginated results.
                      */
                     default ${paginator:T}<${output:T}> ${name:L}Paginator(${input:T} input) {
-                        return ${paginator:T}.paginate(input, new ${operation:T}(), this::${name:L});
+                        return ${paginator:T}.paginate(input, ${operation:T}.instance(), this::${name:L});
                     }
                     """;
             writer.pushState();

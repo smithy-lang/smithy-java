@@ -58,6 +58,8 @@ public final class OperationGenerator
                                     public final class ${shape:T} implements ${operationType:C} {
                                         ${id:C|}
 
+                                        private static final ${shape:T} $$INSTANCE = new ${shape:T}();
+
                                         private ${schema:C|}
 
                                         ${typeRegistrySection:C|}
@@ -67,6 +69,12 @@ public final class OperationGenerator
                                         ${?idempotencyTokenMember}private static final ${sdkSchema:T} IDEMPOTENCY_TOKEN_MEMBER = ${inputType:T}.$$SCHEMA.member(${idempotencyTokenMember:S});${/idempotencyTokenMember}
                                         ${?inputStreamMember}private static final ${sdkSchema:T} INPUT_STREAM_MEMBER = ${inputType:T}.$$SCHEMA.member(${inputStreamMember:S});${/inputStreamMember}
                                         ${?outputStreamMember}private static final ${sdkSchema:T} OUTPUT_STREAM_MEMBER = ${outputType:T}.$$SCHEMA.member(${outputStreamMember:S});${/outputStreamMember}
+
+                                        public static ${shape:T} instance() {
+                                            return $$INSTANCE;
+                                        }
+
+                                        private ${shape:T}() {}
 
                                         @Override
                                         public ${sdkShapeBuilder:N}<${inputType:T}> inputBuilder() {

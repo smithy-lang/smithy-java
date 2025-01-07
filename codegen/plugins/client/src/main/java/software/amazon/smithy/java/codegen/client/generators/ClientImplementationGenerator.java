@@ -109,7 +109,7 @@ public final class ClientImplementationGenerator
                             @Override
                             public ${?async}${future:T}<${/async}${output:T}${?async}>${/async} ${name:L}(${input:T} input, ${overrideConfig:T} overrideConfig) {${^async}
                                 try {
-                                    ${/async}return call(input, new ${operation:T}(), overrideConfig)${^async}.join()${/async};${^async}
+                                    ${/async}return call(input, ${operation:T}.instance(), overrideConfig)${^async}.join()${/async};${^async}
                                 } catch (${completionException:T} e) {
                                     throw unwrapAndThrow(e);
                                 }${/async}

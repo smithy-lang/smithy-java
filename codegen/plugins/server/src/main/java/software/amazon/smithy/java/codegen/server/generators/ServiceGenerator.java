@@ -276,13 +276,13 @@ public final class ServiceGenerator implements
                         """
                                 @Override
                                 public ${nextStage:L} add${operation:T}Operation(${asyncOperationType:T} operation) {
-                                    this.${operationFieldName:L} = s -> ${operationClass:T}.ofAsync("${operation:T}", operation::${operationFieldName:L}, new ${apiOperationClass:T}(), s);
+                                    this.${operationFieldName:L} = s -> ${operationClass:T}.ofAsync("${operation:T}", operation::${operationFieldName:L}, ${apiOperationClass:T}.instance(), s);
                                     return this;
                                 }
 
                                 @Override
                                 public ${nextStage:L} add${operation:T}Operation(${syncOperationType:T} operation) {
-                                    this.${operationFieldName:L} = s -> ${operationClass:T}.of("${operation:T}", operation::${operationFieldName:L}, new ${apiOperationClass:T}(), s);
+                                    this.${operationFieldName:L} = s -> ${operationClass:T}.of("${operation:T}", operation::${operationFieldName:L}, ${apiOperationClass:T}.instance(), s);
                                     return this;
                                 }
                                 """;
