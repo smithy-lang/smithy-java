@@ -82,6 +82,7 @@ public final class JavaTypeCodegenPlugin implements SmithyBuildPlugin {
                             .filter(s -> !shape.equals(s))
                             .filter(s -> !s.isMemberShape())
                             .filter(s -> !Prelude.isPreludeShape(s))
+                            .filter(nested::contains)
                             .collect(Collectors.toSet()));
         }
         closure.removeAll(nested);

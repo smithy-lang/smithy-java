@@ -14,3 +14,12 @@ union MyUnion {
     optionB: Integer
 }
 
+structure A {
+    value: String
+    b: B
+}
+
+structure B {
+    a: A
+}
+
