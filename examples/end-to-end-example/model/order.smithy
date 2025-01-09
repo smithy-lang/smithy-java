@@ -2,7 +2,6 @@ $version: "2.0"
 
 namespace com.example
 
-use aws.api#arn
 use com.shared.types#OrderStatus
 use com.shared.types#Uuid
 
