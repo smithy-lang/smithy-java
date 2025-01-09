@@ -8,7 +8,6 @@ use com.shared.types#Uuid
 
 /// An Order resource, which has an id and describes an order by the type of coffee
 /// and the order's status
-@arn(template: "order/{id}")
 resource Order {
     identifiers: {
         id: Uuid
