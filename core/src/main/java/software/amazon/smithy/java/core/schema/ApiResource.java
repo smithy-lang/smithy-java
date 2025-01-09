@@ -23,7 +23,7 @@ public interface ApiResource {
     /**
      * Map of property string names to Shape schemas that enumerate the identifiers of the resource.
      *
-     * @return Map of the resource identifiers
+     * @return Map of the resource identifier schemas
      */
     default Map<String, Schema> identifiers() {
         return Collections.emptyMap();
@@ -32,7 +32,7 @@ public interface ApiResource {
     /**
      * Map of property string names to Shape schemas that enumerate the properties of the resource.
      *
-     * @return Map of the resource properties
+     * @return Map of the resource property schemas
      */
     default Map<String, Schema> properties() {
         return Collections.emptyMap();
@@ -41,7 +41,7 @@ public interface ApiResource {
     /**
      * Lifecycle operation used to create the resource.
      *
-     * @return Shape ID of create lifecycle operation
+     * @return Schema of the create lifecycle operation, or null
      */
     default Schema create() {
         return null;
@@ -50,7 +50,7 @@ public interface ApiResource {
     /**
      * Idempotent lifecycle operation used to create the resource.
      *
-     * @return operation id or null if no operation is bound for this lifecycle operation.
+     * @return Schema of the put lifecycle operation, or null.
      */
     default Schema put() {
         return null;
@@ -59,7 +59,7 @@ public interface ApiResource {
     /**
      * Lifecycle operation used to read the resource.
      *
-     * @return operation id or null if no operation is bound for this lifecycle operation.
+     * @return Schema of the read lifecycle operation, or null
      */
     default Schema read() {
         return null;
@@ -68,7 +68,7 @@ public interface ApiResource {
     /**
      * Lifecycle operation used to create the resource.
      *
-     * @return operation id or null if no operation is bound for this lifecycle operation.
+     * @return Schema of the update lifecycle operation, or null
      */
     default Schema update() {
         return null;
@@ -77,7 +77,7 @@ public interface ApiResource {
     /**
      * Lifecycle operation used to delete the resource.
      *
-     * @return operation id or null if no operation is bound for this lifecycle operation.
+     * @return Schema of the delete lifecycle operation, or null
      */
     default Schema delete() {
         return null;
@@ -86,7 +86,7 @@ public interface ApiResource {
     /**
      * Lifecycle operation used to list resources of this type.
      *
-     * @return operation id or null if no operation is bound for this lifecycle operation.
+     * @return Schema of the list lifecycle operation, or null
      */
     default Schema list() {
         return null;
@@ -115,7 +115,7 @@ public interface ApiResource {
      *
      * <p>Note: Resources can be bound to only a single parent resource, although they may have multiple children.
      *
-     * @return Resource this resource is bound to or null if the resource has no parent resource.
+     * @return Resource this resource is bound to, or null.
      */
     default ApiResource boundResource() {
         return null;
