@@ -7,10 +7,12 @@ package software.amazon.smithy.java.server.netty;
 
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaders;
-import java.util.HashMap;
+import java.util.AbstractMap;
+import java.util.AbstractSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import software.amazon.smithy.java.http.api.ModifiableHttpHeaders;
 
 final class NettyHttpHeaders implements ModifiableHttpHeaders {
@@ -60,20 +62,64 @@ final class NettyHttpHeaders implements ModifiableHttpHeaders {
         return nettyHeaders.size();
     }
 
-    //TODO implement an efficient toMap and iterator.
-
     @Override
     public Map<String, List<String>> map() {
-        var map = new HashMap<String, List<String>>();
-        for (var name : nettyHeaders.names()) {
-            map.put(name, nettyHeaders.getAll(name));
-        }
-        return map;
+        return new AbstractMap<>() {
+            @Override
+            public Set<Entry<String, List<String>>> entrySet() {
+                return new AbstractSet<>() {
+                    @Override
+                    public Iterator<Entry<String, List<String>>> iterator() {
+                        return NettyHttpHeaders.this.iterator();
+                    }
+
+                    @Override
+                    public int size() {
+                        return nettyHeaders.names().size();
+                    }
+                };
+            }
+
+            @Override
+            public List<String> get(Object key) {
+                // To mimic a normal map, return null when the header doesn't exist.
+                var result = nettyHeaders.getAll((String) key);
+                return result.isEmpty() ? null : result;
+            }
+
+            @Override
+            public boolean containsKey(Object key) {
+                return nettyHeaders.contains((String) key);
+            }
+
+            @Override
+            public int size() {
+                return nettyHeaders.names().size();
+            }
+
+            @Override
+            public Set<String> keySet() {
+                return nettyHeaders.names();
+            }
+        };
     }
 
     @Override
     public Iterator<Map.Entry<String, List<String>>> iterator() {
-        return map().entrySet().iterator();
+        return new Iterator<>() {
+            private final Iterator<String> iter = nettyHeaders.names().iterator();
+
+            @Override
+            public boolean hasNext() {
+                return iter.hasNext();
+            }
+
+            @Override
+            public Map.Entry<String, List<String>> next() {
+                var next = iter.next();
+                return new AbstractMap.SimpleImmutableEntry<>(next, nettyHeaders.getAll(next));
+            }
+        };
     }
 
     HttpHeaders getNettyHeaders() {

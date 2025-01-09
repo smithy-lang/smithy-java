@@ -11,6 +11,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import smithy.java.codegen.server.test.model.A;
+import smithy.java.codegen.server.test.model.B;
 import smithy.java.codegen.server.test.model.MyNestedStruct;
 import smithy.java.codegen.server.test.model.MyStruct;
 import smithy.java.codegen.server.test.model.MyUnion;
@@ -40,7 +42,8 @@ public class GenericSerdeTest {
                                 .nested(NestedIntEnum.ONE)
                                 .build(),
                         UsesOtherStructs.builder()),
-                Arguments.of(new MyUnion.OptionAMember("Value"), MyUnion.builder()));
+                Arguments.of(new MyUnion.OptionAMember("Value"), MyUnion.builder()),
+                Arguments.of(A.builder().b(B.builder().build()).value("top").build(), A.builder()));
     }
 
     @ParameterizedTest

@@ -7,11 +7,11 @@ test-logger-plugin = "4.0.0"
 spotbugs = "6.0.22"
 spotless = "6.25.0"
 smithy-gradle-plugins = "1.2.0"
-assertj = "3.27.0"
+assertj = "3.27.2"
 jackson = "2.18.2"
 netty = "4.1.116.Final"
 dep-analysis = "2.6.1"
-aws-sdk = "2.29.43"
+aws-sdk = "2.29.47"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 
