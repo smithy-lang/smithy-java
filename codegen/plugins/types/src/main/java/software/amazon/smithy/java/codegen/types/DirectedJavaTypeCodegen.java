@@ -15,8 +15,6 @@ import software.amazon.smithy.codegen.core.directed.GenerateErrorDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateIntEnumDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateListDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateMapDirective;
-import software.amazon.smithy.codegen.core.directed.GenerateOperationDirective;
-import software.amazon.smithy.codegen.core.directed.GenerateResourceDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateStructureDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateUnionDirective;
@@ -27,8 +25,6 @@ import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.generators.EnumGenerator;
 import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;
-import software.amazon.smithy.java.codegen.generators.OperationGenerator;
-import software.amazon.smithy.java.codegen.generators.ResourceGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
@@ -39,7 +35,7 @@ import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
-record DirectedJavaTypeCodegen(boolean generateOperations)
+final class DirectedJavaTypeCodegen
         implements DirectedCodegen<CodeGenerationContext, JavaCodegenSettings, JavaCodegenIntegration> {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(DirectedJavaTypeCodegen.class);
 
@@ -66,13 +62,6 @@ record DirectedJavaTypeCodegen(boolean generateOperations)
     @Override
     public void generateService(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         // Type codegen does not generate a service.
-    }
-
-    @Override
-    public void generateResource(GenerateResourceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        if (generateOperations) {
-            new ResourceGenerator().accept(directive);
-        }
     }
 
     @Override
@@ -111,14 +100,6 @@ record DirectedJavaTypeCodegen(boolean generateOperations)
     @Override
     public void generateIntEnumShape(GenerateIntEnumDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         new EnumGenerator<>().accept(directive);
-    }
-
-    @Override
-    public void generateOperation(GenerateOperationDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        if (generateOperations && !isSynthetic(directive.shape())) {
-            LOGGER.debug("Generating Java Class for operation: {}", directive.shape());
-            new OperationGenerator().accept(directive);
-        }
     }
 
     @Override

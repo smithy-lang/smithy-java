@@ -5,9 +5,13 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
+import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateResourceDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -37,11 +41,19 @@ public final class ResourceGenerator
                     writer.pushState(new ClassSection(shape));
                     var template = """
                             public final class ${shape:T} implements ${resourceType:T} {
-                                public static final ${shape:T} INSTANCE = new ${shape:T}();
-                                ${properties:C|}
                                 ${id:C|}
-
+                                private static final ${shape:T} $$INSTANCE = new ${shape:T}();
+                                ${properties:C|}
                                 private ${schema:C}
+
+                                /**
+                                 * Get an instance of this {@code ApiResource}.
+                                 *
+                                 * @return An instance of this class.
+                                 */
+                                public static ${shape:T} instance() {
+                                    return $$INSTANCE;
+                                }
 
                                 private ${shape:T}() {}
 
@@ -52,21 +64,31 @@ public final class ResourceGenerator
 
                                 @Override
                                 public ${map:T}<${string:T}, ${sdkSchema:T}> identifiers() {
-                                    return IDENTIFIERS;
+                                    return $$IDENTIFIERS;
                                 }
 
                                 @Override
                                 public ${map:T}<${string:T}, ${sdkSchema:T}> properties() {
-                                    return PROPERTIES;
+                                    return $$PROPERTIES;
                                 }
 
                                 ${lifecycleOperations:C|}
-
-                                ${?hasResource}
-
+                                ${?hasCollectionOperations}
                                 @Override
-                                public ${resourceType:T} parentResource() {
-                                    return ${resource:T}.INSTANCE;
+                                public ${list:T}<${sdkSchema:T}> collectionOperations() {
+                                    return $$COLLECTION_OPERATIONS;
+                                }
+                                ${/hasCollectionOperations}
+                                ${?hasOperations}
+                                @Override
+                                public ${list:T}<${sdkSchema:T}> operations() {
+                                    return $$OPERATIONS;
+                                }
+                                ${/hasOperations}
+                                ${?hasResource}
+                                @Override
+                                public ${resourceType:T} boundResource() {
+                                    return ${resource:T}.instance();
                                 }
                                 ${/hasResource}
                             }""";
@@ -75,6 +97,7 @@ public final class ResourceGenerator
                     writer.putContext("sdkSchema", Schema.class);
                     writer.putContext("map", Map.class);
                     writer.putContext("string", String.class);
+                    writer.putContext("list", List.class);
                     writer.putContext("resourceType", ApiResource.class);
                     writer.putContext(
                             "properties",
@@ -98,7 +121,8 @@ public final class ResourceGenerator
                                     directive.symbolProvider(),
                                     directive.model(),
                                     shape));
-
+                    writer.putContext("hasCollectionOperations", !shape.getCollectionOperations().isEmpty());
+                    writer.putContext("hasOperations", !shape.getOperations().isEmpty());
                     var bottomUpIndex = BottomUpIndex.of(directive.model());
                     var resourceOptional = bottomUpIndex.getResourceBinding(directive.service(), shape);
                     writer.putContext("hasResource", resourceOptional.isPresent());
@@ -131,17 +155,40 @@ public final class ResourceGenerator
             writer.putContext("props", properties);
             writer.write(
                     """
-                            private static final ${map:T}<${string:T}, ${sdkSchema:T}> IDENTIFIERS = ${map:T}.of(${#ids}${key:S}, ${value:L}${^key.last},
+                            private static final ${map:T}<${string:T}, ${sdkSchema:T}> $$IDENTIFIERS = ${map:T}.of(${#ids}${key:S}, ${value:L}${^key.last},
                                 ${/key.last}${/ids});
-                            private static final ${map:T}<${string:T}, ${sdkSchema:T}> PROPERTIES = ${map:T}.of(${#props}${key:S}, ${value:L}${^key.last},
+                            private static final ${map:T}<${string:T}, ${sdkSchema:T}> $$PROPERTIES = ${map:T}.of(${#props}${key:S}, ${value:L}${^key.last},
                                 ${/key.last}${/props});
                             """);
+            if (!resourceShape.getCollectionOperations().isEmpty()) {
+                writer.putContext("colOperations", getOperationSymbols(resourceShape.getCollectionOperations()));
+                writer.write(
+                        """
+                                private static final ${list:T}<${sdkSchema:T}>$$COLLECTION_OPERATIONS = ${list:T}.of(${#colOperations}${value:T}.$$SCHEMA${^key.last},
+                                    ${/key.last}${/colOperations});""");
+            }
+            if (!resourceShape.getOperations().isEmpty()) {
+                writer.putContext("operations", getOperationSymbols(resourceShape.getOperations()));
+                writer.write(
+                        """
+                                private static final ${list:T}<${sdkSchema:T}> $$OPERATIONS = ${list:T}.of(${#operations}${value:T}.$$SCHEMA${^key.last},
+                                    ${/key.last}${/operations});""");
+            }
             writer.popState();
         }
 
         private String getSchema(ShapeId value) {
             var target = model.expectShape(value);
             return CodegenUtils.getSchemaType(writer, symbolProvider, target);
+        }
+
+        private List<Symbol> getOperationSymbols(Set<ShapeId> shapeIds) {
+            List<Symbol> operations = new ArrayList<>();
+            for (var operation : resourceShape.getOperations()) {
+                var op = symbolProvider.toSymbol(model.expectShape(operation));
+                operations.add(op);
+            }
+            return operations;
         }
     }
 
@@ -171,8 +218,8 @@ public final class ResourceGenerator
             writer.putContext("operation", symbolProvider.toSymbol(operationShape));
             writer.write("""
                     @Override
-                    public ${shapeId:T} ${lifecycleOperation:L}() {
-                        return ${operation:T}.$$ID;
+                    public ${sdkSchema:T} ${lifecycleOperation:L}() {
+                        return ${operation:T}.$$SCHEMA;
                     }
                     """);
             writer.newLine();

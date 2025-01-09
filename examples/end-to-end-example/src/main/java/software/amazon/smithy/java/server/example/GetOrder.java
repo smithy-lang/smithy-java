@@ -17,7 +17,7 @@ final class GetOrder implements GetOrderOperation {
 
     @Override
     public GetOrderOutput getOrder(GetOrderInput input, RequestContext context) {
-        var operation = new software.amazon.smithy.java.example.model.GetOrder();
+        var operation = software.amazon.smithy.java.example.model.GetOrder.instance();
         System.out.println("ACTION NAME: " + arnMapper.getActionName(input, operation));
         try {
             System.out.println("RESOURCE ARN: " + arnMapper.getResourceArn(input, operation));

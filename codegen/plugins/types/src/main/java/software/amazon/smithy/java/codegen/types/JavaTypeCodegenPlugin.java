@@ -45,7 +45,7 @@ public final class JavaTypeCodegenPlugin implements SmithyBuildPlugin {
         var settings = TypeCodegenSettings.fromNode(context.getSettings());
         var codegenSettings = settings.codegenSettings();
         runner.settings(codegenSettings);
-        runner.directedCodegen(new DirectedJavaTypeCodegen(settings.generateOperations()));
+        runner.directedCodegen(new DirectedJavaTypeCodegen());
         runner.fileManifest(context.getFileManifest());
         runner.service(codegenSettings.service());
 

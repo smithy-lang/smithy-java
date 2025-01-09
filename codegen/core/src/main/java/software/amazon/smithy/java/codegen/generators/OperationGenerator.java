@@ -60,7 +60,7 @@ public final class OperationGenerator
 
                                         private static final ${shape:T} $$INSTANCE = new ${shape:T}();
 
-                                        private ${schema:C|}
+                                        ${schema:C|}
 
                                         ${typeRegistrySection:C|}
 
@@ -70,6 +70,11 @@ public final class OperationGenerator
                                         ${?inputStreamMember}private static final ${sdkSchema:T} INPUT_STREAM_MEMBER = ${inputType:T}.$$SCHEMA.member(${inputStreamMember:S});${/inputStreamMember}
                                         ${?outputStreamMember}private static final ${sdkSchema:T} OUTPUT_STREAM_MEMBER = ${outputType:T}.$$SCHEMA.member(${outputStreamMember:S});${/outputStreamMember}
 
+                                        /**
+                                         * Get an instance of this {@code ApiOperation}.
+                                         *
+                                         * @return An instance of this class.
+                                         */
                                         public static ${shape:T} instance() {
                                             return $$INSTANCE;
                                         }
@@ -142,8 +147,8 @@ public final class OperationGenerator
                                         ${?hasResource}
 
                                         @Override
-                                        public ${resourceType:T} parentResource() {
-                                            return ${resource:T}.INSTANCE;
+                                        public ${resourceType:T} boundResource() {
+                                            return ${resource:T}.instance();
                                         }
                                         ${/hasResource}
                                     }""";

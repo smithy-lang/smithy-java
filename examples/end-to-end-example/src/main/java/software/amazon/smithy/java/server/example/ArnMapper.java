@@ -21,13 +21,13 @@ import software.amazon.smithy.java.core.schema.TraitKey;
  */
 record ArnMapper(String serviceName, String region) {
     public <I extends SerializableStruct> String getActionName(I input, ApiOperation<I, ?> operation) {
-        var resource = operation.parentResource();
+        var resource = operation.boundResource();
         return resource.schema().id().getName() + "::" + operation.schema().id().getName();
     }
 
     public <I extends SerializableStruct> String getResourceArn(I input, ApiOperation<I, ?> operation) {
         // Get arn values
-        var resource = operation.parentResource();
+        var resource = operation.boundResource();
         var arnTrait = resource.schema().getTrait(TraitKey.get(ArnTrait.class));
         List<String> replacements = new ArrayList<>(arnTrait.getLabels().size());
         var labels = arnTrait.getLabels();

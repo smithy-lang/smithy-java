@@ -19,9 +19,8 @@ import software.amazon.smithy.model.shapes.ShapeId;
 final class TypeCodegenSettings {
     private static final String SHAPES = "shapes";
     private static final String SELECTOR = "selector";
-    private static final String GENERATE_OPERATIONS = "generateOperations";
     private static final String RENAMES = "renames";
-    private static final List<String> PROPERTIES = List.of(SHAPES, SELECTOR, GENERATE_OPERATIONS, RENAMES);
+    private static final List<String> PROPERTIES = List.of(SHAPES, SELECTOR, RENAMES);
 
     /**
      * By default, all Structures, Enums, IntEnums, and Unions will be generated.
@@ -29,13 +28,11 @@ final class TypeCodegenSettings {
     private static final Selector DEFAULT_SELECTOR = Selector.parse(":is(structure, union, enum, intEnum)");
 
     private final JavaCodegenSettings codegenSettings;
-    private final boolean generateOperations;
     private final Selector selector;
     private final List<ShapeId> shapes;
     private final Map<ShapeId, String> renames;
 
     private TypeCodegenSettings(Builder builder) {
-        this.generateOperations = builder.generateOperations;
         this.selector = Objects.requireNonNullElse(builder.selector, DEFAULT_SELECTOR);
         this.shapes = builder.shapes;
         this.renames = builder.renames;
@@ -44,10 +41,6 @@ final class TypeCodegenSettings {
 
     public JavaCodegenSettings codegenSettings() {
         return codegenSettings;
-    }
-
-    public boolean generateOperations() {
-        return generateOperations;
     }
 
     public Selector selector() {
@@ -65,7 +58,6 @@ final class TypeCodegenSettings {
     static TypeCodegenSettings fromNode(ObjectNode settingsNode) {
         var builder = builder();
         settingsNode
-                .getBooleanMember(GENERATE_OPERATIONS, builder::generateOperations)
                 .getStringMember(SELECTOR, builder::selector)
                 .getArrayMember(SHAPES, n -> n.expectStringNode().expectShapeId(), builder::shapes)
                 .getObjectMember(RENAMES, n -> {
@@ -97,7 +89,6 @@ final class TypeCodegenSettings {
     public static final class Builder {
         private Selector selector = null;
         private final List<ShapeId> shapes = new ArrayList<>();
-        private boolean generateOperations = false;
         private final Map<ShapeId, String> renames = new HashMap<>();
         private JavaCodegenSettings codegenSettings;
 
@@ -110,11 +101,6 @@ final class TypeCodegenSettings {
 
         public Builder shapes(List<ShapeId> shapeIds) {
             this.shapes.addAll(shapeIds);
-            return this;
-        }
-
-        public Builder generateOperations(boolean generateOperations) {
-            this.generateOperations = generateOperations;
             return this;
         }
 

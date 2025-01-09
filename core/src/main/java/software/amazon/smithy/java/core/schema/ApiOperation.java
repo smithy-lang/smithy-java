@@ -114,7 +114,7 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
      *
      * @return Resource the operation is bound to or null if the operation has no parent resource.
      */
-    default ApiResource parentResource() {
+    default ApiResource boundResource() {
         return null;
     }
 }
