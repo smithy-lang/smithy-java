@@ -14,6 +14,9 @@ include(":codegen:plugins:client")
 include(":codegen:plugins:server")
 include(":codegen:plugins:types")
 
+// Codegen Integrations
+include(":codegen:integrations:waiters-codegen")
+
 // Framework errors
 include(":framework-errors")
 
@@ -40,6 +43,7 @@ include(":auth-api")
 include(":retries-api")
 
 include(":jmespath")
+include(":waiters")
 
 // server
 include("server-core")

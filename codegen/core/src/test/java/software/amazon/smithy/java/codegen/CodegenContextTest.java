@@ -72,7 +72,8 @@ public class CodegenContextTest {
                         .build(),
                 new JavaSymbolProvider(model, model.expectShape(SERVICE_ID).asServiceShape().get(), "ns.foo"),
                 new MockManifest(),
-                List.of());
+                List.of(),
+                "test");
 
         assertThat(
                 context.runtimeTraits(),
@@ -129,7 +130,8 @@ public class CodegenContextTest {
                         model.expectShape(NO_PROTOCOL_SERVICE_ID).asServiceShape().get(),
                         "ns.foo"),
                 new MockManifest(),
-                List.of());
+                List.of(),
+                "test");
 
         assertThat(
                 context.runtimeTraits(),

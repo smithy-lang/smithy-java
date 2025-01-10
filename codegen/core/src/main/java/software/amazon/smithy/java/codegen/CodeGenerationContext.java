@@ -103,13 +103,15 @@ public class CodeGenerationContext
     private final WriterDelegator<JavaWriter> writerDelegator;
     private final Set<ShapeId> runtimeTraits;
     private final List<TraitInitializer<?>> traitInitializers;
+    private final String plugin;
 
     public CodeGenerationContext(
             Model model,
             JavaCodegenSettings settings,
             SymbolProvider symbolProvider,
             FileManifest fileManifest,
-            List<JavaCodegenIntegration> integrations
+            List<JavaCodegenIntegration> integrations,
+            String plugin
     ) {
         this.model = model;
         this.settings = settings;
@@ -122,6 +124,7 @@ public class CodeGenerationContext
                 new JavaWriter.Factory(settings));
         this.runtimeTraits = collectRuntimeTraits();
         this.traitInitializers = collectTraitInitializers();
+        this.plugin = plugin;
     }
 
     @Override
@@ -156,6 +159,10 @@ public class CodeGenerationContext
 
     public Set<ShapeId> runtimeTraits() {
         return runtimeTraits;
+    }
+
+    public String plugin() {
+        return plugin;
     }
 
     /**

@@ -58,7 +58,8 @@ final class DirectedJavaServerCodegen
                 directive.settings(),
                 directive.symbolProvider(),
                 directive.fileManifest(),
-                directive.integrations());
+                directive.integrations(),
+                "server");
     }
 
     @Override

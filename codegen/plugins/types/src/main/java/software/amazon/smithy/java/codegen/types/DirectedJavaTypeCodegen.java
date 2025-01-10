@@ -48,7 +48,8 @@ final class DirectedJavaTypeCodegen
                 directive.settings(),
                 directive.symbolProvider(),
                 directive.fileManifest(),
-                directive.integrations());
+                directive.integrations(),
+                "type");
     }
 
     @Override

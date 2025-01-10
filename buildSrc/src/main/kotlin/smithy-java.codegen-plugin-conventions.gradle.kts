@@ -17,7 +17,7 @@ dependencies {
 
     // Avoid circular dependency in codegen core
     if (project.name != "core") {
-        implementation(project(":codegen:core"))
+        api(project(":codegen:core"))
     }
 }
 

@@ -20,6 +20,7 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
+import software.amazon.smithy.java.codegen.client.sections.ClientImplAdditionalMethodsSection;
 import software.amazon.smithy.java.codegen.generators.TypeRegistryGenerator;
 import software.amazon.smithy.java.codegen.sections.ApplyDocumentation;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
@@ -127,6 +128,7 @@ public final class ClientImplementationGenerator
                 writer.write(template);
                 writer.popState();
             }
+            writer.injectSection(new ClientImplAdditionalMethodsSection(service, async));
             writer.popState();
         }
     }

@@ -57,7 +57,8 @@ public class TestJavaCodegen implements
                 directive.settings(),
                 directive.symbolProvider(),
                 directive.fileManifest(),
-                directive.integrations());
+                directive.integrations(),
+                "test");
     }
 
     @Override

@@ -4,6 +4,7 @@ namespace com.example
 
 use com.shared.types#OrderStatus
 use com.shared.types#Uuid
+use smithy.waiters#waitable
 
 /// An Order resource, which has an id and describes an order by the type of coffee
 /// and the order's status
@@ -41,6 +42,25 @@ operation CreateOrder {
 }
 
 /// Retrieve an order
+@waitable(
+    OrderExists: {
+        documentation: "Wait until the order exists"
+        acceptors: [
+            {
+                state: "success"
+                matcher: { success: true }
+            }
+            {
+                state: "success"
+                matcher: { errorType: OtherError }
+            }
+            {
+                state: "retry"
+                matcher: { errorType: OrderNotFound }
+            }
+        ]
+    }
+)
 @readonly
 @http(method: "GET", uri: "/order/{id}")
 operation GetOrder {
@@ -63,6 +83,7 @@ operation GetOrder {
 
     errors: [
         OrderNotFound
+        OtherError
     ]
 }
 
@@ -73,4 +94,10 @@ operation GetOrder {
 structure OrderNotFound {
     message: String
     orderId: Uuid
+}
+
+@httpError(405)
+@error("client")
+structure OtherError {
+    message: String
 }

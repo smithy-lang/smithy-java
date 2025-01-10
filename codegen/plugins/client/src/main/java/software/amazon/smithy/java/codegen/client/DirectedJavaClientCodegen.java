@@ -47,7 +47,8 @@ final class DirectedJavaClientCodegen
                 directive.settings(),
                 directive.symbolProvider(),
                 directive.fileManifest(),
-                directive.integrations());
+                directive.integrations(),
+                "client");
     }
 
     @Override
