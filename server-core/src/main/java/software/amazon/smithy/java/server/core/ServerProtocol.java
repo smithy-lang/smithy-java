@@ -9,7 +9,9 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.framework.model.InternalFailureException;
+import software.amazon.smithy.java.framework.model.MalformedRequestException;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -38,7 +40,18 @@ public abstract class ServerProtocol {
         return serializeError(
                 job,
                 error instanceof ModeledApiException me ? me
-                        : InternalFailureException.builder().withCause(error).build());
+                        : translate(error));
+    }
+
+    private static ModeledApiException translate(Throwable error) {
+        if (error instanceof SerializationException se) {
+            return MalformedRequestException.builder()
+                    .withoutStackTrace()
+                    .withCause(se)
+                    .message(se.getMessage())
+                    .build();
+        }
+        return InternalFailureException.builder().withCause(error).build();
     }
 
     protected abstract CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output, boolean isError);

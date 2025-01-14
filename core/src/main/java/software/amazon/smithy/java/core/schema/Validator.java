@@ -437,13 +437,13 @@ public final class Validator {
         }
 
         private void validateRange(Schema schema, long value, long min, long max) {
-            if (value < min || value > max) {
+            if (schema.hasRangeConstraint && (value < min || value > max)) {
                 emitRangeError(schema, value);
             }
         }
 
         private void validateRange(Schema schema, double value, double min, double max) {
-            if (value < min || value > max) {
+            if (schema.hasRangeConstraint && (value < min || value > max)) {
                 emitRangeError(schema, value);
             }
         }
