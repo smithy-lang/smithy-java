@@ -213,7 +213,8 @@ public final class SchemaBuilder {
             long maxLongConstraint,
             double minDoubleConstraint,
             double maxDoubleConstraint,
-            ValidatorOfString stringValidation) {
+            ValidatorOfString stringValidation,
+            boolean hasRangeConstraint) {
         static ValidationState of(ShapeType type, TraitMap traits, Set<String> stringEnum) {
             long minLengthConstraint;
             long maxLengthConstraint;
@@ -254,6 +255,8 @@ public final class SchemaBuilder {
                 minRangeConstraint = null;
                 maxRangeConstraint = null;
             }
+
+            boolean hasRangeConstraint = maxRangeConstraint != null || minRangeConstraint != null;
 
             // Pre-compute allowable ranges so this doesn't have to be looked up during validation.
             // BigInteger and BigDecimal just use the rangeConstraint BigDecimal directly.
@@ -319,7 +322,8 @@ public final class SchemaBuilder {
                     maxLongConstraint,
                     minDoubleConstraint,
                     maxDoubleConstraint,
-                    stringValidation);
+                    stringValidation,
+                    hasRangeConstraint);
         }
     }
 

@@ -11,7 +11,6 @@ public final class ProtocolHandler implements Handler {
 
     @Override
     public CompletableFuture<Void> before(Job job) {
-        // TODO: Failures here should be converted to Malformed Request exceptions
         return job.chosenProtocol().deserializeInput(job);
     }
 

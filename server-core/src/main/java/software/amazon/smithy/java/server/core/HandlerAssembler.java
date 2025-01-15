@@ -15,6 +15,7 @@ public final class HandlerAssembler {
     public List<Handler> assembleHandlers(List<Service> services) {
         List<Handler> handlers = new ArrayList<>();
         handlers.add(new ProtocolHandler());
+        handlers.add(new ValidationHandler());
         handlers.add(new OperationHandler());
         return handlers;
     }
