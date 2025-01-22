@@ -17,7 +17,7 @@ final class DeprecatedTraitInterceptor implements CodeInterceptor.Appender<Javad
 
     @Override
     public void append(JavaWriter writer, JavadocSection section) {
-        var trait = section.targetShape().expectTrait(DeprecatedTrait.class);
+        var trait = section.targetedShape().expectTrait(DeprecatedTrait.class);
         writer.putContext("since", trait.getSince());
         writer.write("@deprecated ${?since}As of ${since:L}. ${/since}$L", trait.getMessage());
     }
@@ -29,6 +29,6 @@ final class DeprecatedTraitInterceptor implements CodeInterceptor.Appender<Javad
 
     @Override
     public boolean isIntercepted(JavadocSection section) {
-        return section.targetShape() != null && section.targetShape().hasTrait(DeprecatedTrait.class);
+        return section.targetedShape() != null && section.targetedShape().hasTrait(DeprecatedTrait.class);
     }
 }

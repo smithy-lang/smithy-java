@@ -11,10 +11,10 @@ import software.amazon.smithy.utils.CodeSection;
 /**
  * Contains a Java class definition.
  *
- * @param targetShape Smithy shape that the Java class defines
+ * @param targetedShape Smithy shape that the Java class defines
  * @param applyDocumentation Whether and how documentation is applied.
  */
-public record ClassSection(Shape targetShape, ApplyDocumentation applyDocumentation) implements CodeSection,
+public record ClassSection(Shape targetedShape, ApplyDocumentation applyDocumentation) implements CodeSection,
         DocumentedSection {
     public ClassSection(Shape targetShape) {
         this(targetShape, ApplyDocumentation.DOCUMENT);

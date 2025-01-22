@@ -40,7 +40,7 @@ final class JavadocInjectorInterceptor implements CodeInterceptor.Prepender<Code
     @Override
     public void prepend(JavaWriter writer, CodeSection section) {
         if (section instanceof DocumentedSection ds) {
-            var shape = ds.targetShape();
+            var shape = ds.targetedShape();
             writer.injectSection(new JavadocSection(shape, section));
             if (shape == null) {
                 return;

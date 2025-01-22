@@ -18,5 +18,5 @@ public interface DocumentedSection {
     /**
      * @return Shape targeted by this section, or null if target is not a shape
      */
-    Shape targetShape();
+    Shape targetedShape();
 }

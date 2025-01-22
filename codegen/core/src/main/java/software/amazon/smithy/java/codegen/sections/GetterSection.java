@@ -11,6 +11,6 @@ import software.amazon.smithy.utils.CodeSection;
 /**
  * Contains a getter method.
  *
- * @param targetShape Member shape that getter provides
+ * @param targetedShape Member shape that getter provides
  */
-public record GetterSection(MemberShape targetShape) implements CodeSection, DocumentedSection {}
+public record GetterSection(MemberShape targetedShape) implements CodeSection, DocumentedSection {}

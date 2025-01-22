@@ -16,7 +16,7 @@ import software.amazon.smithy.utils.CodeInterceptor;
 final class SinceTraitInterceptor implements CodeInterceptor.Appender<JavadocSection, JavaWriter> {
     @Override
     public void append(JavaWriter writer, JavadocSection section) {
-        var trait = section.targetShape().expectTrait(SinceTrait.class);
+        var trait = section.targetedShape().expectTrait(SinceTrait.class);
         writer.write("@since $L", trait.getValue());
     }
 
@@ -27,6 +27,6 @@ final class SinceTraitInterceptor implements CodeInterceptor.Appender<JavadocSec
 
     @Override
     public boolean isIntercepted(JavadocSection section) {
-        return section.targetShape() != null && section.targetShape().hasTrait(SinceTrait.class);
+        return section.targetedShape() != null && section.targetedShape().hasTrait(SinceTrait.class);
     }
 }

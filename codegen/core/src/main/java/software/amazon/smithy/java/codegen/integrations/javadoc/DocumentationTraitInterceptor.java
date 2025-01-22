@@ -19,7 +19,7 @@ final class DocumentationTraitInterceptor implements CodeInterceptor<JavadocSect
 
     @Override
     public void write(JavaWriter writer, String previousText, JavadocSection section) {
-        writer.writeWithNoFormatting(section.targetShape().expectTrait(DocumentationTrait.class).getValue());
+        writer.writeWithNoFormatting(section.targetedShape().expectTrait(DocumentationTrait.class).getValue());
 
         if (!previousText.isEmpty()) {
             // Add spacing if tags have been added to the javadoc
@@ -35,6 +35,6 @@ final class DocumentationTraitInterceptor implements CodeInterceptor<JavadocSect
 
     @Override
     public boolean isIntercepted(JavadocSection section) {
-        return section.targetShape() != null && section.targetShape().hasTrait(DocumentationTrait.class);
+        return section.targetedShape() != null && section.targetedShape().hasTrait(DocumentationTrait.class);
     }
 }

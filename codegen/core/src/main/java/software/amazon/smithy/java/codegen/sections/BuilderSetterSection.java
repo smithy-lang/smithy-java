@@ -11,6 +11,6 @@ import software.amazon.smithy.utils.CodeSection;
 /**
  * Contains a setter method on a builder.
  *
- * @param targetShape Smithy member that the Builder setter sets
+ * @param targetedShape Smithy member that the Builder setter sets
  */
-public record BuilderSetterSection(MemberShape targetShape) implements CodeSection, DocumentedSection {}
+public record BuilderSetterSection(MemberShape targetedShape) implements CodeSection, DocumentedSection {}
