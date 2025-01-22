@@ -17,7 +17,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.jmespath.JmespathExpression;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 // TODO: Add compliance test test runner and reach full compliance with JMESPath spec.
@@ -29,8 +28,7 @@ public class TestJMESPathDocumentVisitor {
                         Document.of("FAILED"),
                         "nested",
                         Document.of(Map.of("id", Document.of("idValue")))));
-        var exp = JmespathExpression.parse("nested.id");
-        var value = exp.accept(new JMESPathDocumentVisitor(doc));
+        var value = JMESPathDocumentQuery.query("nested.id", doc);
         assertEquals("idValue", value.asString());
     }
 
@@ -48,8 +46,7 @@ public class TestJMESPathDocumentVisitor {
     @MethodSource("indexSource")
     void testIndexExpression(String str, String expected) {
         var doc = Document.of(List.of(Document.of("A"), Document.of("B"), Document.of("C")));
-        var exp = JmespathExpression.parse(str);
-        var actual = exp.accept(new JMESPathDocumentVisitor(doc));
+        var actual = JMESPathDocumentQuery.query(str, doc);
         assertEquals(expected, actual.asString());
     }
 
@@ -68,8 +65,7 @@ public class TestJMESPathDocumentVisitor {
     @MethodSource("sliceSource")
     void testSliceExpression(String str, List<Document> expected) {
         var doc = Document.of(List.of(Document.of(0), Document.of(1), Document.of(2), Document.of(3)));
-        var exp = JmespathExpression.parse(str);
-        var value = exp.accept(new JMESPathDocumentVisitor(doc));
+        var value = JMESPathDocumentQuery.query(str, doc);
         assertEquals(expected, value.asList());
     }
 
@@ -93,8 +89,7 @@ public class TestJMESPathDocumentVisitor {
                 Document.of(List.of(Document.of("c"))),
                 "qux",
                 Document.of(Map.of("quux", Document.of("d")))));
-        var exp = JmespathExpression.parse(str);
-        var value = exp.accept(new JMESPathDocumentVisitor(doc));
+        var value = JMESPathDocumentQuery.query(str, doc);
         assertEquals(expected, value.asList());
     }
 
@@ -120,8 +115,7 @@ public class TestJMESPathDocumentVisitor {
                 Document.of(List.of(Document.of("c"))),
                 "qux",
                 Document.of(Map.of("quux", Document.of("d")))));
-        var exp = JmespathExpression.parse(str);
-        var value = exp.accept(new JMESPathDocumentVisitor(doc));
+        var value = JMESPathDocumentQuery.query(str, doc);
         assertEquals(expected, value.asStringMap());
     }
 
@@ -146,8 +140,7 @@ public class TestJMESPathDocumentVisitor {
                 Document.of("bar-value"),
                 "myList",
                 Document.of(List.of(Document.of("one"), Document.of("two")))));
-        var exp = JmespathExpression.parse(str);
-        var value = exp.accept(new JMESPathDocumentVisitor(doc));
+        var value = JMESPathDocumentQuery.query(str, doc);
 
         if (expected == null) {
             assertNull(value);
@@ -186,8 +179,7 @@ public class TestJMESPathDocumentVisitor {
                 Document.of(List.of(
                         Document.of(Map.of("a", Document.of(1.0), "b", Document.of(2.0))),
                         Document.of(Map.of("a", Document.of(1.0), "b", Document.of(3.0)))))));
-        var exp = JmespathExpression.parse(str);
-        var value = exp.accept(new JMESPathDocumentVisitor(doc));
+        var value = JMESPathDocumentQuery.query(str, doc);
         assertEquals(expected, value);
     }
 
@@ -214,8 +206,7 @@ public class TestJMESPathDocumentVisitor {
                 Document.of(1.0),
                 "qux",
                 Document.of(1)));
-        var exp = JmespathExpression.parse(str);
-        var value = exp.accept(new JMESPathDocumentVisitor(doc));
+        var value = JMESPathDocumentQuery.query(str, doc);
         assertEquals(expected, value.asBoolean());
     }
 
@@ -239,8 +230,7 @@ public class TestJMESPathDocumentVisitor {
                 Document.of(5),
                 "EmptyList",
                 Document.of(List.of())));
-        var exp = JmespathExpression.parse(str);
-        var value = exp.accept(new JMESPathDocumentVisitor(doc));
+        var value = JMESPathDocumentQuery.query(str, doc);
         assertEquals(expected, value.asBoolean());
     }
 
@@ -276,8 +266,7 @@ public class TestJMESPathDocumentVisitor {
                                 Document.of(1),
                                 "b",
                                 Document.of(2)))))));
-        var exp = JmespathExpression.parse(str);
-        var value = exp.accept(new JMESPathDocumentVisitor(doc));
+        var value = JMESPathDocumentQuery.query(str, doc);
         assertEquals(expected, value.asList());
     }
 
@@ -299,8 +288,7 @@ public class TestJMESPathDocumentVisitor {
                 Document.of(List.of(
                         Document.of(Map.of("baz", Document.of(1))),
                         Document.of(Map.of("baz", Document.of(2)))))));
-        var exp = JmespathExpression.parse(str);
-        var value = exp.accept(new JMESPathDocumentVisitor(testDocument));
+        var value = JMESPathDocumentQuery.query(str, testDocument);
         assertEquals(expected, value.asList());
     }
 
@@ -348,8 +336,7 @@ public class TestJMESPathDocumentVisitor {
                 Document.of("myStr"),
                 "nums",
                 Document.of(List.of(Document.of(2), Document.of(1), Document.of(3)))));
-        var exp = JmespathExpression.parse(str);
-        var value = exp.accept(new JMESPathDocumentVisitor(testDocument));
+        var value = JMESPathDocumentQuery.query(str, testDocument);
         if (expected == null) {
             assertNull(value);
         } else if (expected.type().equals(ShapeType.LIST)) {
@@ -383,9 +370,7 @@ public class TestJMESPathDocumentVisitor {
                         Document.of(Map.of("qux", Document.of(1))),
                         Document.of(Map.of("c", Document.of(1))),
                         Document.of(Map.of("qux", Document.of(2)))))));
-        var exp = JmespathExpression.parse(str);
-        var value = exp.accept(new JMESPathDocumentVisitor(testDocument));
+        var value = JMESPathDocumentQuery.query(str, testDocument);
         assertThat(expected.asList(), containsInAnyOrder(value.asList().toArray()));
     }
-
 }
