@@ -81,6 +81,7 @@ public class CborComparator {
                     default -> throw new RuntimeException("can't handle " + CborParser.Token.name(token));
                 }
             }
+            assertThat(parser.getPosition()).isEqualTo(buf.length);
             return root;
         }
 
