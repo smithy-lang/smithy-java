@@ -39,6 +39,8 @@ include(":dynamic-client")
 include(":auth-api")
 include(":retries-api")
 
+include(":jmespath")
+
 // server
 include("server-core")
 include("server-api")

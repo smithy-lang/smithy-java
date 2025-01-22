@@ -100,10 +100,9 @@ public final class DocumentUtils {
         }
     }
 
-    // Emulate JLS 5.1.2 type promotion.
-    static boolean compareWithPromotion(Number a, Document rightDocument) {
+    static boolean numberEquals(Number a, Document rightDocument) {
         try {
-            return compareWithPromotion(a, rightDocument.asNumber());
+            return compareWithPromotion(a, rightDocument) == 0;
         } catch (SerializationException e) {
             // If the other document can't be converted to a number, then don't fail. Instead, report false.
             return false;
@@ -111,21 +110,26 @@ public final class DocumentUtils {
     }
 
     // Emulate JLS 5.1.2 type promotion.
-    private static boolean compareWithPromotion(Number a, Number b) {
+    static int compareWithPromotion(Number a, Document rightDocument) {
+        return compareWithPromotion(a, rightDocument.asNumber());
+    }
+
+    // Emulate JLS 5.1.2 type promotion.
+    private static int compareWithPromotion(Number a, Number b) {
         // Exact matches.
         if (a.equals(b)) {
-            return true;
+            return 0;
         } else if (isBig(a, b)) {
             // When the values have a BigDecimal or BigInteger, normalize them both to BigDecimal. This is used even
             // for BigInteger to avoid dropping decimals from doubles or floats (e.g., 10.01 != 10).
             return DocumentUtils.toBigDecimal(a)
                     .stripTrailingZeros()
-                    .compareTo(DocumentUtils.toBigDecimal(b).stripTrailingZeros()) == 0;
+                    .compareTo(DocumentUtils.toBigDecimal(b).stripTrailingZeros());
         } else if (a instanceof Double || b instanceof Double || a instanceof Float || b instanceof Float) {
             // Treat floats as double to allow for comparing larger values from rhs, like longs.
-            return a.doubleValue() == b.doubleValue();
+            return Double.compare(a.doubleValue(), b.doubleValue());
         } else {
-            return a.longValue() == b.longValue();
+            return Long.compare(a.longValue(), b.longValue());
         }
     }
 
