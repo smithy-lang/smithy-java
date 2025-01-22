@@ -765,7 +765,6 @@ public interface Document extends SerializableShape {
      * @return the value {@code 0} if {@code left == right} a value less than {@code 0} if {@code left < right}
      *         and a value greater than {@code 0} if {@code left > right}.
      */
-    // TODO: Support string comparison
     static int compare(Document left, Document right) {
         if (left == right) {
             return 0;
@@ -780,6 +779,7 @@ public interface Document extends SerializableShape {
             case DOUBLE -> DocumentUtils.compareWithPromotion(left.asDouble(), right);
             case BIG_DECIMAL -> DocumentUtils.compareWithPromotion(left.asBigDecimal(), right);
             case BIG_INTEGER -> DocumentUtils.compareWithPromotion(left.asBigInteger(), right);
+            case STRING -> left.asString().compareTo(right.asString());
             default -> throw new SerializationException("Could not compare documents of type "
                     + left.type() + " and " + right.type());
         };
