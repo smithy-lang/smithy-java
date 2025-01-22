@@ -102,7 +102,10 @@ public record JMESPathDocumentVisitor(Document document) implements ExpressionVi
 
     @Override
     public Document visitField(FieldExpression fieldExpression) {
-        return document.getMember(fieldExpression.getName());
+        return switch (document.type()) {
+            case MAP, STRUCTURE, UNION -> document.getMember(fieldExpression.getName());
+            default -> null;
+        };
     }
 
     @Override
@@ -174,6 +177,7 @@ public record JMESPathDocumentVisitor(Document document) implements ExpressionVi
         if (resultList == null || !resultList.type().equals(ShapeType.LIST)) {
             return null;
         }
+        System.out.println("FOUND : " + resultList);
         List<Document> projectedResults = new ArrayList<>();
         for (var result : resultList.asList()) {
             var projected = projectionExpression.getRight().accept(new JMESPathDocumentVisitor(result));
@@ -181,6 +185,7 @@ public record JMESPathDocumentVisitor(Document document) implements ExpressionVi
                 projectedResults.add(projected);
             }
         }
+        System.out.println("FOUND : " + projectedResults);
         return Document.of(projectedResults);
     }
 
@@ -203,7 +208,19 @@ public record JMESPathDocumentVisitor(Document document) implements ExpressionVi
 
     @Override
     public Document visitObjectProjection(ObjectProjectionExpression objectProjectionExpression) {
-        throw new UnsupportedOperationException("Object projections not yet supported");
+        var resultObject = objectProjectionExpression.getLeft().accept(this);
+        List<Document> projectedResults = new ArrayList<>();
+        for (var member : resultObject.getMemberNames()) {
+            var memberValue = resultObject.getMember(member);
+            if (memberValue != null) {
+                var projectedResult =
+                        objectProjectionExpression.getRight().accept(new JMESPathDocumentVisitor(memberValue));
+                if (projectedResult != null) {
+                    projectedResults.add(projectedResult);
+                }
+            }
+        }
+        return Document.of(projectedResults);
     }
 
     @Override

@@ -343,4 +343,36 @@ public class TestJMESPathDocumentVisitor {
             assertEquals(expected, value);
         }
     }
+
+    static List<Arguments> wildcardSource() {
+        return List.of(
+                Arguments.of("*.foo", Document.of(List.of(Document.of(1), Document.of(2)))),
+                Arguments.of("*.bar", Document.of(List.of(Document.of(3)))),
+                Arguments.of("*.baz", Document.of(List.of())),
+                Arguments.of("z[*].zip", Document.of(List.of())),
+                Arguments.of("z[*].qux", Document.of(List.of(Document.of(1), Document.of(2)))));
+    }
+
+    @ParameterizedTest
+    @MethodSource("wildcardSource")
+    void testWildcardExpressions(String str, Document expected) {
+        var testDocument = Document.of(Map.of(
+                "a",
+                Document.of(Map.of("foo", Document.of(1))),
+                "b",
+                Document.of(Map.of("foo", Document.of(2))),
+                "c",
+                Document.of(Map.of("bar", Document.of(3))),
+                "z",
+                Document.of(List.of(
+                        Document.of(Map.of("qux", Document.of(1))),
+                        Document.of(Map.of("c", Document.of(1))),
+                        Document.of(Map.of("qux", Document.of(2)))))));
+        var exp = JmespathExpression.parse(str);
+        System.out.println("EXP: " + exp);
+        var value = exp.accept(new JMESPathDocumentVisitor(testDocument));
+        System.out.println("VALUE " + value);
+        assertThat(expected.asList(), containsInAnyOrder(value.asList().toArray()));
+    }
+
 }
