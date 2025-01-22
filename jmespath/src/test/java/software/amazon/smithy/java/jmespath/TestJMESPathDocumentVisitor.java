@@ -369,9 +369,7 @@ public class TestJMESPathDocumentVisitor {
                         Document.of(Map.of("c", Document.of(1))),
                         Document.of(Map.of("qux", Document.of(2)))))));
         var exp = JmespathExpression.parse(str);
-        System.out.println("EXP: " + exp);
         var value = exp.accept(new JMESPathDocumentVisitor(testDocument));
-        System.out.println("VALUE " + value);
         assertThat(expected.asList(), containsInAnyOrder(value.asList().toArray()));
     }
 

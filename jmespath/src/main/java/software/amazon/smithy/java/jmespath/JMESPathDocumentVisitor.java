@@ -177,7 +177,6 @@ public record JMESPathDocumentVisitor(Document document) implements ExpressionVi
         if (resultList == null || !resultList.type().equals(ShapeType.LIST)) {
             return null;
         }
-        System.out.println("FOUND : " + resultList);
         List<Document> projectedResults = new ArrayList<>();
         for (var result : resultList.asList()) {
             var projected = projectionExpression.getRight().accept(new JMESPathDocumentVisitor(result));
@@ -185,7 +184,6 @@ public record JMESPathDocumentVisitor(Document document) implements ExpressionVi
                 projectedResults.add(projected);
             }
         }
-        System.out.println("FOUND : " + projectedResults);
         return Document.of(projectedResults);
     }
 
