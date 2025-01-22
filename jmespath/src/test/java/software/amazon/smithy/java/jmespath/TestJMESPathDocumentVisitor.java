@@ -160,20 +160,35 @@ public class TestJMESPathDocumentVisitor {
     //search(Number && EmptyList, {"Number": 5, EmptyList: []}) -> []
     static List<Arguments> andSource() {
         return List.of(
-                Arguments.of("True && False", false));
+                Arguments.of("True && False", Document.of(false)),
+                Arguments.of("Number && EmptyList", Document.of(List.of())),
+                Arguments.of("foo[?a == `1` && b == `2`]",
+                        Document.of(List.of(Document.of(Map.of(
+                                "a",
+                                Document.of(1.0),
+                                "b",
+                                Document.of(2.0)))))));
     }
 
     @ParameterizedTest
     @MethodSource("andSource")
-    void testAndExpression(String str, boolean expected) {
+    void testAndExpression(String str, Document expected) {
         var doc = Document.of(Map.of(
                 "True",
                 Document.of(true),
                 "False",
-                Document.of(false)));
+                Document.of(false),
+                "Number",
+                Document.of(5),
+                "EmptyList",
+                Document.of(List.of()),
+                "foo",
+                Document.of(List.of(
+                        Document.of(Map.of("a", Document.of(1.0), "b", Document.of(2.0))),
+                        Document.of(Map.of("a", Document.of(1.0), "b", Document.of(3.0)))))));
         var exp = JmespathExpression.parse(str);
         var value = exp.accept(new JMESPathDocumentVisitor(doc));
-        assertEquals(expected, value.asBoolean());
+        assertEquals(expected, value);
     }
 
     static List<Arguments> comparisonSource() {

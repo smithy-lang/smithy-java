@@ -687,6 +687,8 @@ public interface Document extends SerializableShape {
             if (l == r) {
                 return true;
             }
+            System.out.println("LEFT " + l);
+            System.out.println("RIGHT " + r);
             return switch (l.type()) {
                 case BLOB -> l.type() == r.type() && l.asBlob().equals(r.asBlob());
                 case BOOLEAN -> l.type() == r.type() && l.asBoolean() == r.asBoolean();
@@ -757,11 +759,16 @@ public interface Document extends SerializableShape {
     }
 
     /**
-     * Compares two Documents numerically.
+     * Compares two Documents.
+     *
+     * <p>If the documents are numbers, then they are compared using JLS 5.1.2 type promotion.
+     * Strings documents are compared lexicographically.
+     *
+     * <p><strong>Note:</strong> Only numeric and string types are supported.
      *
      * @param left Left document to compare.
      * @param right Right document to compare.
-     * @throws SerializationException if the document types are not numerically comparable.
+     * @throws SerializationException if the document types are not comparable.
      * @return the value {@code 0} if {@code left == right} a value less than {@code 0} if {@code left < right}
      *         and a value greater than {@code 0} if {@code left > right}.
      */

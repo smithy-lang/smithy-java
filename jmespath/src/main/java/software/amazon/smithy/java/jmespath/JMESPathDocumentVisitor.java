@@ -39,9 +39,11 @@ public record JMESPathDocumentVisitor(Document document) implements ExpressionVi
     @Override
     public Document visitComparator(ComparatorExpression comparatorExpression) {
         var left = comparatorExpression.getLeft().accept(this);
+        if (left == null) {
+            return null;
+        }
         var right = comparatorExpression.getRight().accept(this);
-
-        if (left == null || right == null) {
+        if (right == null) {
             return null;
         }
         Boolean value = switch (comparatorExpression.getComparator()) {
@@ -147,9 +149,7 @@ public record JMESPathDocumentVisitor(Document document) implements ExpressionVi
     @Override
     public Document visitAnd(AndExpression andExpression) {
         var left = andExpression.getLeft().accept(this);
-        var right = andExpression.getRight().accept(this);
-        return JMESPathDocumentUtils.isTruthy(left) && JMESPathDocumentUtils.isTruthy(right) ? Document.of(true)
-                : Document.of(false);
+        return JMESPathDocumentUtils.isTruthy(left) ? andExpression.getRight().accept(this) : left;
     }
 
     @Override
@@ -168,7 +168,7 @@ public record JMESPathDocumentVisitor(Document document) implements ExpressionVi
     @Override
     public Document visitNot(NotExpression notExpression) {
         var output = notExpression.getExpression().accept(this);
-        return output == null ? null : Document.of(!JMESPathDocumentUtils.isTruthy(output));
+        return Document.of(!JMESPathDocumentUtils.isTruthy(output));
     }
 
     @Override
@@ -191,13 +191,13 @@ public record JMESPathDocumentVisitor(Document document) implements ExpressionVi
     public Document visitFilterProjection(FilterProjectionExpression filterProjectionExpression) {
         var target = filterProjectionExpression.getRight().accept(this);
         var left = filterProjectionExpression.getLeft().accept(new JMESPathDocumentVisitor(target));
-        if (left == null) {
+        if (left == null || !left.type().equals(ShapeType.LIST)) {
             return null;
         }
         List<Document> results = new ArrayList<>();
         for (var val : left.asList()) {
             var output = filterProjectionExpression.getComparison().accept(new JMESPathDocumentVisitor(val));
-            if (output != null && output.asBoolean()) {
+            if (JMESPathDocumentUtils.isTruthy(output)) {
                 results.add(val);
             }
         }
