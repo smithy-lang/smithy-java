@@ -16,7 +16,7 @@ import software.amazon.smithy.utils.CodeInterceptor;
 final class ExternalDocumentationTraitInterceptor implements CodeInterceptor.Appender<JavadocSection, JavaWriter> {
     @Override
     public void append(JavaWriter writer, JavadocSection section) {
-        var trait = section.shape().expectTrait(ExternalDocumentationTrait.class);
+        var trait = section.targetShape().expectTrait(ExternalDocumentationTrait.class);
         writer.pushState();
         writer.putContext("links", trait.getUrls());
         writer.write("${#links}@see <a href=${value:S}>${key:L}</a>${^key.last}\n${/key.last}${/links}");
@@ -30,6 +30,6 @@ final class ExternalDocumentationTraitInterceptor implements CodeInterceptor.App
 
     @Override
     public boolean isIntercepted(JavadocSection section) {
-        return section.shape().hasTrait(ExternalDocumentationTrait.class);
+        return section.targetShape() != null && section.targetShape().hasTrait(ExternalDocumentationTrait.class);
     }
 }

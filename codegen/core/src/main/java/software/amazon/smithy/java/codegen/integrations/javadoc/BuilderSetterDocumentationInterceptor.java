@@ -19,10 +19,10 @@ final class BuilderSetterDocumentationInterceptor implements CodeInterceptor.App
 
     @Override
     public void append(JavaWriter writer, JavadocSection section) {
-        if (section.shape().hasTrait(RequiredTrait.class)) {
+        if (section.targetShape().hasTrait(RequiredTrait.class)) {
             writer.writeWithNoFormatting("<p><strong>Required</strong>");
         }
-        if (section.shape().hasTrait(RecommendedTrait.class)) {
+        if (section.targetShape().hasTrait(RecommendedTrait.class)) {
             writer.writeWithNoFormatting("<p><strong>Recommended</strong>");
         }
         writer.writeWithNoFormatting("@return this builder.");

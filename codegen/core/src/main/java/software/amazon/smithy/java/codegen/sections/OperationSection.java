@@ -16,9 +16,9 @@ import software.amazon.smithy.utils.CodeSection;
  * <p>This section is used operations both as stand-alone models
  * and for operation methods on clients.
  *
- * @param operation Operation that java docs are being added to.
+ * @param targetShape Operation that java docs are being added to.
  */
 public record OperationSection(
-        OperationShape operation,
+        OperationShape targetShape,
         SymbolProvider symbolProvider,
         Model model) implements CodeSection, DocumentedSection {}
