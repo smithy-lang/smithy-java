@@ -23,15 +23,19 @@ operation GetBeer {
 }
 
 structure Beer {
+    @length(min: 3)
     name: String
+
     quantity: Long
 }
 
 @http(method: "POST", uri: "/add-beer")
 operation AddBeer {
     input := {
+        @required
         beer: Beer
     }
+
     output := {
         id: Long
     }
