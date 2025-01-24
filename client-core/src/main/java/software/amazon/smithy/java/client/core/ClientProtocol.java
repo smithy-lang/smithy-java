@@ -9,7 +9,7 @@ import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.core.schema.ApiException;
+import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
@@ -79,7 +79,7 @@ public interface ClientProtocol<RequestT, ResponseT> {
      * @param request      Request that was sent for this response.
      * @param response     Response to deserialize.
      * @return the deserialized output shape.
-     * @throws ApiException if an error occurs, including deserialized modeled errors and protocol errors.
+     * @throws CallException if an error occurs, including deserialized modeled errors and protocol errors.
      */
     <I extends SerializableStruct, O extends SerializableStruct> CompletableFuture<O> deserializeResponse(
             ApiOperation<I, O> operation,

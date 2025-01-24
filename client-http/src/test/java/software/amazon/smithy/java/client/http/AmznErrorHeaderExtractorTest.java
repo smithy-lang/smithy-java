@@ -13,7 +13,7 @@ import static org.hamcrest.Matchers.nullValue;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
@@ -53,7 +53,7 @@ public class AmznErrorHeaderExtractorTest {
                 .headers(HttpHeaders.of(Map.of("x-amzn-errortype", List.of("baz#Bam"))))
                 .build();
         var registry = TypeRegistry.builder()
-                .putType(ShapeId.from("baz#Bam"), ModeledApiException.class, ApiExceptionBuilder::new)
+                .putType(ShapeId.from("baz#Bam"), ModeledException.class, ApiExceptionBuilder::new)
                 .build();
 
         assertThat(extractor.resolveId(response, "com.foo", registry), equalTo(ShapeId.from("baz#Bam")));
@@ -71,7 +71,7 @@ public class AmznErrorHeaderExtractorTest {
                                         List.of("baz#Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/"))))
                 .build();
         var registry = TypeRegistry.builder()
-                .putType(ShapeId.from("baz#Bam"), ModeledApiException.class, ApiExceptionBuilder::new)
+                .putType(ShapeId.from("baz#Bam"), ModeledException.class, ApiExceptionBuilder::new)
                 .build();
 
         assertThat(extractor.resolveId(response, "com.foo", registry), equalTo(ShapeId.from("baz#Bam")));
@@ -89,7 +89,7 @@ public class AmznErrorHeaderExtractorTest {
                                         List.of("Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/"))))
                 .build();
         var registry = TypeRegistry.builder()
-                .putType(ShapeId.from("com.foo#Bam"), ModeledApiException.class, ApiExceptionBuilder::new)
+                .putType(ShapeId.from("com.foo#Bam"), ModeledException.class, ApiExceptionBuilder::new)
                 .build();
 
         assertThat(extractor.resolveId(response, "com.foo", registry), equalTo(ShapeId.from("com.foo#Bam")));
@@ -107,7 +107,7 @@ public class AmznErrorHeaderExtractorTest {
                                         List.of("baz#Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/"))))
                 .build();
         var registry = TypeRegistry.builder()
-                .putType(ShapeId.from("baz#Bam"), ModeledApiException.class, ApiExceptionBuilder::new)
+                .putType(ShapeId.from("baz#Bam"), ModeledException.class, ApiExceptionBuilder::new)
                 .build();
 
         assertThat(extractor.resolveId(response, "com.foo", registry), equalTo(ShapeId.from("baz#Bam")));
@@ -125,7 +125,7 @@ public class AmznErrorHeaderExtractorTest {
                                         List.of("other#Bam:http://internal.amazon.com/coral/com.amazon.coral.validate/"))))
                 .build();
         var registry = TypeRegistry.builder()
-                .putType(ShapeId.from("com.foo#Bam"), ModeledApiException.class, ApiExceptionBuilder::new)
+                .putType(ShapeId.from("com.foo#Bam"), ModeledException.class, ApiExceptionBuilder::new)
                 .build();
 
         assertThat(extractor.resolveId(response, "com.foo", registry), equalTo(ShapeId.from("com.foo#Bam")));
@@ -147,7 +147,7 @@ public class AmznErrorHeaderExtractorTest {
         assertThat(extractor.resolveId(response, "com.foo", registry), nullValue());
     }
 
-    private static final class ApiExceptionBuilder implements ShapeBuilder<ModeledApiException> {
+    private static final class ApiExceptionBuilder implements ShapeBuilder<ModeledException> {
 
         @Override
         public Schema schema() {
@@ -155,17 +155,17 @@ public class AmznErrorHeaderExtractorTest {
         }
 
         @Override
-        public ModeledApiException build() {
+        public ModeledException build() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public ShapeBuilder<ModeledApiException> deserialize(ShapeDeserializer decoder) {
+        public ShapeBuilder<ModeledException> deserialize(ShapeDeserializer decoder) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public ShapeBuilder<ModeledApiException> errorCorrection() {
+        public ShapeBuilder<ModeledException> errorCorrection() {
             throw new UnsupportedOperationException();
         }
     }

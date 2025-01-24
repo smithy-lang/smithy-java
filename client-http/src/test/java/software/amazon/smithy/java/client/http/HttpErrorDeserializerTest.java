@@ -18,8 +18,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.core.schema.ApiException;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.CallException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
@@ -127,7 +127,8 @@ public class HttpErrorDeserializerTest {
                 .codec(CODEC)
                 .serviceId(SERVICE)
                 .unknownErrorFactory(
-                        (fault, message, response) -> CompletableFuture.completedFuture(new ApiException("Hi!", fault)))
+                        (fault, message, response) -> CompletableFuture
+                                .completedFuture(new CallException("Hi!", fault)))
                 .build();
         var registry = TypeRegistry.builder()
                 .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
@@ -138,7 +139,7 @@ public class HttpErrorDeserializerTest {
         var response = responseBuilder.build();
         var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
 
-        assertThat(result, instanceOf(ApiException.class));
+        assertThat(result, instanceOf(CallException.class));
         assertThat(result.getMessage(), equalTo("Hi!"));
     }
 
@@ -149,7 +150,8 @@ public class HttpErrorDeserializerTest {
                 .serviceId(SERVICE)
                 .headerErrorExtractor(new AmznErrorHeaderExtractor())
                 .unknownErrorFactory(
-                        (fault, message, response) -> CompletableFuture.completedFuture(new ApiException("Hi!", fault)))
+                        (fault, message, response) -> CompletableFuture
+                                .completedFuture(new CallException("Hi!", fault)))
                 .build();
         var registry = TypeRegistry.builder()
                 .putType(Baz.SCHEMA.id(), Baz.class, Baz.Builder::new)
@@ -167,11 +169,11 @@ public class HttpErrorDeserializerTest {
         var response = responseBuilder.build();
         var result = deserializer.createError(Context.create(), OPERATION, registry, response).get();
 
-        assertThat(result, instanceOf(ApiException.class));
+        assertThat(result, instanceOf(CallException.class));
         assertThat(result.getMessage(), equalTo("Hi!"));
     }
 
-    static final class Baz extends ModeledApiException {
+    static final class Baz extends ModeledException {
 
         static final Schema SCHEMA = Schema
                 .structureBuilder(ShapeId.from("com.foo#Baz"), new ErrorTrait("client"))

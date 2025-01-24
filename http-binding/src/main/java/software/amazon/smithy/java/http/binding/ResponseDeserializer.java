@@ -7,7 +7,7 @@ package software.amazon.smithy.java.http.binding;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
@@ -23,7 +23,7 @@ public final class ResponseDeserializer {
 
     private final HttpBindingDeserializer.Builder deserBuilder = HttpBindingDeserializer.builder();
     private ShapeBuilder<?> outputShapeBuilder;
-    private ShapeBuilder<? extends ModeledApiException> errorShapeBuilder;
+    private ShapeBuilder<? extends ModeledException> errorShapeBuilder;
     private final ConcurrentMap<Schema, BindingMatcher> bindingCache;
 
     ResponseDeserializer(ConcurrentMap<Schema, BindingMatcher> bindingCache) {
@@ -105,7 +105,7 @@ public final class ResponseDeserializer {
      * @param errorShapeBuilder Error shape builder.
      * @return Returns the deserializer.
      */
-    public ResponseDeserializer errorShapeBuilder(ShapeBuilder<? extends ModeledApiException> errorShapeBuilder) {
+    public ResponseDeserializer errorShapeBuilder(ShapeBuilder<? extends ModeledException> errorShapeBuilder) {
         this.errorShapeBuilder = errorShapeBuilder;
         outputShapeBuilder = null;
         return this;

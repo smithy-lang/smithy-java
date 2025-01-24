@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.settings.ClockSetting;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.core.schema.ApiException;
+import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.retries.api.RetrySafety;
@@ -32,7 +32,7 @@ public class ApplyHttpRetryInfoPluginTest {
                 .statusCode(500)
                 .headers(HttpHeaders.of(Map.of("retry-after", List.of("10"))))
                 .build();
-        var e = new ApiException("err");
+        var e = new CallException("err");
         var context = Context.create();
 
         ApplyHttpRetryInfoPlugin.applyRetryInfo(response, e, context);
@@ -48,7 +48,7 @@ public class ApplyHttpRetryInfoPluginTest {
                 .statusCode(500)
                 .headers(HttpHeaders.of(Map.of("retry-after", List.of("Wed, 21 Oct 2015 07:28:00 GMT"))))
                 .build();
-        var e = new ApiException("err");
+        var e = new CallException("err");
         var context = Context.create();
         context.put(ClockSetting.CLOCK, Clock.fixed(Instant.parse("2015-10-21T05:28:00Z"), ZoneId.of("UTC")));
 
@@ -62,7 +62,7 @@ public class ApplyHttpRetryInfoPluginTest {
     @Test
     public void appliesThrottlingStatusCode503() {
         var response = HttpResponse.builder().statusCode(503).build();
-        var e = new ApiException("err");
+        var e = new CallException("err");
         var context = Context.create();
 
         ApplyHttpRetryInfoPlugin.applyRetryInfo(response, e, context);
@@ -75,7 +75,7 @@ public class ApplyHttpRetryInfoPluginTest {
     @Test
     public void appliesThrottlingStatusCode429() {
         var response = HttpResponse.builder().statusCode(429).build();
-        var e = new ApiException("err");
+        var e = new CallException("err");
         var context = Context.create();
 
         ApplyHttpRetryInfoPlugin.applyRetryInfo(response, e, context);
@@ -88,7 +88,7 @@ public class ApplyHttpRetryInfoPluginTest {
     @Test
     public void retriesSafe5xx() {
         var response = HttpResponse.builder().statusCode(500).build();
-        var e = new ApiException("err");
+        var e = new CallException("err");
         var context = Context.create();
         context.put(CallContext.IDEMPOTENCY_TOKEN, "foo");
 
@@ -102,7 +102,7 @@ public class ApplyHttpRetryInfoPluginTest {
     @Test
     public void doesNotRetryUnsafe5xx() {
         var response = HttpResponse.builder().statusCode(500).build();
-        var e = new ApiException("err");
+        var e = new CallException("err");
         var context = Context.create();
 
         ApplyHttpRetryInfoPlugin.applyRetryInfo(response, e, context);
@@ -115,7 +115,7 @@ public class ApplyHttpRetryInfoPluginTest {
     @Test
     public void doesNotRetryNormal4xx() {
         var response = HttpResponse.builder().statusCode(400).build();
-        var e = new ApiException("err");
+        var e = new CallException("err");
         var context = Context.create();
 
         ApplyHttpRetryInfoPlugin.applyRetryInfo(response, e, context);

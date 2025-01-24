@@ -33,7 +33,7 @@ import software.amazon.smithy.java.client.core.interceptors.OutputHook;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.core.interceptors.ResponseHook;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.core.schema.ApiException;
+import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -260,7 +260,7 @@ final class ClientPipeline<RequestT, ResponseT> {
         for (var authSchemeOption : authSchemeOptions) {
             options.add(authSchemeOption.schemeId().toString());
         }
-        throw new ApiException(
+        throw new CallException(
                 "No auth scheme could be resolved for operation " + call.operation.schema().id()
                         + "; protocol=" + protocol.id()
                         + "; requestClass=" + request.getClass()

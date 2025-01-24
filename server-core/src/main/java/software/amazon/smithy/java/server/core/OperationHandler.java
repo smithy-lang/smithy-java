@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.server.core;
 
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.framework.model.InternalFailureException;
 import software.amazon.smithy.java.server.Operation;
@@ -26,8 +26,8 @@ public class OperationHandler implements Handler {
             response.whenComplete((result, error) -> {
                 SerializableStruct output = result;
                 if (error != null) {
-                    ModeledApiException modeledError;
-                    if (error instanceof ModeledApiException e) {
+                    ModeledException modeledError;
+                    if (error instanceof ModeledException e) {
                         modeledError = e;
                     } else {
                         modeledError = InternalFailureException.builder().withCause(error).build();
@@ -43,7 +43,7 @@ public class OperationHandler implements Handler {
             SerializableStruct response;
             try {
                 response = (SerializableStruct) operation.function().apply(inputShape, null);
-            } catch (ModeledApiException e) {
+            } catch (ModeledException e) {
                 job.setFailure(e);
                 response = e;
             } catch (Exception e) {

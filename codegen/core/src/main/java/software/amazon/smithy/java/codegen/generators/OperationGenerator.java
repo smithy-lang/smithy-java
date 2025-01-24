@@ -17,10 +17,10 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.ApiResource;
 import software.amazon.smithy.java.core.schema.InputEventStreamingApiOperation;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
@@ -161,7 +161,7 @@ public final class OperationGenerator
                     writer.putContext("list", List.class);
                     writer.putContext("string", String.class);
                     writer.putContext("set", Set.class);
-                    writer.putContext("modeledApiException", ModeledApiException.class);
+                    writer.putContext("modeledApiException", ModeledException.class);
 
                     writer.putContext(
                             "operationType",

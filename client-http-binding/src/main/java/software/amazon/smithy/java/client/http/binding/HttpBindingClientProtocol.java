@@ -10,7 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.client.http.HttpClientProtocol;
 import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.core.schema.ApiException;
+import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.InputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.schema.OutputEventStreamingApiOperation;
@@ -145,7 +145,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
      * @return Returns the deserialized error.
      */
     protected <I extends SerializableStruct,
-            O extends SerializableStruct> CompletableFuture<? extends ApiException> createError(
+            O extends SerializableStruct> CompletableFuture<? extends CallException> createError(
                     ApiOperation<I, O> operation,
                     Context context,
                     TypeRegistry typeRegistry,

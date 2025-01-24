@@ -11,7 +11,7 @@ import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.Job;
@@ -105,7 +105,7 @@ public class ProtocolTestProtocolProvider implements ServerProtocolProvider {
             var protocol = job.request().context().get(PROTOCOL_TO_TEST);
             if (protocol != null) {
                 if (isError) {
-                    return protocol.serializeError(job, (ModeledApiException) output);
+                    return protocol.serializeError(job, (ModeledException) output);
                 } else {
                     return protocol.serializeOutput(job, output);
                 }

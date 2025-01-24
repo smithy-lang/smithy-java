@@ -22,9 +22,9 @@ import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
-import software.amazon.smithy.java.core.schema.ApiException;
+import software.amazon.smithy.java.core.error.CallException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
@@ -55,7 +55,7 @@ import software.amazon.smithy.model.shapes.ToShapeId;
  *     <li>No code generated types. You have to construct input and use output manually using document APIs.</li>
  *     <li>No support for streaming inputs or outputs.</li>
  *     <li>All errors are created as an {@link DocumentException} if the error is modeled, allowing document access
- *     to the modeled error contents. Other errors are deserialized as {@link ApiException}.
+ *     to the modeled error contents. Other errors are deserialized as {@link CallException}.
  * </ul>
  */
 public final class DynamicClient extends Client {
@@ -90,7 +90,7 @@ public final class DynamicClient extends Client {
     private void registerError(ShapeId e, TypeRegistry.Builder registryBuilder) {
         var error = model.expectShape(e);
         var errorSchema = schemaConverter.getSchema(error);
-        registryBuilder.putType(e, ModeledApiException.class, () -> {
+        registryBuilder.putType(e, ModeledException.class, () -> {
             return new DocumentException.SchemaGuidedExceptionBuilder(service.getId(), errorSchema);
         });
     }

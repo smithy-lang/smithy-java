@@ -14,7 +14,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import software.amazon.eventstream.HeaderValue;
 import software.amazon.eventstream.Message;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -79,7 +79,7 @@ public final class AwsEventShapeEncoder implements EventEncoder<AwsEventFrame> {
     public AwsEventFrame encodeFailure(Throwable exception) {
         AwsEventFrame frame;
         Schema exceptionSchema;
-        if (exception instanceof ModeledApiException me && (exceptionSchema = possibleExceptions.get(
+        if (exception instanceof ModeledException me && (exceptionSchema = possibleExceptions.get(
                 me.schema().id())) != null) {
             var headers = new HashMap<String, HeaderValue>();
             headers.put(":message-type", HeaderValue.fromString("exception"));
