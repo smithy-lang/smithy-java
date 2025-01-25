@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.examples.events;
+package software.amazon.smithy.java.examples;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -17,9 +17,9 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.java.example.events.model.NewOrderEvent;
-import software.amazon.smithy.java.example.events.model.QueryEvent;
-import software.amazon.smithy.java.example.events.model.ReturnEvent;
+import software.amazon.smithy.java.example.model.NewOrderEvent;
+import software.amazon.smithy.java.example.model.QueryEvent;
+import software.amazon.smithy.java.example.model.ReturnEvent;
 
 public class GenericEventTest {
     private final TypeRegistry typeRegistry = TypeRegistry.builder()
