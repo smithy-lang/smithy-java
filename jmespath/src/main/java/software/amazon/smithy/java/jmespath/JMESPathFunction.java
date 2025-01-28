@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.jmespath.ast.ExpressionTypeExpression;
 import software.amazon.smithy.jmespath.ast.FunctionExpression;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -22,7 +23,7 @@ import software.amazon.smithy.model.shapes.ShapeType;
 enum JMESPathFunction {
     ABS("abs", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var arg = arguments.get(0);
             return switch (arg.type()) {
                 case BYTE -> Document.of(Math.abs(arg.asByte()));
@@ -39,13 +40,13 @@ enum JMESPathFunction {
     },
     AVG("avg", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
-            throw new UnsupportedOperationException("Avg function is not supported");
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
+            return null;
         }
     },
     CONTAINS("contains", 2) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression ignored) {
             var subject = arguments.get(0);
             var search = arguments.get(1);
             return switch (subject.type()) {
@@ -68,7 +69,7 @@ enum JMESPathFunction {
     },
     CEIL("ceil", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var arg = arguments.get(0);
             return switch (arg.type()) {
                 case BYTE, INTEGER, INT_ENUM, BIG_INTEGER, LONG, SHORT -> arg;
@@ -82,7 +83,7 @@ enum JMESPathFunction {
     },
     ENDS_WITH("ends_with", 2) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var subject = arguments.get(0);
             var search = arguments.get(1);
             if (!subject.type().equals(ShapeType.STRING) || !search.type().equals(ShapeType.STRING)) {
@@ -93,27 +94,27 @@ enum JMESPathFunction {
     },
     FLOOR("floor", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var arg = arguments.get(0);
             return switch (arg.type()) {
                 case BYTE, INTEGER, INT_ENUM, BIG_INTEGER, LONG, SHORT -> arg;
                 case BIG_DECIMAL -> Document.of(arg.asBigDecimal().setScale(0, RoundingMode.FLOOR));
                 case DOUBLE -> Document.of(Math.floor(arg.asDouble()));
                 case FLOAT -> Document.of(Math.floor(arg.asFloat()));
-                // Non numeric searches return null per spec
+                // Non numeric searches return null per specification
                 default -> null;
             };
         }
     },
     JOIN("join", 2) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             return null;
         }
     },
     KEYS("keys", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var arg = arguments.get(0);
             return switch (arg.type()) {
                 case MAP, STRUCTURE -> {
@@ -126,26 +127,39 @@ enum JMESPathFunction {
     },
     LENGTH("length", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var arg = arguments.get(0);
             return Document.of(arg.size());
         }
     },
     MAP("map", 2) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
-            throw new UnsupportedOperationException("Map function is not supported");
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
+            return null;
         }
     },
     MAX_BY("max_by", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
-            throw new UnsupportedOperationException("Max by function is not supported");
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
+            var subject = arguments.get(0);
+            if (!subject.type().equals(ShapeType.LIST)) {
+                throw new IllegalArgumentException("`max_by` only supports arrays");
+            }
+            Document max = null;
+            Document maxValue = null;
+            for (var item : subject.asList()) {
+                var value = fnRef.accept(new JMESPathDocumentVisitor(item));
+                if (max == null || Document.compare(maxValue, value) < 0) {
+                    max = item;
+                    maxValue = value;
+                }
+            }
+            return max;
         }
     },
     MAX("max", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var subject = arguments.get(0);
             if (!subject.type().equals(ShapeType.LIST)) {
                 throw new IllegalArgumentException("`max` only supports array arguments");
@@ -155,13 +169,13 @@ enum JMESPathFunction {
     },
     MERGE("merge", 0) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
-            throw new UnsupportedOperationException("Merge function is not supported");
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
+            return null;
         }
     },
     MIN("min", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var subject = arguments.get(0);
             if (!subject.type().equals(ShapeType.LIST)) {
                 throw new IllegalArgumentException("`max` only supports array arguments");
@@ -169,15 +183,28 @@ enum JMESPathFunction {
             return Collections.min(subject.asList(), Document::compare);
         }
     },
-    MIN_BY("min_by", 2) {
+    MIN_BY("min_by", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
-            throw new UnsupportedOperationException("Min by function is not supported");
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
+            var subject = arguments.get(0);
+            if (!subject.type().equals(ShapeType.LIST)) {
+                throw new IllegalArgumentException("`min_by` only supports arrays");
+            }
+            Document min = null;
+            Document minValue = null;
+            for (var item : subject.asList()) {
+                var value = fnRef.accept(new JMESPathDocumentVisitor(item));
+                if (min == null || Document.compare(minValue, value) > 0) {
+                    min = item;
+                    minValue = value;
+                }
+            }
+            return min;
         }
     },
     NOT_NULL("not_null", 0) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             for (var arg : arguments) {
                 if (arg != null) {
                     return arg;
@@ -188,7 +215,7 @@ enum JMESPathFunction {
     },
     REVERSE("reverse", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var subject = arguments.get(0);
             if (!subject.type().equals(ShapeType.LIST)) {
                 throw new IllegalArgumentException("`max` only supports array arguments");
@@ -200,23 +227,32 @@ enum JMESPathFunction {
     },
     SORT("sort", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var subject = arguments.get(0);
             if (!subject.type().equals(ShapeType.LIST)) {
-                throw new IllegalArgumentException("`max` only supports array arguments");
+                throw new IllegalArgumentException("`sort` only supports array arguments");
             }
             return Document.of(subject.asList().stream().sorted(Document::compare).toList());
         }
     },
-    SORT_BY("sort_by", 2) {
+    SORT_BY("sort_by", 1, true) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
-            throw new UnsupportedOperationException("Sort by function is not supported");
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
+            var subject = arguments.get(0);
+            if (!subject.type().equals(ShapeType.LIST)) {
+                throw new IllegalArgumentException("`sort_by` only supports arrays");
+            }
+            return Document.of(subject.asList()
+                    .stream()
+                    .sorted((l, r) -> Document.compare(
+                            fnRef.accept(new JMESPathDocumentVisitor(l)),
+                            fnRef.accept(new JMESPathDocumentVisitor(r))))
+                    .toList());
         }
     },
     STARTS_WITH("starts_with", 2) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var subject = arguments.get(0);
             var search = arguments.get(1);
             if (!subject.type().equals(ShapeType.STRING) || !search.type().equals(ShapeType.STRING)) {
@@ -227,31 +263,31 @@ enum JMESPathFunction {
     },
     SUM("sum", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             throw new UnsupportedOperationException("Sum function is not supported");
         }
     },
     TO_ARRAY("to_array", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             throw new UnsupportedOperationException("To Array function is not supported");
         }
     },
     TO_STRING("to_string", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             throw new UnsupportedOperationException("to_string function is not supported");
         }
     },
     TO_NUMBER("to_number", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> argument, ExpressionTypeExpression fnRef) {
             throw new UnsupportedOperationException("to_number function is not supported");
         }
     },
     TYPE("type", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var argument = arguments.get(0);
             if (argument == null) {
                 return Document.of("null");
@@ -269,7 +305,7 @@ enum JMESPathFunction {
     },
     VALUES("values", 1) {
         @Override
-        public Document applyImpl(List<Document> arguments) {
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var arg = arguments.get(0);
             return switch (arg.type()) {
                 case MAP, STRUCTURE -> {
@@ -283,10 +319,16 @@ enum JMESPathFunction {
 
     private final String name;
     private final int argumentCount;
+    private final boolean expectsFnRef;
 
     JMESPathFunction(String name, int argumentCount) {
+        this(name, argumentCount, false);
+    }
+
+    JMESPathFunction(String name, int argumentCount, boolean expectsFnRef) {
         this.name = name;
         this.argumentCount = argumentCount;
+        this.expectsFnRef = expectsFnRef;
     }
 
     static JMESPathFunction from(FunctionExpression expression) {
@@ -302,15 +344,19 @@ enum JMESPathFunction {
     /**
      * Apply the JMESPath function to a set of arguments.
      * @param arguments arguments
+     * @param fnRef function reference if supported by function, or null.
      * @return result of function
      */
-    public Document apply(List<Document> arguments) {
+    public Document apply(List<Document> arguments, ExpressionTypeExpression fnRef) {
         if (argumentCount > 0 && argumentCount != arguments.size()) {
             throw new IllegalArgumentException("Unexpected number of arguments. Expected " + argumentCount
                     + " but found " + arguments.size());
         }
-        return applyImpl(arguments);
+        if (expectsFnRef && fnRef == null) {
+            throw new IllegalArgumentException("Expected a function reference for `" + name + "`, but found null.");
+        }
+        return applyImpl(arguments, fnRef);
     }
 
-    protected abstract Document applyImpl(List<Document> arguments);
+    protected abstract Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef);
 }

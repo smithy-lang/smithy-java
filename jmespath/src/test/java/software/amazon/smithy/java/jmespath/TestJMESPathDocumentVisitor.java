@@ -311,7 +311,11 @@ public class TestJMESPathDocumentVisitor {
                 Arguments.of("floor(`1`)", Document.of(1.0)),
                 Arguments.of("keys(@)",
                         Document.of(List
-                                .of(Document.of("neg"), Document.of("str"), Document.of("foo"), Document.of("nums")))),
+                                .of(Document.of("neg"),
+                                        Document.of("str"),
+                                        Document.of("foo"),
+                                        Document.of("nums"),
+                                        Document.of("vals")))),
                 Arguments.of("length(nums)", Document.of(3)),
                 Arguments.of("max(nums)", Document.of(3)),
                 Arguments.of("min(nums)", Document.of(1)),
@@ -321,7 +325,9 @@ public class TestJMESPathDocumentVisitor {
                 Arguments.of("type(neg)", Document.of("number")),
                 Arguments.of("type(foo)", Document.of("array")),
                 Arguments.of("type(zip)", Document.of("null")),
-                Arguments.of("type(str)", Document.of("string")));
+                Arguments.of("type(str)", Document.of("string")),
+                Arguments.of("max_by(vals, &age)", Document.of(Map.of("age", Document.of(45)))),
+                Arguments.of("min_by(vals, &age)", Document.of(Map.of("age", Document.of(32)))));
     }
 
     @ParameterizedTest
@@ -335,7 +341,10 @@ public class TestJMESPathDocumentVisitor {
                 "str",
                 Document.of("myStr"),
                 "nums",
-                Document.of(List.of(Document.of(2), Document.of(1), Document.of(3)))));
+                Document.of(List.of(Document.of(2), Document.of(1), Document.of(3))),
+                "vals",
+                Document.of(List.of(Document.of(Map.of("age", Document.of(32))),
+                        Document.of(Map.of("age", Document.of(45)))))));
         var value = JMESPathDocumentQuery.query(str, testDocument);
         if (expected == null) {
             assertNull(value);
