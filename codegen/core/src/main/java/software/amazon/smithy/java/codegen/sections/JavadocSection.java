@@ -15,7 +15,7 @@ import software.amazon.smithy.utils.CodeSection;
  * are used to populate this section with content and to format it as a doc
  * comment.
  *
- * @param shape Shape that java docs are being added to.
+ * @param targetedShape Shape that java docs are being added to.
  * @param parent Code section that this javadoc section is attached to
  */
-public record JavadocSection(Shape shape, CodeSection parent) implements CodeSection {}
+public record JavadocSection(Shape targetedShape, CodeSection parent) implements CodeSection {}

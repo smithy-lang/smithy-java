@@ -38,6 +38,21 @@ final class DeferredMemberSchema extends Schema {
     }
 
     @Override
+    public int requiredMemberCount() {
+        return memberTarget().requiredMemberCount();
+    }
+
+    @Override
+    long requiredByValidationBitmask() {
+        return memberTarget().requiredByValidationBitmask();
+    }
+
+    @Override
+    long requiredStructureMemberBitfield() {
+        return memberTarget().requiredStructureMemberBitfield();
+    }
+
+    @Override
     public <T extends Trait> T getDirectTrait(TraitKey<T> trait) {
         return directTraits.get(trait);
     }

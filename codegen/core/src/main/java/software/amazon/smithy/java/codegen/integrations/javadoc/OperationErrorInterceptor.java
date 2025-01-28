@@ -18,9 +18,8 @@ final class OperationErrorInterceptor implements CodeInterceptor.Appender<Javado
 
     @Override
     public void append(JavaWriter writer, JavadocSection section) {
-        var operation = section.shape().asOperationShape().orElseThrow();
         if (section.parent() instanceof OperationSection os) {
-            for (var error : operation.getErrors()) {
+            for (var error : os.targetedShape().getErrors()) {
                 writer.pushState();
                 var errorShape = os.model().expectShape(error);
                 var errorSymbol = os.symbolProvider().toSymbol(errorShape);
@@ -44,9 +43,6 @@ final class OperationErrorInterceptor implements CodeInterceptor.Appender<Javado
 
     @Override
     public boolean isIntercepted(JavadocSection section) {
-        if (section.parent() instanceof OperationSection) {
-            return section.shape().isOperationShape();
-        }
-        return false;
+        return section.parent() instanceof OperationSection;
     }
 }

@@ -8,7 +8,7 @@ package software.amazon.smithy.java.server.protocols.rpcv2;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.cbor.Rpcv2CborCodec;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.framework.model.MalformedRequestException;
 import software.amazon.smithy.java.framework.model.UnknownOperationException;
@@ -95,7 +95,7 @@ final class RpcV2CborProtocol extends ServerProtocol {
         var httpJob = job.asHttpJob();
         final int statusCode;
         if (isError) {
-            statusCode = ModeledApiException.getHttpStatusCode(output.schema());
+            statusCode = ModeledException.getHttpStatusCode(output.schema());
         } else {
             statusCode = 200;
         }

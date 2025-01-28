@@ -19,7 +19,8 @@ import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.core.schema.ApiException;
+import software.amazon.smithy.java.core.error.CallException;
+import software.amazon.smithy.java.core.error.ErrorFault;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -48,8 +49,8 @@ final class MockClient extends Client {
         try {
             return call(input, operation, overrideConfig).exceptionallyCompose(exc -> {
                 if (exc instanceof CompletionException ce
-                        && ce.getCause() instanceof ApiException apiException
-                        && apiException.getFault().equals(ApiException.Fault.SERVER)) {
+                        && ce.getCause() instanceof CallException apiException
+                        && apiException.getFault().equals(ErrorFault.SERVER)) {
                     LOGGER.debug("Ignoring expected exception", apiException);
                     return CompletableFuture.completedFuture(null);
                 } else {

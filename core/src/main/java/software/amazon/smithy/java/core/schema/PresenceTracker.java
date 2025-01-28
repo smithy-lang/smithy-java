@@ -65,9 +65,10 @@ public abstract sealed class PresenceTracker {
      * @return StructureValidator to use for validating required members.
      */
     public static PresenceTracker of(Schema schema) {
-        if (schema.requiredMemberCount == 0) {
+        int requiredMemberCount = schema.requiredMemberCount();
+        if (requiredMemberCount == 0) {
             return NoOpPresenceTracker.INSTANCE;
-        } else if (schema.requiredMemberCount <= 64) {
+        } else if (requiredMemberCount <= 64) {
             return new PresenceTracker.RequiredMemberPresenceTracker(schema);
         } else {
             return new PresenceTracker.BigRequiredMemberPresenceTracker(schema);
@@ -116,24 +117,24 @@ public abstract sealed class PresenceTracker {
 
         @Override
         public void setMember(Schema memberSchema) {
-            setBitfields |= memberSchema.requiredByValidationBitmask;
+            setBitfields |= memberSchema.requiredByValidationBitmask();
         }
 
         @Override
         public boolean checkMember(Schema memberSchema) {
-            return (setBitfields & memberSchema.requiredByValidationBitmask) != 0L;
+            return (setBitfields & memberSchema.requiredByValidationBitmask()) != 0L;
         }
 
         @Override
         public boolean allSet() {
-            return schema.requiredStructureMemberBitfield == setBitfields;
+            return schema.requiredStructureMemberBitfield() == setBitfields;
         }
 
         @Override
         public Set<String> getMissingMembers() {
             Set<String> result = new TreeSet<>();
             for (var member : schema.members()) {
-                if (member.isRequiredByValidation && (setBitfields & member.requiredByValidationBitmask) == 0L) {
+                if (member.isRequiredByValidation && (setBitfields & member.requiredByValidationBitmask()) == 0L) {
                     result.add(member.memberName());
                 }
             }
@@ -167,7 +168,7 @@ public abstract sealed class PresenceTracker {
 
         @Override
         public boolean allSet() {
-            if (bitSet.cardinality() != schema.requiredMemberCount) {
+            if (bitSet.cardinality() != schema.requiredMemberCount()) {
                 return false;
             }
             for (var member : schema.members()) {

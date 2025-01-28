@@ -18,7 +18,7 @@ import software.amazon.smithy.java.client.core.interceptors.OutputHook;
 import software.amazon.smithy.java.client.core.settings.ClockSetting;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.core.schema.ApiException;
+import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.retries.api.RetrySafety;
@@ -45,16 +45,16 @@ public final class ApplyHttpRetryInfoPlugin implements ClientPlugin {
                 OutputHook<?, O, ?, ?> hook,
                 RuntimeException error
         ) {
-            if (error instanceof ApiException ae
-                    && ae.isRetrySafe() == RetrySafety.MAYBE
+            if (error instanceof CallException ce
+                    && ce.isRetrySafe() == RetrySafety.MAYBE
                     && hook.response() instanceof HttpResponse res) {
-                applyRetryInfo(res, ae, hook.context());
+                applyRetryInfo(res, ce, hook.context());
             }
             return hook.forward(error);
         }
     }
 
-    static void applyRetryInfo(HttpResponse response, ApiException exception, Context context) {
+    static void applyRetryInfo(HttpResponse response, CallException exception, Context context) {
         // (1) Check with the protocol if the server explicitly wants a retry.
         if (!applyRetryAfterHeader(response, exception, context)) {
             if (!applyThrottlingStatusCodes(response, exception)) {
@@ -72,7 +72,7 @@ public final class ApplyHttpRetryInfoPlugin implements ClientPlugin {
     }
 
     // Treat 429 and 503 errors as retryable throttling errors.
-    private static boolean applyThrottlingStatusCodes(HttpResponse response, ApiException exception) {
+    private static boolean applyThrottlingStatusCodes(HttpResponse response, CallException exception) {
         if (response.statusCode() == 429 || response.statusCode() == 503) {
             exception.isRetrySafe(RetrySafety.YES);
             exception.isThrottle(true);
@@ -82,7 +82,7 @@ public final class ApplyHttpRetryInfoPlugin implements ClientPlugin {
     }
 
     // If there's a retry-after header, then the server is telling us it's retryable.
-    private static boolean applyRetryAfterHeader(HttpResponse response, ApiException exception, Context context) {
+    private static boolean applyRetryAfterHeader(HttpResponse response, CallException exception, Context context) {
         var retryAfter = response.headers().firstValue("retry-after");
         if (retryAfter != null) {
             exception.isThrottle(true);

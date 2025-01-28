@@ -23,6 +23,8 @@ final class RootSchema extends Schema {
     private final List<Schema> memberList;
     private final Set<String> stringEnumValues;
     private final Set<Integer> intEnumValues;
+    private final int requiredMemberCount;
+    private final long requiredStructureMemberBitfield;
 
     RootSchema(ShapeType type, ShapeId id, TraitMap traits) {
         this(type, id, traits, Collections.emptyList(), detectEnumTraitValues(type, traits), Collections.emptySet());
@@ -54,12 +56,19 @@ final class RootSchema extends Schema {
         if (memberBuilders.isEmpty()) {
             memberList = Collections.emptyList();
             members = Collections.emptyMap();
+            this.requiredMemberCount = 0;
+            this.requiredStructureMemberBitfield = 0;
         } else {
             memberList = new ArrayList<>(memberBuilders.size());
             for (var builder : memberBuilders) {
                 memberList.add(builder.build());
             }
             members = SchemaBuilder.createMembers(memberList);
+            this.requiredMemberCount = SchemaBuilder.computeRequiredMemberCount(type, memberBuilders);
+            this.requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(type,
+                    requiredMemberCount,
+                    memberList,
+                    Schema::requiredByValidationBitmask);
         }
     }
 
@@ -76,6 +85,21 @@ final class RootSchema extends Schema {
     @Override
     public Set<Integer> intEnumValues() {
         return intEnumValues;
+    }
+
+    @Override
+    int requiredMemberCount() {
+        return requiredMemberCount;
+    }
+
+    @Override
+    long requiredByValidationBitmask() {
+        return 0;
+    }
+
+    @Override
+    long requiredStructureMemberBitfield() {
+        return requiredStructureMemberBitfield;
     }
 
     @Override

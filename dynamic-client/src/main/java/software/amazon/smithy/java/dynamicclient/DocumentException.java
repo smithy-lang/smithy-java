@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.dynamicclient;
 
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
@@ -14,9 +14,9 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
- * A {@link ModeledApiException} that provides access to the contents of the exception as a document.
+ * A {@link ModeledException} that provides access to the contents of the exception as a document.
  */
-public final class DocumentException extends ModeledApiException {
+public final class DocumentException extends ModeledException {
 
     private final WrappedDocument document;
 
@@ -49,7 +49,7 @@ public final class DocumentException extends ModeledApiException {
         return document;
     }
 
-    static final class SchemaGuidedExceptionBuilder implements ShapeBuilder<ModeledApiException> {
+    static final class SchemaGuidedExceptionBuilder implements ShapeBuilder<ModeledException> {
 
         private final Schema target;
         private final SchemaGuidedDocumentBuilder delegateBuilder;

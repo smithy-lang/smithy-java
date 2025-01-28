@@ -25,7 +25,7 @@ import smithy.java.codegen.server.test.service.EchoOperation;
 import smithy.java.codegen.server.test.service.GetBeerOperationAsync;
 import smithy.java.codegen.server.test.service.GetErrorOperationAsync;
 import smithy.java.codegen.server.test.service.TestService;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.framework.model.InternalFailureException;
 import software.amazon.smithy.java.framework.model.UnknownOperationException;
 import software.amazon.smithy.java.server.Operation;
@@ -57,7 +57,7 @@ public class ServiceBuilderTest {
             Throwable exception;
             try {
                 Class<?> clazz = Class.forName(input.exceptionClass());
-                if (ModeledApiException.class.isAssignableFrom(clazz)) {
+                if (ModeledException.class.isAssignableFrom(clazz)) {
                     Object builderInstance = clazz.getDeclaredMethod("builder").invoke(null);
                     builderInstance = builderInstance.getClass()
                             .getMethod("message")

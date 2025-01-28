@@ -28,7 +28,7 @@ import software.amazon.smithy.java.codegen.sections.BuilderSetterSection;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.PresenceTracker;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -120,7 +120,7 @@ public final class StructureGenerator<
             writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
             writer.putContext("shape", directive.symbol());
             writer.putContext("serializableStruct", SerializableStruct.class);
-            writer.putContext("sdkException", ModeledApiException.class);
+            writer.putContext("sdkException", ModeledException.class);
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(
                     "schemas",

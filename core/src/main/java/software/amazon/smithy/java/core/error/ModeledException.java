@@ -3,35 +3,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.core.schema;
+package software.amazon.smithy.java.core.error;
+
+import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.schema.TraitKey;
 
 /**
  * The top-level exception that should be used to throw modeled errors from clients and servers.
  */
-public abstract class ModeledApiException extends ApiException implements SerializableStruct {
+public abstract class ModeledException extends CallException implements SerializableStruct {
 
     private final Schema schema;
     private boolean deserialized = false;
 
-    protected ModeledApiException(Schema schema, String message) {
+    protected ModeledException(Schema schema, String message) {
         super(message);
         this.schema = schema;
     }
 
-    protected ModeledApiException(Schema schema, String message, Fault errorType) {
+    protected ModeledException(Schema schema, String message, ErrorFault errorType) {
         super(message, null, errorType, null);
         this.schema = schema;
     }
 
-    protected ModeledApiException(Schema schema, String message, Fault errorType, Throwable cause) {
+    protected ModeledException(Schema schema, String message, ErrorFault errorType, Throwable cause) {
         super(message, cause, errorType, null);
         this.schema = schema;
     }
 
-    protected ModeledApiException(
+    protected ModeledException(
             Schema schema,
             String message,
-            Fault errorType,
+            ErrorFault errorType,
             Throwable cause,
             Boolean captureStackTrace,
             boolean deserialized
@@ -41,7 +45,7 @@ public abstract class ModeledApiException extends ApiException implements Serial
         this.deserialized = deserialized;
     }
 
-    protected ModeledApiException(
+    protected ModeledException(
             Schema schema,
             String message,
             Throwable cause,
@@ -53,16 +57,16 @@ public abstract class ModeledApiException extends ApiException implements Serial
         this.deserialized = deserialized;
     }
 
-    protected ModeledApiException(Schema schema, String message, Throwable cause) {
+    protected ModeledException(Schema schema, String message, Throwable cause) {
         super(message, cause, (Boolean) null);
         this.schema = schema;
     }
 
-    protected ModeledApiException(
+    protected ModeledException(
             Schema schema,
             String message,
             Throwable cause,
-            Fault errorType,
+            ErrorFault errorType,
             Boolean captureStackTrace,
             boolean deserialized
     ) {

@@ -9,8 +9,8 @@ import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.OutputHook;
-import software.amazon.smithy.java.core.schema.ApiException;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.CallException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -40,14 +40,14 @@ public final class ApplyModelRetryInfoPlugin implements ClientPlugin {
                 OutputHook<?, O, ?, ?> hook,
                 RuntimeException error
         ) {
-            if (error instanceof ApiException ae && ae.isRetrySafe() == RetrySafety.MAYBE) {
-                applyRetryInfoFromModel(hook.operation().schema(), ae);
+            if (error instanceof CallException ce && ce.isRetrySafe() == RetrySafety.MAYBE) {
+                applyRetryInfoFromModel(hook.operation().schema(), ce);
             }
             return hook.forward(error);
         }
     }
 
-    static void applyRetryInfoFromModel(Schema operationSchema, ApiException e) {
+    static void applyRetryInfoFromModel(Schema operationSchema, CallException e) {
         // If the operation is readonly or idempotent, then it's safe to retry (other checks can disqualify later).
         var isRetryable = operationSchema.hasTrait(TraitKey.READ_ONLY_TRAIT)
                 || operationSchema.hasTrait(TraitKey.IDEMPOTENT_TRAIT);
@@ -57,7 +57,7 @@ public final class ApplyModelRetryInfoPlugin implements ClientPlugin {
         }
 
         // If the exception is modeled as retryable or a throttle, then use that information.
-        if (e instanceof ModeledApiException mae) {
+        if (e instanceof ModeledException mae) {
             var retryTrait = mae.schema().getTrait(TraitKey.RETRYABLE_TRAIT);
             if (retryTrait != null) {
                 e.isRetrySafe(RetrySafety.YES);

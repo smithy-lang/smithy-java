@@ -23,7 +23,8 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.OutputHook;
-import software.amazon.smithy.java.core.schema.ApiException;
+import software.amazon.smithy.java.core.error.CallException;
+import software.amazon.smithy.java.core.error.ErrorFault;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.framework.model.InternalFailureException;
@@ -115,8 +116,8 @@ public class MockPluginTest {
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
                 .build();
 
-        var e = Assertions.assertThrows(ApiException.class, () -> client.call("GetSprocket"));
-        assertThat(e.getFault(), equalTo(ApiException.Fault.SERVER));
+        var e = Assertions.assertThrows(CallException.class, () -> client.call("GetSprocket"));
+        assertThat(e.getFault(), equalTo(ErrorFault.SERVER));
         assertThat(e.isRetrySafe(), equalTo(RetrySafety.MAYBE));
 
         assertThat(mock.getRequests(), hasSize(1));
@@ -166,8 +167,8 @@ public class MockPluginTest {
                 })
                 .build();
 
-        var e = Assertions.assertThrows(ApiException.class, () -> client.call("GetSprocket"));
-        assertThat(e.getFault(), is(ApiException.Fault.CLIENT));
+        var e = Assertions.assertThrows(CallException.class, () -> client.call("GetSprocket"));
+        assertThat(e.getFault(), is(ErrorFault.CLIENT));
 
         assertThat(mock.getRequests(), hasSize(1));
 

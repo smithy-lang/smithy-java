@@ -21,7 +21,7 @@ import software.amazon.smithy.java.codegen.test.model.EmptyException;
 import software.amazon.smithy.java.codegen.test.model.ExceptionWithExtraStringException;
 import software.amazon.smithy.java.codegen.test.model.OptionalMessageException;
 import software.amazon.smithy.java.codegen.test.model.SimpleException;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 
 @ExtendWith(ReloadClassesExtension.class)
@@ -39,7 +39,7 @@ public class ExceptionsTest {
     @ParameterizedTest
     @MethodSource("exceptions")
     @Order(1)
-    void simpleExceptionToDocumentRoundTrip(ModeledApiException exception) {
+    void simpleExceptionToDocumentRoundTrip(ModeledException exception) {
         var output = Utils.pojoToDocumentRoundTrip(exception);
         assertEquals(exception.getMessage(), output.getMessage());
         assertEquals(exception.getCause(), output.getCause());

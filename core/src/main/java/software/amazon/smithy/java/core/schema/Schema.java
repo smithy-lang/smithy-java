@@ -36,27 +36,9 @@ public abstract sealed class Schema implements MemberLookup
     private final String memberName;
 
     /**
-     * The structure member count that are required by validation.
-     */
-    final int requiredMemberCount;
-
-    /**
-     * The bitmask to use for this member to compute a required member bitfield. This value will match the
-     * memberIndex if the member is required and has no default value. It will be zero if
-     * isRequiredByValidation == false.
-     */
-    final long requiredByValidationBitmask;
-
-    /**
      * Member index used for member deserialization and validation. This value is unstable across model updates.
      */
     private final int memberIndex;
-
-    /**
-     * The result of creating a bitfield of the memberIndex of every required member with no default value.
-     * This allows for an inexpensive comparison for required structure member validation.
-     */
-    final long requiredStructureMemberBitfield;
 
     /**
      * True if the shape is a member that has the required trait and a non-null default trait.
@@ -103,7 +85,6 @@ public abstract sealed class Schema implements MemberLookup
 
         // Root-level shapes can initialize these member-specific values to default zero values.
         this.memberIndex = 0;
-        this.requiredByValidationBitmask = 0;
         this.isRequiredByValidation = false;
 
         // Even root-level shapes have computed validation information to allow for validating root strings directly.
@@ -121,12 +102,6 @@ public abstract sealed class Schema implements MemberLookup
         this.hasRangeConstraint = validationState.hasRangeConstraint();
 
         // Only use the slow version of required member validation if there are > 64 required members.
-        this.requiredMemberCount = SchemaBuilder.computeRequiredMemberCount(type, members);
-        this.requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(
-                type,
-                requiredMemberCount,
-                members,
-                m -> m.requiredByValidationBitmask);
 
         this.hash = computeHash(this);
     }
@@ -137,8 +112,6 @@ public abstract sealed class Schema implements MemberLookup
         this.traits = builder.traits;
         this.memberName = builder.id.getMember().orElseThrow();
         this.memberIndex = builder.memberIndex;
-        this.requiredByValidationBitmask = builder.requiredByValidationBitmask;
-        this.requiredMemberCount = builder.requiredMemberCount;
         this.isRequiredByValidation = builder.isRequiredByValidation;
 
         this.minLengthConstraint = builder.validationState.minLengthConstraint();
@@ -152,21 +125,6 @@ public abstract sealed class Schema implements MemberLookup
         this.maxDoubleConstraint = builder.validationState.maxDoubleConstraint();
         this.uniqueItemsConstraint = type == ShapeType.LIST && hasTrait(TraitKey.UNIQUE_ITEMS_TRAIT);
         this.hasRangeConstraint = builder.validationState.hasRangeConstraint();
-
-        // Compute the expected bitfield, and adjust how it's computed based on if the target is a builder or not.
-        if (builder.target != null) {
-            this.requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(
-                    type,
-                    requiredMemberCount,
-                    builder.target.members(),
-                    m -> m.requiredByValidationBitmask);
-        } else {
-            this.requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(
-                    type,
-                    requiredMemberCount,
-                    builder.targetBuilder.members,
-                    m -> m.requiredByValidationBitmask);
-        }
 
         this.hash = computeHash(this);
     }
@@ -519,4 +477,25 @@ public abstract sealed class Schema implements MemberLookup
     public Set<Integer> intEnumValues() {
         return Collections.emptySet();
     }
+
+    /**
+     *
+     * @return The structure member count that are required by validation.
+     */
+    abstract int requiredMemberCount();
+
+    /**
+     *
+     * @return The bitmask to use for this member to compute a required member bitfield. This value will match the
+     * memberIndex if the member is required and has no default value. It will be zero if
+     * isRequiredByValidation == false.
+     */
+    abstract long requiredByValidationBitmask();
+
+    /**
+     *
+     * @return The result of creating a bitfield of the memberIndex of every required member with no default value.
+     * This allows for an inexpensive comparison for required structure member validation.
+     */
+    abstract long requiredStructureMemberBitfield();
 }

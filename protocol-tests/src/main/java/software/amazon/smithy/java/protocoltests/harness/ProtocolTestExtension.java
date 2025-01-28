@@ -25,8 +25,8 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
 import software.amazon.smithy.java.codegen.server.ServiceJavaSymbolProvider;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -368,9 +368,9 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
         try {
             var fqn = provider.toSymbol(shape).getFullName();
             var exceptionClazz = CodegenUtils.getClassForName(fqn);
-            if (ModeledApiException.class.isAssignableFrom(exceptionClazz)) {
+            if (ModeledException.class.isAssignableFrom(exceptionClazz)) {
                 var builder = exceptionClazz.getDeclaredMethod("builder").invoke(null);
-                return () -> (ShapeBuilder<? extends ModeledApiException>) builder;
+                return () -> (ShapeBuilder<? extends ModeledException>) builder;
             } else {
                 throw new IllegalArgumentException(exceptionClazz + "is not a ModeledApiException");
             }

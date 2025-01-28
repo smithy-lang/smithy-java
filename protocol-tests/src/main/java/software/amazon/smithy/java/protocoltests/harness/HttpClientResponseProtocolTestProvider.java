@@ -23,8 +23,8 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeOption;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -126,7 +126,7 @@ final class HttpClientResponseProtocolTestProvider extends
                         fail("Expected an exception but got a successful response %s", actualOutput);
                     }
                 } catch (Exception e) {
-                    if (isErrorTestCase && e instanceof ModeledApiException mae) {
+                    if (isErrorTestCase && e instanceof ModeledException mae) {
                         actualOutput = mae;
                     } else {
                         throw e;

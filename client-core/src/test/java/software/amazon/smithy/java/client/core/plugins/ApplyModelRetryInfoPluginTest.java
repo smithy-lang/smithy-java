@@ -9,8 +9,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.core.schema.ApiException;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.CallException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.retries.api.RetrySafety;
@@ -23,7 +23,7 @@ public class ApplyModelRetryInfoPluginTest {
     @Test
     public void marksSafeWhenOperationIsReadOnly() {
         var schema = Schema.createOperation(ShapeId.from("com#Foo"), new ReadonlyTrait());
-        var e = new ApiException("err");
+        var e = new CallException("err");
 
         ApplyModelRetryInfoPlugin.applyRetryInfoFromModel(schema, e);
 
@@ -33,7 +33,7 @@ public class ApplyModelRetryInfoPluginTest {
     @Test
     public void marksSafeWhenOperationIsIdempotent() {
         var schema = Schema.createOperation(ShapeId.from("com#Foo"), new IdempotentTrait());
-        var e = new ApiException("err");
+        var e = new CallException("err");
 
         ApplyModelRetryInfoPlugin.applyRetryInfoFromModel(schema, e);
 
@@ -50,7 +50,7 @@ public class ApplyModelRetryInfoPluginTest {
                 .structureBuilder(ShapeId.from("com#Err"), RetryableTrait.builder().throttling(true).build())
                 .build();
 
-        var e = new ModeledApiException(errorSchema, "err") {
+        var e = new ModeledException(errorSchema, "err") {
             @Override
             public void serializeMembers(ShapeSerializer serializer) {
                 throw new UnsupportedOperationException();

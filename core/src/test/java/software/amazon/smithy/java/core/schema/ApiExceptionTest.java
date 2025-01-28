@@ -12,12 +12,13 @@ import static org.hamcrest.Matchers.nullValue;
 
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.retries.api.RetrySafety;
 
 public class ApiExceptionTest {
     @Test
     public void resetsRetryStateWhenSetToNotRetry() {
-        var e = new ApiException("foo");
+        var e = new CallException("foo");
         var after = Duration.ofDays(2);
 
         e.isRetrySafe(RetrySafety.YES);

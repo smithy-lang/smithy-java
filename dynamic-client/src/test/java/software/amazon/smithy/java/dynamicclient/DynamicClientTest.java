@@ -24,8 +24,8 @@ import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
-import software.amazon.smithy.java.core.schema.ApiException;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.CallException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -153,11 +153,11 @@ public class DynamicClientTest {
     @Test
     public void deserializesDynamicErrorsWithAbsoluteId() {
         var client = createErrorClient("{\"__type\":\"smithy.example#InvalidSprocketId\", \"id\":\"1\"}");
-        var e = Assertions.assertThrows(ApiException.class, () -> {
+        var e = Assertions.assertThrows(CallException.class, () -> {
             client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
         });
 
-        assertThat(e, instanceOf(ModeledApiException.class));
+        assertThat(e, instanceOf(ModeledException.class));
         assertThat(e, instanceOf(DocumentException.class));
 
         var de = (DocumentException) e;
@@ -170,11 +170,11 @@ public class DynamicClientTest {
     @Test
     public void deserializesDynamicErrorsWithRelativeId() {
         var client = createErrorClient("{\"__type\":\"InvalidSprocketId\", \"id\":\"1\"}");
-        var e = Assertions.assertThrows(ApiException.class, () -> {
+        var e = Assertions.assertThrows(CallException.class, () -> {
             client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
         });
 
-        assertThat(e, instanceOf(ModeledApiException.class));
+        assertThat(e, instanceOf(ModeledException.class));
         assertThat(e, instanceOf(DocumentException.class));
 
         var de = (DocumentException) e;
@@ -187,11 +187,11 @@ public class DynamicClientTest {
     @Test
     public void deserializesDynamicErrorsWithRelativeIdFromService() {
         var client = createErrorClient("{\"__type\":\"ServiceFooError\", \"why\":\"IDK\"}");
-        var e = Assertions.assertThrows(ApiException.class, () -> {
+        var e = Assertions.assertThrows(CallException.class, () -> {
             client.call("GetSprocket", Document.ofObject(Map.of("id", "1")));
         });
 
-        assertThat(e, instanceOf(ModeledApiException.class));
+        assertThat(e, instanceOf(ModeledException.class));
         assertThat(e, instanceOf(DocumentException.class));
 
         var de = (DocumentException) e;

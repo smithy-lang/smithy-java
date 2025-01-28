@@ -7,7 +7,7 @@ package software.amazon.smithy.java.server.core;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.core.schema.ModeledApiException;
+import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.framework.model.InternalFailureException;
@@ -39,11 +39,11 @@ public abstract class ServerProtocol {
     public final CompletableFuture<Void> serializeError(Job job, Throwable error) {
         return serializeError(
                 job,
-                error instanceof ModeledApiException me ? me
+                error instanceof ModeledException me ? me
                         : translate(error));
     }
 
-    private static ModeledApiException translate(Throwable error) {
+    private static ModeledException translate(Throwable error) {
         if (error instanceof SerializationException se) {
             return MalformedRequestException.builder()
                     .withoutStackTrace()
@@ -56,7 +56,7 @@ public abstract class ServerProtocol {
 
     protected abstract CompletableFuture<Void> serializeOutput(Job job, SerializableStruct output, boolean isError);
 
-    public final CompletableFuture<Void> serializeError(Job job, ModeledApiException error) {
+    public final CompletableFuture<Void> serializeError(Job job, ModeledException error) {
         // Check both implicit errors and operation errors to see if modeled API exception is
         // defined as part of service interface. Otherwise, throw generic exception.
         if (!job.operation().getOwningService().typeRegistry().contains(error.schema().id())

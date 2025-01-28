@@ -37,7 +37,11 @@ final class DeferredRootSchema extends Schema {
         this.memberBuilders = memberBuilders;
     }
 
-    private record ResolvedMembers(Map<String, Schema> members, List<Schema> memberList) {}
+    private record ResolvedMembers(
+            Map<String, Schema> members,
+            List<Schema> memberList,
+            int requiredMemberCount,
+            long requiredStructureMemberBitfield) {}
 
     private void resolve() {
         if (resolvedMembers == null) {
@@ -45,7 +49,17 @@ final class DeferredRootSchema extends Schema {
             for (var builder : memberBuilders) {
                 memberList.add(builder.build());
             }
-            resolvedMembers = new ResolvedMembers(SchemaBuilder.createMembers(memberList), memberList);
+            int requiredMemberCount = SchemaBuilder.computeRequiredMemberCount(this.type(), memberBuilders);
+            long requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(
+                    type(),
+                    requiredMemberCount,
+                    memberBuilders,
+                    m -> m.requiredByValidationBitmask);
+            resolvedMembers = new ResolvedMembers(SchemaBuilder.createMembers(memberList),
+                    memberList,
+                    requiredMemberCount,
+                    requiredStructureMemberBitfield);
+
         }
     }
 
@@ -69,5 +83,22 @@ final class DeferredRootSchema extends Schema {
     @Override
     public Set<String> stringEnumValues() {
         return stringEnumValues;
+    }
+
+    @Override
+    int requiredMemberCount() {
+        resolve();
+        return resolvedMembers.requiredMemberCount;
+    }
+
+    @Override
+    long requiredByValidationBitmask() {
+        return 0;
+    }
+
+    @Override
+    long requiredStructureMemberBitfield() {
+        resolve();
+        return resolvedMembers.requiredStructureMemberBitfield;
     }
 }

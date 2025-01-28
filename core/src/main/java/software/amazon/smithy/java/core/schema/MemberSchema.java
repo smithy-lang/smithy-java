@@ -16,11 +16,19 @@ final class MemberSchema extends Schema {
 
     private final Schema target;
     private final TraitMap directTraits;
+    private final long requiredStructureMemberBitfield;
+    private final long requiredByValidationBitmask;
 
     MemberSchema(MemberSchemaBuilder builder) {
         super(builder);
         this.target = builder.target;
         this.directTraits = builder.directTraits;
+        this.requiredStructureMemberBitfield = SchemaBuilder.computeRequiredBitField(
+                type(),
+                target.requiredMemberCount(),
+                builder.target.members(),
+                Schema::requiredByValidationBitmask);
+        this.requiredByValidationBitmask = builder.requiredByValidationBitmask;
     }
 
     @Override
@@ -49,7 +57,23 @@ final class MemberSchema extends Schema {
     }
 
     @Override
+    int requiredMemberCount() {
+        return target.requiredMemberCount();
+    }
+
+    @Override
+    long requiredByValidationBitmask() {
+        return requiredByValidationBitmask;
+    }
+
+    @Override
+    long requiredStructureMemberBitfield() {
+        return requiredStructureMemberBitfield;
+    }
+
+    @Override
     public <T extends Trait> T getDirectTrait(TraitKey<T> trait) {
         return directTraits.get(trait);
     }
+
 }

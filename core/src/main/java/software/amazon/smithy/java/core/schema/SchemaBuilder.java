@@ -13,7 +13,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.function.ToLongFunction;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.LengthTrait;
@@ -191,12 +191,12 @@ public final class SchemaBuilder {
             ShapeType type,
             int requiredMemberCount,
             Iterable<T> members,
-            Function<T, Long> bitMaskGetter
+            ToLongFunction<T> bitMaskGetter
     ) {
         if ((requiredMemberCount > 0) && (requiredMemberCount <= 64) && type == ShapeType.STRUCTURE) {
             long setFields = 0L;
             for (var member : members) {
-                setFields |= bitMaskGetter.apply(member);
+                setFields |= bitMaskGetter.applyAsLong(member);
             }
             return setFields;
         } else {
