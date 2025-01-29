@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.jmespath;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,7 +43,45 @@ enum JMESPathFunction {
     AVG("avg", 1) {
         @Override
         protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
-            return null;
+            var list = arguments.get(0);
+            if (!list.type().equals(ShapeType.LIST)) {
+                throw new IllegalArgumentException("`avg` only supports array arguments");
+            }
+            if (list.size() == 0) {
+                return null;
+            }
+            var firstItem = list.asList().get(0);
+            return switch (firstItem.type()) {
+                case INTEGER, INT_ENUM, LONG, SHORT, BYTE -> {
+                    long sum = 0;
+                    for (var item : list.asList()) {
+                        sum += item.asLong();
+                    }
+                    yield Document.of((double) sum / (double) list.size());
+                }
+                case FLOAT, DOUBLE -> {
+                    double sum = 0;
+                    for (var item : list.asList()) {
+                        sum += item.asDouble();
+                    }
+                    yield Document.of(sum / (double) list.size());
+                }
+                case BIG_DECIMAL -> {
+                    var sum = BigDecimal.valueOf(0);
+                    for (var item : list.asList()) {
+                        sum = sum.add(item.asBigDecimal());
+                    }
+                    yield Document.of(sum.divide(BigDecimal.valueOf(list.size()), RoundingMode.HALF_UP));
+                }
+                case BIG_INTEGER -> {
+                    var sum = BigInteger.valueOf(0);
+                    for (var item : list.asList()) {
+                        sum = sum.add(item.asBigInteger());
+                    }
+                    yield Document.of(sum.divide(BigInteger.valueOf(list.size())));
+                }
+                default -> null;
+            };
         }
     },
     CONTAINS("contains", 2) {
@@ -74,8 +114,8 @@ enum JMESPathFunction {
             return switch (arg.type()) {
                 case BYTE, INTEGER, INT_ENUM, BIG_INTEGER, LONG, SHORT -> arg;
                 case BIG_DECIMAL -> Document.of(arg.asBigDecimal().setScale(0, RoundingMode.CEILING));
-                case DOUBLE -> Document.of(Math.ceil(arg.asDouble()));
-                case FLOAT -> Document.of(Math.ceil(arg.asFloat()));
+                case DOUBLE -> Document.of((long) Math.ceil(arg.asDouble()));
+                case FLOAT -> Document.of((long) Math.ceil(arg.asFloat()));
                 // Non numeric searches return null per spec
                 default -> null;
             };
@@ -99,8 +139,8 @@ enum JMESPathFunction {
             return switch (arg.type()) {
                 case BYTE, INTEGER, INT_ENUM, BIG_INTEGER, LONG, SHORT -> arg;
                 case BIG_DECIMAL -> Document.of(arg.asBigDecimal().setScale(0, RoundingMode.FLOOR));
-                case DOUBLE -> Document.of(Math.floor(arg.asDouble()));
-                case FLOAT -> Document.of(Math.floor(arg.asFloat()));
+                case DOUBLE -> Document.ofNumber((long) Math.floor(arg.asDouble()));
+                case FLOAT -> Document.ofNumber((long) Math.floor(arg.asFloat()));
                 // Non numeric searches return null per specification
                 default -> null;
             };
@@ -109,7 +149,23 @@ enum JMESPathFunction {
     JOIN("join", 2) {
         @Override
         protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
-            return null;
+            var delimiter = arguments.get(0);
+            if (!delimiter.type().equals(ShapeType.STRING)) {
+                throw new IllegalArgumentException("`join` delimiter must be a string.");
+            }
+            var list = arguments.get(1);
+            if (!list.type().equals(ShapeType.LIST)) {
+                throw new IllegalArgumentException("`join` only supports array joining.");
+            }
+            var builder = new StringBuilder();
+            var iter = list.asList().iterator();
+            while (iter.hasNext()) {
+                builder.append(iter.next().asString());
+                if (iter.hasNext()) {
+                    builder.append(delimiter.asString());
+                }
+            }
+            return Document.of(builder.toString());
         }
     },
     KEYS("keys", 1) {
@@ -129,10 +185,14 @@ enum JMESPathFunction {
         @Override
         protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var arg = arguments.get(0);
-            return Document.of(arg.size());
+            return switch (arg.type()) {
+                case STRING -> Document.of((long) arg.asString().length());
+                case MAP, STRUCTURE, LIST -> Document.of((long) arg.size());
+                default -> throw new IllegalArgumentException("Type: " + arg.type() + " not supported by `length`");
+            };
         }
     },
-    MAP("map", 2) {
+    MAP("map", 1) {
         @Override
         protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             return null;
@@ -145,10 +205,13 @@ enum JMESPathFunction {
             if (!subject.type().equals(ShapeType.LIST)) {
                 throw new IllegalArgumentException("`max_by` only supports arrays");
             }
+            if (subject.size() == 0) {
+                return null;
+            }
             Document max = null;
             Document maxValue = null;
             for (var item : subject.asList()) {
-                var value = fnRef.accept(new JMESPathDocumentVisitor(item));
+                var value = JMESPathDocumentQuery.query(fnRef, item);
                 if (max == null || Document.compare(maxValue, value) < 0) {
                     max = item;
                     maxValue = value;
@@ -164,7 +227,7 @@ enum JMESPathFunction {
             if (!subject.type().equals(ShapeType.LIST)) {
                 throw new IllegalArgumentException("`max` only supports array arguments");
             }
-            return Collections.max(subject.asList(), Document::compare);
+            return subject.size() == 0 ? null : Collections.max(subject.asList(), Document::compare);
         }
     },
     MERGE("merge", 0) {
@@ -180,7 +243,7 @@ enum JMESPathFunction {
             if (!subject.type().equals(ShapeType.LIST)) {
                 throw new IllegalArgumentException("`max` only supports array arguments");
             }
-            return Collections.min(subject.asList(), Document::compare);
+            return subject.size() == 0 ? null : Collections.min(subject.asList(), Document::compare);
         }
     },
     MIN_BY("min_by", 1) {
@@ -190,10 +253,13 @@ enum JMESPathFunction {
             if (!subject.type().equals(ShapeType.LIST)) {
                 throw new IllegalArgumentException("`min_by` only supports arrays");
             }
+            if (subject.size() == 0) {
+                return null;
+            }
             Document min = null;
             Document minValue = null;
             for (var item : subject.asList()) {
-                var value = fnRef.accept(new JMESPathDocumentVisitor(item));
+                var value = JMESPathDocumentQuery.query(fnRef, item);
                 if (min == null || Document.compare(minValue, value) > 0) {
                     min = item;
                     minValue = value;
@@ -217,12 +283,15 @@ enum JMESPathFunction {
         @Override
         protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
             var subject = arguments.get(0);
-            if (!subject.type().equals(ShapeType.LIST)) {
-                throw new IllegalArgumentException("`max` only supports array arguments");
-            }
-            var copy = new ArrayList<>(subject.asList());
-            Collections.reverse(copy);
-            return Document.of(copy);
+            return switch (subject.type()) {
+                case STRING -> Document.of(new StringBuffer(subject.asString()).reverse().toString());
+                case LIST -> {
+                    var copy = new ArrayList<>(subject.asList());
+                    Collections.reverse(copy);
+                    yield Document.of(copy);
+                }
+                default -> throw new IllegalArgumentException("`reverse` only supports array or string arguments");
+            };
         }
     },
     SORT("sort", 1) {
@@ -244,9 +313,8 @@ enum JMESPathFunction {
             }
             return Document.of(subject.asList()
                     .stream()
-                    .sorted((l, r) -> Document.compare(
-                            fnRef.accept(new JMESPathDocumentVisitor(l)),
-                            fnRef.accept(new JMESPathDocumentVisitor(r))))
+                    .sorted((l, r) -> Document.compare(JMESPathDocumentQuery.query(fnRef, l),
+                            JMESPathDocumentQuery.query(fnRef, r)))
                     .toList());
         }
     },
@@ -264,7 +332,73 @@ enum JMESPathFunction {
     SUM("sum", 1) {
         @Override
         protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
-            throw new UnsupportedOperationException("Sum function is not supported");
+            var list = arguments.get(0);
+            if (!list.type().equals(ShapeType.LIST)) {
+                throw new IllegalArgumentException("`avg` only supports array arguments");
+            }
+            if (list.size() == 0) {
+                return Document.of(0L);
+            }
+            var firstItem = list.asList().get(0);
+            return switch (firstItem.type()) {
+                case BYTE -> {
+                    byte sum = 0;
+                    for (var item : list.asList()) {
+                        sum += item.asByte();
+                    }
+                    yield Document.of(sum);
+                }
+                case SHORT -> {
+                    short sum = 0;
+                    for (var item : list.asList()) {
+                        sum += item.asShort();
+                    }
+                    yield Document.of(sum);
+                }
+                case INTEGER, INT_ENUM -> {
+                    int sum = 0;
+                    for (var item : list.asList()) {
+                        sum += item.asInteger();
+                    }
+                    yield Document.of(sum);
+                }
+                case LONG -> {
+                    long sum = 0;
+                    for (var item : list.asList()) {
+                        sum += item.asLong();
+                    }
+                    yield Document.of(sum);
+                }
+                case FLOAT -> {
+                    float sum = 0;
+                    for (var item : list.asList()) {
+                        sum += item.asFloat();
+                    }
+                    yield Document.of(sum);
+                }
+                case DOUBLE -> {
+                    double sum = 0;
+                    for (var item : list.asList()) {
+                        sum += item.asDouble();
+                    }
+                    yield Document.of(sum);
+                }
+                case BIG_DECIMAL -> {
+                    var sum = BigDecimal.valueOf(0);
+                    for (var item : list.asList()) {
+                        sum = sum.add(item.asBigDecimal());
+                    }
+                    yield Document.of(sum);
+                }
+                case BIG_INTEGER -> {
+                    var sum = BigInteger.valueOf(0);
+                    for (var item : list.asList()) {
+                        sum = sum.add(item.asBigInteger());
+                    }
+                    yield Document.of(sum);
+                }
+                default -> null;
+            };
         }
     },
     TO_ARRAY("to_array", 1) {

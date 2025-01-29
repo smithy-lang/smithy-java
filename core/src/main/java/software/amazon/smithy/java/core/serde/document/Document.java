@@ -687,8 +687,6 @@ public interface Document extends SerializableShape {
             if (l == r) {
                 return true;
             }
-            System.out.println("LEFT " + l);
-            System.out.println("RIGHT " + r);
             return switch (l.type()) {
                 case BLOB -> l.type() == r.type() && l.asBlob().equals(r.asBlob());
                 case BOOLEAN -> l.type() == r.type() && l.asBoolean() == r.asBoolean();

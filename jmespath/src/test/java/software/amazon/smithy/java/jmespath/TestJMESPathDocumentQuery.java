@@ -19,8 +19,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeType;
 
-// TODO: Add compliance test test runner and reach full compliance with JMESPath spec.
-public class TestJMESPathDocumentVisitor {
+public class TestJMESPathDocumentQuery {
     @Test
     void testSubExpressionExpr() {
         var doc = Document.of(
@@ -158,9 +157,9 @@ public class TestJMESPathDocumentVisitor {
                 Arguments.of("foo[?a == `1` && b == `2`]",
                         Document.of(List.of(Document.of(Map.of(
                                 "a",
-                                Document.of(1.0),
+                                Document.of(1L),
                                 "b",
-                                Document.of(2.0)))))));
+                                Document.of(2L)))))));
     }
 
     @ParameterizedTest
@@ -177,8 +176,8 @@ public class TestJMESPathDocumentVisitor {
                 Document.of(List.of()),
                 "foo",
                 Document.of(List.of(
-                        Document.of(Map.of("a", Document.of(1.0), "b", Document.of(2.0))),
-                        Document.of(Map.of("a", Document.of(1.0), "b", Document.of(3.0)))))));
+                        Document.of(Map.of("a", Document.of(1L), "b", Document.of(2L))),
+                        Document.of(Map.of("a", Document.of(1L), "b", Document.of(3L)))))));
         var value = JMESPathDocumentQuery.query(str, doc);
         assertEquals(expected, value);
     }
@@ -191,7 +190,7 @@ public class TestJMESPathDocumentVisitor {
                 Arguments.of("baz<`2`", true),
                 Arguments.of("qux==`2`", false),
                 Arguments.of("qux<=`2`", true),
-                Arguments.of("baz==`1.0`", true));
+                Arguments.of("baz==`1`", true));
     }
 
     @ParameterizedTest
@@ -203,7 +202,7 @@ public class TestJMESPathDocumentVisitor {
                 "bar",
                 Document.of("b"),
                 "baz",
-                Document.of(1.0),
+                Document.of(1L),
                 "qux",
                 Document.of(1)));
         var value = JMESPathDocumentQuery.query(str, doc);
@@ -298,17 +297,17 @@ public class TestJMESPathDocumentVisitor {
                 Arguments.of("contains(foo, 'b')", Document.of(true)),
                 Arguments.of("contains(foo, 'n')", Document.of(false)),
                 Arguments.of("contains(str, 'my')", Document.of(true)),
-                Arguments.of("ceil(`1.001`)", Document.of(2.0)),
-                Arguments.of("ceil(`1.9`)", Document.of(2.0)),
-                Arguments.of("ceil(`1`)", Document.of(1.0)),
+                Arguments.of("ceil(`1.001`)", Document.of(2L)),
+                Arguments.of("ceil(`1.9`)", Document.of(2L)),
+                Arguments.of("ceil(`1`)", Document.of(1L)),
                 Arguments.of("ceil(`\"abc\"`)", null),
                 Arguments.of("ends_with(str, 'Str')", Document.of(true)),
                 Arguments.of("ends_with(str, 'bar')", Document.of(false)),
                 Arguments.of("starts_with(str, 'my')", Document.of(true)),
                 Arguments.of("starts_with(str, 'bar')", Document.of(false)),
-                Arguments.of("floor(`1.001`)", Document.of(1.0)),
-                Arguments.of("floor(`1.9`)", Document.of(1.0)),
-                Arguments.of("floor(`1`)", Document.of(1.0)),
+                Arguments.of("floor(`1.001`)", Document.of(1L)),
+                Arguments.of("floor(`1.9`)", Document.of(1L)),
+                Arguments.of("floor(`1`)", Document.of(1L)),
                 Arguments.of("keys(@)",
                         Document.of(List
                                 .of(Document.of("neg"),
@@ -316,7 +315,7 @@ public class TestJMESPathDocumentVisitor {
                                         Document.of("foo"),
                                         Document.of("nums"),
                                         Document.of("vals")))),
-                Arguments.of("length(nums)", Document.of(3)),
+                Arguments.of("length(nums)", Document.of(3L)),
                 Arguments.of("max(nums)", Document.of(3)),
                 Arguments.of("min(nums)", Document.of(1)),
                 Arguments.of("not_null(no, not, this, str)", Document.of("myStr")),
