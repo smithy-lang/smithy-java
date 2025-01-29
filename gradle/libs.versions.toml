@@ -11,7 +11,7 @@ assertj = "3.27.3"
 jackson = "2.18.2"
 netty = "4.1.117.Final"
 dep-analysis = "2.7.0"
-aws-sdk = "2.30.3"
+aws-sdk = "2.30.8"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 
