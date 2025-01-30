@@ -10,8 +10,8 @@ dependencies {
     implementation(project(":aws:integrations:lambda"))
     implementation(project(":logging"))
     implementation(project(":core"))
-    implementation(project(":server-aws-rest-json1"))
-    implementation(project(":server-rpcv2-cbor"))
+    implementation(project(":aws:server:aws-server-restjson"))
+    implementation(project(":server:server-rpcv2-cbor"))
 }
 
 tasks {

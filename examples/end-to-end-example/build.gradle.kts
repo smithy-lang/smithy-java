@@ -5,14 +5,14 @@ plugins {
 
 dependencies {
     // Server dependencies
-    api(project(":server-api"))
-    api(project(":server-core"))
-    implementation(project(":server-netty"))
-    api(project(":server-aws-rest-json1"))
+    api(project(":server:server-api"))
+    api(project(":server:server-core"))
+    implementation(project(":server:server-netty"))
+    api(project(":aws:server:aws-server-restjson"))
 
     // Client dependencies
-    api(project(":aws:client-restjson"))
-    api(project(":client-core"))
+    api(project(":aws:client:aws-client-restjson"))
+    api(project(":client:client-core"))
 
     // Common dependencies
     api(project(":core"))

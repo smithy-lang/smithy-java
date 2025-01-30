@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":client-core"))
+    implementation(project(":client:client-core"))
 
     api(project(":examples:middleware-example:middleware-model"))
 }

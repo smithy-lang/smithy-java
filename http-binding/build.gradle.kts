@@ -5,7 +5,7 @@ plugins {
 description = "This module provides http-binding functionality"
 
 extra["displayName"] = "Smithy :: Java :: Http Binding"
-extra["moduleName"] = "software.amazon.smithy.java.http-binding"
+extra["moduleName"] = "software.amazon.smithy.java.http.binding"
 
 dependencies {
     api(project(":core"))

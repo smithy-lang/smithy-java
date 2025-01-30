@@ -10,7 +10,7 @@ extra["moduleName"] = "software.amazon.smithy.java.codegen.core"
 
 dependencies {
     api(libs.smithy.codegen)
-    itImplementation(project(":json-codec"))
+    itImplementation(project(":codecs:json-codec"))
 }
 
 addGenerateSrcsTask("software.amazon.smithy.java.codegen.utils.TestJavaCodegenRunner")
