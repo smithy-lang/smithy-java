@@ -25,6 +25,7 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.utils.SmithyGenerated;
 import software.amazon.smithy.utils.StringUtils;
 import software.amazon.smithy.waiters.Matcher;
 import software.amazon.smithy.waiters.WaitableTrait;
@@ -50,6 +51,7 @@ final class WaiterContainerGenerator implements Consumer<CodeGenerationContext> 
                     /**
                      * Waiters for the {@link ${clientType:T}} client.
                      */
+                    @${smithyGenerated:T}
                     public record ${type:T}(${clientType:T} client) {
                         public ${type:T} {
                             ${objects:T}.requireNonNull(client, "client cannot be null");
@@ -58,6 +60,7 @@ final class WaiterContainerGenerator implements Consumer<CodeGenerationContext> 
                         ${waiters:C|}
                     }
                     """;
+            writer.putContext("smithyGenerated", SmithyGenerated.class);
             writer.putContext("type", symbol);
             writer.putContext("objects", Objects.class);
             var clientSymbol = context.symbolProvider().toSymbol(serviceShape);
