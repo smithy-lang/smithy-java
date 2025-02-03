@@ -14,6 +14,7 @@ dep-analysis = "2.7.0"
 aws-sdk = "2.30.8"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
+jreleaser = "1.15.0"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -54,3 +55,4 @@ dependency-analysis = { module = "com.autonomousapps:dependency-analysis-gradle-
 jmh = { id = "me.champeau.jmh", version.ref = "jmh" }
 osdetector = { id = "com.google.osdetector", version.ref = "osdetector" }
 smithy-gradle-jar = { id = "software.amazon.smithy.gradle.smithy-jar", version.ref = "smithy-gradle-plugins" }
+jreleaser = { id = "org.jreleaser", version.ref = "jreleaser" }
