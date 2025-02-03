@@ -101,7 +101,7 @@ final class WaiterContainerGenerator implements Consumer<CodeGenerationContext> 
                 writer.putContext("deprecated", Deprecated.class);
                 for (var waiterEntry : trait.getWaiters().entrySet()) {
                     writer.pushState(new WaiterSection(waiterEntry.getValue()));
-                    writer.putContext("waiterName", waiterEntry.getKey());
+                    writer.putContext("waiterName", StringUtils.uncapitalize(waiterEntry.getKey()));
                     var waiter = waiterEntry.getValue();
                     // Min and max delay on trait are always in seconds. Convert to millis and add to context
                     writer.putContext("maxDelay", waiter.getMaxDelay() * 1000);
