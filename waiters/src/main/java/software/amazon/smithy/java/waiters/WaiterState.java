@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.waiters;
 
-public enum WaiterState {
+enum WaiterState {
     /**
      * Indicates the waiter succeeded and must no longer continue waiting.
      */
