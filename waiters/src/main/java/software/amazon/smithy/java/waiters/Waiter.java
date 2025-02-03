@@ -40,10 +40,11 @@ import software.amazon.smithy.java.waiters.matching.Matcher;
  * @param <O> Output type of resource polling function.
  * @see <a href="https://smithy.io/2.0/additional-specs/waiters.html">Waiter Specification</a>
  */
-public final class Waiter<I extends SerializableStruct, O extends SerializableStruct> {
+public final class Waiter<I extends SerializableStruct, O extends SerializableStruct> implements WaiterSettings {
     private final Waitable<I, O> pollingFunction;
     private final List<Acceptor<I, O>> acceptors;
-    private final BackoffStrategy backoffStrategy;
+    private BackoffStrategy backoffStrategy;
+    private RequestOverrideConfig overrideConfig;
 
     private Waiter(Builder<I, O> builder) {
         this.pollingFunction = builder.pollingFunction;
@@ -59,30 +60,7 @@ public final class Waiter<I extends SerializableStruct, O extends SerializableSt
      * @throws WaiterFailureException if the waiter reaches a FAILURE state
      */
     public void wait(I input, Duration maxWaitTime) {
-        wait(input, maxWaitTime.toMillis(), null);
-    }
-
-    /**
-     * Wait for the resource to reach a terminal state.
-     *
-     * @param input Input to use for polling function.
-     * @param maxWaitTimeMillis maximum amount of time for waiter to wait, in milliseconds.
-     * @throws WaiterFailureException if the waiter reaches a FAILURE state
-     */
-    public void wait(I input, long maxWaitTimeMillis) {
-        wait(input, maxWaitTimeMillis, null);
-    }
-
-    /**
-     * Wait for the resource to reach a terminal state.
-     *
-     * @param input Input to use for polling function.
-     * @param maxWaitTime maximum wait time
-     * @param overrideConfig Override config to use when calling polling function.
-     * @throws WaiterFailureException if the waiter reaches a FAILURE state
-     */
-    public void wait(I input, Duration maxWaitTime, RequestOverrideConfig overrideConfig) {
-        wait(input, maxWaitTime.toMillis(), overrideConfig);
+        wait(input, maxWaitTime.toMillis());
     }
 
     /**
@@ -90,10 +68,9 @@ public final class Waiter<I extends SerializableStruct, O extends SerializableSt
      *
      * @param input Input to use for polling function.
      * @param maxWaitTimeMillis maximum wait time
-     * @param overrideConfig Override config to use when calling polling function.
      * @throws WaiterFailureException if the waiter reaches a FAILURE state
      */
-    public void wait(I input, long maxWaitTimeMillis, RequestOverrideConfig overrideConfig) {
+    public void wait(I input, long maxWaitTimeMillis) {
         int attemptNumber = 0;
         long startTime = System.currentTimeMillis();
 
@@ -183,6 +160,16 @@ public final class Waiter<I extends SerializableStruct, O extends SerializableSt
                     .totalTimeMillis(System.currentTimeMillis() - startTimeMillis)
                     .build();
         }
+    }
+
+    @Override
+    public void backoffStrategy(BackoffStrategy backoffStrategy) {
+        this.backoffStrategy = Objects.requireNonNull(backoffStrategy, "backoffStrategy cannot be null.");
+    }
+
+    @Override
+    public void overrideConfig(RequestOverrideConfig overrideConfig) {
+        this.overrideConfig = Objects.requireNonNull(overrideConfig, "overrideConfig cannot be null.");
     }
 
     /**
