@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.waiters;
 
+import java.util.Objects;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.waiters.matching.Matcher;
 
@@ -16,4 +17,8 @@ import software.amazon.smithy.java.waiters.matching.Matcher;
  */
 record Acceptor<I extends SerializableStruct, O extends SerializableStruct>(
         WaiterState state,
-        Matcher<I, O> matcher) {}
+        Matcher<I, O> matcher) {
+    Acceptor {
+        Objects.requireNonNull(matcher, "matcher cannot be null");
+    }
+}

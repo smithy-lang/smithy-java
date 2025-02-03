@@ -10,6 +10,6 @@ extra["moduleName"] = "software.amazon.smithy.java.waiters"
 dependencies {
     api(libs.smithy.waiters)
     implementation(project(":jmespath"))
-    implementation(project(":client-core"))
     implementation(project(":logging"))
+    implementation(project(":client:client-core"))
 }
