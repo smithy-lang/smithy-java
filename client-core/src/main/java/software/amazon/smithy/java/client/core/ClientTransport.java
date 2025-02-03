@@ -5,6 +5,11 @@
 
 package software.amazon.smithy.java.client.core;
 
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.net.ConnectException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.context.Context;
 
@@ -24,6 +29,22 @@ import software.amazon.smithy.java.context.Context;
 public interface ClientTransport<RequestT, ResponseT> extends ClientPlugin {
     /**
      * Send a prepared request.
+     *
+     * <p>Transports must only <strong>must</strong> throw exceptions from Java's standard library or exceptions that
+     * subclass them, including but not limited to:
+     *
+     * <ul>
+     *     <li>{@link IOException}</li>
+     *     <li>{@link SocketException}</li>
+     *     <li>{@link SocketTimeoutException}</li>
+     *     <li>{@link ConnectException}</li>
+     *     <li>{@link InterruptedIOException}</li>
+     *     <li>{@link InterruptedException}</li>
+     * </ul>
+     *
+     * <p>Transports that do not use these standard Java exceptions or subclass from them <strong>must</strong>
+     * wrap transport-specific exceptions into these types to ensure that changing the transport of a client doesn't
+     * impact the user-facing API of a client call.
      *
      * @param context Call context.
      * @param request Request to send.
