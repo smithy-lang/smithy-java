@@ -31,7 +31,7 @@ public interface BackoffStrategy {
      * @return new, default backoff strategy
      */
     static BackoffStrategy getDefault(Long minDelayMillis, Long maxDelayMillis) {
-        return new DefaultRetryStrategy(minDelayMillis, maxDelayMillis);
+        return new DefaultBackoffStrategy(minDelayMillis, maxDelayMillis);
     }
 
     /**
@@ -42,7 +42,7 @@ public interface BackoffStrategy {
      * @return new, default backoff strategy
      */
     static BackoffStrategy getDefault(Duration minDelay, Duration maxDelay) {
-        return new DefaultRetryStrategy(
+        return new DefaultBackoffStrategy(
                 minDelay != null ? minDelay.toMillis() : null,
                 maxDelay != null ? maxDelay.toMillis() : null);
     }
@@ -55,6 +55,6 @@ public interface BackoffStrategy {
      * @return new, default backoff strategy
      */
     static BackoffStrategy getDefault() {
-        return new DefaultRetryStrategy(null, null);
+        return new DefaultBackoffStrategy(null, null);
     }
 }

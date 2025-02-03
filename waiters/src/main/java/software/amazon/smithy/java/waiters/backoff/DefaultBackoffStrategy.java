@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.Random;
 
 // TODO: Add additional testing of exponential backoff impl
-final class DefaultRetryStrategy implements BackoffStrategy {
+final class DefaultBackoffStrategy implements BackoffStrategy {
     private static final long defaultMinDelayMillis = 2;
     private static final long defaultMaxDelayMillis = 120000;
 
@@ -17,7 +17,7 @@ final class DefaultRetryStrategy implements BackoffStrategy {
     private final long maxDelayMillis;
     private final Random rng;
 
-    DefaultRetryStrategy(Long minDelayMillis, Long maxDelayMillis) {
+    DefaultBackoffStrategy(Long minDelayMillis, Long maxDelayMillis) {
         this.minDelayMillis = Objects.requireNonNullElse(minDelayMillis, defaultMinDelayMillis);
         this.maxDelayMillis = Objects.requireNonNullElse(maxDelayMillis, defaultMaxDelayMillis);
         this.rng = new Random();
