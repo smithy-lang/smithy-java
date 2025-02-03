@@ -26,6 +26,7 @@ include(":client:client-http-binding")
 include(":client:client-rpcv2-cbor")
 include(":client:dynamic-client")
 include(":client:mock-client-plugin")
+include(":client:waiters")
 
 // Server
 include(":server:server-api")
@@ -39,11 +40,12 @@ include(":codegen:plugins")
 include(":codegen:plugins:client")
 include(":codegen:plugins:server")
 include(":codegen:plugins:types")
+include(":codegen:integrations:waiters-codegen")
+
 
 // Utilities
 include(":protocol-test-harness")
 include(":jmespath")
-include(":waiters")
 
 // Examples
 include(":examples:restjson-example")

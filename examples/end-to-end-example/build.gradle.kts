@@ -27,7 +27,7 @@ dependencies {
 
     // TODO: Add example server middleware once applicable
     smithyBuild(project(":codegen:integrations:waiters-codegen"))
-    implementation(project(":waiters"))
+    implementation(project(":client:waiters"))
 }
 
 jmh {
