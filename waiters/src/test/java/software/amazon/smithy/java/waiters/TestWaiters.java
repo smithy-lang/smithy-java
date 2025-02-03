@@ -17,7 +17,6 @@ import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.waiters.backoff.BackoffStrategy;
-import software.amazon.smithy.java.waiters.matching.Acceptor;
 import software.amazon.smithy.java.waiters.matching.Matcher;
 import software.amazon.smithy.java.waiters.models.GetFoosInput;
 import software.amazon.smithy.java.waiters.models.GetFoosOutput;
@@ -33,8 +32,7 @@ public class TestWaiters {
                         new GetFoosOutput("BUILDING"),
                         new GetFoosOutput("DONE")));
         var waiter = Waiter.builder(client::getFoosSync)
-                .addAcceptor(Acceptor.success(
-                        Matcher.output(o -> o.status().equals("DONE"))))
+                .success(Matcher.output(o -> o.status().equals("DONE")))
                 .build();
         // Waiter will throw on failure.
         waiter.wait(new GetFoosInput(ID), 20000);
@@ -49,8 +47,7 @@ public class TestWaiters {
                         new GetFoosOutput("BUILDING"),
                         new GetFoosOutput("DONE")));
         var waiter = Waiter.builder(client::getFoosSync)
-                .addAcceptor(Acceptor.failure(
-                        Matcher.output(o -> o.status().equals("DONE"))))
+                .failure(Matcher.output(o -> o.status().equals("DONE")))
                 .build();
         var exc = assertThrows(
                 WaiterFailureException.class,
@@ -68,7 +65,7 @@ public class TestWaiters {
                         new GetFoosOutput("BUILDING")));
         var waiter = Waiter.builder(client::getFoosSync)
                 .backoffStrategy(BackoffStrategy.getDefault(10L, 20L))
-                .addAcceptor(Acceptor.failure(Matcher.output(o -> o.status().equals("DONE"))))
+                .failure(Matcher.output(o -> o.status().equals("DONE")))
                 .build();
         var exc = assertThrows(
                 WaiterFailureException.class,
@@ -81,7 +78,7 @@ public class TestWaiters {
     void testWaiterWrapsError() {
         var client = new MockClient(ID, List.of(new UnexpectedException("borked")));
         var waiter = Waiter.builder(client::getFoosSync)
-                .addAcceptor(Acceptor.failure(Matcher.output(o -> o.status().equals("DONE"))))
+                .failure(Matcher.output(o -> o.status().equals("DONE")))
                 .build();
         var exc = assertThrows(
                 WaiterFailureException.class,

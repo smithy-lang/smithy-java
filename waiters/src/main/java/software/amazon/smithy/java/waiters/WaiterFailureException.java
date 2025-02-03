@@ -13,7 +13,7 @@ import java.util.Objects;
  *
  * <p>{@code Waiter}'s can reach a terminal FAILURE state if:
  * <ul>
- *     <li>An {@link software.amazon.smithy.java.waiters.matching.Acceptor} transitions the {@code Waiter} to a FAILURE state.</li>
+ *     <li>A matching FAILURE acceptor transitions the {@code Waiter} to a FAILURE state.</li>
  *     <li>The {@code Waiter} times out.</li>
  *     <li>The {@code Waiter} encounters an unknown exception.</li>
  * </ul>

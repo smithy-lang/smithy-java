@@ -21,7 +21,6 @@ import software.amazon.smithy.java.waiters.backoff.BackoffStrategy;
 import software.amazon.smithy.java.waiters.jmespath.Comparator;
 import software.amazon.smithy.java.waiters.jmespath.JMESPathBiPredicate;
 import software.amazon.smithy.java.waiters.jmespath.JMESPathPredicate;
-import software.amazon.smithy.java.waiters.matching.Acceptor;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
@@ -87,8 +86,6 @@ final class WaiterContainerGenerator implements Consumer<CodeGenerationContext> 
             OperationIndex index = OperationIndex.of(model);
 
             writer.putContext("waiterClass", Waiter.class);
-            writer.putContext("acceptor", Acceptor.class);
-            writer.putContext("acceptorType", Acceptor.class);
 
             for (var operation : waitableOperations) {
                 var trait = operation.expectTrait(WaitableTrait.class);
@@ -114,7 +111,7 @@ final class WaiterContainerGenerator implements Consumer<CodeGenerationContext> 
                                     ${/isDeprecated}public ${waiterClass:T}<${input:T}, ${output:T}> ${waiterName:L}() {
                                         return ${waiterClass:T}.<${input:T}, ${output:T}>builder(client::${opName:L})
                                             .backoffStrategy(${backoff:T}.getDefault(${maxDelay:L}L, ${minDelay:L}L))${#acceptors}
-                                            .addAcceptor(${acceptorType:T}.${key:L}(${value:C|}))${/acceptors}
+                                            .${key:L}(${value:C|})${/acceptors}
                                             .build();
                                     }
                                     """;

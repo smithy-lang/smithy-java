@@ -14,7 +14,7 @@ import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.waiters.backoff.BackoffStrategy;
-import software.amazon.smithy.java.waiters.matching.Acceptor;
+import software.amazon.smithy.java.waiters.matching.Matcher;
 
 /**
  * Waiters are used to poll a resource until a desired state is reached, or until it is determined that the resource
@@ -161,7 +161,7 @@ public final class Waiter<I extends SerializableStruct, O extends SerializableSt
         return WaiterState.RETRY;
     }
 
-    public void waitToRetry(int attemptNumber, long maxWaitTimeMillis, long startTimeMillis) {
+    private void waitToRetry(int attemptNumber, long maxWaitTimeMillis, long startTimeMillis) {
         long elapsedTimeMillis = System.currentTimeMillis() - startTimeMillis;
         long remainingTime = maxWaitTimeMillis - elapsedTimeMillis;
 
@@ -199,33 +199,6 @@ public final class Waiter<I extends SerializableStruct, O extends SerializableSt
     }
 
     /**
-     * Acceptors used to evaluate resource states and change the state of this waiter.
-     *
-     * @return immutable list of acceptors configured for this waiter.
-     */
-    public List<Acceptor<I, O>> acceptors() {
-        return acceptors;
-    }
-
-    /**
-     * Polling function used to get resource state.
-     *
-     * @return polling function.
-     */
-    public Waitable<I, O> pollingFunction() {
-        return pollingFunction;
-    }
-
-    /**
-     * Backoff strategy used to determine how long to wait between polling.
-     *
-     * @return backoff strategy
-     */
-    public BackoffStrategy backoffStrategy() {
-        return backoffStrategy;
-    }
-
-    /**
      * Static builder for {@link Waiter}.
      *
      * @param <I> Polling function input shape type
@@ -241,13 +214,35 @@ public final class Waiter<I extends SerializableStruct, O extends SerializableSt
         }
 
         /**
-         * Add an acceptor that can be used to change the state of the waiter based on resource state.
+         * Add a matcher to the Waiter that will transition the waiter to a SUCCESS state if matched.
          *
-         * @param acceptor acceptor to add
+         * @param matcher matcher to add
          * @return this builder
          */
-        public Builder<I, O> addAcceptor(Acceptor<I, O> acceptor) {
-            this.acceptors.add(acceptor);
+        public Builder<I, O> success(Matcher<I, O> matcher) {
+            this.acceptors.add(new Acceptor<>(WaiterState.SUCCESS, matcher));
+            return this;
+        }
+
+        /**
+         * Add a matcher to the Waiter that will transition the waiter to a FAILURE state if matched.
+         *
+         * @param matcher matcher to add
+         * @return this builder
+         */
+        public Builder<I, O> failure(Matcher<I, O> matcher) {
+            this.acceptors.add(new Acceptor<>(WaiterState.FAILURE, matcher));
+            return this;
+        }
+
+        /**
+         * Add a matcher to the Waiter that will transition the waiter to a FAILURE state if matched.
+         *
+         * @param matcher acceptor to add
+         * @return this builder
+         */
+        public Builder<I, O> retry(Matcher<I, O> matcher) {
+            this.acceptors.add(new Acceptor<>(WaiterState.RETRY, matcher));
             return this;
         }
 
