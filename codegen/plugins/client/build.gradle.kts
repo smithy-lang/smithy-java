@@ -10,9 +10,10 @@ extra["moduleName"] = "software.amazon.smithy.java.codegen.client"
 dependencies {
     api(project(":client-core"))
     testImplementation(project(":aws:client-restjson"))
+    testImplementation(project(":aws:client:aws-client-restjson"))
     testImplementation(libs.smithy.aws.traits)
 
-    itImplementation(project(":aws:client-restjson"))
+    itImplementation(project(":aws:client:aws-client-restjson"))
 }
 
 addGenerateSrcsTask("software.amazon.smithy.java.codegen.client.TestServerJavaClientCodegenRunner")

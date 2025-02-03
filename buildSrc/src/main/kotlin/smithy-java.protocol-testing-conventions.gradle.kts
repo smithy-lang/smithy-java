@@ -6,7 +6,7 @@ plugins {
 }
 
 dependencies {
-    testImplementation(project(":protocol-tests"))
+    testImplementation(project(":protocol-test-harness"))
 }
 
 // Do not run spotbugs on integration tests

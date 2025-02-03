@@ -4,7 +4,7 @@ plugins {
 }
 
 dependencies {
-    api(project(":aws:client-awsjson"))
+    api(project(":aws:client:aws-client-awsjson"))
     api(libs.smithy.aws.traits)
     implementation(project(":aws:sigv4"))
 }

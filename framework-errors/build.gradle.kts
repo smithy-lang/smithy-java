@@ -3,10 +3,10 @@ plugins {
     alias(libs.plugins.smithy.gradle.jar)
 }
 
-description = "Smithy traits for framework errors"
+description = "Smithy framework errors for Smithy Java"
 
-extra["displayName"] = "Smithy :: Framework :: Errors"
-extra["moduleName"] = "software.amazon.smithy.framework.errors"
+extra["displayName"] = "Smithy :: Framework Errors"
+extra["moduleName"] = "software.amazon.smithy.framework"
 
 dependencies {
     smithyBuild(project(":codegen:plugins:types"))

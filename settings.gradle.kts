@@ -1,56 +1,49 @@
 rootProject.name = "smithy-java"
 
+// Common modules
 include("logging")
 include(":context")
 include(":io")
 include(":core")
 
-// Codegen Base
+// Common components
+include(":auth-api")
+include(":retries-api")
+include(":tracing-api")
+include("http-api")
+include("http-binding")
+include(":framework-errors")
+
+// Codecs
+include(":codecs:json-codec")
+include(":codecs:cbor-codec")
+include(":codecs:xml-codec")
+
+// Client
+include(":client:client-core")
+include(":client:client-http")
+include(":client:client-http-binding")
+include(":client:client-rpcv2-cbor")
+include(":client:dynamic-client")
+include(":client:mock-client-plugin")
+
+// Server
+include(":server:server-api")
+include(":server:server-core")
+include(":server:server-netty")
+include(":server:server-rpcv2-cbor")
+
+// Codegen
 include(":codegen:core")
 include(":codegen:plugins")
-
-// Codegen Plugins
 include(":codegen:plugins:client")
 include(":codegen:plugins:server")
 include(":codegen:plugins:types")
 
-// Codegen Integrations
-include(":codegen:integrations:waiters-codegen")
-
-// Framework errors
-include(":framework-errors")
-
-// Protocol tests
-include(":protocol-tests")
-include(":mock-client-plugin")
-
-include("tracing-api")
-
-include(":http-api")
-include(":http-binding")
-
-include(":json-codec")
-include(":xml-codec")
-include(":rpcv2-cbor-codec")
-
-include(":client-core")
-include(":client-http")
-include(":client-http-binding")
-
-include(":dynamic-client")
-
-include(":auth-api")
-include(":retries-api")
-
+// Utilities
+include(":protocol-test-harness")
 include(":jmespath")
 include(":waiters")
-
-// server
-include("server-core")
-include("server-api")
-include("server-netty")
-include("server-core")
-include("server-aws-rest-json1")
 
 // Examples
 include(":examples:restjson-example")
@@ -67,18 +60,17 @@ include(":examples:middleware-example:server-integration")
 
 // AWS specific
 include(":aws:event-streams")
-include(":aws:aws-client-core")
 include(":aws:sigv4")
-include(":aws:client-awsjson")
-include(":aws:client-restjson")
-include(":aws:client-restxml")
-include(":aws:client-rpcv2-cbor-protocol")
-include(":aws:aws-client-http")
-include(":aws:sdkv2-retries")
-
-// AWS integrations
+include(":aws:client:aws-client-core")
+include(":aws:client:aws-client-awsjson")
+include(":aws:client:aws-client-restjson")
+include(":aws:client:aws-client-restxml")
+include(":aws:client:aws-client-http")
+include(":aws:client:sdkv2-retries")
+include(":aws:client:sdkv2-shapes")
+include(":aws:server:aws-server-restjson")
 include(":aws:integrations:lambda")
 
-include(":server-rpcv2-cbor")
+// Compatibility
 include(":aws:sdkv2-shapes")
 include(":aws:sdkv2-shapes")

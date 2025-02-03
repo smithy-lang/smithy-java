@@ -6,14 +6,14 @@ plugins {
     alias(libs.plugins.osdetector)
 }
 
-description = "This module provides AWS-Specific http client functionality"
+description = "This module provides AWS-Specific Sigv4 Signing capabilities"
 
-extra["displayName"] = "Smithy :: Java :: AWS :: Client-HTTP"
-extra["moduleName"] = "software.amazon.smithy.java.aws.client-http"
+extra["displayName"] = "Smithy :: Java :: AWS :: Sigv4"
+extra["moduleName"] = "software.amazon.smithy.java.aws.sigv4"
 
 dependencies {
-    implementation(project(":client-core"))
-    api(project(":aws:aws-client-core"))
+    implementation(project(":client:client-core"))
+    api(project(":aws:client:aws-client-core"))
     implementation(project(":http-api"))
     implementation(project(":io"))
     implementation(project(":logging"))

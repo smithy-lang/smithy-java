@@ -11,11 +11,11 @@ extra["moduleName"] = "software.amazon.smithy.java.aws.integrations.lambda"
 
 dependencies {
     implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
-    implementation(project(":server-api"))
+    implementation(project(":server:server-api"))
     implementation(project(":http-api"))
     implementation(project(":logging"))
     implementation(project(":core"))
-    api(project(":server-core"))
-    testImplementation(project(":rpcv2-cbor-codec"))
+    api(project(":server:server-core"))
+    testImplementation(project(":codecs:cbor-codec"))
     testImplementation(project(":examples:lambda-endpoint"))
 }
