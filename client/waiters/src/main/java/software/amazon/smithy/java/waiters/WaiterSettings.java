@@ -14,8 +14,6 @@ interface WaiterSettings {
      */
     void backoffStrategy(BackoffStrategy backoffStrategy);
 
-
-
     /**
      * Set the override config to use for polling requests.
      *
