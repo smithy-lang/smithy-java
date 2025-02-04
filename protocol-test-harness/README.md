@@ -62,7 +62,7 @@ Client response and server request test handler need only execute the provided r
 ```
 
 #### Filtering 
-Protocols tests can be filtered out for the entire test suite or for a particular 
+Protocol tests can be filtered out for the entire test suite or for a particular 
 handler using the `@ProtocolTestFilter` annotation. This annotation can be used to: 
 1. Skip test cases by IDs
 2. Skip all test cases on an operation based on operation ID. 
