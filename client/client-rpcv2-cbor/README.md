@@ -5,27 +5,27 @@ Client implementation of the [rpcv2-cbor](https://smithy.io/2.0/additional-specs
 To use this protocol as the default in a generated client, first add the `@rpcv2Cbor` trait
 to your service.
 
-```smithy
+```diff
 $version: "2"
 
 namespace smithy.example
 
-use smithy.protocols#rpcv2Cbor
++ use smithy.protocols#rpcv2Cbor
 
-@rpcv2Cbor
++@rpcv2Cbor
 service MyService {
     version: "2020-07-02"
 }
 ```
 Then add this module as a runtime dependency of your project 
-```kotlin
+```diff
 dependencies {
 +    implementation("software.amazon.smithy.java:client-rpcv2-cbor")
 }
 ```
 Finally, configure the client codegen plugin to use this protocol as the
 default 
-```json
+```diff
 {
   "version": "1.0",
   "plugins": {

@@ -6,10 +6,10 @@ or until it is determined that the resource will never enter into the desired st
 
 ### Usage
 Waiter can be manually defined as:
-```
+```java
 // Create a waiter with a single failure acceptor
 var waiter = Waiter.builder(client::getFoosSync)
-    .failure(Matcher.output(o -> o.status().equals("FAILED"))))
+    .failure(Matcher.output(o -> o.status().equals("FAILED")))
     .build();
 // Wait for up to 2 seconds for waiter to complete
 waiter.wait(input, Duration.ofSeconds(2));
