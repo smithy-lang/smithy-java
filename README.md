@@ -2,7 +2,7 @@
 [![ci](https://github.com/smithy-lang/smithy-java/actions/workflows/ci.yml/badge.svg)](https://github.com/smithy-lang/smithy-java/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-[Smithy](https://smithy.io/2.0/index.html) code generators and next-generation framework for [Java](https://java.com/).
+[Smithy](https://smithy.io/2.0/index.html) code generators for clients, servers, and shapes for [Java](https://java.com/).
 
 > [!WARNING]
 > This project is still in development and is not intended for use in production.
