@@ -5,7 +5,7 @@
 [Smithy](https://smithy.io/2.0/index.html) code generators and next-generation framework for [Java](https://java.com/).
 
 > [!WARNING]
-> This project is in early development and is not intended for use in production.
+> This project is still in development and is not intended for use in production.
 
 ## Usage
 > [!WARNING]
