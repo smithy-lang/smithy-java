@@ -17,12 +17,14 @@ service MyService {
     version: "2020-07-02"
 }
 ```
+
 Then add this module as a runtime dependency of your project 
 ```diff
 dependencies {
 +    implementation("software.amazon.smithy.java:client-rpcv2-cbor")
 }
 ```
+
 Finally, configure the client codegen plugin to use this protocol as the
 default 
 ```diff

@@ -29,6 +29,7 @@ public class RestJson1ClientProtocolTests {
     // Add specific handlers here
 }
 ```
+
 The `@ProtocolTest` annotation will trigger the generation of tests based on the 
 protocol test traits found within the closure of the provided service. 
 
