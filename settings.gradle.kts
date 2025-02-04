@@ -1,7 +1,7 @@
 rootProject.name = "smithy-java"
 
 // Common modules
-include("logging")
+include(":logging")
 include(":context")
 include(":io")
 include(":core")
@@ -10,8 +10,8 @@ include(":core")
 include(":auth-api")
 include(":retries-api")
 include(":tracing-api")
-include("http-api")
-include("http-binding")
+include(":http-api")
+include(":http-binding")
 include(":framework-errors")
 
 // Codecs
@@ -42,23 +42,9 @@ include(":codegen:plugins:server")
 include(":codegen:plugins:types")
 include(":codegen:integrations:waiters-codegen")
 
-
 // Utilities
 include(":protocol-test-harness")
 include(":jmespath")
-
-// Examples
-include(":examples:restjson-example")
-include(":examples:dynamodb")
-include(":examples:server-example")
-include(":examples:event-streaming")
-include(":examples:end-to-end-example")
-include(":examples:lambda-endpoint")
-include(":examples:standalone-types-example")
-include("examples:shared-types-example")
-include(":examples:middleware-example:middleware-model")
-include(":examples:middleware-example:client-integration")
-include(":examples:middleware-example:server-integration")
 
 // AWS specific
 include(":aws:event-streams")
@@ -74,5 +60,15 @@ include(":aws:server:aws-server-restjson")
 include(":aws:integrations:lambda")
 
 // Compatibility
-include(":aws:sdkv2-shapes")
-include(":aws:sdkv2-shapes")
+include(":aws:aws-sdkv2-retries")
+include(":aws:aws-sdkv2-shapes")
+
+// Examples
+include(":examples")
+include(":examples:basic-server")
+include(":examples:dynamodb-client")
+include(":examples:event-streaming-client")
+include(":examples:restjson-client")
+include(":examples:lambda-endpoint")
+include(":examples:standalone-types")
+include(":examples:end-to-end")

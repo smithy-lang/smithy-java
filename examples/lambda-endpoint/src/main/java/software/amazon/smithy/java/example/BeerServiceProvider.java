@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 import software.amazon.smithy.java.aws.integrations.lambda.SmithyServiceProvider;
 import software.amazon.smithy.java.example.model.AddBeerInput;
 import software.amazon.smithy.java.example.model.AddBeerOutput;
@@ -19,7 +20,6 @@ import software.amazon.smithy.java.example.model.GetBeerOutput;
 import software.amazon.smithy.java.example.service.AddBeerOperation;
 import software.amazon.smithy.java.example.service.BeerService;
 import software.amazon.smithy.java.example.service.GetBeerOperation;
-import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Service;
 
@@ -30,7 +30,7 @@ import software.amazon.smithy.java.server.Service;
 @AutoService(SmithyServiceProvider.class)
 public final class BeerServiceProvider implements SmithyServiceProvider {
 
-    private static final InternalLogger LOGGER = InternalLogger.getLogger(BeerServiceProvider.class);
+    private static final Logger LOGGER = Logger.getLogger(BeerServiceProvider.class.getName());
     private static final Service SERVICE;
     private static final Map<String, Beer> FRIDGE = new HashMap<>(
             Map.of("TXVuaWNoIEhlbGxlcw==", Beer.builder().name("Munich Helles").quantity(1).build()));
@@ -54,7 +54,7 @@ public final class BeerServiceProvider implements SmithyServiceProvider {
     private static final class AddBeerImpl implements AddBeerOperation {
         @Override
         public AddBeerOutput addBeer(AddBeerInput input, RequestContext context) {
-            LOGGER.info("AddBeer - {}", input);
+            LOGGER.info("AddBeer - " + input);
             String id = ENCODER.encodeToString(input.beer().name().getBytes(StandardCharsets.UTF_8));
             FRIDGE.put(id, input.beer());
             return AddBeerOutput.builder().id(id).build();
@@ -64,7 +64,7 @@ public final class BeerServiceProvider implements SmithyServiceProvider {
     private static final class GetBeerImpl implements GetBeerOperation {
         @Override
         public GetBeerOutput getBeer(GetBeerInput input, RequestContext context) {
-            LOGGER.info("GetBeer - {}", input);
+            LOGGER.info("GetBeer - " + input);
             return GetBeerOutput.builder().beer(FRIDGE.get(input.id())).build();
         }
     }

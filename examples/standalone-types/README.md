@@ -1,0 +1,1 @@
+## Examples: Standalone Types

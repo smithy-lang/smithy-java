@@ -1,3 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.waiters;
 
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
@@ -21,4 +26,3 @@ interface WaiterSettings {
      */
     void overrideConfig(RequestOverrideConfig overrideConfig);
 }
-

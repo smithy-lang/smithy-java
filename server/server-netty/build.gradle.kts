@@ -8,7 +8,7 @@ extra["displayName"] = "Smithy :: Java :: Server Netty"
 extra["moduleName"] = "software.amazon.smithy.java.server.netty"
 
 dependencies {
-    implementation(project(":server:server-core"))
+    api(project(":server:server-core"))
     implementation(project(":core"))
     implementation(project(":logging"))
     implementation(project(":http-api"))

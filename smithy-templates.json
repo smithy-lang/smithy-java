@@ -1,11 +1,59 @@
 {
   "name": "smithy-java",
   "templates": {
-    "quickstart": {
-      "documentation": "Smithy-Java quickstart example with client and server.",
-      "path": "examples/quickstart",
+    "basic-server": {
+      "documentation": "Basic code generated HTTP server.",
+      "path": "examples/basic-server",
       "include": [
-        "gradle.properties",
+        "examples/gradle.properties",
+        ".gitignore"
+      ]
+    },
+    "dynamodb-client": {
+      "documentation": "Generated client for AWS DynamoDb model.",
+      "path": "examples/dynamodb-client",
+      "include": [
+        "examples/gradle.properties",
+        ".gitignore"
+      ]
+    },
+    "end-to-end": {
+      "documentation": "Generate both client and server for a service.",
+      "path": "examples/end-to-end",
+      "include": [
+        "examples/gradle.properties",
+        ".gitignore"
+      ]
+    },
+    "event-streaming-client": {
+      "documentation": "Client that can send an receive event streams.",
+      "path": "examples/event-streaming-client",
+      "include": [
+        "examples/gradle.properties",
+        ".gitignore"
+      ]
+    },
+    "lambda-endpoint": {
+      "documentation": "Generated server that can be deployed to an AWS Lambda.",
+      "path": "examples/lambda-endpoint",
+      "include": [
+        "examples/gradle.properties",
+        ".gitignore"
+      ]
+    },
+    "restjson-client": {
+      "documentation": "Generated client using the AWS RestJson1 protocol.",
+      "path": "examples/restjson-client",
+      "include": [
+        "examples/gradle.properties",
+        ".gitignore"
+      ]
+    },
+    "standalone-types": {
+      "documentation": "Package of standalone types with no service.",
+      "path": "examples/standalone-types",
+      "include": [
+        "examples/gradle.properties",
         ".gitignore"
       ]
     }
