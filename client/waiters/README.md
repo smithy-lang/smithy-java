@@ -5,7 +5,7 @@ Waiters are a client-side abstraction used to poll a resource until a desired st
 or until it is determined that the resource will never enter into the desired state.
 
 ### Usage
-Waiter can be manually defined as:
+A Waiter can be manually created using:
 ```java
 // Create a waiter with a single failure acceptor
 var waiter = Waiter.builder(client::getFoosSync)
