@@ -1,2 +1,2 @@
 ### client-http
-Provides client-side implementation of HTTP transport.
+Provides a client-side implementation of HTTP transport.
