@@ -105,7 +105,7 @@ used by Smithy users. API's annotated with `@SmithyUnstableApi` are subject to c
 - `client-core` - Provides protocol and transport agnostic functionality for clients. 
                   All generated clients require this package as a runtime dependency.
 - `client-http` - Client-side implementation of HTTP transport.
-- `dynamic-client` - 
+- `dynamic-client` - Smithy client that exposes a dynamic API that doesn't require codegen.
 
 ### Server
 - `server-core` - Provides protocol and transport agnostic functionality for servers. 
