@@ -3,7 +3,7 @@ Demonstrates how to build a simple HTTP server from a service model.
 
 In this example, a Smithy model for a `BeerService` is used to generate a server and 
 operation stub interfaces. These stub interfaces (`AddBeerOperation` and `GetBeerOperationAsync`) are implemented 
-and registered with the Generated client to create a basic server.
+and registered with the generated client to create a basic server.
 
 This example server supports the `restJson1` protocol.
 
