@@ -40,6 +40,7 @@ To use the Smithy Java code generators with Gradle, first create a Smithy Gradle
 
 Then apply the [`smithy-base`](https://smithy.io/2.0/guides/gradle-plugin/index.html#smithy-gradle-plugins) gradle plugin to 
 your project.
+
 ```diff
 // build.gradle.kts
 plugins {
@@ -58,6 +59,7 @@ dependencies {
 Now, configure your [`smithy-build`](https://smithy.io/2.0/guides/smithy-build-json.html) to use one of the 
 Smithy Java codegen plugins. For example, to generate a client for a `CoffeeShop` service we would 
 add the following to our `smithy-build.json`:
+
 ```diff
 // smithy-build.json
 {
@@ -75,6 +77,7 @@ add the following to our `smithy-build.json`:
 Your project is now configured to generate Java code from our model. To execute a build run the 
 gradle `build` task for your project. To compile the generated code as part of your project, 
 add the generated package to your `main` sourceSet. For example:
+
 ```kotlin
 // build.gradle.kts
 
