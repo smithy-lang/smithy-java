@@ -2,7 +2,7 @@
 junit5 = "5.11.4"
 hamcrest = "3.0"
 smithy = "1.54.0"
-jmh = "0.7.2"
+jmh = "0.7.3"
 test-logger-plugin = "4.0.0"
 spotbugs = "6.0.22"
 spotless = "6.25.0"
@@ -10,11 +10,11 @@ smithy-gradle-plugins = "1.2.0"
 assertj = "3.27.3"
 jackson = "2.18.2"
 netty = "4.1.117.Final"
-dep-analysis = "2.7.0"
-aws-sdk = "2.30.8"
+dep-analysis = "2.8.0"
+aws-sdk = "2.30.13"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
-jreleaser = "1.15.0"
+jreleaser = "1.16.0"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
