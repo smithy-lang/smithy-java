@@ -19,7 +19,7 @@ gradle run
 ```
 This will start the server running on port `8080`.
 
-You can use curl to make a call to the service, for example you could add a beer as follows: 
+You can use curl to make a call to the service. For example, you can add a beer as follows: 
 ```console
 curl -H "content-type: application/json" -d '{"beer":{"name": "wit", "quantity":2} }' -X POST localhost:8080/add-beer
 ```
