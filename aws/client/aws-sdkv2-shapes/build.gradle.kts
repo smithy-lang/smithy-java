@@ -10,8 +10,8 @@ extra["moduleName"] = "software.amazon.smithy.java.aws.sdkv2.shapes"
 dependencies {
     implementation(project(":codecs:json-codec"))
     implementation(project(":core"))
-    implementation(project(":aws:client:client-restjson"))
-    implementation(project(":aws:client:client-awsjson"))
+    implementation(project(":aws:client:aws-client-restjson"))
+    implementation(project(":aws:client:aws-client-awsjson"))
     implementation(libs.aws.sdkcore)
 
     testImplementation(project(":client:dynamic-client"))
