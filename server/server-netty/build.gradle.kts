@@ -9,9 +9,7 @@ extra["moduleName"] = "software.amazon.smithy.java.server.netty"
 
 dependencies {
     api(project(":server:server-core"))
-    implementation(project(":core"))
     implementation(project(":logging"))
-    implementation(project(":http-api"))
     implementation(project(":context"))
     implementation(libs.netty.all)
 }

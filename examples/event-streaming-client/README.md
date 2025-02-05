@@ -5,6 +5,13 @@ Event streams allow multiple messages to be sent asynchronously between a client
 
 ### Usage
 To use this example as a template, run the following command with the [Smithy CLI](https://smithy.io/2.0/guides/smithy-cli/index.html):
+
 ```console
-smithy init -t event-stream-client --url https://github.com/smithy-lang/smithy-java
+smithy init -t event-streaming-client --url https://github.com/smithy-lang/smithy-java
+```
+
+or 
+
+```console
+smithy init -t event-streaming-client --url git@github.com:smithy-lang/smithy-java.git
 ```
