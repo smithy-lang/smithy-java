@@ -11,4 +11,5 @@ record AwsCredentialsIdentityRecord(
         String accessKeyId,
         String secretAccessKey,
         String sessionToken,
-        Instant expirationTime) implements AwsCredentialsIdentity {}
+        Instant expirationTime,
+        String accountId) implements AwsCredentialsIdentity {}
