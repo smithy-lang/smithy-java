@@ -30,10 +30,13 @@ and building services. These examples can be used as a template for a new projec
 [Smithy CLI](https://smithy.io/2.0/guides/smithy-cli/index.html) `init` command.
 
 ## Usage
+
 > [!WARNING]
 > Smithy-Java only supports **Java 17** or later. Older Java versions are not supported.
+
 ### Codegen (Gradle)
 To use the Smithy Java code generators with Gradle, first create a Smithy Gradle project. 
+
 > [!NOTE]
 > You can use the `smithy init` [CLI](https://smithy.io/2.0/guides/smithy-cli/index.html) command to create a new
 > Smithy Gradle project. The command `smithy init quickstart-gradle`  will create a new basic Smithy Gradle project.
@@ -50,6 +53,7 @@ plugins {
 
 Then add the codegen plugins as a dependency of the `smithyBuild` configuration to make the plugins discoverable 
 by the Smithy build process: 
+
 ```diff
 dependencies {
 +    smithyBuild("software.amazon.smithy.codegen:plugins:<replace with version>")
