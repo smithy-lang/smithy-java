@@ -72,7 +72,7 @@ add the following to our `smithy-build.json`:
 }
 ```
 
-Our project is now configured to generate Java code from our model. To execute a build run the 
+Your project is now configured to generate Java code from our model. To execute a build run the 
 gradle `build` task for your project. To compile the generated code as part of your project, 
 add the generated package to your `main` sourceSet. For example:
 ```kotlin
