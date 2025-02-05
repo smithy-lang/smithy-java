@@ -32,6 +32,21 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaHttpClientTransport.class);
     private final HttpClient client;
 
+    static {
+        // For some reason, this can't just be done in the constructor to always take effect.
+        setHostProperties();
+    }
+
+    private static void setHostProperties() {
+        // Allow clients to set Host header. This has to be done using a system property and can't be done per/client.
+        var currentValues = System.getProperty("jdk.httpclient.allowRestrictedHeaders");
+        if (currentValues == null || currentValues.isEmpty()) {
+            System.setProperty("jdk.httpclient.allowRestrictedHeaders", "host");
+        } else if (!containsHost(currentValues)) {
+            System.setProperty("jdk.httpclient.allowRestrictedHeaders", currentValues + ",host");
+        }
+    }
+
     public JavaHttpClientTransport() {
         this(HttpClient.newHttpClient());
     }
@@ -41,14 +56,7 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
      */
     public JavaHttpClientTransport(HttpClient client) {
         this.client = client;
-
-        // Allow clients to set Host header. This has to be done using a system property and can't be done per/client.
-        var currentValues = System.getProperty("jdk.httpclient.allowRestrictedHeaders");
-        if (currentValues == null || currentValues.isEmpty()) {
-            System.setProperty("jdk.httpclient.allowRestrictedHeaders", "host");
-        } else if (!containsHost(currentValues)) {
-            System.setProperty("jdk.httpclient.allowRestrictedHeaders", currentValues + ",host");
-        }
+        setHostProperties();
     }
 
     private static boolean containsHost(String currentValues) {
@@ -123,12 +131,18 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
     }
 
     private HttpResponse createSmithyResponse(java.net.http.HttpResponse<Flow.Publisher<List<ByteBuffer>>> response) {
-        LOGGER.trace("Got response: {}; headers: {}", response, response.headers().map());
+        var headerMap = response.headers().map();
+        LOGGER.trace("Got response: {}; headers: {}", response, headerMap);
+
+        var headers = HttpHeaders.of(headerMap);
+        var length = headers.contentLength();
+        long adaptedLength = length == null ? -1 : length;
+
         return HttpResponse.builder()
                 .httpVersion(javaToSmithyVersion(response.version()))
                 .statusCode(response.statusCode())
-                .headers(HttpHeaders.of(response.headers().map()))
-                .body(new ListByteBufferToByteBuffer(response.body())) // Flatten the List<ByteBuffer> to ByteBuffer.
+                .headers(headers)
+                .body(new HttpClientDataStream(response.body(), adaptedLength, headers.contentType()))
                 .build();
     }
 
@@ -146,35 +160,6 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
             case HTTP_2 -> HttpVersion.HTTP_2;
             default -> throw new UnsupportedOperationException("Unsupported HTTP version: " + version);
         };
-    }
-
-    private record ListByteBufferToByteBuffer(Flow.Publisher<List<ByteBuffer>> originalPublisher)
-            implements Flow.Publisher<ByteBuffer> {
-        @Override
-        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-            originalPublisher.subscribe(new Flow.Subscriber<>() {
-                @Override
-                public void onSubscribe(Flow.Subscription subscription) {
-                    subscriber.onSubscribe(subscription);
-                }
-
-                @Override
-                public void onNext(List<ByteBuffer> item) {
-                    // TODO: subscriber.onNext should only be called as many times as requested by the subscription
-                    item.forEach(subscriber::onNext);
-                }
-
-                @Override
-                public void onError(Throwable throwable) {
-                    subscriber.onError(throwable);
-                }
-
-                @Override
-                public void onComplete() {
-                    subscriber.onComplete();
-                }
-            });
-        }
     }
 
     public static final class Factory implements ClientTransportFactory<HttpRequest, HttpResponse> {
