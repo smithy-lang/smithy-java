@@ -45,7 +45,7 @@ public interface SigV4Settings<B extends ClientSetting<B>> extends ClockSetting<
     /**
      * Service name to use for signing. For example {@code lambda}.
      */
-    Context.Key<String> SIGNING_NAME = Context.key("Signing name to use for computing SigV4 signatures.");
+    Context.Key<String> SIGNING_NAME = Context.key(String.class, "Signing name to use for computing SigV4 signatures.");
 
     /**
      * Signing name to use for the SigV4 signing process.

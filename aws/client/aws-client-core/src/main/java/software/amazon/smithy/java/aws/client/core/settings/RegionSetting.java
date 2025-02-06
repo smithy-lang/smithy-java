@@ -27,7 +27,7 @@ public interface RegionSetting<B extends ClientSetting<B>> extends ClientSetting
      *
      * @see <a href="https://docs.aws.amazon.com/general/latest/gr/rande.html">AWS service endpoints</a>
      */
-    Context.Key<String> REGION = Context.key("Region name. For example `us-east-2`");
+    Context.Key<String> REGION = Context.key(String.class, "Region name. For example `us-east-2`");
 
     /**
      * Set the AWS region for a client to use.

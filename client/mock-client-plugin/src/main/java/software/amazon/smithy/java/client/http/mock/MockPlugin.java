@@ -53,7 +53,9 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public final class MockPlugin implements ClientPlugin {
 
     // Used to pass the required context from the wrapped protocol to the wrapped transport.
-    private static final Context.Key<CurrentRequest> CURRENT_REQUEST = Context.key("CURRENT_REQUEST");
+    private static final Context.Key<CurrentRequest> CURRENT_REQUEST = Context.key(
+            CurrentRequest.class,
+            "CURRENT_REQUEST");
 
     private static final Map<ShapeId, ServerProtocolProvider> SERVER_PROTOCOL_HANDLERS = ServiceLoader.load(
             ServerProtocolProvider.class,

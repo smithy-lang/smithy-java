@@ -41,7 +41,9 @@ public class ProtocolTestProtocolProvider implements ServerProtocolProvider {
 
     private static class DelegatingServerProtocol extends ServerProtocol {
 
-        private static final Context.Key<ServerProtocol> PROTOCOL_TO_TEST = Context.key("protocol-to-test");
+        private static final Context.Key<ServerProtocol> PROTOCOL_TO_TEST = Context.key(
+                ServerProtocol.class,
+                "protocol-to-test");
 
         private final Map<ShapeId, ServerProtocol> delegateProtocols;
 

@@ -21,10 +21,13 @@ import software.amazon.smithy.model.traits.HttpApiKeyAuthTrait;
  */
 public final class HttpApiKeyAuthScheme implements AuthScheme<HttpRequest, ApiKeyIdentity> {
     static final Context.Key<String> NAME = Context.key(
+            String.class,
             "Name of the header or query parameter that contains the API key");
     static final Context.Key<HttpApiKeyAuthTrait.Location> IN = Context.key(
+            HttpApiKeyAuthTrait.Location.class,
             "Defines the location of where the key is serialized.");
     static final Context.Key<String> SCHEME = Context.key(
+            String.class,
             "Defines the IANA scheme to use on the Authorization header value.");
 
     private final String scheme;

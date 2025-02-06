@@ -176,7 +176,7 @@ public class ClientConfigTest {
 
     static final class RegionAwareServicePlugin implements ClientPlugin {
 
-        public static final Context.Key<String> REGION = Context.key("Region for the service");
+        public static final Context.Key<String> REGION = Context.key(String.class, "Region for the service");
 
         @Override
         public void configureClient(ClientConfig.Builder config) {

@@ -20,48 +20,52 @@ public final class CallContext {
     /**
      * The total amount of time to wait for an API call to complete, including retries, and serialization.
      */
-    public static final Context.Key<Duration> API_CALL_TIMEOUT = Context.key("API call timeout");
+    public static final Context.Key<Duration> API_CALL_TIMEOUT = Context.key(Duration.class, "API call timeout");
 
     /**
      * The amount of time to wait for a single, underlying network request to complete before giving up and timing out.
      */
-    public static final Context.Key<Duration> API_CALL_ATTEMPT_TIMEOUT = Context.key("API call attempt timeout");
+    public static final Context.Key<Duration> API_CALL_ATTEMPT_TIMEOUT = Context.key(
+            Duration.class,
+            "API call attempt timeout");
 
     /**
      * The endpoint resolver used to resolve the destination endpoint for a request.
      */
-    public static final Context.Key<EndpointResolver> ENDPOINT_RESOLVER = Context.key("EndpointResolver");
+    public static final Context.Key<EndpointResolver> ENDPOINT_RESOLVER = Context.key(
+            EndpointResolver.class,
+            "EndpointResolver");
 
     /**
      * The read-only resolved endpoint for the request.
      */
-    public static final Context.Key<Endpoint> ENDPOINT = Context.key("Endpoint of the request");
+    public static final Context.Key<Endpoint> ENDPOINT = Context.key(Endpoint.class, "Endpoint of the request");
 
     /**
      * The identity resolved for the request.
      */
-    public static final Context.Key<Identity> IDENTITY = Context.key("Identity of the caller");
+    public static final Context.Key<Identity> IDENTITY = Context.key(Identity.class, "Identity of the caller");
 
     /**
      * The current number of retry attempts the client has made for the current call, starting at 1.
      *
      * <p>This is a read-only value; modifying this value has no effect on a request.
      */
-    public static final Context.Key<Integer> RETRY_ATTEMPT = Context.key("Retry attempt");
+    public static final Context.Key<Integer> RETRY_ATTEMPT = Context.key(Integer.class, "Retry attempt");
 
     /**
      * The maximum number of retries the client will issue before giving up.
      *
      * <p>This is a read-only value; modifying this value has no effect on a request.
      */
-    public static final Context.Key<Integer> RETRY_MAX = Context.key("Max retries");
+    public static final Context.Key<Integer> RETRY_MAX = Context.key(Integer.class, "Max retries");
 
     /**
      * The idempotency token used with the call, if any.
      *
      * <p>This is a read-only value; modifying this value has no effect on a request.
      */
-    public static final Context.Key<String> IDEMPOTENCY_TOKEN = Context.key("Idempotency token");
+    public static final Context.Key<String> IDEMPOTENCY_TOKEN = Context.key(String.class, "Idempotency token");
 
     /**
      * The set of user-defined feature IDs used with a request.
@@ -70,9 +74,13 @@ public final class CallContext {
      * only ASCII letters, numbers, and hyphens. For example, "P" might be used to indicate that pagination was used
      * with a request.
      */
-    public static final Context.Key<Set<FeatureId>> FEATURE_IDS = Context.key(
-            "Feature IDs used with a request",
-            HashSet::new);
+    @SuppressWarnings("unchecked")
+    public static final Context.Key<Set<FeatureId>> FEATURE_IDS = (Context.Key<Set<FeatureId>>) createFeatureIdKey();
+
+    @SuppressWarnings("rawtypes")
+    private static Context.Key createFeatureIdKey() {
+        return Context.key(Set.class, "Feature IDs used with a request", HashSet::new);
+    }
 
     /**
      * The name of the application, used in things like user-agent headers.
@@ -83,7 +91,7 @@ public final class CallContext {
      *
      * <p>This value should be less than 50 characters.
      */
-    public static final Context.Key<String> APPLICATION_ID = Context.key("Application ID");
+    public static final Context.Key<String> APPLICATION_ID = Context.key(String.class, "Application ID");
 
     private CallContext() {}
 }

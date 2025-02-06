@@ -19,12 +19,13 @@ public final class HttpContext {
      * received in time, then the request is considered timed out. This setting does not apply to streaming
      * operations.
      */
-    public static final Context.Key<Duration> HTTP_REQUEST_TIMEOUT = Context.key("HTTP.RequestTimeout");
+    public static final Context.Key<Duration> HTTP_REQUEST_TIMEOUT = Context.key(Duration.class, "HTTP.RequestTimeout");
 
     /**
      * Custom HTTP headers returned from an {@link EndpointResolver} to use with a request.
      */
     public static final Context.Key<HttpHeaders> ENDPOINT_RESOLVER_HTTP_HEADERS = Context.key(
+            HttpHeaders.class,
             "HTTP headers to use with the request returned from an endpoint resolver");
 
     private HttpContext() {}

@@ -37,13 +37,16 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
         static final AtomicInteger COUNTER = new AtomicInteger();
 
         private final String name;
+        private final Class<T> type;
         final int id;
         private final Function<T, T> copyFunction;
 
         /**
+         * @param type The kind of Class value stored in the key, if known.
          * @param name Name of the value.
          */
-        private Key(String name, Function<T, T> copyFunction) {
+        private Key(Class<T> type, String name, Function<T, T> copyFunction) {
+            this.type = type;
             this.name = Objects.requireNonNull(name);
             this.id = COUNTER.getAndIncrement();
             this.copyFunction = Objects.requireNonNull(copyFunction);
@@ -52,6 +55,23 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
         @Override
         public String toString() {
             return name;
+        }
+
+        /**
+         * Get the class of the value wrapped by the Key, if known.
+         *
+         * <p>By allowing {@code Context.Keys} to return the {@code Class<T>} of the wrapped value, the
+         * {@code Context.Key} can be adapted into other libraries that offer similar abstractions
+         * but requires the {@code Class<T>} of the wrapped value.
+         *
+         * <p>Some libraries that provide a similar abstraction as {@code Context.Key} don't provide access to
+         * the {@code Class<T>} of the wrapped value. To allow a smithy-java {@code Context.Key} to adapt those
+         * keys into smithy-java, {@code Context.Key} allows {@code getType} to return null.
+         *
+         * @return the wrapped value class, or null if unknown.
+         */
+        public Class<T> getType() {
+            return type;
         }
 
         /**
@@ -68,6 +88,9 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
     /**
      * Create a new identity-based key to store in the context.
      *
+     * <p>Use this method when you don't have access to {@code Class<T>}.
+     * Use {@link #key(Class, String)} when you do have access to {@code Class<T>}.
+     *
      * @param name Name of the key.
      * @return the created key.
      * @param <T> Value type associated with the key.
@@ -80,13 +103,42 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
      * Create a new identity-based key to store in the context, and use a function to copy mutable values so they
      * can be independently copied into other contexts.
      *
+     * <p>Use this method when you don't have access to {@code Class<T>}.
+     * Use {@link #key(Class, String, Function)} when you do have access to {@code Class<T>}.
+     *
      * @param name Name of the key.
      * @param copyFunction A function that takes the current value of a key and returns an independent copy of it.
      * @return the created key.
      * @param <T> Value type associated with the key.
      */
     static <T> Key<T> key(String name, Function<T, T> copyFunction) {
-        Key<T> key = new Key<>(name, copyFunction);
+        return key(null, name, copyFunction);
+    }
+
+    /**
+     * Create a new identity-based key to store in the context.
+     *
+     * @param type The class of the underlying value.
+     * @param name Name of the key.
+     * @return the created key.
+     * @param <T> Value type associated with the key.
+     */
+    static <T> Key<T> key(Class<T> type, String name) {
+        return key(type, name, Function.identity());
+    }
+
+    /**
+     * Create a new identity-based key to store in the context, and use a function to copy mutable values so they
+     * can be independently copied into other contexts.
+     *
+     * @param type The class of the underlying value.
+     * @param name Name of the key.
+     * @param copyFunction A function that takes the current value of a key and returns an independent copy of it.
+     * @return the created key.
+     * @param <T> Value type associated with the key.
+     */
+    static <T> Key<T> key(Class<T> type, String name, Function<T, T> copyFunction) {
+        Key<T> key = new Key<>(type, name, copyFunction);
         if (key.id < Key.MAX_ARRAY_KEY_SPACE) {
             Key.KEYS[key.id] = key;
         }

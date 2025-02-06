@@ -27,7 +27,7 @@ public interface ClockSetting<B extends ClientSetting<B>> extends ClientSetting<
     /**
      * Override the {@code Clock} implementation to used in clients.
      */
-    Context.Key<Clock> CLOCK = Context.key("Clock override.");
+    Context.Key<Clock> CLOCK = Context.key(Clock.class, "Clock override.");
 
     /**
      * Override the default client clock.
