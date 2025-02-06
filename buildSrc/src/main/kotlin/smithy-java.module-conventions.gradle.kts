@@ -25,10 +25,9 @@ val licenseSpec = copySpec {
  * Extra Jars
  * ============================
  */
-// Build a javadoc JAR too.
-tasks.register<Jar>("javadocJar") {
-    from(tasks.named("javadoc"))
-    archiveClassifier.set("javadoc")
+java {
+    withJavadocJar()
+    withSourcesJar()
 }
 
 // TODO: Remove this once package is ready for docs

@@ -66,7 +66,8 @@ jreleaser {
                     snapshotUrl = "https://aws.oss.sonatype.org/content/repositories/snapshots"
                     closeRepository.set(true)
                     releaseRepository.set(true)
-                    stagingRepositories.add("${rootProject.buildDir}/staging")
+                    verifyPom.set(true)
+                    stagingRepository(rootProject.layout.buildDirectory.dir("staging").get().asFile.path)
                 }
             }
         }
