@@ -1,0 +1,5 @@
+{
+  "path": "/add-beer",
+  "httpMethod": "POST",
+  "body": "{\"beer\": { \"name\": \"Oatmeal Stout\", \"quantity\": 1 } }"
+}

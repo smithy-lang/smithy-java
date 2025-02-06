@@ -17,5 +17,4 @@ dependencies {
     implementation(project(":core"))
     api(project(":server:server-core"))
     testImplementation(project(":codecs:cbor-codec"))
-    testImplementation(project(":examples:lambda-endpoint"))
 }

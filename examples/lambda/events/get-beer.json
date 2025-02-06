@@ -1,0 +1,5 @@
+{
+  "path": "/get-beer",
+  "httpMethod": "POST",
+  "body": "{\"id\": \"TXVuaWNoIEhlbGxlcw==\"}"
+}

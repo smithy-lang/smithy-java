@@ -71,7 +71,7 @@ add the following to our `smithy-build.json`:
     "plugins": {
 +       "java-client-codegen": {
 +            "service": "com.example#CoffeeShop"
-+            "namespace": "software.amazon.smithy.java.example",
++            "namespace": "software.amazon.smithy.java.examples",
 +            "headerFile": "license.txt"
 +       }
     }
