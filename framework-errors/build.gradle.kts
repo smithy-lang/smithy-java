@@ -14,7 +14,9 @@ dependencies {
 
     // Validation error is imported separately, b/c it is used a bit uniquely in protocol tests.
     // TODO: Can this be collapsed into the framework errors when they are upstreamed?
-    api(libs.smithy.validation.model)
+    api(libs.smithy.validation.model) {
+        exclude(group = "software.amazon.smithy", module = "smithy-cli")
+    }
 }
 
 // Add generated Java sources to the main sourceSet
