@@ -212,10 +212,15 @@ final class ClientPipeline<RequestT, ResponseT> {
                     call.interceptor.readBeforeTransmit(updatedHook.withRequest(req));
                     return req;
                 })
-                .thenCompose(
-                        finalRequest -> transport
-                                .send(call.context, finalRequest)
-                                .thenCompose(response -> deserialize(call, finalRequest, response, call.interceptor)));
+                .thenCompose(finalRequest -> {
+                    return transport
+                            .send(call.context, finalRequest)
+                            .exceptionally(e -> {
+                                // In case the transport doesn't do the remapping, do that here now.
+                                throw ClientTransport.remapExceptions(e);
+                            })
+                            .thenCompose(response -> deserialize(call, finalRequest, response, call.interceptor));
+                });
     }
 
     private static void setIdemTokenValue(ApiOperation<?, ?> operation, Context context, SerializableStruct input) {

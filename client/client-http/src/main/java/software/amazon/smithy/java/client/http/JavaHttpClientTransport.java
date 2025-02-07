@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.http;
 
 import java.net.http.HttpClient;
+import java.net.http.HttpConnectTimeoutException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
@@ -14,6 +15,7 @@ import java.util.concurrent.Flow;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.client.core.MessageExchange;
+import software.amazon.smithy.java.client.core.error.ConnectTimeoutException;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -127,7 +129,15 @@ public class JavaHttpClientTransport implements ClientTransport<HttpRequest, Htt
 
     private CompletableFuture<HttpResponse> sendRequest(java.net.http.HttpRequest request) {
         return client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofPublisher())
-                .thenApply(this::createSmithyResponse);
+                .thenApply(this::createSmithyResponse)
+                .exceptionally(e -> {
+                    if (e instanceof HttpConnectTimeoutException) {
+                        throw new ConnectTimeoutException(e);
+                    }
+                    // The client pipeline also does this remapping, but to adhere to the required contract of
+                    // ClientTransport, we remap here too if needed.
+                    throw ClientTransport.remapExceptions(e);
+                });
     }
 
     private HttpResponse createSmithyResponse(java.net.http.HttpResponse<Flow.Publisher<List<ByteBuffer>>> response) {

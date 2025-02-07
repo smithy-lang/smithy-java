@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.client.core.error.TransportException;
 import software.amazon.smithy.java.client.core.plugins.ApplyModelRetryInfoPlugin;
 import software.amazon.smithy.java.client.core.plugins.DefaultPlugin;
 import software.amazon.smithy.java.client.core.plugins.InjectIdempotencyTokenPlugin;
@@ -97,7 +98,7 @@ public class ClientTest {
     }
 
     @Test
-    public void correctlyUnwraps() throws URISyntaxException {
+    public void correctlyWrapsTransportExceptions() throws URISyntaxException {
         var expectedException = new IOException("A");
         var queue = new MockQueue();
         queue.enqueueError(expectedException);
@@ -111,7 +112,7 @@ public class ClientTest {
                 .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
                 .build();
 
-        var exception = Assertions.assertThrows(IOException.class, () -> c.call("GetSprocket"));
-        assertSame(expectedException, exception);
+        var exception = Assertions.assertThrows(TransportException.class, () -> c.call("GetSprocket"));
+        assertSame(exception.getCause(), expectedException);
     }
 }

@@ -5,13 +5,20 @@
 
 package software.amazon.smithy.java.client.core;
 
-import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.net.ConnectException;
+import java.net.ProtocolException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.CompletableFuture;
+import javax.net.ssl.SSLException;
+import software.amazon.smithy.java.client.core.error.ConnectTimeoutException;
+import software.amazon.smithy.java.client.core.error.TlsException;
+import software.amazon.smithy.java.client.core.error.TransportException;
+import software.amazon.smithy.java.client.core.error.TransportProtocolException;
+import software.amazon.smithy.java.client.core.error.TransportSocketException;
+import software.amazon.smithy.java.client.core.error.TransportSocketTimeout;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.core.error.CallException;
 
 /**
  * Sends a serialized request and returns a response.
@@ -30,21 +37,9 @@ public interface ClientTransport<RequestT, ResponseT> extends ClientPlugin {
     /**
      * Send a prepared request.
      *
-     * <p>Transports must only <strong>must</strong> throw exceptions from Java's standard library or exceptions that
-     * subclass them, including but not limited to:
-     *
-     * <ul>
-     *     <li>{@link IOException}</li>
-     *     <li>{@link SocketException}</li>
-     *     <li>{@link SocketTimeoutException}</li>
-     *     <li>{@link ConnectException}</li>
-     *     <li>{@link InterruptedIOException}</li>
-     *     <li>{@link InterruptedException}</li>
-     * </ul>
-     *
-     * <p>Transports that do not use these standard Java exceptions or subclass from them <strong>must</strong>
-     * wrap transport-specific exceptions into these types to ensure that changing the transport of a client doesn't
-     * impact the user-facing API of a client call.
+     * <p>Transports must only throw exceptions that extend from {@link TransportException} or {@link CallException},
+     * mapping the exceptions thrown by the underlying implementation to the most specific subtype of
+     * {@code TransportException}.
      *
      * @param context Call context.
      * @param request Request to send.
@@ -62,5 +57,33 @@ public interface ClientTransport<RequestT, ResponseT> extends ClientPlugin {
     @Override
     default void configureClient(ClientConfig.Builder config) {
         config.applyPlugin(messageExchange());
+    }
+
+    /**
+     * Remaps a thrown exception to an appropriate {@link TransportException} or {@link CallException}.
+     *
+     * <p>This method attempts to map built-in JDK exceptions to the appropriate subclass of
+     * {@code TransportException}.
+     *
+     * @param e Exception to map to a {@link TransportException} or subclass.
+     * @return the remapped exception. A given {@code CallException} or {@code TransportException} is returned as-is.
+     */
+    static CallException remapExceptions(Throwable e) {
+        if (e instanceof CallException ce) {
+            return ce; // rethrow CallException and TransportException as-is.
+        } else if (e instanceof ConnectException) {
+            return new ConnectTimeoutException(e);
+        } else if (e instanceof SocketTimeoutException) {
+            return new TransportSocketTimeout(e);
+        } else if (e instanceof SocketException) {
+            return new TransportSocketException(e);
+        } else if (e instanceof SSLException) {
+            return new TlsException(e);
+        } else if (e instanceof ProtocolException) {
+            return new TransportProtocolException(e);
+        } else {
+            // Wrap all other exceptions as a TransportException.
+            return new TransportException(e);
+        }
     }
 }
