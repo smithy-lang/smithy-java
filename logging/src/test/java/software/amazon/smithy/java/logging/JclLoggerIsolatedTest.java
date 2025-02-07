@@ -5,19 +5,18 @@
 
 package software.amazon.smithy.java.logging;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogConfigurationException;
 import org.apache.commons.logging.LogFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 
-public class JclLoggerIsolatedTest {
+public class JclLoggerIsolatedTest extends LoggerTestBase {
 
     @BeforeAll
     public static void setupLoggers() {
@@ -34,64 +33,21 @@ public class JclLoggerIsolatedTest {
     @AfterEach
     public void tearDown() {
         JclLog.BUFFER.getBuffer().setLength(0);
+    }
+
+    @Override
+    protected List<String> getLogLines() {
+        return Arrays.asList(JclLog.BUFFER.toString().split(System.lineSeparator()));
+    }
+
+    @Override
+    protected void disableWarnLevel() {
+        JclLog.warnEnabled = false;
+    }
+
+    @Override
+    protected void enableWarnLevel() {
         JclLog.warnEnabled = true;
-    }
-
-    @Test
-    void smokeTest() {
-        InternalLogger logger = InternalLogger.getLogger(JclLoggerIsolatedTest.class);
-        logger.error("test1");
-        logger.warn("test2: {}", "abc");
-        logger.fatal("{}: test3: {} {}", "a", "b", "c", new NullPointerException("BANG!"));
-
-        var lines = JclLog.BUFFER.toString().split(System.lineSeparator());
-        assertThat(lines).hasSizeGreaterThan(5);
-        assertThat(lines[0]).startsWith("ERROR test1");
-        assertThat(lines[1]).startsWith("WARN test2: abc");
-        assertThat(lines[2]).startsWith("FATAL a: test3: b c");
-        assertThat(lines[3]).startsWith("java.lang.NullPointerException: BANG!");
-        assertThat(lines[4]).contains(
-                "at software.amazon.smithy.java.logging.JclLoggerIsolatedTest.smokeTest(JclLoggerIsolatedTest.java:");
-    }
-
-    @Test
-    void levelTest() {
-        InternalLogger logger = InternalLogger.getLogger(JclLoggerIsolatedTest.class);
-        JclLog.warnEnabled = false;
-        logger.error("test1");
-        logger.warn("test2: {}", "abc");
-        logger.fatal("{}: test3: {} {}", "a", "b", "c", new NullPointerException("BANG!"));
-
-        var lines = JclLog.BUFFER.toString().split(System.lineSeparator());
-        assertThat(lines).hasSizeGreaterThan(4);
-        assertThat(lines[0]).startsWith("ERROR test1");
-        assertThat(lines[1]).startsWith("FATAL a: test3: b c");
-        assertThat(lines[2]).startsWith("java.lang.NullPointerException: BANG!");
-        assertThat(lines[3]).contains(
-                "at software.amazon.smithy.java.logging.JclLoggerIsolatedTest.levelTest(JclLoggerIsolatedTest.java:");
-    }
-
-    @Test
-    void dynamicLevelTest() {
-        InternalLogger logger = InternalLogger.getLogger(JclLoggerIsolatedTest.class);
-        JclLog.warnEnabled = false;
-        logger.log(InternalLogger.Level.ERROR, "test1");
-        logger.log(InternalLogger.Level.WARN, "test2: {}", "abc");
-        logger.log(
-                InternalLogger.Level.FATAL,
-                "{}: test3: {} {}",
-                "a",
-                "b",
-                "c",
-                new NullPointerException("BANG!"));
-
-        var lines = JclLog.BUFFER.toString().split(System.lineSeparator());
-        assertThat(lines).hasSizeGreaterThan(4);
-        assertThat(lines[0]).startsWith("ERROR test1");
-        assertThat(lines[1]).startsWith("FATAL a: test3: b c");
-        assertThat(lines[2]).startsWith("java.lang.NullPointerException: BANG!");
-        assertThat(lines[3]).contains(
-                "at software.amazon.smithy.java.logging.JclLoggerIsolatedTest.dynamicLevelTest(JclLoggerIsolatedTest.java:");
     }
 
     public static final class JclLogFactory extends LogFactory {
@@ -135,36 +91,22 @@ public class JclLoggerIsolatedTest {
 
         @Override
         public void debug(Object message) {
-            WRITER.write("DEBUG ");
-            WRITER.write(String.valueOf(message));
-            WRITER.write(System.lineSeparator());
+            write("DEBUG", message);
         }
 
         @Override
         public void debug(Object message, Throwable t) {
-            WRITER.write("DEBUG ");
-            WRITER.write(String.valueOf(message));
-            WRITER.write(System.lineSeparator());
-            if (t != null) {
-                t.printStackTrace(WRITER);
-            }
+            write("DEBUG", message, t);
         }
 
         @Override
         public void info(Object message) {
-            WRITER.write("INFO ");
-            WRITER.write(String.valueOf(message));
-            WRITER.write(System.lineSeparator());
+            write("INFO", message);
         }
 
         @Override
         public void info(Object message, Throwable t) {
-            WRITER.write("INFO ");
-            WRITER.write(String.valueOf(message));
-            WRITER.write(System.lineSeparator());
-            if (t != null) {
-                t.printStackTrace(WRITER);
-            }
+            write("INFO", message, t);
         }
 
         @Override
@@ -172,9 +114,7 @@ public class JclLoggerIsolatedTest {
             if (!warnEnabled) {
                 throw new IllegalStateException();
             }
-            WRITER.write("WARN ");
-            WRITER.write(String.valueOf(message));
-            WRITER.write(System.lineSeparator());
+            write("WARN", message);
         }
 
         @Override
@@ -182,41 +122,45 @@ public class JclLoggerIsolatedTest {
             if (!warnEnabled) {
                 throw new IllegalStateException();
             }
-            WRITER.write("WARN ");
-            WRITER.write(String.valueOf(message));
-            WRITER.write(System.lineSeparator());
-            if (t != null) {
-                t.printStackTrace(WRITER);
-            }
+            write("WARN", message, t);
         }
 
         @Override
         public void error(Object message) {
-            WRITER.write("ERROR ");
-            WRITER.write(String.valueOf(message));
-            WRITER.write(System.lineSeparator());
+            write("ERROR", message);
         }
 
         @Override
         public void error(Object message, Throwable t) {
-            WRITER.write("ERROR ");
-            WRITER.write(String.valueOf(message));
-            WRITER.write(System.lineSeparator());
-            if (t != null) {
-                t.printStackTrace(WRITER);
-            }
+            write("ERROR", message, t);
         }
 
         @Override
         public void fatal(Object message) {
-            WRITER.write("FATAL ");
-            WRITER.write(String.valueOf(message));
-            WRITER.write(System.lineSeparator());
+            write("FATAL", message);
         }
 
         @Override
         public void fatal(Object message, Throwable t) {
-            WRITER.write("FATAL ");
+            write("FATAL", message, t);
+        }
+
+        @Override
+        public void trace(Object message) {
+            write("TRACE", message);
+        }
+
+        @Override
+        public void trace(Object message, Throwable t) {
+            write("TRACE", message, t);
+        }
+
+        private void write(String level, Object message) {
+            write(level, message, null);
+        }
+
+        private void write(String level, Object message, Throwable t) {
+            WRITER.write(level + " ");
             WRITER.write(String.valueOf(message));
             WRITER.write(System.lineSeparator());
             if (t != null) {
@@ -246,19 +190,13 @@ public class JclLoggerIsolatedTest {
 
         @Override
         public boolean isTraceEnabled() {
-            return false;
+            return true;
         }
 
         @Override
         public boolean isWarnEnabled() {
             return warnEnabled;
         }
-
-        @Override
-        public void trace(Object message) {}
-
-        @Override
-        public void trace(Object message, Throwable t) {}
     }
 
 }

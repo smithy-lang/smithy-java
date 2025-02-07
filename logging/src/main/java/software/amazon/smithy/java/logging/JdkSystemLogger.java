@@ -174,13 +174,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p7
     ) {
         if (isEnabled(level)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
                 internalLog(
                         level,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
                         t);
             } else {
-                internalLog(level, ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}), null);
+                internalLog(level,
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
+                        null);
             }
         }
     }
@@ -200,13 +202,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p8
     ) {
         if (isEnabled(level)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
                 internalLog(
                         level,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         t);
             } else {
-                internalLog(level, ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}), null);
+                internalLog(level,
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
+                        null);
             }
         }
     }
@@ -377,15 +381,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p7
     ) {
         if (isEnabled(Level.TRACE)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
                 internalLog(
                         Level.TRACE,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
                         t);
             } else {
                 internalLog(
                         Level.TRACE,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         null);
             }
         }
@@ -405,15 +409,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p8
     ) {
         if (isEnabled(Level.TRACE)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
                 internalLog(
                         Level.TRACE,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         t);
             } else {
                 internalLog(
                         Level.TRACE,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         null);
             }
         }
@@ -437,7 +441,7 @@ final class JdkSystemLogger implements InternalLogger {
             if (ParameterFormatter.countArgumentPlaceholders(message) == 9 && p9 instanceof Throwable t) {
                 internalLog(
                         Level.TRACE,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         t);
             } else {
                 internalLog(
@@ -584,15 +588,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p7
     ) {
         if (isEnabled(Level.DEBUG)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
                 internalLog(
                         Level.DEBUG,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
                         t);
             } else {
                 internalLog(
                         Level.DEBUG,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         null);
             }
         }
@@ -612,15 +616,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p8
     ) {
         if (isEnabled(Level.DEBUG)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
                 internalLog(
                         Level.DEBUG,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         t);
             } else {
                 internalLog(
                         Level.DEBUG,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         null);
             }
         }
@@ -644,7 +648,7 @@ final class JdkSystemLogger implements InternalLogger {
             if (ParameterFormatter.countArgumentPlaceholders(message) == 9 && p9 instanceof Throwable t) {
                 internalLog(
                         Level.DEBUG,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         t);
             } else {
                 internalLog(
@@ -788,15 +792,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p7
     ) {
         if (isEnabled(Level.INFO)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
                 internalLog(
                         Level.INFO,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
                         t);
             } else {
                 internalLog(
                         Level.INFO,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         null);
             }
         }
@@ -816,15 +820,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p8
     ) {
         if (isEnabled(Level.INFO)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
                 internalLog(
                         Level.INFO,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         t);
             } else {
                 internalLog(
                         Level.INFO,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         null);
             }
         }
@@ -848,7 +852,7 @@ final class JdkSystemLogger implements InternalLogger {
             if (ParameterFormatter.countArgumentPlaceholders(message) == 9 && p9 instanceof Throwable t) {
                 internalLog(
                         Level.INFO,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         t);
             } else {
                 internalLog(
@@ -992,15 +996,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p7
     ) {
         if (isEnabled(Level.WARN)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
                 internalLog(
                         Level.WARN,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
                         t);
             } else {
                 internalLog(
                         Level.WARN,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         null);
             }
         }
@@ -1020,15 +1024,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p8
     ) {
         if (isEnabled(Level.WARN)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
                 internalLog(
                         Level.WARN,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         t);
             } else {
                 internalLog(
                         Level.WARN,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         null);
             }
         }
@@ -1052,7 +1056,7 @@ final class JdkSystemLogger implements InternalLogger {
             if (ParameterFormatter.countArgumentPlaceholders(message) == 9 && p9 instanceof Throwable t) {
                 internalLog(
                         Level.WARN,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         t);
             } else {
                 internalLog(
@@ -1199,15 +1203,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p7
     ) {
         if (isEnabled(Level.ERROR)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
                 internalLog(
                         Level.ERROR,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
                         t);
             } else {
                 internalLog(
                         Level.ERROR,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         null);
             }
         }
@@ -1227,15 +1231,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p8
     ) {
         if (isEnabled(Level.ERROR)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
                 internalLog(
                         Level.ERROR,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         t);
             } else {
                 internalLog(
                         Level.ERROR,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         null);
             }
         }
@@ -1259,7 +1263,7 @@ final class JdkSystemLogger implements InternalLogger {
             if (ParameterFormatter.countArgumentPlaceholders(message) == 9 && p9 instanceof Throwable t) {
                 internalLog(
                         Level.ERROR,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         t);
             } else {
                 internalLog(
@@ -1406,15 +1410,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p7
     ) {
         if (isEnabled(Level.FATAL)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
                 internalLog(
                         Level.FATAL,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
                         t);
             } else {
                 internalLog(
                         Level.FATAL,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         null);
             }
         }
@@ -1434,15 +1438,15 @@ final class JdkSystemLogger implements InternalLogger {
             Object p8
     ) {
         if (isEnabled(Level.FATAL)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
                 internalLog(
                         Level.FATAL,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         t);
             } else {
                 internalLog(
                         Level.FATAL,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         null);
             }
         }
@@ -1466,7 +1470,7 @@ final class JdkSystemLogger implements InternalLogger {
             if (ParameterFormatter.countArgumentPlaceholders(message) == 9 && p9 instanceof Throwable t) {
                 internalLog(
                         Level.FATAL,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         t);
             } else {
                 internalLog(

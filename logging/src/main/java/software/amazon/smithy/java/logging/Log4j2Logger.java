@@ -155,6 +155,6 @@ final class Log4j2Logger extends ExtendedLoggerWrapper implements InternalLogger
             Object p8,
             Object p9
     ) {
-        log(convert(level), message, p0, p1, p2, p3, p4, p5, p6, p7, p9);
+        log(convert(level), message, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9);
     }
 }

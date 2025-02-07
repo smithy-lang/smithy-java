@@ -5,22 +5,25 @@
 
 package software.amazon.smithy.java.logging;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import java.io.StringWriter;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.appender.WriterAppender;
 import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.filter.AbstractFilter;
 import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 
-public class Log4j2LoggerIsolatedTest {
+public class Log4j2LoggerIsolatedTest extends LoggerTestBase {
 
     private static final StringWriter WRITER = new StringWriter();
     private static WriterAppender APPENDER;
+    private static volatile boolean warnEnabled = true;
 
     @BeforeAll
     public static void setupLoggers() {
@@ -29,6 +32,15 @@ public class Log4j2LoggerIsolatedTest {
         cfg.getLoggerConfig("").setLevel(org.apache.logging.log4j.Level.TRACE);
         APPENDER = WriterAppender.newBuilder()
                 .setTarget(WRITER)
+                .setFilter(new AbstractFilter() {
+                    @Override
+                    public Result filter(LogEvent event) {
+                        if (event.getLevel() == Level.WARN) {
+                            return warnEnabled ? Result.NEUTRAL : Result.DENY;
+                        }
+                        return Result.NEUTRAL;
+                    }
+                })
                 .setName("Log4j2LoggerTestAppender")
                 .setLayout(PatternLayout.newBuilder().withPattern("%level %m%n").build())
                 .build();
@@ -49,43 +61,19 @@ public class Log4j2LoggerIsolatedTest {
         WRITER.getBuffer().setLength(0);
     }
 
-    @Test
-    void smokeTest() {
-        InternalLogger logger = InternalLogger.getLogger(Log4j2LoggerIsolatedTest.class);
-        logger.error("test1");
-        logger.warn("test2: {}", "abc");
-        logger.fatal("{}: test3: {} {}", "a", "b", "c", new NullPointerException("BANG!"));
-
-        var lines = WRITER.toString().split(System.lineSeparator());
-        assertThat(lines).hasSizeGreaterThan(5);
-        assertThat(lines[0]).startsWith("ERROR test1");
-        assertThat(lines[1]).startsWith("WARN test2: abc");
-        assertThat(lines[2]).startsWith("FATAL a: test3: b c");
-        assertThat(lines[3]).startsWith("java.lang.NullPointerException: BANG!");
-        assertThat(lines[4]).contains(
-                "at software.amazon.smithy.java.logging.Log4j2LoggerIsolatedTest.smokeTest(Log4j2LoggerIsolatedTest.java:");
+    @Override
+    protected List<String> getLogLines() {
+        return Arrays.asList(WRITER.toString().split(System.lineSeparator()));
     }
 
-    @Test
-    void dynamicLevelSmokeTest() {
-        InternalLogger logger = InternalLogger.getLogger(Log4j2LoggerIsolatedTest.class);
-        logger.log(InternalLogger.Level.ERROR, "test1");
-        logger.log(InternalLogger.Level.WARN, "test2: {}", "abc");
-        logger.log(
-                InternalLogger.Level.FATAL,
-                "{}: test3: {} {}",
-                "a",
-                "b",
-                "c",
-                new NullPointerException("BANG!"));
-
-        var lines = WRITER.toString().split(System.lineSeparator());
-        assertThat(lines).hasSizeGreaterThan(5);
-        assertThat(lines[0]).startsWith("ERROR test1");
-        assertThat(lines[1]).startsWith("WARN test2: abc");
-        assertThat(lines[2]).startsWith("FATAL a: test3: b c");
-        assertThat(lines[3]).startsWith("java.lang.NullPointerException: BANG!");
-        assertThat(lines[4]).contains(
-                "at software.amazon.smithy.java.logging.Log4j2LoggerIsolatedTest.dynamicLevelSmokeTest(Log4j2LoggerIsolatedTest.java:");
+    @Override
+    protected void disableWarnLevel() {
+        warnEnabled = false;
     }
+
+    @Override
+    protected void enableWarnLevel() {
+        warnEnabled = true;
+    }
+
 }

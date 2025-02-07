@@ -178,13 +178,15 @@ final class JclLogger implements InternalLogger {
             Object p7
     ) {
         if (isEnabled(level)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
                 internalLog(
                         level,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}),
                         t);
             } else {
-                internalLog(level, ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}), null);
+                internalLog(level,
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
+                        null);
             }
         }
     }
@@ -204,13 +206,15 @@ final class JclLogger implements InternalLogger {
             Object p8
     ) {
         if (isEnabled(level)) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
                 internalLog(
                         level,
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}),
                         t);
             } else {
-                internalLog(level, ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}), null);
+                internalLog(level,
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
+                        null);
             }
         }
     }
@@ -351,10 +355,10 @@ final class JclLogger implements InternalLogger {
             Object p7
     ) {
         if (log.isTraceEnabled()) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
-                log.trace(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}), t);
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
+                log.trace(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}), t);
             } else {
-                log.trace(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}));
+                log.trace(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}));
             }
         }
     }
@@ -373,10 +377,10 @@ final class JclLogger implements InternalLogger {
             Object p8
     ) {
         if (log.isTraceEnabled()) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
-                log.trace(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}), t);
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
+                log.trace(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}), t);
             } else {
-                log.trace(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}));
+                log.trace(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}));
             }
         }
     }
@@ -398,7 +402,7 @@ final class JclLogger implements InternalLogger {
         if (log.isTraceEnabled()) {
             if (ParameterFormatter.countArgumentPlaceholders(message) == 9 && p9 instanceof Throwable t) {
                 log.trace(
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         t);
             } else {
                 log.trace(
@@ -514,10 +518,10 @@ final class JclLogger implements InternalLogger {
             Object p7
     ) {
         if (log.isDebugEnabled()) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
-                log.debug(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}), t);
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
+                log.debug(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}), t);
             } else {
-                log.debug(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}));
+                log.debug(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}));
             }
         }
     }
@@ -536,10 +540,10 @@ final class JclLogger implements InternalLogger {
             Object p8
     ) {
         if (log.isDebugEnabled()) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
-                log.debug(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}), t);
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
+                log.debug(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}), t);
             } else {
-                log.debug(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}));
+                log.debug(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}));
             }
         }
     }
@@ -561,7 +565,7 @@ final class JclLogger implements InternalLogger {
         if (log.isDebugEnabled()) {
             if (ParameterFormatter.countArgumentPlaceholders(message) == 9 && p9 instanceof Throwable t) {
                 log.debug(
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         t);
             } else {
                 log.debug(
@@ -677,10 +681,10 @@ final class JclLogger implements InternalLogger {
             Object p7
     ) {
         if (log.isInfoEnabled()) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
-                log.info(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}), t);
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
+                log.info(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}), t);
             } else {
-                log.info(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}));
+                log.info(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}));
             }
         }
     }
@@ -699,10 +703,10 @@ final class JclLogger implements InternalLogger {
             Object p8
     ) {
         if (log.isInfoEnabled()) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
-                log.info(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}), t);
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
+                log.info(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}), t);
             } else {
-                log.info(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}));
+                log.info(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}));
             }
         }
     }
@@ -724,7 +728,7 @@ final class JclLogger implements InternalLogger {
         if (log.isInfoEnabled()) {
             if (ParameterFormatter.countArgumentPlaceholders(message) == 9 && p9 instanceof Throwable t) {
                 log.info(
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         t);
             } else {
                 log.info(
@@ -840,10 +844,10 @@ final class JclLogger implements InternalLogger {
             Object p7
     ) {
         if (log.isWarnEnabled()) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
-                log.warn(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}), t);
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
+                log.warn(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}), t);
             } else {
-                log.warn(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}));
+                log.warn(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}));
             }
         }
     }
@@ -862,10 +866,10 @@ final class JclLogger implements InternalLogger {
             Object p8
     ) {
         if (log.isWarnEnabled()) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
-                log.warn(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}), t);
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
+                log.warn(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}), t);
             } else {
-                log.warn(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}));
+                log.warn(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}));
             }
         }
     }
@@ -887,7 +891,7 @@ final class JclLogger implements InternalLogger {
         if (log.isWarnEnabled()) {
             if (ParameterFormatter.countArgumentPlaceholders(message) == 9 && p9 instanceof Throwable t) {
                 log.warn(
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         t);
             } else {
                 log.warn(
@@ -1002,10 +1006,10 @@ final class JclLogger implements InternalLogger {
             Object p7
     ) {
         if (log.isErrorEnabled()) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
-                log.error(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}), t);
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
+                log.error(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}), t);
             } else {
-                log.error(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}));
+                log.error(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}));
             }
         }
     }
@@ -1024,10 +1028,10 @@ final class JclLogger implements InternalLogger {
             Object p8
     ) {
         if (log.isErrorEnabled()) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
-                log.error(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}), t);
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
+                log.error(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}), t);
             } else {
-                log.error(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}));
+                log.error(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}));
             }
         }
     }
@@ -1049,7 +1053,7 @@ final class JclLogger implements InternalLogger {
         if (log.isErrorEnabled()) {
             if (ParameterFormatter.countArgumentPlaceholders(message) == 9 && p9 instanceof Throwable t) {
                 log.error(
-                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8, p9}),
+                        ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}),
                         t);
             } else {
                 log.error(
@@ -1165,10 +1169,10 @@ final class JclLogger implements InternalLogger {
             Object p7
     ) {
         if (log.isFatalEnabled()) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
-                log.fatal(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}), t);
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 7 && p7 instanceof Throwable t) {
+                log.fatal(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}), t);
             } else {
-                log.fatal(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}));
+                log.fatal(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}));
             }
         }
     }
@@ -1187,10 +1191,10 @@ final class JclLogger implements InternalLogger {
             Object p8
     ) {
         if (log.isFatalEnabled()) {
-            if (ParameterFormatter.countArgumentPlaceholders(message) == 6 && p6 instanceof Throwable t) {
-                log.fatal(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5}), t);
+            if (ParameterFormatter.countArgumentPlaceholders(message) == 8 && p8 instanceof Throwable t) {
+                log.fatal(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7}), t);
             } else {
-                log.fatal(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6}));
+                log.fatal(ParameterFormatter.format(message, new Object[] {p0, p1, p2, p3, p4, p5, p6, p7, p8}));
             }
         }
     }
