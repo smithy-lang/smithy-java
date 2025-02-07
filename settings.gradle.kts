@@ -59,10 +59,6 @@ include(":aws:client:aws-sdkv2-shapes")
 include(":aws:server:aws-server-restjson")
 include(":aws:integrations:lambda-endpoint")
 
-// Compatibility
-include(":aws:aws-sdkv2-retries")
-include(":aws:aws-sdkv2-shapes")
-
 // Examples
 include(":examples")
 include(":examples:basic-server")
