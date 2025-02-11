@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.dynamicclient;
+package software.amazon.smithy.java.dynamicschemas;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -23,17 +23,36 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 /**
- * A discriminator can be defined using "__type".
+ * A document implementation that also implements {@link SerializableStruct}.
+ *
+ * <p>A discriminator can be defined using "__type".
  *
  * <p>Note that this implementation does break the invariant of Document that {@link #serialize} always serializes
  * itself as a document, and then serializes the contents. That's because this implementation of Document is meant to
  * stand-in for a modeled value and not get serialized as a document.
- *
- * @param service The service shape ID used to provide a default namespace for discriminators.
- * @param schema Schema to use when reading or writing.
- * @param delegate Document data to read/write.
  */
-record WrappedDocument(ShapeId service, Schema schema, Document delegate) implements Document, SerializableStruct {
+public final class WrappedDocument implements Document, SerializableStruct {
+
+    private final Schema schema;
+    private final ShapeId service;
+    private final Document delegate;
+
+    /**
+     * @param schema Schema to use as the schema of the wrapped document.
+     * @param delegate The document to wrap.
+     * @param service The shape ID of a service, used to provide a default namespace to relative document shape IDs.
+     */
+    public WrappedDocument(Schema schema, Document delegate, ShapeId service) {
+        this.service = service;
+        this.schema = schema;
+        this.delegate = delegate;
+    }
+
+    @Override
+    public Schema schema() {
+        return schema;
+    }
+
     @Override
     public void serialize(ShapeSerializer serializer) {
         if (schema.type() == ShapeType.DOCUMENT) {
@@ -163,7 +182,7 @@ record WrappedDocument(ShapeId service, Schema schema, Document delegate) implem
         List<Document> result = new ArrayList<>(list.size());
         var member = schema.listMember();
         for (var value : list) {
-            result.add(new WrappedDocument(service, member, value));
+            result.add(new WrappedDocument(member, value, service));
         }
         return result;
     }
@@ -175,13 +194,13 @@ record WrappedDocument(ShapeId service, Schema schema, Document delegate) implem
         if (type() == ShapeType.MAP) {
             var member = schema.mapValueMember();
             for (var entry : map.entrySet()) {
-                wrapped.put(entry.getKey(), new WrappedDocument(service, member, entry.getValue()));
+                wrapped.put(entry.getKey(), new WrappedDocument(member, entry.getValue(), service));
             }
         } else {
             for (var entry : map.entrySet()) {
                 var member = schema.member(entry.getKey());
                 if (member != null) {
-                    wrapped.put(entry.getKey(), new WrappedDocument(service, member, entry.getValue()));
+                    wrapped.put(entry.getKey(), new WrappedDocument(member, entry.getValue(), service));
                 } else {
                     wrapped.put(entry.getKey(), entry.getValue());
                 }
@@ -202,7 +221,7 @@ record WrappedDocument(ShapeId service, Schema schema, Document delegate) implem
             return delegate.getMember(memberName);
         } else {
             var delegatedValue = delegate.getMember(memberName);
-            return delegatedValue == null ? null : new WrappedDocument(service, member, delegate.getMember(memberName));
+            return delegatedValue == null ? null : new WrappedDocument(member, delegate.getMember(memberName), service);
         }
     }
 

@@ -29,6 +29,8 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
+import software.amazon.smithy.java.dynamicschemas.WrappedDocument;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
@@ -176,7 +178,7 @@ public final class DynamicClient extends Client {
             RequestOverrideConfig overrideConfig
     ) {
         var apiOperation = getApiOperation(operation);
-        var inputStruct = new WrappedDocument(service.getId(), apiOperation.inputSchema(), input);
+        var inputStruct = new WrappedDocument(apiOperation.inputSchema(), input, service.getId());
         return call(inputStruct, apiOperation, overrideConfig).thenApply(Function.identity());
     }
 
@@ -192,7 +194,7 @@ public final class DynamicClient extends Client {
         if (value.type() != ShapeType.MAP && value.type() != ShapeType.STRUCTURE) {
             throw new IllegalArgumentException("Document value must be a map or structure, found " + value.type());
         }
-        return new WrappedDocument(service.getId(), schema, value);
+        return new WrappedDocument(schema, value, service.getId());
     }
 
     private ApiOperation<WrappedDocument, WrappedDocument> getApiOperation(String name) {

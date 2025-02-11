@@ -11,6 +11,8 @@ import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
+import software.amazon.smithy.java.dynamicschemas.WrappedDocument;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -52,11 +54,11 @@ public final class DocumentException extends ModeledException {
     static final class SchemaGuidedExceptionBuilder implements ShapeBuilder<ModeledException> {
 
         private final Schema target;
-        private final SchemaGuidedDocumentBuilder delegateBuilder;
+        private final ShapeBuilder<WrappedDocument> delegateBuilder;
 
         SchemaGuidedExceptionBuilder(ShapeId service, Schema target) {
             this.target = target;
-            this.delegateBuilder = new SchemaGuidedDocumentBuilder(service, target);
+            this.delegateBuilder = SchemaConverter.createDocumentBuilder(target, service);
         }
 
         @Override

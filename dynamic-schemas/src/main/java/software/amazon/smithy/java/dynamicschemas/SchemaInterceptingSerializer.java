@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.dynamicclient;
+package software.amazon.smithy.java.dynamicschemas;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -33,7 +33,7 @@ final class SchemaInterceptingSerializer implements ShapeSerializer {
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         delegateSerializer
-                .writeStruct(delegateSchema, new WrappedDocument(service, schema, Document.of(struct)));
+                .writeStruct(delegateSchema, new WrappedDocument(schema, Document.of(struct), service));
     }
 
     @Override

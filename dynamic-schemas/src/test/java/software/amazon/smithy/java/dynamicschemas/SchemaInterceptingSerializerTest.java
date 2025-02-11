@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.dynamicclient;
+package software.amazon.smithy.java.dynamicschemas;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -96,7 +96,7 @@ public class SchemaInterceptingSerializerTest {
     public void interceptsWithSchema(String name, Document value) {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#" + name)));
-        var wrapped = new WrappedDocument(ShapeId.from("smithy.example#S"), schema, value);
+        var wrapped = new WrappedDocument(schema, value, ShapeId.from("smithy.example#S"));
 
         Schema[] written = new Schema[1];
 
@@ -134,9 +134,9 @@ public class SchemaInterceptingSerializerTest {
         var converter = new SchemaConverter(model);
         var listSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleList")));
         var wrapped = new WrappedDocument(
-                ShapeId.from("smithy.example#S"),
                 listSchema,
-                Document.of(Arrays.asList(Document.of("a"), null)));
+                Document.of(Arrays.asList(Document.of("a"), null)),
+                ShapeId.from("smithy.example#S"));
 
         wrapped.serialize(new SpecificShapeSerializer() {
             @Override
@@ -163,9 +163,9 @@ public class SchemaInterceptingSerializerTest {
         var converter = new SchemaConverter(model);
         var mapSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleMap")));
         var wrapped = new WrappedDocument(
-                ShapeId.from("smithy.example#S"),
                 mapSchema,
-                Document.ofObject(Map.of("foo", "bar")));
+                Document.ofObject(Map.of("foo", "bar")),
+                ShapeId.from("smithy.example#S"));
 
         wrapped.serialize(new SpecificShapeSerializer() {
             @Override
@@ -201,9 +201,9 @@ public class SchemaInterceptingSerializerTest {
         var converter = new SchemaConverter(model);
         var mapSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#DocumentMap")));
         var wrapped = new WrappedDocument(
-                ShapeId.from("smithy.example#S"),
                 mapSchema,
-                Document.ofObject(Map.of("foo", "bar")));
+                Document.ofObject(Map.of("foo", "bar")),
+                ShapeId.from("smithy.example#S"));
 
         wrapped.serialize(new SpecificShapeSerializer() {
             @Override
@@ -239,14 +239,14 @@ public class SchemaInterceptingSerializerTest {
         var converter = new SchemaConverter(model);
         var structSchema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
         var wrapped = new WrappedDocument(
-                ShapeId.from("smithy.example#S"),
                 structSchema,
                 Document.ofObject(
                         Map.of(
                                 "foo",
                                 "bar",
                                 "baz",
-                                Document.ofObject(Map.of("foo", "hi")))));
+                                Document.ofObject(Map.of("foo", "hi")))),
+                ShapeId.from("smithy.example#S"));
 
         wrapped.serialize(new SpecificShapeSerializer() {
             @Override

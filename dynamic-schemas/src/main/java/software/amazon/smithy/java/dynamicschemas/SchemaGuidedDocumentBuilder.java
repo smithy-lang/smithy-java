@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.dynamicclient;
+package software.amazon.smithy.java.dynamicschemas;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,9 +23,9 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<WrappedDocument>
     private Document result;
     private final Map<String, Document> map;
 
-    SchemaGuidedDocumentBuilder(ShapeId service, Schema target) {
-        this.service = service;
+    SchemaGuidedDocumentBuilder(Schema target, ShapeId service) {
         this.target = target;
+        this.service = service;
         this.map = switch (target.type()) {
             case STRUCTURE, UNION, MAP -> new HashMap<>();
             default -> null;
@@ -43,9 +43,9 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<WrappedDocument>
             if (map.isEmpty() && target.type() == ShapeType.UNION) {
                 throw new IllegalArgumentException("No value set for union document: " + schema().id());
             }
-            return new WrappedDocument(service, target, Document.of(map));
+            return new WrappedDocument(target, Document.of(map), service);
         } else if (result != null) {
-            return new WrappedDocument(service, target, result);
+            return new WrappedDocument(target, result, service);
         } else {
             throw new IllegalArgumentException("No value was set on document builder for " + schema().id());
         }

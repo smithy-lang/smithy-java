@@ -12,6 +12,8 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
+import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
+import software.amazon.smithy.java.dynamicschemas.WrappedDocument;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDocument> {
@@ -69,12 +71,12 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
 
     @Override
     public ShapeBuilder<WrappedDocument> inputBuilder() {
-        return new SchemaGuidedDocumentBuilder(service, inputSchema());
+        return SchemaConverter.createDocumentBuilder(inputSchema(), service);
     }
 
     @Override
     public ShapeBuilder<WrappedDocument> outputBuilder() {
-        return new SchemaGuidedDocumentBuilder(service, outputSchema());
+        return SchemaConverter.createDocumentBuilder(outputSchema(), service);
     }
 
     @Override

@@ -52,12 +52,12 @@
 
     <Match>
         <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
-        <Class name="software.amazon.smithy.java.dynamicclient.SchemaGuidedDocumentBuilder$SchemaList"/>
+        <Class name="software.amazon.smithy.java.dynamicschemas.SchemaGuidedDocumentBuilder$SchemaList"/>
     </Match>
 
     <Match>
         <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
-        <Class name="software.amazon.smithy.java.dynamicclient.SchemaGuidedDocumentBuilder$SchemaMap"/>
+        <Class name="software.amazon.smithy.java.dynamicschemas.SchemaGuidedDocumentBuilder$SchemaMap"/>
     </Match>
 
     <Match>

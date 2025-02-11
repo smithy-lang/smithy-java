@@ -5,6 +5,7 @@ include(":logging")
 include(":context")
 include(":io")
 include(":core")
+include(":dynamic-schemas")
 
 // Common components
 include(":auth-api")

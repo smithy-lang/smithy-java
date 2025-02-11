@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.dynamicclient;
+package software.amazon.smithy.java.dynamicschemas;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -14,23 +14,47 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaBuilder;
+import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.Trait;
 
-final class SchemaConverter {
+/**
+ * Converts {@link Shape}s to {@link Schema}s.
+ */
+public final class SchemaConverter {
 
     private final Model model;
     private final ConcurrentMap<Shape, Schema> schemas = new ConcurrentHashMap<>();
     private final Map<Shape, SchemaBuilder> recursiveBuilders = Collections.synchronizedMap(new HashMap<>());
 
-    SchemaConverter(Model model) {
+    /**
+     * @param model Model used when converting shapes to schemas.
+     */
+    public SchemaConverter(Model model) {
         this.model = model;
     }
 
-    Schema getSchema(Shape shape) {
+    /**
+     * Create a schema-guided document shape builder.
+     *
+     * @param schema Schema used to inform deserialization.
+     * @param serviceId The shape ID of the service that is used to provide default namespaces for relative shape IDs.
+     * @return the created shape builder.
+     */
+    public static ShapeBuilder<WrappedDocument> createDocumentBuilder(Schema schema, ShapeId serviceId) {
+        return new SchemaGuidedDocumentBuilder(schema, serviceId);
+    }
+
+    /**
+     * Get the converted {@link Schema} of a Smithy {@link Shape}.
+     *
+     * @param shape Shape to get the converted schema from.
+     * @return the converted schema.
+     */
+    public Schema getSchema(Shape shape) {
         // Aggregate shapes are re-entrant and may need to recursively set values in the CHM.
         var result = schemas.get(shape);
 

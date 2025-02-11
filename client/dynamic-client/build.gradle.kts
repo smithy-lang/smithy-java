@@ -8,6 +8,7 @@ extra["displayName"] = "Smithy :: Java :: Dynamic client"
 extra["moduleName"] = "software.amazon.smithy.java.dynamicclient"
 
 dependencies {
+    api(project(":dynamic-schemas"))
     api(project(":client:client-core"))
 
     testImplementation(project(":aws:client:aws-client-restjson"))

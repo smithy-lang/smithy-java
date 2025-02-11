@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.dynamicclient;
+package software.amazon.smithy.java.dynamicschemas;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -96,7 +96,7 @@ public class SchemaGuidedDocumentBuilderTest {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#" + name)));
 
-        var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
+        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
         source.deserializeInto(builder);
 
         var result = builder.build();
@@ -111,7 +111,7 @@ public class SchemaGuidedDocumentBuilderTest {
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
         var document = Document.ofObject(Map.of("foo", "bar"));
 
-        var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
+        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
         builder.deserializeMember(new DocumentDeserializer(document), schema.member("baz"));
 
         var result = builder.build();
@@ -125,7 +125,7 @@ public class SchemaGuidedDocumentBuilderTest {
         var converter = new SchemaConverter(model);
         var member = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct"))).member("foo");
         var schema = PreludeSchemas.STRING;
-        var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
+        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> builder.setMemberValue(member, "x"));
     }
@@ -134,7 +134,7 @@ public class SchemaGuidedDocumentBuilderTest {
     public void deserializesMultipleMembersUsingDocuments() {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
-        var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
+        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
 
         builder.setMemberValue(schema.member("foo"), Document.of("bar1"));
         builder.setMemberValue(schema.member("baz"), Document.ofObject(Map.of("foo", "bar2")));
@@ -149,7 +149,7 @@ public class SchemaGuidedDocumentBuilderTest {
     public void deserializesMultipleMembersUsingObjects() {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
-        var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
+        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
 
         builder.setMemberValue(schema.member("foo"), "bar1");
         builder.setMemberValue(schema.member("baz"), Map.of("foo", "bar2"));
@@ -165,7 +165,7 @@ public class SchemaGuidedDocumentBuilderTest {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
         var member = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleMap"))).member("key");
-        var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
+        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> builder.setMemberValue(member, "bar1"));
     }
@@ -175,7 +175,7 @@ public class SchemaGuidedDocumentBuilderTest {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleList")));
         var member = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleList"))).member("member");
-        var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
+        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> builder.setMemberValue(member, "bar1"));
     }
@@ -184,7 +184,7 @@ public class SchemaGuidedDocumentBuilderTest {
     public void throwsWhenNoValueSetForScalar() {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleList")));
-        var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
+        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
 
         Assertions.assertThrows(IllegalArgumentException.class, builder::build);
     }
@@ -193,7 +193,7 @@ public class SchemaGuidedDocumentBuilderTest {
     public void throwsWhenNoValueSetForUnion() {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleUnion")));
-        var builder = new SchemaGuidedDocumentBuilder(ShapeId.from("smithy.example#Foo"), schema);
+        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
 
         Assertions.assertThrows(IllegalArgumentException.class, builder::build);
     }
