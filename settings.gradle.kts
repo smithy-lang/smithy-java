@@ -10,7 +10,7 @@ include(":dynamic-schemas")
 // Common components
 include(":auth-api")
 include(":retries-api")
-include(":tracing-api")
+include(":metrics:metrics-api")
 include(":http-api")
 include(":http-binding")
 include(":framework-errors")
