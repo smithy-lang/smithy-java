@@ -35,7 +35,10 @@ public class RpcV2CborProtocolTests {
     @HttpClientResponseTests
     @ProtocolTestFilter(
             skipTests = {
-                    "RpcV2CborClientPopulatesDefaultsValuesWhenMissingInResponse"
+                    "RpcV2CborClientPopulatesDefaultsValuesWhenMissingInResponse",
+                    "RpcV2CborInvalidGreetingError",
+                    "RpcV2CborEmptyComplexError",
+                    "RpcV2CborComplexError"
             })
     public void responseTest(Runnable test) {
         test.run();

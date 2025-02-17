@@ -314,21 +314,20 @@ public final class ProtocolTestExtension implements BeforeAllCallback, AfterAllC
                 });
                 for (var errorId : operation.getErrors()) {
                     var error = serviceModel.getShape(errorId);
-                    if (error.map(Shape::isStructureShape).orElse(false)) {
-                        continue;
-                    }
-                    var errorShape = error.get().asStructureShape().get();
-                    errorShape.getTrait(HttpResponseTestsTrait.class).ifPresent(httpResponseTestsTrait -> {
-                        for (var testCase : httpResponseTestsTrait.getTestCases()) {
-                            if (testTypeFiler.test(testCase)) {
-                                responseTestsCases.add(
-                                        new HttpResponseProtocolTestCase(
-                                                testCase,
-                                                true,
-                                                getApiExceptionBuilder(symbolProvider, errorShape)));
+                    if (error.isPresent() && error.get().isStructureShape()) {
+                        var errorShape = error.get().asStructureShape().get();
+                        errorShape.getTrait(HttpResponseTestsTrait.class).ifPresent(httpResponseTestsTrait -> {
+                            for (var testCase : httpResponseTestsTrait.getTestCases()) {
+                                if (testTypeFiler.test(testCase)) {
+                                    responseTestsCases.add(
+                                            new HttpResponseProtocolTestCase(
+                                                    testCase,
+                                                    true,
+                                                    getApiExceptionBuilder(symbolProvider, errorShape)));
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                 }
                 operation.getTrait(HttpMalformedRequestTestsTrait.class)
                         .map(HttpMalformedRequestTestsTrait::getTestCases)

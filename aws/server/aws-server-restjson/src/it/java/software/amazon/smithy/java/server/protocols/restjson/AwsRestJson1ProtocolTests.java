@@ -73,7 +73,10 @@ public class AwsRestJson1ProtocolTests {
                     "RestJsonStreamingTraitsWithMediaTypeWithBlob",
                     "RestJsonDeserializesDenseSetMapAndSkipsNull",
                     "RestJsonServerPopulatesDefaultsInResponseWhenMissingInParams",
+                    // These can be fixed after https://github.com/smithy-lang/smithy-java/blob/main/http-binding/src/main/java/software/amazon/smithy/java/http/binding/HttpBindingSerializer.java#L109
                     "RestJsonInvalidGreetingError",
+                    "RestJsonComplexErrorWithNoMessage",
+                    "RestJsonEmptyComplexErrorWithNoMessage",
                     //TODO this breaks because of Validation and errorCorrection doesn't handle that.
                     "RestJsonServerPopulatesNestedDefaultValuesWhenMissingInInResponseParams"
 
