@@ -15,6 +15,7 @@ aws-sdk = "2.30.38"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 jreleaser = "1.17.0"
+otel = "1.47.0"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -36,6 +37,9 @@ aws-sdkcore = {module = "software.amazon.awssdk:sdk-core", version.ref = "aws-sd
 jackson-core = {module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson"}
 
 netty-all = {module = "io.netty:netty-all", version.ref = "netty"}
+
+# OTeL
+otel-api = {module = "io.opentelemetry:opentelemetry-api", version.ref = "otel"}
 
 # Test dependencies
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit5" }
