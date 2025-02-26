@@ -1,3 +1,5 @@
+
+
 plugins {
     id("smithy-java.module-conventions")
 }
@@ -21,6 +23,7 @@ dependencies {
     implementation(project(":codecs:json-codec"))
     implementation(libs.assertj.core)
 
+    api(platform(libs.junit.bom))
     api(libs.junit.jupiter.api)
     api(libs.junit.jupiter.engine)
     api(libs.junit.jupiter.params)
