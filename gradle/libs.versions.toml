@@ -5,7 +5,7 @@ smithy = "1.54.0"
 jmh = "0.7.3"
 test-logger-plugin = "4.0.0"
 spotbugs = "6.0.22"
-spotless = "6.25.0"
+spotless = "7.0.2"
 smithy-gradle-plugins = "1.2.0"
 assertj = "3.27.3"
 jackson = "2.18.2"
@@ -39,9 +39,10 @@ netty-all = {module = "io.netty:netty-all", version.ref = "netty"}
 
 # Test dependencies
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit5" }
-junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit5" }
-junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit5" }
-junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit5" }
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
+junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine" }
+junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 hamcrest = { module = "org.hamcrest:hamcrest", version.ref = "hamcrest" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj"}
 
