@@ -28,6 +28,7 @@ include(":client:client-rpcv2-cbor")
 include(":client:dynamic-client")
 include(":client:mock-client-plugin")
 include(":client:waiters")
+include(":client:dynamic-client-cli")
 
 // Server
 include(":server:server-api")
