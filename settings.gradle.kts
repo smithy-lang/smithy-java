@@ -35,6 +35,11 @@ include(":server:server-core")
 include(":server:server-netty")
 include(":server:server-rpcv2-cbor")
 
+// CLI
+// TODO: Some of the cli core could be broken out into a cli-api
+//       package for making Plugins
+include(":cli:cli-core")
+
 // Codegen
 include(":codegen:core")
 include(":codegen:plugins")

@@ -78,7 +78,7 @@ public sealed interface TimestampResolver {
         private final ConcurrentHashMap<Schema, TimestampFormatter> cache = new ConcurrentHashMap<>();
         private final TimestampFormatter defaultFormat;
 
-        UseTimestampFormatTrait(TimestampFormatter defaultFormat) {
+        public UseTimestampFormatTrait(TimestampFormatter defaultFormat) {
             this.defaultFormat = defaultFormat;
         }
 
