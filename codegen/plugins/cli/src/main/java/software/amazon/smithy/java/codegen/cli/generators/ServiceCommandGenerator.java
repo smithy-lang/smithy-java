@@ -26,6 +26,7 @@ import software.amazon.smithy.java.client.core.Client;
 import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ClientTransport;
+import software.amazon.smithy.java.client.core.ClientTransportFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
@@ -53,10 +54,15 @@ public class ServiceCommandGenerator
     private static final InternalLogger LOGGER = InternalLogger.getLogger(ServiceCommandGenerator.class);
 
     private static final Map<ShapeId, Class<? extends AuthSchemeFactory>> authSchemeFactories = new HashMap<>();
+    private static final Map<String, Class<? extends ClientTransportFactory>> clientTransportFactories =
+            new HashMap<>();
     static {
         // Add all trait services to a map, so they can be queried for a provider class
         ServiceLoader.load(AuthSchemeFactory.class, ServiceCommandGenerator.class.getClassLoader())
                 .forEach((service) -> authSchemeFactories.put(service.schemeId(), service.getClass()));
+        // Add all transport services to a map, so they can be queried for a provider class
+        ServiceLoader.load(ClientTransportFactory.class, ServiceCommandGenerator.class.getClassLoader())
+                .forEach((service) -> clientTransportFactories.put(service.name(), service.getClass()));
     }
 
     @Override
@@ -77,7 +83,7 @@ public class ServiceCommandGenerator
 
                                         public ${shape:T}(${string:T} parent) {
                                             this.parent = parent;${#operations}
-                                            addCommand(new ${operationCmd:T}<>(parent == null ? ${name:S} : parent + " " + ${name:S}, ${key:S}, new ${value:T}()));${/operations}
+                                            addCommand(new ${operationCmd:T}<>(parent == null ? ${name:S} : parent + " " + ${name:S}, ${key:S}, ${value:T}.instance()));${/operations}
                                         }
 
                                         @Override
@@ -99,9 +105,9 @@ public class ServiceCommandGenerator
                                         @Override
                                         public void modifyEnv(${cmd:T}.Env env) {
                                             env.clientBuilder()
-                                                .putConfig(${client:T}.SERVICE_KEY, ${name:S})
-                                                .protocol(${protocolFactory:C}.createProtocol(settings, protocolTrait))
-                                                .transport(new ${transport:T}())${?hasDefaultSchemes}
+                                                .putConfig(${client:T}.SERVICE_KEY, ${name:S})${?hasDefaultProtocol}
+                                                .protocol(${protocolFactory:C}.createProtocol(settings, protocolTrait))${/hasDefaultProtocol}${?hasDefaultTransport}
+                                                .transport(new ${transport:T}())${/hasDefaultTransport}${?hasDefaultSchemes}
                                                 .putSupportedAuthSchemes(${authFactories:C})${/hasDefaultSchemes}${?hasDefaultPlugins}
                                                 ${plugins:C|}${/hasDefaultPlugins};
                                         }
@@ -118,12 +124,12 @@ public class ServiceCommandGenerator
                     writer.putContext("helpPath", "/" + directive.settings().name());
                     writer.putContext("operationCmd", OperationCommand.class);
                     writer.putContext("smithyGenerated", SmithyGenerated.class);
+                    writer.putContext("hasDefaultTransport", directive.settings().transport() != null);
                     var operationMap = getOperationMap(
                             directive.operations(),
                             directive.symbolProvider(),
                             directive.service());
                     writer.putContext("operations", operationMap);
-
                     writer.putContext(
                             "description",
                             directive.shape().getTrait(TitleTrait.class).map(TitleTrait::getValue));
@@ -131,6 +137,7 @@ public class ServiceCommandGenerator
                     // TODO: Consolidate logic for this with client generator?
                     // DEFAULT PROTOCOLS
                     var defaultProtocolTrait = getDefaultProtocolTrait(directive.model(), directive.settings());
+                    writer.putContext("hasDefaultProtocol", defaultProtocolTrait != null);
                     writer.putContext(
                             "defaultProtocolTrait",
                             new DefaultProtocolTraitGenerator(
@@ -254,15 +261,8 @@ public class ServiceCommandGenerator
         if (settings.transport() == null) {
             return null;
         }
-        // Use one of the built-in transports
-        if (settings.transport().equals("http-java")) {
-            return JavaHttpClientTransport.class;
-        } else if (settings.transport().equals("http-netty")) {
-            // TODO: Add netty transport once supported
-            throw new CodegenException("Netty default transport not yet supported");
-        }
+        // TODO: Actually instantiate with factory
 
-        // TODO: Handle custom transports
         throw new UnsupportedOperationException("Custom default transports not yet supported");
     }
 

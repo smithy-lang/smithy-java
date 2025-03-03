@@ -23,7 +23,7 @@ import software.amazon.smithy.model.Model;
 public class JavaCliCodegenPlugin implements SmithyBuildPlugin {
     @Override
     public String getName() {
-        return "cli-codegen";
+        return "java-cli-codegen";
     }
 
     @Override

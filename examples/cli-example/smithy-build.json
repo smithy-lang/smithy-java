@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "plugins": {
+    "java-cli-codegen": {
+      "name": "cafe",
+      "namespace": "com.example.cafe",
+      "endpoint": "http://localhost:8888",
+      "standalone": true,
+      "services": {
+        "cafe": {
+          "service": "com.example#CoffeeShop",
+          "protocol": "aws.protocols#restJson1"
+        }
+      }
+    }
+  }
+}

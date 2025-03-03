@@ -8,9 +8,12 @@ extra["displayName"] = "Smithy :: Java :: CLI Core"
 extra["moduleName"] = "software.amazon.smithy.java.cli.core"
 
 dependencies {
-    api(project(":client:client-core"))
+    implementation(project(":client:client-core"))
     // For parsing provided args
     implementation(project(":codecs:json-codec"))
+    // TODO: Ideally we would support this based on a CLI plugin or some sort of CLI-http package
+    //       rather than tying the CLI to http this way.
+    //
     implementation(project(":http-api"))
     // Used to handle input parsing for now.
     // TODO: Replace this with an updated, custom input parser

@@ -28,6 +28,8 @@ public final class EntryPointGenerator implements Consumer<EntryPointGenerationC
     @Override
     public void accept(EntryPointGenerationContext context) {
         var symbol = getEntrypointSymbol(context.settings());
+        // Workaround to add this file to at least one context for writer flush
+        context.settings().settings().get(0).addSymbol(symbol);
         context.writerDelegator().useSymbolWriter(symbol, writer -> {
             writer.pushState();
             var template = """

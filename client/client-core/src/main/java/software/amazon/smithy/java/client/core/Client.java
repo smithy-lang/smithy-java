@@ -28,6 +28,9 @@ import software.amazon.smithy.utils.SmithyInternalApi;
  */
 public abstract class Client {
 
+    // TODO: This is probably unecessary if we just add Schema to the clients.
+    public static final Context.Key<String> SERVICE_KEY = Context.key("service name");
+
     private final ClientConfig config;
     private final ClientPipeline<?, ?> pipeline;
     private final TypeRegistry typeRegistry;

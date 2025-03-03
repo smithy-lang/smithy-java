@@ -114,6 +114,7 @@ public class CliCodegenSettings {
             var objectNode = serviceEntry.getValue().expectObjectNode();
             objectNode.warnIfAdditionalProperties(SERVICE_PROPERTIES)
                     .expectStringMember(SERVICE, builder::service)
+                    // TODO: Ideally this wouldnt be required
                     .expectStringMember(PROTOCOL, builder::defaultProtocol)
                     .getArrayMember(DEFAULT_PLUGINS, n -> n.expectStringNode().getValue(), builder::defaultPlugins);
 
