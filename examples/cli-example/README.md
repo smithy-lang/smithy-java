@@ -22,5 +22,5 @@ Now, check the generated CLI works:
 And then use the generated CLI to call our Cafe service: 
 
 ```console
-
+./examples/cli-example/build/native/nativeCompile/cafe create-order --coffee-type COLD_BREW
 ```
