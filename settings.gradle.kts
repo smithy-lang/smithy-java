@@ -46,6 +46,7 @@ include(":codegen:plugins")
 include(":codegen:plugins:client")
 include(":codegen:plugins:server")
 include(":codegen:plugins:types")
+include(":codegen:plugins:cli")
 include(":codegen:integrations:waiters-codegen")
 
 // Utilities
