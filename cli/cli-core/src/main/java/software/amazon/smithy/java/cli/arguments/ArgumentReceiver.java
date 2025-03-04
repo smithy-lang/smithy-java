@@ -56,6 +56,12 @@ public interface ArgumentReceiver {
      */
     Map<Flag, String> flags();
 
+    /**
+     * Defines an argument flag.
+     *
+     * @param longFlag Long version of the flag, i.e. --long (REQUIRED).
+     * @param shortFlag Short version of the flag, i.e. -l (optional).
+     */
     record Flag(String longFlag, String shortFlag) {
         public Flag(String longFlag) {
             this(longFlag, null);

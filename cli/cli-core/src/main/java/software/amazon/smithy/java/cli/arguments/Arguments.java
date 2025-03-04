@@ -17,6 +17,8 @@ import software.amazon.smithy.java.cli.CliError;
  * known before {@link #complete()} is called.
  */
 // TODO: Maybe make this an iterator?
+// TODO: In the smithy cli we use a logging args wrapper. If we dont need that (see CLI class) then this doesnt need
+//       to be an interface
 public interface Arguments {
 
     static Arguments of(String[] args, Env env) {

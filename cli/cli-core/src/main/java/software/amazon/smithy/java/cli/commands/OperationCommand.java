@@ -94,7 +94,7 @@ public final class OperationCommand<I extends SerializableStruct, O extends Seri
             // Top-level inputs
             buffer.println("Inputs:", theme.title());
             for (var memberSchema : operation.inputSchema().members()) {
-                // TODO: handle nicely spacing these
+                // TODO: nicely space these
                 var memberStyle = memberSchema.hasTrait(TraitKey.get(DeprecatedTrait.class))
                         ? theme.deprecated()
                         : theme.literal();
@@ -106,7 +106,7 @@ public final class OperationCommand<I extends SerializableStruct, O extends Seri
             }
 
             // Flags
-            CliUtils.printFlags(buffer, formatter, theme, args);
+            Command.printFlags(buffer, formatter, theme, args);
         }
     }
 

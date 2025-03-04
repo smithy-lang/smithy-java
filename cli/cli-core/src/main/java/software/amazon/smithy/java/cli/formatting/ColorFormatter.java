@@ -66,12 +66,6 @@ public sealed interface ColorFormatter permits AnsiColorFormatter, ColorFormatte
         style(appendable, text + System.lineSeparator(), styles);
     }
 
-    /**
-     * TODO: DOCS
-     * @param appendable
-     * @param throwable
-     * @param styles
-     */
     default void printException(Appendable appendable, Throwable throwable, Style... styles) {
         println(appendable, throwable.getMessage(), styles);
     }

@@ -8,7 +8,6 @@ package software.amazon.smithy.java.cli;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -23,8 +22,7 @@ import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
- * CLI executor.
- * TODO: Docs
+ * Base class for all Smithy Java CLIs.
  */
 @SmithyInternalApi
 public final class CLI {
@@ -61,9 +59,6 @@ public final class CLI {
         } catch (CliError e) {
             System.exit(e.code);
         } catch (Exception e) {
-            //TODO: Remove?
-            System.out.println("EXIT CODE: " + e);
-            System.out.println("ERROR: " + Arrays.toString(e.getStackTrace()));
             System.exit(1);
         }
     }
@@ -86,7 +81,7 @@ public final class CLI {
         }
 
         // Initialize arguments container.
-        // TODO: Do we need logging args wrapper?
+        // TODO: Do we need logging args wrapper like in Smithy CLI?
         var argEnv = new Arguments.Env(clientBuilder);
         var arguments = Arguments.of(args, argEnv);
         // Add defaults available to all commands

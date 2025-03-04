@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import software.amazon.smithy.java.cli.CliError;
-import software.amazon.smithy.java.cli.CliUtils;
 import software.amazon.smithy.java.cli.StandardOptions;
 import software.amazon.smithy.java.cli.arguments.Arguments;
 import software.amazon.smithy.java.cli.formatting.CliPrinter;
@@ -117,7 +116,7 @@ public abstract class AggregateCommand implements Command {
             }
 
             // Flags
-            CliUtils.printFlags(buffer, formatter, theme, args);
+            Command.printFlags(buffer, formatter, theme, args);
         }
     }
 

@@ -120,23 +120,7 @@ public enum AnsiColorFormatter implements ColorFormatter {
     }
 
     private static boolean isAnsiEnabled() {
-        //        if (EnvironmentVariable.FORCE_COLOR.isSet()) {
-        //            return true;
-        //        }
-        //
-        //        // Disable colors if NO_COLOR is set to anything.
-        //        if (EnvironmentVariable.NO_COLOR.isSet()) {
-        //            return false;
-        //        }
-        //
-        //        String term = EnvironmentVariable.TERM.get();
-
         // If Windows is detected, then don't use colors.
-        if (System.getProperty("os.name").contains("win")) {
-            return false;
-        }
-
-        // Disable colors if no console is associated.
-        return true; // System.console() != null
+        return !System.getProperty("os.name").contains("win");
     }
 }

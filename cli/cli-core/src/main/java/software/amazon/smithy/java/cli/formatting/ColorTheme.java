@@ -7,6 +7,8 @@ package software.amazon.smithy.java.cli.formatting;
 
 /**
  * Standardizes on colors across commands.
+ *
+ * <p>Implement a custom version of this class to customize the color theme of your CLI.
  */
 public interface ColorTheme {
 

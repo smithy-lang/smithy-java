@@ -16,6 +16,12 @@ import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 
+
+/**
+ * Prints out the wire request/response for debugging.
+ *
+ * <p>Formatting is intended to be similar to curl debug.
+ */
 // TODO: Support other protocols
 record DebuggingInterceptor(ColorFormatter formatter, CliPrinter printer)
         implements ClientInterceptor {

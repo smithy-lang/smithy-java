@@ -18,7 +18,7 @@ import software.amazon.smithy.java.cli.formatting.OutputShapeFormatter;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 
 /**
- * Logging Options available to all commands.
+ * Common Options available to all commands.
  */
 public final class StandardOptions implements ArgumentReceiver {
 

@@ -26,9 +26,8 @@ import software.amazon.smithy.java.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.TimestampResolver;
 
-// TODO: Make a specific shape deserializer base class
 // TODO: it might be possible to re-use some of the existing parsing.
-// TODO: This might be better as a document implementation?
+// TODO: This might be better as a document implementation? Might also work with dynamic then?
 public class CliArgumentDeserializer implements ShapeDeserializer {
     private final Map<Schema, List<String>> memberArgs = new HashMap<>();
 
