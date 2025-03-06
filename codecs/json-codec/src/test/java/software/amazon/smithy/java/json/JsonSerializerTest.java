@@ -67,8 +67,6 @@ public class JsonSerializerTest {
     }
 
     static List<Arguments> serializesJsonValuesProvider() {
-        var now = Instant.now();
-
         return List.of(
                 Arguments.of(Document.of("a"), "\"a\""),
                 Arguments.of(Document.of("a".getBytes(StandardCharsets.UTF_8)), "\"YQ==\""),
@@ -87,7 +85,7 @@ public class JsonSerializerTest {
                 Arguments.of(Document.of(BigInteger.ZERO), "0"),
                 Arguments.of(Document.of(BigDecimal.ONE), "1"),
                 Arguments.of(Document.of(true), "true"),
-                Arguments.of(Document.of(now), Double.toString(((double) now.toEpochMilli()) / 1000)),
+                Arguments.of(Document.of(Instant.EPOCH), "0"),
                 Arguments.of(Document.of(List.of(Document.of("a"))), "[\"a\"]"),
                 Arguments.of(
                         Document.of(
