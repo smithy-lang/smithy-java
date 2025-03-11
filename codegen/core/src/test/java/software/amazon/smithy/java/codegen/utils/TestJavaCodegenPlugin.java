@@ -12,9 +12,12 @@ import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.DefaultTransforms;
 import software.amazon.smithy.java.codegen.JavaCodegenIntegration;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.TestJavaCodegen;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 
 public class TestJavaCodegenPlugin implements SmithyBuildPlugin {
+
+    public CodeGenerationContext capturedContext;
     @Override
     public String getName() {
         return "test-java-codegen-core";
@@ -27,12 +30,14 @@ public class TestJavaCodegenPlugin implements SmithyBuildPlugin {
 
         var settings = JavaCodegenSettings.fromNode(context.getSettings());
         runner.settings(settings);
-        runner.directedCodegen(new TestJavaCodegen());
+        TestJavaCodegen directedCodegen = new TestJavaCodegen();
+        runner.directedCodegen(directedCodegen);
         runner.fileManifest(context.getFileManifest());
         runner.service(settings.service());
         runner.model(context.getModel());
         runner.integrationClass(JavaCodegenIntegration.class);
         DefaultTransforms.apply(runner, settings);
         runner.run();
+        this.capturedContext = directedCodegen.context;
     }
 }

@@ -17,7 +17,7 @@ import software.amazon.smithy.framework.knowledge.ImplicitErrorIndex;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.generators.IdStringGenerator;
-import software.amazon.smithy.java.codegen.generators.SchemaGenerator;
+import software.amazon.smithy.java.codegen.generators.SchemaFieldGenerator;
 import software.amazon.smithy.java.codegen.generators.TypeRegistryGenerator;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
@@ -60,9 +60,10 @@ public final class ServiceGenerator implements
             var template =
                     """
                             public final class ${service:T} implements ${serviceType:T} {
-                                ${id:C|}
 
                                 ${schema:C}
+
+                                ${id:C|}
 
                                 ${typeRegistry:C|}
 
@@ -122,11 +123,10 @@ public final class ServiceGenerator implements
                     new GetOperationGenerator(writer, shape, directive.symbolProvider(), operations));
             writer.putContext(
                     "schema",
-                    new SchemaGenerator(writer,
-                            shape,
-                            directive.symbolProvider(),
-                            directive.model(),
-                            directive.context()));
+                    new SchemaFieldGenerator(
+                            directive,
+                            writer,
+                            shape));
             writer.putContext("operationList", List.class);
             writer.write(template);
             writer.popState();

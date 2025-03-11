@@ -35,7 +35,6 @@ public class RelativeDeprecationFilteringTest extends AbstractCodegenFileTest {
     @Test
     void expectedUnfilteredDateExist() {
         var fileStr = getFileStringForClass("NotYetDeprecatedDate");
-        System.out.println(fileStr);
         var expected = "public final class NotYetDeprecatedDate implements ApiOperation";
         assertTrue(fileStr.contains(expected));
     }

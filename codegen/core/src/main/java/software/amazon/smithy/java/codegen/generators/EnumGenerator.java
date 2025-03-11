@@ -13,6 +13,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.directed.ContextualDirective;
 import software.amazon.smithy.codegen.core.directed.ShapeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
@@ -46,10 +47,11 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.pushState(new ClassSection(shape));
             var template = """
                     public final class ${shape:T} implements ${serializableShape:T} {
-                        ${id:C|}
                         ${staticImpls:C|}
 
                         ${schema:C|}
+
+                        ${id:C|}
 
                         ${properties:C|}
 
@@ -82,11 +84,9 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.putContext("staticImpls", new StaticImplGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext(
                     "schema",
-                    new SchemaGenerator(writer,
-                            shape,
-                            directive.symbolProvider(),
-                            directive.model(),
-                            directive.context()));
+                    new SchemaFieldGenerator(directive,
+                            writer,
+                            shape));
             writer.putContext("properties", writer.consumer(EnumGenerator::writeProperties));
             writer.putContext("constructor", new ConstructorGenerator(writer, valueSymbol));
             writer.putContext("innerEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
@@ -94,11 +94,9 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             writer.putContext(
                     "serializer",
                     new SerializerGenerator(
+                            directive,
                             writer,
-                            shape,
-                            directive.symbolProvider(),
-                            directive.model(),
-                            directive.service()));
+                            shape));
             writer.putContext("toString", new ToStringGenerator(writer));
             writer.putContext("from", new FromValueGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext("equals", new EqualsGenerator(writer, valueSymbol));
@@ -211,18 +209,16 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
     }
 
     private record SerializerGenerator(
+            ContextualDirective<CodeGenerationContext, ?> directive,
             JavaWriter writer,
-            Shape shape,
-            SymbolProvider symbolProvider,
-            Model model,
-            ServiceShape service) implements Runnable {
+            Shape shape) implements Runnable {
         @Override
         public void run() {
             writer.pushState();
             writer.putContext("shapeSerializer", ShapeSerializer.class);
             writer.putContext(
                     "serializerBody",
-                    new SerializerMemberGenerator(writer, symbolProvider, model, service, shape, "this"));
+                    new SerializerMemberGenerator(directive, writer, shape, "this"));
             writer.write("""
                     @Override
                     public void serialize(${shapeSerializer:N} serializer) {

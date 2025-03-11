@@ -92,9 +92,10 @@ public final class StructureGenerator<
             var template =
                     """
                             public final class ${shape:T} ${^isError}implements ${serializableStruct:T}${/isError}${?isError}extends ${sdkException:T}${/isError} {
-                                ${id:C|}
 
                                 ${schemas:C|}
+
+                                ${id:C|}
 
                                 ${properties:C|}
 
@@ -124,12 +125,10 @@ public final class StructureGenerator<
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(
                     "schemas",
-                    new SchemaGenerator(
+                    new SchemaFieldGenerator(
+                            directive,
                             writer,
-                            shape,
-                            directive.symbolProvider(),
-                            directive.model(),
-                            directive.context()));
+                            shape));
             writer.putContext(
                     "properties",
                     new PropertyGenerator(writer, shape, directive.symbolProvider(), directive.model()));
@@ -147,6 +146,7 @@ public final class StructureGenerator<
             writer.putContext(
                     "serializer",
                     new StructureSerializerGenerator(
+                            directive,
                             writer,
                             shape,
                             directive.symbolProvider(),
@@ -1056,4 +1056,5 @@ public final class StructureGenerator<
             }
         }
     }
+
 }

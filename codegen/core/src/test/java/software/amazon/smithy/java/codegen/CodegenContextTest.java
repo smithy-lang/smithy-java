@@ -8,13 +8,18 @@ package software.amazon.smithy.java.codegen;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 
-import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.build.MockManifest;
+import software.amazon.smithy.build.PluginContext;
+import software.amazon.smithy.java.codegen.utils.TestJavaCodegenPlugin;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.node.ArrayNode;
+import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.AnnotationTrait;
 import software.amazon.smithy.model.traits.CorsTrait;
 import software.amazon.smithy.model.traits.DefaultTrait;
 import software.amazon.smithy.model.traits.EndpointTrait;
@@ -62,21 +67,23 @@ public class CodegenContextTest {
 
     @Test
     void getsCorrectRuntimeTraitsForProtocolsAndAuth() {
-        var context = new CodeGenerationContext(
-                model,
-                JavaCodegenSettings.builder()
-                        .service(SERVICE_ID.toString())
-                        .runtimeTraitsSelector("[id=smithy.java.codegen#selectedTrait]")
-                        .runtimeTraits(List.of(HttpErrorTrait.ID))
-                        .packageNamespace("ns.foo")
-                        .build(),
-                new JavaSymbolProvider(model, model.expectShape(SERVICE_ID).asServiceShape().get(), "ns.foo"),
-                new MockManifest(),
-                List.of(),
-                "test");
+        TestJavaCodegenPlugin plugin = new TestJavaCodegenPlugin();
+        PluginContext context = PluginContext.builder()
+                .fileManifest(new MockManifest())
+                .settings(
+                        ObjectNode.builder()
+                                .withMember("service", "smithy.java.codegen#TestService")
+                                .withMember("namespace", "software.amazon.smithy.java.codegen.test")
+                                .withMember("runtimeTraitsSelector", "[id=smithy.java.codegen#selectedTrait]")
+                                .withMember("runtimeTraits",
+                                        ArrayNode.builder().withValue("smithy.api#httpError").build())
+                                .build())
+                .model(model)
+                .build();
+        plugin.execute(context);
 
         assertThat(
-                context.runtimeTraits(),
+                plugin.capturedContext.runtimeTraits(),
                 containsInAnyOrder(
                         // Prelude validation traits
                         LengthTrait.ID,
@@ -120,21 +127,20 @@ public class CodegenContextTest {
 
     @Test
     void getsCorrectTraitsWithNoProtocolOrAuth() {
-        var context = new CodeGenerationContext(
-                model,
-                JavaCodegenSettings.builder()
-                        .service(NO_PROTOCOL_SERVICE_ID.toString())
-                        .packageNamespace("ns.foo")
-                        .build(),
-                new JavaSymbolProvider(model,
-                        model.expectShape(NO_PROTOCOL_SERVICE_ID).asServiceShape().get(),
-                        "ns.foo"),
-                new MockManifest(),
-                List.of(),
-                "test");
+        TestJavaCodegenPlugin plugin = new TestJavaCodegenPlugin();
+        PluginContext context = PluginContext.builder()
+                .fileManifest(new MockManifest())
+                .settings(
+                        ObjectNode.builder()
+                                .withMember("service", "smithy.java.codegen#NoProtocolService")
+                                .withMember("namespace", "software.amazon.smithy.java.codegen.test")
+                                .build())
+                .model(model)
+                .build();
+        plugin.execute(context);
 
         assertThat(
-                context.runtimeTraits(),
+                plugin.capturedContext.runtimeTraits(),
                 containsInAnyOrder(
                         // Prelude Validation Traits
                         LengthTrait.ID,
@@ -165,5 +171,23 @@ public class CodegenContextTest {
                         RetryableTrait.ID,
                         RequestCompressionTrait.ID,
                         StreamingTrait.ID));
+    }
+
+    public static class SelectedTrait extends AnnotationTrait {
+        public static final ShapeId ID = ShapeId.from("smithy.java.codegen#selectedTrait");
+
+        public SelectedTrait() {
+            this(Node.objectNode());
+        }
+
+        public SelectedTrait(ObjectNode node) {
+            super(ID, node);
+        }
+
+        public static final class Provider extends AnnotationTrait.Provider<SelectedTrait> {
+            public Provider() {
+                super(SelectedTrait.ID, SelectedTrait::new);
+            }
+        }
     }
 }

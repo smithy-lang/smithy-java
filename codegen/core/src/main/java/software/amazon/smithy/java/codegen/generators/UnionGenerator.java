@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.directed.ContextualDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateUnionDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
@@ -44,9 +45,9 @@ public final class UnionGenerator
             writer.pushState(new ClassSection(shape));
             var template = """
                     public abstract class ${shape:T} implements ${serializableStruct:T} {
-                        ${id:C|}
-
                         ${schemas:C|}
+
+                        ${id:C|}
 
                         private final ${type:N} type;
 
@@ -108,17 +109,16 @@ public final class UnionGenerator
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(
                     "schemas",
-                    new SchemaGenerator(
+                    new SchemaFieldGenerator(
+                            directive,
                             writer,
-                            shape,
-                            directive.symbolProvider(),
-                            directive.model(),
-                            directive.context()));
+                            shape));
             writer.putContext("memberEnum", new TypeEnumGenerator(writer, shape, directive.symbolProvider()));
             writer.putContext("toString", new ToStringGenerator(writer));
             writer.putContext(
                     "valueClasses",
                     new ValueClassGenerator(
+                            directive,
                             writer,
                             shape,
                             directive.symbolProvider(),
@@ -138,6 +138,7 @@ public final class UnionGenerator
     }
 
     private record ValueClassGenerator(
+            ContextualDirective<CodeGenerationContext, ?> directive,
             JavaWriter writer,
             UnionShape shape,
             SymbolProvider symbolProvider,
@@ -184,7 +185,7 @@ public final class UnionGenerator
                 writer.putContext("memberName", symbolProvider.toMemberName(member));
                 writer.putContext(
                         "serializeMember",
-                        new SerializerMemberGenerator(writer, symbolProvider, model, service, member, "value"));
+                        new SerializerMemberGenerator(directive, writer, member, "value"));
                 writer.putContext("primitive", memberSymbol.expectProperty(SymbolProperties.IS_PRIMITIVE));
                 writer.putContext(
                         "wrap",

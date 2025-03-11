@@ -38,11 +38,15 @@ public final class MapGenerator
                             var value = directive.model().expectShape(directive.shape().getValue().getTarget());
                             var valueSymbol = directive.symbolProvider().toSymbol(value);
                             var valueSchema = writer.format(
-                                    "SharedSchemas.$L.mapValueMember()",
-                                    CodegenUtils.toSchemaName(directive.shape()));
+                                    "$L.mapValueMember()",
+                                    directive.context()
+                                            .schemaFieldOrder()
+                                            .getSchemaFieldName(directive.shape(), writer));
                             var keySymbol = directive.symbolProvider().toSymbol(directive.shape().getKey());
                             var keySchema =
-                                    CodegenUtils.getSchemaType(writer, directive.symbolProvider(), directive.shape());
+                                    directive.context()
+                                            .schemaFieldOrder()
+                                            .getSchemaFieldName(directive.shape(), writer);
                             var name = CodegenUtils.getDefaultName(directive.shape(), directive.service());
 
                             writer.pushState();
@@ -116,10 +120,8 @@ public final class MapGenerator
                             writer.putContext(
                                     "memberSerializer",
                                     new SerializerMemberGenerator(
+                                            directive,
                                             writer,
-                                            directive.symbolProvider(),
-                                            directive.model(),
-                                            directive.service(),
                                             directive.shape().getValue(),
                                             "values"));
                             writer.putContext(

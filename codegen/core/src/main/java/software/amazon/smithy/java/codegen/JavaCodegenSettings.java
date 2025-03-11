@@ -205,7 +205,7 @@ public final class JavaCodegenSettings {
 
     @SmithyInternalApi
     public Set<Symbol> getGeneratedSymbolsPackage(String packageNamespace) {
-        return generatedSymbols.get(packageNamespace);
+        return generatedSymbols.getOrDefault(packageNamespace, Collections.emptySet());
     }
 
     private static Symbol buildSymbolFromFullyQualifiedName(String fullyQualifiedName) {

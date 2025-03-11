@@ -7,7 +7,6 @@ package software.amazon.smithy.java.codegen;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -19,20 +18,15 @@ import software.amazon.smithy.codegen.core.ReservedWordsBuilder;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.TopologicalIndex;
-import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.NullableIndex;
-import software.amazon.smithy.model.loader.Prelude;
 import software.amazon.smithy.model.selector.PathFinder;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.ClientOptionalTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
-import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.model.traits.synthetic.OriginalShapeIdTrait;
 import software.amazon.smithy.utils.CaseUtils;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -60,14 +54,6 @@ public final class CodegenUtils {
             .build();
 
     private static final String SCHEMA_STATIC_NAME = "$SCHEMA";
-    private static final EnumSet<ShapeType> SHAPES_WITH_INNER_SCHEMA = EnumSet.of(
-            ShapeType.RESOURCE,
-            ShapeType.OPERATION,
-            ShapeType.SERVICE,
-            ShapeType.ENUM,
-            ShapeType.INT_ENUM,
-            ShapeType.UNION,
-            ShapeType.STRUCTURE);
 
     // Semver regex from spec.
     // See: https://semver.org/#is-there-a-suggested-regular-expression-regex-to-check-a-semver-string
@@ -199,46 +185,6 @@ public final class CodegenUtils {
      */
     public static String toMemberSchemaName(String memberName) {
         return SCHEMA_STATIC_NAME + "_" + CaseUtils.toSnakeCase(memberName).toUpperCase(Locale.ENGLISH);
-    }
-
-    /**
-     * Determines the name to use for shape Schemas.
-     *
-     * @param shape shape to generate name for
-     * @return name to use for static schema property
-     */
-    public static String toSchemaName(Shape shape) {
-        // Shapes that generate their own classes have a static name
-        if (SHAPES_WITH_INNER_SCHEMA.contains(shape.getType())) {
-            return SCHEMA_STATIC_NAME;
-        }
-        return CaseUtils.toSnakeCase(shape.toShapeId().getName()).toUpperCase(Locale.ENGLISH);
-    }
-
-    /**
-     * Writes the schema property to use for a given shape.
-     *
-     * <p>If a shape is a prelude shape then it will use a property from {@link PreludeSchemas}.
-     * Otherwise, the shape will use the generated {@code SharedSchemas} utility class.
-     *
-     * @param writer Writer to use for writing the Schema type.
-     * @param shape shape to write Schema type for.
-     */
-    public static String getSchemaType(
-            JavaWriter writer,
-            SymbolProvider provider,
-            Shape shape
-    ) {
-        if (Prelude.isPreludeShape(shape) && !shape.hasTrait(UnitTypeTrait.class)) {
-            return writer.format("$T.$L", PreludeSchemas.class, shape.getType().name());
-        } else if (SHAPES_WITH_INNER_SCHEMA.contains(shape.getType())) {
-            // Shapes that generate a class have their schemas as static properties on that class
-            return writer.format(
-                    "$T.$L",
-                    provider.toSymbol(shape),
-                    shape.hasTrait(UnitTypeTrait.class) ? "SCHEMA" : "$SCHEMA");
-        }
-        return writer.format("SharedSchemas.$L", toSchemaName(shape));
     }
 
     /**

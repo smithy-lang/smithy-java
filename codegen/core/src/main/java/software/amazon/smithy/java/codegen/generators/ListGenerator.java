@@ -37,8 +37,10 @@ public final class ListGenerator
                             var name = CodegenUtils.getDefaultName(directive.shape(), directive.service());
                             var target = directive.model().expectShape(directive.shape().getMember().getTarget());
                             var valueSchema = writer.format(
-                                    "SharedSchemas.$L.listMember()",
-                                    CodegenUtils.toSchemaName(directive.shape()));
+                                    "$L.listMember()",
+                                    directive.context()
+                                            .schemaFieldOrder()
+                                            .getSchemaFieldName(directive.shape(), writer));
                             writer.pushState();
                             var template =
                                     """
@@ -93,10 +95,8 @@ public final class ListGenerator
                             writer.putContext(
                                     "memberSerializer",
                                     new SerializerMemberGenerator(
+                                            directive,
                                             writer,
-                                            directive.symbolProvider(),
-                                            directive.model(),
-                                            directive.service(),
                                             directive.shape().getMember(),
                                             "value"));
                             writer.putContext(

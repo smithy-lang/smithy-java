@@ -8,7 +8,6 @@ package software.amazon.smithy.java.codegen.types;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.net.URL;
 import java.nio.file.Path;
@@ -49,14 +48,13 @@ public class CodegenTest {
         var settings = settingsBuilder.build();
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
-        assertFalse(manifest.getFiles().isEmpty());
-        assertEquals(manifest.getFiles().size(), 7);
+        assertEquals(7, manifest.getFiles().size());
         assertThat(
                 manifest.getFiles(),
                 containsInAnyOrder(
                         Path.of("/test/smithy/codegen/types/test/model/EnumShape.java"),
                         Path.of("/test/smithy/codegen/types/test/model/IntEnumShape.java"),
-                        Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/Schemas.java"),
                         Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
                         Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
                         Path.of("/test/smithy/codegen/types/test/model/UnionShape.java"),
@@ -70,12 +68,11 @@ public class CodegenTest {
                 .build();
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
-        assertFalse(manifest.getFiles().isEmpty());
-        assertEquals(manifest.getFiles().size(), 4);
+        assertEquals(4, manifest.getFiles().size());
         assertThat(
                 manifest.getFiles(),
                 containsInAnyOrder(
-                        Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/Schemas.java"),
                         Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
                         Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
                         Path.of("/META-INF/smithy-java/type-mappings.properties")));
@@ -89,12 +86,11 @@ public class CodegenTest {
                 .build();
         var context = contextBuilder.settings(settings).build();
         plugin.execute(context);
-        assertFalse(manifest.getFiles().isEmpty());
-        assertEquals(manifest.getFiles().size(), 5);
+        assertEquals(5, manifest.getFiles().size());
         assertThat(
                 manifest.getFiles(),
                 containsInAnyOrder(
-                        Path.of("/test/smithy/codegen/types/test/model/SharedSchemas.java"),
+                        Path.of("/test/smithy/codegen/types/test/model/Schemas.java"),
                         Path.of("/test/smithy/codegen/types/test/model/SharedSerde.java"),
                         Path.of("/test/smithy/codegen/types/test/model/StructureShape.java"),
                         Path.of("/test/smithy/codegen/types/test/model/UnionShape.java"),

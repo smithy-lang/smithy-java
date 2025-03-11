@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URL;
@@ -81,11 +82,10 @@ public class NamingTest extends AbstractCodegenFileTest {
 
     @Test
     void snakeCaseMember() {
-        var fileStr = getFileStringForClass("CasingInput");
         // Member schema still uses the raw member name
-        assertTrue(fileStr.contains("\"snake_case_member\", PreludeSchemas.STRING"));
+        assertTrue(getFileStringForClass("Schemas").contains("\"snake_case_member\", PreludeSchemas.STRING"));
         // Member property is renamed to java-friendly string
-        assertTrue(fileStr.contains("private final transient String snakeCaseMember;"));
+        assertTrue(getFileStringForClass("CasingInput").contains("private final transient String snakeCaseMember;"));
     }
 
     @Test
@@ -102,11 +102,12 @@ public class NamingTest extends AbstractCodegenFileTest {
 
     @Test
     void acronymInsideMember() {
-        var fileStr = getFileStringForClass("CasingInput");
         // Member schema still uses the raw member name
-        assertTrue(fileStr.contains("\"ACRONYM_Inside_Member\", PreludeSchemas.STRING"));
+        assertThat(getFileStringForClass("Schemas"))
+                .contains("\"ACRONYM_Inside_Member\", PreludeSchemas.STRING");
         // Member property is renamed to java-friendly string
-        assertTrue(fileStr.contains("private final transient String acronymInsideMember;"));
+        assertThat(getFileStringForClass("CasingInput"))
+                .contains("private final transient String acronymInsideMember;");
     }
 
     @Test

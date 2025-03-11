@@ -17,7 +17,7 @@ import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;
 import software.amazon.smithy.java.codegen.generators.OperationGenerator;
 import software.amazon.smithy.java.codegen.generators.ResourceGenerator;
-import software.amazon.smithy.java.codegen.generators.SharedSchemasGenerator;
+import software.amazon.smithy.java.codegen.generators.SchemasGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.java.codegen.generators.UnionGenerator;
@@ -43,11 +43,7 @@ final class DirectedJavaClientCodegen
             CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive
     ) {
         return new CodeGenerationContext(
-                directive.model(),
-                directive.settings(),
-                directive.symbolProvider(),
-                directive.fileManifest(),
-                directive.integrations(),
+                directive,
                 "client");
     }
 
@@ -123,7 +119,7 @@ final class DirectedJavaClientCodegen
     @Override
     public void customizeBeforeIntegrations(CustomizeDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         if (!directive.settings().useExternalTypes()) {
-            new SharedSchemasGenerator().accept(directive);
+            new SchemasGenerator().accept(directive);
             new SharedSerdeGenerator().accept(directive);
         }
     }

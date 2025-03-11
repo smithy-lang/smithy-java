@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -23,11 +22,7 @@ public record IdStringGenerator(JavaWriter writer, Shape shape) implements Runna
     public void run() {
         writer.pushState();
         writer.putContext("shapeId", ShapeId.class);
-        // Use the original shape ID here instead of any potentially renamed input or output shapes.
-        // This is critical for shape serialization in protocols like XML.
-        writer.write(
-                "public static final ${shapeId:T} $$ID = ${shapeId:T}.from($S);",
-                CodegenUtils.getOriginalId(shape));
+        writer.write("public static final ${shapeId:T} $$ID = $$SCHEMA.id();");
         writer.popState();
     }
 }
