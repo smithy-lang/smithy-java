@@ -7,7 +7,7 @@ package software.amazon.smithy.java.server.example;
 
 import java.net.URI;
 import java.util.concurrent.ExecutionException;
-import software.amazon.smithy.java.example.service.CoffeeShop;
+import software.amazon.smithy.java.example.etoe.service.CoffeeShop;
 import software.amazon.smithy.java.server.Server;
 
 public class BasicServerExample implements Runnable {

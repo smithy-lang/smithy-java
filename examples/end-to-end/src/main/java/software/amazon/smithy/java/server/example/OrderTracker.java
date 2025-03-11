@@ -10,7 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import software.amazon.smithy.java.example.model.OrderStatus;
+import software.amazon.smithy.java.example.etoe.model.OrderStatus;
 
 /**
  * This class is a stand-in for a database.

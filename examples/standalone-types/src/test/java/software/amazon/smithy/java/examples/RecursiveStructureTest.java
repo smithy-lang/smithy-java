@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.core.schema.PresenceTracker;
-import software.amazon.smithy.java.example.model.Human;
+import software.amazon.smithy.java.example.standalone.model.Human;
 
 public class RecursiveStructureTest {
 
