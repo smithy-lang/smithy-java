@@ -57,6 +57,8 @@ operation ReservedWordMembers {
         byte: Byte
         static: String
         double: Double
+        null: String
+        true: Boolean
     }
 }
 
@@ -82,6 +84,7 @@ operation Casing {
         acronymInsideStruct: ACRONYMInsideStruct
         enums: EnumCasing
         ACRONYMMemberName: String
+        ALLCAPS: String
     }
 }
 

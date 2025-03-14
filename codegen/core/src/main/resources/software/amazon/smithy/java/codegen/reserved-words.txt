@@ -60,3 +60,6 @@ try
 void
 volatile
 while
+true
+false
+null

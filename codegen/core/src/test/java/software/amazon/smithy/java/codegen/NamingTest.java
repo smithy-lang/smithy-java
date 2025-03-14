@@ -69,6 +69,8 @@ public class NamingTest extends AbstractCodegenFileTest {
                     private final transient Byte byteMember;
                     private final transient String staticMember;
                     private final transient Double doubleMember;
+                    private final transient String nullMember;
+                    private final transient Boolean trueMember;
                 """;
         assertTrue(fileStr.contains(expected));
     }
@@ -121,6 +123,13 @@ public class NamingTest extends AbstractCodegenFileTest {
         var fileStr = getFileStringForClass("CasingInput");
         assertTrue(fileStr.contains("private final transient String acronymMemberName"));
         assertTrue(fileStr.contains("public String acronymMemberName() {"));
+    }
+
+    @Test
+    void allCapsMemberName() {
+        var fileStr = getFileStringForClass("CasingInput");
+        assertTrue(fileStr.contains("private final transient String allcaps"));
+        assertTrue(fileStr.contains("public String allcaps() {"));
     }
 
     static List<Arguments> enumCaseArgs() {
