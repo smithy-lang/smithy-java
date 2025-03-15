@@ -141,7 +141,8 @@ public final class SchemaBuilder {
                     traits,
                     new ArrayList<>(members),
                     Collections.emptySet(),
-                    Collections.emptySet());
+                    Collections.emptySet(),
+                    this);
         } else {
             builtShape = new RootSchema(
                     type,
@@ -153,6 +154,13 @@ public final class SchemaBuilder {
         }
 
         return builtShape;
+    }
+
+    void resolve(Schema schema) {
+        if (!(builtShape instanceof DeferredRootSchema)) {
+            throw new IllegalStateException("Cannot resolve built shape " + id);
+        }
+        this.builtShape = schema;
     }
 
     @SuppressWarnings("unchecked")
