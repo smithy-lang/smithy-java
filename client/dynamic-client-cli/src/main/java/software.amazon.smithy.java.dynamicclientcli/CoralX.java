@@ -74,6 +74,7 @@ public class CoralX implements Callable<Integer> {
 
     private Integer listOperationsForService() {
         try {
+            System.out.println("Listing operations for service: " + service);
             Model model = assembleModel(getFilesFromDirectory(filepath));
             System.out.println("Available Operations:\n" + model.getOperationShapes());
             return 0;
