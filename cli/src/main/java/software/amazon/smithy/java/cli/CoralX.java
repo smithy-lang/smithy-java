@@ -14,6 +14,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+
+import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
@@ -34,22 +36,25 @@ public class CoralX implements Callable<Integer> {
     private static final String AWS_JSON = "awsjson";
     private static final String RPC_V2_CBOR = "rpcv2-cbor";
 
-    @Option(names = "--service", description = "Service name", required = true)
+    @Parameters(index = "0", description = "Service Name")
     private String service;
 
-    @Option(names = "--filepath", description = "Model file path", required = true)
-    private String filepath;
+    @Parameters(index = "1", description = "Operation Name", arity = "0..1")
+    private String operation;
+
+    @Option(names = { "-m", "--model-path" }, description = "Model file path", required = true)
+    private String modelPath;
+
+    @Option(names = "--input-path", description = "Input json file path")
+    private String inputPath;
+
+    @Option(names = "--input-json", description = "Input JSON string")
+    private String input;
 
     @Option(names = "--url", description = "Service URL")
     private String url;
 
-    @Option(names = "--operation", description = "Operation name")
-    private String operation;
-
-    @Option(names = "--input", description = "Input JSON string")
-    private String input;
-
-    @Option(names = "--protocol", description = "Protocol to use", defaultValue = AWS_JSON)
+    @Option(names = { "-p", "--protocol" }, description = "Protocol to use", defaultValue = AWS_JSON)
     private String protocol;
 
     @Option(names = "--list-operations", description = "List operations for the specified service")
@@ -75,7 +80,7 @@ public class CoralX implements Callable<Integer> {
     private Integer listOperationsForService() {
         try {
             System.out.println("Listing operations for service: " + service);
-            Model model = assembleModel(getFilesFromDirectory(filepath));
+            Model model = assembleModel(getFilesFromDirectory(modelPath));
             System.out.println("Available Operations:\n" + model.getOperationShapes());
             return 0;
         } catch (Exception e) {
@@ -86,7 +91,7 @@ public class CoralX implements Callable<Integer> {
 
     private Integer executeOperation() {
         try {
-            Model model = assembleModel(getFilesFromDirectory(filepath));
+            Model model = assembleModel(getFilesFromDirectory(modelPath));
             ShapeId serviceInput = validateServiceExists(model);
 
             DynamicClient client = buildDynamicClient(model, serviceInput);
