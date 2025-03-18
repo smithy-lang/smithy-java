@@ -25,7 +25,7 @@ dependencies {
 }
 
 application {
-    mainClass = "software.amazon.smithy.java.dynamicclientcli.CoralXRunner"
+    mainClass = "software.amazon.smithy.java.cli.CoralXRunner"
 }
 
 // Add generated Java sources to the main sourceset

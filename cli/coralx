@@ -14,4 +14,4 @@ if [ ! -f "$JAR_PATH" ]; then
 fi
 
 # Run the Java application with all passed arguments
-java -cp "$JAR_PATH" software.amazon.smithy.java.dynamicclientcli.CoralXRunner "$@"
+java -cp "$JAR_PATH" software.amazon.smithy.java.cli.CoralXRunner "$@"

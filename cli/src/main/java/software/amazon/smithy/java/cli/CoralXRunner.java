@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.dynamicclientcli;
+package software.amazon.smithy.java.cli;
 
 import picocli.CommandLine;
 

@@ -7,6 +7,9 @@ include(":io")
 include(":core")
 include(":dynamic-schemas")
 
+// CLI
+include(":cli")
+
 // Common components
 include(":auth-api")
 include(":retries-api")
