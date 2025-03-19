@@ -35,6 +35,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public class CoralX implements Callable<Integer> {
     private static final String AWS_JSON = "awsjson";
     private static final String RPC_V2_CBOR = "rpcv2-cbor";
+    // todo: add support the other two protocols
 
     @Parameters(index = "0", description = "Service Name")
     private String service;
@@ -45,6 +46,7 @@ public class CoralX implements Callable<Integer> {
     @Option(names = { "-m", "--model-path" }, description = "Model file path", required = true)
     private String modelPath;
 
+    //todo: test support for this
     @Option(names = "--input-path", description = "Input json file path")
     private String inputPath;
 
@@ -72,8 +74,8 @@ public class CoralX implements Callable<Integer> {
     }
 
     private void validateInput() {
-        if (!listOperations && (url == null || operation == null)) {
-            throw new IllegalArgumentException("URL and operation are required when not listing operations");
+        if (!listOperations && operation == null) {
+            throw new IllegalArgumentException("Operation required");
         }
     }
 
@@ -121,14 +123,14 @@ public class CoralX implements Callable<Integer> {
                     assembler.addUnparsedModel(file.getName(), content.toString());
                 } catch (IOException e) {
                     System.err.println("Error reading file: " + file.getPath());
-                    e.printStackTrace(); // This will print the stack trace for better error diagnosis
+                    e.printStackTrace();
                 }
             } else {
                 System.err.println("File does not exist: " + file.getPath());
             }
         }
 
-        return assembler.discoverModels().assemble().unwrap();
+        return assembler.disablePrelude().assemble().unwrap();
     }
 
     private ShapeId validateServiceExists(Model model) {
@@ -167,7 +169,7 @@ public class CoralX implements Callable<Integer> {
     }
 
     private void configureInputInterceptor(DynamicClient.Builder builder) {
-        if (input != null) {
+        if (input != null || inputPath != null) {
             builder.addInterceptor(new ClientInterceptor() {
                 @Override
                 public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {}
@@ -176,14 +178,34 @@ public class CoralX implements Callable<Integer> {
     }
 
     private Object executeClientCall(DynamicClient client) throws Exception {
+        if (input != null && inputPath != null) {
+            throw new IllegalArgumentException("Cannot specify both '--input-json' and '--input-path'. Please provide only one.");
+        }
+
         if (input != null) {
             try (JsonCodec codec = JsonCodec.builder().build()) {
                 byte[] jsonBytes = input.getBytes(StandardCharsets.UTF_8);
                 var inputDocument = codec.createDeserializer(jsonBytes).readDocument();
-                return client.callAsync(operation, inputDocument).get().asObject();
+                return client.call(operation, inputDocument).asObject();
             }
         }
-        return client.callAsync(operation).get().asObject();
+        if (inputPath != null) {
+            try (JsonCodec codec = JsonCodec.builder().build();
+                    FileInputStream fis = new FileInputStream(inputPath);
+                    InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
+                    BufferedReader reader = new BufferedReader(isr)) {
+
+                StringBuilder content = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    content.append(line).append(System.lineSeparator());
+                }
+
+                var inputDocument = codec.createDeserializer(content.toString().getBytes()).readDocument();
+                return client.call(operation, inputDocument).asObject();
+            }
+        }
+        return client.call(operation).asObject();
     }
 
     private static List<File> getFilesFromDirectory(String directoryPath) {
