@@ -28,6 +28,7 @@ import software.amazon.smithy.java.codegen.sections.BuilderSetterSection;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.sections.GetterSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
+import software.amazon.smithy.java.core.error.ErrorFault;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.PresenceTracker;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -121,7 +122,15 @@ public final class StructureGenerator<
             writer.putContext("isError", shape.hasTrait(ErrorTrait.class));
             writer.putContext("shape", directive.symbol());
             writer.putContext("serializableStruct", SerializableStruct.class);
-            writer.putContext("sdkException", ModeledException.class);
+
+            var service = directive.service();
+            var serviceSymbol = service != null ? directive.symbolProvider().toSymbol(service) : null;
+            if (serviceSymbol == null) {
+                writer.putContext("sdkException", ModeledException.class);
+            } else {
+                writer.putContext("sdkException", serviceSymbol.expectProperty(SymbolProperties.SERVICE_EXCEPTION));
+            }
+
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(
                     "schemas",
@@ -200,12 +209,22 @@ public final class StructureGenerator<
                     "}",
                     () -> {
                         if (shape.hasTrait(ErrorTrait.class)) {
+                            var error = shape.expectTrait(ErrorTrait.class);
+                            writer.putContext("errorFault", ErrorFault.class);
+                            if (error.isClientError()) {
+                                writer.putContext("errorFaultType", "CLIENT");
+                            } else if (error.isServerError()) {
+                                writer.putContext("errorFaultType", "SERVER");
+                            } else {
+                                // Here just in case we ever expand this trait.
+                                writer.putContext("errorFaultType", "OTHER");
+                            }
                             if (shape.getMember("message").isPresent()) {
                                 writer.write(
-                                        "super($$SCHEMA, builder.message, builder.$$cause, builder.$$captureStackTrace, builder.$$deserialized);");
+                                        "super($$SCHEMA, builder.message, builder.$$cause, ${errorFault:T}.${errorFaultType:L}, builder.$$captureStackTrace, builder.$$deserialized);");
                             } else {
                                 writer.write(
-                                        "super($$SCHEMA, null, builder.$$cause, builder.$$captureStackTrace, builder.$$deserialized);");
+                                        "super($$SCHEMA, null, builder.$$cause, ${errorFault:T}.${errorFaultType:L}, builder.$$captureStackTrace, builder.$$deserialized);");
                             }
                         }
 

@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.server;
 import static java.lang.String.format;
 
 import software.amazon.smithy.codegen.core.Symbol;
+import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.model.Model;
@@ -65,6 +66,8 @@ public final class ServiceJavaSymbolProvider extends JavaSymbolProvider {
         return Symbol.builder()
                 .name(serviceName)
                 .putProperty(SymbolProperties.IS_PRIMITIVE, false)
+                .putProperty(SymbolProperties.SERVICE_EXCEPTION,
+                        CodegenUtils.getServiceExceptionSymbol(packageNamespace(), serviceName))
                 .namespace(format("%s.service", packageNamespace()), ".")
                 .declarationFile(format("./%s/service/%s.java", packageNamespace().replace(".", "/"), serviceName))
                 .build();
