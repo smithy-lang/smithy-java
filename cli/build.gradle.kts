@@ -41,13 +41,13 @@ application {
 //}
 
 // Helps Intellij IDE's discover smithy models
-sourceSets {
-    main {
-        java {
-            srcDir("src")
-        }
-    }
-}
+//sourceSets {
+//    main {
+//        java {
+//            srcDir("src")
+//        }
+//    }
+//}
 
 graalvmNative {
     binaries.named("main") {
@@ -62,6 +62,9 @@ graalvmNative {
 
         // Ensure resources are detected
         resources.autodetect()
+
+        buildArgs.add("-H:ResourceConfigurationFiles=${projectDir}/src/resource-config.json")
+        buildArgs.add("-H:Log=registerResource:3")
 
         // Debug info
         verbose.set(true)
