@@ -12,7 +12,7 @@ dependencies {
     api("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
 
     // Test dependencies
-    testImplementation("org.junit.jupiter:junit-jupiter:5.12.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.12.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation(libs.assertj.core)
 }
