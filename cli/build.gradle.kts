@@ -17,6 +17,8 @@ dependencies {
     implementation("software.amazon.smithy.java:aws-client-restjson:")
     implementation("software.amazon.smithy.java:aws-client-awsjson:")
 
+    implementation("software.amazon.smithy:smithy-aws-traits")
+
     implementation(project(":aws:client:aws-client-restjson"))
     implementation(project(":aws:client:aws-client-awsjson"))
     implementation(project(":client:client-rpcv2-cbor"))
@@ -63,8 +65,27 @@ graalvmNative {
         // Ensure resources are detected
         resources.autodetect()
 
-        buildArgs.add("-H:ResourceConfigurationFiles=${projectDir}/src/resource-config.json")
-        buildArgs.add("-H:Log=registerResource:3")
+        buildArgs.addAll(listOf(
+            "-H:ResourceConfigurationFiles=${projectDir}/src/resource-config.json",
+            "-H:ReflectionConfigurationFiles=${projectDir}/src/reflect-config.json",
+            "--enable-url-protocols=http,https",
+
+            "--initialize-at-build-time=software.amazon.smithy.aws.traits",
+            "--initialize-at-build-time=software.amazon.smithy.aws.traits.protocols",
+            "--initialize-at-build-time=software.amazon.smithy.utils.BuilderRef"
+
+
+//            "--initialize-at-build-time=java.net.URL",
+//            "--initialize-at-build-time=java.net.URI",
+//            "--enable-all-security-services"
+
+//            "--initialize-at-build-time=software.amazon.smithy.aws.traits",
+//            "--initialize-at-build-time=software.amazon.smithy.aws.protocols"
+//            "--initialize-at-build-time=software.amazon.smithy",
+//            "--initialize-at-build-time=software.amazon.smithy.model",
+//            "-H:Log=registerResource:5",
+//            "--no-fallback"
+        ))
 
         // Debug info
         verbose.set(true)

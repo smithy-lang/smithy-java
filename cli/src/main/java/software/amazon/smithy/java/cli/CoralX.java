@@ -130,7 +130,7 @@ public class CoralX implements Callable<Integer> {
             }
         }
 
-        return assembler.disablePrelude().assemble().unwrap();
+        return assembler.assemble().unwrap();
     }
 
     private ShapeId validateServiceExists(Model model) {
