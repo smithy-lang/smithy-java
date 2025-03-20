@@ -14,13 +14,11 @@ dependencies {
     annotationProcessor("info.picocli:picocli-codegen:4.7.6")
 
     // Client dependencies
-    implementation("software.amazon.smithy.java:aws-client-restjson:")
-    implementation("software.amazon.smithy.java:aws-client-awsjson:")
-
     implementation("software.amazon.smithy:smithy-aws-traits")
 
     implementation(project(":aws:client:aws-client-restjson"))
     implementation(project(":aws:client:aws-client-awsjson"))
+    implementation(project(":aws:client:aws-client-restxml"))
     implementation(project(":client:client-rpcv2-cbor"))
 
     implementation(project(":client:dynamic-client"))

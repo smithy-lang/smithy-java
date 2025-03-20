@@ -19,6 +19,8 @@ import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
+import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
+import software.amazon.smithy.java.aws.client.restxml.RestXmlClientProtocol;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
@@ -35,7 +37,8 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public class CoralX implements Callable<Integer> {
     private static final String AWS_JSON = "awsjson";
     private static final String RPC_V2_CBOR = "rpcv2-cbor";
-    // todo: add support the other two protocols
+    private static final String REST_JSON = "restjson";
+    private static final String REST_XML = "restxml";
 
     @Parameters(index = "0", description = "Service Name")
     private String service;
@@ -163,6 +166,11 @@ public class CoralX implements Callable<Integer> {
             case RPC_V2_CBOR:
                 builder.protocol(new RpcV2CborProtocol(serviceInput));
                 break;
+            case REST_JSON:
+                builder.protocol(new RestJsonClientProtocol(serviceInput));
+                break;
+            case REST_XML:
+                builder.protocol(new RestXmlClientProtocol(serviceInput));
             default:
                 throw new IllegalArgumentException("Unsupported protocol type: " + protocol);
         }

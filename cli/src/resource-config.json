@@ -1,10 +1,7 @@
 {
   "resources": {
     "includes": [
-      {"pattern": ".*prelude\\.smithy$"},
-      {"pattern": ".*smithy/smithy-model/src/main/resources.*"},
-      {"pattern": ".*smithy/smithy-aws-traits/src/main/resources.*"},
-      {"pattern": ".*smithy/smithy-protocol-traits/src/main/resources.*"}
+      {"pattern": ".*aws.*smithy$"}
     ]
   }
 }
