@@ -15,9 +15,9 @@ import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.context.Context;
 
 public class SdkCredentialsResolverTest {
 
@@ -26,7 +26,7 @@ public class SdkCredentialsResolverTest {
     private static final String SESSION_TOKEN = "SessionToken";
     private static final Instant EXPIRATION_TIME = Instant.now().plusSeconds(10);
 
-    private final AuthProperties authProperties = null;
+    private final Context authProperties = null;
 
     @Test
     public void testResolveBasicCredentials() throws ExecutionException, InterruptedException {

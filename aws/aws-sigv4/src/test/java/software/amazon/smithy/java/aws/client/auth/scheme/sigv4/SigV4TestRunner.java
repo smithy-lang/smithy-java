@@ -22,9 +22,9 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -87,11 +87,11 @@ public class SigV4TestRunner {
         return this;
     }
 
-    private record TestCase(String name, Context context, HttpRequest request, HttpRequest expected) {
+    private record TestCase(String name, Ctx context, HttpRequest request, HttpRequest expected) {
 
         public static TestCase from(Path directory) {
             var name = directory.getFileName().toString();
-            var context = Context.load(directory);
+            var context = Ctx.load(directory);
             var request = loadRequest(directory);
             var signed = loadSigned(directory);
             return new TestCase(name, context, request, signed);
@@ -167,13 +167,13 @@ public class SigV4TestRunner {
         }
     }
 
-    record Context(
+    record Ctx(
             AwsCredentialsIdentity identity,
-            AuthProperties properties) {
-        static Context load(Path directory) {
+            Context properties) {
+        static Ctx load(Path directory) {
             String fileName = directory.resolve(CONTEXT).toString();
             var node = Node.parse(IoUtils.readUtf8File(fileName)).expectObjectNode();
-            return new Context(
+            return new Ctx(
                     getIdentity(node.expectObjectMember("credentials")),
                     getAuthProperties(node.expectObjectMember("properties")));
         }
@@ -185,12 +185,12 @@ public class SigV4TestRunner {
                     credentialsNode.getStringMemberOrDefault("token", null));
         }
 
-        private static AuthProperties getAuthProperties(ObjectNode objectNode) {
-            return AuthProperties.builder()
-                    .put(SigV4Settings.SIGNING_NAME, objectNode.expectStringMember("service").getValue())
-                    .put(SigV4Settings.REGION, objectNode.expectStringMember("region").getValue())
-                    .put(SigV4Settings.CLOCK, getStaticClock(objectNode.expectStringMember("timestamp").getValue()))
-                    .build();
+        private static Context getAuthProperties(ObjectNode objectNode) {
+            var result = Context.create();
+            result.put(SigV4Settings.SIGNING_NAME, objectNode.expectStringMember("service").getValue());
+            result.put(SigV4Settings.REGION, objectNode.expectStringMember("region").getValue());
+            result.put(SigV4Settings.CLOCK, getStaticClock(objectNode.expectStringMember("timestamp").getValue()));
+            return Context.unmodifiableCopy(result);
         }
 
         private static Clock getStaticClock(String timeString) {

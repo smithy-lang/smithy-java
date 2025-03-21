@@ -25,9 +25,9 @@ import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.datastream.DataStream;
@@ -101,7 +101,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
     public CompletableFuture<HttpRequest> sign(
             HttpRequest request,
             AwsCredentialsIdentity identity,
-            AuthProperties properties
+            Context properties
     ) {
         var region = properties.expect(SigV4Settings.REGION);
         var name = properties.expect(SigV4Settings.SIGNING_NAME);

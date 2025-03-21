@@ -252,7 +252,8 @@ public class ContextTest {
         ctx.get(SAD_SET).add("a");
         ctx.get(HAPPY_SET).add("a");
 
-        var copy = ctx.copyTo(Context.create());
+        var copy = Context.create();
+        ctx.copyTo(copy);
         copy.get(SAD_SET).add("b");
         copy.get(HAPPY_SET).add("b");
 

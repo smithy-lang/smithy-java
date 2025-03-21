@@ -9,14 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.context.Context;
 
 public class SystemPropertiesIdentityResolverTest {
     @Test
     void resolverReturnsExpectedIdentity() throws ExecutionException, InterruptedException {
         var resolver = new SystemPropertiesIdentityResolver();
-        var value = resolver.resolveIdentity(AuthProperties.empty()).get();
+        var value = resolver.resolveIdentity(Context.empty()).get();
         var expected = AwsCredentialsIdentity.create(
                 "property_access_key",
                 "property_secret_key",

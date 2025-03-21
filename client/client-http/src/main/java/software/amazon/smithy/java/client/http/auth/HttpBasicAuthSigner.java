@@ -10,9 +10,9 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.LoginIdentity;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -29,7 +29,7 @@ final class HttpBasicAuthSigner implements Signer<HttpRequest, LoginIdentity> {
     public CompletableFuture<HttpRequest> sign(
             HttpRequest request,
             LoginIdentity identity,
-            AuthProperties properties
+            Context properties
     ) {
         var identityString = identity.username() + ":" + identity.password();
         var base64Value = Base64.getEncoder().encodeToString(identityString.getBytes(StandardCharsets.UTF_8));

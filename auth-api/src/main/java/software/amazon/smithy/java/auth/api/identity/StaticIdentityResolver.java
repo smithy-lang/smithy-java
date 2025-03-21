@@ -7,7 +7,7 @@ package software.amazon.smithy.java.auth.api.identity;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.auth.api.AuthProperties;
+import software.amazon.smithy.java.context.Context;
 
 final class StaticIdentityResolver<IdentityT extends Identity> implements IdentityResolver<IdentityT> {
 
@@ -20,7 +20,7 @@ final class StaticIdentityResolver<IdentityT extends Identity> implements Identi
     }
 
     @Override
-    public CompletableFuture<IdentityResult<IdentityT>> resolveIdentity(AuthProperties requestProperties) {
+    public CompletableFuture<IdentityResult<IdentityT>> resolveIdentity(Context requestProperties) {
         return result;
     }
 

@@ -6,12 +6,12 @@
 package software.amazon.smithy.java.client.core.auth.scheme;
 
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -61,7 +61,7 @@ final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
                         IdentityResult.of(new Identity() {}));
 
         @Override
-        public CompletableFuture<IdentityResult<Identity>> resolveIdentity(AuthProperties requestProperties) {
+        public CompletableFuture<IdentityResult<Identity>> resolveIdentity(Context requestProperties) {
             return NULL_IDENTITY;
         }
 
