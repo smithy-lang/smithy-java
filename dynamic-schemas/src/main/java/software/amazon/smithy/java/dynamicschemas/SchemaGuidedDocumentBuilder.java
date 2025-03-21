@@ -83,22 +83,22 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<WrappedDocument>
 
     private Document deserialize(ShapeDeserializer decoder, Schema schema) {
         return switch (schema.type()) {
-            case BLOB -> Document.of(decoder.readBlob(target));
-            case BOOLEAN -> Document.of(decoder.readBoolean(target));
-            case STRING, ENUM -> Document.of(decoder.readString(target));
-            case TIMESTAMP -> Document.of(decoder.readTimestamp(target));
-            case BYTE -> Document.of(decoder.readByte(target));
-            case SHORT -> Document.of(decoder.readShort(target));
-            case INTEGER, INT_ENUM -> Document.of(decoder.readInteger(target));
-            case LONG -> Document.of(decoder.readLong(target));
-            case FLOAT -> Document.of(decoder.readFloat(target));
+            case BLOB -> Document.of(decoder.readBlob(schema));
+            case BOOLEAN -> Document.of(decoder.readBoolean(schema));
+            case STRING, ENUM -> Document.of(decoder.readString(schema));
+            case TIMESTAMP -> Document.of(decoder.readTimestamp(schema));
+            case BYTE -> Document.of(decoder.readByte(schema));
+            case SHORT -> Document.of(decoder.readShort(schema));
+            case INTEGER, INT_ENUM -> Document.of(decoder.readInteger(schema));
+            case LONG -> Document.of(decoder.readLong(schema));
+            case FLOAT -> Document.of(decoder.readFloat(schema));
             case DOCUMENT -> decoder.readDocument();
-            case DOUBLE -> Document.of(decoder.readDouble(target));
-            case BIG_DECIMAL -> Document.of(decoder.readBigDecimal(target));
-            case BIG_INTEGER -> Document.of(decoder.readBigInteger(target));
+            case DOUBLE -> Document.of(decoder.readDouble(schema));
+            case BIG_DECIMAL -> Document.of(decoder.readBigDecimal(schema));
+            case BIG_INTEGER -> Document.of(decoder.readBigInteger(schema));
             case LIST -> {
                 var items = new SchemaList(schema.listMember());
-                decoder.readList(target, items, (it, memberDeserializer) -> {
+                decoder.readList(schema, items, (it, memberDeserializer) -> {
                     it.add(deserialize(memberDeserializer, it.schema));
                 });
                 yield Document.of(items);
@@ -117,7 +117,7 @@ final class SchemaGuidedDocumentBuilder implements ShapeBuilder<WrappedDocument>
                 });
                 yield Document.of(map);
             }
-            default -> throw new UnsupportedOperationException("Unsupported target type: " + target.type());
+            default -> throw new UnsupportedOperationException("Unsupported target type: " + schema.type());
         };
     }
 
