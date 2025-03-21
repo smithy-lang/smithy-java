@@ -5,12 +5,10 @@
 
 package software.amazon.smithy.java.cli;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -216,8 +214,43 @@ public class CoralX implements Callable<Integer> {
         return client.call(operation).asObject();
     }
 
+    private static List<File> getResourceFiles() {
+        List<File> resourceFiles = new ArrayList<>();
+
+        try {
+            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+
+            String[] knownSmithyFiles = {
+                    "aws.api.smithy",
+                    "aws.auth.smithy",
+                    "aws.customizations.smithy",
+                    "aws.protocols.smithy",
+            };
+
+            for (String smithyFile : knownSmithyFiles) {
+                try (InputStream inputStream = classLoader.getResourceAsStream(smithyFile)) {
+                    if (inputStream != null) {
+                        File tempFile = File.createTempFile(
+                                smithyFile.replace(".smithy", ""),
+                                ".smithy"
+                        );
+                        tempFile.deleteOnExit();
+                        Files.copy(inputStream, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                        resourceFiles.add(tempFile);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("IO exception when accessing resources: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Error occurred while fetching resource files: " + e.getMessage());
+        }
+
+        return resourceFiles;
+    }
+
     private static List<File> getFilesFromDirectory(String directoryPath) {
-        List<File> fileList = new ArrayList<>();
+        List<File> fileList = new ArrayList<>(getResourceFiles());
 
         try {
             File directory = new File(directoryPath);
@@ -247,7 +280,7 @@ public class CoralX implements Callable<Integer> {
         } catch (SecurityException e) {
             System.err.println("Security exception when accessing directory: " + e.getMessage());
         } catch (Exception e) {
-            System.err.println("Error occurred while fetching files: " + e.getMessage());
+            System.err.println("Error occurred while fetching directory files: " + e.getMessage());
         }
 
         return fileList;

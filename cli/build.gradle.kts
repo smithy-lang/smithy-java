@@ -14,7 +14,7 @@ dependencies {
     annotationProcessor("info.picocli:picocli-codegen:4.7.6")
 
     // Client dependencies
-    implementation("software.amazon.smithy:smithy-aws-traits")
+//    implementation("software.amazon.smithy:smithy-aws-traits")
 
     implementation(project(":aws:client:aws-client-restjson"))
     implementation(project(":aws:client:aws-client-awsjson"))
@@ -49,6 +49,19 @@ application {
 //    }
 //}
 
+//sourceSets {
+//    main {
+//        resources {
+//            // Make sure .smithy files are included
+//            include("**/*.smithy")
+//        }
+//    }
+//}
+//
+//tasks.processResources {
+//    include("**/*.smithy")
+//}
+
 graalvmNative {
     binaries.named("main") {
         // Set up correct java JVM to use.
@@ -68,9 +81,9 @@ graalvmNative {
             "-H:ReflectionConfigurationFiles=${projectDir}/src/reflect-config.json",
             "--enable-url-protocols=http,https",
 
-            "--initialize-at-build-time=software.amazon.smithy.aws.traits",
-            "--initialize-at-build-time=software.amazon.smithy.aws.traits.protocols",
-            "--initialize-at-build-time=software.amazon.smithy.utils.BuilderRef"
+//            "--initialize-at-build-time=software.amazon.smithy.aws.traits",
+//            "--initialize-at-build-time=software.amazon.smithy.aws.traits.protocols",
+//            "--initialize-at-build-time=software.amazon.smithy.utils.BuilderRef"
 
 
 //            "--initialize-at-build-time=java.net.URL",
