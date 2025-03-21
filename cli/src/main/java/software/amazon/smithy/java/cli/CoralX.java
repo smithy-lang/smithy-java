@@ -47,7 +47,6 @@ public class CoralX implements Callable<Integer> {
     @Option(names = { "-m", "--model-path" }, description = "Model file path", required = true)
     private String modelPath;
 
-    //todo: test support for this
     @Option(names = "--input-path", description = "Input json file path")
     private String inputPath;
 
@@ -142,6 +141,10 @@ public class CoralX implements Callable<Integer> {
     }
 
     private DynamicClient buildDynamicClient(Model model, ShapeId serviceInput) {
+        if (url == null) {
+            throw new IllegalArgumentException("Service endpoint URL required");
+        }
+
         DynamicClient.Builder builder = DynamicClient.builder()
                 .service(serviceInput)
                 .model(model)
