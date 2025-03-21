@@ -22,6 +22,8 @@ dependencies {
     implementation(project(":client:client-rpcv2-cbor"))
 
     implementation(project(":client:dynamic-client"))
+    implementation(project(":codecs:json-codec"))
+    implementation(project(":client:client-http"))
 }
 
 application {

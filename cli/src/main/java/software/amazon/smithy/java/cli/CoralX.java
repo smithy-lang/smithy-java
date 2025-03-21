@@ -56,7 +56,7 @@ public class CoralX implements Callable<Integer> {
     @Option(names = "--url", description = "Service URL")
     private String url;
 
-    @Option(names = { "-p", "--protocol" }, description = "Protocol to use", defaultValue = AWS_JSON)
+    @Option(names = { "-p", "--protocol" }, description = "Optionally specified protocol")
     private String protocol;
 
     @Option(names = "--list-operations", description = "List operations for the specified service")
@@ -159,20 +159,23 @@ public class CoralX implements Callable<Integer> {
     }
 
     private void configureProtocol(DynamicClient.Builder builder, ShapeId serviceInput) {
-        switch (protocol.toLowerCase()) {
-            case AWS_JSON:
-                builder.protocol(new AwsJson1Protocol(serviceInput));
-                break;
-            case RPC_V2_CBOR:
-                builder.protocol(new RpcV2CborProtocol(serviceInput));
-                break;
-            case REST_JSON:
-                builder.protocol(new RestJsonClientProtocol(serviceInput));
-                break;
-            case REST_XML:
-                builder.protocol(new RestXmlClientProtocol(serviceInput));
-            default:
-                throw new IllegalArgumentException("Unsupported protocol type: " + protocol);
+        if (protocol != null) {
+            switch (protocol.toLowerCase()) {
+                case AWS_JSON:
+                    builder.protocol(new AwsJson1Protocol(serviceInput));
+                    break;
+                case RPC_V2_CBOR:
+                    builder.protocol(new RpcV2CborProtocol(serviceInput));
+                    break;
+                case REST_JSON:
+                    builder.protocol(new RestJsonClientProtocol(serviceInput));
+                    break;
+                case REST_XML:
+                    builder.protocol(new RestXmlClientProtocol(serviceInput));
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unsupported protocol type: " + protocol);
+            }
         }
     }
 
