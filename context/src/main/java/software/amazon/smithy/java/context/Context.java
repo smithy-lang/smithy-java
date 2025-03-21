@@ -125,6 +125,19 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
     <T> T get(Key<T> key);
 
     /**
+     * Get a property from the context, or return a default value if not found.
+     *
+     * @param key Property key to get by exact reference identity.
+     * @param defaultValue Value to return if the property isn't found.
+     * @return the value, or null if not present.
+     * @param <T> Value type.
+     */
+    default <T> T getOrDefault(Key<T> key, T defaultValue) {
+        var result = get(key);
+        return result == null ? defaultValue : result;
+    }
+
+    /**
      * Get a property and throw if it isn't present.
      *
      * @param key Property key to get by exact reference identity.
@@ -163,9 +176,30 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
      * Copy this context into the target context, overwriting any existing keys.
      *
      * @param target Context to copy to.
-     * @return the given {@code target} context.
      */
-    Context copyTo(Context target);
+    void copyTo(Context target);
+
+    /**
+     * Merges this context with {@code other}, returning <strong>a new context instance</strong>.
+     *
+     * @param other The context to merge. Keys from this context overwrite keys from this context.
+     * @return the created and merged context.
+     */
+    default Context merge(Context other) {
+        Context result = Context.create();
+        copyTo(result);
+        other.copyTo(result);
+        return result;
+    }
+
+    /**
+     * Get an empty and unmodifiable Context.
+     *
+     * @return the empty and umodifiable context.
+     */
+    static Context empty() {
+        return UnmodifiableContext.EMPTY;
+    }
 
     /**
      * Creates an empty Context.

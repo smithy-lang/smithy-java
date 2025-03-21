@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.client.http.auth;
 
 import java.util.Objects;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.ApiKeyIdentity;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
@@ -53,14 +52,14 @@ public final class HttpApiKeyAuthScheme implements AuthScheme<HttpRequest, ApiKe
     }
 
     @Override
-    public AuthProperties getSignerProperties(Context context) {
-        var builder = AuthProperties.builder();
-        builder.put(IN, in);
-        builder.put(NAME, name);
+    public Context getSignerProperties(Context context) {
+        var ctx = Context.create();
+        ctx.put(IN, in);
+        ctx.put(NAME, name);
         if (scheme != null) {
-            builder.put(SCHEME, scheme);
+            ctx.put(SCHEME, scheme);
         }
-        return builder.build();
+        return Context.unmodifiableView(ctx);
     }
 
     @Override

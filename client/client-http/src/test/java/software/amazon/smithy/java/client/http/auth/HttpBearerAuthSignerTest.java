@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.identity.TokenIdentity;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -28,7 +28,7 @@ public class HttpBearerAuthSignerTest {
                 .uri(URI.create("https://www.example.com"))
                 .build();
 
-        var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, AuthProperties.empty()).get();
+        var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, Context.empty()).get();
         var authHeader = signedRequest.headers().firstValue("authorization");
         assertEquals(authHeader, "Bearer token");
     }
@@ -43,7 +43,7 @@ public class HttpBearerAuthSignerTest {
                 .uri(URI.create("https://www.example.com"))
                 .build();
 
-        var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, AuthProperties.empty()).get();
+        var signedRequest = HttpBearerAuthSigner.INSTANCE.sign(request, tokenIdentity, Context.empty()).get();
         var authHeader = signedRequest.headers().firstValue("authorization");
         assertEquals(authHeader, "Bearer token");
     }

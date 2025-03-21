@@ -8,9 +8,9 @@ package software.amazon.smithy.java.client.http.auth;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.TokenIdentity;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -27,7 +27,7 @@ final class HttpBearerAuthSigner implements Signer<HttpRequest, TokenIdentity> {
     public CompletableFuture<HttpRequest> sign(
             HttpRequest request,
             TokenIdentity identity,
-            AuthProperties properties
+            Context properties
     ) {
         var headers = new LinkedHashMap<>(request.headers().map());
         var existing = headers.put(AUTHORIZATION_HEADER, List.of(SCHEME + " " + identity.token()));

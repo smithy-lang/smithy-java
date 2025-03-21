@@ -9,14 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.auth.api.AuthProperties;
+import software.amazon.smithy.java.context.Context;
 
 public class EnvironmentVariableIdentityResolverTest {
 
     @Test
     void resolverReturnsExpectedIdentity() throws ExecutionException, InterruptedException {
         var resolver = new EnvironmentVariableIdentityResolver();
-        var value = resolver.resolveIdentity(AuthProperties.empty()).get();
+        var value = resolver.resolveIdentity(Context.empty()).get();
         var expected = AwsCredentialsIdentity.create(
                 "env_access_key",
                 "env_secret_key",

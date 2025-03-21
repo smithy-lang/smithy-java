@@ -7,6 +7,7 @@ package software.amazon.smithy.java.auth.api;
 
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.context.Context;
 
 /**
  * Signs the given request using the given identity and returns a signed request.
@@ -24,7 +25,7 @@ public interface Signer<RequestT, IdentityT extends Identity> extends AutoClosea
      * @param properties Signing properties.
      * @return the signed request.
      */
-    CompletableFuture<RequestT> sign(RequestT request, IdentityT identity, AuthProperties properties);
+    CompletableFuture<RequestT> sign(RequestT request, IdentityT identity, Context properties);
 
     @SuppressWarnings("unchecked")
     static <RequestT, IdentityT extends Identity> Signer<RequestT, IdentityT> nullSigner() {
