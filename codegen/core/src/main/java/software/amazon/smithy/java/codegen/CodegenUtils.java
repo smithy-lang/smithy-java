@@ -387,4 +387,25 @@ public final class CodegenUtils {
     public static boolean isISO8601Date(String string) {
         return ISO_8601_DATE_REGEX.matcher(string).matches();
     }
+
+    /**
+     * Returns the exception class used as the base-level exception for service shapes.
+     *
+     * <p>Exceptions bound to a service that are not an implicit error, framework errors, or an external shape are
+     * code generated to extend from this exception.
+     *
+     * @param packageNamespace The package namespace to use for the service exception.
+     * @param serviceName The name of the service to use for the service exception.
+     * @return the service exception symbol.
+     */
+    public static Symbol getServiceExceptionSymbol(String packageNamespace, String serviceName) {
+        var name = serviceName + "Exception";
+        var filename = String.format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name);
+        return Symbol.builder()
+                .name(name)
+                .namespace(packageNamespace + ".model", ".")
+                .putProperty(SymbolProperties.IS_PRIMITIVE, false)
+                .declarationFile(filename)
+                .build();
+    }
 }

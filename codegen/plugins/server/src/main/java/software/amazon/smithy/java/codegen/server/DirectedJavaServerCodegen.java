@@ -29,6 +29,7 @@ import software.amazon.smithy.java.codegen.generators.MapGenerator;
 import software.amazon.smithy.java.codegen.generators.OperationGenerator;
 import software.amazon.smithy.java.codegen.generators.ResourceGenerator;
 import software.amazon.smithy.java.codegen.generators.SchemasGenerator;
+import software.amazon.smithy.java.codegen.generators.ServiceExceptionGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.java.codegen.generators.UnionGenerator;
@@ -110,6 +111,11 @@ final class DirectedJavaServerCodegen
     @Override
     public void generateService(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
         new ServiceGenerator().accept(directive);
+
+        // Don't generate the root-level service exception when using external types.
+        if (!directive.context().settings().useExternalTypes()) {
+            new ServiceExceptionGenerator<>().accept(directive);
+        }
     }
 
     @Override
