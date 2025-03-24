@@ -69,3 +69,6 @@ include(":examples:restjson-client")
 include(":examples:lambda")
 include(":examples:standalone-types")
 include(":examples:end-to-end")
+
+//MCP
+include("mcp-core")
