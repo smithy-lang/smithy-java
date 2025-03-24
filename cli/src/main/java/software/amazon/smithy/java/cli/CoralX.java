@@ -5,21 +5,10 @@
 
 package software.amazon.smithy.java.cli;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.BufferedInputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.Callable;
 
 import picocli.CommandLine.Parameters;
@@ -100,7 +89,7 @@ public class CoralX implements Callable<Integer> {
 
     private Integer listOperationsForService() {
         try {
-            Model model = assembleModel(getFilesFromDirectory(modelPath));
+            Model model = assembleModel(modelPath);
             System.out.println("Available Operations:\n" + model.getOperationShapes());
             return 0;
         } catch (Exception e) {
@@ -111,7 +100,7 @@ public class CoralX implements Callable<Integer> {
 
     private Integer executeOperation() {
         try {
-            Model model = assembleModel(getFilesFromDirectory(modelPath));
+            Model model = assembleModel(modelPath);
             ShapeId serviceInput = validateServiceExists(model);
 
             DynamicClient client = buildDynamicClient(model, serviceInput);
@@ -126,29 +115,28 @@ public class CoralX implements Callable<Integer> {
         }
     }
 
-    private Model assembleModel(List<File> modelFiles) {
+    private Model assembleModel(String directoryPath) {
         var assembler = Model.assembler();
 
-        for (var file : modelFiles) {
-            if (file.exists()) {
-                try (BufferedReader reader =
-                        new BufferedReader(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
-                    StringBuilder content = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        content.append(line).append(System.lineSeparator());
-                    }
-                    assembler.addUnparsedModel(file.getName(), content.toString());
-                } catch (IOException e) {
-                    System.err.println("Error reading file: " + file.getPath());
-                    e.printStackTrace();
-                }
+        // Add resource files
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+
+        for (String smithyFile : KNOWN_SMITHY_FILES) {
+            URL resourceUrl = classLoader.getResource(smithyFile);
+            if (resourceUrl != null) {
+                assembler.addImport(resourceUrl);
             } else {
-                System.err.println("File does not exist: " + file.getPath());
+                System.err.println("Resource not found: " + smithyFile);
             }
         }
 
-        return assembler.assemble().unwrap();
+        // Add model files
+        try {
+            assembler.addImport(directoryPath);
+            return assembler.assemble().unwrap();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Failed to assemble model from directory: " + directoryPath, e);
+        }
     }
 
     private ShapeId validateServiceExists(Model model) {
@@ -225,69 +213,6 @@ public class CoralX implements Callable<Integer> {
         }
 
         return client.call(operation, inputDocument).asObject();
-    }
-
-    private static List<File> getResourceFiles() {
-        List<File> resourceFiles = new ArrayList<>(KNOWN_SMITHY_FILES.length);
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-
-        Arrays.stream(KNOWN_SMITHY_FILES).parallel().forEach(smithyFile -> {
-            try (InputStream inputStream = classLoader.getResourceAsStream(smithyFile)) {
-                if (inputStream != null) {
-                    String baseName = smithyFile.replace(".smithy", "");
-                    Path tempFile = Files.createTempFile(baseName, ".smithy");
-                    tempFile.toFile().deleteOnExit();
-
-                    try (BufferedInputStream bis = new BufferedInputStream(inputStream)) {
-                        Files.copy(bis, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                        synchronized(resourceFiles) {
-                            resourceFiles.add(tempFile.toFile());
-                        }
-                    }
-                }
-            } catch (IOException e) {
-                System.err.println("IO exception when accessing resources: " + e.getMessage());
-            }
-        });
-
-        return Collections.unmodifiableList(resourceFiles);
-    }
-
-    private static List<File> getFilesFromDirectory(String directoryPath) {
-        List<File> fileList = new ArrayList<>(getResourceFiles());
-
-        try {
-            File directory = new File(directoryPath);
-
-            if (!directory.exists()) {
-                System.out.println("Directory does not exist: " + directoryPath);
-                return fileList;
-            }
-
-            if (!directory.isDirectory()) {
-                System.out.println("Path is not a directory: " + directoryPath);
-                return fileList;
-            }
-
-            File[] files = directory.listFiles();
-
-            if (files != null) {
-                for (File file : files) {
-                    if (file.isFile()) {
-                        fileList.add(file);
-                    } else if (file.isDirectory()) {
-                        fileList.addAll(getFilesFromDirectory(file.getAbsolutePath()));
-                    }
-                }
-            }
-
-        } catch (SecurityException e) {
-            System.err.println("Security exception when accessing directory: " + e.getMessage());
-        } catch (Exception e) {
-            System.err.println("Error occurred while fetching directory files: " + e.getMessage());
-        }
-
-        return fileList;
     }
 
     private void logError(String message, Exception e) {
