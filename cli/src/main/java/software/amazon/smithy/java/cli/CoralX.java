@@ -8,8 +8,11 @@ package software.amazon.smithy.java.cli;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
 
@@ -25,6 +28,7 @@ import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.client.protocols.rpcv2.RpcV2CborProtocol;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.Model;
@@ -33,10 +37,19 @@ import software.amazon.smithy.model.shapes.ShapeId;
 @Command(name = "coralx", mixinStandardHelpOptions = true, version = "1.0",
         description = "Coral CLI tool")
 public class CoralX implements Callable<Integer> {
+    private static final JsonCodec CODEC = JsonCodec.builder().build();
+
     private static final String AWS_JSON = "awsjson";
     private static final String RPC_V2_CBOR = "rpcv2-cbor";
     private static final String REST_JSON = "restjson";
     private static final String REST_XML = "restxml";
+
+    private static final String[] KNOWN_SMITHY_FILES = {
+            "aws.api.smithy",
+            "aws.auth.smithy",
+            "aws.customizations.smithy",
+            "aws.protocols.smithy"
+    };
 
     @Parameters(index = "0", description = "Service Name")
     private String service;
@@ -193,65 +206,45 @@ public class CoralX implements Callable<Integer> {
             throw new IllegalArgumentException("Cannot specify both '--input-json' and '--input-path'. Please provide only one.");
         }
 
+        if (input == null && inputPath == null) {
+            return client.call(operation).asObject();
+        }
+
+        Document inputDocument;
         if (input != null) {
-            try (JsonCodec codec = JsonCodec.builder().build()) {
-                byte[] jsonBytes = input.getBytes(StandardCharsets.UTF_8);
-                var inputDocument = codec.createDeserializer(jsonBytes).readDocument();
-                return client.call(operation, inputDocument).asObject();
-            }
+            inputDocument = CODEC.createDeserializer(input.getBytes(StandardCharsets.UTF_8)).readDocument();
+        } else {
+            String content = Files.readString(Path.of(inputPath), StandardCharsets.UTF_8);
+            inputDocument = CODEC.createDeserializer(content.getBytes(StandardCharsets.UTF_8)).readDocument();
         }
-        if (inputPath != null) {
-            try (JsonCodec codec = JsonCodec.builder().build();
-                    FileInputStream fis = new FileInputStream(inputPath);
-                    InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
-                    BufferedReader reader = new BufferedReader(isr)) {
 
-                StringBuilder content = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    content.append(line).append(System.lineSeparator());
-                }
-
-                var inputDocument = codec.createDeserializer(content.toString().getBytes()).readDocument();
-                return client.call(operation, inputDocument).asObject();
-            }
-        }
-        return client.call(operation).asObject();
+        return client.call(operation, inputDocument).asObject();
     }
 
     private static List<File> getResourceFiles() {
-        List<File> resourceFiles = new ArrayList<>();
+        List<File> resourceFiles = new ArrayList<>(KNOWN_SMITHY_FILES.length);
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
 
-        try {
-            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        Arrays.stream(KNOWN_SMITHY_FILES).parallel().forEach(smithyFile -> {
+            try (InputStream inputStream = classLoader.getResourceAsStream(smithyFile)) {
+                if (inputStream != null) {
+                    String baseName = smithyFile.replace(".smithy", "");
+                    Path tempFile = Files.createTempFile(baseName, ".smithy");
+                    tempFile.toFile().deleteOnExit();
 
-            String[] knownSmithyFiles = {
-                    "aws.api.smithy",
-                    "aws.auth.smithy",
-                    "aws.customizations.smithy",
-                    "aws.protocols.smithy",
-            };
-
-            for (String smithyFile : knownSmithyFiles) {
-                try (InputStream inputStream = classLoader.getResourceAsStream(smithyFile)) {
-                    if (inputStream != null) {
-                        File tempFile = File.createTempFile(
-                                smithyFile.replace(".smithy", ""),
-                                ".smithy"
-                        );
-                        tempFile.deleteOnExit();
-                        Files.copy(inputStream, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                        resourceFiles.add(tempFile);
+                    try (BufferedInputStream bis = new BufferedInputStream(inputStream)) {
+                        Files.copy(bis, tempFile, StandardCopyOption.REPLACE_EXISTING);
+                        synchronized(resourceFiles) {
+                            resourceFiles.add(tempFile.toFile());
+                        }
                     }
                 }
+            } catch (IOException e) {
+                System.err.println("IO exception when accessing resources: " + e.getMessage());
             }
-        } catch (IOException e) {
-            System.err.println("IO exception when accessing resources: " + e.getMessage());
-        } catch (Exception e) {
-            System.err.println("Error occurred while fetching resource files: " + e.getMessage());
-        }
+        });
 
-        return resourceFiles;
+        return Collections.unmodifiableList(resourceFiles);
     }
 
     private static List<File> getFilesFromDirectory(String directoryPath) {
