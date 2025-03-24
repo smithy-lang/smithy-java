@@ -36,8 +36,11 @@ import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.core.serde.MapSerializer;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 final class CborSerializer implements ShapeSerializer {
     private static final int MAP_STREAM = TYPE_MAP | INDEFINITE;
@@ -48,6 +51,7 @@ final class CborSerializer implements ShapeSerializer {
     private final Sink sink;
     private final CborMapSerializer mapSerializer = new CborMapSerializer();
     private final CborStructSerializer structSerializer = new CborStructSerializer();
+    private SerializeDocumentContents serializeDocumentContents;
 
     public CborSerializer(Sink sink) {
         this.sink = sink;
@@ -266,7 +270,14 @@ final class CborSerializer implements ShapeSerializer {
 
     @Override
     public void writeDocument(Schema schema, Document value) {
-        throw new UnsupportedOperationException();
+        if (value.type() != ShapeType.STRUCTURE) {
+            value.serializeContents(this);
+        } else {
+            if (serializeDocumentContents == null) {
+                serializeDocumentContents = new SerializeDocumentContents(this);
+            }
+            value.serializeContents(serializeDocumentContents);
+        }
     }
 
     private final class CborStructSerializer extends InterceptingSerializer {
@@ -290,6 +301,28 @@ final class CborSerializer implements ShapeSerializer {
             byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
             writeBytes0(TYPE_TEXTSTRING, keyBytes, 0, keyBytes.length);
             valueSerializer.accept(state, CborSerializer.this);
+        }
+    }
+
+    private static final class SerializeDocumentContents extends SpecificShapeSerializer {
+        private final CborSerializer parent;
+
+        SerializeDocumentContents(CborSerializer parent) {
+            this.parent = parent;
+        }
+
+        @Override
+        public void writeStruct(Schema schema, SerializableStruct struct) {
+            try {
+                parent.startMap(-1);
+                parent.tagAndLength(TYPE_TEXTSTRING, 6);
+                parent.sink.writeAscii("__type");
+                parent.writeString(null, schema.id().toString());
+                struct.serializeMembers(parent.structSerializer);
+                parent.endMap();
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
         }
     }
 }
