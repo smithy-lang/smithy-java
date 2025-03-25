@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "plugins": {
+    "java-server-codegen": {
+      "service": "smithy.example#BeerService",
+      "namespace": "software.amazon.smithy.java.server.example",
+      "headerFile": "license.txt",
+      "runtimeTraits": ["smithy.protocols#jsonRpc2", "smithy.protocols#jsonRpc2Method", "smithy.protocols#jsonRpc2Error"]
+    }
+  }
+}

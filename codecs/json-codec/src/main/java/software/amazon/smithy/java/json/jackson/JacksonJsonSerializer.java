@@ -28,7 +28,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
 
     private JsonGenerator generator;
     private final JsonSettings settings;
-    private SerializeDocumentContents serializeDocumentContents;
+    private SpecificShapeSerializer serializeDocumentContents;
     private final ShapeSerializer structSerializer = new JsonStructSerializer();
 
     JacksonJsonSerializer(
@@ -275,7 +275,8 @@ final class JacksonJsonSerializer implements ShapeSerializer {
             value.serializeContents(this);
         } else {
             if (serializeDocumentContents == null) {
-                serializeDocumentContents = new SerializeDocumentContents(this);
+                serializeDocumentContents = settings.serializeTypeInDocuments() ?
+                    new SerializeDocumentContents(this) : new SerializeDocumentNoType(this);
             }
             value.serializeContents(serializeDocumentContents);
         }
@@ -293,6 +294,25 @@ final class JacksonJsonSerializer implements ShapeSerializer {
             try {
                 parent.generator.writeStartObject();
                 parent.generator.writeStringField("__type", schema.id().toString());
+                struct.serializeMembers(parent.structSerializer);
+                parent.generator.writeEndObject();
+            } catch (Exception e) {
+                throw new SerializationException(e);
+            }
+        }
+    }
+
+    private static final class SerializeDocumentNoType extends SpecificShapeSerializer {
+        private final JacksonJsonSerializer parent;
+
+        SerializeDocumentNoType(JacksonJsonSerializer parent) {
+            this.parent = parent;
+        }
+
+        @Override
+        public void writeStruct(Schema schema, SerializableStruct struct) {
+            try {
+                parent.generator.writeStartObject();
                 struct.serializeMembers(parent.structSerializer);
                 parent.generator.writeEndObject();
             } catch (Exception e) {

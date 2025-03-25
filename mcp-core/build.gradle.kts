@@ -9,5 +9,5 @@ extra["moduleName"] = "software.amazon.smithy.java.mcp.core"
 
 dependencies {
     implementation(project(":core"))
-    implementation(project(":server-api"))
+    implementation(project(":server:server-api"))
 }

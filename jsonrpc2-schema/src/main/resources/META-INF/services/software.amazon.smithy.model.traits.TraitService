@@ -1,0 +1,3 @@
+software.amazon.smithy.java.jsonrpc2.JsonRpc2Trait$Provider
+software.amazon.smithy.java.jsonrpc2.JsonRpc2ErrorTrait$Provider
+software.amazon.smithy.java.jsonrpc2.JsonRpc2MethodTrait$Provider

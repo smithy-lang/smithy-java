@@ -15,6 +15,9 @@ include(":http-api")
 include(":http-binding")
 include(":framework-errors")
 
+// JSON-RPC 2.0 APIs
+include(":jsonrpc2-schema")
+
 // Codecs
 include(":codecs:json-codec")
 include(":codecs:cbor-codec")
@@ -33,7 +36,9 @@ include(":client:waiters")
 include(":server:server-api")
 include(":server:server-core")
 include(":server:server-netty")
+include(":server:server-stdio")
 include(":server:server-rpcv2-cbor")
+include(":server:server-jsonrpc2")
 
 // Codegen
 include(":codegen:core")
@@ -63,6 +68,7 @@ include(":aws:integrations:lambda-endpoint")
 // Examples
 include(":examples")
 include(":examples:basic-server")
+include(":examples:stdio-server")
 include(":examples:dynamodb-client")
 include(":examples:event-streaming-client")
 include(":examples:restjson-client")

@@ -16,4 +16,5 @@ dependencies {
     implementation(libs.smithy.model)
     implementation(project(":io"))
     implementation(project(":logging"))
+    implementation(project(":jsonrpc2-schema"))
 }

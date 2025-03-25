@@ -66,6 +66,15 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
     }
 
     @Override
+    public ShapeDeserializer newDeserializer(String source, JsonSettings settings) {
+        try {
+            return new JacksonJsonDeserializer(FACTORY.createParser(source), settings);
+        } catch (IOException e) {
+            throw new SerializationException(e);
+        }
+    }
+
+    @Override
     public ShapeSerializer newSerializer(
             OutputStream sink,
             JsonSettings settings

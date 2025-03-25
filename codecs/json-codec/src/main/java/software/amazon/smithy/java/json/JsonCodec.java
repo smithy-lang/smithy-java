@@ -51,6 +51,10 @@ public final class JsonCodec implements Codec {
         return settings.provider().newDeserializer(source, settings);
     }
 
+    public ShapeDeserializer createDeserializer(String source) {
+        return settings.provider().newDeserializer(source, settings);
+    }
+
     @Override
     public ShapeDeserializer createDeserializer(ByteBuffer source) {
         return settings.provider().newDeserializer(source, settings);

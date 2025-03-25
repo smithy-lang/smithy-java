@@ -43,6 +43,7 @@ public final class JsonSettings {
     private final boolean forbidUnknownUnionMembers;
     private final String defaultNamespace;
     private final JsonSerdeProvider provider;
+    private final boolean serializeTypeInDocuments;
 
     private JsonSettings(Builder builder) {
         this.timestampResolver = builder.useTimestampFormat
@@ -54,6 +55,7 @@ public final class JsonSettings {
         this.forbidUnknownUnionMembers = builder.forbidUnknownUnionMembers;
         this.defaultNamespace = builder.defaultNamespace;
         this.provider = builder.provider;
+        this.serializeTypeInDocuments = builder.serializeTypeInDocuments;
     }
 
     /**
@@ -102,6 +104,10 @@ public final class JsonSettings {
         return defaultNamespace;
     }
 
+    public boolean serializeTypeInDocuments() {
+        return serializeTypeInDocuments;
+    }
+
     JsonSerdeProvider provider() {
         return provider;
     }
@@ -110,6 +116,7 @@ public final class JsonSettings {
         builder.forbidUnknownUnionMembers(forbidUnknownUnionMembers);
         builder.defaultNamespace(defaultNamespace);
         builder.overrideSerdeProvider(provider);
+        builder.serializeTypeInDocuments(serializeTypeInDocuments);
         if (timestampResolver instanceof TimestampResolver.UseTimestampFormatTrait) {
             builder.useTimestampFormat(true);
         }
@@ -139,6 +146,7 @@ public final class JsonSettings {
         private boolean forbidUnknownUnionMembers;
         private String defaultNamespace;
         private JsonSerdeProvider provider = PROVIDER;
+        private boolean serializeTypeInDocuments = true;
 
         private Builder() {}
 
@@ -213,6 +221,11 @@ public final class JsonSettings {
          */
         public Builder defaultNamespace(String defaultNamespace) {
             this.defaultNamespace = defaultNamespace;
+            return this;
+        }
+
+        public Builder serializeTypeInDocuments(boolean serializeTypeInDocuments) {
+            this.serializeTypeInDocuments = serializeTypeInDocuments;
             return this;
         }
 

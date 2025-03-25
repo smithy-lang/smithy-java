@@ -9,7 +9,7 @@ import java.util.Objects;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Operation;
 
-public abstract sealed class DefaultJob implements Job permits HttpJob {
+public abstract sealed class DefaultJob implements Job permits HttpJob, StdioJob {
 
     private final Operation<? extends SerializableStruct, ? extends SerializableStruct> operation;
     private final ServerProtocol protocol;

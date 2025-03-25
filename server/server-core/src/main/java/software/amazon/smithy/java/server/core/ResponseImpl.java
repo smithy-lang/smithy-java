@@ -9,7 +9,7 @@ import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.io.datastream.DataStream;
 
-public abstract sealed class ResponseImpl implements Response permits HttpResponse {
+public abstract sealed class ResponseImpl implements Response permits HttpResponse, StdioResponse {
 
     private final Context context = Context.create();
     private SerializableStruct value;

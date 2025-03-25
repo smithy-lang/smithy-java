@@ -20,6 +20,7 @@ public interface JsonSerdeProvider {
 
     ShapeDeserializer newDeserializer(ByteBuffer source, JsonSettings settings);
 
-    ShapeSerializer newSerializer(OutputStream sink, JsonSettings settings);
+    ShapeDeserializer newDeserializer(String source, JsonSettings settings);
 
+    ShapeSerializer newSerializer(OutputStream sink, JsonSettings settings);
 }

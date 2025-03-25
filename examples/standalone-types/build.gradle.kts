@@ -43,6 +43,10 @@ tasks {
     }
 }
 
+java.sourceSets["main"].java {
+    srcDirs("model")
+}
+
 repositories {
     mavenLocal()
     mavenCentral()
