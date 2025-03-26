@@ -24,6 +24,8 @@ dependencies {
     implementation(project(":client:dynamic-client"))
     implementation(project(":codecs:json-codec"))
     implementation(project(":client:client-http"))
+    implementation(project(":aws:client:aws-client-core"))
+    implementation(project(":aws:sigv4"))
 }
 
 application {

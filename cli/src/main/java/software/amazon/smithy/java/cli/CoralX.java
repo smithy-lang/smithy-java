@@ -14,7 +14,10 @@ import java.util.concurrent.Callable;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigV4AuthScheme;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
+import software.amazon.smithy.java.aws.client.core.identity.EnvironmentVariableIdentityResolver;
+import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.aws.client.restxml.RestXmlClientProtocol;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
@@ -135,7 +138,7 @@ public class CoralX implements Callable<Integer> {
             assembler.addImport(directoryPath);
             return assembler.assemble().unwrap();
         } catch (Exception e) {
-            throw new IllegalArgumentException("Failed to assemble model from directory: " + directoryPath, e);
+            throw new IllegalArgumentException("Failed to assemble model from directory: " + e, e);
         }
     }
 
@@ -155,7 +158,10 @@ public class CoralX implements Callable<Integer> {
         DynamicClient.Builder builder = DynamicClient.builder()
                 .service(serviceInput)
                 .model(model)
-                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .putConfigIfAbsent(RegionSetting.REGION, "us-east-1") // this will probably be an input
+                .putSupportedAuthSchemes(new SigV4AuthScheme("bt111fluuperm")) // can maybe assume that this would just be service name lowercase?
+                .authSchemeResolver(AuthSchemeResolver.DEFAULT)
+                .addIdentityResolver(new EnvironmentVariableIdentityResolver())
                 .transport(new JavaHttpClientTransport())
                 .endpointResolver(EndpointResolver.staticEndpoint(url));
 
