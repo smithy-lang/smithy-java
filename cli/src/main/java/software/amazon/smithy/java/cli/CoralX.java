@@ -52,32 +52,32 @@ public class CoralX implements Callable<Integer> {
     @Parameters(index = "0", description = "Service Name")
     private String service;
 
-    @Parameters(index = "1", description = "Operation Name", arity = "0..1")
+    @Parameters(index = "1", description = "Name of the operation to perform on the service", arity = "0..1")
     private String operation;
 
-    @Option(names = { "-m", "--model-path" }, description = "Model file path", required = true)
+    @Option(names = { "-m", "--model-path" }, description = "Path to the .smithy service model file", required = true)
     private String modelPath;
 
-    @Option(names = "--input-path", description = "Input json file path")
+    @Option(names = "--input-path", description = "Path to a JSON file containing input parameters for the operation")
     private String inputPath;
 
-    @Option(names = "--input-json", description = "Input JSON string")
+    @Option(names = "--input-json", description = "JSON string containing input parameters for the operation")
     private String input;
 
-    @Option(names = "--url", description = "Service URL")
+    @Option(names = "--url", description = "Endpoint URL for the service")
     private String url;
 
-    @Option(names = { "-p", "--protocol" }, description = "Optionally specified protocol")
+    @Option(names = { "-p", "--protocol" }, description = "Communication protocol to use (options: awsjson, rpcv2-cbor, restjson, and restxml)")
     private String protocol;
 
-    @Option(names = { "-a", "--auth" }, description = "Optionally configured auth method")
+    @Option(names = { "-a", "--auth" }, description = "Authentication method to use")
     private String authType;
 
-    @Option(names = { "--aws-region" }, description = "Optionally configured sigv4 auth region")
+    @Option(names = { "--aws-region" }, description = "AWS region for SigV4 authentication")
     private String awsRegion;
 
 
-    @Option(names = "--list-operations", description = "List operations for the specified service")
+    @Option(names = "--list-operations", description = "List all available operations for the specified service")
     private boolean listOperations;
 
     @Override
@@ -85,8 +85,11 @@ public class CoralX implements Callable<Integer> {
         try {
             validateInput();
             return listOperations ? listOperationsForService() : executeOperation();
+        } catch (IllegalArgumentException e) {
+            logError("Invalid input", e);
+            return 1;
         } catch (Exception e) {
-            logError("Command execution failed", e);
+            logError("Unexpected error occurred", e);
             return 1;
         }
     }
@@ -179,7 +182,8 @@ public class CoralX implements Callable<Integer> {
         String defaultArnNamespace = serviceInput.getNamespace().toLowerCase();
         if (authType != null) {
             switch (authType.toLowerCase()) {
-                case "sigv4", "aws":
+                case "sigv4":
+                case "aws":
                     if (awsRegion == null) {
                         throw new IllegalArgumentException("SigV4 auth requires --aws-region to be set");
                     }
@@ -187,6 +191,9 @@ public class CoralX implements Callable<Integer> {
                             .putSupportedAuthSchemes(new SigV4AuthScheme(defaultArnNamespace))
                             .authSchemeResolver(AuthSchemeResolver.DEFAULT)
                             .addIdentityResolver(new EnvironmentVariableIdentityResolver()); // should we let users determine this?
+                    break;
+                case "none":
+                    builder.authSchemeResolver(AuthSchemeResolver.NO_AUTH);
                     break;
                 default:
                     throw new IllegalArgumentException("Unsupported auth type: " + authType);
