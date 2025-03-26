@@ -13,7 +13,6 @@ import java.util.Collections;
 import java.util.Scanner;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.framework.model.UnknownOperationException;
 import software.amazon.smithy.java.http.api.HttpHeaders;
@@ -78,10 +77,10 @@ final class StdioServer implements Server {
 
     static final class StdioDispatcher {
         private static final JsonCodec CODEC = JsonCodec.builder()
-            .settings(JsonSettings.builder()
-                .serializeTypeInDocuments(false)
-                .build())
-            .build();
+                .settings(JsonSettings.builder()
+                        .serializeTypeInDocuments(false)
+                        .build())
+                .build();
         private static final URI DUMMY_URI = URI.create("/");
         private static final HttpHeaders NO_HEADERS = HttpHeaders.of(Collections.emptyMap());
         private static final int UNKNOWN_METHOD = -32601;
@@ -150,10 +149,10 @@ final class StdioServer implements Server {
 
         private void writeResponse(int id, StdioResponse smithyResponse, OutputStream os) {
             var response = JsonRpcResponse.builder()
-                .id(id)
-                .result(Document.of(smithyResponse.response()))
-                .jsonrpc("2.0")
-                .build();
+                    .id(id)
+                    .result(Document.of(smithyResponse.response()))
+                    .jsonrpc("2.0")
+                    .build();
             synchronized (os) {
                 try {
                     os.write(CODEC.serializeToString(response).getBytes(StandardCharsets.UTF_8));

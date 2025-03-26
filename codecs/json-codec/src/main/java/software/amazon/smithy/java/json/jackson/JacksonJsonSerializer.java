@@ -275,8 +275,8 @@ final class JacksonJsonSerializer implements ShapeSerializer {
             value.serializeContents(this);
         } else {
             if (serializeDocumentContents == null) {
-                serializeDocumentContents = settings.serializeTypeInDocuments() ?
-                    new SerializeDocumentContents(this) : new SerializeDocumentNoType(this);
+                serializeDocumentContents = settings.serializeTypeInDocuments() ? new SerializeDocumentContents(this)
+                        : new SerializeDocumentNoType(this);
             }
             value.serializeContents(serializeDocumentContents);
         }

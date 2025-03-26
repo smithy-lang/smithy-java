@@ -3,7 +3,6 @@ package software.amazon.smithy.java.server.example;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.Codec;
@@ -56,8 +55,7 @@ public class IOStreamServerIntegrationTest {
             .build();
         write("add-beer", AddBeerInput.builder().beer(beer).build());
 
-        var response = output.read();
-        var added = CODEC.deserializeShape(response, AddBeerOutput.builder());
+        var added = read(AddBeerOutput.builder());
         assertEquals(1, added.id());
 
         write("get-beer", GetBeerInput.builder().id(added.id()).build());

@@ -5,6 +5,11 @@
 
 package com.amazon.coral.smithy.java.server.protocols.jsonrpc2;
 
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.Codec;
@@ -19,12 +24,6 @@ import software.amazon.smithy.java.server.core.ServiceProtocolResolutionResult;
 import software.amazon.smithy.java.server.core.StdioRequest;
 import software.amazon.smithy.java.server.core.StdioResponse;
 import software.amazon.smithy.model.shapes.ShapeId;
-
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 final class JsonRpc2Protocol extends ServerProtocol {
     static final ShapeId JSON_RPC2_PROTOCOL_ID = ShapeId.from("smithy.example#jsonRpc2");
