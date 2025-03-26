@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.cli;
 
+import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -42,7 +43,7 @@ public class CoralX implements Callable<Integer> {
     private static final String REST_JSON = "restjson";
     private static final String REST_XML = "restxml";
 
-    private static final String[] KNOWN_SMITHY_FILES = {
+    private static final String[] RESOURCE_SMITHY_FILES = {
             "aws.api.smithy",
             "aws.auth.smithy",
             "aws.customizations.smithy",
@@ -83,20 +84,16 @@ public class CoralX implements Callable<Integer> {
     @Override
     public Integer call() {
         try {
-            validateInput();
+            if (!listOperations && operation == null) {
+                throw new IllegalArgumentException("Operation is required when not listing operations");
+            }
             return listOperations ? listOperationsForService() : executeOperation();
         } catch (IllegalArgumentException e) {
             logError("Invalid input", e);
             return 1;
         } catch (Exception e) {
-            logError("Unexpected error occurred", e);
+            logError("Unexpected error occurred: ", e);
             return 1;
-        }
-    }
-
-    private void validateInput() {
-        if (!listOperations && operation == null) {
-            throw new IllegalArgumentException("Operation required");
         }
     }
 
@@ -128,13 +125,12 @@ public class CoralX implements Callable<Integer> {
         }
     }
 
-    private Model assembleModel(String directoryPath) {
+    private Model assembleModel(String directoryPath) throws IOException {
         var assembler = Model.assembler();
 
         // Add resource files
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-
-        for (String smithyFile : KNOWN_SMITHY_FILES) {
+        for (String smithyFile : RESOURCE_SMITHY_FILES) {
             URL resourceUrl = classLoader.getResource(smithyFile);
             if (resourceUrl != null) {
                 assembler.addImport(resourceUrl);
@@ -148,7 +144,7 @@ public class CoralX implements Callable<Integer> {
             assembler.addImport(directoryPath);
             return assembler.assemble().unwrap();
         } catch (Exception e) {
-            throw new IllegalArgumentException("Failed to assemble model from directory: " + e, e);
+            throw new IOException("Failed to assemble model from directory: " + e, e);
         }
     }
 
@@ -162,7 +158,7 @@ public class CoralX implements Callable<Integer> {
 
     private DynamicClient buildDynamicClient(Model model, ShapeId serviceInput) {
         if (url == null) {
-            throw new IllegalArgumentException("Service endpoint URL required");
+            throw new IllegalArgumentException("Service endpoint URL is required. Please provide the --url option.");
         }
 
         DynamicClient.Builder builder = DynamicClient.builder()
@@ -185,7 +181,7 @@ public class CoralX implements Callable<Integer> {
                 case "sigv4":
                 case "aws":
                     if (awsRegion == null) {
-                        throw new IllegalArgumentException("SigV4 auth requires --aws-region to be set");
+                        throw new IllegalArgumentException("SigV4 auth requires --aws-region to be set. Please provide the --aws-region option.");
                     }
                     builder.putConfig(RegionSetting.REGION, awsRegion)
                             .putSupportedAuthSchemes(new SigV4AuthScheme(defaultArnNamespace))
