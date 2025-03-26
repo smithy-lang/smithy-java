@@ -42,7 +42,6 @@ graalvmNative {
 
         buildArgs.addAll(listOf(
             "-H:ResourceConfigurationFiles=${projectDir}/src/resource-config.json",
-            "-H:ReflectionConfigurationFiles=${projectDir}/src/reflect-config.json",
             "--enable-url-protocols=http,https",
         ))
 
