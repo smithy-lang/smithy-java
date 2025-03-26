@@ -70,6 +70,13 @@ public class CoralX implements Callable<Integer> {
     @Option(names = { "-p", "--protocol" }, description = "Optionally specified protocol")
     private String protocol;
 
+    @Option(names = { "-a", "--auth" }, description = "Optionally configured auth method")
+    private String authType;
+
+    @Option(names = { "--aws-region" }, description = "Optionally configured sigv4 auth region")
+    private String awsRegion;
+
+
     @Option(names = "--list-operations", description = "List operations for the specified service")
     private boolean listOperations;
 
@@ -158,17 +165,35 @@ public class CoralX implements Callable<Integer> {
         DynamicClient.Builder builder = DynamicClient.builder()
                 .service(serviceInput)
                 .model(model)
-                .putConfigIfAbsent(RegionSetting.REGION, "us-east-1") // this will probably be an input
-                .putSupportedAuthSchemes(new SigV4AuthScheme("bt111fluuperm")) // can maybe assume that this would just be service name lowercase?
-                .authSchemeResolver(AuthSchemeResolver.DEFAULT)
-                .addIdentityResolver(new EnvironmentVariableIdentityResolver())
                 .transport(new JavaHttpClientTransport())
                 .endpointResolver(EndpointResolver.staticEndpoint(url));
 
+        configureAuth(builder, serviceInput);
         configureProtocol(builder, serviceInput);
         configureInputInterceptor(builder);
 
         return builder.build();
+    }
+
+    private void configureAuth(DynamicClient.Builder builder, ShapeId serviceInput) {
+        String defaultArnNamespace = serviceInput.getNamespace().toLowerCase();
+        if (authType != null) {
+            switch (authType.toLowerCase()) {
+                case "sigv4", "aws":
+                    if (awsRegion == null) {
+                        throw new IllegalArgumentException("SigV4 auth requires --aws-region to be set");
+                    }
+                    builder.putConfig(RegionSetting.REGION, awsRegion)
+                            .putSupportedAuthSchemes(new SigV4AuthScheme(defaultArnNamespace))
+                            .authSchemeResolver(AuthSchemeResolver.DEFAULT)
+                            .addIdentityResolver(new EnvironmentVariableIdentityResolver()); // should we let users determine this?
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unsupported auth type: " + authType);
+            }
+        } else {
+            builder.authSchemeResolver(AuthSchemeResolver.NO_AUTH);
+        }
     }
 
     private void configureProtocol(DynamicClient.Builder builder, ShapeId serviceInput) {
