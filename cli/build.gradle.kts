@@ -6,16 +6,10 @@ plugins {
 }
 
 dependencies {
-//    val smithyJavaVersion: String by project
-
-//    smithyBuild("software.amazon.smithy.java.codegen:plugins:$smithyJavaVersion")
-
     implementation("info.picocli:picocli:4.7.6")
     annotationProcessor("info.picocli:picocli-codegen:4.7.6")
 
     // Client dependencies
-//    implementation("software.amazon.smithy:smithy-aws-traits")
-
     implementation(project(":aws:client:aws-client-restjson"))
     implementation(project(":aws:client:aws-client-awsjson"))
     implementation(project(":aws:client:aws-client-restxml"))
@@ -31,40 +25,6 @@ dependencies {
 application {
     mainClass = "software.amazon.smithy.java.cli.CoralXRunner"
 }
-
-// Add generated Java sources to the main sourceset
-//afterEvaluate {
-//    val clientPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-cli-codegen")
-//    sourceSets.main.get().java.srcDir(clientPath)
-//}
-
-//tasks {
-//    compileJava {
-//        dependsOn(smithyBuild)
-//    }
-//}
-
-// Helps Intellij IDE's discover smithy models
-//sourceSets {
-//    main {
-//        java {
-//            srcDir("src")
-//        }
-//    }
-//}
-
-//sourceSets {
-//    main {
-//        resources {
-//            // Make sure .smithy files are included
-//            include("**/*.smithy")
-//        }
-//    }
-//}
-//
-//tasks.processResources {
-//    include("**/*.smithy")
-//}
 
 graalvmNative {
     binaries.named("main") {
@@ -84,22 +44,6 @@ graalvmNative {
             "-H:ResourceConfigurationFiles=${projectDir}/src/resource-config.json",
             "-H:ReflectionConfigurationFiles=${projectDir}/src/reflect-config.json",
             "--enable-url-protocols=http,https",
-
-//            "--initialize-at-build-time=software.amazon.smithy.aws.traits",
-//            "--initialize-at-build-time=software.amazon.smithy.aws.traits.protocols",
-//            "--initialize-at-build-time=software.amazon.smithy.utils.BuilderRef"
-
-
-//            "--initialize-at-build-time=java.net.URL",
-//            "--initialize-at-build-time=java.net.URI",
-//            "--enable-all-security-services"
-
-//            "--initialize-at-build-time=software.amazon.smithy.aws.traits",
-//            "--initialize-at-build-time=software.amazon.smithy.aws.protocols"
-//            "--initialize-at-build-time=software.amazon.smithy",
-//            "--initialize-at-build-time=software.amazon.smithy.model",
-//            "-H:Log=registerResource:5",
-//            "--no-fallback"
         ))
 
         // Debug info
