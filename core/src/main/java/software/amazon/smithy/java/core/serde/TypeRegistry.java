@@ -156,7 +156,29 @@ public interface TypeRegistry {
      */
     final class Builder {
 
-        private record Entry<T extends SerializableStruct>(Class<T> type, Supplier<ShapeBuilder<T>> supplier) {}
+        private interface Entry<T extends SerializableStruct> {
+            Class<T> type();
+
+            Supplier<ShapeBuilder<T>> builderSupplier();
+        }
+
+        private record EagerEntry<T extends SerializableStruct>(
+                Class<T> type,
+                Supplier<ShapeBuilder<T>> builderSupplier) implements Entry<T> {}
+
+        private record LazyEntry<T extends SerializableStruct>(
+                Supplier<Class<T>> typeSupplier,
+                Supplier<Supplier<ShapeBuilder<T>>> lazyBuilderSupplier) implements Entry<T> {
+            @Override
+            public Class<T> type() {
+                return typeSupplier.get();
+            }
+
+            @Override
+            public Supplier<ShapeBuilder<T>> builderSupplier() {
+                return lazyBuilderSupplier.get();
+            }
+        }
 
         private final Map<ShapeId, Entry<? extends SerializableStruct>> supplierMap = new HashMap<>();
 
@@ -185,7 +207,28 @@ public interface TypeRegistry {
                 Class<T> type,
                 Supplier<ShapeBuilder<T>> supplier
         ) {
-            supplierMap.put(shapeId, new Entry<>(type, supplier));
+            supplierMap.put(shapeId, new EagerEntry<>(type, supplier));
+            return this;
+        }
+
+        /**
+         * Put a shape into the registry in a way that does not eagerly load the targeted class.
+         *
+         * <p>This alternative API can be used to build up large type registries that don't eagerly load classes
+         * just by adding them to the registry, leading to potentially faster startup.
+         *
+         * @param shapeId             ID of the shape.
+         * @param typeSupplier        Supplier to return the class.
+         * @param lazyBuilderSupplier Supplier to create a new builder supplier for this shape.
+         * @return the builder.
+         * @param <T> shape type.
+         */
+        public <T extends SerializableStruct> Builder putType(
+                ShapeId shapeId,
+                Supplier<Class<T>> typeSupplier,
+                Supplier<Supplier<ShapeBuilder<T>>> lazyBuilderSupplier
+        ) {
+            supplierMap.put(shapeId, new LazyEntry<>(typeSupplier, lazyBuilderSupplier));
             return this;
         }
 
@@ -199,13 +242,13 @@ public interface TypeRegistry {
             @Override
             public Class<? extends SerializableStruct> getShapeClass(ShapeId shapeId) {
                 var entry = supplierMap.get(shapeId);
-                return entry == null ? null : entry.type;
+                return entry == null ? null : entry.type();
             }
 
             @Override
             public ShapeBuilder<?> createBuilder(ShapeId shapeId) {
                 var entry = supplierMap.get(shapeId);
-                return entry == null ? null : entry.supplier.get();
+                return entry == null ? null : entry.builderSupplier().get();
             }
 
             @Override

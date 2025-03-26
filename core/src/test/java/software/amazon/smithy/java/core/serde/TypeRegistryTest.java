@@ -80,4 +80,17 @@ public class TypeRegistryTest {
         assertThat(deserialized, instanceOf(Person.class));
         assertThat(((Person) deserialized).name(), equalTo("Phreddie"));
     }
+
+    @Test
+    public void registersLazyTypes() {
+        TypeRegistry registry = TypeRegistry.builder()
+                .putType(ShapeId.from("smithy.example#Person"), () -> Person.class, () -> Person::builder)
+                .build();
+        var person = Person.builder().name("Pharkus").build();
+        var document = Document.of(person);
+        var deserialized = registry.deserialize(document);
+
+        assertThat(deserialized, instanceOf(Person.class));
+        assertThat(((Person) deserialized).name(), equalTo("Pharkus"));
+    }
 }
