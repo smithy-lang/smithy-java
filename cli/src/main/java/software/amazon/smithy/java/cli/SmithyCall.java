@@ -42,7 +42,7 @@ public class SmithyCall implements Callable<Integer> {
     private static final String REST_JSON = "restjson";
     private static final String REST_XML = "restxml";
 
-    private static final String[] RESOURCE_SMITHY_FILES = {
+    private static final String[] BASE_RESOURCE_FILES = {
             "aws.api.smithy",
             "aws.auth.smithy",
             "aws.customizations.smithy",
@@ -129,7 +129,7 @@ public class SmithyCall implements Callable<Integer> {
 
         // Add base resource files
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        for (String smithyFile : RESOURCE_SMITHY_FILES) {
+        for (String smithyFile : BASE_RESOURCE_FILES) {
             URL resourceUrl = classLoader.getResource(smithyFile);
             if (resourceUrl != null) {
                 assembler.addImport(resourceUrl);
