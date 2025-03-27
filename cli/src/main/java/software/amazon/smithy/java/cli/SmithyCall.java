@@ -25,7 +25,6 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
-import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.client.protocols.rpcv2.RpcV2CborProtocol;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
@@ -33,9 +32,9 @@ import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-@Command(name = "coralx", mixinStandardHelpOptions = true, version = "1.0",
-        description = "Coral CLI tool")
-public class CoralX implements Callable<Integer> {
+@Command(name = "smithy-call", mixinStandardHelpOptions = true, version = "1.0",
+        description = "Smithy Java CLI")
+public class SmithyCall implements Callable<Integer> {
     private static final JsonCodec CODEC = JsonCodec.builder().build();
 
     private static final String AWS_JSON = "awsjson";
@@ -128,7 +127,7 @@ public class CoralX implements Callable<Integer> {
     private Model assembleModel(String directoryPath) throws IOException {
         var assembler = Model.assembler();
 
-        // Add resource files
+        // Add base resource files
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         for (String smithyFile : RESOURCE_SMITHY_FILES) {
             URL resourceUrl = classLoader.getResource(smithyFile);

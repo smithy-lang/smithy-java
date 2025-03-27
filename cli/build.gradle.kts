@@ -23,7 +23,7 @@ dependencies {
 }
 
 application {
-    mainClass = "software.amazon.smithy.java.cli.CoralXRunner"
+    mainClass = "software.amazon.smithy.java.cli.SmithyCallRunner"
 }
 
 graalvmNative {
@@ -49,7 +49,7 @@ graalvmNative {
         verbose.set(true)
 
         // Image configuration
-        imageName.set("coralx")
+        imageName.set("smithy-call")
         mainClass.set(application.mainClass)
 
         // Determines if image is a shared library [note: defaults to true if java-library plugin is applied]
