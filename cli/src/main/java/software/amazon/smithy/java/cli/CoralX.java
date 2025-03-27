@@ -164,7 +164,6 @@ public class CoralX implements Callable<Integer> {
         DynamicClient.Builder builder = DynamicClient.builder()
                 .service(serviceInput)
                 .model(model)
-                .transport(new JavaHttpClientTransport())
                 .endpointResolver(EndpointResolver.staticEndpoint(url));
 
         configureAuth(builder, serviceInput);
@@ -186,7 +185,7 @@ public class CoralX implements Callable<Integer> {
                     builder.putConfig(RegionSetting.REGION, awsRegion)
                             .putSupportedAuthSchemes(new SigV4AuthScheme(defaultArnNamespace))
                             .authSchemeResolver(AuthSchemeResolver.DEFAULT)
-                            .addIdentityResolver(new EnvironmentVariableIdentityResolver()); // should we let users determine this?
+                            .addIdentityResolver(new EnvironmentVariableIdentityResolver());
                     break;
                 case "none":
                     builder.authSchemeResolver(AuthSchemeResolver.NO_AUTH);
