@@ -1,7 +1,6 @@
 plugins {
     `java-library`
     application
-    id("software.amazon.smithy.gradle.smithy-base")
     id("org.graalvm.buildtools.native") version "0.10.3"
 }
 
