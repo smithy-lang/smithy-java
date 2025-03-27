@@ -97,6 +97,11 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
     }
 
     private static String uncapitalizeAcronymAware(String str) {
+        if (Character.isLowerCase(str.charAt(0))) {
+            return str;
+        } else if (str.equals(str.toUpperCase())) {
+            return str.toLowerCase();
+        }
         int strLen = str.length();
         StringBuilder sb = new StringBuilder(strLen);
         boolean nextIsUpperCase;

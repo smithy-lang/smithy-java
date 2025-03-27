@@ -17,9 +17,9 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.java.example.model.NewOrderEvent;
-import software.amazon.smithy.java.example.model.QueryEvent;
-import software.amazon.smithy.java.example.model.ReturnEvent;
+import software.amazon.smithy.java.example.standalone.model.NewOrderEvent;
+import software.amazon.smithy.java.example.standalone.model.QueryEvent;
+import software.amazon.smithy.java.example.standalone.model.ReturnEvent;
 
 public class GenericEventTest {
     private final TypeRegistry typeRegistry = TypeRegistry.builder()

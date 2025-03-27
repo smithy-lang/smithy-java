@@ -13,9 +13,9 @@ import java.util.Set;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.directed.ContextualDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateResourceDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
-import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -41,10 +41,11 @@ public final class ResourceGenerator
                     writer.pushState(new ClassSection(shape));
                     var template = """
                             public final class ${shape:T} implements ${resourceType:T} {
-                                ${id:C|}
                                 private static final ${shape:T} $$INSTANCE = new ${shape:T}();
                                 ${properties:C|}
                                 private ${schema:C}
+
+                                ${id:C|}
 
                                 /**
                                  * Get an instance of this {@code ApiResource}.
@@ -102,18 +103,17 @@ public final class ResourceGenerator
                     writer.putContext(
                             "properties",
                             new PropertyGenerator(
+                                    directive,
                                     writer,
                                     directive.symbolProvider(),
                                     directive.model(),
                                     shape));
                     writer.putContext(
                             "schema",
-                            new SchemaGenerator(
+                            new SchemaFieldGenerator(
+                                    directive,
                                     writer,
-                                    shape,
-                                    directive.symbolProvider(),
-                                    directive.model(),
-                                    directive.context()));
+                                    shape));
                     writer.putContext(
                             "lifecycleOperations",
                             new LifecycleOperationGenerator(
@@ -136,6 +136,7 @@ public final class ResourceGenerator
     }
 
     private record PropertyGenerator(
+            ContextualDirective<CodeGenerationContext, JavaCodegenSettings> directive,
             JavaWriter writer,
             SymbolProvider symbolProvider,
             Model model,
@@ -179,7 +180,7 @@ public final class ResourceGenerator
 
         private String getSchema(ShapeId value) {
             var target = model.expectShape(value);
-            return CodegenUtils.getSchemaType(writer, symbolProvider, target);
+            return directive.context().schemaFieldOrder().getSchemaFieldName(target, writer);
         }
 
         private List<Symbol> getOperationSymbols(Set<ShapeId> shapeIds) {

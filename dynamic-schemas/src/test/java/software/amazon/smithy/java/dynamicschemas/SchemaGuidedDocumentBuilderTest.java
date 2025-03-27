@@ -7,6 +7,8 @@ package software.amazon.smithy.java.dynamicschemas;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -21,10 +23,19 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
+import software.amazon.smithy.java.core.schema.Schema;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.InterceptingSerializer;
+import software.amazon.smithy.java.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.core.serde.ShapeSerializer;
+import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
+import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
+import software.amazon.smithy.java.core.serde.document.DocumentUtils;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 public class SchemaGuidedDocumentBuilderTest {
 
@@ -103,6 +114,25 @@ public class SchemaGuidedDocumentBuilderTest {
 
         assertThat(result.asObject(), equalTo(source.asObject()));
         assertThat(result.schema(), equalTo(schema));
+
+        // Ensure structure and union members are set appropriately.
+        if (schema.type() == ShapeType.STRUCTURE || schema.type() == ShapeType.UNION) {
+            for (var member : result.getMemberNames()) {
+                var memberValue = result.getMember(member);
+                if (memberValue != null) {
+                    var expectedMember = schema.member(member);
+                    if (expectedMember != null) {
+                        memberValue.serialize(new InterceptingSerializer() {
+                            @Override
+                            protected ShapeSerializer before(Schema s) {
+                                assertThat(s, equalTo(expectedMember));
+                                return ShapeSerializer.nullSerializer();
+                            }
+                        });
+                    }
+                }
+            }
+        }
     }
 
     @Test
@@ -118,6 +148,43 @@ public class SchemaGuidedDocumentBuilderTest {
 
         assertThat(result.asObject(), equalTo(document.asObject()));
         assertThat(result.schema(), equalTo(schema));
+    }
+
+    @Test
+    public void usesCorrectMemberSchemas() {
+        var converter = new SchemaConverter(model);
+        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
+
+        // Ensure that the schema used to deserialize the shape is pass through to the deserializer methods.
+        var deser = new SpecificShapeDeserializer() {
+            @Override
+            public <T> void readStruct(Schema s1, T state, StructMemberConsumer<T> consumer) {
+                assertThat(s1, equalTo(schema));
+                consumer.accept(state, s1.member("foo"), new SpecificShapeDeserializer() {
+                    @Override
+                    public String readString(Schema s2) {
+                        // We previously had a bug that always passed the same root schema over and over.
+                        assertThat(s2, equalTo(schema.member("foo")));
+                        return "bar";
+                    }
+                });
+            }
+        };
+
+        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
+        builder.deserialize(deser);
+
+        var result = builder.build();
+
+        assertThat(result.asObject(), equalTo(Map.of("foo", "bar")));
+        assertThat(result.schema(), equalTo(schema));
+
+        result.getMember("foo").serialize(new SpecificShapeSerializer() {
+            @Override
+            public void writeString(Schema s, String value) {
+                assertThat(s, equalTo(schema.member("foo")));
+            }
+        });
     }
 
     @Test

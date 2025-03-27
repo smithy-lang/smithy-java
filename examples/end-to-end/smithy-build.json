@@ -3,13 +3,13 @@
   "plugins": {
     "java-client-codegen": {
       "service": "com.example#CoffeeShop",
-      "namespace": "software.amazon.smithy.java.example",
+      "namespace": "software.amazon.smithy.java.example.etoe",
       "headerFile": "license.txt",
       "protocol": "aws.protocols#restJson1"
     },
     "java-server-codegen": {
       "service": "com.example#CoffeeShop",
-      "namespace": "software.amazon.smithy.java.example",
+      "namespace": "software.amazon.smithy.java.example.etoe",
       "headerFile": "license.txt",
       "useExternalTypes": true
     }

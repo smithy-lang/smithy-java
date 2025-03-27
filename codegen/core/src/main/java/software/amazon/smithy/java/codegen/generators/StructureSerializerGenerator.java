@@ -6,6 +6,8 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.directed.ContextualDirective;
+import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -22,6 +24,7 @@ import software.amazon.smithy.model.traits.ErrorTrait;
  * method for a structure class.
  */
 record StructureSerializerGenerator(
+        ContextualDirective<CodeGenerationContext, ?> directive,
         JavaWriter writer,
         StructureShape shape,
         SymbolProvider symbolProvider,
@@ -74,7 +77,7 @@ record StructureSerializerGenerator(
                     ${?nullable}if (${memberName:L} != null) {
                         ${/nullable}${C|};${?nullable}
                     }${/nullable}
-                    """, new SerializerMemberGenerator(writer, symbolProvider, model, service, member, memberName));
+                    """, new SerializerMemberGenerator(directive, writer, member, memberName));
             writer.popState();
         }
     }

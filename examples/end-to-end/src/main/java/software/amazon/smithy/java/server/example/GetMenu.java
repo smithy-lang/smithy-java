@@ -6,11 +6,11 @@
 package software.amazon.smithy.java.server.example;
 
 import java.util.List;
-import software.amazon.smithy.java.example.model.CoffeeItem;
-import software.amazon.smithy.java.example.model.CoffeeType;
-import software.amazon.smithy.java.example.model.GetMenuInput;
-import software.amazon.smithy.java.example.model.GetMenuOutput;
-import software.amazon.smithy.java.example.service.GetMenuOperation;
+import software.amazon.smithy.java.example.etoe.model.CoffeeItem;
+import software.amazon.smithy.java.example.etoe.model.CoffeeType;
+import software.amazon.smithy.java.example.etoe.model.GetMenuInput;
+import software.amazon.smithy.java.example.etoe.model.GetMenuOutput;
+import software.amazon.smithy.java.example.etoe.service.GetMenuOperation;
 import software.amazon.smithy.java.server.RequestContext;
 
 /**

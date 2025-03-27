@@ -17,6 +17,8 @@ import software.amazon.smithy.codegen.core.CodegenContext;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.WriterDelegator;
+import software.amazon.smithy.codegen.core.directed.CreateContextDirective;
+import software.amazon.smithy.java.codegen.generators.SchemaFieldOrder;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.Model;
@@ -52,6 +54,7 @@ import software.amazon.smithy.model.traits.XmlAttributeTrait;
 import software.amazon.smithy.model.traits.XmlFlattenedTrait;
 import software.amazon.smithy.model.traits.XmlNameTrait;
 import software.amazon.smithy.model.traits.XmlNamespaceTrait;
+import software.amazon.smithy.utils.SmithyInternalApi;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
@@ -104,20 +107,27 @@ public class CodeGenerationContext
     private final Set<ShapeId> runtimeTraits;
     private final List<TraitInitializer<?>> traitInitializers;
     private final String plugin;
+    private final SchemaFieldOrder schemaFieldOrder;
 
     public CodeGenerationContext(
-            Model model,
-            JavaCodegenSettings settings,
-            SymbolProvider symbolProvider,
-            FileManifest fileManifest,
-            List<JavaCodegenIntegration> integrations,
+            CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive,
             String plugin
     ) {
-        this.model = model;
-        this.settings = settings;
-        this.fileManifest = fileManifest;
-        this.integrations = integrations;
-        this.symbolProvider = symbolProvider;
+        this(directive, plugin, 64000);
+    }
+
+    //Visible for testing
+    @SmithyInternalApi
+    CodeGenerationContext(
+            CreateContextDirective<JavaCodegenSettings, JavaCodegenIntegration> directive,
+            String plugin,
+            int schemaPartitionThreshold
+    ) {
+        this.model = directive.model();
+        this.settings = directive.settings();
+        this.fileManifest = directive.fileManifest();
+        this.integrations = directive.integrations();
+        this.symbolProvider = directive.symbolProvider();
         this.writerDelegator = new WriterDelegator<>(
                 fileManifest,
                 this.symbolProvider,
@@ -125,6 +135,7 @@ public class CodeGenerationContext
         this.runtimeTraits = collectRuntimeTraits();
         this.traitInitializers = collectTraitInitializers();
         this.plugin = plugin;
+        this.schemaFieldOrder = new SchemaFieldOrder(directive, schemaPartitionThreshold, symbolProvider);
     }
 
     @Override
@@ -163,6 +174,10 @@ public class CodeGenerationContext
 
     public String plugin() {
         return plugin;
+    }
+
+    public SchemaFieldOrder schemaFieldOrder() {
+        return schemaFieldOrder;
     }
 
     /**

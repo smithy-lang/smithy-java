@@ -2,7 +2,7 @@
   "version": "1.0",
   "plugins": {
     "java-type-codegen": {
-      "namespace": "software.amazon.smithy.java.example",
+      "namespace": "software.amazon.smithy.java.example.standalone",
       "headerFile": "license.txt"
     }
   }

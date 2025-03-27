@@ -23,7 +23,7 @@ import software.amazon.smithy.model.traits.Trait;
  * <p>Note: when creating a structure schema, all required members must come before optional members.
  */
 public abstract sealed class Schema implements MemberLookup
-        permits RootSchema, MemberSchema, DeferredRootSchema, DeferredMemberSchema {
+        permits RootSchema, MemberSchema, DeferredRootSchema, DeferredMemberSchema, ResolvedRootSchema {
 
     private final ShapeType type;
     private final ShapeId id;
@@ -498,4 +498,15 @@ public abstract sealed class Schema implements MemberLookup
      * This allows for an inexpensive comparison for required structure member validation.
      */
     abstract long requiredStructureMemberBitfield();
+
+    /**
+     * Resolve this Schema and return a resolved instance. The resolved instance can be the same Schema
+     * if the Schema doesn't need any resolution.
+     * This is primarily useful for Schemas of recursive structures which need to be resolved after construction.
+     *
+     * @return A resolved Schema.
+     */
+    public Schema resolve() {
+        return this;
+    }
 }

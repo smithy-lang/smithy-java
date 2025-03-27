@@ -19,9 +19,16 @@ structure CoffeeItem {
 
     @required
     description: String
+
+    extraItems: ExtraItems
 }
 
 /// A list of coffee items
 list CoffeeItems {
     member: CoffeeItem
+}
+
+map ExtraItems {
+    key: String
+    value: String
 }

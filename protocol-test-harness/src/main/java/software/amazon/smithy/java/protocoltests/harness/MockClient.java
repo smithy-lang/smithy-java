@@ -34,6 +34,9 @@ import software.amazon.smithy.model.shapes.ShapeId;
 final class MockClient extends Client {
     private static final InternalLogger LOGGER = InternalLogger.getLogger(MockClient.class);
 
+    // We inject a synthetic error in the TestTransport that we need to ignore in some tests.
+    private static final String SYNTHETIC_ERROR_SEARCH = "555";
+
     private MockClient(Builder builder) {
         super(builder);
     }
@@ -50,7 +53,8 @@ final class MockClient extends Client {
             return call(input, operation, overrideConfig).exceptionallyCompose(exc -> {
                 if (exc instanceof CompletionException ce
                         && ce.getCause() instanceof CallException apiException
-                        && apiException.getFault().equals(ErrorFault.SERVER)) {
+                        && apiException.getFault().equals(ErrorFault.SERVER)
+                        && exc.getMessage().contains(SYNTHETIC_ERROR_SEARCH)) {
                     LOGGER.debug("Ignoring expected exception", apiException);
                     return CompletableFuture.completedFuture(null);
                 } else {

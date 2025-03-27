@@ -18,9 +18,10 @@ import software.amazon.smithy.model.shapes.ShapeType;
  */
 final class DeferredRootSchema extends Schema {
 
-    private final List<MemberSchemaBuilder> memberBuilders;
-    private final Set<String> stringEnumValues;
-    private final Set<Integer> intEnumValues;
+    final List<MemberSchemaBuilder> memberBuilders;
+    private final SchemaBuilder schemaBuilder;
+    final Set<String> stringEnumValues;
+    final Set<Integer> intEnumValues;
     private volatile ResolvedMembers resolvedMembers;
 
     DeferredRootSchema(
@@ -29,21 +30,31 @@ final class DeferredRootSchema extends Schema {
             TraitMap traits,
             List<MemberSchemaBuilder> memberBuilders,
             Set<String> stringEnumValues,
-            Set<Integer> intEnumValues
+            Set<Integer> intEnumValues,
+            SchemaBuilder schemaBuilder
     ) {
         super(type, id, traits, memberBuilders, stringEnumValues);
         this.stringEnumValues = Collections.unmodifiableSet(stringEnumValues);
         this.intEnumValues = Collections.unmodifiableSet(intEnumValues);
         this.memberBuilders = memberBuilders;
+        this.schemaBuilder = schemaBuilder;
     }
 
-    private record ResolvedMembers(
+    record ResolvedMembers(
             Map<String, Schema> members,
             List<Schema> memberList,
             int requiredMemberCount,
             long requiredStructureMemberBitfield) {}
 
-    private void resolve() {
+    @Override
+    public Schema resolve() {
+        resolveInternal();
+        var resolved = new ResolvedRootSchema(this);
+        schemaBuilder.resolve(resolved);
+        return resolved;
+    }
+
+    private void resolveInternal() {
         if (resolvedMembers == null) {
             List<Schema> memberList = new ArrayList<>(memberBuilders.size());
             for (var builder : memberBuilders) {
@@ -55,7 +66,7 @@ final class DeferredRootSchema extends Schema {
                     requiredMemberCount,
                     memberBuilders,
                     m -> m.requiredByValidationBitmask);
-            resolvedMembers = new ResolvedMembers(SchemaBuilder.createMembers(memberList),
+            this.resolvedMembers = new ResolvedMembers(SchemaBuilder.createMembers(memberList),
                     memberList,
                     requiredMemberCount,
                     requiredStructureMemberBitfield);
@@ -63,15 +74,20 @@ final class DeferredRootSchema extends Schema {
         }
     }
 
+    ResolvedMembers resolvedMembers() {
+        resolveInternal();
+        return resolvedMembers;
+    }
+
     @Override
     public List<Schema> members() {
-        resolve();
+        resolveInternal();
         return resolvedMembers.memberList;
     }
 
     @Override
     public Schema member(String memberName) {
-        resolve();
+        resolveInternal();
         return resolvedMembers.members.get(memberName);
     }
 
@@ -87,7 +103,7 @@ final class DeferredRootSchema extends Schema {
 
     @Override
     int requiredMemberCount() {
-        resolve();
+        resolveInternal();
         return resolvedMembers.requiredMemberCount;
     }
 
@@ -98,7 +114,7 @@ final class DeferredRootSchema extends Schema {
 
     @Override
     long requiredStructureMemberBitfield() {
-        resolve();
+        resolveInternal();
         return resolvedMembers.requiredStructureMemberBitfield;
     }
 }

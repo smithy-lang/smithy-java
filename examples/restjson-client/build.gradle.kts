@@ -10,6 +10,11 @@ dependencies {
     smithyBuild("software.amazon.smithy.java.codegen:plugins:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
     api("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
+
+    // Test dependencies
+    testImplementation("org.junit.jupiter:junit-jupiter:5.12.1")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation(libs.assertj.core)
 }
 
 // Add generated Java sources to the main sourceset

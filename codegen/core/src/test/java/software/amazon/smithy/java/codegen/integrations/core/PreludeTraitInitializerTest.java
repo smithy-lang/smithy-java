@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.net.URL;
 import java.util.List;
 import java.util.Objects;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -35,13 +36,13 @@ public class PreludeTraitInitializerTest extends AbstractCodegenFileTest {
     @ParameterizedTest
     @MethodSource("customInitializersInput")
     void customInitializersCorrectOnInput(String expected) {
-        var fileContents = getFileStringForClass("SpecialCasedInput");
-        assertTrue(fileContents.contains(expected));
+        var fileContents = getFileStringForClass("Schemas");
+        Assertions.assertThat(fileContents).contains(expected);
     }
 
     @Test
     void customInitializerForRetryableCorrect() {
-        var fileContents = getFileStringForClass("RetryableError");
+        var fileContents = getFileStringForClass("Schemas");
         assertTrue(fileContents.contains("RetryableTrait.builder().throttling(false).build()"));
     }
 }

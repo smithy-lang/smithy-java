@@ -66,5 +66,12 @@ public final class SymbolProperties {
      */
     public static final Property<Boolean> EXTERNAL_TYPE = Property.named("external-type");
 
+    /**
+     * Symbol representing the root-level service exception class for a client.
+     *
+     * <p>This property is expected on all {@code Service} shape symbols.
+     */
+    public static final Property<Symbol> SERVICE_EXCEPTION = Property.named("service-exception");
+
     private SymbolProperties() {}
 }

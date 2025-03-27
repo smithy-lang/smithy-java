@@ -56,11 +56,12 @@ public final class OperationGenerator
                     var template =
                             """
                                     public final class ${shape:T} implements ${operationType:C} {
-                                        ${id:C|}
 
                                         private static final ${shape:T} $$INSTANCE = new ${shape:T}();
 
                                         ${schema:C|}
+
+                                        ${id:C|}
 
                                         ${typeRegistrySection:C|}
 
@@ -174,14 +175,7 @@ public final class OperationGenerator
                                     directive.context()));
 
                     writer.putContext("typeRegistry", TypeRegistry.class);
-                    writer.putContext(
-                            "schema",
-                            new SchemaGenerator(
-                                    writer,
-                                    shape,
-                                    directive.symbolProvider(),
-                                    directive.model(),
-                                    directive.context()));
+                    writer.putContext("schema", new SchemaFieldGenerator(directive, writer, shape));
                     var exceptions = getExceptionSymbols(directive.shape(), directive);
                     writer.putContext("exceptions", exceptions);
                     writer.putContext("typeRegistrySection", new TypeRegistryGenerator(writer, exceptions));

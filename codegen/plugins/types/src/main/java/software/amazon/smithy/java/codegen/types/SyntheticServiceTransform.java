@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen.types;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import software.amazon.smithy.java.codegen.generators.SyntheticTrait;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.OperationShape;
@@ -38,7 +39,9 @@ final class SyntheticServiceTransform {
 
         Set<Shape> shapesToAdd = new HashSet<>();
 
-        ServiceShape.Builder serviceBuilder = ServiceShape.builder().id(SYNTHETIC_SERVICE_ID);
+        ServiceShape.Builder serviceBuilder = ServiceShape.builder()
+                .id(SYNTHETIC_SERVICE_ID)
+                .addTrait(new SyntheticTrait());
         serviceBuilder.rename(renames);
 
         for (Shape shape : closure) {
@@ -48,9 +51,11 @@ final class SyntheticServiceTransform {
                         shape);
                 case OPERATION -> serviceBuilder.addOperation(shape.asOperationShape().orElseThrow());
                 case STRUCTURE, ENUM, INT_ENUM, UNION -> {
-                    var syntheticInput = createSyntheticInput(shape);
+                    var syntheticInput = createSyntheticWrapper(shape, "Input");
+                    var syntheticOutput = createSyntheticWrapper(shape, "Output");
                     shapesToAdd.add(syntheticInput);
-                    var syntheticOperation = createSyntheticOperation(syntheticInput);
+                    shapesToAdd.add(syntheticOutput);
+                    var syntheticOperation = createSyntheticOperation(syntheticInput, syntheticOutput);
                     shapesToAdd.add(syntheticOperation);
                     serviceBuilder.addOperation(syntheticOperation);
                 }
@@ -65,23 +70,26 @@ final class SyntheticServiceTransform {
         return ModelTransformer.create().replaceShapes(model, shapesToAdd);
     }
 
-    private static OperationShape createSyntheticOperation(Shape shape) {
+    private static OperationShape createSyntheticOperation(Shape shape, Shape syntheticOutput) {
         var id = ShapeId.fromParts(SYNTHETIC_NAMESPACE, shape.getId().getName() + "Operation");
         var operationBuilder = OperationShape.builder()
                 .id(id)
+                .addTrait(new SyntheticTrait())
                 .addTrait(new PrivateTrait());
         if (shape.hasTrait(ErrorTrait.class)) {
             operationBuilder.addError(shape.toShapeId());
         } else {
             operationBuilder.input(shape.toShapeId());
         }
+        operationBuilder.output(syntheticOutput.toShapeId());
         return operationBuilder.build();
     }
 
-    private static StructureShape createSyntheticInput(Shape shape) {
-        var id = ShapeId.fromParts(SYNTHETIC_NAMESPACE, shape.getId().getName() + "Input");
+    private static StructureShape createSyntheticWrapper(Shape shape, String suffix) {
+        var id = ShapeId.fromParts(SYNTHETIC_NAMESPACE, shape.getId().getName() + suffix);
         return StructureShape.builder()
                 .id(id)
+                .addTrait(new SyntheticTrait())
                 .addMember("syntheticMember", shape.getId())
                 .build();
     }

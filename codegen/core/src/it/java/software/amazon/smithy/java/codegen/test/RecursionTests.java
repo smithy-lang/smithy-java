@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
@@ -106,5 +107,10 @@ public class RecursionTests {
         assertEquals(recursive.hashCode(), output.hashCode());
         assertEquals(recursive, output);
         assertNotEquals(AttributeValue.Type.$UNKNOWN, output.type());
+    }
+
+    @Test
+    void verifyRecursiveSchemaResolved() {
+        assertThat(AttributeValue.$SCHEMA.resolve()).isSameAs(AttributeValue.$SCHEMA);
     }
 }

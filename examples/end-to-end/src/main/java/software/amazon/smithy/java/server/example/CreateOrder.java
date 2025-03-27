@@ -6,10 +6,10 @@
 package software.amazon.smithy.java.server.example;
 
 import java.util.UUID;
-import software.amazon.smithy.java.example.model.CreateOrderInput;
-import software.amazon.smithy.java.example.model.CreateOrderOutput;
-import software.amazon.smithy.java.example.model.OrderStatus;
-import software.amazon.smithy.java.example.service.CreateOrderOperation;
+import software.amazon.smithy.java.example.etoe.model.CreateOrderInput;
+import software.amazon.smithy.java.example.etoe.model.CreateOrderOutput;
+import software.amazon.smithy.java.example.etoe.model.OrderStatus;
+import software.amazon.smithy.java.example.etoe.service.CreateOrderOperation;
 import software.amazon.smithy.java.server.RequestContext;
 
 /**

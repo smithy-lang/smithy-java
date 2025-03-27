@@ -6,6 +6,8 @@
 package software.amazon.smithy.java.codegen.generators;
 
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.directed.ContextualDirective;
+import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Unit;
@@ -45,19 +47,19 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
     private final ServiceShape service;
     private final Shape shape;
     private final String state;
+    private final ContextualDirective<CodeGenerationContext, ?> directive;
 
     SerializerMemberGenerator(
+            ContextualDirective<CodeGenerationContext, ?> directive,
             JavaWriter writer,
-            SymbolProvider provider,
-            Model model,
-            ServiceShape service,
             Shape shape,
             String state
     ) {
+        this.directive = directive;
         this.writer = writer;
-        this.provider = provider;
-        this.model = model;
-        this.service = service;
+        this.provider = directive.symbolProvider();
+        this.model = directive.model();
+        this.service = directive.service();
         this.shape = shape;
         this.state = state;
     }
@@ -208,11 +210,14 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
             return null;
         }
         var container = model.expectShape(memberShape.getContainer());
+        var schemaFieldOder = directive.context().schemaFieldOrder();
         if (container.isListShape()) {
-            var memberSchema = CodegenUtils.getSchemaType(writer, provider, container) + ".listMember()";
+            var memberSchema =
+                    schemaFieldOder.getSchemaFieldName(container, writer) + ".listMember()";
             writer.putContext("schema", memberSchema);
         } else if (container.isMapShape()) {
-            var memberSchema = CodegenUtils.getSchemaType(writer, provider, container) + ".mapValueMember()";
+            var memberSchema =
+                    schemaFieldOder.getSchemaFieldName(container, writer) + ".mapValueMember()";
             writer.putContext("schema", memberSchema);
         } else {
             writer.putContext("schema", CodegenUtils.toMemberSchemaName(memberName));
