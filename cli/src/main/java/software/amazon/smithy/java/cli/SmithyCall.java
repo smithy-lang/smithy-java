@@ -11,6 +11,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
 import picocli.CommandLine.Parameters;
@@ -32,6 +33,7 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 @Command(name = "smithy-call", mixinStandardHelpOptions = true, version = "1.0",
@@ -96,7 +98,19 @@ public final class SmithyCall implements Callable<Integer> {
     private Integer listOperationsForService() {
         try {
             Model model = assembleModel(modelPath);
-            System.out.println("Available Operations:\n" + model.getOperationShapes());
+
+            Set<OperationShape> operations = model.getOperationShapes();
+            StringBuilder sb = new StringBuilder();
+            for (OperationShape operation : operations) {
+                sb.append(operation.getId().getName()).append("\n");
+            }
+            if (!sb.isEmpty()) {
+                sb.setLength(sb.length() - 1);
+            }
+
+            String result = sb.toString();
+            System.out.println(result);
+
             return 0;
         } catch (Exception e) {
             logError("Failed to list operations", e);
