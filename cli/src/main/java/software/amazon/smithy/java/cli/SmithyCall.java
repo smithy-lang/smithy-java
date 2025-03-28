@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.cli;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -26,6 +27,7 @@ import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.protocols.rpcv2.RpcV2CborProtocol;
+import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.json.JsonCodec;
@@ -108,9 +110,17 @@ public final class SmithyCall implements Callable<Integer> {
             ShapeId serviceInput = validateServiceExists(model);
 
             DynamicClient client = buildDynamicClient(model, serviceInput);
-            Object result = executeClientCall(client);
+            Document result = executeClientCall(client);
 
-            System.out.println("Results:\n" + result);
+            // Todo: uncomment after serialization is fixed
+//            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+//            try (ShapeSerializer serializer = CODEC.createSerializer(outputStream)) {
+//                result.serialize(serializer);
+//            }
+//            String output = outputStream.toString(StandardCharsets.UTF_8);
+//            System.out.println(output);
+
+            System.out.println(result.asObject());
 
             return 0;
         } catch (Exception e) {
@@ -217,13 +227,13 @@ public final class SmithyCall implements Callable<Integer> {
         }
     }
 
-    private Object executeClientCall(DynamicClient client) throws Exception {
+    private Document executeClientCall(DynamicClient client) throws Exception {
         if (input != null && inputPath != null) {
             throw new IllegalArgumentException("Cannot specify both '--input-json' and '--input-path'. Please provide only one.");
         }
 
         if (input == null && inputPath == null) {
-            return client.call(operation).asObject();
+            return client.call(operation);
         }
 
         Document inputDocument;
@@ -234,7 +244,7 @@ public final class SmithyCall implements Callable<Integer> {
             inputDocument = CODEC.createDeserializer(content.getBytes(StandardCharsets.UTF_8)).readDocument();
         }
 
-        return client.call(operation, inputDocument).asObject();
+        return client.call(operation, inputDocument);
     }
 
     private void logError(String message, Exception e) {
