@@ -7,8 +7,6 @@ package software.amazon.smithy.java.dynamicschemas;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.not;
-import static org.hamcrest.Matchers.nullValue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -24,15 +22,13 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
-import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.InterceptingSerializer;
-import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeDeserializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
-import software.amazon.smithy.java.core.serde.document.DocumentUtils;
+import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -95,6 +91,16 @@ public class SchemaGuidedDocumentBuilderTest {
                         union SimpleUnion {
                             foo: String
                             baz: SimpleStruct
+                        }
+
+                        map StructMap {
+                            key: String
+                            value: Foo
+                        }
+
+                        structure Foo {
+                            @jsonName("B")
+                            b: String
                         }
                         """)
                 .assemble()
@@ -263,6 +269,26 @@ public class SchemaGuidedDocumentBuilderTest {
         var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
 
         Assertions.assertThrows(IllegalArgumentException.class, builder::build);
+    }
+
+    @Test
+    public void worksWithMapOfStructure() {
+        var source = Document.ofObject(Map.of("a", Document.ofObject(Map.of("b", "str"))));
+
+        var converter = new SchemaConverter(model);
+        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#StructMap")));
+
+        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#StructMap"));
+        source.deserializeInto(builder);
+
+        var result = builder.build();
+
+        assertThat(result.asObject(), equalTo(source.asObject()));
+        assertThat(result.schema(), equalTo(schema));
+
+        var codec = JsonCodec.builder().useJsonName(true).build();
+
+        assertThat(codec.serializeToString(result), equalTo("{\"a\":{\"B\":\"str\"}}"));
     }
 
     static List<Arguments> deserializesShapesProvider() {
