@@ -9,6 +9,6 @@ extra["moduleName"] = "software.amazon.smithy.java.http.binding"
 
 dependencies {
     api(project(":core"))
-    api(project(":http-api"))
+    api(project(":http:http-api"))
     implementation(project(":logging"))
 }

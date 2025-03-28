@@ -11,7 +11,7 @@ extra["moduleName"] = "software.amazon.smithy.java.aws.client.awsjson"
 dependencies {
     api(project(":client:client-http"))
     api(project(":codecs:json-codec"))
-    api(project(":aws:event-streams"))
+    api(project(":aws:aws-event-streams"))
     api(libs.smithy.aws.traits)
 
     // Protocol test dependencies

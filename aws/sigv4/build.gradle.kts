@@ -14,7 +14,7 @@ extra["moduleName"] = "software.amazon.smithy.java.aws.sigv4"
 dependencies {
     implementation(project(":client:client-core"))
     api(project(":aws:client:aws-client-core"))
-    implementation(project(":http-api"))
+    implementation(project(":http:http-api"))
     implementation(project(":io"))
     implementation(project(":logging"))
     implementation(libs.smithy.aws.traits)

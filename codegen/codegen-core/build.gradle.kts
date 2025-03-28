@@ -4,7 +4,7 @@ plugins {
 }
 
 description = "This module provides the core codegen functionality for Smithy java"
-group = "software.amazon.smithy.java.codegen"
+
 extra["displayName"] = "Smithy :: Java :: Codegen :: Core"
 extra["moduleName"] = "software.amazon.smithy.java.codegen.core"
 

@@ -8,16 +8,14 @@ plugins {
 // Workaround per: https://github.com/gradle/gradle/issues/15383
 val Project.libs get() = the<org.gradle.accessors.dm.LibrariesForLibs>()
 
-group = "software.amazon.smithy.java.codegen.plugins"
-
 dependencies {
     implementation(libs.smithy.codegen)
     implementation(project(":core"))
     implementation(project(":logging"))
 
     // Avoid circular dependency in codegen core
-    if (project.name != "core") {
-        api(project(":codegen:core"))
+    if (project.name != "codegen-core") {
+        api(project(":codegen:codegen-core"))
     }
 }
 

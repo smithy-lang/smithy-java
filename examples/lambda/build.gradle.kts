@@ -9,7 +9,7 @@ dependencies {
     annotationProcessor("com.google.auto.service:auto-service:1.1.1")
     compileOnly("com.google.auto.service:auto-service:1.1.1")
 
-    smithyBuild("software.amazon.smithy.java.codegen:plugins:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:plugins:$smithyJavaVersion")
 
     implementation("software.amazon.smithy.java:lambda-endpoint:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-server-restjson:$smithyJavaVersion")
