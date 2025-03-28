@@ -134,12 +134,8 @@ public final class SmithyCall implements Callable<Integer> {
         }
 
         // Add model files
-        try {
-            assembler.addImport(directoryPath);
-            return assembler.assemble().unwrap();
-        } catch (Exception e) {
-            throw new IOException("Failed to assemble model from directory: " + e, e);
-        }
+        assembler.addImport(directoryPath);
+        return assembler.assemble().unwrap();
     }
 
     private ShapeId validateServiceExists(Model model) {
