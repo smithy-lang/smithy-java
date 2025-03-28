@@ -126,15 +126,12 @@ public final class SmithyCall implements Callable<Integer> {
             DynamicClient client = buildDynamicClient(model, serviceInput);
             Document result = executeClientCall(client);
 
-            // Todo: uncomment after serialization is fixed
-//            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-//            try (ShapeSerializer serializer = CODEC.createSerializer(outputStream)) {
-//                result.serialize(serializer);
-//            }
-//            String output = outputStream.toString(StandardCharsets.UTF_8);
-//            System.out.println(output);
-
-            System.out.println(result.asObject());
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            try (ShapeSerializer serializer = CODEC.createSerializer(outputStream)) {
+                result.serialize(serializer);
+            }
+            String output = outputStream.toString(StandardCharsets.UTF_8);
+            System.out.println(output);
 
             return 0;
         } catch (Exception e) {
@@ -143,7 +140,7 @@ public final class SmithyCall implements Callable<Integer> {
         }
     }
 
-    private Model assembleModel(String directoryPath) throws IOException {
+    private Model assembleModel(String directoryPath) {
         var assembler = Model.assembler();
 
         // Add base resource files
