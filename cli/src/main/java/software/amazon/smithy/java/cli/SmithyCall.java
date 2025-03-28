@@ -55,7 +55,7 @@ public class SmithyCall implements Callable<Integer> {
     @Parameters(index = "1", description = "Name of the operation to perform on the service", arity = "0..1")
     private String operation;
 
-    @Option(names = { "-m", "--model-path" }, description = "Path to the .smithy service model file", required = true)
+    @Option(names = { "-m", "--model-path" }, description = "Path to a directory containing all necessary .smithy service model files", required = true)
     private String modelPath;
 
     @Option(names = "--input-path", description = "Path to a JSON file containing input parameters for the operation")
@@ -70,7 +70,7 @@ public class SmithyCall implements Callable<Integer> {
     @Option(names = { "-p", "--protocol" }, description = "Communication protocol to use (options: awsjson, rpcv2-cbor, restjson, and restxml)")
     private String protocol;
 
-    @Option(names = { "-a", "--auth" }, description = "Authentication method to use")
+    @Option(names = { "-a", "--auth" }, description = "Authentication method to use (e.g., sigv4), smithy.api#noAuth is applied by default")
     private String authType;
 
     @Option(names = { "--aws-region" }, description = "AWS region for SigV4 authentication")
