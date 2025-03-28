@@ -37,11 +37,6 @@ import software.amazon.smithy.model.shapes.ShapeId;
 public final class SmithyCall implements Callable<Integer> {
     private static final JsonCodec CODEC = JsonCodec.builder().build();
 
-    private static final String AWS_JSON = "awsjson";
-    private static final String RPC_V2_CBOR = "rpcv2-cbor";
-    private static final String REST_JSON = "restjson";
-    private static final String REST_XML = "restxml";
-
     private static final String[] BASE_RESOURCE_FILES = {
             "aws.api.smithy",
             "aws.auth.smithy",
@@ -199,7 +194,8 @@ public final class SmithyCall implements Callable<Integer> {
 
     private void configureProtocol(DynamicClient.Builder builder, ShapeId serviceInput) {
         if (protocol != null) {
-            switch (protocol.toLowerCase()) {
+            ProtocolType protocolType = ProtocolType.fromString(protocol);
+            switch (protocolType) {
                 case AWS_JSON:
                     builder.protocol(new AwsJson1Protocol(serviceInput));
                     break;
@@ -212,8 +208,6 @@ public final class SmithyCall implements Callable<Integer> {
                 case REST_XML:
                     builder.protocol(new RestXmlClientProtocol(serviceInput));
                     break;
-                default:
-                    throw new IllegalArgumentException("Unsupported protocol type: " + protocol);
             }
         }
     }
