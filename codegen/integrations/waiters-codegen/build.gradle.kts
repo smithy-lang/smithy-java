@@ -9,5 +9,5 @@ extra["moduleName"] = "software.amazon.smithy.java.codegen.waiters"
 
 dependencies {
     implementation(project(":client:waiters"))
-    implementation(project(":codegen:plugins:client"))
+    implementation(project(":codegen:plugins:client-codegen"))
 }
