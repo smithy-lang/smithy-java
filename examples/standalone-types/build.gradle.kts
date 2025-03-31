@@ -7,7 +7,7 @@ plugins {
 dependencies {
     val smithyJavaVersion: String by project
 
-    smithyBuild("software.amazon.smithy.java.codegen:plugins:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:plugins:$smithyJavaVersion")
     api("software.amazon.smithy.java:core:$smithyJavaVersion")
 
     testImplementation("org.hamcrest:hamcrest:3.0")

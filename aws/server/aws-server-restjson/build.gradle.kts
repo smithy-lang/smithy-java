@@ -10,13 +10,13 @@ extra["moduleName"] = "software.amazon.smithy.java.server-aws-rest-json1"
 
 dependencies {
     api(project(":server:server-api"))
-    api(project(":http-api"))
+    api(project(":http:http-api"))
     api(libs.smithy.aws.traits)
     implementation(project(":server:server-core"))
     implementation(project(":context"))
     implementation(project(":core"))
     implementation(project(":codecs:json-codec"))
-    implementation(project(":http-binding"))
+    implementation(project(":http:http-binding"))
 
     itImplementation(project(":server:server-api"))
     itImplementation(project(":server:server-netty"))
