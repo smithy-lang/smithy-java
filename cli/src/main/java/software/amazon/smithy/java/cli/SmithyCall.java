@@ -16,6 +16,7 @@ import java.util.concurrent.Callable;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.ArgGroup;
 import software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigV4AuthScheme;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.aws.client.core.identity.EnvironmentVariableIdentityResolver;
@@ -68,15 +69,19 @@ public final class SmithyCall implements Callable<Integer> {
     @Option(names = { "-p", "--protocol" }, description = "Communication protocol to use (options: awsjson, rpcv2-cbor, restjson, and restxml)")
     private String protocol;
 
-    @Option(names = { "-a", "--auth" }, description = "Authentication method to use (e.g., sigv4), smithy.api#noAuth is applied by default")
-    private String authType;
-
-    @Option(names = { "--aws-region" }, description = "AWS region for SigV4 authentication")
-    private String awsRegion;
-
-
     @Option(names = "--list-operations", description = "List all available operations for the specified service")
     private boolean listOperations;
+
+    @ArgGroup(exclusive = false)
+    Authentication auth;
+
+    static class Authentication {
+        @Option(names = { "-a", "--auth" }, description = "Authentication method to use (e.g., sigv4), smithy.api#noAuth is applied by default", required = true)
+        private String authType;
+
+        @Option(names = { "--aws-region" }, description = "AWS region for SigV4 authentication")
+        private String awsRegion;
+    }
 
     @Override
     public Integer call() {
@@ -187,14 +192,14 @@ public final class SmithyCall implements Callable<Integer> {
 
     private void configureAuth(DynamicClient.Builder builder, ShapeId serviceInput) {
         String defaultArnNamespace = serviceInput.getNamespace().toLowerCase();
-        if (authType != null) {
-            switch (authType.toLowerCase()) {
+        if (auth != null) {
+            switch (auth.authType.toLowerCase()) {
                 case "sigv4":
                 case "aws":
-                    if (awsRegion == null) {
+                    if (auth.awsRegion == null) {
                         throw new IllegalArgumentException("SigV4 auth requires --aws-region to be set. Please provide the --aws-region option.");
                     }
-                    builder.putConfig(RegionSetting.REGION, awsRegion)
+                    builder.putConfig(RegionSetting.REGION, auth.awsRegion)
                             .putSupportedAuthSchemes(new SigV4AuthScheme(defaultArnNamespace))
                             .authSchemeResolver(AuthSchemeResolver.DEFAULT)
                             .addIdentityResolver(new EnvironmentVariableIdentityResolver());
@@ -203,7 +208,7 @@ public final class SmithyCall implements Callable<Integer> {
                     builder.authSchemeResolver(AuthSchemeResolver.NO_AUTH);
                     break;
                 default:
-                    throw new IllegalArgumentException("Unsupported auth type: " + authType);
+                    throw new IllegalArgumentException("Unsupported auth type: " + auth.authType);
             }
         } else {
             builder.authSchemeResolver(AuthSchemeResolver.NO_AUTH);
