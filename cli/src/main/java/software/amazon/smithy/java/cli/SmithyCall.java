@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.logging.ConsoleHandler;
@@ -121,6 +122,7 @@ public final class SmithyCall implements Callable<Integer> {
     }
 
     private Integer listOperationsForService() {
+        LOGGER.fine("Listing operations for service: " + service);
         try {
             Model model = assembleModel(modelPath);
 
@@ -144,6 +146,7 @@ public final class SmithyCall implements Callable<Integer> {
     }
 
     private Integer executeOperation() {
+        LOGGER.fine("Executing operation: " + operation);
         try {
             Model model = assembleModel(modelPath);
             ShapeId serviceInput = validateServiceExists(model);
@@ -166,6 +169,7 @@ public final class SmithyCall implements Callable<Integer> {
     }
 
     private Model assembleModel(String[] directoryPath) {
+        LOGGER.fine("Assembling model from directory path(s): " + Arrays.toString(directoryPath));
         var assembler = Model.assembler();
 
         // Add base resource files
@@ -187,6 +191,7 @@ public final class SmithyCall implements Callable<Integer> {
     }
 
     private ShapeId validateServiceExists(Model model) {
+        LOGGER.fine("Checking if the provided model contains service: " + service);
         ShapeId serviceInput = ShapeId.from(service);
         if (!model.getShapeIds().contains(serviceInput)) {
             throw new IllegalArgumentException("Service " + service + " not found in model");
@@ -195,6 +200,7 @@ public final class SmithyCall implements Callable<Integer> {
     }
 
     private DynamicClient buildDynamicClient(Model model, ShapeId serviceInput) {
+        LOGGER.fine("Building dynamic client");
         if (url == null) {
             throw new IllegalArgumentException("Service endpoint URL is required. Please provide the --url option.");
         }
@@ -269,6 +275,8 @@ public final class SmithyCall implements Callable<Integer> {
         if (input != null && inputPath != null) {
             throw new IllegalArgumentException("Cannot specify both '--input-json' and '--input-path'. Please provide only one.");
         }
+
+        LOGGER.fine("Executing client call");
 
         if (input == null && inputPath == null) {
             return client.call(operation);
