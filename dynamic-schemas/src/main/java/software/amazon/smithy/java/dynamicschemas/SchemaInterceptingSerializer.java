@@ -13,8 +13,10 @@ import java.util.function.BiConsumer;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.MapSerializer;
+import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.java.core.serde.document.DocumentParser;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -45,23 +47,38 @@ final class SchemaInterceptingSerializer implements ShapeSerializer {
 
     @Override
     public <T> void writeMap(Schema schema, T mapState, int size, BiConsumer<T, MapSerializer> consumer) {
-        var delegateKeySchema = delegateSchema.mapKeyMember();
-        var delegateValueSchema = delegateSchema.mapValueMember();
-        delegateSerializer.writeMap(delegateSchema, mapState, size, (s, ms) -> {
-            consumer.accept(s, new MapSerializer() {
-                @Override
-                public <V> void writeEntry(
-                        Schema keySchema,
-                        String key,
-                        V state,
-                        BiConsumer<V, ShapeSerializer> valueSerializer
-                ) {
-                    ms.writeEntry(delegateKeySchema, key, state, (s, ms) -> {
-                        valueSerializer.accept(s, new SchemaInterceptingSerializer(service, delegateValueSchema, ms));
+        switch (delegateSchema.type()) {
+            case DOCUMENT, MAP -> {
+                var delegateKeySchema = delegateSchema.mapKeyMember();
+                var delegateValueSchema = delegateSchema.mapValueMember();
+                delegateSerializer.writeMap(delegateSchema, mapState, size, (s, ms) -> {
+                    consumer.accept(s, new MapSerializer() {
+                        @Override
+                        public <V> void writeEntry(
+                                Schema keySchema,
+                                String key,
+                                V state,
+                                BiConsumer<V, ShapeSerializer> valueSerializer
+                        ) {
+                            ms.writeEntry(delegateKeySchema, key, state, (s, ms) -> {
+                                valueSerializer.accept(s,
+                                        new SchemaInterceptingSerializer(service, delegateValueSchema, ms));
+                            });
+                        }
                     });
-                }
-            });
-        });
+                });
+            }
+            case STRUCTURE, UNION -> {
+                var parser = new DocumentParser();
+                parser.writeMap(schema, mapState, size, consumer);
+                var struct = parser.getResult();
+                var wrappedStruct = new WrappedDocument(delegateSchema, Document.of(struct), service);
+                delegateSerializer.writeStruct(delegateSchema, wrappedStruct);
+            }
+            default -> {
+                throw new SerializationException("Expected a map, structure, or union, but found " + delegateSchema);
+            }
+        }
     }
 
     @Override
