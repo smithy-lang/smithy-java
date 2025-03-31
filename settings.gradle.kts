@@ -27,8 +27,8 @@ include(":client:client-http")
 include(":client:client-http-binding")
 include(":client:client-rpcv2-cbor")
 include(":client:dynamic-client")
-include(":client:mock-client-plugin")
-include(":client:waiters")
+include(":client:client-mock-plugin")
+include(":client:client-waiters")
 
 // Server
 include(":server:server-api")
@@ -50,6 +50,7 @@ include(":protocol-test-harness")
 
 // AWS specific
 include(":aws:aws-event-streams")
+include(":aws:aws-sigv4")
 include(":aws:client:aws-client-awsjson")
 include(":aws:client:aws-client-core")
 include(":aws:client:aws-client-http")
@@ -59,7 +60,6 @@ include(":aws:integrations:aws-lambda-endpoint")
 include(":aws:sdkv2:aws-sdkv2-retries")
 include(":aws:sdkv2:aws-sdkv2-shapes")
 include(":aws:server:aws-server-restjson")
-include(":aws:sigv4")
 
 // Examples
 include(":examples")

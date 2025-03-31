@@ -13,6 +13,6 @@ dependencies {
     api(project(":http:http-api"))
 
     testImplementation(project(":client:dynamic-client"))
-    testImplementation(project(":client:mock-client-plugin"))
+    testImplementation(project(":client:client-mock-plugin"))
     testImplementation(project(":aws:client:aws-client-awsjson"))
 }

@@ -17,5 +17,5 @@ dependencies {
 
     testImplementation(project(":client:dynamic-client"))
     testImplementation(project(":aws:client:aws-client-restjson"))
-    testImplementation(project(":client:mock-client-plugin"))
+    testImplementation(project(":client:client-mock-plugin"))
 }
