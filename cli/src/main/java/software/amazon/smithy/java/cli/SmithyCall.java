@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.cli;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -55,7 +54,7 @@ public final class SmithyCall implements Callable<Integer> {
     private String operation;
 
     @Option(names = { "-m", "--model-path" }, description = "Path to a directory containing all necessary .smithy service model files", required = true)
-    private String modelPath;
+    private String[] modelPath;
 
     @Option(names = "--input-path", description = "Path to a JSON file containing input parameters for the operation")
     private String inputPath;
@@ -140,7 +139,7 @@ public final class SmithyCall implements Callable<Integer> {
         }
     }
 
-    private Model assembleModel(String directoryPath) {
+    private Model assembleModel(String[] directoryPath) {
         var assembler = Model.assembler();
 
         // Add base resource files
@@ -155,7 +154,9 @@ public final class SmithyCall implements Callable<Integer> {
         }
 
         // Add model files
-        assembler.addImport(directoryPath);
+        for (String path : directoryPath) {
+            assembler.addImport(path);
+        }
         return assembler.assemble().unwrap();
     }
 
