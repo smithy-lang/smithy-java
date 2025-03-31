@@ -9,9 +9,14 @@ import java.io.ByteArrayOutputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Command;
@@ -40,6 +45,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
         description = "Smithy Java CLI")
 public final class SmithyCall implements Callable<Integer> {
     private static final JsonCodec CODEC = JsonCodec.builder().build();
+    private static final Logger LOGGER = Logger.getLogger(SmithyCall.class.getName());
 
     private static final String[] BASE_RESOURCE_FILES = {
             "aws.api.smithy",
@@ -53,6 +59,9 @@ public final class SmithyCall implements Callable<Integer> {
 
     @Parameters(index = "1", description = "Name of the operation to perform on the service", arity = "0..1")
     private String operation;
+
+    @Option(names = {"-v", "--verbose"}, description = "Enable verbose logging")
+    private boolean verbose;
 
     @Option(names = { "-m", "--model-path" }, description = "Path to a directory containing all necessary .smithy service model files", required = true)
     private String[] modelPath;
@@ -85,18 +94,30 @@ public final class SmithyCall implements Callable<Integer> {
 
     @Override
     public Integer call() {
+        setupLogger();
         try {
             if (!listOperations && operation == null) {
                 throw new IllegalArgumentException("Operation is required when not listing operations");
             }
             return listOperations ? listOperationsForService() : executeOperation();
         } catch (IllegalArgumentException e) {
-            logError("Invalid input", e);
+            LOGGER.log(Level.SEVERE, "Invalid input", e);
             return 1;
         } catch (Exception e) {
-            logError("Unexpected error occurred: ", e);
+            LOGGER.log(Level.SEVERE, "Unexpected error occurred", e);
             return 1;
         }
+    }
+
+    private void setupLogger() {
+        LogManager.getLogManager().reset();
+        LOGGER.setLevel(verbose ? Level.FINE : Level.INFO);
+
+        ConsoleHandler handler = new ConsoleHandler();
+        handler.setLevel(verbose ? Level.FINE : Level.INFO);
+        LOGGER.addHandler(handler);
+
+        LOGGER.setUseParentHandlers(false);
     }
 
     private Integer listOperationsForService() {
@@ -117,7 +138,7 @@ public final class SmithyCall implements Callable<Integer> {
 
             return 0;
         } catch (Exception e) {
-            logError("Failed to list operations", e);
+            LOGGER.log(Level.SEVERE, "Failed to list operations", e);
             return 1;
         }
     }
@@ -139,7 +160,7 @@ public final class SmithyCall implements Callable<Integer> {
 
             return 0;
         } catch (Exception e) {
-            logError("Operation execution failed", e);
+            LOGGER.log(Level.SEVERE, "Operation execution failed", e);
             return 1;
         }
     }
@@ -154,7 +175,7 @@ public final class SmithyCall implements Callable<Integer> {
             if (resourceUrl != null) {
                 assembler.addImport(resourceUrl);
             } else {
-                System.err.println("Resource not found: " + smithyFile);
+                LOGGER.log(Level.SEVERE, "Resource not found: " + smithyFile, new NoSuchFileException(smithyFile));
             }
         }
 
@@ -262,9 +283,5 @@ public final class SmithyCall implements Callable<Integer> {
         }
 
         return client.call(operation, inputDocument);
-    }
-
-    private void logError(String message, Exception e) {
-        System.err.println(message + ": " + e.getMessage());
     }
 }
