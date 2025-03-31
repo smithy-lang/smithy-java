@@ -4,7 +4,7 @@ plugins {
 
 description = "This module provides the Smithy Java HTTP API"
 
-extra["displayName"] = "Smithy :: Java :: HTTP"
+extra["displayName"] = "Smithy :: Java :: HTTP :: API"
 extra["moduleName"] = "software.amazon.smithy.java.http.api"
 
 dependencies {

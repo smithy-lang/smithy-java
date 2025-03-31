@@ -5,8 +5,8 @@ plugins {
 
 description = "This module provides the RpcV2 CBOR support for servers."
 
-extra["displayName"] = "Smithy :: Java :: Server :: Protocols :: RPCV2 CBOR"
-extra["moduleName"] = "software.amazon.smithy.java.server.protocols.rpcv2cbor"
+extra["displayName"] = "Smithy :: Java :: Server :: RPCv2 CBOR"
+extra["moduleName"] = "software.amazon.smithy.java.server.rpcv2cbor"
 
 dependencies {
     api(project(":server:server-api"))

@@ -4,7 +4,7 @@ plugins {
 
 description = "This module provides HTTP binding support for clients"
 
-extra["displayName"] = "Smithy :: Java :: Client HTTP Binding"
+extra["displayName"] = "Smithy :: Java :: Client :: HTTP :: Binding"
 extra["moduleName"] = "software.amazon.smithy.java.client.http.binding"
 
 dependencies {

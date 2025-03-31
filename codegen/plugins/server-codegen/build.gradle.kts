@@ -4,7 +4,7 @@ plugins {
 
 description = "This module provides the codegen plugin for Smithy java server codegen"
 
-extra["displayName"] = "Smithy :: Java :: Codegen :: Plugins :: Server"
+extra["displayName"] = "Smithy :: Java :: Codegen :: Server"
 extra["moduleName"] = "software.amazon.smithy.java.codegen.server"
 
 dependencies {

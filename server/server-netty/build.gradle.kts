@@ -4,7 +4,7 @@ plugins {
 
 description = "Netty based Smithy Java Server implementation"
 
-extra["displayName"] = "Smithy :: Java :: Server Netty"
+extra["displayName"] = "Smithy :: Java :: Server :: Netty"
 extra["moduleName"] = "software.amazon.smithy.java.server.netty"
 
 dependencies {
