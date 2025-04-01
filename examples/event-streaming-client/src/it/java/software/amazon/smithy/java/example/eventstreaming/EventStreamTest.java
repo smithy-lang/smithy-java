@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.examples.eventstreaming;
+package software.amazon.smithy.java.example.eventstreaming;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,16 +13,20 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
-import software.amazon.smithy.java.examples.eventstreaming.client.FizzBuzzServiceClient;
-import software.amazon.smithy.java.examples.eventstreaming.model.FizzBuzzInput;
-import software.amazon.smithy.java.examples.eventstreaming.model.FizzBuzzOutput;
-import software.amazon.smithy.java.examples.eventstreaming.model.FizzBuzzStream;
-import software.amazon.smithy.java.examples.eventstreaming.model.Value;
-import software.amazon.smithy.java.examples.eventstreaming.model.ValueStream;
+import software.amazon.smithy.java.example.eventstreaming.client.FizzBuzzServiceClient;
+import software.amazon.smithy.java.example.eventstreaming.model.FizzBuzzInput;
+import software.amazon.smithy.java.example.eventstreaming.model.FizzBuzzOutput;
+import software.amazon.smithy.java.example.eventstreaming.model.FizzBuzzStream;
+import software.amazon.smithy.java.example.eventstreaming.model.Value;
+import software.amazon.smithy.java.example.eventstreaming.model.ValueStream;
 
-// This test requires manually running a server locally and then verifies client behavior against it.
+// TODO: Update the test to create and run the server in setup before the test
+@Disabled("This test requires manually running a server locally and then verifies client behavior against it.")
 public class EventStreamTest {
 
     @Test

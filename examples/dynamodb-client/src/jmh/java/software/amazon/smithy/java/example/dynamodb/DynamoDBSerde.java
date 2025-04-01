@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.examples.dynamodb;
+package software.amazon.smithy.java.example.dynamodb;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -27,13 +27,13 @@ import org.openjdk.jmh.infra.Blackhole;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
-import software.amazon.smithy.java.examples.dynamodb.model.AttributeValue;
-import software.amazon.smithy.java.examples.dynamodb.model.GetItem;
-import software.amazon.smithy.java.examples.dynamodb.model.GetItemInput;
-import software.amazon.smithy.java.examples.dynamodb.model.GetItemOutput;
-import software.amazon.smithy.java.examples.dynamodb.model.PutItem;
-import software.amazon.smithy.java.examples.dynamodb.model.PutItemInput;
-import software.amazon.smithy.java.examples.dynamodb.model.PutItemOutput;
+import software.amazon.smithy.java.example.dynamodb.model.AttributeValue;
+import software.amazon.smithy.java.example.dynamodb.model.GetItem;
+import software.amazon.smithy.java.example.dynamodb.model.GetItemInput;
+import software.amazon.smithy.java.example.dynamodb.model.GetItemOutput;
+import software.amazon.smithy.java.example.dynamodb.model.PutItem;
+import software.amazon.smithy.java.example.dynamodb.model.PutItemInput;
+import software.amazon.smithy.java.example.dynamodb.model.PutItemOutput;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.java.io.datastream.DataStream;

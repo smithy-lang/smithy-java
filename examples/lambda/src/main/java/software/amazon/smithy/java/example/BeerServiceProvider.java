@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.examples;
+package software.amazon.smithy.java.example;
 
 import com.google.auto.service.AutoService;
 import java.nio.charset.StandardCharsets;
@@ -12,14 +12,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 import software.amazon.smithy.java.aws.integrations.lambda.SmithyServiceProvider;
-import software.amazon.smithy.java.examples.lambda.model.AddBeerInput;
-import software.amazon.smithy.java.examples.lambda.model.AddBeerOutput;
-import software.amazon.smithy.java.examples.lambda.model.Beer;
-import software.amazon.smithy.java.examples.lambda.model.GetBeerInput;
-import software.amazon.smithy.java.examples.lambda.model.GetBeerOutput;
-import software.amazon.smithy.java.examples.lambda.service.AddBeerOperation;
-import software.amazon.smithy.java.examples.lambda.service.BeerService;
-import software.amazon.smithy.java.examples.lambda.service.GetBeerOperation;
+import software.amazon.smithy.java.example.lambda.model.AddBeerInput;
+import software.amazon.smithy.java.example.lambda.model.AddBeerOutput;
+import software.amazon.smithy.java.example.lambda.model.Beer;
+import software.amazon.smithy.java.example.lambda.model.GetBeerInput;
+import software.amazon.smithy.java.example.lambda.model.GetBeerOutput;
+import software.amazon.smithy.java.example.lambda.service.AddBeerOperation;
+import software.amazon.smithy.java.example.lambda.service.BeerService;
+import software.amazon.smithy.java.example.lambda.service.GetBeerOperation;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Service;
 

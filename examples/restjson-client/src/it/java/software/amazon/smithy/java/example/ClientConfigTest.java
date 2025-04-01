@@ -26,16 +26,16 @@ import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
-import software.amazon.smithy.java.example.client.PersonDirectoryClient;
-import software.amazon.smithy.java.example.model.GetPersonImage;
-import software.amazon.smithy.java.example.model.GetPersonImageInput;
-import software.amazon.smithy.java.example.model.GetPersonImageOutput;
-import software.amazon.smithy.java.example.model.PutPerson;
-import software.amazon.smithy.java.example.model.PutPersonImage;
-import software.amazon.smithy.java.example.model.PutPersonImageInput;
-import software.amazon.smithy.java.example.model.PutPersonImageOutput;
-import software.amazon.smithy.java.example.model.PutPersonInput;
-import software.amazon.smithy.java.example.model.PutPersonOutput;
+import software.amazon.smithy.java.example.restjson.client.PersonDirectoryClient;
+import software.amazon.smithy.java.example.restjson.model.GetPersonImage;
+import software.amazon.smithy.java.example.restjson.model.GetPersonImageInput;
+import software.amazon.smithy.java.example.restjson.model.GetPersonImageOutput;
+import software.amazon.smithy.java.example.restjson.model.PutPerson;
+import software.amazon.smithy.java.example.restjson.model.PutPersonImage;
+import software.amazon.smithy.java.example.restjson.model.PutPersonImageInput;
+import software.amazon.smithy.java.example.restjson.model.PutPersonImageOutput;
+import software.amazon.smithy.java.example.restjson.model.PutPersonInput;
+import software.amazon.smithy.java.example.restjson.model.PutPersonOutput;
 import software.amazon.smithy.java.http.api.HttpRequest;
 
 public class ClientConfigTest {
