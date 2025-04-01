@@ -25,6 +25,7 @@ import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
@@ -70,11 +71,11 @@ public final class DynamicClient extends Client {
     private final Map<String, OperationShape> operationNames = new HashMap<>();
     private final TypeRegistry serviceErrorRegistry;
 
-    private DynamicClient(Builder builder, ServiceShape shape, Model model) {
+    private DynamicClient(Builder builder, SchemaConverter converter, ServiceShape shape, Model model) {
         super(builder);
         this.model = model;
         this.service = shape;
-        this.schemaConverter = new SchemaConverter(model);
+        this.schemaConverter = converter;
 
         // Create a lookup table of operation names to the operation shape IDs.
         for (var operation : TopDownIndex.of(model).getContainedOperations(service)) {
@@ -234,7 +235,7 @@ public final class DynamicClient extends Client {
             }
 
             return new DynamicOperation(
-                    service.getId(),
+                    config().service(),
                     operationSchema,
                     inputSchema,
                     outputSchema,
@@ -264,7 +265,19 @@ public final class DynamicClient extends Client {
                 autoDetectProtocol();
             }
 
-            return new DynamicClient(this, shape, model);
+            var converter = new SchemaConverter(model);
+
+            // Create the schema for the service and put it in the config.
+            var serviceSchema = converter.getSchema(shape);
+            var apiService = new ApiService() {
+                @Override
+                public Schema schema() {
+                    return serviceSchema;
+                }
+            };
+            configBuilder().service(apiService);
+
+            return new DynamicClient(this, converter, shape, model);
         }
 
         @SuppressWarnings("unchecked")

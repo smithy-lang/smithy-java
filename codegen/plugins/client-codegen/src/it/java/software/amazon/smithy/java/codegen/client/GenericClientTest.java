@@ -27,6 +27,7 @@ import software.amazon.smithy.java.codegen.client.util.EchoServer;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
+import software.amazon.smithy.model.shapes.ShapeId;
 
 public class GenericClientTest {
     private static final EchoServer server = new EchoServer();
@@ -157,5 +158,16 @@ public class GenericClientTest {
         var input = EchoInput.builder().string(value).build();
         var output = client.echo(input);
         assertEquals(value, output.string());
+    }
+
+    @Test
+    public void generatedApiService() {
+        var client = TestServiceClient.builder()
+                .protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()))
+                .endpointResolver(ENDPOINT_RESOLVER)
+                .build();
+
+        assertEquals(client.config().service().schema().id(),
+                ShapeId.from("smithy.java.codegen.server.test#TestService"));
     }
 }

@@ -7,6 +7,7 @@ package software.amazon.smithy.java.codegen;
 
 import software.amazon.smithy.codegen.core.Property;
 import software.amazon.smithy.codegen.core.Symbol;
+import software.amazon.smithy.java.core.schema.ApiService;
 
 /**
  * Contains properties that may be added to symbols by smithy-java.
@@ -72,6 +73,13 @@ public final class SymbolProperties {
      * <p>This property is expected on all {@code Service} shape symbols.
      */
     public static final Property<Symbol> SERVICE_EXCEPTION = Property.named("service-exception");
+
+    /**
+     * Symbol representing the {@link ApiService} of a service.
+     *
+     * <p>This property is expected on all {@code Service} shape symbols.
+     */
+    public static final Property<Symbol> SERVICE_API_SERVICE = Property.named("service-api-service");
 
     private SymbolProperties() {}
 }

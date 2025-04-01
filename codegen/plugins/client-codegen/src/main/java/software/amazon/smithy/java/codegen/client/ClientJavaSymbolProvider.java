@@ -31,6 +31,8 @@ final class ClientJavaSymbolProvider extends JavaSymbolProvider {
                 .putProperty(ClientSymbolProperties.ASYNC_SYMBOL, getSymbolFromName(true))
                 .putProperty(SymbolProperties.SERVICE_EXCEPTION,
                         CodegenUtils.getServiceExceptionSymbol(packageNamespace(), serviceName))
+                .putProperty(SymbolProperties.SERVICE_API_SERVICE,
+                        CodegenUtils.getServiceApiSymbol(packageNamespace(), serviceName))
                 .build();
     }
 

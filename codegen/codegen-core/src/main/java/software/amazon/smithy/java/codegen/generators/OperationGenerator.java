@@ -14,12 +14,15 @@ import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateOperationDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
+import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.error.ModeledException;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.ApiResource;
+import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.core.schema.InputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.schema.OutputEventStreamingApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -145,6 +148,18 @@ public final class OperationGenerator
                                         public ${sdkSchema:T} idempotencyTokenMember() {
                                             return ${?idempotencyTokenMember}IDEMPOTENCY_TOKEN_MEMBER${/idempotencyTokenMember}${^idempotencyTokenMember}null${/idempotencyTokenMember};
                                         }
+
+                                        ${?specificApiServiceType}
+                                        @Override
+                                        public ${apiServiceType:T} service() {
+                                            return ${specificApiServiceType:T}.instance();
+                                        }
+                                        ${/specificApiServiceType}${^specificApiServiceType}
+                                        @Override
+                                        public ${apiServiceType:T} service() {
+                                            return null;
+                                        }
+                                        ${/specificApiServiceType}
                                         ${?hasResource}
 
                                         @Override
@@ -234,6 +249,14 @@ public final class OperationGenerator
                     resourceOptional.ifPresent(
                             resourceShape -> writer.putContext("resource",
                                     directive.symbolProvider().toSymbol(resourceShape)));
+
+                    writer.putContext("apiServiceType", ApiService.class);
+                    var apiService = CodegenUtils.tryGetServiceProperty(
+                            directive,
+                            SymbolProperties.SERVICE_API_SERVICE);
+                    if (apiService != null) {
+                        writer.putContext("specificApiServiceType", apiService);
+                    }
 
                     writer.write(template);
                     writer.popState();

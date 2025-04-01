@@ -7,6 +7,7 @@ package software.amazon.smithy.java.client.waiters.models;
 
 import java.util.List;
 import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
@@ -48,5 +49,10 @@ public final class TestOperationWaitable implements ApiOperation<GetFoosInput, G
     @Override
     public List<ShapeId> effectiveAuthSchemes() {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ApiService service() {
+        return new WaiterApiService();
     }
 }
