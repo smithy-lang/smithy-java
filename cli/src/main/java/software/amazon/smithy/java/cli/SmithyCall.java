@@ -126,6 +126,12 @@ public final class SmithyCall implements Callable<Integer> {
         try {
             Model model = assembleModel(modelPath);
 
+            LOGGER.fine("Checking if the provided model contains service: " + service);
+            ShapeId serviceInput = ShapeId.from(service);
+            if (!model.getShapeIds().contains(serviceInput)) {
+                throw new IllegalArgumentException("Service " + service + " not found in model");
+            }
+
             Set<OperationShape> operations = model.getOperationShapes();
             StringBuilder sb = new StringBuilder();
             for (OperationShape operation : operations) {
@@ -149,7 +155,12 @@ public final class SmithyCall implements Callable<Integer> {
         LOGGER.fine("Executing operation: " + operation);
         try {
             Model model = assembleModel(modelPath);
-            ShapeId serviceInput = validateServiceExists(model);
+
+            LOGGER.fine("Checking if the provided model contains service: " + service);
+            ShapeId serviceInput = ShapeId.from(service);
+            if (!model.getShapeIds().contains(serviceInput)) {
+                throw new IllegalArgumentException("Service " + service + " not found in model");
+            }
 
             DynamicClient client = buildDynamicClient(model, serviceInput);
             Document result = executeClientCall(client);
@@ -188,15 +199,6 @@ public final class SmithyCall implements Callable<Integer> {
             assembler.addImport(path);
         }
         return assembler.assemble().unwrap();
-    }
-
-    private ShapeId validateServiceExists(Model model) {
-        LOGGER.fine("Checking if the provided model contains service: " + service);
-        ShapeId serviceInput = ShapeId.from(service);
-        if (!model.getShapeIds().contains(serviceInput)) {
-            throw new IllegalArgumentException("Service " + service + " not found in model");
-        }
-        return serviceInput;
     }
 
     private DynamicClient buildDynamicClient(Model model, ShapeId serviceInput) {
