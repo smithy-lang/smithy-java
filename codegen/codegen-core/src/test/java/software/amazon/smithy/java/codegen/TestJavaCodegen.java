@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen;
 
+import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.CreateContextDirective;
 import software.amazon.smithy.codegen.core.directed.CreateSymbolProviderDirective;
@@ -20,15 +21,18 @@ import software.amazon.smithy.codegen.core.directed.GenerateResourceDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateStructureDirective;
 import software.amazon.smithy.codegen.core.directed.GenerateUnionDirective;
+import software.amazon.smithy.java.codegen.generators.ApiServiceGenerator;
 import software.amazon.smithy.java.codegen.generators.EnumGenerator;
 import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;
 import software.amazon.smithy.java.codegen.generators.OperationGenerator;
 import software.amazon.smithy.java.codegen.generators.ResourceGenerator;
 import software.amazon.smithy.java.codegen.generators.SchemasGenerator;
+import software.amazon.smithy.java.codegen.generators.ServiceExceptionGenerator;
 import software.amazon.smithy.java.codegen.generators.SharedSerdeGenerator;
 import software.amazon.smithy.java.codegen.generators.StructureGenerator;
 import software.amazon.smithy.java.codegen.generators.UnionGenerator;
+import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -46,7 +50,20 @@ public class TestJavaCodegen implements
         return new JavaSymbolProvider(
                 directive.model(),
                 directive.service(),
-                directive.settings().packageNamespace());
+                directive.settings().packageNamespace()) {
+            @Override
+            public Symbol serviceShape(ServiceShape serviceShape) {
+                var serviceName = directive.settings().name();
+                return Symbol.builder()
+                        .name(serviceName)
+                        .namespace(directive.settings().packageNamespace(), ".")
+                        .putProperty(SymbolProperties.SERVICE_API_SERVICE,
+                                CodegenUtils.getServiceApiSymbol(packageNamespace(), serviceName))
+                        .putProperty(SymbolProperties.SERVICE_EXCEPTION,
+                                CodegenUtils.getServiceExceptionSymbol(packageNamespace(), serviceName))
+                        .build();
+            }
+        };
     }
 
     @Override
@@ -68,7 +85,8 @@ public class TestJavaCodegen implements
 
     @Override
     public void generateService(GenerateServiceDirective<CodeGenerationContext, JavaCodegenSettings> directive) {
-        // No service generated for tests.
+        new ApiServiceGenerator().accept(directive);
+        new ServiceExceptionGenerator<>().accept(directive);
     }
 
     @Override

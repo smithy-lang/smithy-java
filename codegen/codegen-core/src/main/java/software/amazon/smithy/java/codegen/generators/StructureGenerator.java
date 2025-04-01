@@ -123,13 +123,8 @@ public final class StructureGenerator<
             writer.putContext("shape", directive.symbol());
             writer.putContext("serializableStruct", SerializableStruct.class);
 
-            var service = directive.service();
-            var serviceSymbol = service != null ? directive.symbolProvider().toSymbol(service) : null;
-            if (serviceSymbol == null) {
-                writer.putContext("sdkException", ModeledException.class);
-            } else {
-                writer.putContext("sdkException", serviceSymbol.expectProperty(SymbolProperties.SERVICE_EXCEPTION));
-            }
+            var sdkError = CodegenUtils.tryGetServiceProperty(directive, SymbolProperties.SERVICE_EXCEPTION);
+            writer.putContext("sdkException", sdkError == null ? ModeledException.class : sdkError);
 
             writer.putContext("id", new IdStringGenerator(writer, shape));
             writer.putContext(

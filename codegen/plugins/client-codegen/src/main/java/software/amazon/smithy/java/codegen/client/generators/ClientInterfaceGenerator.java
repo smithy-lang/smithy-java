@@ -32,6 +32,7 @@ import software.amazon.smithy.java.client.core.pagination.Paginator;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.client.sections.ClientInterfaceAdditionalMethodsSection;
 import software.amazon.smithy.java.codegen.integrations.core.GenericTraitInitializer;
@@ -132,7 +133,9 @@ public final class ClientInterfaceGenerator
                                             ${defaultAuth:C|}${/defaultSchemes}
 
                                             private Builder() {${?defaultSchemes}
-                                                configBuilder().putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes});
+                                                configBuilder()
+                                                    .putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes})
+                                                    .service(${serviceApi:T}.instance());
                                             ${/defaultSchemes}}
 
                                             @Override
@@ -203,6 +206,9 @@ public final class ClientInterfaceGenerator
                     writer.putContext("hasDefaults", !defaultPlugins.isEmpty());
                     writer.putContext("defaultPlugins", new PluginPropertyWriter(writer, defaultPlugins));
                     writer.putContext("settings", getBuilderSettings(directive.settings()));
+
+                    var serviceSymbol = directive.symbolProvider().toSymbol(directive.service());
+                    writer.putContext("serviceApi", serviceSymbol.expectProperty(SymbolProperties.SERVICE_API_SERVICE));
                     writer.write(template);
                     writer.popState();
                 });

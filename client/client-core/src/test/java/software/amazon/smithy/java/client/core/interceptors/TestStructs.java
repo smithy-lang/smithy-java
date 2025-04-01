@@ -7,6 +7,7 @@ package software.amazon.smithy.java.client.core.interceptors;
 
 import java.util.List;
 import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -53,6 +54,11 @@ public final class TestStructs {
         @Override
         public List<ShapeId> effectiveAuthSchemes() {
             return List.of();
+        }
+
+        @Override
+        public ApiService service() {
+            return null;
         }
     };
 

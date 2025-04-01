@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.java.core.schema.ApiService;
+import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
@@ -50,9 +52,12 @@ public class DynamicOperationTest {
         var input = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFooInput")));
         var output = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFooOutput")));
 
+        var serviceSchema = Schema.createService(ShapeId.from("smithy.example#S"));
+        ApiService apiService = () -> serviceSchema;
+
         var e = Assertions.assertThrows(UnsupportedOperationException.class, () -> {
             DynamicOperation o = new DynamicOperation(
-                    ShapeId.from("smithy.example#S"),
+                    apiService,
                     operationSchema,
                     input,
                     output,
@@ -86,8 +91,11 @@ public class DynamicOperationTest {
         var input = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFooInput")));
         var output = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#PutFooOutput")));
 
+        var serviceSchema = Schema.createService(ShapeId.from("smithy.example#S"));
+        ApiService apiService = () -> serviceSchema;
+
         var o = new DynamicOperation(
-                ShapeId.from("smithy.example#S"),
+                apiService,
                 operationSchema,
                 input,
                 output,

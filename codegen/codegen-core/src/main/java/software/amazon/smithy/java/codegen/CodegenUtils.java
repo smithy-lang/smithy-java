@@ -13,11 +13,14 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import software.amazon.smithy.codegen.core.CodegenException;
+import software.amazon.smithy.codegen.core.Property;
 import software.amazon.smithy.codegen.core.ReservedWords;
 import software.amazon.smithy.codegen.core.ReservedWordsBuilder;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.TopologicalIndex;
+import software.amazon.smithy.codegen.core.directed.ShapeDirective;
+import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.NullableIndex;
 import software.amazon.smithy.model.selector.PathFinder;
@@ -389,6 +392,26 @@ public final class CodegenUtils {
     }
 
     /**
+     * Try to get a property from the service symbol of a directive (IFF the service exists, the symbol is
+     * created, and property is found).
+     *
+     * @param directive Directive to get the service from.
+     * @param prop Property to get from the symbol of the service.
+     * @return the property if found, or null.
+     * @param <T> the property type.
+     */
+    public static <T> T tryGetServiceProperty(ShapeDirective<?, ?, ?> directive, Property<T> prop) {
+        var service = directive.service();
+        if (service != null) {
+            var symbol = directive.symbolProvider().toSymbol(service);
+            if (symbol != null) {
+                return symbol.getProperty(prop).orElse(null);
+            }
+        }
+        return null;
+    }
+
+    /**
      * Returns the exception class used as the base-level exception for service shapes.
      *
      * <p>Exceptions bound to a service that are not an implicit error, framework errors, or an external shape are
@@ -400,6 +423,24 @@ public final class CodegenUtils {
      */
     public static Symbol getServiceExceptionSymbol(String packageNamespace, String serviceName) {
         var name = serviceName + "Exception";
+        var filename = String.format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name);
+        return Symbol.builder()
+                .name(name)
+                .namespace(packageNamespace + ".model", ".")
+                .putProperty(SymbolProperties.IS_PRIMITIVE, false)
+                .declarationFile(filename)
+                .build();
+    }
+
+    /**
+     * Returns the class used as the {@link ApiService} for the service.
+     *
+     * @param packageNamespace The package namespace to use for the service.
+     * @param serviceName The name of the service to use for the service.
+     * @return the service ApiService symbol.
+     */
+    public static Symbol getServiceApiSymbol(String packageNamespace, String serviceName) {
+        var name = serviceName + "ApiService";
         var filename = String.format("./%s/model/%s.java", packageNamespace.replace(".", "/"), name);
         return Symbol.builder()
                 .name(name)

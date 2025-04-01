@@ -20,6 +20,7 @@ import software.amazon.smithy.java.client.core.FeatureId;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
@@ -132,6 +133,11 @@ public class UserAgentPluginTest {
 
             @Override
             public Schema outputSchema() {
+                return null;
+            }
+
+            @Override
+            public ApiService service() {
                 return null;
             }
 
