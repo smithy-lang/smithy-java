@@ -71,7 +71,7 @@ public final class SmithyCall implements Callable<Integer> {
     private String inputPath;
 
     @Option(names = "--input-json", description = "JSON string containing input parameters for the operation")
-    private String input;
+    private String inputJson;
 
     @Option(names = "--url", description = "Endpoint URL for the service")
     private String url;
@@ -265,7 +265,7 @@ public final class SmithyCall implements Callable<Integer> {
     }
 
     private void configureInputInterceptor(DynamicClient.Builder builder) {
-        if (input != null || inputPath != null) {
+        if (inputJson != null || inputPath != null) {
             builder.addInterceptor(new ClientInterceptor() {
                 @Override
                 public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {}
@@ -274,19 +274,19 @@ public final class SmithyCall implements Callable<Integer> {
     }
 
     private Document executeClientCall(DynamicClient client) throws Exception {
-        if (input != null && inputPath != null) {
+        if (inputJson != null && inputPath != null) {
             throw new IllegalArgumentException("Cannot specify both '--input-json' and '--input-path'. Please provide only one.");
         }
 
         LOGGER.fine("Executing client call");
 
-        if (input == null && inputPath == null) {
+        if (inputJson == null && inputPath == null) {
             return client.call(operation);
         }
 
         Document inputDocument;
-        if (input != null) {
-            inputDocument = CODEC.createDeserializer(input.getBytes(StandardCharsets.UTF_8)).readDocument();
+        if (inputJson != null) {
+            inputDocument = CODEC.createDeserializer(inputJson.getBytes(StandardCharsets.UTF_8)).readDocument();
         } else {
             String content = Files.readString(Path.of(inputPath), StandardCharsets.UTF_8);
             inputDocument = CODEC.createDeserializer(content.getBytes(StandardCharsets.UTF_8)).readDocument();
