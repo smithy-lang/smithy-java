@@ -50,11 +50,7 @@ class SmithyCallTest {
         mockServer.setExecutor(Executors.newFixedThreadPool(1));
 
         mockServer.createContext("/", exchange -> {
-            String method = exchange.getRequestMethod();
-            String path = exchange.getRequestURI().getPath();
-            String headers = exchange.getRequestHeaders().toString();
-
-            String requestBody = "";
+            String requestBody;
             try (InputStream is = exchange.getRequestBody()) {
                 requestBody = new String(is.readAllBytes());
             }
