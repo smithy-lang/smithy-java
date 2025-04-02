@@ -165,12 +165,12 @@ public final class SmithyCall implements Callable<Integer> {
             DynamicClient client = buildDynamicClient(model, serviceInput);
             Document result = executeClientCall(client);
 
-            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                 ShapeSerializer serializer = CODEC.createSerializer(outputStream)) {
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            try (ShapeSerializer serializer = CODEC.createSerializer(outputStream)) {
                 result.serialize(serializer);
-                String output = outputStream.toString(StandardCharsets.UTF_8);
-                System.out.println(output);
             }
+            String output = outputStream.toString(StandardCharsets.UTF_8);
+            System.out.println(output);
 
             return 0;
         } catch (Exception e) {
