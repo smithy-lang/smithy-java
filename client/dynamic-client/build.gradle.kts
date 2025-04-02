@@ -13,5 +13,5 @@ dependencies {
 
     testImplementation(project(":aws:client:aws-client-restjson"))
     testImplementation(project(":aws:client:aws-client-awsjson"))
-    testImplementation(project(":aws:sigv4"))
+    testImplementation(project(":aws:aws-sigv4"))
 }

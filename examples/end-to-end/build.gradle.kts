@@ -11,7 +11,7 @@ application {
 dependencies {
     val smithyJavaVersion: String by project
 
-    smithyBuild("software.amazon.smithy.java.codegen:plugins:$smithyJavaVersion")
+    smithyBuild("software.amazon.smithy.java:plugins:$smithyJavaVersion")
 
     // Server dependencies
     implementation("software.amazon.smithy.java:server-netty:$smithyJavaVersion")
