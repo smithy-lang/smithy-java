@@ -59,10 +59,6 @@ class SmithyCallTest {
                 requestBody = new String(is.readAllBytes());
             }
 
-            System.err.println("Received request: " + method + " " + path);
-            System.err.println("Headers: " + headers);
-            System.err.println("Body: " + requestBody);
-
             String target = exchange.getRequestHeaders().getFirst("X-Amz-Target");
             String response;
 
@@ -95,7 +91,7 @@ class SmithyCallTest {
     }
 
     @Test
-    void testListOperations() throws Exception {
+    void testListOperations() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
@@ -111,7 +107,7 @@ class SmithyCallTest {
     }
 
     @Test
-    void testListOperationsWithUnknownService() throws Exception {
+    void testListOperationsWithUnknownService() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#UnknownService",
@@ -126,7 +122,7 @@ class SmithyCallTest {
     }
 
     @Test
-    void testCreateSprocket() throws Exception {
+    void testCreateSprocket() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
@@ -144,7 +140,7 @@ class SmithyCallTest {
     }
 
     @Test
-    void testGetSprocket() throws Exception {
+    void testGetSprocket() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
@@ -161,7 +157,7 @@ class SmithyCallTest {
     }
 
     @Test
-    void testGetSprocketInvalidId() throws Exception {
+    void testGetSprocketInvalidId() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
@@ -178,7 +174,7 @@ class SmithyCallTest {
     }
 
     @Test
-    void testUnsupportedProtocol() throws Exception {
+    void testUnsupportedProtocol() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
@@ -196,7 +192,7 @@ class SmithyCallTest {
     }
 
     @Test
-    void testNoURL() throws Exception {
+    void testNoURL() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
@@ -212,7 +208,7 @@ class SmithyCallTest {
     }
 
     @Test
-    void testDuplicateInput() throws Exception {
+    void testDuplicateInput() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
@@ -230,7 +226,7 @@ class SmithyCallTest {
     }
 
     @Test
-    void testUnknownOperation() throws Exception {
+    void testUnknownOperation() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
@@ -247,7 +243,7 @@ class SmithyCallTest {
     }
 
     @Test
-    void testWithUnsupportedAuth() throws Exception {
+    void testWithUnsupportedAuth() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
@@ -266,7 +262,7 @@ class SmithyCallTest {
     }
 
     @Test
-    void testWithSigV4() throws Exception {
+    void testWithSigV4() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
@@ -286,7 +282,7 @@ class SmithyCallTest {
     }
 
     @Test
-    void testWithNoAWSRegion() throws Exception {
+    void testWithNoAWSRegion() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
@@ -306,7 +302,7 @@ class SmithyCallTest {
 
 
 
-    private Path createSprocketsModelFile() throws Exception {
+    private Path createSprocketsModelFile() {
         Path modelFile = tempDir.resolve("sprockets.smithy");
         String modelContent = """
             $version: "2"
@@ -346,7 +342,11 @@ class SmithyCallTest {
                 why: String
             }
             """;
-        Files.write(modelFile, modelContent.getBytes());
+        try {
+            Files.write(modelFile, modelContent.getBytes());
+        } catch (IOException e) {
+            System.err.println("Failed to write model file: " + e.getMessage());
+        }
         return tempDir;
     }
 }
