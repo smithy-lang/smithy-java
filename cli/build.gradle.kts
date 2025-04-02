@@ -18,7 +18,7 @@ dependencies {
     implementation(project(":codecs:json-codec"))
     implementation(project(":client:client-http"))
     implementation(project(":aws:client:aws-client-core"))
-    implementation(project(":aws:sigv4"))
+    implementation(project(":aws:aws-sigv4"))
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.8.1")
