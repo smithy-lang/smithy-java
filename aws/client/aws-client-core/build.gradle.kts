@@ -4,7 +4,7 @@ plugins {
 
 description = "This module provides AWS-Specific client functionality"
 
-extra["displayName"] = "Smithy :: Java :: AWS :: Client-Core"
+extra["displayName"] = "Smithy :: Java :: AWS :: Client :: Core"
 extra["moduleName"] = "software.amazon.smithy.java.aws.client.core"
 
 dependencies {

@@ -5,8 +5,8 @@ plugins {
 
 description = "This module provides the AWS RestJson1 support for servers."
 
-extra["displayName"] = "Smithy :: Java :: Server AWS RestJson1"
-extra["moduleName"] = "software.amazon.smithy.java.server-aws-rest-json1"
+extra["displayName"] = "Smithy :: Java :: AWS :: Server :: REST JSON"
+extra["moduleName"] = "software.amazon.smithy.java.aws.server.restjson"
 
 dependencies {
     api(project(":server:server-api"))
