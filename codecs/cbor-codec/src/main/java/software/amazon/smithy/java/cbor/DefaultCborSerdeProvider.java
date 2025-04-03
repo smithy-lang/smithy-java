@@ -23,22 +23,22 @@ final class DefaultCborSerdeProvider implements CborSerdeProvider {
     }
 
     @Override
-    public ShapeDeserializer newDeserializer(byte[] source, Rpcv2CborCodec.Settings settings) {
-        return new CborDeserializer(source);
+    public ShapeDeserializer newDeserializer(byte[] source, CborSettings settings) {
+        return new CborDeserializer(source, settings);
     }
 
     @Override
-    public ShapeDeserializer newDeserializer(ByteBuffer source, Rpcv2CborCodec.Settings settings) {
-        return new CborDeserializer(source);
+    public ShapeDeserializer newDeserializer(ByteBuffer source, CborSettings settings) {
+        return new CborDeserializer(source, settings);
     }
 
     @Override
-    public ShapeSerializer newSerializer(OutputStream sink, Rpcv2CborCodec.Settings settings) {
+    public ShapeSerializer newSerializer(OutputStream sink, CborSettings settings) {
         return new CborSerializer(new Sink.OutputStreamSink(sink));
     }
 
     @Override
-    public ByteBuffer serialize(SerializableStruct struct, Rpcv2CborCodec.Settings settings) {
+    public ByteBuffer serialize(SerializableStruct struct, CborSettings settings) {
         var sink = new Sink.ResizingSink();
         var serializer = new CborSerializer(sink);
         struct.serialize(serializer);

@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 
 public class CborSerializerTest {
-    private static final Rpcv2CborCodec.Settings SETTINGS = new Rpcv2CborCodec.Settings();
+    private static final CborSettings SETTINGS = CborSettings.defaultSettings();
     private static final DefaultCborSerdeProvider CODEC = new DefaultCborSerdeProvider();
 
     @Test
