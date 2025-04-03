@@ -262,7 +262,13 @@ public final class JsonDocuments {
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeMap(PreludeSchemas.DOCUMENT, values, values.size(), (stringMap, mapSerializer) -> {
                 for (var e : stringMap.entrySet()) {
-                    mapSerializer.writeEntry(STRING_MAP_KEY, e.getKey(), e.getValue(), Document::serializeContents);
+                    mapSerializer.writeEntry(STRING_MAP_KEY, e.getKey(), e.getValue(), (document, ser) -> {
+                        if (document == null) {
+                            ser.writeNull(PreludeSchemas.DOCUMENT);
+                        } else {
+                            document.serializeContents(ser);
+                        }
+                    });
                 }
             });
         }
