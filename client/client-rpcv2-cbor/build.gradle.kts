@@ -5,8 +5,8 @@ plugins {
 
 description = "This module provides the implementation of the client RpcV2 CBOR protocol"
 
-extra["displayName"] = "Smithy :: Java :: Client :: Protocols :: RPCv2 CBOR"
-extra["moduleName"] = "software.amazon.smithy.java.client.protocols.rpcv2cbor"
+extra["displayName"] = "Smithy :: Java :: Client :: RPCv2 CBOR"
+extra["moduleName"] = "software.amazon.smithy.java.client.rpcv2cbor"
 
 dependencies {
     api(project(":client:client-http"))

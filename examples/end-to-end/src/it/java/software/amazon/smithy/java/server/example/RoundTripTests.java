@@ -20,13 +20,13 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
-import software.amazon.smithy.java.example.client.CoffeeShopClient;
-import software.amazon.smithy.java.example.model.CoffeeType;
-import software.amazon.smithy.java.example.model.CreateOrderInput;
-import software.amazon.smithy.java.example.model.GetMenuInput;
-import software.amazon.smithy.java.example.model.GetOrderInput;
-import software.amazon.smithy.java.example.model.OrderNotFound;
-import software.amazon.smithy.java.example.model.OrderStatus;
+import software.amazon.smithy.java.example.etoe.client.CoffeeShopClient;
+import software.amazon.smithy.java.example.etoe.model.CoffeeType;
+import software.amazon.smithy.java.example.etoe.model.CreateOrderInput;
+import software.amazon.smithy.java.example.etoe.model.GetMenuInput;
+import software.amazon.smithy.java.example.etoe.model.GetOrderInput;
+import software.amazon.smithy.java.example.etoe.model.OrderNotFound;
+import software.amazon.smithy.java.example.etoe.model.OrderStatus;
 
 public class RoundTripTests {
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();

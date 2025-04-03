@@ -2,9 +2,9 @@ plugins {
     id("smithy-java.module-conventions")
 }
 
-description = "This module provides http-binding functionality"
+description = "This module provides Smithy Java http-binding functionality"
 
-extra["displayName"] = "Smithy :: Java :: Http Binding"
+extra["displayName"] = "Smithy :: Java :: HTTP :: Binding"
 extra["moduleName"] = "software.amazon.smithy.java.http.binding"
 
 dependencies {

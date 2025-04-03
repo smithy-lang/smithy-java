@@ -3,7 +3,7 @@
   "plugins": {
     "java-server-codegen": {
       "service": "smithy.example#BeerService",
-      "namespace": "software.amazon.smithy.java.examples.lambda"
+      "namespace": "software.amazon.smithy.java.example.lambda"
     }
   }
 }

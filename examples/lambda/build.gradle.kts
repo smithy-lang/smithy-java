@@ -11,7 +11,8 @@ dependencies {
 
     smithyBuild("software.amazon.smithy.java:plugins:$smithyJavaVersion")
 
-    implementation("software.amazon.smithy.java:lambda-endpoint:$smithyJavaVersion")
+    implementation("software.amazon.smithy.java:aws-lambda-endpoint:$smithyJavaVersion")
+    implementation("software.amazon.smithy.java:server-api:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-server-restjson:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:server-rpcv2-cbor:$smithyJavaVersion")
 }

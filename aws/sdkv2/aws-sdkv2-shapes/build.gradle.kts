@@ -4,7 +4,7 @@ plugins {
 
 description = "This module allows for converting between Smithy Java and AWS SDK for Java V2 documents"
 
-extra["displayName"] = "Smithy :: Java :: AWS :: SDK V2 :: Shapes"
+extra["displayName"] = "Smithy :: Java :: AWS :: SDKv2 :: Shapes"
 extra["moduleName"] = "software.amazon.smithy.java.aws.sdkv2.shapes"
 
 dependencies {

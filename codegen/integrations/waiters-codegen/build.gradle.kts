@@ -4,7 +4,7 @@ plugins {
 
 description = "This module provides the Smithy Java Waiter codegen integration"
 
-extra["displayName"] = "Smithy :: Java :: Waiters :: Codegen"
+extra["displayName"] = "Smithy :: Java :: Codegen :: Waiters"
 extra["moduleName"] = "software.amazon.smithy.java.codegen.waiters"
 
 dependencies {

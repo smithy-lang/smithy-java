@@ -6,7 +6,7 @@ description = """
     This module provides a basic endpoint implementation that may be used to back an AWS Lambda request handler
     """
 
-extra["displayName"] = "Smithy :: Java :: AWS :: Integrations :: Lambda"
+extra["displayName"] = "Smithy :: Java :: AWS :: Integrations :: Lambda Endpoint"
 extra["moduleName"] = "software.amazon.smithy.java.aws.integrations.lambda"
 
 dependencies {

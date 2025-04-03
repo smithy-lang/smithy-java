@@ -11,7 +11,7 @@ dependencies {
 
     implementation("software.amazon.smithy.java:aws-client-awsjson:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
-    implementation("software.amazon.smithy.java:sigv4:$smithyJavaVersion")
+    implementation("software.amazon.smithy.java:aws-sigv4:$smithyJavaVersion")
 }
 
 // Add generated Java sources to the main sourceset

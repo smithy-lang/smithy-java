@@ -5,7 +5,7 @@ plugins {
 
 description = "This module provides the implementation of AWS REST XML"
 
-extra["displayName"] = "Smithy :: Java :: Client AWS REST XML"
+extra["displayName"] = "Smithy :: Java :: AWS :: Client :: REST XML"
 extra["moduleName"] = "software.amazon.smithy.java.aws.client.restxml"
 
 dependencies {

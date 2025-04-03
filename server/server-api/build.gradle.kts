@@ -4,8 +4,8 @@ plugins {
 
 description = "This module provides the public Server API"
 
-extra["displayName"] = "Smithy :: Java :: Server"
-extra["moduleName"] = "software.amazon.smithy.java.server"
+extra["displayName"] = "Smithy :: Java :: Server :: API"
+extra["moduleName"] = "software.amazon.smithy.java.server.api"
 
 dependencies {
     implementation(project(":logging"))

@@ -4,7 +4,7 @@ plugins {
 
 description = "This module provides the core client functionality"
 
-extra["displayName"] = "Smithy :: Java :: Client Core"
+extra["displayName"] = "Smithy :: Java :: Client :: Core"
 extra["moduleName"] = "software.amazon.smithy.java.client.core"
 
 dependencies {

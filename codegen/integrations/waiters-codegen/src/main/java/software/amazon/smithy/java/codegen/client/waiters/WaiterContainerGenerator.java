@@ -12,15 +12,15 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.client.waiters.Waiter;
+import software.amazon.smithy.java.client.waiters.backoff.BackoffStrategy;
+import software.amazon.smithy.java.client.waiters.jmespath.Comparator;
+import software.amazon.smithy.java.client.waiters.jmespath.JMESPathBiPredicate;
+import software.amazon.smithy.java.client.waiters.jmespath.JMESPathPredicate;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.client.ClientSymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.waiters.Waiter;
-import software.amazon.smithy.java.waiters.backoff.BackoffStrategy;
-import software.amazon.smithy.java.waiters.jmespath.Comparator;
-import software.amazon.smithy.java.waiters.jmespath.JMESPathBiPredicate;
-import software.amazon.smithy.java.waiters.jmespath.JMESPathPredicate;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.OperationIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
@@ -139,7 +139,7 @@ final class WaiterContainerGenerator implements Consumer<CodeGenerationContext> 
         @Override
         public void run() {
             writer.pushState();
-            writer.putContext("matcherType", software.amazon.smithy.java.waiters.matching.Matcher.class);
+            writer.putContext("matcherType", software.amazon.smithy.java.client.waiters.matching.Matcher.class);
             matcher.accept(this);
             writer.popState();
         }

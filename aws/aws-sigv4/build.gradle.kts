@@ -8,7 +8,7 @@ plugins {
 
 description = "This module provides AWS-Specific Sigv4 Signing capabilities"
 
-extra["displayName"] = "Smithy :: Java :: AWS :: Sigv4"
+extra["displayName"] = "Smithy :: Java :: AWS :: SigV4"
 extra["moduleName"] = "software.amazon.smithy.java.aws.sigv4"
 
 dependencies {

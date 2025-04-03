@@ -1,4 +1,4 @@
-## waiters
+## client-waiters
 Provides the core runtime functionality for [Waiters](https://smithy.io/2.0/additional-specs/waiters.html#waiters). 
 
 Waiters are a client-side abstraction used to poll a resource until a desired state is reached, 

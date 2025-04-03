@@ -4,7 +4,7 @@ plugins {
 
 description = "This module provides mocking functionality for HTTP clients"
 
-extra["displayName"] = "Smithy :: Java :: JSON"
+extra["displayName"] = "Smithy :: Java :: Client :: HTTP :: Mock"
 extra["moduleName"] = "software.amazon.smithy.java.client.http.mock"
 
 dependencies {

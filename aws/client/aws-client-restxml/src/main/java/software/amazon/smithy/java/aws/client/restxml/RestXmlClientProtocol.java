@@ -6,6 +6,9 @@
 package software.amazon.smithy.java.aws.client.restxml;
 
 import software.amazon.smithy.aws.traits.protocols.RestXmlTrait;
+import software.amazon.smithy.java.aws.events.AwsEventDecoderFactory;
+import software.amazon.smithy.java.aws.events.AwsEventEncoderFactory;
+import software.amazon.smithy.java.aws.events.AwsEventFrame;
 import software.amazon.smithy.java.client.core.ClientProtocol;
 import software.amazon.smithy.java.client.core.ClientProtocolFactory;
 import software.amazon.smithy.java.client.core.ProtocolSettings;
@@ -20,9 +23,6 @@ import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.event.EventDecoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventEncoderFactory;
 import software.amazon.smithy.java.core.serde.event.EventStreamingException;
-import software.amazon.smithy.java.events.aws.AwsEventDecoderFactory;
-import software.amazon.smithy.java.events.aws.AwsEventEncoderFactory;
-import software.amazon.smithy.java.events.aws.AwsEventFrame;
 import software.amazon.smithy.java.xml.XmlCodec;
 import software.amazon.smithy.model.shapes.ShapeId;
 

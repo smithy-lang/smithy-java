@@ -4,7 +4,7 @@ plugins {
 
 description = "This module provides client HTTP functionality"
 
-extra["displayName"] = "Smithy :: Java :: Client Http"
+extra["displayName"] = "Smithy :: Java :: Client :: HTTP"
 extra["moduleName"] = "software.amazon.smithy.java.client.http"
 
 dependencies {

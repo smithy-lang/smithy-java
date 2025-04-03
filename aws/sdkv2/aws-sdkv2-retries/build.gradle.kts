@@ -4,7 +4,7 @@ plugins {
 
 description = "This module provides an adapter that allows Smithy Java to use retry strategies from the AWS SDK for Java V2"
 
-extra["displayName"] = "Smithy :: Java :: AWS :: AWS SDK v2 :: Retries adapter"
+extra["displayName"] = "Smithy :: Java :: AWS :: SDKv2 :: Retries Adapter"
 extra["moduleName"] = "software.amazon.smithy.java.aws.sdkv2.retries"
 
 dependencies {

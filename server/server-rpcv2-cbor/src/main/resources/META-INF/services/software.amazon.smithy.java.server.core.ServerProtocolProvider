@@ -1,1 +1,1 @@
-software.amazon.smithy.java.server.protocols.rpcv2.RpcV2CborProtocolProvider
+software.amazon.smithy.java.server.rpcv2.RpcV2CborProtocolProvider
