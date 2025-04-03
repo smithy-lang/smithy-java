@@ -95,6 +95,11 @@ public final class JsonDocuments {
         public void serializeContents(ShapeSerializer serializer) {
             serializer.writeString(PreludeSchemas.STRING, value);
         }
+
+        @Override
+        public boolean equals(Object obj) {
+            return Document.equals(this, obj);
+        }
     }
 
     record NumberDocument(Number value, JsonSettings settings, Schema schema) implements Document {
@@ -158,6 +163,11 @@ public final class JsonDocuments {
         public void serializeContents(ShapeSerializer serializer) {
             DocumentUtils.serializeNumber(serializer, schema, value);
         }
+
+        @Override
+        public boolean equals(Object obj) {
+            return Document.equals(this, obj);
+        }
     }
 
     record BooleanDocument(boolean value, JsonSettings settings) implements Document {
@@ -179,6 +189,11 @@ public final class JsonDocuments {
         @Override
         public ShapeDeserializer createDeserializer() {
             return new JsonDocumentDeserializer(settings, this);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return Document.equals(this, obj);
         }
     }
 
@@ -214,6 +229,11 @@ public final class JsonDocuments {
                     }
                 }
             });
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return Document.equals(this, obj);
         }
     }
 
@@ -271,6 +291,11 @@ public final class JsonDocuments {
                     });
                 }
             });
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return Document.equals(this, obj);
         }
     }
 
