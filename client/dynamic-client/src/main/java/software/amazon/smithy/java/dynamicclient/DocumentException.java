@@ -51,12 +51,12 @@ public final class DocumentException extends ModeledException {
         return document;
     }
 
-    static final class SchemaGuidedExceptionBuilder implements ShapeBuilder<ModeledException> {
+    public static final class SchemaGuidedExceptionBuilder implements ShapeBuilder<ModeledException> {
 
         private final Schema target;
         private final ShapeBuilder<WrappedDocument> delegateBuilder;
 
-        SchemaGuidedExceptionBuilder(ShapeId service, Schema target) {
+        public SchemaGuidedExceptionBuilder(ShapeId service, Schema target) {
             this.target = target;
             this.delegateBuilder = SchemaConverter.createDocumentBuilder(target, service);
         }
