@@ -56,6 +56,14 @@
         "examples/gradle.properties",
         ".gitignore"
       ]
+    },
+    "mcp-server" : {
+      "documentation" : "Generate or create an MCP server.",
+      "path": "examples/mcp-server",
+      "include": [
+        "examples/gradle.properties",
+        ".gitignore"
+      ]
     }
   }
 }
