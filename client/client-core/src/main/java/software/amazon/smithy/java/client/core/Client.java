@@ -95,8 +95,8 @@ public abstract class Client {
         } else {
             callConfig = config.withRequestOverride(overrideConfig);
             callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
-            callInterceptor = ClientInterceptor.chain(config.interceptors());
-            callIdentityResolvers = IdentityResolvers.of(config.identityResolvers());
+            callInterceptor = ClientInterceptor.chain(callConfig.interceptors());
+            callIdentityResolvers = IdentityResolvers.of(callConfig.identityResolvers());
         }
 
         var callBuilder = ClientCall.<I, O>builder();
