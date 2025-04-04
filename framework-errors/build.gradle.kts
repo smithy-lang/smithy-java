@@ -36,12 +36,6 @@ afterEvaluate {
     }
 }
 
-// TODO: This is needed because the type-mapping file is mapped (twice) in the source-set above and source-set below,
-//  but really we shouldn't be doing that
-tasks.withType<Jar> {
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-}
-
 tasks.named("compileJava") {
     dependsOn("smithyBuild")
 }
