@@ -9,6 +9,7 @@ dependencies {
     annotationProcessor("info.picocli:picocli-codegen:4.7.6")
 
     implementation("software.amazon.smithy:smithy-aws-traits:1.56.0")
+    implementation("software.amazon.smithy:smithy-waiters:1.56.0")
 
     // Client dependencies
     implementation(project(":aws:client:aws-client-restjson"))
