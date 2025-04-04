@@ -23,6 +23,7 @@ import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ErrorFault;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
+import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.logging.InternalLogger;
@@ -78,6 +79,8 @@ final class MockClient extends Client {
             configBuilder().transport(new PlaceHolderTransport<>(HttpMessageExchange.INSTANCE));
             configBuilder().authSchemeResolver(AuthSchemeResolver.NO_AUTH);
             configBuilder().endpointResolver(EndpointResolver.staticEndpoint("http://example.com"));
+            var serviceSchema = Schema.createService(ShapeId.from("smithy.test#Service"));
+            configBuilder().service(() -> serviceSchema);
             return new MockClient(this);
         }
     }

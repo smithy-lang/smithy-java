@@ -8,6 +8,7 @@ package software.amazon.smithy.java.dynamicclient;
 import java.util.List;
 import java.util.Set;
 import software.amazon.smithy.java.core.schema.ApiOperation;
+import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.TraitKey;
@@ -18,7 +19,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 
 final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDocument> {
 
-    private final ShapeId service;
+    private final ApiService service;
     private final Schema operationSchema;
     private final Schema inputSchema;
     private final Schema outputSchema;
@@ -27,7 +28,7 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
     private final List<ShapeId> effectiveAuthSchemes;
 
     public DynamicOperation(
-            ShapeId service,
+            ApiService service,
             Schema operationSchema,
             Schema inputSchema,
             Schema outputSchema,
@@ -60,6 +61,11 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
     }
 
     @Override
+    public ApiService service() {
+        return service;
+    }
+
+    @Override
     public Schema inputSchema() {
         return inputSchema;
     }
@@ -71,12 +77,12 @@ final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDoc
 
     @Override
     public ShapeBuilder<WrappedDocument> inputBuilder() {
-        return SchemaConverter.createDocumentBuilder(inputSchema(), service);
+        return SchemaConverter.createDocumentBuilder(inputSchema(), service.schema().id());
     }
 
     @Override
     public ShapeBuilder<WrappedDocument> outputBuilder() {
-        return SchemaConverter.createDocumentBuilder(outputSchema(), service);
+        return SchemaConverter.createDocumentBuilder(outputSchema(), service.schema().id());
     }
 
     @Override

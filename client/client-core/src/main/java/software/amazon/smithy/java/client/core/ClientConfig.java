@@ -19,6 +19,7 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.retries.api.RetryStrategy;
 
@@ -48,6 +49,7 @@ public final class ClientConfig {
     private final List<IdentityResolver<?>> identityResolvers;
     private final Context context;
     private final Set<Class<? extends ClientPlugin>> appliedPlugins;
+    private final ApiService service;
 
     private final RetryStrategy retryStrategy;
     private final String retryScope;
@@ -86,6 +88,7 @@ public final class ClientConfig {
 
         this.context = Context.unmodifiableCopy(builder.context);
         this.appliedPlugins = Collections.unmodifiableSet(new LinkedHashSet<>(builder.appliedPlugins));
+        this.service = Objects.requireNonNull(builder.service, "Missing required service schema");
     }
 
     /**
@@ -111,6 +114,15 @@ public final class ClientConfig {
      */
     public Set<Class<? extends ClientPlugin>> appliedPlugins() {
         return appliedPlugins;
+    }
+
+    /**
+     * Get the configured service schema.
+     *
+     * @return the service schema.
+     */
+    public ApiService service() {
+        return service;
     }
 
     /**
@@ -244,6 +256,7 @@ public final class ClientConfig {
      * Static builder for ClientConfiguration.
      */
     public static final class Builder {
+        private ApiService service;
         private ClientTransport<?, ?> transport;
         private ClientProtocol<?, ?> protocol;
         private EndpointResolver endpointResolver;
@@ -258,6 +271,7 @@ public final class ClientConfig {
 
         private Builder copyBuilder() {
             Builder builder = new Builder();
+            builder.service = service;
             builder.transport = transport;
             builder.protocol = protocol;
             builder.endpointResolver = endpointResolver;
@@ -270,6 +284,13 @@ public final class ClientConfig {
             builder.retryScope = retryScope;
             builder.appliedPlugins.addAll(appliedPlugins);
             return builder;
+        }
+
+        /**
+         * @return Get the service schema.
+         */
+        public ApiService service() {
+            return service;
         }
 
         /**
@@ -340,6 +361,17 @@ public final class ClientConfig {
          */
         public String retryScope() {
             return retryScope;
+        }
+
+        /**
+         * Set the service schema.
+         *
+         * @param service The service schema.
+         * @return Returns the builder.
+         */
+        public Builder service(ApiService service) {
+            this.service = service;
+            return this;
         }
 
         /**

@@ -5,7 +5,7 @@ plugins {
 
 description = "This module provides the implementation of AWS JSON protocols"
 
-extra["displayName"] = "Smithy :: Java :: Client AWS JSON 1.0 and 1.1"
+extra["displayName"] = "Smithy :: Java :: AWS :: Client :: AWS JSON"
 extra["moduleName"] = "software.amazon.smithy.java.aws.client.awsjson"
 
 dependencies {

@@ -47,14 +47,9 @@ public abstract class Client {
         }
 
         this.config = configBuilder.build();
-
         this.pipeline = ClientPipeline.of(config.protocol(), config.transport());
-
-        // TODO: Add an interceptor to throw service-specific exceptions (e.g., PersonDirectoryClientException).
         this.interceptor = ClientInterceptor.chain(config.interceptors());
-
         this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
-
         this.typeRegistry = typeRegistry();
 
         if (config.retryStrategy() != null) {
@@ -95,8 +90,8 @@ public abstract class Client {
         } else {
             callConfig = config.withRequestOverride(overrideConfig);
             callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
-            callInterceptor = ClientInterceptor.chain(config.interceptors());
-            callIdentityResolvers = IdentityResolvers.of(config.identityResolvers());
+            callInterceptor = ClientInterceptor.chain(callConfig.interceptors());
+            callIdentityResolvers = IdentityResolvers.of(callConfig.identityResolvers());
         }
 
         var callBuilder = ClientCall.<I, O>builder();
@@ -184,7 +179,9 @@ public abstract class Client {
          */
         @SuppressWarnings("unchecked")
         public B withConfiguration(ClientConfig config) {
-            configBuilder.transport(config.transport())
+            configBuilder
+                    .service(config.service())
+                    .transport(config.transport())
                     .protocol(config.protocol())
                     .endpointResolver(config.endpointResolver())
                     .authSchemeResolver(config.authSchemeResolver())

@@ -14,6 +14,8 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
@@ -183,6 +185,33 @@ public class JsonDocumentTest {
         var document = de.readDocument();
         assertThat(document.getMember("c"), nullValue());
         assertThat(document.getMember("d"), nullValue());
+    }
+
+    @Test
+    public void nullMapMemberRoundtrip() {
+        var codec = JsonCodec.builder().build();
+        var doc = codec.createDeserializer("{\"a\":null}".getBytes(StandardCharsets.UTF_8)).readDocument();
+        var roundtrip = codec.createDeserializer(codec.serialize(doc)).readDocument();
+
+        assertEquals(doc, roundtrip);
+    }
+
+    @Test
+    public void nullListMemberRoundtrip() {
+        var codec = JsonCodec.builder().build();
+        var doc = codec.createDeserializer("[null]".getBytes(StandardCharsets.UTF_8)).readDocument();
+        var roundtrip = codec.createDeserializer(codec.serialize(doc)).readDocument();
+
+        assertEquals(doc, roundtrip);
+    }
+
+    @Test
+    public void nullDocument() {
+        var codec = JsonCodec.builder().build();
+        var de = codec.createDeserializer("null".getBytes(StandardCharsets.UTF_8));
+
+        var document = de.readDocument();
+        assertNull(document);
     }
 
     @ParameterizedTest

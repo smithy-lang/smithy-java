@@ -5,7 +5,7 @@ plugins {
 
 description = "This module provides the implementation of AWS REST JSON"
 
-extra["displayName"] = "Smithy :: Java :: Client AWS REST JSON"
+extra["displayName"] = "Smithy :: Java :: AWS :: Client :: REST JSON"
 extra["moduleName"] = "software.amazon.smithy.java.aws.client.restjson"
 
 dependencies {

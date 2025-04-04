@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public class JavaHttpClientTest {
@@ -82,6 +83,8 @@ public class JavaHttpClientTest {
         builder.protocol(new AwsJson1Protocol(ShapeId.from("foo#Bar")));
         builder.transport(new JavaHttpClientTransport());
         builder.endpointResolver(EndpointResolver.staticEndpoint(new URI("localhost:8080")));
+        var serviceSchema = Schema.createService(ShapeId.from("foo#Bar"));
+        builder.service(() -> serviceSchema);
         var config = builder.build();
 
         assertThat(config.interceptors(), not(empty()));

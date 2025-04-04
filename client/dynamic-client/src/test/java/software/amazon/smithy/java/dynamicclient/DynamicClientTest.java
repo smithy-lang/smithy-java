@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import software.amazon.smithy.aws.traits.protocols.AwsJson1_0Trait;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.MessageExchange;
@@ -26,6 +27,7 @@ import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.CallException;
 import software.amazon.smithy.java.core.error.ModeledException;
+import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpResponse;
@@ -89,6 +91,21 @@ public class DynamicClientTest {
     @Test
     public void requiresServiceAndModel() {
         Assertions.assertThrows(NullPointerException.class, () -> DynamicClient.builder().build());
+    }
+
+    @Test
+    public void createsServiceSchema() throws Exception {
+        var client = DynamicClient.builder()
+                .service(service)
+                .model(model)
+                .protocol(new AwsJson1Protocol(service))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .transport(mockTransport())
+                .endpointResolver(EndpointResolver.staticEndpoint("https://foo.com"))
+                .build();
+
+        assertThat(client.config().service().schema().id(), equalTo(service));
+        assertThat(client.config().service().schema().hasTrait(TraitKey.get(AwsJson1_0Trait.class)), is(true));
     }
 
     @Test
