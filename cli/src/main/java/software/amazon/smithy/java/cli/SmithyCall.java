@@ -33,7 +33,7 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
-import software.amazon.smithy.java.client.protocols.rpcv2.RpcV2CborProtocol;
+import software.amazon.smithy.java.client.rpcv2.RpcV2CborProtocol;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
