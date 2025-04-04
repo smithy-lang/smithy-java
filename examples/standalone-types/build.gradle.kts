@@ -22,9 +22,11 @@ afterEvaluate {
         main {
             java {
                 srcDir(typePath)
+                include("software/**")
             }
             resources {
                 srcDir(typePath)
+                include("META-INF/**")
             }
         }
     }
