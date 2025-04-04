@@ -7,6 +7,7 @@ package software.amazon.smithy.java.core.schema;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import software.amazon.smithy.model.traits.DefaultTrait;
+import software.amazon.smithy.model.traits.DocumentationTrait;
 import software.amazon.smithy.model.traits.EndpointTrait;
 import software.amazon.smithy.model.traits.EnumTrait;
 import software.amazon.smithy.model.traits.ErrorTrait;
@@ -62,6 +63,7 @@ public final class TraitKey<T extends Trait> {
     // Note that TraitKeys can be accessed at any time through TraitKey#get; these are just pre-defined.
 
     public static final TraitKey<RequiredTrait> REQUIRED_TRAIT = TraitKey.get(RequiredTrait.class);
+    public static final TraitKey<DocumentationTrait> DOCUMENTATION_TRAIT = TraitKey.get(DocumentationTrait.class);
     public static final TraitKey<DefaultTrait> DEFAULT_TRAIT = TraitKey.get(DefaultTrait.class);
     public static final TraitKey<UniqueItemsTrait> UNIQUE_ITEMS_TRAIT = TraitKey.get(UniqueItemsTrait.class);
     public static final TraitKey<TimestampFormatTrait> TIMESTAMP_FORMAT_TRAIT = TraitKey.get(
