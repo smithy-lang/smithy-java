@@ -8,6 +8,8 @@ dependencies {
     implementation("info.picocli:picocli:4.7.6")
     annotationProcessor("info.picocli:picocli-codegen:4.7.6")
 
+    implementation("software.amazon.smithy:smithy-aws-traits:1.56.0")
+
     // Client dependencies
     implementation(project(":aws:client:aws-client-restjson"))
     implementation(project(":aws:client:aws-client-awsjson"))
@@ -23,6 +25,31 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.8.1")
     testImplementation("org.junit.jupiter:junit-jupiter-params:5.8.1")
+}
+
+tasks.register<Copy>("copySmithyAwsTraits") {
+    from(zipTree(configurations.runtimeClasspath.get().filter { it.name.startsWith("smithy-aws-traits-") }.single())) {
+        include("**/*.smithy")
+        eachFile {
+            relativePath = RelativePath(true, name)
+        }
+    }
+    into(layout.buildDirectory.dir("smithy-aws-traits"))
+
+    includeEmptyDirs = false
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.named("processResources") {
+    dependsOn("copySmithyAwsTraits")
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDir(layout.buildDirectory.dir("smithy-aws-traits"))
+        }
+    }
 }
 
 tasks.test {
