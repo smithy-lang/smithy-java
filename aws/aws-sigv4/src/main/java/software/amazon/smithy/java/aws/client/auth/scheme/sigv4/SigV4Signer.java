@@ -159,7 +159,7 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         var headers = copyHeaders(httpHeaders);
 
         // AWS4 requires a number of headers to be set before signing including 'Host' and 'X-Amz-Date'
-        var hostHeader = uriUsingNonStandardPort(uri) ? uri.getHost() + ':' + uri.getPort() : uri.getHost();
+        var hostHeader = uriUsingStandardPort(uri) ? uri.getHost() + ':' + uri.getPort() : uri.getHost();
         headers.put("host", List.of(hostHeader));
 
         var sb = signingResources.sb;
@@ -249,12 +249,11 @@ final class SigV4Signer implements Signer<HttpRequest, AwsCredentialsIdentity> {
         sb.append(value);
     }
 
-    private static boolean uriUsingNonStandardPort(URI uri) {
+    private static boolean uriUsingStandardPort(URI uri) {
         return switch (uri.getPort()) {
-            case -1 -> false;
             case 80 -> uri.getScheme().equals("http");
             case 443 -> uri.getScheme().equals("https");
-            default -> throw new IllegalStateException("Unexpected value for URI scheme: " + uri.getScheme());
+            default -> false;
         };
     }
 
