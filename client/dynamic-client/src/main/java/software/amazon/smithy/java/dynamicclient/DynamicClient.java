@@ -31,14 +31,13 @@ import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
-import software.amazon.smithy.java.dynamicschemas.WrappedDocument;
+import software.amazon.smithy.java.dynamicschemas.StructDocument;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.shapes.ToShapeId;
 
 /**
@@ -65,7 +64,7 @@ public final class DynamicClient extends Client {
 
     private final ServiceShape service;
     private final Model model;
-    private final ConcurrentMap<String, ApiOperation<WrappedDocument, WrappedDocument>> operations =
+    private final ConcurrentMap<String, ApiOperation<StructDocument, StructDocument>> operations =
             new ConcurrentHashMap<>();
     private final SchemaConverter schemaConverter;
     private final Map<String, OperationShape> operationNames = new HashMap<>();
@@ -179,7 +178,7 @@ public final class DynamicClient extends Client {
             RequestOverrideConfig overrideConfig
     ) {
         var apiOperation = getApiOperation(operation);
-        var inputStruct = new WrappedDocument(apiOperation.inputSchema(), input, service.getId());
+        var inputStruct = StructDocument.of(apiOperation.inputSchema(), input, service.getId());
         return call(inputStruct, apiOperation, overrideConfig).thenApply(Function.identity());
     }
 
@@ -192,13 +191,10 @@ public final class DynamicClient extends Client {
      */
     public SerializableStruct createStruct(ToShapeId shape, Document value) {
         var schema = schemaConverter.getSchema(model.expectShape(shape.toShapeId()));
-        if (value.type() != ShapeType.MAP && value.type() != ShapeType.STRUCTURE) {
-            throw new IllegalArgumentException("Document value must be a map or structure, found " + value.type());
-        }
-        return new WrappedDocument(schema, value, service.getId());
+        return StructDocument.of(schema, value, service.getId());
     }
 
-    private ApiOperation<WrappedDocument, WrappedDocument> getApiOperation(String name) {
+    private ApiOperation<StructDocument, StructDocument> getApiOperation(String name) {
         return operations.computeIfAbsent(name, operation -> {
             var shape = operationNames.get(name);
             if (shape == null) {

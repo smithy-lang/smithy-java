@@ -18,14 +18,14 @@ import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
-import software.amazon.smithy.java.dynamicschemas.WrappedDocument;
+import software.amazon.smithy.java.dynamicschemas.StructDocument;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.ServiceIndex;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-public final class DynamicOperation implements ApiOperation<WrappedDocument, WrappedDocument> {
+public final class DynamicOperation implements ApiOperation<StructDocument, StructDocument> {
 
     private final ApiService service;
     private final Schema operationSchema;
@@ -84,12 +84,12 @@ public final class DynamicOperation implements ApiOperation<WrappedDocument, Wra
     }
 
     @Override
-    public ShapeBuilder<WrappedDocument> inputBuilder() {
+    public ShapeBuilder<StructDocument> inputBuilder() {
         return SchemaConverter.createDocumentBuilder(inputSchema(), service.schema().id());
     }
 
     @Override
-    public ShapeBuilder<WrappedDocument> outputBuilder() {
+    public ShapeBuilder<StructDocument> outputBuilder() {
         return SchemaConverter.createDocumentBuilder(outputSchema(), service.schema().id());
     }
 

@@ -19,6 +19,7 @@ import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 public class ListDocumentTest {
@@ -106,13 +107,15 @@ public class ListDocumentTest {
 
                     @Override
                     public void writeString(Schema schema, String value) {
-                        assertThat(schema, equalTo(PreludeSchemas.STRING));
+                        // We don't attempt to change the schema of a list member. Since the given list member
+                        // was a document that didn't use a member schema, it's reflected here.
+                        assertThat(schema.id(), equalTo(ShapeId.from("smithy.api#String")));
                         writtenStrings.add(value);
                     }
 
                     @Override
                     public void writeNull(Schema schema) {
-                        assertThat(schema, equalTo(PreludeSchemas.DOCUMENT));
+                        assertThat(schema.id(), equalTo(ShapeId.from("smithy.api#Document$member")));
                         writtenStrings.add(null);
                     }
                 });

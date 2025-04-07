@@ -124,7 +124,7 @@ public class SdkDocumentWriterTest {
                                         "bar",
                                         software.amazon.awssdk.core.document.Document.fromString("a"),
                                         "BAZ",
-                                        software.amazon.awssdk.core.document.Document.fromString("b"),
+                                        software.amazon.awssdk.core.document.Document.fromNumber(2),
                                         "date",
                                         software.amazon.awssdk.core.document.Document
                                                 .fromString(Instant.EPOCH.toString())))));
@@ -150,7 +150,7 @@ public class SdkDocumentWriterTest {
                                 "bar",
                                 Document.of("a"),
                                 "baz",
-                                Document.of("b"),
+                                Document.of(2),
                                 "date",
                                 Document.of(Instant.EPOCH))));
     }
@@ -170,7 +170,7 @@ public class SdkDocumentWriterTest {
                                         "bar",
                                         software.amazon.awssdk.core.document.Document.fromString("a"),
                                         "baz",
-                                        software.amazon.awssdk.core.document.Document.fromString("b"),
+                                        software.amazon.awssdk.core.document.Document.fromNumber(2),
                                         "date",
                                         software.amazon.awssdk.core.document.Document.fromNumber(0.0)))));
     }
