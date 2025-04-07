@@ -1,5 +1,5 @@
 # Change Log
-## 0.0.2 (03/21/2025)
+## 0.0.2 (04/07/2025)
 > [!WARNING]
 > This is a developer-preview release and may contain bugs. **No** guarantee is made about API stability.
 > This release is not recommended for production use!
@@ -9,6 +9,9 @@
 - Added custom exceptions for ClientTransport.
 - Added lambda endpoint functionality with updated naming.
 - Consolidated Schemas into a single class.
+- Updated namespace and module naming.
+- Improved document serialization of wrapped structures.
+- Added support for service-schema access from client-side.
 
 
 ## 0.0.1 (02/06/2025)
