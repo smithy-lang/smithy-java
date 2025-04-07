@@ -27,5 +27,4 @@ dependencies {
     api(libs.junit.jupiter.api)
     api(libs.junit.jupiter.engine)
     api(libs.junit.jupiter.params)
-    api(libs.hamcrest)
 }
