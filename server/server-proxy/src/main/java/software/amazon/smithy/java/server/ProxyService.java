@@ -25,7 +25,7 @@ import software.amazon.smithy.java.dynamicclient.DocumentException;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.dynamicclient.DynamicOperation;
 import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
-import software.amazon.smithy.java.dynamicschemas.WrappedDocument;
+import software.amazon.smithy.java.dynamicschemas.StructDocument;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.OperationShape;
@@ -40,7 +40,7 @@ public final class ProxyService implements Service {
 
     private final DynamicClient dynamicClient;
     private final SchemaConverter schemaConverter;
-    private final Map<String, Operation<WrappedDocument, WrappedDocument>> operations;
+    private final Map<String, Operation<StructDocument, StructDocument>> operations;
     private final TypeRegistry serviceErrorRegistry;
     private final Model model;
     private final ServiceShape service;
@@ -76,8 +76,8 @@ public final class ProxyService implements Service {
             String operationName = operation.getId().getName();
             var function =
                     new DynamicFunction(dynamicClient, operationName, schemaConverter, model, operation, service);
-            Operation<WrappedDocument,
-                    WrappedDocument> serverOperation = Operation.of(operationName,
+            Operation<StructDocument,
+                    StructDocument> serverOperation = Operation.of(operationName,
                             function,
                             DynamicOperation.create(operation,
                                     schemaConverter,
@@ -196,25 +196,26 @@ public final class ProxyService implements Service {
         }
     }
 
-    private record DynamicFunction(DynamicClient dynamicClient,
-                                   String operation, 
-                                   SchemaConverter schemaConverter,
-                                   Model model,
-                                   OperationShape operationShape,
-                                   ServiceShape serviceShape) implements BiFunction<WrappedDocument, RequestContext, WrappedDocument> {
+    private record DynamicFunction(
+            DynamicClient dynamicClient,
+            String operation,
+            SchemaConverter schemaConverter,
+            Model model,
+            OperationShape operationShape,
+            ServiceShape serviceShape) implements BiFunction<StructDocument, RequestContext, StructDocument> {
 
         @Override
-            public WrappedDocument apply(WrappedDocument input, RequestContext requestContext) {
-                return createWrappedDocument(operationShape.getOutput().get(), dynamicClient.call(operation, input));
-            }
-
-            private WrappedDocument createWrappedDocument(ToShapeId shape, Document value) {
-                var schema = schemaConverter.getSchema(model.expectShape(shape.toShapeId()));
-                if (value.type() != ShapeType.MAP && value.type() != ShapeType.STRUCTURE) {
-                    throw new IllegalArgumentException("Document value must be a map or structure, found " + value.type());
-                }
-                return new WrappedDocument(schema, value, serviceShape.getId());
-            }
+        public StructDocument apply(StructDocument input, RequestContext requestContext) {
+            return createStructDocument(operationShape.getOutput().get(), dynamicClient.call(operation, input));
         }
+
+        private StructDocument createStructDocument(ToShapeId shape, Document value) {
+            var schema = schemaConverter.getSchema(model.expectShape(shape.toShapeId()));
+            if (value.type() != ShapeType.MAP && value.type() != ShapeType.STRUCTURE) {
+                throw new IllegalArgumentException("Document value must be a map or structure, found " + value.type());
+            }
+            return StructDocument.of(schema, value, serviceShape.getId());
+        }
+    }
 
 }
