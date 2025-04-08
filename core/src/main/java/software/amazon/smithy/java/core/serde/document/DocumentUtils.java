@@ -48,7 +48,7 @@ public final class DocumentUtils {
         switch (schema.type()) {
             case BYTE -> serializer.writeByte(schema, value.byteValue());
             case SHORT -> serializer.writeShort(schema, value.shortValue());
-            case INTEGER -> serializer.writeInteger(schema, value.intValue());
+            case INTEGER, INT_ENUM -> serializer.writeInteger(schema, value.intValue());
             case LONG -> serializer.writeLong(schema, value.longValue());
             case FLOAT -> serializer.writeFloat(schema, value.floatValue());
             case DOUBLE -> serializer.writeDouble(schema, value.doubleValue());

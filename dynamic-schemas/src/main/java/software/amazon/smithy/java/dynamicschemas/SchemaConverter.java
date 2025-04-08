@@ -44,8 +44,20 @@ public final class SchemaConverter {
      * @param serviceId The shape ID of the service that is used to provide default namespaces for relative shape IDs.
      * @return the created shape builder.
      */
-    public static ShapeBuilder<WrappedDocument> createDocumentBuilder(Schema schema, ShapeId serviceId) {
+    public static ShapeBuilder<StructDocument> createDocumentBuilder(Schema schema, ShapeId serviceId) {
         return new SchemaGuidedDocumentBuilder(schema, serviceId);
+    }
+
+    /**
+     * Create a schema-guided document shape builder.
+     *
+     * <p>Document discriminators that use a relative ID will assume the same namespace as the given {@code schema}.
+     *
+     * @param schema Schema used to inform deserialization.
+     * @return the created shape builder.
+     */
+    public static ShapeBuilder<StructDocument> createDocumentBuilder(Schema schema) {
+        return createDocumentBuilder(schema, schema.id());
     }
 
     /**
