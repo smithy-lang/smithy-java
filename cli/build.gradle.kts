@@ -1,15 +1,15 @@
 plugins {
     `java-library`
     application
-    id("org.graalvm.buildtools.native") version "0.10.3"
+    alias(libs.plugins.graalvm.native)
 }
 
 dependencies {
-    implementation("info.picocli:picocli:4.7.6")
-    annotationProcessor("info.picocli:picocli-codegen:4.7.6")
+    implementation(libs.picocli)
+    annotationProcessor(libs.picocli.codegen)
 
-    implementation("software.amazon.smithy:smithy-aws-traits:1.56.0")
-    implementation("software.amazon.smithy:smithy-waiters:1.56.0")
+    implementation(libs.smithy.aws.traits)
+    implementation(libs.smithy.waiters)
 
     // Client dependencies
     implementation(project(":aws:client:aws-client-restjson"))
@@ -23,9 +23,10 @@ dependencies {
     implementation(project(":aws:client:aws-client-core"))
     implementation(project(":aws:aws-sigv4"))
 
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
-    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.8.1")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:5.8.1")
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.engine)
+    testImplementation(libs.junit.jupiter.params)
 }
 
 tasks.register<Copy>("copySmithyAwsTraits") {
@@ -99,5 +100,3 @@ repositories {
     mavenLocal()
     mavenCentral()
 }
-
-

@@ -15,6 +15,8 @@ aws-sdk = "2.31.8"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 jreleaser = "1.17.0"
+picocli = "4.7.6"
+graalvm-native = "0.10.3"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -37,6 +39,10 @@ jackson-core = {module = "com.fasterxml.jackson.core:jackson-core", version.ref 
 
 netty-all = {module = "io.netty:netty-all", version.ref = "netty"}
 
+# CLI related dependencies
+picocli = { module = "info.picocli:picocli", version.ref = "picocli" }
+picocli-codegen = { module = "info.picocli:picocli-codegen", version.ref = "picocli" }
+
 # Test dependencies
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit5" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
@@ -58,3 +64,4 @@ jmh = { id = "me.champeau.jmh", version.ref = "jmh" }
 osdetector = { id = "com.google.osdetector", version.ref = "osdetector" }
 smithy-gradle-jar = { id = "software.amazon.smithy.gradle.smithy-jar", version.ref = "smithy-gradle-plugins" }
 jreleaser = { id = "org.jreleaser", version.ref = "jreleaser" }
+graalvm-native = { id = "org.graalvm.buildtools.native", version.ref = "graalvm-native" }
