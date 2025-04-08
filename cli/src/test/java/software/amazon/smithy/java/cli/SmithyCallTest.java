@@ -95,7 +95,7 @@ class SmithyCallTest {
                 "--model-path", modelDir.toString()
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
         assertEquals(0, exitCode);
         String output = outContent.toString().trim();
         assertTrue(output.contains("CreateSprocket"));
@@ -111,7 +111,7 @@ class SmithyCallTest {
                 "--model-path", modelDir.toString()
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("Service smithy.example#UnknownService not found in model"));
@@ -125,11 +125,11 @@ class SmithyCallTest {
                 "CreateSprocket",
                 "--model-path", modelDir.toString(),
                 "--url", "http://localhost:" + PORT,
-                "--protocol", "awsjson",
+                "--protocol", "aws_json",
                 "--input-json", "{}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
         assertEquals(0, exitCode);
         String output = outContent.toString().trim();
         assertTrue(output.contains("sprocket-123"));
@@ -146,7 +146,7 @@ class SmithyCallTest {
                 "--input-json", "{\"id\":\"sprocket-123\"}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
         assertEquals(0, exitCode);
         String output = outContent.toString().trim();
         assertTrue(output.contains("sprocket-123"));
@@ -163,7 +163,7 @@ class SmithyCallTest {
                 "--input-json", "{\"id\":\"invalid-id\"}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("InvalidSprocketId"));
@@ -181,10 +181,10 @@ class SmithyCallTest {
                 "--input-json", "{\"id\":\"sprocket-123\"}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
-        assertTrue(error.contains("Unsupported protocol type: foo"));
+        assertTrue(error.contains("Invalid value for option '--protocol'"));
     }
 
     @Test
@@ -197,7 +197,7 @@ class SmithyCallTest {
                 "--input-json", "{\"id\":\"sprocket-123\"}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("Service endpoint URL is required"));
@@ -215,7 +215,7 @@ class SmithyCallTest {
                 "--input-path", "/some/path"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("Cannot specify both '--input-json' and '--input-path'. Please provide only one."));
@@ -232,7 +232,7 @@ class SmithyCallTest {
                 "--input-json", "{}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("Operation 'UnknownOperation' not found in service 'smithy.example#Sprockets'"));
@@ -247,11 +247,11 @@ class SmithyCallTest {
                 "--model-path", modelDir.toString(),
                 "--url", "http://localhost:" + PORT,
                 "--auth", "foo",
-                "--protocol", "awsjson",
+                "--protocol", "aws_json",
                 "--input-json", "{}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("Unsupported auth type: foo"));
@@ -267,11 +267,11 @@ class SmithyCallTest {
                 "--url", "http://localhost:" + PORT,
                 "--auth", "sigv4",
                 "--aws-region", "us-west-2",
-                "--protocol", "awsjson",
+                "--protocol", "aws_json",
                 "--input-json", "{}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("No auth scheme could be resolved for operation"));
@@ -286,11 +286,11 @@ class SmithyCallTest {
                 "--model-path", modelDir.toString(),
                 "--url", "http://localhost:" + PORT,
                 "--auth", "sigv4",
-                "--protocol", "awsjson",
+                "--protocol", "aws_json",
                 "--input-json", "{}"
         };
 
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
         assertTrue(exitCode != 0);
         String error = errContent.toString();
         assertTrue(error.contains("SigV4 auth requires --aws-region to be set."));

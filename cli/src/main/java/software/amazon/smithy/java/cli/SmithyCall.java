@@ -76,8 +76,8 @@ public final class SmithyCall implements Callable<Integer> {
     @Option(names = "--url", description = "Endpoint URL for the service")
     private String url;
 
-    @Option(names = { "-p", "--protocol" }, description = "Communication protocol to use (options: awsjson, rpcv2-cbor, restjson, and restxml)")
-    private String protocol;
+    @Option(names = { "-p", "--protocol" }, description = "Supported protocols: ${COMPLETION-CANDIDATES}")
+    private ProtocolType protocolType;
 
     @Option(names = "--list-operations", description = "List all available operations for the specified service")
     private boolean listOperations;
@@ -245,22 +245,13 @@ public final class SmithyCall implements Callable<Integer> {
     }
 
     private void configureProtocol(DynamicClient.Builder builder, ShapeId serviceInput) {
-        if (protocol != null) {
-            ProtocolType protocolType = ProtocolType.fromString(protocol);
-            switch (protocolType) {
-                case AWS_JSON:
-                    builder.protocol(new AwsJson1Protocol(serviceInput));
-                    break;
-                case RPC_V2_CBOR:
-                    builder.protocol(new RpcV2CborProtocol(serviceInput));
-                    break;
-                case REST_JSON:
-                    builder.protocol(new RestJsonClientProtocol(serviceInput));
-                    break;
-                case REST_XML:
-                    builder.protocol(new RestXmlClientProtocol(serviceInput));
-                    break;
-            }
+        if (protocolType != null) {
+            builder.protocol(switch (protocolType) {
+                case AWS_JSON -> new AwsJson1Protocol(serviceInput);
+                case RPC_V2_CBOR -> new RpcV2CborProtocol(serviceInput);
+                case REST_JSON -> new RestJsonClientProtocol(serviceInput);
+                case REST_XML -> new RestXmlClientProtocol(serviceInput);
+            });
         }
     }
 

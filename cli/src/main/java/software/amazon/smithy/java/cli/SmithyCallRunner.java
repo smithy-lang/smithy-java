@@ -9,7 +9,10 @@ import picocli.CommandLine;
 
 public final class SmithyCallRunner {
     public static void main(String[] args) {
-        int exitCode = new CommandLine(new SmithyCall()).execute(args);
+        int exitCode = new CommandLine(new SmithyCall())
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(args);
+
         System.exit(exitCode);
     }
 }
