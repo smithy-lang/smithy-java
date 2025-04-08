@@ -43,7 +43,7 @@ import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 @Command(name = "smithy-call", mixinStandardHelpOptions = true, version = "1.0",
-        description = "Smithy Java CLI")
+        description = "Smithy Call, send request to Smithy services using Smithy models")
 public final class SmithyCall implements Callable<Integer> {
     private static final JsonCodec CODEC = JsonCodec.builder().build();
     private static final Logger LOGGER = Logger.getLogger(SmithyCall.class.getName());
@@ -55,7 +55,7 @@ public final class SmithyCall implements Callable<Integer> {
             "aws.protocols.smithy"
     };
 
-    @Parameters(index = "0", description = "Service Name")
+    @Parameters(index = "0", description = "Service Name (e.g. com.example#CoffeeShop)")
     private String service;
 
     @Parameters(index = "1", description = "Name of the operation to perform on the service", arity = "0..1")
@@ -64,7 +64,7 @@ public final class SmithyCall implements Callable<Integer> {
     @Option(names = {"-v", "--verbose"}, description = "Enable verbose logging")
     private boolean verbose;
 
-    @Option(names = { "-m", "--model-path" }, description = "Path to a directory containing all necessary .smithy service model files", required = true)
+    @Option(names = { "-m", "--model-path" }, description = "Path to a directory containing all necessary Smithy models", required = true)
     private String[] modelPath;
 
     @Option(names = "--input-path", description = "Path to a JSON file containing input parameters for the operation")
