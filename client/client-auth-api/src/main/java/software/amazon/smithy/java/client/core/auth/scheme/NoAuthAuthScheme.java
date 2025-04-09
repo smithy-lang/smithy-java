@@ -55,7 +55,7 @@ final class NoAuthAuthScheme implements AuthScheme<Object, Identity> {
         return Signer.nullSigner();
     }
 
-    private static class NullIdentityResolver implements IdentityResolver<Identity> {
+    private static final class NullIdentityResolver implements IdentityResolver<Identity> {
         public static final CompletableFuture<IdentityResult<Identity>> NULL_IDENTITY = CompletableFuture
                 .completedFuture(
                         IdentityResult.of(new Identity() {}));
