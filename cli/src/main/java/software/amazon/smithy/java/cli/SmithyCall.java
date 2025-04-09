@@ -55,7 +55,7 @@ public final class SmithyCall implements Callable<Integer> {
             "aws.protocols.smithy"
     };
 
-    @Parameters(index = "0", description = "Service Name (e.g. com.example#CoffeeShop)")
+    @Parameters(index = "0", description = "Fully qualified service Name (e.g. com.example#CoffeeShop)")
     private String service;
 
     @Parameters(index = "1", description = "Name of the operation to perform on the service", arity = "0..1")
