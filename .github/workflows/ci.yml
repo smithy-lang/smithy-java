@@ -28,6 +28,9 @@ jobs:
       - name: Clean, build and javadoc
         run: ./gradlew clean build javadoc -Plog-tests --stacktrace
 
+      - name: Integration tests
+        run: ./gradlew integ -Plog-tests --stacktrace
+
       - name: Allow long file names in git for windows
         if: matrix.os == 'windows-latest'
         run: git config --system core.longpaths true

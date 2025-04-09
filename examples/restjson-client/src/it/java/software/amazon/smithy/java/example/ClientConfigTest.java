@@ -30,6 +30,7 @@ import software.amazon.smithy.java.example.restjson.client.PersonDirectoryClient
 import software.amazon.smithy.java.example.restjson.model.GetPersonImage;
 import software.amazon.smithy.java.example.restjson.model.GetPersonImageInput;
 import software.amazon.smithy.java.example.restjson.model.GetPersonImageOutput;
+import software.amazon.smithy.java.example.restjson.model.PersonDirectoryApiService;
 import software.amazon.smithy.java.example.restjson.model.PutPerson;
 import software.amazon.smithy.java.example.restjson.model.PutPersonImage;
 import software.amazon.smithy.java.example.restjson.model.PutPersonImageInput;
@@ -154,6 +155,7 @@ public class ClientConfigTest {
 
             private Builder() {
                 ClientConfig.Builder configBuilder = configBuilder();
+                configBuilder.service(PersonDirectoryApiService.instance());
                 configBuilder.protocol(new RestJsonClientProtocol(PreludeSchemas.DOCUMENT.id()));
                 configBuilder.transport(new JavaHttpClientTransport(HttpClient.newHttpClient()));
 
