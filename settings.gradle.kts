@@ -23,6 +23,7 @@ include(":codecs:xml-codec")
 
 // Client
 include(":client:client-core")
+include(":client:client-auth-api")
 include(":client:client-http")
 include(":client:client-http-binding")
 include(":client:client-rpcv2-cbor")
@@ -35,6 +36,7 @@ include(":server:server-api")
 include(":server:server-core")
 include(":server:server-netty")
 include(":server:server-rpcv2-cbor")
+include(":server:server-proxy")
 
 // Codegen
 include(":codegen:codegen-core")
@@ -70,3 +72,10 @@ include(":examples:event-streaming-client")
 include(":examples:lambda")
 include(":examples:restjson-client")
 include(":examples:standalone-types")
+include(":examples:mcp-server")
+
+//MCP
+include(":mcp")
+include(":mcp:mcp-schemas")
+include(":server:server-mcp")
+

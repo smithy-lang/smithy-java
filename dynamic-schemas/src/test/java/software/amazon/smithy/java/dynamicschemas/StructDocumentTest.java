@@ -9,9 +9,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 
 import java.math.BigDecimal;
@@ -30,13 +28,47 @@ import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.InterceptingSerializer;
+import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.DiscriminatorException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 
-public class WrappedDocumentTest {
+public class StructDocumentTest {
+
+    static Schema getDocumentSchema(Document document) {
+        var serializer = new InterceptingSerializer() {
+            Schema result;
+            @Override
+            protected ShapeSerializer before(Schema schema) {
+                result = schema;
+                return ShapeSerializer.nullSerializer();
+            }
+        };
+        document.serialize(serializer);
+        return serializer.result;
+    }
+
+    @Test
+    public void onlySupportsStructAndUnionSchemas() {
+        var schema = Schema.createString(ShapeId.from("foo#Bar"));
+        var document = Document.of("hi");
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> StructDocument.of(schema, document));
+    }
+
+    @Test
+    public void onlySupportsCompatibleDocuments() {
+        var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
+                .putMember("foo", PreludeSchemas.STRING)
+                .build();
+        var document = Document.of("hi");
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> StructDocument.of(schema, document));
+    }
+
     @Test
     public void wrapsDelegate() {
         var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
@@ -44,11 +76,22 @@ public class WrappedDocumentTest {
                 .build();
         var document = Document.ofObject(Map.of("__type", "foo#Bar", "foo", "bar"));
 
-        var sd = new WrappedDocument(schema, document, ShapeId.from("smithy.example#S"));
+        var sd = StructDocument.of(schema, document, ShapeId.from("smithy.example#S"));
 
         assertThat(sd.type(), is(ShapeType.STRUCTURE));
         assertThat(sd.discriminator().toString(), equalTo("foo#Bar"));
-        assertThat(sd.size(), equalTo(2));
+        assertThat(sd.size(), equalTo(1));
+    }
+
+    @Test
+    public void throwsWhenGettingUnionDiscriminator() {
+        var schema = Schema.unionBuilder(ShapeId.from("foo#Bar"))
+                .putMember("foo", PreludeSchemas.STRING)
+                .build();
+        var document = Document.ofObject(Map.of("foo", "bar"));
+        var sd = StructDocument.of(schema, document, ShapeId.from("smithy.example#S"));
+
+        Assertions.assertThrows(DiscriminatorException.class, sd::discriminator);
     }
 
     @Test
@@ -57,7 +100,7 @@ public class WrappedDocumentTest {
                 .putMember("foo", PreludeSchemas.STRING)
                 .build();
         var document = Document.ofObject(Map.of("__type", "foo#Bar", "foo", "bar"));
-        var sd = new WrappedDocument(schema, document, ShapeId.from("smithy.example#S"));
+        var sd = StructDocument.of(schema, document, ShapeId.from("smithy.example#S"));
 
         assertThat(sd.getMemberValue(schema.member("foo")), equalTo("bar"));
     }
@@ -68,22 +111,10 @@ public class WrappedDocumentTest {
                 .putMember("foo", PreludeSchemas.STRING)
                 .build();
         var document = Document.of(Map.of());
-        var sd = new WrappedDocument(schema, document, ShapeId.from("smithy.example#S"));
+        var sd = StructDocument.of(schema, document, ShapeId.from("smithy.example#S"));
 
         assertThat(sd.getMemberValue(schema.member("foo")), nullValue());
         assertThat(sd.getMember("foo"), nullValue());
-    }
-
-    @Test
-    public void callsDelegateIfNoDiscriminatorFound() {
-        var schema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
-                .putMember("foo", PreludeSchemas.STRING)
-                .build();
-        var document = Document.ofObject(Map.of("foo", "bar"));
-
-        var sd = new WrappedDocument(schema, document, ShapeId.from("smithy.example#S"));
-
-        Assertions.assertThrows(DiscriminatorException.class, sd::discriminator);
     }
 
     @Test
@@ -93,7 +124,7 @@ public class WrappedDocumentTest {
                 .build();
         var document = Document.ofObject(Map.of("foo", "bar"));
 
-        var sd = new WrappedDocument(schema, document, ShapeId.from("smithy.example#S"));
+        var sd = StructDocument.of(schema, document, ShapeId.from("smithy.example#S"));
 
         assertThat(sd.getMemberNames(), contains("foo"));
         var member = sd.getMember("foo");
@@ -103,10 +134,18 @@ public class WrappedDocumentTest {
     @ParameterizedTest
     @MethodSource("convertsToTypeProvider")
     public void convertsToType(Schema schema, Document value, Object expected, Function<Document, Object> mapper) {
-        var wrapped = new WrappedDocument(schema, value, ShapeId.from("smithy.example#S"));
+        // Wrap the test document so it's always the same kind of structure schema and document value.
+        var wrappingSchema = Schema.structureBuilder(ShapeId.from("foo#Bar"))
+                .putMember("value", schema)
+                .build();
+        var wrappedDocument = Document.ofObject(Map.of("value", value));
+        var wrapped = StructDocument.of(wrappingSchema, wrappedDocument, ShapeId.from("smithy.example#S"));
 
-        assertThat(wrapped.type(), equalTo(schema.type()));
-        assertThat(mapper.apply(wrapped), equalTo(expected));
+        assertThat(wrapped.type(), equalTo(ShapeType.STRUCTURE));
+
+        var innerValue = wrapped.getMember("value");
+        assertThat(innerValue.type(), equalTo(schema.type()));
+        assertThat(mapper.apply(innerValue), equalTo(expected));
     }
 
     static List<Arguments> convertsToTypeProvider() {
@@ -181,38 +220,56 @@ public class WrappedDocumentTest {
 
     @Test
     public void convertingToListWrapsValuesInSchemas() {
-        var schema = Schema.listBuilder(ShapeId.from("foo#Bar"))
+        var listSchema = Schema.listBuilder(ShapeId.from("foo#Bar"))
                 .putMember("member", PreludeSchemas.STRING)
                 .build();
-        var document = Document.ofObject(List.of("a", "b"));
+        var wrapper = Schema.structureBuilder(ShapeId.from("foo#Wrapper"))
+                .putMember("value", listSchema)
+                .build();
 
-        var sd = new WrappedDocument(schema, document, ShapeId.from("smithy.example#S"));
+        var document = Document.ofObject(Map.of("value", List.of("a", "b")));
+        var sd = StructDocument.of(wrapper, document, ShapeId.from("smithy.example#S"));
 
-        assertThat(sd.type(), is(ShapeType.LIST));
-        assertThat(sd.size(), equalTo(2));
+        assertThat(sd.type(), is(ShapeType.STRUCTURE));
+        assertThat(getDocumentSchema(sd), equalTo(wrapper));
 
-        var list = sd.asList();
+        var value = sd.getMember("value");
+        assertThat(value.type(), is(ShapeType.LIST));
+        assertThat(value.size(), equalTo(2));
+        assertThat(getDocumentSchema(value), equalTo(wrapper.member("value")));
+
+        var list = value.asList();
         assertThat(list, hasSize(2));
-        assertThat(list.get(0), instanceOf(WrappedDocument.class));
-        assertThat(list.get(1), instanceOf(WrappedDocument.class));
+        assertThat(getDocumentSchema(list.get(0)), equalTo(listSchema.listMember()));
+        assertThat(list.get(0).asString(), equalTo("a"));
+        assertThat(getDocumentSchema(list.get(0)), equalTo(listSchema.listMember()));
+        assertThat(list.get(1).asString(), equalTo("b"));
     }
 
     @Test
     public void convertingToMapWrapsValuesInSchemas() {
-        var schema = Schema.mapBuilder(ShapeId.from("foo#Bar"))
+        var mapSchema = Schema.mapBuilder(ShapeId.from("foo#Bar"))
                 .putMember("key", PreludeSchemas.STRING)
                 .putMember("value", PreludeSchemas.STRING)
                 .build();
-        var document = Document.ofObject(Map.of("a", "b"));
+        var wrapper = Schema.structureBuilder(ShapeId.from("foo#Wrapper"))
+                .putMember("value", mapSchema)
+                .build();
 
-        var sd = new WrappedDocument(schema, document, ShapeId.from("smithy.example#S"));
+        var document = Document.ofObject(Map.of("value", Map.of("a", "b")));
+        var sd = StructDocument.of(wrapper, document, ShapeId.from("smithy.example#S"));
 
-        assertThat(sd.type(), is(ShapeType.MAP));
-        assertThat(sd.size(), equalTo(1));
+        assertThat(getDocumentSchema(sd), equalTo(wrapper));
+        assertThat(sd.type(), is(ShapeType.STRUCTURE));
 
-        var map = sd.asStringMap();
+        var value = sd.getMember("value");
+        assertThat(getDocumentSchema(value), equalTo(wrapper.member("value")));
+        assertThat(value.type(), is(ShapeType.MAP));
+        assertThat(value.size(), equalTo(1));
+
+        var map = value.asStringMap();
         assertThat(map.values(), hasSize(1));
-        assertThat(map.get("a"), instanceOf(WrappedDocument.class));
+        assertThat(getDocumentSchema(map.get("a")), equalTo(mapSchema.mapValueMember()));
     }
 
     @Test
@@ -223,39 +280,39 @@ public class WrappedDocumentTest {
                 .build();
         var document = Document.ofObject(Map.of("a", "a", "b", "b", "c", "c"));
 
-        var sd = new WrappedDocument(schema, document, ShapeId.from("smithy.example#S"));
+        var sd = StructDocument.of(schema, document, ShapeId.from("smithy.example#S"));
 
         assertThat(sd.type(), is(ShapeType.STRUCTURE));
-        assertThat(sd.getMember("a"), instanceOf(WrappedDocument.class));
-        assertThat(sd.getMember("b"), instanceOf(WrappedDocument.class));
-        assertThat(sd.getMember("c"), not(instanceOf(WrappedDocument.class)));
+        assertThat(getDocumentSchema(sd), equalTo(schema));
+        assertThat(getDocumentSchema(sd.getMember("a")), equalTo(schema.member("a")));
+        assertThat(getDocumentSchema(sd.getMember("b")), equalTo(schema.member("b")));
 
         var map = sd.asStringMap();
-        assertThat(map.values(), hasSize(3));
-        assertThat(map.get("a"), instanceOf(WrappedDocument.class));
-        assertThat(map.get("b"), instanceOf(WrappedDocument.class));
-        assertThat(map.get("c"), not(instanceOf(WrappedDocument.class)));
-
-        // Convert to object does the same as the delegate.
-        assertThat(sd.asObject(), equalTo(document.asObject()));
+        assertThat(map.values(), hasSize(2));
+        assertThat(getDocumentSchema(map.get("a")), equalTo(schema.member("a")));
+        assertThat(getDocumentSchema(map.get("b")), equalTo(schema.member("b")));
     }
 
     @Test
     public void serializesDocumentLikeShape() {
-        var wrapped = new WrappedDocument(
-                PreludeSchemas.STRING,
-                Document.of("hi"),
+        var wrapper = Schema.structureBuilder(ShapeId.from("foo#Wrapper"))
+                .putMember("value", PreludeSchemas.STRING)
+                .build();
+
+        var wrapped = StructDocument.of(
+                wrapper,
+                Document.ofObject(Map.of("value", "hi")),
                 ShapeId.from("smithy.example#S"));
         Schema[] set = new Schema[1];
 
-        wrapped.serialize(new SpecificShapeSerializer() {
+        wrapped.getMember("value").serialize(new SpecificShapeSerializer() {
             @Override
             public void writeString(Schema schema, String value) {
                 set[0] = schema;
             }
         });
 
-        assertThat(set[0], is(PreludeSchemas.STRING));
+        assertThat(set[0], equalTo(wrapper.member("value")));
     }
 
     @Test
@@ -265,7 +322,7 @@ public class WrappedDocumentTest {
                 .putMember("b", PreludeSchemas.STRING)
                 .build();
         var document = Document.ofObject(Map.of("a", "a", "b", "b", "c", "c"));
-        var sd = new WrappedDocument(schema, document, ShapeId.from("smithy.example#S"));
+        var sd = StructDocument.of(schema, document, ShapeId.from("smithy.example#S"));
         Schema[] set = new Schema[3];
 
         sd.serialize(new SpecificShapeSerializer() {
@@ -293,7 +350,7 @@ public class WrappedDocumentTest {
                 .putMember("b", PreludeSchemas.STRING)
                 .build();
         var document = Document.ofObject(Map.of("a", "a"));
-        var sd = new WrappedDocument(schema, document, ShapeId.from("smithy.example#S"));
+        var sd = StructDocument.of(schema, document, ShapeId.from("smithy.example#S"));
         Schema[] set = new Schema[2];
 
         sd.serialize(new SpecificShapeSerializer() {

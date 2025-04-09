@@ -191,7 +191,7 @@ final class Documents {
             serializer.writeList(schema, values, values.size(), (values, ser) -> {
                 for (var element : values) {
                     if (element == null) {
-                        ser.writeNull(PreludeSchemas.DOCUMENT);
+                        ser.writeNull(schema.listMember());
                     } else {
                         element.serialize(ser);
                     }

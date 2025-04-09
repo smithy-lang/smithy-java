@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.serde.InterceptingSerializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
@@ -31,7 +30,6 @@ import software.amazon.smithy.java.core.serde.document.DocumentDeserializer;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.ShapeType;
 
 public class SchemaGuidedDocumentBuilderTest {
 
@@ -44,43 +42,11 @@ public class SchemaGuidedDocumentBuilderTest {
                         $version: "2"
                         namespace smithy.example
 
-                        document MyDocument
                         string MyString
-                        boolean MyBoolean
-                        timestamp MyTimestamp
-                        blob MyBlob
-                        byte MyByte
-                        short MyShort
-                        integer MyInteger
-                        long MyLong
-                        float MyFloat
-                        double MyDouble
-                        bigInteger MyBigInteger
-                        bigDecimal MyBigDecimal
-
-                        intEnum MyIntEnum {
-                            foo = 1
-                            bar = 2
-                        }
-
-                        enum MyEnum {
-                            foo
-                            bar
-                        }
-
-                        @sparse
-                        list SimpleList {
-                            member: String
-                        }
 
                         map SimpleMap {
                             key: MyString
                             value: MyString
-                        }
-
-                        map DocumentMap {
-                            key: MyString
-                            value: MyDocument
                         }
 
                         structure SimpleStruct {
@@ -98,6 +64,10 @@ public class SchemaGuidedDocumentBuilderTest {
                             value: Foo
                         }
 
+                        structure StructMapWrapper {
+                            map: StructMap
+                        }
+
                         structure Foo {
                             @jsonName("B")
                             b: String
@@ -109,9 +79,10 @@ public class SchemaGuidedDocumentBuilderTest {
 
     @ParameterizedTest
     @MethodSource("deserializesShapesProvider")
-    public void deserializesShapes(String name, Document source) {
-        var converter = new SchemaConverter(model);
-        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#" + name)));
+    public void deserializesShapes(String modelText, Document source) {
+        var testModel = Model.assembler().addUnparsedModel("test.smithy", modelText).assemble().unwrap();
+        var converter = new SchemaConverter(testModel);
+        var schema = converter.getSchema(testModel.expectShape(ShapeId.from("smithy.example#TestShape")));
 
         var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
         source.deserializeInto(builder);
@@ -122,23 +93,192 @@ public class SchemaGuidedDocumentBuilderTest {
         assertThat(result.schema(), equalTo(schema));
 
         // Ensure structure and union members are set appropriately.
-        if (schema.type() == ShapeType.STRUCTURE || schema.type() == ShapeType.UNION) {
-            for (var member : result.getMemberNames()) {
-                var memberValue = result.getMember(member);
-                if (memberValue != null) {
-                    var expectedMember = schema.member(member);
-                    if (expectedMember != null) {
-                        memberValue.serialize(new InterceptingSerializer() {
-                            @Override
-                            protected ShapeSerializer before(Schema s) {
-                                assertThat(s, equalTo(expectedMember));
-                                return ShapeSerializer.nullSerializer();
-                            }
-                        });
-                    }
+        for (var member : result.getMemberNames()) {
+            var memberValue = result.getMember(member);
+            if (memberValue != null) {
+                var expectedMember = schema.member(member);
+                if (expectedMember != null) {
+                    memberValue.serialize(new InterceptingSerializer() {
+                        @Override
+                        protected ShapeSerializer before(Schema s) {
+                            assertThat(s, equalTo(expectedMember));
+                            return ShapeSerializer.nullSerializer();
+                        }
+                    });
                 }
             }
         }
+    }
+
+    static List<Arguments> deserializesShapesProvider() {
+        return List.of(
+                Arguments.of(
+                        """
+                                $version: "2"
+                                namespace smithy.example
+
+                                structure TestShape {
+                                    foo: MyDocument
+                                }
+
+                                document MyDocument
+                                """,
+                        Document.ofObject(Map.of("foo", "hi"))),
+                Arguments.of(
+                        """
+                                $version: "2"
+                                namespace smithy.example
+
+                                structure TestShape {
+                                    foo: String
+                                    myEnum: MyEnum
+                                }
+
+                                enum MyEnum {
+                                    foo
+                                    bar
+                                }
+                                """,
+                        Document.ofObject(Map.of("foo", "hi", "myEnum", "bar"))),
+                Arguments.of(
+                        """
+                                $version: "2"
+                                namespace smithy.example
+
+                                structure TestShape {
+                                    foo: MyBoolean
+                                }
+
+                                boolean MyBoolean
+                                """,
+                        Document.ofObject(Map.of("foo", true))),
+                Arguments.of(
+                        """
+                                $version: "2"
+                                namespace smithy.example
+
+                                structure TestShape {
+                                    foo: MyTimestamp
+                                }
+
+                                timestamp MyTimestamp
+                                """,
+                        Document.ofObject(Map.of("foo", Document.of(Instant.EPOCH)))),
+                Arguments.of(
+                        """
+                                $version: "2"
+                                namespace smithy.example
+
+                                structure TestShape {
+                                    foo: MyBlob
+                                }
+
+                                blob MyBlob
+                                """,
+                        Document.ofObject(Map.of("foo", Document.of("foo".getBytes(StandardCharsets.UTF_8))))),
+                Arguments.of(
+                        """
+                                $version: "2"
+                                namespace smithy.example
+
+                                structure TestShape {
+                                    byte: Byte
+                                    short: Short
+                                    integer: Integer
+                                    long: Long
+                                    float: Float
+                                    double: Double
+                                    bigInteger: BigInteger
+                                    bigDecimal: BigDecimal
+                                    intEnum: MyIntEnum
+                                }
+
+                                intEnum MyIntEnum {
+                                    foo = 1
+                                    bar = 2
+                                }
+                                """,
+                        Document.ofObject(Map.of(
+                                "byte",
+                                Document.of((byte) 1),
+                                "short",
+                                Document.of((short) 2),
+                                "integer",
+                                Document.of(3),
+                                "long",
+                                Document.of((long) 4),
+                                "float",
+                                Document.of((float) 5),
+                                "double",
+                                Document.of((double) 6),
+                                "bigInteger",
+                                Document.of(BigInteger.TEN),
+                                "bigDecimal",
+                                Document.of(BigDecimal.TEN),
+                                "intEnum",
+                                Document.of(2)))),
+                Arguments.of(
+                        """
+                                $version: "2"
+                                namespace smithy.example
+
+                                structure TestShape {
+                                    values: MyList
+                                }
+
+                                list MyList {
+                                    member: MyStruct
+                                }
+
+                                structure MyStruct {
+                                    foo: String
+                                    bar: Integer
+                                }
+                                """,
+                        Document.ofObject(Map.of(
+                                "values",
+                                Document.ofObject(
+                                        List.of(
+                                                Document.ofObject(Map.of("foo", "hi", "bar", 1)),
+                                                Document.ofObject(Map.of("foo", "bye", "bar", 2))))))),
+                Arguments.of(
+                        """
+                                $version: "2"
+                                namespace smithy.example
+
+                                structure TestShape {
+                                    values: MyMap
+                                }
+
+                                map MyMap {
+                                    key: String
+                                    value: MyStruct
+                                }
+
+                                structure MyStruct {
+                                    foo: String
+                                    bar: Integer
+                                }
+                                """,
+                        Document.ofObject(Map.of(
+                                "values",
+                                Document.ofObject(
+                                        Map.of(
+                                                "hi",
+                                                Document.ofObject(Map.of("foo", "hi", "bar", 1)),
+                                                "bye",
+                                                Document.ofObject(Map.of("foo", "bye", "bar", 2))))))),
+                Arguments.of(
+                        """
+                                $version: "2"
+                                namespace smithy.example
+
+                                union TestShape {
+                                    foo: String
+                                    bar: Integer
+                                }
+                                """,
+                        Document.ofObject(Map.of("foo", Document.ofObject("hi")))));
     }
 
     @Test
@@ -194,16 +334,6 @@ public class SchemaGuidedDocumentBuilderTest {
     }
 
     @Test
-    public void cannotSetMemberWhenNotBuildingStructureOrMapOrUnion() {
-        var converter = new SchemaConverter(model);
-        var member = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct"))).member("foo");
-        var schema = PreludeSchemas.STRING;
-        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
-
-        Assertions.assertThrows(IllegalArgumentException.class, () -> builder.setMemberValue(member, "x"));
-    }
-
-    @Test
     public void deserializesMultipleMembersUsingDocuments() {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
@@ -244,25 +374,6 @@ public class SchemaGuidedDocumentBuilderTest {
     }
 
     @Test
-    public void throwsWhenSettingInvalidMemberOnNonAggregate() {
-        var converter = new SchemaConverter(model);
-        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleList")));
-        var member = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleList"))).member("member");
-        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
-
-        Assertions.assertThrows(IllegalArgumentException.class, () -> builder.setMemberValue(member, "bar1"));
-    }
-
-    @Test
-    public void throwsWhenNoValueSetForScalar() {
-        var converter = new SchemaConverter(model);
-        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleList")));
-        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#Foo"));
-
-        Assertions.assertThrows(IllegalArgumentException.class, builder::build);
-    }
-
-    @Test
     public void throwsWhenNoValueSetForUnion() {
         var converter = new SchemaConverter(model);
         var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleUnion")));
@@ -273,12 +384,12 @@ public class SchemaGuidedDocumentBuilderTest {
 
     @Test
     public void worksWithMapOfStructure() {
-        var source = Document.ofObject(Map.of("a", Document.ofObject(Map.of("b", "str"))));
+        var source = Document.ofObject(Map.of("map", Map.of("a", Document.ofObject(Map.of("b", "str")))));
 
         var converter = new SchemaConverter(model);
-        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#StructMap")));
+        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#StructMapWrapper")));
 
-        var builder = SchemaConverter.createDocumentBuilder(schema, ShapeId.from("smithy.example#StructMap"));
+        var builder = SchemaConverter.createDocumentBuilder(schema);
         source.deserializeInto(builder);
 
         var result = builder.build();
@@ -288,31 +399,34 @@ public class SchemaGuidedDocumentBuilderTest {
 
         var codec = JsonCodec.builder().useJsonName(true).build();
 
-        assertThat(codec.serializeToString(result), equalTo("{\"a\":{\"B\":\"str\"}}"));
+        assertThat(codec.serializeToString(result), equalTo("{\"map\":{\"a\":{\"B\":\"str\"}}}"));
     }
 
-    static List<Arguments> deserializesShapesProvider() {
-        return List.of(
-                Arguments.of("MyDocument", Document.ofObject(Map.of("a", "b"))),
-                Arguments.of("MyString", Document.of("hi")),
-                Arguments.of("MyBoolean", Document.of(true)),
-                Arguments.of("MyTimestamp", Document.of(Instant.EPOCH)),
-                Arguments.of("MyBlob", Document.of("foo".getBytes(StandardCharsets.UTF_8))),
-                Arguments.of("MyByte", Document.of((byte) 1)),
-                Arguments.of("MyShort", Document.of((short) 1)),
-                Arguments.of("MyInteger", Document.of(1)),
-                Arguments.of("MyLong", Document.of(1L)),
-                Arguments.of("MyFloat", Document.of(1f)),
-                Arguments.of("MyDouble", Document.of(1d)),
-                Arguments.of("MyBigInteger", Document.of(BigInteger.ONE)),
-                Arguments.of("MyBigDecimal", Document.of(BigDecimal.ONE)),
-                Arguments.of("MyIntEnum", Document.of(1)),
-                Arguments.of("MyEnum", Document.of("foo")),
-                Arguments.of("SimpleList", Document.ofObject(List.of("a", "b"))),
-                Arguments.of("SimpleMap", Document.ofObject(Map.of("foo", "bar"))),
-                Arguments.of(
-                        "SimpleStruct",
-                        Document.ofObject(Map.of("foo", "bar", "baz", Document.ofObject(Map.of("foo", "hi"))))),
-                Arguments.of("SimpleUnion", Document.ofObject(Map.of("foo", "bar"))));
+    @Test
+    public void throwsIfNotStructureOrUnion() {
+        var schema = Schema.createString(ShapeId.from("foo#Bar"));
+
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new SchemaGuidedDocumentBuilder(schema, schema.id()));
+    }
+
+    @Test
+    public void usesStructDocumentForSetMember() {
+        var converter = new SchemaConverter(model);
+        var schema = converter.getSchema(model.expectShape(ShapeId.from("smithy.example#SimpleStruct")));
+
+        // Make a SimpleStruct StructDocument to see if setValue for "foo" uses it as-is.
+        var struct = StructDocument.of(schema, Document.ofObject(Map.of("foo", "bar")));
+
+        var builder = SchemaConverter.createDocumentBuilder(schema);
+        builder.setMemberValue(schema.member("foo"), "hi");
+        builder.setMemberValue(schema.member("baz"), struct);
+
+        var result = builder.build();
+
+        assertThat(result.getMemberValue(schema.member("foo")), equalTo("hi"));
+        assertThat(result.getMemberValue(schema.member("baz")), equalTo(Map.of("foo", "bar")));
+        assertThat(StructDocumentTest.getDocumentSchema(result.getMember("foo")), equalTo(schema.member("foo")));
+        assertThat(StructDocumentTest.getDocumentSchema(result.getMember("baz")), equalTo(schema.member("baz")));
     }
 }

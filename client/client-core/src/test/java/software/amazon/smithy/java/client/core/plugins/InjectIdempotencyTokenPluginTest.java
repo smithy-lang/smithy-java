@@ -99,7 +99,7 @@ public class InjectIdempotencyTokenPluginTest {
                 .addPlugin(mock)
                 .build();
 
-        client.call(operation, Document.of(input));
+        client.call(operation, input);
         assertThat(mock.getRequests(), not(empty()));
         return mock.getRequests().get(0).request().headers().firstValue("x-token");
     }
