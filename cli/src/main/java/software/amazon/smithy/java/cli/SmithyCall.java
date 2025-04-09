@@ -100,7 +100,7 @@ public final class SmithyCall implements Callable<Integer> {
             }
             return listOperations ? listOperationsForService() : executeOperation();
         } catch (IllegalArgumentException e) {
-            LOGGER.log(Level.SEVERE, "Invalid input", e);
+            System.err.println("Invalid input: " + e.getMessage());
             return 1;
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Unexpected error occurred", e);
@@ -143,7 +143,12 @@ public final class SmithyCall implements Callable<Integer> {
             System.out.println(result);
 
             return 0;
-        } catch (Exception e) {
+        }
+        catch (IllegalArgumentException e) {
+            System.err.println("Invalid input: " + e.getMessage());
+            return 1;
+        }
+        catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Failed to list operations", e);
             return 1;
         }
@@ -171,7 +176,12 @@ public final class SmithyCall implements Callable<Integer> {
             System.out.println(output);
 
             return 0;
-        } catch (Exception e) {
+        }
+        catch (IllegalArgumentException e) {
+            System.err.println("Invalid input: " + e.getMessage());
+            return 1;
+        }
+        catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Operation execution failed", e);
             return 1;
         }
@@ -188,7 +198,7 @@ public final class SmithyCall implements Callable<Integer> {
             if (resourceUrl != null) {
                 assembler.addImport(resourceUrl);
             } else {
-                LOGGER.log(Level.SEVERE, "Resource not found: " + smithyFile, new NoSuchFileException(smithyFile));
+                LOGGER.log(Level.SEVERE, "Base resource not found: " + smithyFile, new NoSuchFileException(smithyFile));
             }
         }
 
