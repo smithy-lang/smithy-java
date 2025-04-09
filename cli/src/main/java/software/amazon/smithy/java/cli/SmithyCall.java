@@ -220,8 +220,7 @@ public final class SmithyCall implements Callable<Integer> {
         String defaultArnNamespace = serviceInput.getNamespace().toLowerCase();
         if (auth != null) {
             switch (auth.authType.toLowerCase()) {
-                case "sigv4":
-                case "aws":
+                case "sigv4", "aws":
                     if (auth.awsRegion == null) {
                         throw new IllegalArgumentException("SigV4 auth requires --aws-region to be set. Please provide the --aws-region option.");
                     }
