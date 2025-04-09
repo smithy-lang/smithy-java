@@ -79,3 +79,5 @@ include(":mcp")
 include(":mcp:mcp-schemas")
 include(":server:server-mcp")
 
+
+include(":model-bundler:bundle-api")
