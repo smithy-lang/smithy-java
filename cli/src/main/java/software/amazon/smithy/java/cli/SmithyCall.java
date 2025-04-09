@@ -262,14 +262,17 @@ public final class SmithyCall implements Callable<Integer> {
             return client.call(operation);
         }
 
-        Document inputDocument;
+        byte[] inputBytes;
         if (inputJson != null) {
-            inputDocument = CODEC.createDeserializer(inputJson.getBytes(StandardCharsets.UTF_8)).readDocument();
+            inputBytes = inputJson.getBytes(StandardCharsets.UTF_8);
         } else {
-            String content = Files.readString(Path.of(inputPath), StandardCharsets.UTF_8);
-            inputDocument = CODEC.createDeserializer(content.getBytes(StandardCharsets.UTF_8)).readDocument();
+            inputBytes = Files.readAllBytes(Path.of(inputPath));
         }
 
-        return client.call(operation, inputDocument);
+        Document input;
+        try (var deserializer = CODEC.createDeserializer(inputBytes)) {
+            input = deserializer.readDocument();
+        }
+        return client.call(operation, input);
     }
 }
