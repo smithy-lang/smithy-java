@@ -31,8 +31,6 @@ import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.aws.client.restxml.RestXmlClientProtocol;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
-import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
-import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.client.rpcv2.RpcV2CborProtocol;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.document.Document;
@@ -214,7 +212,6 @@ public final class SmithyCall implements Callable<Integer> {
 
         configureAuth(builder, serviceInput);
         configureProtocol(builder, serviceInput);
-        configureInputInterceptor(builder);
 
         return builder.build();
     }
@@ -251,15 +248,6 @@ public final class SmithyCall implements Callable<Integer> {
                 case RPC_V2_CBOR -> new RpcV2CborProtocol(serviceInput);
                 case REST_JSON -> new RestJsonClientProtocol(serviceInput);
                 case REST_XML -> new RestXmlClientProtocol(serviceInput);
-            });
-        }
-    }
-
-    private void configureInputInterceptor(DynamicClient.Builder builder) {
-        if (inputJson != null || inputPath != null) {
-            builder.addInterceptor(new ClientInterceptor() {
-                @Override
-                public void readBeforeTransmit(RequestHook<?, ?, ?> hook) {}
             });
         }
     }
