@@ -42,7 +42,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 
 @Command(name = "smithy-call", mixinStandardHelpOptions = true, version = "1.0",
         description = "Smithy Call, send request to Smithy services using Smithy models")
-public final class SmithyCall implements Callable<Integer> {
+final class SmithyCall implements Callable<Integer> {
     private static final JsonCodec CODEC = JsonCodec.builder().build();
     private static final Logger LOGGER = Logger.getLogger(SmithyCall.class.getName());
 
