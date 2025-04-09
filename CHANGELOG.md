@@ -12,6 +12,7 @@
 - Updated namespace and module naming.
 - Improved document serialization of wrapped structures.
 - Added support for service-schema access from client-side.
+- Added support for generating MCP and MCP-proxy servers
 
 
 ## 0.0.1 (02/06/2025)
