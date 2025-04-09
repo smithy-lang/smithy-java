@@ -23,6 +23,7 @@ include(":codecs:xml-codec")
 
 // Client
 include(":client:client-core")
+include(":client:client-auth-api")
 include(":client:client-http")
 include(":client:client-http-binding")
 include(":client:client-rpcv2-cbor")
