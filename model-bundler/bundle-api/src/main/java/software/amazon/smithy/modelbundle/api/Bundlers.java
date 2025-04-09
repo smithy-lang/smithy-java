@@ -7,22 +7,21 @@ package software.amazon.smithy.modelbundle.api;
 
 import java.util.HashMap;
 import java.util.Map;
-import software.amazon.smithy.java.core.serde.document.Document;
 
-public final class ConfigProviders {
-    private final Map<String, ConfigProviderFactory> providers;
+public final class Bundlers {
+    private final Map<String, BundlerFactory> providers;
 
-    private ConfigProviders(Builder builder) {
+    private Bundlers(Builder builder) {
         this.providers = builder.providers;
     }
 
-    public ConfigProvider<?> getProvider(String identifier, Document input) {
+    public Bundler getProvider(String identifier, String... args) {
         var provider = providers.get(identifier);
         if (provider == null) {
-            throw new NullPointerException("no auth provider named " + identifier);
+            throw new NullPointerException("no bundler named " + identifier);
         }
 
-        return provider.createAuthFactory(input);
+        return provider.newBundler(args);
     }
 
     public static Builder builder() {
@@ -30,16 +29,16 @@ public final class ConfigProviders {
     }
 
     public static final class Builder {
-        private static final Map<String, ConfigProviderFactory> BASE_PROVIDERS =
-                ServiceLoaderLoader.load(ConfigProviderFactory.class, ConfigProviderFactory::identifier);
+        private static final Map<String, BundlerFactory> BASE_PROVIDERS =
+                ServiceLoaderLoader.load(BundlerFactory.class, BundlerFactory::identifier);
 
-        private Map<String, ConfigProviderFactory> providers;
+        private Map<String, BundlerFactory> providers;
 
         private Builder() {
 
         }
 
-        public Builder addProvider(ConfigProviderFactory provider) {
+        public Builder addProvider(BundlerFactory provider) {
             if (providers == null) {
                 providers = new HashMap<>(BASE_PROVIDERS);
             }
@@ -47,11 +46,11 @@ public final class ConfigProviders {
             return this;
         }
 
-        public ConfigProviders build() {
+        public Bundlers build() {
             if (providers == null) {
                 providers = BASE_PROVIDERS;
             }
-            return new ConfigProviders(this);
+            return new Bundlers(this);
         }
 
     }

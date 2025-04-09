@@ -65,6 +65,11 @@ include(":aws:integrations:aws-lambda-endpoint")
 include(":aws:server:aws-server-restjson")
 include(":aws:aws-auth-api")
 
+// AWS service bundling code
+include(":aws:aws-service-bundler")
+include(":aws:aws-mcp-provider")
+include(":aws:aws-mcp-types")
+
 // AWS SDK V2 shims
 include(":aws:sdkv2:aws-sdkv2-retries")
 include(":aws:sdkv2:aws-sdkv2-shapes")
@@ -86,5 +91,5 @@ include(":mcp")
 include(":mcp:mcp-schemas")
 include(":mcp:mcp-server")
 
-
 include(":model-bundler:bundle-api")
+include(":model-bundler:bundle-cli")
