@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.logging.ConsoleHandler;
@@ -38,6 +39,7 @@ import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.OperationShape;
+import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 @Command(name = "smithy-call", mixinStandardHelpOptions = true, version = "1.0",
@@ -123,27 +125,30 @@ final class SmithyCall implements Callable<Integer> {
         LOGGER.fine("Checking if the provided model contains service: " + service);
 
         ShapeId serviceInput = null;
-        Set<ShapeId> serviceShapes = model.getShapeIds();
+        Set<ServiceShape> serviceShapes = model.getServiceShapes();
+        Set<ShapeId> serviceShapeIds = new HashSet<>(serviceShapes.size());
+        for (ServiceShape shape : serviceShapes) {
+            serviceShapeIds.add(shape.toShapeId());
+        }
 
         if (!service.contains("#")) {
-            for (ShapeId serviceShape : serviceShapes) {
-                if (serviceShape.getName().contains(service)) {
+            for (ShapeId serviceShape : serviceShapeIds) {
+                if (serviceShape.getName().equals(service)) {
                     if (serviceInput == null) {
                         serviceInput = serviceShape;
                     } else {
-                        throw new IllegalArgumentException("Multiple services found with name " + service + " in model.\nAvailable services: " + serviceShapes);
+                        throw new IllegalArgumentException("Multiple services found with name " + service + " in model.\nAvailable services: " + serviceShapeIds);
                     }
                 }
             }
-            if (serviceInput == null) {
-                throw new IllegalArgumentException("Service " + service + " not found in model.\nAvailable services: " + serviceShapes);
-            }
         } else {
             serviceInput = ShapeId.from(service);
-            if (!serviceShapes.contains(serviceInput)) {
-                throw new IllegalArgumentException("Service " + service + " not found in model.\nAvailable services: " + serviceShapes);
-            }
         }
+
+        if (serviceInput == null || !serviceShapeIds.contains(serviceInput)) {
+            throw new IllegalArgumentException("Service " + service + " not found in model.\nAvailable services: " + serviceShapeIds);
+        }
+
         return serviceInput;
     }
 
