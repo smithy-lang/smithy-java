@@ -119,16 +119,39 @@ final class SmithyCall implements Callable<Integer> {
         LOGGER.setUseParentHandlers(false);
     }
 
+    private ShapeId getServiceInput(Model model) {
+        LOGGER.fine("Checking if the provided model contains service: " + service);
+
+        ShapeId serviceInput = null;
+        Set<ShapeId> serviceShapes = model.getShapeIds();
+
+        if (!service.contains("#")) {
+            for (ShapeId serviceShape : serviceShapes) {
+                if (serviceShape.getName().contains(service)) {
+                    if (serviceInput == null) {
+                        serviceInput = serviceShape;
+                    } else {
+                        throw new IllegalArgumentException("Multiple services found with name " + service + " in model.\nAvailable services: " + serviceShapes);
+                    }
+                }
+            }
+            if (serviceInput == null) {
+                throw new IllegalArgumentException("Service " + service + " not found in model.\nAvailable services: " + serviceShapes);
+            }
+        } else {
+            serviceInput = ShapeId.from(service);
+            if (!serviceShapes.contains(serviceInput)) {
+                throw new IllegalArgumentException("Service " + service + " not found in model.\nAvailable services: " + serviceShapes);
+            }
+        }
+        return serviceInput;
+    }
+
     private Integer listOperationsForService() {
         LOGGER.fine("Listing operations for service: " + service);
         try {
             Model model = assembleModel(modelPath);
-
-            LOGGER.fine("Checking if the provided model contains service: " + service);
-            ShapeId serviceInput = ShapeId.from(service);
-            if (!model.getShapeIds().contains(serviceInput)) {
-                throw new IllegalArgumentException("Service " + service + " not found in model");
-            }
+            getServiceInput(model);
 
             Set<OperationShape> operations = model.getOperationShapes();
             StringBuilder sb = new StringBuilder();
@@ -158,12 +181,7 @@ final class SmithyCall implements Callable<Integer> {
         LOGGER.fine("Executing operation: " + operation);
         try {
             Model model = assembleModel(modelPath);
-
-            LOGGER.fine("Checking if the provided model contains service: " + service);
-            ShapeId serviceInput = ShapeId.from(service);
-            if (!model.getShapeIds().contains(serviceInput)) {
-                throw new IllegalArgumentException("Service " + service + " not found in model");
-            }
+            ShapeId serviceInput = getServiceInput(model);
 
             DynamicClient client = buildDynamicClient(model, serviceInput);
             Document result = executeClientCall(client);
