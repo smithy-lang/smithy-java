@@ -59,10 +59,10 @@ final class SmithyCall implements Callable<Integer> {
     @Parameters(index = "1", description = "Name of the operation to perform on the service", arity = "0..1")
     private String operation;
 
-    @Option(names = {"-v", "--verbose"}, description = "Enable verbose logging")
-    private boolean verbose;
+    @Option(names = "--debug", description = "Enable debug logging")
+    private boolean debug;
 
-    @Option(names = { "-m", "--model-path" }, description = "Path to a directory containing all necessary Smithy models", required = true)
+    @Option(names = { "-m", "--model-path" }, description = "Path to a directory containing all necessary Smithy models. The option to list multiple paths is supported", required = true)
     private String[] modelPath;
 
     @Option(names = "--input-path", description = "Path to a JSON file containing input parameters for the operation")
@@ -110,10 +110,10 @@ final class SmithyCall implements Callable<Integer> {
 
     private void setupLogger() {
         LogManager.getLogManager().reset();
-        LOGGER.setLevel(verbose ? Level.FINE : Level.INFO);
+        LOGGER.setLevel(debug ? Level.FINE : Level.INFO);
 
         ConsoleHandler handler = new ConsoleHandler();
-        handler.setLevel(verbose ? Level.FINE : Level.INFO);
+        handler.setLevel(debug ? Level.FINE : Level.INFO);
         LOGGER.addHandler(handler);
 
         LOGGER.setUseParentHandlers(false);
