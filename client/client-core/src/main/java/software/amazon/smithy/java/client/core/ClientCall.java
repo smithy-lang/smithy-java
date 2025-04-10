@@ -13,7 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import software.amazon.smithy.java.client.core.auth.identity.IdentityResolvers;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;

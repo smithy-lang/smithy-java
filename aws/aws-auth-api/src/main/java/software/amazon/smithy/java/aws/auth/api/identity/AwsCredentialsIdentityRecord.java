@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.aws.client.core.identity;
+package software.amazon.smithy.java.aws.auth.api.identity;
 
 import java.time.Instant;
 

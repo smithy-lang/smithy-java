@@ -9,6 +9,8 @@ extra["moduleName"] = "software.amazon.smithy.java.aws.client.core"
 
 dependencies {
     api(project(":client:client-core"))
+    api(project(":aws:aws-auth-api"))
+    api(project(":auth-api"))
 }
 
 tasks {

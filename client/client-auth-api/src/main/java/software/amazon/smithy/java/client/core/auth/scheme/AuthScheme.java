@@ -8,9 +8,9 @@ package software.amazon.smithy.java.client.core.auth.scheme;
 import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.auth.api.identity.TokenIdentity;
-import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
-import software.amazon.smithy.java.client.core.auth.identity.IdentityResolvers;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.model.shapes.ShapeId;
 

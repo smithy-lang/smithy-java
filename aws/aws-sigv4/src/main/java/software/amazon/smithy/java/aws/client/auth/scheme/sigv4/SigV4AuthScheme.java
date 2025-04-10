@@ -8,7 +8,7 @@ package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
-import software.amazon.smithy.java.aws.client.core.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeFactory;
 import software.amazon.smithy.java.context.Context;

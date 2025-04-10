@@ -12,7 +12,7 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":aws:client:aws-client-restjson"))
     implementation(project(":aws:client:aws-client-awsjson"))
-    implementation(libs.aws.sdkcore)
+    implementation(libs.aws.sdk.core)
 
     testImplementation(project(":client:dynamic-client"))
 }

@@ -3,13 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.client.core.auth.identity;
+package software.amazon.smithy.java.auth.api.identity;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import software.amazon.smithy.java.auth.api.identity.Identity;
 
 /**
  * An interface to allow retrieving an {@link IdentityResolver} based on the identity class.

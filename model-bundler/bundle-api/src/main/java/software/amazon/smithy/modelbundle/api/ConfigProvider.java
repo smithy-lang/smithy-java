@@ -7,8 +7,8 @@ package software.amazon.smithy.modelbundle.api;
 
 import static software.amazon.smithy.modelbundle.api.StaticAuthSchemeResolver.staticScheme;
 
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.client.core.RequestOverrideConfig;
-import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.core.serde.document.Document;

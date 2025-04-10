@@ -59,9 +59,13 @@ include(":aws:client:aws-client-http")
 include(":aws:client:aws-client-restjson")
 include(":aws:client:aws-client-restxml")
 include(":aws:integrations:aws-lambda-endpoint")
+include(":aws:server:aws-server-restjson")
+include(":aws:aws-auth-api")
+
+// AWS SDK V2 shims
 include(":aws:sdkv2:aws-sdkv2-retries")
 include(":aws:sdkv2:aws-sdkv2-shapes")
-include(":aws:server:aws-server-restjson")
+include("aws:sdkv2:aws-sdkv2-auth")
 
 // Examples
 include(":examples")
