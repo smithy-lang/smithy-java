@@ -72,9 +72,8 @@ public class RoundTripTests {
         var getResponse1 = client.getOrder(getRequest);
         assertEquals(getResponse1.status(), OrderStatus.IN_PROGRESS);
 
-        // Give order some time to complete
-        System.out.println("Waiting for order to complete....");
-        TimeUnit.SECONDS.sleep(5);
+        // Complete the order
+        OrderTracker.completeOrder(getResponse1.id());
 
         var getResponse2 = client.getOrder(getRequest);
         assertEquals(getResponse2.status(), OrderStatus.COMPLETED);

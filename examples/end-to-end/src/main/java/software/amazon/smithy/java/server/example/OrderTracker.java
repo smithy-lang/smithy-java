@@ -16,17 +16,16 @@ import software.amazon.smithy.java.example.etoe.model.OrderStatus;
  * This class is a stand-in for a database.
  */
 final class OrderTracker {
-    private static final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(1);
     private static final Map<UUID, Order> ORDERS = new ConcurrentHashMap<>();
+
+    private OrderTracker() {}
 
     public static void putOrder(Order order) {
         ORDERS.put(order.id(), order);
+    }
 
-        // Start a process to complete the order in the background.
-        executor.schedule(
-                () -> ORDERS.put(order.id(), new Order(order.id(), order.type(), OrderStatus.COMPLETED)),
-                5,
-                TimeUnit.SECONDS);
+    public static void completeOrder(String id) {
+        ORDERS.computeIfPresent(UUID.fromString(id), (k,v) -> v.complete());
     }
 
     public static Order getOrderById(UUID id) {

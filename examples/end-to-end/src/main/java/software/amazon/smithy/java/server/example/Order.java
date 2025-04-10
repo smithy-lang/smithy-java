@@ -16,4 +16,9 @@ import software.amazon.smithy.java.example.etoe.model.OrderStatus;
  * @param type Type of drink for the order
  * @param status status of the order.
  */
-public record Order(UUID id, CoffeeType type, OrderStatus status) {}
+public record Order(UUID id, CoffeeType type, OrderStatus status) {
+
+    Order complete() {
+        return new Order(id, type, OrderStatus.COMPLETED);
+    }
+}

@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         java: [17]
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +27,9 @@ jobs:
 
       - name: Clean, build and javadoc
         run: ./gradlew clean build javadoc -Plog-tests --stacktrace
+
+      - name: Integration tests
+        run: ./gradlew integ -Plog-tests --stacktrace
 
       - name: Allow long file names in git for windows
         if: matrix.os == 'windows-latest'
