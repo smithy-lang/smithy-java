@@ -118,6 +118,21 @@ class SmithyCallTest {
     }
 
     @Test
+    void testUnknownRelativeService() {
+        Path modelDir = createSprocketsModelFile();
+        String[] args = {
+                "UnknownService",
+                "--list-operations",
+                "--model-path", modelDir.toString()
+        };
+
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        assertTrue(exitCode != 0);
+        String error = errContent.toString();
+        assertTrue(error.contains("Service UnknownService not found in model"));
+    }
+
+    @Test
     void testCreateSprocket() {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
@@ -140,6 +155,23 @@ class SmithyCallTest {
         Path modelDir = createSprocketsModelFile();
         String[] args = {
                 "smithy.example#Sprockets",
+                "GetSprocket",
+                "--model-path", modelDir.toString(),
+                "--url", "http://localhost:" + PORT,
+                "--input-json", "{\"id\":\"sprocket-123\"}"
+        };
+
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+        assertEquals(0, exitCode);
+        String output = outContent.toString().trim();
+        assertTrue(output.contains("sprocket-123"));
+    }
+
+    @Test
+    void testRelativeShapeId() {
+        Path modelDir = createSprocketsModelFile();
+        String[] args = {
+                "Sprockets",
                 "GetSprocket",
                 "--model-path", modelDir.toString(),
                 "--url", "http://localhost:" + PORT,
