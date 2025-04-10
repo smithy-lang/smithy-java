@@ -132,11 +132,11 @@ public final class ClientInterfaceGenerator
                                             ${/hasTransportSettings}${?defaultSchemes}
                                             ${defaultAuth:C|}${/defaultSchemes}
 
-                                            private Builder() {${?defaultSchemes}
-                                                configBuilder()
-                                                    .putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes})
+                                            private Builder() {
+                                                configBuilder()${?defaultSchemes}
+                                                    .putSupportedAuthSchemes(${#defaultSchemes}${value:L}.createAuthScheme(${key:L})${^key.last}, ${/key.last}${/defaultSchemes})${/defaultSchemes}
                                                     .service(${serviceApi:T}.instance());
-                                            ${/defaultSchemes}}
+                                            }
 
                                             @Override
                                             public ${interface:T} build() {
