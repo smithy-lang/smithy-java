@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -92,15 +93,18 @@ final class CborDeserializer implements ShapeDeserializer {
     private static final Map<Schema, Canonicalizer> CANONICALIZERS = new ConcurrentHashMap<>();
 
     private final CborParser parser;
+    private final CborSettings settings;
     private final byte[] payload;
 
-    CborDeserializer(byte[] payload) {
+    CborDeserializer(byte[] payload, CborSettings settings) {
         this.parser = new CborParser(payload);
+        this.settings = settings;
         this.payload = payload;
         parser.advance();
     }
 
-    CborDeserializer(ByteBuffer byteBuffer) {
+    CborDeserializer(ByteBuffer byteBuffer, CborSettings settings) {
+        this.settings = settings;
         if (byteBuffer.hasArray()) {
             byte[] payload = byteBuffer.array();
             this.payload = payload;
@@ -248,12 +252,12 @@ final class CborDeserializer implements ShapeDeserializer {
 
     @Override
     public BigInteger readBigInteger(Schema schema) {
-        return null;
+        throw new UnsupportedOperationException("BigInteger is not supported yet");
     }
 
     @Override
     public BigDecimal readBigDecimal(Schema schema) {
-        return null;
+        throw new UnsupportedOperationException("BigDecimal is not supported yet");
     }
 
     @Override
@@ -267,7 +271,54 @@ final class CborDeserializer implements ShapeDeserializer {
 
     @Override
     public Document readDocument() {
-        throw new UnsupportedOperationException("RPCv2 does not support Documents");
+        var token = parser.currentToken();
+        if (token == Token.FINISHED) {
+            throw new SerializationException("No CBOR value to read");
+        }
+        return switch (token) {
+            case Token.POS_INT, Token.NEG_INT -> Document.of(readLong(null));
+            case Token.NULL -> null;
+            case Token.TEXT_STRING -> Document.of(readString(null));
+            case Token.BYTE_STRING -> Document.of(readBlob(null));
+            case Token.TRUE -> Document.of(true);
+            case Token.FALSE -> Document.of(false);
+            case Token.EPOCH_INEG, Token.EPOCH_IPOS, Token.EPOCH_F -> Document.of(readTimestamp(null));
+            case Token.FLOAT -> {
+                int pos = parser.getPosition();
+                int len = parser.getItemLength();
+                long fp = CborReadUtil.readLong(payload, token, pos, len);
+                // ordered by how likely it is we'll encounter each case
+                if (len == 8) { // double
+                    yield Document.of(Double.longBitsToDouble(fp));
+                } else if (len == 4) { // float
+                    yield Document.of(Float.intBitsToFloat((int) fp));
+                } else { // b == 2  - half-precision float
+                    yield Document.of(float16((int) fp));
+                }
+            }
+            case Token.POS_BIGINT, Token.NEG_BIGINT -> Document.of(readBigInteger(null));
+            case Token.START_ARRAY -> {
+                List<Document> values = new ArrayList<>();
+                for (token = parser.advance(); token != Token.END_ARRAY; token = parser.advance()) {
+                    values.add(readDocument());
+                }
+                yield Document.of(values);
+            }
+            case Token.START_OBJECT -> {
+                Map<String, Document> values = new LinkedHashMap<>();
+                for (token = parser.advance(); token != Token.END_OBJECT; token = parser.advance()) {
+                    if (token != Token.KEY) {
+                        throw badType("struct member", token);
+                    }
+
+                    var key = CborReadUtil.readTextString(payload, parser.getPosition(), parser.getItemLength());
+                    parser.advance();
+                    values.put(key, readDocument());
+                }
+                yield CborDocuments.of(values, settings);
+            }
+            default -> throw new SerializationException("Unexpected token: " + Token.name(token));
+        };
     }
 
     @Override

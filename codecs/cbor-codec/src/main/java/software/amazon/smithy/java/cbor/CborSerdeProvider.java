@@ -16,11 +16,11 @@ public interface CborSerdeProvider {
 
     String getName();
 
-    ShapeDeserializer newDeserializer(byte[] source, Rpcv2CborCodec.Settings settings);
+    ShapeDeserializer newDeserializer(byte[] source, CborSettings settings);
 
-    ShapeDeserializer newDeserializer(ByteBuffer source, Rpcv2CborCodec.Settings settings);
+    ShapeDeserializer newDeserializer(ByteBuffer source, CborSettings settings);
 
-    ShapeSerializer newSerializer(OutputStream sink, Rpcv2CborCodec.Settings settings);
+    ShapeSerializer newSerializer(OutputStream sink, CborSettings settings);
 
-    ByteBuffer serialize(SerializableStruct struct, Rpcv2CborCodec.Settings settings);
+    ByteBuffer serialize(SerializableStruct struct, CborSettings settings);
 }
