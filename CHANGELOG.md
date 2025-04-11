@@ -5,7 +5,8 @@
 > This release is not recommended for production use!
 ### Features
 - Added smithy-call CLI.
-
+- Added model bundle API to be used by the MCP server bundle consumer.
+- Added support for Smithy Java to use auth from the AWS SDK for Java V2.
 
 
 ## 0.0.2 (04/07/2025)
