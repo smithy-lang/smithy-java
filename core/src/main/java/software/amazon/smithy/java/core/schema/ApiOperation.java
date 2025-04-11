@@ -125,4 +125,13 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
     default ApiResource boundResource() {
         return null;
     }
+
+    /**
+     * Name of the Operation.
+     *
+     * @return Returns the name of the operation.
+     */
+    default String name() {
+        return schema().id().getName();
+    }
 }
