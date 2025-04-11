@@ -64,7 +64,7 @@ final class SmithyCall implements Callable<Integer> {
     @Option(names = "--debug", description = "Enable debug logging")
     private boolean debug;
 
-    @Option(names = { "-m", "--model-path" }, description = "Path to a directory containing all necessary Smithy models. The option to list multiple paths is supported", required = true)
+    @Option(names = { "-m", "--model-path" }, description = "Path to a Smithy model or a directory Smithy models. This argument can be repeated to provide multiple files or directories.", required = true)
     private String[] modelPath;
 
     @Option(names = "--input-path", description = "Path to a JSON file containing input parameters for the operation")
