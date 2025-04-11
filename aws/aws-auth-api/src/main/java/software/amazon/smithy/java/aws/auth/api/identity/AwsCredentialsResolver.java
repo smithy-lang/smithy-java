@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.aws.client.core.identity;
+package software.amazon.smithy.java.aws.auth.api.identity;
 
-import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 
 /**
  * An {@link IdentityResolver} that resolves a {@link AwsCredentialsIdentity} for authentication.
  */
-interface AwsCredentialsResolver extends IdentityResolver<AwsCredentialsIdentity> {
+public interface AwsCredentialsResolver extends IdentityResolver<AwsCredentialsIdentity> {
     @Override
     default Class<AwsCredentialsIdentity> identityType() {
         return AwsCredentialsIdentity.class;

@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.auth.api.AuthProperties;
+import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 
 public class SystemPropertiesIdentityResolverTest {
     @Test

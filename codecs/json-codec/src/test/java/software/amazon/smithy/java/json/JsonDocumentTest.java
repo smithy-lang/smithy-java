@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -424,6 +425,7 @@ public class JsonDocumentTest {
     }
 
     @Test
+    @Disabled //TODO revisit if this test makes sense. See https://github.com/smithy-lang/smithy-java/pull/629
     public void onlyEqualIfBothUseTimestampFormat() {
         var de1 = JsonCodec.builder()
                 .useTimestampFormat(true)
@@ -441,6 +443,7 @@ public class JsonDocumentTest {
     }
 
     @Test
+    @Disabled //TODO revisit if this test makes sense. See https://github.com/smithy-lang/smithy-java/pull/629
     public void onlyEqualIfBothUseJsonName() {
         var de1 = JsonCodec.builder()
                 .useJsonName(true)

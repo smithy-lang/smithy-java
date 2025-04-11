@@ -14,6 +14,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.auth.api.AuthProperties;
+import software.amazon.smithy.java.auth.api.identity.IdentityNotFoundException;
+import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
+import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.auth.api.identity.TokenIdentity;
 
 public class IdentityResolverTest {

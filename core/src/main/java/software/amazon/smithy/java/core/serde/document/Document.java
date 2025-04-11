@@ -683,7 +683,9 @@ public interface Document extends SerializableShape {
      * @return true if they are equal.
      */
     static boolean equals(Object left, Object right, int options) {
-        if (left instanceof Document l && right instanceof Document r) {
+        if (left == null && right == null) {
+            return true;
+        } else if (left instanceof Document l && right instanceof Document r) {
             if (l == r) {
                 return true;
             }

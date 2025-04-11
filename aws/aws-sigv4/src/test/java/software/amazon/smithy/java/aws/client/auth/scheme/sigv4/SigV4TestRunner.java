@@ -24,7 +24,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
-import software.amazon.smithy.java.aws.client.core.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;

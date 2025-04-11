@@ -33,7 +33,8 @@ smithy-waiters = { module = "software.amazon.smithy:smithy-waiters", version.ref
 # AWS SDK for Java V2 adapters.
 aws-sdk-retries-spi = {module = "software.amazon.awssdk:retries-spi", version.ref = "aws-sdk"}
 aws-sdk-retries = {module = "software.amazon.awssdk:retries", version.ref = "aws-sdk"}
-aws-sdkcore = {module = "software.amazon.awssdk:sdk-core", version.ref = "aws-sdk"}
+aws-sdk-core = {module = "software.amazon.awssdk:sdk-core", version.ref = "aws-sdk"}
+aws-sdk-auth = {module = "software.amazon.awssdk:auth", version.ref = "aws-sdk"}
 
 jackson-core = {module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson"}
 
