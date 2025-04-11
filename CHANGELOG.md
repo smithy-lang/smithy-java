@@ -1,4 +1,13 @@
 # Change Log
+## 0.0.3 (04/10/2025)
+> [!WARNING]
+> This is a developer-preview release and may contain bugs. **No** guarantee is made about API stability.
+> This release is not recommended for production use!
+### Features
+- Added smithy-call CLI.
+
+
+
 ## 0.0.2 (04/07/2025)
 > [!WARNING]
 > This is a developer-preview release and may contain bugs. **No** guarantee is made about API stability.
