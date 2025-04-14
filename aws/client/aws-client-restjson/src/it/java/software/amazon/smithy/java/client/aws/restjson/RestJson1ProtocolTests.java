@@ -39,7 +39,8 @@ public class RestJson1ProtocolTests {
                     "RestJsonHttpChecksumRequired",
                     // TODO: These tests require a payload even when the httpPayload member is null. Should it?
                     "RestJsonHttpWithHeadersButNoPayload",
-                    "RestJsonHttpWithEmptyStructurePayload"
+                    "RestJsonHttpWithEmptyStructurePayload",
+                    "RestJsonHttpEmptyPrefixHeadersRequestClient" //FIXME https://github.com/smithy-lang/smithy-java/issues/647
             })
     public void requestTest(DataStream expected, DataStream actual) {
         assertThat(expected.hasKnownLength())
