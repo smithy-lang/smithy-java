@@ -84,7 +84,7 @@ include(":examples:mcp-server")
 //MCP
 include(":mcp")
 include(":mcp:mcp-schemas")
-include(":server:server-mcp")
+include(":mcp:mcp-server")
 
 
 include(":model-bundler:bundle-api")
