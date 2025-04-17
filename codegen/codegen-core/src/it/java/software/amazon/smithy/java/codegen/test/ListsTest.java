@@ -223,8 +223,8 @@ public class ListsTest {
         assertTrue(emptyInput.hasListOfBoolean());
         assertFalse(nullInput.hasListOfBoolean());
         // Collections should return empty collections for access
-        assertEquals(emptyInput.listOfBoolean(), Collections.emptyList());
-        assertEquals(emptyInput.listOfBoolean(), nullInput.listOfBoolean());
+        assertEquals(emptyInput.getListOfBoolean(), Collections.emptyList());
+        assertEquals(emptyInput.getListOfBoolean(), nullInput.getListOfBoolean());
         var emptyDocument = Document.of(emptyInput);
         var nullDocument = Document.of(nullInput);
         assertNotNull(emptyDocument.getMember("listOfBoolean"));

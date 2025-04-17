@@ -21,31 +21,32 @@ import software.amazon.smithy.java.codegen.test.model.NestedEnum;
 import software.amazon.smithy.java.codegen.test.model.NestedIntEnum;
 
 public class ClientErrorCorrectionTest {
+
     @Test
     void correctsErrors() {
         var corrected = ClientErrorCorrectionInput.builder()
                 .errorCorrection()
                 .build();
 
-        assertFalse(corrected.booleanMember());
-        assertEquals(corrected.bigDecimal(), BigDecimal.ZERO);
-        assertEquals(corrected.bigInteger(), BigInteger.ZERO);
-        assertEquals(corrected.byteMember(), (byte) 0);
-        assertEquals(corrected.doubleMember(), 0);
-        assertEquals(corrected.floatMember(), 0);
-        assertEquals(corrected.integer(), 0);
-        assertEquals(corrected.longMember(), 0);
-        assertEquals(corrected.shortMember(), (short) 0);
-        assertEquals(corrected.blob(), ByteBuffer.allocate(0));
-        assertEquals(corrected.streamingBlob().contentLength(), 0);
-        corrected.streamingBlob().asByteBuffer().thenAccept(bytes -> assertEquals(0, bytes.remaining()));
-        assertNull(corrected.document());
-        assertEquals(corrected.list(), List.of());
-        assertEquals(corrected.map(), Map.of());
-        assertEquals(corrected.timestamp(), Instant.EPOCH);
-        assertEquals(corrected.enumMember().type(), NestedEnum.Type.$UNKNOWN);
-        assertEquals(corrected.enumMember().value(), "");
-        assertEquals(corrected.intEnum().type(), NestedIntEnum.Type.$UNKNOWN);
-        assertEquals(corrected.intEnum().value(), 0);
+        assertFalse(corrected.getBooleanMember());
+        assertEquals(corrected.getBigDecimal(), BigDecimal.ZERO);
+        assertEquals(corrected.getBigInteger(), BigInteger.ZERO);
+        assertEquals(corrected.getByteMember(), (byte) 0);
+        assertEquals(corrected.getDoubleMember(), 0);
+        assertEquals(corrected.getFloatMember(), 0);
+        assertEquals(corrected.getInteger(), 0);
+        assertEquals(corrected.getLongMember(), 0);
+        assertEquals(corrected.getShortMember(), (short) 0);
+        assertEquals(corrected.getBlob(), ByteBuffer.allocate(0));
+        assertEquals(corrected.getStreamingBlob().contentLength(), 0);
+        corrected.getStreamingBlob().asByteBuffer().thenAccept(bytes -> assertEquals(0, bytes.remaining()));
+        assertNull(corrected.getDocument());
+        assertEquals(corrected.getList(), List.of());
+        assertEquals(corrected.getMap(), Map.of());
+        assertEquals(corrected.getTimestamp(), Instant.EPOCH);
+        assertEquals(corrected.getEnumMember().getType(), NestedEnum.Type.$UNKNOWN);
+        assertEquals(corrected.getEnumMember().getValue(), "");
+        assertEquals(corrected.getIntEnum().getType(), NestedIntEnum.Type.$UNKNOWN);
+        assertEquals(corrected.getIntEnum().getValue(), 0);
     }
 }

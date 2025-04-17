@@ -55,7 +55,7 @@ public class GenericClientTest {
         var value = "hello world";
         var input = EchoInput.builder().string(value).build();
         var output = client.echo(input);
-        assertEquals(value, output.string());
+        assertEquals(value, output.getString());
     }
 
     @Test
@@ -89,7 +89,7 @@ public class GenericClientTest {
         var echoedString = "hello world";
         var input = EchoInput.builder().string(echoedString).build();
         var output = client.echo(input);
-        assertEquals(echoedString, output.string());
+        assertEquals(echoedString, output.getString());
     }
 
     @Test
@@ -157,7 +157,7 @@ public class GenericClientTest {
         var value = "hello world";
         var input = EchoInput.builder().string(value).build();
         var output = client.echo(input);
-        assertEquals(value, output.string());
+        assertEquals(value, output.getString());
     }
 
     @Test

@@ -168,7 +168,7 @@ public final class UnionGenerator
                                         ${serializeMember:C};
                                     }${^unit}
 
-                                    public ${member:N} ${memberName:L}() {
+                                    public ${member:N} ${getterName:L}() {
                                         return value;
                                     }${/unit}
 
@@ -180,9 +180,15 @@ public final class UnionGenerator
                                 }
                                 """;
                 var memberSymbol = symbolProvider.toSymbol(member);
+                var memberName = symbolProvider.toMemberName(member);
+                var getterName = CodegenUtils.toGetterName(member, memberName);
+                if (getterName.equals("getValue")) {
+                    getterName += "Member";
+                }
                 writer.putContext("hasBoxed", memberSymbol.getProperty(SymbolProperties.BOXED_TYPE).isPresent());
                 writer.putContext("member", memberSymbol);
-                writer.putContext("memberName", symbolProvider.toMemberName(member));
+                writer.putContext("memberName", memberName);
+                writer.putContext("getterName", getterName);
                 writer.putContext(
                         "serializeMember",
                         new SerializerMemberGenerator(directive, writer, member, "value"));

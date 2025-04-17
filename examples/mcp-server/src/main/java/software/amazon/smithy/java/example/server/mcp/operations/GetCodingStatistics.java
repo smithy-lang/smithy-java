@@ -12,7 +12,7 @@ public class GetCodingStatistics implements GetCodingStatisticsOperation {
 
     @Override
     public GetCodingStatisticsOutput getCodingStatistics(GetCodingStatisticsInput input, RequestContext context) {
-        return switch (input.login()) {
+        return switch (input.getLogin()) {
             case "janedoe" -> GetCodingStatisticsOutput.builder().commits(Map.of()).build();
             case "johndoe" -> GetCodingStatisticsOutput.builder().commits(Map.of("Java", 100)).build();
             default -> throw NoSuchUserException.builder().message("User doesn't exist in the system").build();

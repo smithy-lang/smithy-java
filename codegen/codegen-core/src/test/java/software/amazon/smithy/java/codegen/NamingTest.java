@@ -31,13 +31,13 @@ public class NamingTest extends AbstractCodegenFileTest {
         var fileStr = getFileStringForClass("NamingConflictsInput");
         // Java map uses fully qualified name
         var expectedJavaMapGetter = """
-                    public java.util.Map<String, String> javaMap() {
+                    public java.util.Map<String, String> getJavaMap() {
                 """;
         assertTrue(fileStr.contains(expectedJavaMapGetter));
 
         // Custom map does not use fully qualified name
         var expectedCustomMap = """
-                    public Map map() {
+                    public Map getMap() {
                         return map;
                     }
                 """;
@@ -49,13 +49,13 @@ public class NamingTest extends AbstractCodegenFileTest {
         var fileStr = getFileStringForClass("NamingConflictsInput");
         // Java map uses fully qualified name
         var expectedJavaListGetter = """
-                    public java.util.List<String> javaList() {
+                    public java.util.List<String> getJavaList() {
                 """;
         assertTrue(fileStr.contains(expectedJavaListGetter));
 
         // Custom map does not use fully qualified name
         var expectedCustomList = """
-                    public List list() {
+                    public List getList() {
                         return list;
                     }
                 """;
@@ -122,14 +122,14 @@ public class NamingTest extends AbstractCodegenFileTest {
     void acronymMemberName() {
         var fileStr = getFileStringForClass("CasingInput");
         assertTrue(fileStr.contains("private final transient String acronymMemberName"));
-        assertTrue(fileStr.contains("public String acronymMemberName() {"));
+        assertTrue(fileStr.contains("public String getAcronymMemberName() {"));
     }
 
     @Test
     void allCapsMemberName() {
         var fileStr = getFileStringForClass("CasingInput");
         assertTrue(fileStr.contains("private final transient String allcaps"));
-        assertTrue(fileStr.contains("public String allcaps() {"));
+        assertTrue(fileStr.contains("public String getAllcaps() {"));
     }
 
     static List<Arguments> enumCaseArgs() {

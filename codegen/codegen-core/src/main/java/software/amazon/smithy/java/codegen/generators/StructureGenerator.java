@@ -282,9 +282,11 @@ public final class StructureGenerator<
                     continue;
                 }
                 writer.pushState();
-                writer.putContext("memberName", symbolProvider.toMemberName(member));
+                var memberName = symbolProvider.toMemberName(member);
+                writer.putContext("memberName", memberName);
                 writer.putContext("member", symbolProvider.toSymbol(member));
                 writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
+                writer.putContext("getterName", CodegenUtils.toGetterName(member, memberName));
                 this.member = member;
                 member.accept(this);
                 writer.popState();
@@ -298,7 +300,7 @@ public final class StructureGenerator<
 
             writer.write(
                     """
-                            public ${?isNullable}${member:B}${/isNullable}${^isNullable}${member:N}${/isNullable} ${memberName:L}() {
+                            public ${?isNullable}${member:B}${/isNullable}${^isNullable}${member:N}${/isNullable} ${getterName:L}() {
                                 return ${memberName:L};
                             }
                             """);
@@ -325,7 +327,7 @@ public final class StructureGenerator<
             writer.putContext("collections", Collections.class);
             writer.write(
                     """
-                            public ${member:T} ${memberName:L}() {${?isNullable}
+                            public ${member:T} ${getterName:L}() {${?isNullable}
                                 if (${memberName:L} == null) {
                                     return ${collections:T}.${empty:L};
                                 }${/isNullable}

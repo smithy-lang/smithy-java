@@ -248,8 +248,8 @@ public class MapsTest {
         assertTrue(emptyInput.hasStringBooleanMap());
         assertFalse(nullInput.hasStringBooleanMap());
         // Collections should return empty collections for access
-        assertEquals(emptyInput.stringBooleanMap(), Collections.emptyMap());
-        assertEquals(emptyInput.stringBooleanMap(), nullInput.stringBooleanMap());
+        assertEquals(emptyInput.getStringBooleanMap(), Collections.emptyMap());
+        assertEquals(emptyInput.getStringBooleanMap(), nullInput.getStringBooleanMap());
 
         var emptyDocument = Document.of(emptyInput);
         var nullDocument = Document.of(nullInput);

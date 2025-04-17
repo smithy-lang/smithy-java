@@ -91,8 +91,8 @@ public final class MCPServer implements Server {
 
     private void handleRequest(JsonRpcRequest req) {
         try {
-            switch (req.method()) {
-                case "initialize" -> writeResponse(req.id(),
+            switch (req.getMethod()) {
+                case "initialize" -> writeResponse(req.getId(),
                         InitializeResult.builder()
                                 .capabilities(Capabilities.builder()
                                         .tools(Tools.builder().listChanged(false).build())
@@ -102,13 +102,13 @@ public final class MCPServer implements Server {
                                         .version("1.0.0")
                                         .build())
                                 .build());
-                case "tools/list" -> writeResponse(req.id(),
+                case "tools/list" -> writeResponse(req.getId(),
                         ListToolsResult.builder().tools(tools.values().stream().map(Tool::toolInfo).toList()).build());
                 case "tools/call" -> {
-                    var operationName = req.params().getMember("name").asString();
+                    var operationName = req.getParams().getMember("name").asString();
                     var tool = tools.get(operationName);
                     var operation = tool.operation();
-                    var input = req.params()
+                    var input = req.getParams()
                             .getMember("arguments")
                             .asShape(operation.getApiOperation().inputBuilder());
                     var output = operation.function().apply(input, null);
@@ -117,7 +117,7 @@ public final class MCPServer implements Server {
                                     .text(CODEC.serializeToString((SerializableShape) output))
                                     .build()))
                             .build();
-                    writeResponse(req.id(), result);
+                    writeResponse(req.getId(), result);
                 }
                 default -> {
                     //For now don't do anything
@@ -161,7 +161,7 @@ public final class MCPServer implements Server {
                 .message(s)
                 .build();
         var response = JsonRpcResponse.builder()
-                .id(req.id())
+                .id(req.getId())
                 .error(error)
                 .jsonrpc("2.0")
                 .build();

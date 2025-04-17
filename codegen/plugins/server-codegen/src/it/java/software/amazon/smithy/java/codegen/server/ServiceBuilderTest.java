@@ -36,7 +36,7 @@ public class ServiceBuilderTest {
     private static final class EchoImpl implements EchoOperation {
         @Override
         public EchoOutput echo(EchoInput input, RequestContext context) {
-            var output = input.value().toBuilder().echoCount(input.value().echoCount() + 1).build();
+            var output = input.getValue().toBuilder().echoCount(input.getValue().getEchoCount() + 1).build();
             return EchoOutput.builder().value(output).build();
         }
     }
@@ -46,7 +46,7 @@ public class ServiceBuilderTest {
         public CompletableFuture<GetBeerOutput> getBeer(GetBeerInput input, RequestContext context) {
             return CompletableFuture.completedFuture(
                     GetBeerOutput.builder()
-                            .value(List.of(Beer.builder().id(input.id()).name("TestBeer").build()))
+                            .value(List.of(Beer.builder().id(input.getId()).name("TestBeer").build()))
                             .build());
         }
     }
@@ -56,15 +56,15 @@ public class ServiceBuilderTest {
         public CompletableFuture<GetErrorOutput> getError(GetErrorInput input, RequestContext context) {
             Throwable exception;
             try {
-                Class<?> clazz = Class.forName(input.exceptionClass());
+                Class<?> clazz = Class.forName(input.getExceptionClass());
                 if (ModeledException.class.isAssignableFrom(clazz)) {
                     Object builderInstance = clazz.getDeclaredMethod("builder").invoke(null);
                     builderInstance = builderInstance.getClass()
                             .getMethod("message")
-                            .invoke(builderInstance, input.message());
+                            .invoke(builderInstance, input.getMessage());
                     exception = (Throwable) builderInstance.getClass().getMethod("build").invoke(builderInstance);
                 } else {
-                    exception = (Throwable) clazz.getConstructor().newInstance(input.message());
+                    exception = (Throwable) clazz.getConstructor().newInstance(input.getMessage());
                 }
             } catch (ClassNotFoundException
                     | NoSuchMethodException
@@ -88,7 +88,7 @@ public class ServiceBuilderTest {
         Operation<GetBeerInput, GetBeerOutput> getBeer = service.getOperation("GetBeer");
         assertThat("GetBeer").isEqualTo(getBeer.name());
         var output = getBeer.asyncFunction().apply(GetBeerInput.builder().id(1).build(), null);
-        assertThat(output.get().value())
+        assertThat(output.get().getValue())
                 .hasSize(1)
                 .containsExactly(Beer.builder().id(1).name("TestBeer").build());
 
@@ -96,8 +96,8 @@ public class ServiceBuilderTest {
         assertThat("Echo").isEqualTo(echo.name());
         var echoOutput = echo.function()
                 .apply(EchoInput.builder().value(EchoPayload.builder().string("A").build()).build(), null);
-        assertThat(echoOutput.value().echoCount()).isEqualTo(1);
-        assertThat(echoOutput.value().string()).isEqualTo("A");
+        assertThat(echoOutput.getValue().getEchoCount()).isEqualTo(1);
+        assertThat(echoOutput.getValue().getString()).isEqualTo("A");
     }
 
     @Test

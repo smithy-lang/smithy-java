@@ -42,15 +42,16 @@ final class AwsAuthProvider implements ConfigProvider<PreRequest> {
 
     @Override
     public IdentityResolver<?> identityResolver(PreRequest input) {
-        return new SdkCredentialsResolver(ProfileCredentialsProvider.create(input.awsProfileName()));
+        return new SdkCredentialsResolver(ProfileCredentialsProvider.create(input.getAwsProfileName()));
     }
 
     @Override
     public EndpointResolver endpointResolver(PreRequest input) {
         // TODO: error reporting
         return ignore -> {
-            var endpoint = URI.create(Objects.requireNonNull(serviceMetadata.endpoints().get(input.awsRegion()),
-                    "no endpoint for region " + input.awsRegion()));
+            var endpoint =
+                    URI.create(Objects.requireNonNull(serviceMetadata.getEndpoints().get(input.getAwsProfileName()),
+                            "no endpoint for region " + input.getAwsRegion()));
             return CompletableFuture.completedFuture(Endpoint.builder()
                     .uri(endpoint)
                     .build());
@@ -59,13 +60,13 @@ final class AwsAuthProvider implements ConfigProvider<PreRequest> {
 
     @Override
     public AuthScheme<?, ?> authScheme(PreRequest input) {
-        return new SigV4AuthScheme(serviceMetadata.sigv4SigningName());
+        return new SigV4AuthScheme(serviceMetadata.getSigv4SigningName());
     }
 
     @Override
     public RequestOverrideConfig.Builder adaptConfig(PreRequest args) {
         return ConfigProvider.super.adaptConfig(args)
-                .putConfig(RegionSetting.REGION, args.awsRegion());
+                .putConfig(RegionSetting.REGION, args.getAwsRegion());
     }
 
 }

@@ -38,7 +38,7 @@ public class NonNullAnnotationTest extends AbstractCodegenFileTest {
     void nonNullAnnotationsOnFieldsAndGetter() {
         var fileStr = getFileStringForClass("NonNullAnnotationStructInput");
         var expectedField = "private final transient @TestNonNullAnnotation RequiredStruct requiredStruct;";
-        var expectedGetter = "public @TestNonNullAnnotation RequiredStruct requiredStruct()";
+        var expectedGetter = "public @TestNonNullAnnotation RequiredStruct getRequiredStruct()";
         var expectedImport = "import software.amazon.smithy.java.codegen.utils.TestNonNullAnnotation;";
         var expectedToString = "public @TestNonNullAnnotation String toString() {";
 
@@ -53,7 +53,7 @@ public class NonNullAnnotationTest extends AbstractCodegenFileTest {
         var fileStr = getFileStringForClass("NonNullAnnotationStructInput");
 
         var expectedField = "private final transient boolean requiredPrimitive;";
-        var expectedGetter = "public boolean requiredPrimitive() {";
+        var expectedGetter = "public boolean getRequiredPrimitive() {";
         var expectedToString = "public @TestNonNullAnnotation String toString() {";
 
         assertTrue(fileStr.contains(expectedField));
@@ -63,24 +63,25 @@ public class NonNullAnnotationTest extends AbstractCodegenFileTest {
     @Test
     void nonNullAnnotationAddedForUnionVariant() {
         var fileStr = getFileStringForClass("TestUnion");
-        var expectedGetterBoxed = "public @TestNonNullAnnotation String boxedVariant() {";
-        var expectedGetterPrimitive = "public @TestNonNullAnnotation String primitiveVariant() {";
+        var expectedGetterBoxed = "public @TestNonNullAnnotation String getBoxedVariant() {";
+        var expectedGetterPrimitive = "public @TestNonNullAnnotation String getPrimitiveVariant() {";
         var expectedToString = "public @TestNonNullAnnotation String toString() {";
         var expectedTypeGetter = "public @TestNonNullAnnotation Type type() {";
 
         assertTrue(fileStr.contains(expectedGetterBoxed));
         assertTrue(fileStr.contains(expectedGetterPrimitive));
         assertTrue(fileStr.contains(expectedToString));
+        System.out.println(fileStr);
         assertTrue(fileStr.contains(expectedTypeGetter));
     }
 
     @Test
     void nonNullAnnotationAddedForEnumVariant() {
         var fileStr = getFileStringForClass("TestEnum");
-        var expectedValueGetter = "public @TestNonNullAnnotation String value() {";
+        var expectedValueGetter = "public @TestNonNullAnnotation String getValue() {";
         var expectedValueField = "private final @TestNonNullAnnotation String value;";
         var expectedToString = "public @TestNonNullAnnotation String toString() {";
-        var expectedTypeGetter = "public @TestNonNullAnnotation Type type() {";
+        var expectedTypeGetter = "public @TestNonNullAnnotation Type getType() {";
 
         assertTrue(fileStr.contains(expectedValueGetter));
         assertTrue(fileStr.contains(expectedValueField));

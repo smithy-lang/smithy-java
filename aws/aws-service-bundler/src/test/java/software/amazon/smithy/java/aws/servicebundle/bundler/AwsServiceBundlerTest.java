@@ -17,12 +17,12 @@ public class AwsServiceBundlerTest {
     @Test
     public void accessAnalyzer() {
         var bundler = new AwsServiceBundler("accessanalyzer-2019-11-01.json", AwsServiceBundlerTest::getModel);
-        var bundle = bundler.bundle().config().asShape(AwsServiceMetadata.builder());
+        var bundle = bundler.bundle().getConfig().asShape(AwsServiceMetadata.builder());
 
-        assertEquals("access-analyzer", bundle.sigv4SigningName());
-        assertEquals("AccessAnalyzer", bundle.serviceName());
+        assertEquals("access-analyzer", bundle.getSigv4SigningName());
+        assertEquals("AccessAnalyzer", bundle.getServiceName());
 
-        assertNotEquals(0, bundle.endpoints().size());
+        assertNotEquals(0, bundle.getEndpoints().size());
     }
 
     private static String getModel(String path) {

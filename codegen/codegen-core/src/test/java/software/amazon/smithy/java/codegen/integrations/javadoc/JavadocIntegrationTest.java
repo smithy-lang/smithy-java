@@ -50,7 +50,7 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
                                      *     <li> Lorem ipsum dolor sit amet, consectetur adipiscing elit Lorem ipsum dolor sit amet, consectetur adipiscing elit </li>
                                      * </ul>
                                      */
-                                    public String shouldNotBeWrapped() {
+                                    public String getShouldNotBeWrapped() {
                                 """));
     }
 
@@ -74,7 +74,7 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
                      * @deprecated As of 1.2.
                      */
                     @Deprecated(since = "1.2")
-                    public String deprecatedMember() {
+                    public String getDeprecatedMember() {
                         return deprecatedMember;
                     }
                 """));
@@ -91,7 +91,7 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
                      * @deprecated
                      */
                     @Deprecated
-                    public String deprecatedWithDocs() {
+                    public String getDeprecatedWithDocs() {
                         return deprecatedWithDocs;
                     }
                 """));
@@ -120,7 +120,7 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
                     /**
                      * @since 1.2
                      */
-                    public String sinceMember() {
+                    public String getSinceMember() {
                 """));
     }
 
@@ -139,7 +139,7 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
                     /**
                      * @see <a href="https://en.wikipedia.org/wiki/Puffin">Puffins are also neat</a>
                      */
-                    public String memberWithExternalDocumentation() {
+                    public String getMemberWithExternalDocumentation() {
                 """));
     }
 
@@ -153,7 +153,7 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
                 """));
         assertThat(fileContents, containsString("""
                     @SmithyUnstableApi
-                    public String unstableMember() {
+                    public String getUnstableMember() {
                         return unstableMember;
                     }
                 """));
@@ -185,7 +185,7 @@ public class JavadocIntegrationTest extends AbstractCodegenFileTest {
                      */
                     @SmithyUnstableApi
                     @Deprecated(since = "sometime")
-                    public String rollupMember() {
+                    public String getRollupMember() {
                 """));
     }
 

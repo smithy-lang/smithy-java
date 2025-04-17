@@ -22,8 +22,8 @@ public class BuilderTest {
                 .build();
         var copy = original.toBuilder().optionalList(List.of("1")).build();
         assertThat(copy)
-                .returns(original.requiredList(), ListMembersInput::requiredList)
-                .returns(List.of("1"), ListMembersInput::optionalList);
+                .returns(original.getRequiredList(), ListMembersInput::getRequiredList)
+                .returns(List.of("1"), ListMembersInput::getOptionalList);
     }
 
     @Test
@@ -33,7 +33,7 @@ public class BuilderTest {
                 .build();
         var copy = original.toBuilder().optionalMap(Map.of("1", "2")).build();
         assertThat(copy)
-                .returns(original.requiredMap(), MapMembersInput::requiredMap)
-                .returns(Map.of("1", "2"), MapMembersInput::optionalMap);
+                .returns(original.getRequiredMap(), MapMembersInput::getRequiredMap)
+                .returns(Map.of("1", "2"), MapMembersInput::getOptionalMap);
     }
 }

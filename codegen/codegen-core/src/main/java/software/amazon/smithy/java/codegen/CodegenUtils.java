@@ -256,6 +256,33 @@ public final class CodegenUtils {
     }
 
     /**
+     * Gets the name to use when defining the default value of a member.
+     *
+     * @param memberShape memberShape.
+     * @return Upper snake case name of default
+     */
+    public static String toGetterName(MemberShape memberShape, String memberName) {
+        var prefix = memberShape.isBooleanShape() ? "is" : "get";
+        var suffix =
+                Character.toUpperCase(memberName.charAt(0)) + (memberName.length() == 1 ? "" : memberName.substring(1));
+        return prefix + suffix;
+    }
+
+    /**
+     * Gets the name to use when defining the default value of a member.
+     *
+     * @param memberShape memberShape.
+     * @return Upper snake case name of default
+     */
+    public static String toUnionGetterName(MemberShape memberShape, String memberName) {
+        var getterName = toGetterName(memberShape, memberName);
+        if (getterName.equals("getValue")) {
+            getterName += "Member";
+        }
+        return getterName;
+    }
+
+    /**
      * Gets the file name to use for the SharedSerde utility class
      *
      * @param settings Settings to use for package namespace

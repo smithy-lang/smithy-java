@@ -46,7 +46,7 @@ public class BasicServerExample {
         @Override
         public AddBeerOutput addBeer(AddBeerInput input, RequestContext context) {
             long id = ID_GEN.incrementAndGet();
-            FRIDGE.put(id, input.beer());
+            FRIDGE.put(id, input.getBeer());
             return AddBeerOutput.builder().id(id).build();
         }
     }
@@ -56,7 +56,7 @@ public class BasicServerExample {
         @Override
         public CompletableFuture<GetBeerOutput> getBeer(GetBeerInput input, RequestContext context) {
             return CompletableFuture.supplyAsync(
-                    () -> GetBeerOutput.builder().beer(FRIDGE.get(input.id())).build(),
+                    () -> GetBeerOutput.builder().beer(FRIDGE.get(input.getId())).build(),
                     CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS));
         }
     }
