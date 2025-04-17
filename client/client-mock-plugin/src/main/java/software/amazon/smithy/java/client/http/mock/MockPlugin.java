@@ -25,6 +25,7 @@ import software.amazon.smithy.java.client.http.HttpMessageExchange;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -165,6 +166,11 @@ public final class MockPlugin implements ClientPlugin {
         @Override
         public MessageExchange<HttpRequest, HttpResponse> messageExchange() {
             return delegate.messageExchange();
+        }
+
+        @Override
+        public Codec payloadCodec() {
+            return delegate.payloadCodec();
         }
 
         @Override

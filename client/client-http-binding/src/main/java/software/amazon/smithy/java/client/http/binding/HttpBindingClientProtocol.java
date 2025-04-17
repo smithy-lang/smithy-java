@@ -31,6 +31,8 @@ import software.amazon.smithy.model.shapes.ShapeId;
 /**
  * An HTTP-based protocol that uses HTTP binding traits.
  *
+ * <p>Subclasses MUST implement a {@link #payloadCodec()} method that returns a non-null {@link Codec}.
+ *
  * @param <F> the framing type for event streams.
  */
 public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends HttpClientProtocol {
@@ -41,8 +43,6 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
     public HttpBindingClientProtocol(ShapeId id) {
         super(id);
     }
-
-    abstract protected Codec codec();
 
     abstract protected String payloadMediaType();
 
@@ -73,7 +73,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
     ) {
         RequestSerializer serializer = httpBinding.requestSerializer()
                 .operation(operation)
-                .payloadCodec(codec())
+                .payloadCodec(payloadCodec())
                 .payloadMediaType(payloadMediaType())
                 .shapeValue(input)
                 .endpoint(endpoint)
@@ -104,7 +104,7 @@ public abstract class HttpBindingClientProtocol<F extends Frame<?>> extends Http
 
         var outputBuilder = operation.outputBuilder();
         ResponseDeserializer deser = httpBinding.responseDeserializer()
-                .payloadCodec(codec())
+                .payloadCodec(payloadCodec())
                 .payloadMediaType(payloadMediaType())
                 .outputShapeBuilder(outputBuilder)
                 .response(response);

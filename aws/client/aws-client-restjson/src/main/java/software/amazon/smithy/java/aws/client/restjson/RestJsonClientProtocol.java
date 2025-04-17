@@ -56,7 +56,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
     }
 
     @Override
-    protected Codec codec() {
+    public Codec payloadCodec() {
         return codec;
     }
 
@@ -82,7 +82,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
         // TODO: this is where you'd plumb through Sigv4 support, another frame transformer?
         return AwsEventEncoderFactory.forInputStream(
                 inputOperation,
-                codec(),
+                payloadCodec(),
                 payloadMediaType(),
                 (e) -> new EventStreamingException("InternalServerException", "Internal Server Error"));
     }
@@ -91,7 +91,7 @@ public final class RestJsonClientProtocol extends HttpBindingClientProtocol<AwsE
     protected EventDecoderFactory<AwsEventFrame> getEventDecoderFactory(
             OutputEventStreamingApiOperation<?, ?, ?> outputOperation
     ) {
-        return AwsEventDecoderFactory.forOutputStream(outputOperation, codec(), f -> f);
+        return AwsEventDecoderFactory.forOutputStream(outputOperation, payloadCodec(), f -> f);
     }
 
     public static final class Factory implements ClientProtocolFactory<RestJson1Trait> {
