@@ -9,14 +9,14 @@ import java.util.HashMap;
 import java.util.Map;
 import software.amazon.smithy.java.core.serde.document.Document;
 
-public final class ConfigProviders {
-    private final Map<String, ConfigProviderFactory> providers;
+public final class PluginProviders {
+    private final Map<String, BundleClientPluginProviderFactory> providers;
 
-    private ConfigProviders(Builder builder) {
+    private PluginProviders(Builder builder) {
         this.providers = builder.providers;
     }
 
-    public ConfigProvider<?> getProvider(String identifier, Document input) {
+    public BundleClientPluginProvider getProvider(String identifier, Document input) {
         var provider = providers.get(identifier);
         if (provider == null) {
             throw new NullPointerException("no auth provider named " + identifier);
@@ -30,16 +30,17 @@ public final class ConfigProviders {
     }
 
     public static final class Builder {
-        private static final Map<String, ConfigProviderFactory> BASE_PROVIDERS =
-                ServiceLoaderLoader.load(ConfigProviderFactory.class, ConfigProviderFactory::identifier);
+        private static final Map<String, BundleClientPluginProviderFactory> BASE_PROVIDERS =
+                ServiceLoaderLoader.load(BundleClientPluginProviderFactory.class,
+                        BundleClientPluginProviderFactory::identifier);
 
-        private Map<String, ConfigProviderFactory> providers;
+        private Map<String, BundleClientPluginProviderFactory> providers;
 
         private Builder() {
 
         }
 
-        public Builder addProvider(ConfigProviderFactory provider) {
+        public Builder addProvider(BundleClientPluginProviderFactory provider) {
             if (providers == null) {
                 providers = new HashMap<>(BASE_PROVIDERS);
             }
@@ -47,11 +48,11 @@ public final class ConfigProviders {
             return this;
         }
 
-        public ConfigProviders build() {
+        public PluginProviders build() {
             if (providers == null) {
                 providers = BASE_PROVIDERS;
             }
-            return new ConfigProviders(this);
+            return new PluginProviders(this);
         }
 
     }

@@ -27,7 +27,7 @@ final class StaticAuthSchemeResolver implements AuthSchemeResolver {
         return AUTH_SCHEME_OPTION;
     }
 
-    static <RequestT, IdentityT extends Identity> AuthScheme<RequestT, IdentityT> staticScheme(
+    public static <RequestT, IdentityT extends Identity> AuthScheme<RequestT, IdentityT> staticScheme(
             AuthScheme<RequestT, IdentityT> actual
     ) {
         return new AuthScheme<>() {

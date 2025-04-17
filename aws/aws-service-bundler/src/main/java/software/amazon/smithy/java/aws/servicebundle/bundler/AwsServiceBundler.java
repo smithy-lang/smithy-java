@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
-import software.amazon.smithy.awsmcp.model.Model;
+import software.amazon.smithy.awsmcp.model.PreRequest;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.node.BooleanNode;
@@ -27,9 +27,11 @@ import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ModelSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.traits.EndpointTrait;
 import software.amazon.smithy.modelbundle.api.Bundler;
 import software.amazon.smithy.modelbundle.api.model.Bundle;
+import software.amazon.smithy.modelbundle.api.model.Model;
 
 final class AwsServiceBundler implements Bundler {
     private static final ShapeId ENDPOINT_TESTS = ShapeId.from("smithy.rules#endpointTests");
@@ -61,6 +63,32 @@ final class AwsServiceBundler implements Bundler {
         this.resolver = resolver;
     }
 
+    private static software.amazon.smithy.model.Model adapt(software.amazon.smithy.model.Model model) {
+        var template = model.expectShape(PreRequest.$ID).asStructureShape().get();
+        var b = model.toBuilder();
+
+        // mix in the PreRequest structure members
+        for (var op : model.getOperationShapes()) {
+            var input = model.expectShape(op.getInput().get(), StructureShape.class).toBuilder();
+            for (var member : template.members()) {
+                input.addMember(member.toBuilder()
+                        .id(ShapeId.from(input.getId().toString() + "$" + member.getMemberName()))
+                        .build());
+            }
+            b.addShape(input.build());
+        }
+
+        for (var service : model.getServiceShapes()) {
+            b.addShape(service.toBuilder()
+                    // trim the endpoint rules because they're huge and we don't need them
+                    .removeTrait(ShapeId.from("smithy.rules#endpointRuleSet"))
+                    .removeTrait(ENDPOINT_TESTS)
+                    .build());
+        }
+
+        return b.build();
+    }
+
     @Override
     public Bundle bundle() {
         try {
@@ -73,18 +101,8 @@ final class AwsServiceBundler implements Bundler {
                     .unwrap();
             var bundle = AwsServiceMetadata.builder();
             var service = model.getServiceShapes().iterator().next();
-            var redactedModel = model.toBuilder()
-                    .addShape(service.toBuilder()
-                            // trim the endpoint rules because they're huge and we don't need them
-                            .removeTrait(ShapeId.from("smithy.rules#endpointRuleSet"))
-                            .removeTrait(ENDPOINT_TESTS)
-                            .build())
-                    .build();
             bundle.serviceName(service.getId().getName())
-                    .endpoints(Collections.emptyMap())
-                    .model(Model.builder()
-                            .model(ObjectNode.printJson(ModelSerializer.builder().build().serialize(redactedModel)))
-                            .build());
+                    .endpoints(Collections.emptyMap());
             var sigv4Trait = service.getTrait(SigV4Trait.class);
             if (sigv4Trait.isEmpty()) {
                 throw new RuntimeException("Service " + serviceName + " does not have a SigV4 trait");
@@ -102,7 +120,11 @@ final class AwsServiceBundler implements Bundler {
             return Bundle.builder()
                     .config(Document.of(bundle.build()))
                     .configType("aws")
-                    .serviceName(serviceName)
+                    .serviceName(model.getServiceShapes().iterator().next().getId().toString())
+                    .model(Model.builder()
+                            .smithyModel(
+                                    ObjectNode.printJson(ModelSerializer.builder().build().serialize(adapt(model))))
+                            .build())
                     .build();
         } catch (Exception e) {
             throw new RuntimeException("Failed to bundle " + serviceName, e);
@@ -193,7 +215,8 @@ final class AwsServiceBundler implements Bundler {
         public String getModel(String serviceName) throws Exception {
             return CLIENT.send(HttpRequest.newBuilder()
                     .uri(URI.create("https://raw.githubusercontent.com/aws/api-models-aws/refs/heads/main/"
-                            + GH_URIS_BY_SERVICE.get(serviceName)))
+                            + Objects.requireNonNull(GH_URIS_BY_SERVICE.get(serviceName),
+                                    "No known service name " + serviceName)))
                     .build(), HttpResponse.BodyHandlers.ofString())
                     .body();
         }

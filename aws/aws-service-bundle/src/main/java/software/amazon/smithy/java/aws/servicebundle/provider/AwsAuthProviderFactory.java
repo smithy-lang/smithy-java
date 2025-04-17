@@ -7,10 +7,10 @@ package software.amazon.smithy.java.aws.servicebundle.provider;
 
 import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.modelbundle.api.ConfigProvider;
-import software.amazon.smithy.modelbundle.api.ConfigProviderFactory;
+import software.amazon.smithy.modelbundle.api.BundleClientPluginProvider;
+import software.amazon.smithy.modelbundle.api.BundleClientPluginProviderFactory;
 
-public final class AwsAuthProviderFactory implements ConfigProviderFactory {
+public final class AwsAuthProviderFactory implements BundleClientPluginProviderFactory {
     public AwsAuthProviderFactory() {
 
     }
@@ -21,7 +21,7 @@ public final class AwsAuthProviderFactory implements ConfigProviderFactory {
     }
 
     @Override
-    public ConfigProvider<?> createAuthFactory(Document input) {
+    public BundleClientPluginProvider createAuthFactory(Document input) {
         return new AwsAuthProvider(input.asShape(AwsServiceMetadata.builder()));
     }
 }

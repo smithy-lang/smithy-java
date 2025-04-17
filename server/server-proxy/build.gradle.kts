@@ -13,6 +13,7 @@ dependencies {
     api(project(":core"))
     api(project(":context"))
     api(project(":framework-errors"))
+    api(project(":model-bundler:bundle-api"))
     implementation(libs.smithy.model)
     implementation(project(":io"))
     implementation(project(":logging"))

@@ -11,4 +11,11 @@ structure Bundle {
 
     @required
     config: Document
+
+    @required
+    model: Model
+}
+
+union Model {
+    smithyModel: String
 }
