@@ -27,15 +27,15 @@ public class DefaultsTest {
     void setsCorrectDefault() {
         var defaults = DefaultsInput.builder().build();
 
-        assertTrue(defaults.getBooleanMember());
+        assertTrue(defaults.isBoolean());
         assertEquals(defaults.getBigDecimal(), BigDecimal.valueOf(1.0));
         assertEquals(defaults.getBigInteger(), BigInteger.valueOf(1));
-        assertEquals(defaults.getByteMember(), (byte) 1);
-        assertEquals(defaults.getDoubleMember(), 1.0);
-        assertEquals(defaults.getFloatMember(), 1f);
+        assertEquals(defaults.getByte(), (byte) 1);
+        assertEquals(defaults.getDouble(), 1.0);
+        assertEquals(defaults.getFloat(), 1f);
         assertEquals(defaults.getInteger(), 1);
-        assertEquals(defaults.getLongMember(), 1);
-        assertEquals(defaults.getShortMember(), (short) 1);
+        assertEquals(defaults.getLong(), 1);
+        assertEquals(defaults.getShort(), (short) 1);
         assertEquals(defaults.getBlob(), ByteBuffer.wrap(Base64.getDecoder().decode("YmxvYg==")));
         defaults.getStreamingBlob()
                 .asByteBuffer()
@@ -49,7 +49,7 @@ public class DefaultsTest {
         assertEquals(defaults.getList(), List.of());
         assertEquals(defaults.getMap(), Map.of());
         assertEquals(defaults.getTimestamp(), Instant.parse("1985-04-12T23:20:50.52Z"));
-        assertEquals(defaults.getEnumMember(), NestedEnum.A);
+        assertEquals(defaults.getEnum(), NestedEnum.A);
         assertEquals(defaults.getIntEnum(), NestedIntEnum.A);
     }
 }

@@ -53,7 +53,7 @@ public class NonNullAnnotationTest extends AbstractCodegenFileTest {
         var fileStr = getFileStringForClass("NonNullAnnotationStructInput");
 
         var expectedField = "private final transient boolean requiredPrimitive;";
-        var expectedGetter = "public boolean getRequiredPrimitive() {";
+        var expectedGetter = "public boolean isRequiredPrimitive() {";
         var expectedToString = "public @TestNonNullAnnotation String toString() {";
 
         assertTrue(fileStr.contains(expectedField));

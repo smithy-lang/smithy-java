@@ -46,6 +46,10 @@ public final class CodegenUtils {
             CodegenUtils.class.getResource("object-reserved-members.txt"));
     private static final URL SMITHY_RESERVED_MEMBERS_FILE = Objects.requireNonNull(
             CodegenUtils.class.getResource("smithy-reserved-members.txt"));
+    private static final URL SMITHY_RESERVED_METHODS_FILE = Objects.requireNonNull(
+            CodegenUtils.class.getResource("smithy-reserved-methods.txt"));
+
+    private static final List<String> DELIMITERS = List.of("_", "-", " ");
 
     public static final ReservedWords SHAPE_ESCAPER = new ReservedWordsBuilder()
             .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Shape")
@@ -54,6 +58,9 @@ public final class CodegenUtils {
             .loadCaseInsensitiveWords(RESERVED_WORDS_FILE, word -> word + "Member")
             .loadCaseInsensitiveWords(OBJECT_RESERVED_MEMBERS_FILE, word -> word + "Member")
             .loadCaseInsensitiveWords(SMITHY_RESERVED_MEMBERS_FILE, word -> word + "Member")
+            .build();
+    public static final ReservedWords METHODS_ESCAPER = new ReservedWordsBuilder()
+            .loadCaseInsensitiveWords(SMITHY_RESERVED_METHODS_FILE, word -> word + "Member")
             .build();
 
     private static final String SCHEMA_STATIC_NAME = "$SCHEMA";
@@ -256,16 +263,30 @@ public final class CodegenUtils {
     }
 
     /**
-     * Gets the name to use when defining the default value of a member.
      *
-     * @param memberShape memberShape.
-     * @return Upper snake case name of default
+     * Gets the name to use when defining a member as instance variable in a class.
+     *
+     * @param memberShape MemberShape
+     * @param model Model
+     * @return Instance variable name of a member.
      */
-    public static String toGetterName(MemberShape memberShape, String memberName) {
-        var prefix = memberShape.isBooleanShape() ? "is" : "get";
+    public static String toMemberName(MemberShape memberShape, Model model) {
+        return getMemberName(memberShape, model, true);
+    }
+
+    /**
+     * Gets the name to use when defining the getter method of a member.
+     *
+     * @param  memberShape memberShape.
+     * @return Getter method name of a member.
+     */
+    public static String toGetterName(MemberShape memberShape, Model model) {
+        var target = model.expectShape(memberShape.getTarget());
+        var prefix = target.isBooleanShape() ? "is" : "get";
+        var memberName = getMemberName(memberShape, model, false);
         var suffix =
                 Character.toUpperCase(memberName.charAt(0)) + (memberName.length() == 1 ? "" : memberName.substring(1));
-        return prefix + suffix;
+        return METHODS_ESCAPER.escape(prefix + suffix);
     }
 
     /**
@@ -462,4 +483,46 @@ public final class CodegenUtils {
                 .declarationFile(filename)
                 .build();
     }
+
+    private static String getMemberName(MemberShape shape, Model model, boolean escape) {
+        Shape containerShape = model.expectShape(shape.getContainer());
+        if (containerShape.isEnumShape() || containerShape.isIntEnumShape()) {
+            return CaseUtils.toSnakeCase(shape.getMemberName()).toUpperCase(Locale.ENGLISH);
+        }
+
+        // If a member name contains an underscore, space, or dash, convert to camel case using Smithy utility
+        var memberName = shape.getMemberName();
+        if (DELIMITERS.stream().anyMatch(memberName::contains)) {
+            memberName = CaseUtils.toCamelCase(memberName);
+        } else {
+            memberName = uncapitalizeAcronymAware(memberName);
+        }
+
+        if (escape) {
+            memberName = CodegenUtils.MEMBER_ESCAPER.escape(memberName);
+        }
+        return memberName;
+    }
+
+    private static String uncapitalizeAcronymAware(String str) {
+        if (Character.isLowerCase(str.charAt(0))) {
+            return str;
+        } else if (str.equals(str.toUpperCase())) {
+            return str.toLowerCase();
+        }
+        int strLen = str.length();
+        StringBuilder sb = new StringBuilder(strLen);
+        boolean nextIsUpperCase;
+        for (int idx = 0; idx < strLen; idx++) {
+            var currentChar = str.charAt(idx);
+            nextIsUpperCase = (idx + 1 < strLen) && Character.isUpperCase(str.charAt(idx + 1));
+            if (Character.isUpperCase(currentChar) && (nextIsUpperCase || idx == 0)) {
+                sb.append(Character.toLowerCase(currentChar));
+            } else {
+                sb.append(currentChar);
+            }
+        }
+        return sb.toString();
+    }
+
 }

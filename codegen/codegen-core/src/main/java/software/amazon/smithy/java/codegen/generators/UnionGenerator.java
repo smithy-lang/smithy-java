@@ -180,8 +180,9 @@ public final class UnionGenerator
                                 }
                                 """;
                 var memberSymbol = symbolProvider.toSymbol(member);
+                var target = model.expectShape(member.getTarget());
                 var memberName = symbolProvider.toMemberName(member);
-                var getterName = CodegenUtils.toGetterName(member, memberName);
+                var getterName = CodegenUtils.toGetterName(member, model);
                 if (getterName.equals("getValue")) {
                     getterName += "Member";
                 }
@@ -196,7 +197,6 @@ public final class UnionGenerator
                 writer.putContext(
                         "wrap",
                         memberSymbol.getProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER).orElse(null));
-                var target = model.expectShape(member.getTarget());
                 writer.putContext("unit", target.hasTrait(UnitTypeTrait.class));
                 writer.putContext("col", target.isMapShape() || target.isListShape());
                 writer.write(template);

@@ -60,7 +60,7 @@ public class RoundTripTests {
     @Test
     void executesCorrectly() throws InterruptedException {
         var menu = client.getMenu(GetMenuInput.builder().build());
-        var hasEspresso = menu.getItems().stream().anyMatch(item -> item.getTypeMember().equals(CoffeeType.ESPRESSO));
+        var hasEspresso = menu.getItems().stream().anyMatch(item -> item.getType().equals(CoffeeType.ESPRESSO));
         assertTrue(hasEspresso);
 
         var createRequest = CreateOrderInput.builder().coffeeType(CoffeeType.COLD_BREW).build();

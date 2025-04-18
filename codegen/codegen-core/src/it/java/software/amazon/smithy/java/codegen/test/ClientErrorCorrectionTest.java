@@ -28,15 +28,15 @@ public class ClientErrorCorrectionTest {
                 .errorCorrection()
                 .build();
 
-        assertFalse(corrected.getBooleanMember());
+        assertFalse(corrected.isBoolean());
         assertEquals(corrected.getBigDecimal(), BigDecimal.ZERO);
         assertEquals(corrected.getBigInteger(), BigInteger.ZERO);
-        assertEquals(corrected.getByteMember(), (byte) 0);
-        assertEquals(corrected.getDoubleMember(), 0);
-        assertEquals(corrected.getFloatMember(), 0);
+        assertEquals(corrected.getByte(), (byte) 0);
+        assertEquals(corrected.getDouble(), 0);
+        assertEquals(corrected.getFloat(), 0);
         assertEquals(corrected.getInteger(), 0);
-        assertEquals(corrected.getLongMember(), 0);
-        assertEquals(corrected.getShortMember(), (short) 0);
+        assertEquals(corrected.getLong(), 0);
+        assertEquals(corrected.getShort(), (short) 0);
         assertEquals(corrected.getBlob(), ByteBuffer.allocate(0));
         assertEquals(corrected.getStreamingBlob().contentLength(), 0);
         corrected.getStreamingBlob().asByteBuffer().thenAccept(bytes -> assertEquals(0, bytes.remaining()));
@@ -44,8 +44,8 @@ public class ClientErrorCorrectionTest {
         assertEquals(corrected.getList(), List.of());
         assertEquals(corrected.getMap(), Map.of());
         assertEquals(corrected.getTimestamp(), Instant.EPOCH);
-        assertEquals(corrected.getEnumMember().getType(), NestedEnum.Type.$UNKNOWN);
-        assertEquals(corrected.getEnumMember().getValue(), "");
+        assertEquals(corrected.getEnum().getType(), NestedEnum.Type.$UNKNOWN);
+        assertEquals(corrected.getEnum().getValue(), "");
         assertEquals(corrected.getIntEnum().getType(), NestedIntEnum.Type.$UNKNOWN);
         assertEquals(corrected.getIntEnum().getValue(), 0);
     }

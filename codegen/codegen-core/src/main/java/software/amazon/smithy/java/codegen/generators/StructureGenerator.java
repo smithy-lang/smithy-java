@@ -286,7 +286,7 @@ public final class StructureGenerator<
                 writer.putContext("memberName", memberName);
                 writer.putContext("member", symbolProvider.toSymbol(member));
                 writer.putContext("isNullable", CodegenUtils.isNullableMember(model, member));
-                writer.putContext("getterName", CodegenUtils.toGetterName(member, memberName));
+                writer.putContext("getterName", CodegenUtils.toGetterName(member, model));
                 this.member = member;
                 member.accept(this);
                 writer.popState();
