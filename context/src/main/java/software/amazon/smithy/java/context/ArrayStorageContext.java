@@ -38,7 +38,7 @@ final class ArrayStorageContext implements Context {
     }
 
     @Override
-    public <T> void put(Key<T> key, T value) {
+    public <T> Context put(Key<T> key, T value) {
         var idx = key.id;
         if (idx >= values.length) {
             resize();
@@ -50,6 +50,8 @@ final class ArrayStorageContext implements Context {
         if (idx >= Key.MAX_ARRAY_KEY_SPACE) {
             keys.put(key.id, key);
         }
+
+        return this;
     }
 
     private void resize() {

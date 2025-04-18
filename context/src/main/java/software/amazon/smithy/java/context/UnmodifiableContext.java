@@ -16,12 +16,12 @@ final class UnmodifiableContext implements Context {
     }
 
     @Override
-    public <T> void put(Key<T> key, T value) {
+    public <T> Context put(Key<T> key, T value) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public <T> void putIfAbsent(Key<T> key, T value) {
+    public <T> Context putIfAbsent(Key<T> key, T value) {
         throw new UnsupportedOperationException();
     }
 

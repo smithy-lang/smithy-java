@@ -100,7 +100,7 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
      * @param value Value to set.
      * @param <T>   Value type.
      */
-    <T> void put(Key<T> key, T value);
+    <T> Context put(Key<T> key, T value);
 
     /**
      * Set a Property if not already present.
@@ -109,10 +109,11 @@ public sealed interface Context permits ArrayStorageContext, MapStorageContext, 
      * @param value Value to set.
      * @param <T>   Value type.
      */
-    default <T> void putIfAbsent(Key<T> key, T value) {
+    default <T> Context putIfAbsent(Key<T> key, T value) {
         if (get(key) == null) {
             put(key, value);
         }
+        return this;
     }
 
     /**

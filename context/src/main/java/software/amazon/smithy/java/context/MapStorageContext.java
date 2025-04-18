@@ -13,8 +13,9 @@ final class MapStorageContext implements Context {
     private final Map<Key<?>, Object> attributes = new HashMap<>();
 
     @Override
-    public <T> void put(Key<T> key, T value) {
+    public <T> Context put(Key<T> key, T value) {
         attributes.put(key, value);
+        return this;
     }
 
     @Override
