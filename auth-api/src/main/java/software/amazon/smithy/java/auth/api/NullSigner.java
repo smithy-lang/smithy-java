@@ -7,6 +7,7 @@ package software.amazon.smithy.java.auth.api;
 
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.auth.api.identity.Identity;
+import software.amazon.smithy.java.context.Context;
 
 /**
  * A signer that does nothing.
@@ -30,7 +31,7 @@ final class NullSigner implements Signer {
      * @return the request as-is.
      */
     @Override
-    public CompletableFuture<Object> sign(Object request, Identity identity, AuthProperties properties) {
+    public CompletableFuture<Object> sign(Object request, Identity identity, Context properties) {
         return CompletableFuture.completedFuture(request);
     }
 }

@@ -8,10 +8,10 @@ package software.amazon.smithy.java.aws.sdkv2.auth;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
+import software.amazon.smithy.java.context.Context;
 
 public class SdkCredentialsResolver implements AwsCredentialsResolver {
 
@@ -37,11 +37,11 @@ public class SdkCredentialsResolver implements AwsCredentialsResolver {
      * <p>If the resolved credentials are {@link AwsSessionCredentials}, the session token and
      * expiration time (if available) will be included in the identity.
      *
-     * @param requestProperties Authentication properties that may influence credential resolution.
+     * @param requestProperties The request properties used to resolve an Identity.
      * @return A future that completes with the resolved AWS credentials identity.
      */
     @Override
-    public CompletableFuture<IdentityResult<AwsCredentialsIdentity>> resolveIdentity(AuthProperties requestProperties) {
+    public CompletableFuture<IdentityResult<AwsCredentialsIdentity>> resolveIdentity(Context requestProperties) {
         var credentials = sdkCredentialsProvider.resolveCredentials();
         AwsCredentialsIdentity identity;
         if (credentials instanceof AwsSessionCredentials s) {

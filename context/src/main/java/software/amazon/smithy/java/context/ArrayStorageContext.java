@@ -62,7 +62,7 @@ final class ArrayStorageContext implements Context {
 
     @Override
     @SuppressWarnings("unchecked")
-    public Context copyTo(Context target) {
+    public void copyTo(Context target) {
         for (var i = 0; i < values.length; i++) {
             var v = values[i];
             if (v != null) {
@@ -71,6 +71,5 @@ final class ArrayStorageContext implements Context {
                 target.put(k, k.copyValue(v));
             }
         }
-        return target;
     }
 }

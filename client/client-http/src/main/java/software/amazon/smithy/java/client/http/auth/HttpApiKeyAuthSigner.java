@@ -8,9 +8,9 @@ package software.amazon.smithy.java.client.http.auth;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.ApiKeyIdentity;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.io.uri.QueryStringBuilder;
@@ -27,7 +27,7 @@ final class HttpApiKeyAuthSigner implements Signer<HttpRequest, ApiKeyIdentity> 
     public CompletableFuture<HttpRequest> sign(
             HttpRequest request,
             ApiKeyIdentity identity,
-            AuthProperties properties
+            Context properties
     ) {
         var name = properties.expect(HttpApiKeyAuthScheme.NAME);
         return switch (properties.expect(HttpApiKeyAuthScheme.IN)) {

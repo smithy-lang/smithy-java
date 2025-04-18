@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.client.core.auth.scheme;
 
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
@@ -73,8 +72,8 @@ public interface AuthScheme<RequestT, IdentityT extends Identity> {
      *
      * @param context request context
      */
-    default AuthProperties getSignerProperties(Context context) {
-        return AuthProperties.empty();
+    default Context getSignerProperties(Context context) {
+        return Context.empty();
     }
 
     /**
@@ -82,8 +81,8 @@ public interface AuthScheme<RequestT, IdentityT extends Identity> {
      *
      * @param context request context
      */
-    default AuthProperties getIdentityProperties(Context context) {
-        return AuthProperties.empty();
+    default Context getIdentityProperties(Context context) {
+        return Context.empty();
     }
 
     /**

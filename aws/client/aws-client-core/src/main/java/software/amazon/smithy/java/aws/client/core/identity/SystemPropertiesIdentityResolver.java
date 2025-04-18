@@ -6,10 +6,10 @@
 package software.amazon.smithy.java.aws.client.core.identity;
 
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsResolver;
+import software.amazon.smithy.java.context.Context;
 
 /**
  * {@link AwsCredentialsResolver} implementation that loads credentials from Java system properties.
@@ -35,7 +35,7 @@ public final class SystemPropertiesIdentityResolver implements AwsCredentialsRes
             + "aws.secretAccessKey system properties";
 
     @Override
-    public CompletableFuture<IdentityResult<AwsCredentialsIdentity>> resolveIdentity(AuthProperties requestProperties) {
+    public CompletableFuture<IdentityResult<AwsCredentialsIdentity>> resolveIdentity(Context requestProperties) {
         String accessKey = System.getProperty(ACCESS_KEY_PROPERTY);
         String secretKey = System.getProperty(SECRET_KEY_PROPERTY);
         String sessionToken = System.getProperty(SESSION_TOKEN_PROPERTY);

@@ -6,13 +6,13 @@
 package software.amazon.smithy.java.codegen.client;
 
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeFactory;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -56,7 +56,7 @@ public final class TestAuthScheme implements AuthScheme<HttpRequest, Identity> {
         public CompletableFuture<HttpRequest> sign(
                 HttpRequest request,
                 Identity identity,
-                AuthProperties properties
+                Context properties
         ) {
             return CompletableFuture.completedFuture(
                     request.toBuilder().withAddedHeader(SIGNATURE_HEADER, "smithy-test-signature").build());

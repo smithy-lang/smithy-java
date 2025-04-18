@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.auth.api.AuthProperties;
+import software.amazon.smithy.java.context.Context;
 
 final class IdentityResolverChain<IdentityT extends Identity> implements IdentityResolver<IdentityT> {
     private final Class<IdentityT> identityClass;
@@ -29,14 +29,14 @@ final class IdentityResolverChain<IdentityT extends Identity> implements Identit
     }
 
     @Override
-    public CompletableFuture<IdentityResult<IdentityT>> resolveIdentity(AuthProperties requestProperties) {
+    public CompletableFuture<IdentityResult<IdentityT>> resolveIdentity(Context requestProperties) {
         List<IdentityResult<?>> errors = new ArrayList<>();
         return executeChain(resolvers.get(0), requestProperties, errors, 0);
     }
 
     private CompletableFuture<IdentityResult<IdentityT>> executeChain(
             IdentityResolver<IdentityT> resolver,
-            AuthProperties requestProperties,
+            Context requestProperties,
             List<IdentityResult<?>> errors,
             int idx
     ) {

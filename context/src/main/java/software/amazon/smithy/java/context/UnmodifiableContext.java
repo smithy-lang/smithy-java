@@ -9,6 +9,8 @@ import java.util.function.Function;
 
 final class UnmodifiableContext implements Context {
 
+    static final Context EMPTY = new UnmodifiableContext(new MapStorageContext());
+
     private final Context delegate;
 
     UnmodifiableContext(Context delegate) {
@@ -36,7 +38,7 @@ final class UnmodifiableContext implements Context {
     }
 
     @Override
-    public Context copyTo(Context target) {
-        return delegate.copyTo(target);
+    public void copyTo(Context target) {
+        delegate.copyTo(target);
     }
 }
