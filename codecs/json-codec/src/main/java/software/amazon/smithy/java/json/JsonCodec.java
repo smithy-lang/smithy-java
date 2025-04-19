@@ -142,6 +142,17 @@ public final class JsonCodec implements Codec {
         }
 
         /**
+         * Whether the type field should be written when Documents are being serialized. Default is true.
+         *
+         * @param serializeTypeInDocuments if the type field should be written when Documents are being serialized
+         * @return the builder
+         */
+        public Builder serializeTypeInDocuments(boolean serializeTypeInDocuments) {
+            settingsBuilder.serializeTypeInDocuments(serializeTypeInDocuments);
+            return this;
+        }
+
+        /**
          * Uses a custom JSON serde provider.
          *
          * @param provider the JSON serde provider to use.

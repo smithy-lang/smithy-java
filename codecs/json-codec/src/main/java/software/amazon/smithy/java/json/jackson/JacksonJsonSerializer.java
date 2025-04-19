@@ -292,7 +292,9 @@ final class JacksonJsonSerializer implements ShapeSerializer {
         public void writeStruct(Schema schema, SerializableStruct struct) {
             try {
                 parent.generator.writeStartObject();
-                parent.generator.writeStringField("__type", schema.id().toString());
+                if (parent.settings.serializeTypeInDocuments()) {
+                    parent.generator.writeStringField("__type", schema.id().toString());
+                }
                 struct.serializeMembers(parent.structSerializer);
                 parent.generator.writeEndObject();
             } catch (Exception e) {
