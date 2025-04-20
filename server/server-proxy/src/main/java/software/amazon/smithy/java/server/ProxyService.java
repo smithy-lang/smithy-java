@@ -33,6 +33,7 @@ import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.ToShapeId;
 import software.amazon.smithy.modelbundle.api.PluginProviders;
 import software.amazon.smithy.modelbundle.api.model.Bundle;
@@ -50,8 +51,46 @@ public final class ProxyService implements Service {
     private final List<Operation<? extends SerializableStruct, ? extends SerializableStruct>> allOperations;
     private final Schema schema;
 
+    private static software.amazon.smithy.model.Model adapt(Builder builder) {
+        if (builder.bundle == null || builder.bundle.getRequestArguments() == null) {
+            return builder.model;
+        }
+
+        var args = builder.bundle.getRequestArguments();
+        var model = new ModelAssembler()
+                .addModel(builder.model)
+                .addModel(args.getModel().getValue())
+                .assemble()
+                .unwrap();
+        var template = model.expectShape(ShapeId.from(args.getIdentifier()))
+                .asStructureShape()
+                .get();
+        var b = model.toBuilder();
+
+        // mix in the generic arg members
+        for (var op : model.getOperationShapes()) {
+            var input = model.expectShape(op.getInput().get(), StructureShape.class).toBuilder();
+            for (var member : template.members()) {
+                input.addMember(member.toBuilder()
+                        .id(ShapeId.from(input.getId().toString() + "$" + member.getMemberName()))
+                        .build());
+            }
+            b.addShape(input.build());
+        }
+
+        for (var service : model.getServiceShapes()) {
+            b.addShape(service.toBuilder()
+                    // trim the endpoint rules because they're huge and we don't need them
+                    .removeTrait(ShapeId.from("smithy.rules#endpointRuleSet"))
+                    .removeTrait(ShapeId.from("smithy.rules#endpointTests"))
+                    .build());
+        }
+
+        return b.build();
+    }
+
     private ProxyService(Builder builder) {
-        this.model = builder.model;
+        this.model = adapt(builder);
         DynamicClient.Builder clientBuilder = DynamicClient.builder()
                 .service(builder.service)
                 .model(model);

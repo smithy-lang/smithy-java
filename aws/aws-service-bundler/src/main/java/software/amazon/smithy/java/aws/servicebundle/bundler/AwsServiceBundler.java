@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
 import software.amazon.smithy.awsmcp.model.PreRequest;
@@ -27,10 +28,10 @@ import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ModelSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.traits.EndpointTrait;
 import software.amazon.smithy.modelbundle.api.Bundler;
 import software.amazon.smithy.modelbundle.api.model.Bundle;
+import software.amazon.smithy.modelbundle.api.model.GenericArguments;
 import software.amazon.smithy.modelbundle.api.model.Model;
 
 final class AwsServiceBundler implements Bundler {
@@ -61,32 +62,6 @@ final class AwsServiceBundler implements Bundler {
     AwsServiceBundler(String serviceName, ModelResolver resolver) {
         this.serviceName = serviceName;
         this.resolver = resolver;
-    }
-
-    private static software.amazon.smithy.model.Model adapt(software.amazon.smithy.model.Model model) {
-        var template = model.expectShape(PreRequest.$ID).asStructureShape().get();
-        var b = model.toBuilder();
-
-        // mix in the PreRequest structure members
-        for (var op : model.getOperationShapes()) {
-            var input = model.expectShape(op.getInput().get(), StructureShape.class).toBuilder();
-            for (var member : template.members()) {
-                input.addMember(member.toBuilder()
-                        .id(ShapeId.from(input.getId().toString() + "$" + member.getMemberName()))
-                        .build());
-            }
-            b.addShape(input.build());
-        }
-
-        for (var service : model.getServiceShapes()) {
-            b.addShape(service.toBuilder()
-                    // trim the endpoint rules because they're huge and we don't need them
-                    .removeTrait(ShapeId.from("smithy.rules#endpointRuleSet"))
-                    .removeTrait(ENDPOINT_TESTS)
-                    .build());
-        }
-
-        return b.build();
     }
 
     @Override
@@ -122,12 +97,33 @@ final class AwsServiceBundler implements Bundler {
                     .configType("aws")
                     .serviceName(model.getServiceShapes().iterator().next().getId().toString())
                     .model(Model.builder()
-                            .smithyModel(
-                                    ObjectNode.printJson(ModelSerializer.builder().build().serialize(adapt(model))))
+                            .smithyModel(serializeModel(model))
+                            .build())
+                    .requestArguments(GenericArguments.builder()
+                            .identifier(PreRequest.$ID.toString())
+                            .model(Model.builder()
+                                    .smithyModel(loadModel("/META-INF/smithy/bundle.smithy"))
+                                    .build())
                             .build())
                     .build();
         } catch (Exception e) {
             throw new RuntimeException("Failed to bundle " + serviceName, e);
+        }
+    }
+
+    private static String serializeModel(software.amazon.smithy.model.Model model) {
+        return ObjectNode.printJson(ModelSerializer.builder()
+                .build()
+                .serialize(model));
+    }
+
+    private static String loadModel(String path) {
+        try (var reader = new BufferedReader(new InputStreamReader(
+                Objects.requireNonNull(AwsServiceBundler.class.getResourceAsStream(path)),
+                StandardCharsets.UTF_8))) {
+            return reader.lines().collect(Collectors.joining());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 

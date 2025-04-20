@@ -33,11 +33,11 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.modelbundle.api.BundleClientPluginProvider;
 import software.amazon.smithy.modelbundle.api.StaticAuthSchemePlugin;
 
-final class AwsAuthProvider implements BundleClientPluginProvider {
+final class AwsServiceBundle implements BundleClientPluginProvider {
     private final AwsServiceMetadata serviceMetadata;
     private final AwsServicePlugin plugin;
 
-    AwsAuthProvider(AwsServiceMetadata serviceMetadata) {
+    AwsServiceBundle(AwsServiceMetadata serviceMetadata) {
         this.serviceMetadata = serviceMetadata;
         this.plugin = new AwsServicePlugin();
     }

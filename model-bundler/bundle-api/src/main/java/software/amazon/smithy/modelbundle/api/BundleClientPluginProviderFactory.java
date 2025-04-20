@@ -10,5 +10,5 @@ import software.amazon.smithy.java.core.serde.document.Document;
 public interface BundleClientPluginProviderFactory {
     String identifier();
 
-    BundleClientPluginProvider createAuthFactory(Document input);
+    BundleClientPluginProvider createPluginProvider(Document input);
 }

@@ -10,8 +10,8 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.modelbundle.api.BundleClientPluginProvider;
 import software.amazon.smithy.modelbundle.api.BundleClientPluginProviderFactory;
 
-public final class AwsAuthProviderFactory implements BundleClientPluginProviderFactory {
-    public AwsAuthProviderFactory() {
+public final class AwsServiceBundlePluginFactory implements BundleClientPluginProviderFactory {
+    public AwsServiceBundlePluginFactory() {
 
     }
 
@@ -21,7 +21,7 @@ public final class AwsAuthProviderFactory implements BundleClientPluginProviderF
     }
 
     @Override
-    public BundleClientPluginProvider createAuthFactory(Document input) {
-        return new AwsAuthProvider(input.asShape(AwsServiceMetadata.builder()));
+    public BundleClientPluginProvider createPluginProvider(Document input) {
+        return new AwsServiceBundle(input.asShape(AwsServiceMetadata.builder()));
     }
 }

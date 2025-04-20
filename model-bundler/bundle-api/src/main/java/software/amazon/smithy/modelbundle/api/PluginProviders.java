@@ -22,7 +22,7 @@ public final class PluginProviders {
             throw new NullPointerException("no auth provider named " + identifier);
         }
 
-        return provider.createAuthFactory(input);
+        return provider.createPluginProvider(input);
     }
 
     public static Builder builder() {
