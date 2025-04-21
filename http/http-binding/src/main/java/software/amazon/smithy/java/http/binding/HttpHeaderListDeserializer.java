@@ -84,7 +84,6 @@ final class HttpHeaderListDeserializer extends SpecificShapeDeserializer {
                 escaping = true;
             } else if (c == '"') {
                 inQuotes = !inQuotes;
-                currentEntry.append(c);
             } else if (c == ',' && !inQuotes) {
                 // If we encounter a comma outside quotes, finalize the current entry.
                 accumulator.add(currentEntry.toString().trim());

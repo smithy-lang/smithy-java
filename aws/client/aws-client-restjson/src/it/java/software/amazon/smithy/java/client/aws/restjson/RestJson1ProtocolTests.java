@@ -67,7 +67,6 @@ public class RestJson1ProtocolTests {
     @HttpClientResponseTests
     @ProtocolTestFilter(
             skipTests = {
-                    "RestJsonInputAndOutputWithQuotedStringHeaders",
                     "RestJsonFooErrorUsingCode",
                     "RestJsonFooErrorUsingCodeAndNamespace",
                     "RestJsonFooErrorUsingCodeUriAndNamespace",
