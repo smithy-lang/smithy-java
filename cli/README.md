@@ -12,6 +12,6 @@ The functionality provided by this CLI includes:
 ### Example Call
 1. Build the native binary for smithy-call: `./gradlew :cli:nativeCompile`
 2. Start-up Cafe service from the end-to-end example: `./gradlew :examples:end-to-end:run`
-3. Check the available operations: `./cli/build/native/nativeCompile/smithy-call com.example#CoffeeShop --list-operations -m /Users/fluu/workplace/smithy-java-cli/examples/end-to-end/model`
-4. Send a test call to our Cafe service: `./cli/build/native/nativeCompile/smithy-call com.example#CoffeeShop GetMenu -m /Users/fluu/workplace/smithy-java-cli/examples/end-to-end/model --url http://localhost:8888`
+3. Check the available operations: `./cli/build/native/nativeCompile/smithy-call com.example#CoffeeShop --list-operations -m [LOCAL_PATH_TO_smithy-java_DIRECTORY]/examples/end-to-end/model`
+4. Send a test call to our Cafe service: `./cli/build/native/nativeCompile/smithy-call com.example#CoffeeShop GetMenu -m [LOCAL_PATH_TO_smithy-java_DIRECTORY]/examples/end-to-end/model --url http://localhost:8888`
 
