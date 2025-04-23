@@ -11,7 +11,7 @@ public class GetEmployeeDetails implements GetEmployeeDetailsOperation {
 
     @Override
     public GetEmployeeDetailsOutput getEmployeeDetails(GetEmployeeDetailsInput input, RequestContext context) {
-        return switch (input.loginId()) {
+        return switch (input.getLoginId()) {
             case "janedoe" -> GetEmployeeDetailsOutput.builder().name("Jane Doe").build();
             case "johndoe" -> GetEmployeeDetailsOutput.builder().name("John Doe").managerAlias("janedoe").build();
             default -> throw NoSuchUserException.builder().message("User doesn't exist in the system").build();

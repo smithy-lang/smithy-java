@@ -55,8 +55,8 @@ public final class BeerServiceProvider implements SmithyServiceProvider {
         @Override
         public AddBeerOutput addBeer(AddBeerInput input, RequestContext context) {
             LOGGER.info("AddBeer - " + input);
-            String id = ENCODER.encodeToString(input.beer().name().getBytes(StandardCharsets.UTF_8));
-            FRIDGE.put(id, input.beer());
+            String id = ENCODER.encodeToString(input.getBeer().getName().getBytes(StandardCharsets.UTF_8));
+            FRIDGE.put(id, input.getBeer());
             return AddBeerOutput.builder().id(id).build();
         }
     }
@@ -65,7 +65,7 @@ public final class BeerServiceProvider implements SmithyServiceProvider {
         @Override
         public GetBeerOutput getBeer(GetBeerInput input, RequestContext context) {
             LOGGER.info("GetBeer - " + input);
-            return GetBeerOutput.builder().beer(FRIDGE.get(input.id())).build();
+            return GetBeerOutput.builder().beer(FRIDGE.get(input.getId())).build();
         }
     }
 }

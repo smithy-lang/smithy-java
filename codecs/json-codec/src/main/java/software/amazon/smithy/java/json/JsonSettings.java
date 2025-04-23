@@ -104,6 +104,15 @@ public final class JsonSettings {
         return defaultNamespace;
     }
 
+    /**
+     * Whether the type field should be written when Documents are being serialized. Default is true.
+     *
+     * @return true if the type field should be written when Documents are being serialized
+     */
+    public boolean serializeTypeInDocuments() {
+        return serializeTypeInDocuments;
+    }
+
     JsonSerdeProvider provider() {
         return provider;
     }
@@ -118,6 +127,7 @@ public final class JsonSettings {
         if (fieldMapper instanceof JsonFieldMapper.UseJsonNameTrait) {
             builder.useJsonName(true);
         }
+        builder.serializeTypeInDocuments(serializeTypeInDocuments);
     }
 
     /**
@@ -220,9 +230,10 @@ public final class JsonSettings {
         }
 
         /**
+         * Whether the type field should be written when Documents are being serialized. Default is true.
          *
-         * @param serializeTypeInDocuments
-         * @return
+         * @param serializeTypeInDocuments if the type field should be written when Documents are being serialized
+         * @return the builder
          */
         public Builder serializeTypeInDocuments(boolean serializeTypeInDocuments) {
             this.serializeTypeInDocuments = serializeTypeInDocuments;

@@ -16,6 +16,7 @@ import software.amazon.smithy.java.client.http.HttpErrorDeserializer;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
@@ -52,6 +53,11 @@ abstract sealed class AwsJsonProtocol extends HttpClientProtocol permits AwsJson
     }
 
     protected abstract String contentType();
+
+    @Override
+    public Codec payloadCodec() {
+        return codec;
+    }
 
     @Override
     public <I extends SerializableStruct, O extends SerializableStruct> HttpRequest createRequest(

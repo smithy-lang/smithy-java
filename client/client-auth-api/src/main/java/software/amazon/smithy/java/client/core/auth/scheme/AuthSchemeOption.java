@@ -6,7 +6,7 @@
 package software.amazon.smithy.java.client.core.auth.scheme;
 
 import java.util.Objects;
-import software.amazon.smithy.java.auth.api.AuthProperties;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 /**
@@ -25,8 +25,8 @@ import software.amazon.smithy.model.shapes.ShapeId;
  */
 public record AuthSchemeOption(
         ShapeId schemeId,
-        AuthProperties identityPropertyOverrides,
-        AuthProperties signerPropertyOverrides) {
+        Context identityPropertyOverrides,
+        Context signerPropertyOverrides) {
     public AuthSchemeOption {
         Objects.requireNonNull(schemeId, "schemeId cannot be null.");
         Objects.requireNonNull(identityPropertyOverrides, "identityPropertyOverrides cannot be null.");
@@ -42,6 +42,6 @@ public record AuthSchemeOption(
      * @param schemeId id of auth scheme to create an option for.
      */
     public AuthSchemeOption(ShapeId schemeId) {
-        this(schemeId, AuthProperties.empty(), AuthProperties.empty());
+        this(schemeId, Context.empty(), Context.empty());
     }
 }

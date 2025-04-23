@@ -60,7 +60,7 @@ public final class MapGenerator
                                                     for (var valueEntry : values.entrySet()) {
                                                         serializer.writeEntry(
                                                             ${keySchema:L}.mapKeyMember(),
-                                                            valueEntry.getKey()${?enumKey}.value()${/enumKey},
+                                                            valueEntry.getKey()${?enumKey}.getValue()${/enumKey},
                                                             valueEntry.getValue(),
                                                             ${name:U}$$ValueSerializer.INSTANCE
                                                         );

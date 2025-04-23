@@ -38,6 +38,7 @@ import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -212,7 +213,9 @@ final class SmithyCall implements Callable<Integer> {
 
     private Model assembleModel(String[] directoryPath) {
         LOGGER.fine("Assembling model from directory path(s): " + Arrays.toString(directoryPath));
-        var assembler = Model.assembler();
+        var assembler = Model.assembler()
+            // ignore unknown traits because we don't have a way of dynamically loading non-core traits at the moment
+            .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true);
 
         // Add base resource files
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();

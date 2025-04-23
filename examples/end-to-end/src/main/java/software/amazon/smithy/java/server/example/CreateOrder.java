@@ -20,11 +20,11 @@ final class CreateOrder implements CreateOrderOperation {
     public CreateOrderOutput createOrder(CreateOrderInput input, RequestContext context) {
         var id = UUID.randomUUID();
 
-        OrderTracker.putOrder(new Order(id, input.coffeeType(), OrderStatus.IN_PROGRESS));
+        OrderTracker.putOrder(new Order(id, input.getCoffeeType(), OrderStatus.IN_PROGRESS));
 
         return CreateOrderOutput.builder()
                 .id(id.toString())
-                .coffeeType(input.coffeeType())
+                .coffeeType(input.getCoffeeType())
                 .status(OrderStatus.IN_PROGRESS)
                 .build();
     }

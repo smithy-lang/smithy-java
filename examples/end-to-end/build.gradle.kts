@@ -22,7 +22,7 @@ dependencies {
     implementation("software.amazon.smithy.java:client-core:$smithyJavaVersion")
 
     // Test dependencies
-    testImplementation("org.junit.jupiter:junit-jupiter:5.12.1")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.12.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

@@ -48,6 +48,11 @@ public final class RpcV2CborProtocol extends HttpClientProtocol {
     }
 
     @Override
+    public Codec payloadCodec() {
+        return CBOR_CODEC;
+    }
+
+    @Override
     public <I extends SerializableStruct, O extends SerializableStruct> HttpRequest createRequest(
             ApiOperation<I, O> operation,
             I input,

@@ -125,7 +125,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void intEnumShape(IntEnumShape shape) {
-        writer.write("serializer.writeInteger(${schema:L}, ${state:L}.value())");
+        writer.write("serializer.writeInteger(${schema:L}, ${state:L}.getValue())");
         return null;
     }
 
@@ -177,7 +177,7 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void enumShape(EnumShape shape) {
-        writer.write("serializer.writeString(${schema:L}, ${state:L}.value())");
+        writer.write("serializer.writeString(${schema:L}, ${state:L}.getValue())");
         return null;
     }
 

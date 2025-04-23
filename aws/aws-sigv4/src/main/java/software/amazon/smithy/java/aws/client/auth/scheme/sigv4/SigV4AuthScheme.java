@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.aws.client.auth.scheme.sigv4;
 
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
@@ -57,15 +56,15 @@ public final class SigV4AuthScheme implements AuthScheme<HttpRequest, AwsCredent
     }
 
     @Override
-    public AuthProperties getSignerProperties(Context context) {
-        var builder = AuthProperties.builder()
-                .put(SigV4Settings.SIGNING_NAME, signingName)
-                .put(SigV4Settings.REGION, context.expect(SigV4Settings.REGION));
+    public Context getSignerProperties(Context context) {
+        var ctx = Context.create();
+        ctx.put(SigV4Settings.SIGNING_NAME, signingName);
+        ctx.put(SigV4Settings.REGION, context.expect(SigV4Settings.REGION));
         var clock = context.get(SigV4Settings.CLOCK);
         if (clock != null) {
-            builder.put(SigV4Settings.CLOCK, clock);
+            ctx.put(SigV4Settings.CLOCK, clock);
         }
-        return builder.build();
+        return Context.unmodifiableView(ctx);
     }
 
     @Override

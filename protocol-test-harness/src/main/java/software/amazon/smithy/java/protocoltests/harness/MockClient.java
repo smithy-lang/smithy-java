@@ -25,6 +25,7 @@ import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -93,6 +94,11 @@ final class MockClient extends Client {
         @Override
         public ShapeId id() {
             return PreludeSchemas.DOCUMENT.id();
+        }
+
+        @Override
+        public Codec payloadCodec() {
+            throw new UnsupportedOperationException("Placeholder protocol must be overridden");
         }
 
         @Override

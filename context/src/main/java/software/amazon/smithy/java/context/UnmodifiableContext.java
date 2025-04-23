@@ -9,6 +9,8 @@ import java.util.function.Function;
 
 final class UnmodifiableContext implements Context {
 
+    static final Context EMPTY = new UnmodifiableContext(new MapStorageContext());
+
     private final Context delegate;
 
     UnmodifiableContext(Context delegate) {
@@ -16,12 +18,12 @@ final class UnmodifiableContext implements Context {
     }
 
     @Override
-    public <T> void put(Key<T> key, T value) {
+    public <T> Context put(Key<T> key, T value) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public <T> void putIfAbsent(Key<T> key, T value) {
+    public <T> Context putIfAbsent(Key<T> key, T value) {
         throw new UnsupportedOperationException();
     }
 
@@ -36,7 +38,7 @@ final class UnmodifiableContext implements Context {
     }
 
     @Override
-    public Context copyTo(Context target) {
-        return delegate.copyTo(target);
+    public void copyTo(Context target) {
+        delegate.copyTo(target);
     }
 }

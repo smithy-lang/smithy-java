@@ -46,7 +46,7 @@ public class EventStreamTest {
 
         AtomicLong receivedEvents = new AtomicLong();
         Set<Long> unbuzzed = new HashSet<>();
-        output.stream().subscribe(new Flow.Subscriber<>() {
+        output.getStream().subscribe(new Flow.Subscriber<>() {
 
             private Flow.Subscription subscription;
 

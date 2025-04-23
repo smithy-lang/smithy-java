@@ -168,7 +168,7 @@ public final class UnionGenerator
                                         ${serializeMember:C};
                                     }${^unit}
 
-                                    public ${member:N} ${memberName:L}() {
+                                    public ${member:N} ${getterName:L}() {
                                         return value;
                                     }${/unit}
 
@@ -180,9 +180,16 @@ public final class UnionGenerator
                                 }
                                 """;
                 var memberSymbol = symbolProvider.toSymbol(member);
+                var target = model.expectShape(member.getTarget());
+                var memberName = symbolProvider.toMemberName(member);
+                var getterName = CodegenUtils.toGetterName(member, model);
+                if (getterName.equals("getValue")) {
+                    getterName += "Member";
+                }
                 writer.putContext("hasBoxed", memberSymbol.getProperty(SymbolProperties.BOXED_TYPE).isPresent());
                 writer.putContext("member", memberSymbol);
-                writer.putContext("memberName", symbolProvider.toMemberName(member));
+                writer.putContext("memberName", memberName);
+                writer.putContext("getterName", getterName);
                 writer.putContext(
                         "serializeMember",
                         new SerializerMemberGenerator(directive, writer, member, "value"));
@@ -190,7 +197,6 @@ public final class UnionGenerator
                 writer.putContext(
                         "wrap",
                         memberSymbol.getProperty(SymbolProperties.COLLECTION_IMMUTABLE_WRAPPER).orElse(null));
-                var target = model.expectShape(member.getTarget());
                 writer.putContext("unit", target.hasTrait(UnitTypeTrait.class));
                 writer.putContext("col", target.isMapShape() || target.isListShape());
                 writer.write(template);

@@ -14,8 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.identity.LoginIdentity;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -34,7 +34,7 @@ public class HttpBasicAuthSignerTest {
 
         var expectedHeader = "Basic " + Base64.getEncoder()
                 .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, AuthProperties.empty()).get();
+        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, Context.empty()).get();
         var authHeader = signedRequest.headers().firstValue("authorization");
         assertEquals(authHeader, expectedHeader);
     }
@@ -53,7 +53,7 @@ public class HttpBasicAuthSignerTest {
 
         var expectedHeader = "Basic " + Base64.getEncoder()
                 .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, AuthProperties.empty()).get();
+        var signedRequest = HttpBasicAuthSigner.INSTANCE.sign(request, testIdentity, Context.empty()).get();
         var authHeader = signedRequest.headers().firstValue("authorization");
         assertEquals(authHeader, expectedHeader);
     }

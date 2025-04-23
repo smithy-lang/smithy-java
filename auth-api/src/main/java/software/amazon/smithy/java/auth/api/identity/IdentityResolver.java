@@ -7,7 +7,7 @@ package software.amazon.smithy.java.auth.api.identity;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.auth.api.AuthProperties;
+import software.amazon.smithy.java.context.Context;
 
 /**
  * Interface for loading {@link Identity} that is used for authentication.
@@ -22,7 +22,7 @@ public interface IdentityResolver<IdentityT extends Identity> {
      * @param requestProperties The request properties used to resolve an Identity.
      * @return a CompletableFuture for the resolved identity result.
      */
-    CompletableFuture<IdentityResult<IdentityT>> resolveIdentity(AuthProperties requestProperties);
+    CompletableFuture<IdentityResult<IdentityT>> resolveIdentity(Context requestProperties);
 
     /**
      * Retrieve the class of the identity resolved by this identity resolver.

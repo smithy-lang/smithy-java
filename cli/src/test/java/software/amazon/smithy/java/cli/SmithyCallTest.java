@@ -12,11 +12,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Executors;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class SmithyCallTest {
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
@@ -52,7 +55,7 @@ class SmithyCallTest {
         mockServer.createContext("/", exchange -> {
             String requestBody;
             try (InputStream is = exchange.getRequestBody()) {
-                requestBody = new String(is.readAllBytes());
+                requestBody = new String(is.readAllBytes(), StandardCharsets.UTF_8);
             }
 
             String target = exchange.getRequestHeaders().getFirst("X-Amz-Target");
@@ -79,7 +82,7 @@ class SmithyCallTest {
             }
 
             try (var os = exchange.getResponseBody()) {
-                os.write(response.getBytes());
+                os.write(response.getBytes(StandardCharsets.UTF_8));
             }
         });
 
@@ -328,7 +331,49 @@ class SmithyCallTest {
         assertTrue(error.contains("SigV4 auth requires --aws-region to be set."));
     }
 
+    @Test
+    void testWithUnknownTraits() {
+        Path modelFile = tempDir.resolve("sprockets-unknown-traits.smithy");
+        String modelContent = """
+        $version: "2"
+        namespace smithy.example
 
+        @aws.protocols#awsJson1_0
+        @unknownTrait
+        service SprocketsUnknown {
+            operations: [CreateSprocket]
+        }
+
+        @anotherUnknownTrait("some value")
+        operation CreateSprocket {
+            input := {}
+            output := {
+                @fieldUnknownTrait
+                id: String
+            }
+        }
+        """;
+        try {
+            Files.write(modelFile, modelContent.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            fail("Failed to write model file: " + e.getMessage());
+        }
+
+        String[] args = {
+                "SprocketsUnknown",
+                "CreateSprocket",
+                "--model-path", tempDir.toString(),
+                "--url", "http://localhost:" + PORT,
+                "--protocol", "aws_json",
+                "--input-json", "{}"
+        };
+
+        int exitCode = new CommandLine(new SmithyCall()).setCaseInsensitiveEnumValuesAllowed(true).execute(args);
+
+        assertEquals(0, exitCode);
+        String output = outContent.toString().trim();
+        assertTrue(output.contains("sprocket-123"));
+    }
 
     private Path createSprocketsModelFile() {
         Path modelFile = tempDir.resolve("sprockets.smithy");
@@ -371,9 +416,9 @@ class SmithyCallTest {
             }
             """;
         try {
-            Files.write(modelFile, modelContent.getBytes());
+            Files.write(modelFile, modelContent.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
-            System.err.println("Failed to write model file: " + e.getMessage());
+            fail("Failed to write model file: " + e.getMessage());
         }
         return tempDir;
     }

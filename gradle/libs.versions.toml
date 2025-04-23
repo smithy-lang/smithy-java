@@ -1,22 +1,23 @@
 [versions]
-junit5 = "5.12.1"
+junit5 = "5.12.2"
 hamcrest = "3.0"
-smithy = "1.55.0"
+smithy = "1.56.0"
 jmh = "0.7.3"
 test-logger-plugin = "4.0.0"
 spotbugs = "6.0.22"
-spotless = "7.0.2"
+spotless = "7.0.3"
 smithy-gradle-plugins = "1.2.0"
 assertj = "3.27.3"
 jackson = "2.18.3"
-netty = "4.1.119.Final"
-dep-analysis = "2.13.2"
-aws-sdk = "2.31.8"
+netty = "4.2.0.Final"
+dep-analysis = "2.16.0"
+aws-sdk = "2.31.22"
 osdetector = "1.7.3"
 accp = "2.4.1" # Amazon Corretto Crypto Provider
 jreleaser = "1.17.0"
 picocli = "4.7.6"
-graalvm-native = "0.10.3"
+graalvm-native = "0.10.6"
+shadow = "8.3.5"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -66,3 +67,4 @@ osdetector = { id = "com.google.osdetector", version.ref = "osdetector" }
 smithy-gradle-jar = { id = "software.amazon.smithy.gradle.smithy-jar", version.ref = "smithy-gradle-plugins" }
 jreleaser = { id = "org.jreleaser", version.ref = "jreleaser" }
 graalvm-native = { id = "org.graalvm.buildtools.native", version.ref = "graalvm-native" }
+shadow = { id = "com.gradleup.shadow", version.ref =  "shadow"}

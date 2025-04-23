@@ -66,7 +66,6 @@ public interface Codec extends AutoCloseable {
         ByteBufferOutputStream baos = new ByteBufferOutputStream();
         try (var serializer = createSerializer(baos)) {
             shape.serialize(serializer);
-            serializer.flush();
         }
         return baos.toByteBuffer();
     }
@@ -99,9 +98,9 @@ public interface Codec extends AutoCloseable {
      */
     default String serializeToString(SerializableShape shape) {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        ShapeSerializer serializer = createSerializer(stream);
-        shape.serialize(serializer);
-        serializer.flush();
+        try (var serializer = createSerializer(stream)) {
+            shape.serialize(serializer);
+        }
         return stream.toString(StandardCharsets.UTF_8);
     }
 

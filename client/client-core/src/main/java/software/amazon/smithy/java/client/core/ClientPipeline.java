@@ -18,7 +18,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.auth.api.identity.IdentityResult;
@@ -288,7 +287,7 @@ final class ClientPipeline<RequestT, ResponseT> {
     }
 
     private record ResolvedScheme<IdentityT extends Identity, RequestT>(
-            AuthProperties signerProperties,
+            Context signerProperties,
             AuthScheme<RequestT, IdentityT> authScheme,
             CompletableFuture<IdentityResult<IdentityT>> identity) {
         public CompletableFuture<RequestT> sign(RequestT request) {

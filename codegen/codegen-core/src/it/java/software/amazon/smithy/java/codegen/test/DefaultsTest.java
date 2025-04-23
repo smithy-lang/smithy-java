@@ -27,29 +27,29 @@ public class DefaultsTest {
     void setsCorrectDefault() {
         var defaults = DefaultsInput.builder().build();
 
-        assertTrue(defaults.booleanMember());
-        assertEquals(defaults.bigDecimal(), BigDecimal.valueOf(1.0));
-        assertEquals(defaults.bigInteger(), BigInteger.valueOf(1));
-        assertEquals(defaults.byteMember(), (byte) 1);
-        assertEquals(defaults.doubleMember(), 1.0);
-        assertEquals(defaults.floatMember(), 1f);
-        assertEquals(defaults.integer(), 1);
-        assertEquals(defaults.longMember(), 1);
-        assertEquals(defaults.shortMember(), (short) 1);
-        assertEquals(defaults.blob(), ByteBuffer.wrap(Base64.getDecoder().decode("YmxvYg==")));
-        defaults.streamingBlob()
+        assertTrue(defaults.isBoolean());
+        assertEquals(defaults.getBigDecimal(), BigDecimal.valueOf(1.0));
+        assertEquals(defaults.getBigInteger(), BigInteger.valueOf(1));
+        assertEquals(defaults.getByte(), (byte) 1);
+        assertEquals(defaults.getDouble(), 1.0);
+        assertEquals(defaults.getFloat(), 1f);
+        assertEquals(defaults.getInteger(), 1);
+        assertEquals(defaults.getLong(), 1);
+        assertEquals(defaults.getShort(), (short) 1);
+        assertEquals(defaults.getBlob(), ByteBuffer.wrap(Base64.getDecoder().decode("YmxvYg==")));
+        defaults.getStreamingBlob()
                 .asByteBuffer()
                 .thenAccept(b -> assertEquals(b, ByteBuffer.wrap(Base64.getDecoder().decode("c3RyZWFtaW5n"))));
-        assertEquals(defaults.boolDoc(), Document.of(true));
-        assertEquals(defaults.stringDoc(), Document.of("string"));
-        assertEquals(defaults.numberDoc(), Document.of(1));
-        assertEquals(defaults.floatingPointnumberDoc(), Document.of(1.2));
-        assertEquals(defaults.listDoc(), Document.of(Collections.emptyList()));
-        assertEquals(defaults.mapDoc(), Document.of(Collections.emptyMap()));
-        assertEquals(defaults.list(), List.of());
-        assertEquals(defaults.map(), Map.of());
-        assertEquals(defaults.timestamp(), Instant.parse("1985-04-12T23:20:50.52Z"));
-        assertEquals(defaults.enumMember(), NestedEnum.A);
-        assertEquals(defaults.intEnum(), NestedIntEnum.A);
+        assertEquals(defaults.getBoolDoc(), Document.of(true));
+        assertEquals(defaults.getStringDoc(), Document.of("string"));
+        assertEquals(defaults.getNumberDoc(), Document.of(1));
+        assertEquals(defaults.getFloatingPointnumberDoc(), Document.of(1.2));
+        assertEquals(defaults.getListDoc(), Document.of(Collections.emptyList()));
+        assertEquals(defaults.getMapDoc(), Document.of(Collections.emptyMap()));
+        assertEquals(defaults.getList(), List.of());
+        assertEquals(defaults.getMap(), Map.of());
+        assertEquals(defaults.getTimestamp(), Instant.parse("1985-04-12T23:20:50.52Z"));
+        assertEquals(defaults.getEnum(), NestedEnum.A);
+        assertEquals(defaults.getIntEnum(), NestedIntEnum.A);
     }
 }

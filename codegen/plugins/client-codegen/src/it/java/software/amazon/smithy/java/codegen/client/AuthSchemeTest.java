@@ -58,6 +58,6 @@ public class AuthSchemeTest {
         var value = "hello world";
         var input = EchoInput.builder().string(value).build();
         var output = client.echo(input);
-        assertEquals(value, output.string());
+        assertEquals(value, output.getString());
     }
 }

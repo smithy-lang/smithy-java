@@ -19,6 +19,6 @@ public class EnumTest {
         try (var codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build()) {
             output = codec.deserializeShape("\"option-n\"", EnumType.builder());
         }
-        assertEquals(output.type(), EnumType.Type.$UNKNOWN);
+        assertEquals(output.getType(), EnumType.Type.$UNKNOWN);
     }
 }

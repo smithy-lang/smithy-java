@@ -6,7 +6,6 @@
 package software.amazon.smithy.modelbundle.api;
 
 import java.util.List;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
@@ -28,7 +27,7 @@ final class StaticAuthSchemeResolver implements AuthSchemeResolver {
         return AUTH_SCHEME_OPTION;
     }
 
-    static <RequestT, IdentityT extends Identity> AuthScheme<RequestT, IdentityT> staticScheme(
+    public static <RequestT, IdentityT extends Identity> AuthScheme<RequestT, IdentityT> staticScheme(
             AuthScheme<RequestT, IdentityT> actual
     ) {
         return new AuthScheme<>() {
@@ -58,12 +57,12 @@ final class StaticAuthSchemeResolver implements AuthSchemeResolver {
             }
 
             @Override
-            public AuthProperties getSignerProperties(Context context) {
+            public Context getSignerProperties(Context context) {
                 return actual.getSignerProperties(context);
             }
 
             @Override
-            public AuthProperties getIdentityProperties(Context context) {
+            public Context getIdentityProperties(Context context) {
                 return actual.getIdentityProperties(context);
             }
         };

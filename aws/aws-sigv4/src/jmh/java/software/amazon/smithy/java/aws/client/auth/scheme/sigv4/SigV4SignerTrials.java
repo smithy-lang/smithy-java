@@ -22,9 +22,9 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import software.amazon.smithy.java.auth.api.AuthProperties;
 import software.amazon.smithy.java.auth.api.Signer;
 import software.amazon.smithy.java.aws.auth.api.identity.AwsCredentialsIdentity;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.http.api.HttpHeaders;
 import software.amazon.smithy.java.http.api.HttpRequest;
 import software.amazon.smithy.java.http.api.HttpVersion;
@@ -38,10 +38,15 @@ public class SigV4SignerTrials {
     private static final AwsCredentialsIdentity TEST_IDENTITY = AwsCredentialsIdentity.create(
             "access-key",
             "secret-key");
-    private static final AuthProperties TEST_PROPERTIES = AuthProperties.builder()
-            .put(SigV4Settings.SIGNING_NAME, "service")
-            .put(SigV4Settings.REGION, "us-east-1")
-            .build();
+
+    private static final Context TEST_PROPERTIES;
+    static {
+        var ctx = Context.create();
+        ctx.put(SigV4Settings.SIGNING_NAME, "service");
+        ctx.put(SigV4Settings.REGION, "us-east-1");
+        TEST_PROPERTIES = Context.unmodifiableView(ctx);
+    }
+
     private static final Map<String, HttpRequest> CASES = Map.ofEntries(
             Map.entry(
                     "put_no_headers_no_query_no_body",

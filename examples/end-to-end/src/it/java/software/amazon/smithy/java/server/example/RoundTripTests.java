@@ -60,23 +60,23 @@ public class RoundTripTests {
     @Test
     void executesCorrectly() throws InterruptedException {
         var menu = client.getMenu(GetMenuInput.builder().build());
-        var hasEspresso = menu.items().stream().anyMatch(item -> item.typeMember().equals(CoffeeType.ESPRESSO));
+        var hasEspresso = menu.getItems().stream().anyMatch(item -> item.getType().equals(CoffeeType.ESPRESSO));
         assertTrue(hasEspresso);
 
         var createRequest = CreateOrderInput.builder().coffeeType(CoffeeType.COLD_BREW).build();
         var createResponse = client.createOrder(createRequest);
-        assertEquals(CoffeeType.COLD_BREW, createResponse.coffeeType());
-        System.out.println("Created request with id = " + createResponse.id());
+        assertEquals(CoffeeType.COLD_BREW, createResponse.getCoffeeType());
+        System.out.println("Created request with id = " + createResponse.getId());
 
-        var getRequest = GetOrderInput.builder().id(createResponse.id()).build();
+        var getRequest = GetOrderInput.builder().id(createResponse.getId()).build();
         var getResponse1 = client.getOrder(getRequest);
-        assertEquals(getResponse1.status(), OrderStatus.IN_PROGRESS);
+        assertEquals(getResponse1.getStatus(), OrderStatus.IN_PROGRESS);
 
         // Complete the order
-        OrderTracker.completeOrder(getResponse1.id());
+        OrderTracker.completeOrder(getResponse1.getId());
 
         var getResponse2 = client.getOrder(getRequest);
-        assertEquals(getResponse2.status(), OrderStatus.COMPLETED);
+        assertEquals(getResponse2.getStatus(), OrderStatus.COMPLETED);
         System.out.println("Completed Order :" + getResponse2);
     }
 
@@ -84,7 +84,7 @@ public class RoundTripTests {
     void errorsOutIfOrderDoesNotExist() throws InterruptedException {
         var getRequest = GetOrderInput.builder().id(UUID.randomUUID().toString()).build();
         var orderNotFound = assertThrows(OrderNotFound.class, () -> client.getOrder(getRequest));
-        assertEquals(orderNotFound.orderId(), getRequest.id());
+        assertEquals(orderNotFound.getOrderId(), getRequest.getId());
     }
 
     @AfterAll

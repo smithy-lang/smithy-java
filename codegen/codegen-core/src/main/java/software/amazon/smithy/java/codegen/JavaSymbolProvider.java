@@ -14,7 +14,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.codegen.core.CodegenException;
@@ -52,7 +51,6 @@ import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
-import software.amazon.smithy.utils.CaseUtils;
 
 /**
  * Maps Smithy types to Java Symbols
@@ -61,7 +59,6 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
 
     private static final InternalLogger LOGGER = InternalLogger.getLogger(JavaSymbolProvider.class);
     private static final Symbol UNIT_SYMBOL = CodegenUtils.fromClass(Unit.class);
-    private static final List<String> DELIMITERS = List.of("_", "-", " ");
 
     private final Model model;
     private final ServiceShape service;
@@ -82,39 +79,7 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
 
     @Override
     public String toMemberName(MemberShape shape) {
-        Shape containerShape = model.expectShape(shape.getContainer());
-        if (containerShape.isEnumShape() || containerShape.isIntEnumShape()) {
-            return CaseUtils.toSnakeCase(shape.getMemberName()).toUpperCase(Locale.ENGLISH);
-        }
-
-        // If a member name contains an underscore, space, or dash, convert to camel case using Smithy utility
-        var memberName = shape.getMemberName();
-        if (DELIMITERS.stream().anyMatch(memberName::contains)) {
-            return CodegenUtils.MEMBER_ESCAPER.escape(CaseUtils.toCamelCase(memberName));
-        }
-
-        return CodegenUtils.MEMBER_ESCAPER.escape(uncapitalizeAcronymAware(memberName));
-    }
-
-    private static String uncapitalizeAcronymAware(String str) {
-        if (Character.isLowerCase(str.charAt(0))) {
-            return str;
-        } else if (str.equals(str.toUpperCase())) {
-            return str.toLowerCase();
-        }
-        int strLen = str.length();
-        StringBuilder sb = new StringBuilder(strLen);
-        boolean nextIsUpperCase;
-        for (int idx = 0; idx < strLen; idx++) {
-            var currentChar = str.charAt(idx);
-            nextIsUpperCase = (idx + 1 < strLen) && Character.isUpperCase(str.charAt(idx + 1));
-            if (Character.isUpperCase(currentChar) && (nextIsUpperCase || idx == 0)) {
-                sb.append(Character.toLowerCase(currentChar));
-            } else {
-                sb.append(currentChar);
-            }
-        }
-        return sb.toString();
+        return CodegenUtils.toMemberName(shape, model);
     }
 
     @Override

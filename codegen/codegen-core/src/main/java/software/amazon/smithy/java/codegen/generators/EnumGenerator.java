@@ -174,14 +174,14 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
                     /**
                      * Value contained by this Enum.
                      */
-                    public ${value:N} value() {
+                    public ${value:N} getValue() {
                         return value;
                     }
 
                     /**
                      * Type of this Enum variant.
                      */
-                    public ${type:N} type() {
+                    public ${type:N} getType() {
                         return type;
                     }
 

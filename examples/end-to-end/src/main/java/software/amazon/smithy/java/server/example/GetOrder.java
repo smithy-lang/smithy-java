@@ -15,15 +15,15 @@ import software.amazon.smithy.java.server.RequestContext;
 final class GetOrder implements GetOrderOperation {
     @Override
     public GetOrderOutput getOrder(GetOrderInput input, RequestContext context) {
-        var order = OrderTracker.getOrderById(UUID.fromString(input.id()));
+        var order = OrderTracker.getOrderById(UUID.fromString(input.getId()));
         if (order == null) {
             throw OrderNotFound.builder()
-                    .orderId(input.id())
+                    .orderId(input.getId())
                     .message("Order not found")
                     .build();
         }
         return GetOrderOutput.builder()
-                .id(input.id())
+                .id(input.getId())
                 .coffeeType(order.type())
                 .status(order.status())
                 .build();

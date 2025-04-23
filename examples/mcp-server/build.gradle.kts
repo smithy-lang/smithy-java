@@ -10,11 +10,13 @@ dependencies {
     val smithyJavaVersion: String by project
 
     smithyBuild("software.amazon.smithy.java:plugins:$smithyJavaVersion")
+    implementation("software.amazon.smithy.java:mcp-server:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:server-proxy:$smithyJavaVersion")
-    implementation("software.amazon.smithy.java:server-mcp:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:server-netty:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-server-restjson:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
+    implementation("software.amazon.smithy.java:aws-client-awsjson:$smithyJavaVersion")
+    implementation("software.amazon.smithy.java:aws-service-bundle:$smithyJavaVersion")
 }
 
 // Add generated Java files to the main sourceSet

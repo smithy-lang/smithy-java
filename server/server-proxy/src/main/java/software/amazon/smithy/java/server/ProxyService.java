@@ -28,47 +28,96 @@ import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
 import software.amazon.smithy.java.dynamicschemas.StructDocument;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
+import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.ToShapeId;
+import software.amazon.smithy.modelbundle.api.PluginProviders;
+import software.amazon.smithy.modelbundle.api.model.Bundle;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
 public final class ProxyService implements Service {
+    private static final PluginProviders PLUGIN_PROVIDERS = PluginProviders.builder().build();
 
     private final DynamicClient dynamicClient;
     private final SchemaConverter schemaConverter;
     private final Map<String, Operation<StructDocument, StructDocument>> operations;
     private final TypeRegistry serviceErrorRegistry;
     private final Model model;
-    private final ServiceShape service;
     private final List<Operation<? extends SerializableStruct, ? extends SerializableStruct>> allOperations;
     private final Schema schema;
 
-    private ProxyService(Builder builder, ServiceShape service, Model model) {
-        this.model = model;
-        this.service = service;
+    private static software.amazon.smithy.model.Model adapt(Builder builder) {
+        if (builder.bundle == null || builder.bundle.getRequestArguments() == null) {
+            return builder.model;
+        }
+
+        var args = builder.bundle.getRequestArguments();
+        var model = new ModelAssembler()
+                .addModel(builder.model)
+                .addModel(args.getModel().getValue())
+                .assemble()
+                .unwrap();
+        var template = model.expectShape(ShapeId.from(args.getIdentifier()))
+                .asStructureShape()
+                .get();
+        var b = model.toBuilder();
+
+        // mix in the generic arg members
+        for (var op : model.getOperationShapes()) {
+            var input = model.expectShape(op.getInput().get(), StructureShape.class).toBuilder();
+            for (var member : template.members()) {
+                input.addMember(member.toBuilder()
+                        .id(ShapeId.from(input.getId().toString() + "$" + member.getMemberName()))
+                        .build());
+            }
+            b.addShape(input.build());
+        }
+
+        for (var service : model.getServiceShapes()) {
+            b.addShape(service.toBuilder()
+                    // trim the endpoint rules because they're huge and we don't need them
+                    .removeTrait(ShapeId.from("smithy.rules#endpointRuleSet"))
+                    .removeTrait(ShapeId.from("smithy.rules#endpointTests"))
+                    .build());
+        }
+
+        return b.build();
+    }
+
+    private ProxyService(Builder builder) {
+        this.model = adapt(builder);
         DynamicClient.Builder clientBuilder = DynamicClient.builder()
-                .service(service.getId())
-                .model(model)
-                .endpointResolver(EndpointResolver.staticEndpoint(builder.proxyEndpoint));
-        if (builder.identityResolver != null) {
-            clientBuilder.addIdentityResolver(builder.identityResolver);
-        }
-        if (builder.authScheme != null) {
-            clientBuilder.authSchemeResolver(builder.authScheme);
-        }
-        if (builder.region != null) {
-            clientBuilder.putConfig(RegionSetting.REGION, builder.region);
+                .service(builder.service)
+                .model(model);
+        if (builder.bundle != null) {
+            clientBuilder
+                    .addPlugin(PLUGIN_PROVIDERS.getProvider(builder.bundle.getConfigType(), builder.bundle.getConfig())
+                            .newPlugin());
+        } else {
+            // TODO: render this as a bundle
+            clientBuilder.endpointResolver(EndpointResolver.staticEndpoint(builder.proxyEndpoint));
+            if (builder.identityResolver != null) {
+                clientBuilder.addIdentityResolver(builder.identityResolver);
+            }
+            if (builder.authScheme != null) {
+                clientBuilder.authSchemeResolver(builder.authScheme);
+            }
+            if (builder.region != null) {
+                clientBuilder.putConfig(RegionSetting.REGION, builder.region);
+            }
         }
         this.dynamicClient = clientBuilder.build();
         this.schemaConverter = new SchemaConverter(model);
         this.operations = new HashMap<>();
         var registryBuilder = TypeRegistry.builder();
+        var service = model.expectShape(builder.service, ServiceShape.class);
         for (var e : service.getErrors()) {
-            registerError(e, registryBuilder);
+            registerError(e, builder.service, registryBuilder);
         }
         this.serviceErrorRegistry = registryBuilder.build();
         this.allOperations = new ArrayList<>();
@@ -84,7 +133,7 @@ public final class ProxyService implements Service {
                                     model,
                                     service,
                                     serviceErrorRegistry,
-                                    this::registerError),
+                                    (e, rb) -> registerError(e, builder.service, rb)),
                             this);
             allOperations.add(serverOperation);
             operations.put(operationName, serverOperation);
@@ -92,12 +141,12 @@ public final class ProxyService implements Service {
         this.schema = schemaConverter.getSchema(service);
     }
 
-    private void registerError(ShapeId e, TypeRegistry.Builder registryBuilder) {
+    private void registerError(ShapeId e, ShapeId serviceId, TypeRegistry.Builder registryBuilder) {
         var error = model.expectShape(e);
         var errorSchema = schemaConverter.getSchema(error);
         registryBuilder.putType(e,
                 ModeledException.class,
-                () -> new DocumentException.SchemaGuidedExceptionBuilder(service.getId(), errorSchema));
+                () -> new DocumentException.SchemaGuidedExceptionBuilder(serviceId, errorSchema));
     }
 
     @Override
@@ -133,15 +182,15 @@ public final class ProxyService implements Service {
         private IdentityResolver<? extends Identity> identityResolver;
         private String proxyEndpoint;
         private AuthSchemeResolver authScheme;
+        private Bundle bundle;
 
         private Builder() {}
 
         public ProxyService build() {
             Objects.requireNonNull(model, "model is not set");
             Objects.requireNonNull(service, "service is not set");
-            ServiceShape shape = model.expectShape(service, ServiceShape.class);
 
-            return new ProxyService(this, shape, model);
+            return new ProxyService(this);
         }
 
         /**
@@ -192,6 +241,19 @@ public final class ProxyService implements Service {
 
         public Builder region(String region) {
             this.region = region;
+            return this;
+        }
+
+        public Builder bundle(Bundle bundle) {
+            this.bundle = bundle;
+            this.model = new ModelAssembler()
+                    .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
+                    .addUnparsedModel("bundle.json", bundle.getModel().getValue())
+                    // synthetic members may cause certain validations to fail, but it's ok for this application
+                    .disableValidation()
+                    .assemble()
+                    .unwrap();
+            this.service = ShapeId.from(bundle.getServiceName());
             return this;
         }
     }

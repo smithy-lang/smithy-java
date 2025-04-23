@@ -47,11 +47,3 @@ tasks.sourcesJar {
 tasks.processResources {
     dependsOn("compileJava")
 }
-
-sourceSets {
-    main {
-        java {
-            srcDir("model")
-        }
-    }
-}
