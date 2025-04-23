@@ -1,5 +1,6 @@
 plugins {
     `java-library`
+    application
     id("software.amazon.smithy.gradle.smithy-base")
     id("me.champeau.jmh") version "0.7.3"
 }
@@ -15,6 +16,10 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.12.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation(libs.assertj.core)
+}
+
+application {
+    mainClass = "software.amazon.smithy.java.example.ClientExample"
 }
 
 // Add generated Java sources to the main sourceset
