@@ -7,8 +7,8 @@ package software.amazon.smithy.modelbundle.api;
 
 import software.amazon.smithy.java.core.serde.document.Document;
 
-public interface BundleClientPluginProviderFactory {
+public interface BundlePluginFactory {
     String identifier();
 
-    BundleClientPluginProvider createPluginProvider(Document input);
+    BundlePlugin createBundlePlugin(Document input);
 }

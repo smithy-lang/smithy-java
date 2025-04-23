@@ -7,10 +7,10 @@ package software.amazon.smithy.java.aws.servicebundle.provider;
 
 import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.modelbundle.api.BundleClientPluginProvider;
-import software.amazon.smithy.modelbundle.api.BundleClientPluginProviderFactory;
+import software.amazon.smithy.modelbundle.api.BundlePlugin;
+import software.amazon.smithy.modelbundle.api.BundlePluginFactory;
 
-public final class AwsServiceBundlePluginFactory implements BundleClientPluginProviderFactory {
+public final class AwsServiceBundlePluginFactory implements BundlePluginFactory {
     public AwsServiceBundlePluginFactory() {
 
     }
@@ -21,7 +21,7 @@ public final class AwsServiceBundlePluginFactory implements BundleClientPluginPr
     }
 
     @Override
-    public BundleClientPluginProvider createPluginProvider(Document input) {
+    public BundlePlugin createBundlePlugin(Document input) {
         return new AwsServiceBundle(input.asShape(AwsServiceMetadata.builder()));
     }
 }

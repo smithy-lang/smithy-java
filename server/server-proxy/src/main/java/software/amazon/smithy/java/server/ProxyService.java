@@ -14,6 +14,7 @@ import java.util.function.BiFunction;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
+import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.core.error.ModeledException;
@@ -35,6 +36,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.ToShapeId;
+import software.amazon.smithy.modelbundle.api.BundlePlugin;
 import software.amazon.smithy.modelbundle.api.PluginProviders;
 import software.amazon.smithy.modelbundle.api.model.Bundle;
 import software.amazon.smithy.utils.SmithyUnstableApi;
@@ -50,6 +52,7 @@ public final class ProxyService implements Service {
     private final Model model;
     private final List<Operation<? extends SerializableStruct, ? extends SerializableStruct>> allOperations;
     private final Schema schema;
+    private final BundlePlugin plugin;
 
     private static software.amazon.smithy.model.Model adapt(Builder builder) {
         if (builder.bundle == null || builder.bundle.getRequestArguments() == null) {
@@ -95,10 +98,10 @@ public final class ProxyService implements Service {
                 .service(builder.service)
                 .model(model);
         if (builder.bundle != null) {
-            clientBuilder
-                    .addPlugin(PLUGIN_PROVIDERS.getProvider(builder.bundle.getConfigType(), builder.bundle.getConfig())
-                            .newPlugin());
+            this.plugin = PLUGIN_PROVIDERS.getProvider(builder.bundle.getConfigType(), builder.bundle.getConfig());
+            clientBuilder.endpointResolver(EndpointResolver.staticEndpoint("http://placeholder"));
         } else {
+            this.plugin = null;
             // TODO: render this as a bundle
             clientBuilder.endpointResolver(EndpointResolver.staticEndpoint(builder.proxyEndpoint));
             if (builder.identityResolver != null) {
@@ -124,7 +127,13 @@ public final class ProxyService implements Service {
         for (var operation : TopDownIndex.of(model).getContainedOperations(service.getId())) {
             String operationName = operation.getId().getName();
             var function =
-                    new DynamicFunction(dynamicClient, operationName, schemaConverter, model, operation, service);
+                    new DynamicFunction(dynamicClient,
+                            operationName,
+                            schemaConverter,
+                            model,
+                            operation,
+                            service,
+                            plugin);
             Operation<StructDocument,
                     StructDocument> serverOperation = Operation.of(operationName,
                             function,
@@ -264,11 +273,17 @@ public final class ProxyService implements Service {
             SchemaConverter schemaConverter,
             Model model,
             OperationShape operationShape,
-            ServiceShape serviceShape) implements BiFunction<StructDocument, RequestContext, StructDocument> {
+            ServiceShape serviceShape,
+            BundlePlugin plugin) implements BiFunction<StructDocument, RequestContext, StructDocument> {
 
         @Override
         public StructDocument apply(StructDocument input, RequestContext requestContext) {
-            return createStructDocument(operationShape.getOutput().get(), dynamicClient.call(operation, input));
+            RequestOverrideConfig bundleSettings = null;
+            if (plugin != null) {
+                bundleSettings = plugin.buildOverride(input).build();
+            }
+            return createStructDocument(operationShape.getOutput().get(),
+                    dynamicClient.call(operation, input, bundleSettings));
         }
 
         private StructDocument createStructDocument(ToShapeId shape, Document value) {

@@ -17,10 +17,18 @@ import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolverPar
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-final class StaticAuthSchemeResolver implements AuthSchemeResolver {
+public final class StaticAuthSchemeResolver implements AuthSchemeResolver {
     static final StaticAuthSchemeResolver INSTANCE = new StaticAuthSchemeResolver();
     static final ShapeId CONFIGURED_AUTH = ShapeId.from("modelbundle#configuredAuth");
     private static final List<AuthSchemeOption> AUTH_SCHEME_OPTION = List.of(new AuthSchemeOption(CONFIGURED_AUTH));
+
+    public static StaticAuthSchemeResolver getInstance() {
+        return INSTANCE;
+    }
+
+    private StaticAuthSchemeResolver() {
+
+    }
 
     @Override
     public List<AuthSchemeOption> resolveAuthScheme(AuthSchemeResolverParams params) {

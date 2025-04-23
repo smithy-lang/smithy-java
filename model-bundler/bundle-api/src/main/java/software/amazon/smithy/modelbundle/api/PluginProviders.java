@@ -10,19 +10,19 @@ import java.util.Map;
 import software.amazon.smithy.java.core.serde.document.Document;
 
 public final class PluginProviders {
-    private final Map<String, BundleClientPluginProviderFactory> providers;
+    private final Map<String, BundlePluginFactory> providers;
 
     private PluginProviders(Builder builder) {
         this.providers = builder.providers;
     }
 
-    public BundleClientPluginProvider getProvider(String identifier, Document input) {
+    public BundlePlugin getProvider(String identifier, Document input) {
         var provider = providers.get(identifier);
         if (provider == null) {
             throw new NullPointerException("no auth provider named " + identifier);
         }
 
-        return provider.createPluginProvider(input);
+        return provider.createBundlePlugin(input);
     }
 
     public static Builder builder() {
@@ -30,17 +30,17 @@ public final class PluginProviders {
     }
 
     public static final class Builder {
-        private static final Map<String, BundleClientPluginProviderFactory> BASE_PROVIDERS =
-                ServiceLoaderLoader.load(BundleClientPluginProviderFactory.class,
-                        BundleClientPluginProviderFactory::identifier);
+        private static final Map<String, BundlePluginFactory> BASE_PROVIDERS =
+                ServiceLoaderLoader.load(BundlePluginFactory.class,
+                        BundlePluginFactory::identifier);
 
-        private Map<String, BundleClientPluginProviderFactory> providers;
+        private Map<String, BundlePluginFactory> providers;
 
         private Builder() {
 
         }
 
-        public Builder addProvider(BundleClientPluginProviderFactory provider) {
+        public Builder addProvider(BundlePluginFactory provider) {
             if (providers == null) {
                 providers = new HashMap<>(BASE_PROVIDERS);
             }
