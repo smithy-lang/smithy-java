@@ -13,12 +13,17 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Duration;
+import java.util.HashMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.error.TransportException;
+import software.amazon.smithy.java.client.core.interceptors.CallHook;
+import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
+import software.amazon.smithy.java.client.core.interceptors.InputHook;
 import software.amazon.smithy.java.client.core.plugins.ApplyModelRetryInfoPlugin;
 import software.amazon.smithy.java.client.core.plugins.DefaultPlugin;
 import software.amazon.smithy.java.client.core.plugins.InjectIdempotencyTokenPlugin;
@@ -28,7 +33,9 @@ import software.amazon.smithy.java.client.http.mock.MockPlugin;
 import software.amazon.smithy.java.client.http.mock.MockQueue;
 import software.amazon.smithy.java.client.http.plugins.ApplyHttpRetryInfoPlugin;
 import software.amazon.smithy.java.client.http.plugins.UserAgentPlugin;
+import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
+import software.amazon.smithy.java.http.api.HttpResponse;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -114,5 +121,76 @@ public class ClientTest {
 
         var exception = Assertions.assertThrows(TransportException.class, () -> c.call("GetSprocket"));
         assertSame(exception.getCause(), expectedException);
+    }
+
+    @Test
+    public void allowsInterceptorRequestOverrides() throws URISyntaxException {
+        var queue = new MockQueue();
+        queue.enqueue(HttpResponse.builder().statusCode(200).build());
+        var id = "abc";
+
+        DynamicClient c = DynamicClient.builder()
+                .model(MODEL)
+                .service(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(MockPlugin.builder().addQueue(queue).build())
+                .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
+                    @Override
+                    public ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
+                        var override = RequestOverrideConfig.builder()
+                                .putConfig(CallContext.APPLICATION_ID, id)
+                                .build();
+                        return hook.config().withRequestOverride(override);
+                    }
+
+                    @Override
+                    public void readBeforeExecution(InputHook<?, ?> hook) {
+                        assertThat(hook.context().get(CallContext.APPLICATION_ID), equalTo(id));
+                    }
+                }))
+                .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .build();
+
+        c.call("GetSprocket");
+    }
+
+    @Test
+    public void allowsInterceptorRequestOverridesOnOtherOverrides() throws URISyntaxException {
+        var queue = new MockQueue();
+        queue.enqueue(HttpResponse.builder().statusCode(200).build());
+        var id = "abc";
+
+        DynamicClient c = DynamicClient.builder()
+                .model(MODEL)
+                .service(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(MockPlugin.builder().addQueue(queue).build())
+                .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
+                    @Override
+                    public ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
+                        var override = RequestOverrideConfig.builder()
+                                .putConfig(CallContext.APPLICATION_ID, id)
+                                .build();
+                        return hook.config().withRequestOverride(override);
+                    }
+
+                    @Override
+                    public void readBeforeExecution(InputHook<?, ?> hook) {
+                        assertThat(hook.context().get(CallContext.APPLICATION_ID), equalTo(id));
+                        assertThat(hook.context().get(CallContext.API_CALL_TIMEOUT), equalTo(Duration.ofMinutes(2)));
+                    }
+                }))
+                .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .build();
+
+        // Provide request-level overrides here.
+        c.call("GetSprocket",
+                Document.ofObject(new HashMap<>()),
+                RequestOverrideConfig.builder()
+                        .putConfig(CallContext.API_CALL_TIMEOUT, Duration.ofMinutes(2))
+                        .putConfig(CallContext.APPLICATION_ID, "foo") // this will be overridden in the interceptor
+                        .build());
     }
 }

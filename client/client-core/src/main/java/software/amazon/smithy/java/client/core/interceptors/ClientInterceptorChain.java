@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.core.interceptors;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.logging.InternalLogger;
 
@@ -42,6 +43,15 @@ final class ClientInterceptorChain implements ClientInterceptor {
         if (error != null) {
             throw error;
         }
+    }
+
+    @Override
+    public ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
+        var config = hook.config();
+        for (var interceptor : interceptors) {
+            config = interceptor.modifyBeforeCall(hook.withConfig(config));
+        }
+        return config;
     }
 
     @Override

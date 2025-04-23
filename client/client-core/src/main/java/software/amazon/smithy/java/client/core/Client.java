@@ -14,6 +14,7 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.client.core.interceptors.CallHook;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.client.core.plugins.DefaultPlugin;
 import software.amazon.smithy.java.context.Context;
@@ -75,20 +76,26 @@ public abstract class Client {
             ApiOperation<I, O> operation,
             RequestOverrideConfig overrideConfig
     ) {
-        // Create a copy of the type registry that adds the errors this operation can encounter.
-        TypeRegistry operationRegistry = TypeRegistry.compose(operation.errorRegistry(), typeRegistry);
+        ClientPipeline<?, ?> callPipeline = pipeline;
+        IdentityResolvers callIdentityResolvers = identityResolvers;
+        ClientConfig callConfig = config;
+        ClientInterceptor callInterceptor = interceptor;
 
-        ClientPipeline<?, ?> callPipeline;
-        ClientInterceptor callInterceptor;
-        IdentityResolvers callIdentityResolvers;
-        ClientConfig callConfig;
-        if (overrideConfig == null) {
-            callConfig = config;
-            callPipeline = pipeline;
-            callInterceptor = interceptor;
-            callIdentityResolvers = identityResolvers;
-        } else {
-            callConfig = config.withRequestOverride(overrideConfig);
+        // Apply the given override before potentially applying interceptor based overrides.
+        var needsRebuild = false;
+        if (overrideConfig != null) {
+            needsRebuild = true;
+            callConfig = callConfig.withRequestOverride(overrideConfig);
+            callInterceptor = ClientInterceptor.chain(callConfig.interceptors());
+        }
+
+        var updatedConfig = callInterceptor.modifyBeforeCall(new CallHook<>(operation, callConfig, input));
+        if (updatedConfig != callConfig) {
+            needsRebuild = true;
+            callConfig = updatedConfig;
+        }
+
+        if (needsRebuild) {
             callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
             callInterceptor = ClientInterceptor.chain(callConfig.interceptors());
             callIdentityResolvers = IdentityResolvers.of(callConfig.identityResolvers());
@@ -97,16 +104,12 @@ public abstract class Client {
         var callBuilder = ClientCall.<I, O>builder();
         callBuilder.input = input;
         callBuilder.operation = operation;
-        callBuilder.endpointResolver = callConfig.endpointResolver();
-        callBuilder.context = Context.modifiableCopy(callConfig.context());
         callBuilder.interceptor = callInterceptor;
-        callBuilder.supportedAuthSchemes.addAll(callConfig.supportedAuthSchemes());
-        callBuilder.authSchemeResolver = callConfig.authSchemeResolver();
         callBuilder.identityResolvers = callIdentityResolvers;
-        callBuilder.typeRegistry = operationRegistry;
+        // Create a copy of the type registry that adds the errors this operation can encounter.
+        callBuilder.typeRegistry = TypeRegistry.compose(operation.errorRegistry(), typeRegistry);;
         callBuilder.retryStrategy = retryStrategy;
-        callBuilder.retryScope = callConfig.retryScope();
-
+        callBuilder.withConfig(callConfig);
         return callPipeline.send(callBuilder.build());
     }
 

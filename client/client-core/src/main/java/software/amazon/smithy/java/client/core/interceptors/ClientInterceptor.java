@@ -8,6 +8,8 @@ package software.amazon.smithy.java.client.core.interceptors;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.RequestOverrideConfig;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 
 /**
@@ -46,6 +48,19 @@ public interface ClientInterceptor {
      */
     static ClientInterceptor chain(List<ClientInterceptor> interceptors) {
         return interceptors.isEmpty() ? NOOP : new ClientInterceptorChain(interceptors);
+    }
+
+    /**
+     * The first hook called before executing a call, allowing modification of the {@link ClientConfig} used
+     * with the call.
+     *
+     * <p>Use {@link ClientConfig#withRequestOverride(RequestOverrideConfig)} to modify the given config.
+     *
+     * @param hook Hook data.
+     * @return the updated ClientConfig, or the ClientConfig given to the hook.
+     */
+    default ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
+        return hook.config();
     }
 
     /**

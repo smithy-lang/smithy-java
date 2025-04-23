@@ -110,6 +110,27 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
 
         private Builder() {}
 
+        void withConfig(ClientConfig callConfig) {
+            context = Context.modifiableCopy(callConfig.context());
+            supportedAuthSchemes.addAll(callConfig.supportedAuthSchemes());
+
+            if (callConfig.endpointResolver() != null) {
+                endpointResolver = callConfig.endpointResolver();
+            }
+
+            if (callConfig.authSchemeResolver() != null) {
+                authSchemeResolver = callConfig.authSchemeResolver();
+            }
+
+            if (callConfig.retryScope() != null) {
+                retryScope = callConfig.retryScope();
+            }
+
+            if (callConfig.retryStrategy() != null) {
+                retryStrategy = callConfig.retryStrategy();
+            }
+        }
+
         ClientCall<I, O> build() {
             return new ClientCall<>(this);
         }
