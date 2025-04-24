@@ -24,6 +24,8 @@ import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ArgGroup;
+import software.amazon.smithy.aws.traits.ServiceTrait;
+import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.java.aws.client.auth.scheme.sigv4.SigV4AuthScheme;
 import software.amazon.smithy.java.aws.client.awsjson.AwsJson1Protocol;
 import software.amazon.smithy.java.aws.client.core.identity.EnvironmentVariableIdentityResolver;
@@ -41,6 +43,7 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 @Command(name = "smithy-call", mixinStandardHelpOptions = true, version = "1.0",
@@ -246,22 +249,28 @@ final class SmithyCall implements Callable<Integer> {
                 .model(model)
                 .endpointResolver(EndpointResolver.staticEndpoint(url));
 
-        configureAuth(builder, serviceInput);
+        Shape shape = model.expectShape(serviceInput);
+        configureAuth(builder, serviceInput, shape);
         configureProtocol(builder, serviceInput);
 
         return builder.build();
     }
 
-    private void configureAuth(DynamicClient.Builder builder, ShapeId serviceInput) {
-        String defaultArnNamespace = serviceInput.getNamespace().toLowerCase();
+    private void configureAuth(DynamicClient.Builder builder, ShapeId serviceInput, Shape shape) {
         if (auth != null) {
             switch (auth.authType.toLowerCase()) {
                 case "sigv4", "aws":
                     if (auth.awsRegion == null) {
                         throw new IllegalArgumentException("SigV4 auth requires --aws-region to be set. Please provide the --aws-region option.");
                     }
+                    String signingName = shape.getTrait(SigV4Trait.class)
+                            .map(SigV4Trait::getName)
+                            .orElseGet(() -> shape.getTrait(ServiceTrait.class)
+                                    .map(ServiceTrait::getArnNamespace)
+                                    .orElse(serviceInput.getNamespace().toLowerCase()));
+
                     builder.putConfig(RegionSetting.REGION, auth.awsRegion)
-                            .putSupportedAuthSchemes(new SigV4AuthScheme(defaultArnNamespace))
+                            .putSupportedAuthSchemes(new SigV4AuthScheme(signingName))
                             .authSchemeResolver(AuthSchemeResolver.DEFAULT)
                             .addIdentityResolver(new EnvironmentVariableIdentityResolver());
                     break;
