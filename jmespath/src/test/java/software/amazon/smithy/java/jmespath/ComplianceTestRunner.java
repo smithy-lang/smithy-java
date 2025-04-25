@@ -10,6 +10,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.math.BigDecimal;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
@@ -40,7 +41,6 @@ class ComplianceTestRunner {
     private static final NodeToDocumentConverter CONVERTER = new NodeToDocumentConverter();
     // TODO: Remove these suppressions as remaining functions are supported
     private static final List<String> UNSUPPORTED_FUNCTIONS = List.of(
-            "to_number",
             "to_string",
             "to_array",
             "merge",
@@ -145,8 +145,7 @@ class ComplianceTestRunner {
     private static boolean isEqual(Document expected, Document actual) {
         if (expected == null || actual == null) {
             return expected == null && actual == null;
-        }
-        if (expected.type().equals(ShapeType.MAP) && actual.type().equals(ShapeType.MAP)) {
+        } else if (expected.type().equals(ShapeType.MAP) && actual.type().equals(ShapeType.MAP)) {
             for (var member : expected.getMemberNames()) {
                 var expectedMember = expected.getMember(member);
                 var actualMember = actual.getMember(member);
@@ -155,8 +154,30 @@ class ComplianceTestRunner {
                 }
             }
             return true;
+        } else if (expected.type().equals(ShapeType.LIST) && actual.type().equals(ShapeType.LIST)) {
+            if (expected.size() != actual.size()) {
+                return false;
+            } else {
+                for (int i = 0; i < expected.size(); i++) {
+                    if (!isEqual(expected.asList().get(i), actual.asList().get(i))) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        } else if (isNumeric(expected) && isNumeric(actual)) {
+            // Normalize all numbers to BigDecimal to make comparisons work.
+            return new BigDecimal(expected.asNumber().toString())
+                           .compareTo(new BigDecimal(actual.asNumber().toString())) == 0;
         }
         return Objects.equals(expected, actual);
+    }
+
+    private static boolean isNumeric(Document doc) {
+        var type = doc.type();
+        return type == ShapeType.BYTE || type == ShapeType.SHORT || type == ShapeType.INTEGER
+                || type == ShapeType.LONG || type == ShapeType.BIG_INTEGER || type == ShapeType.BIG_DECIMAL
+                || type == ShapeType.FLOAT || type == ShapeType.DOUBLE || type == ShapeType.INT_ENUM;
     }
 
     private static final class NodeToDocumentConverter implements NodeVisitor<Document> {

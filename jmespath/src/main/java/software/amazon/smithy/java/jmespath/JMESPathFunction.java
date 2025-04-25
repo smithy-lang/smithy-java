@@ -415,8 +415,23 @@ enum JMESPathFunction {
     },
     TO_NUMBER("to_number", 1) {
         @Override
-        protected Document applyImpl(List<Document> argument, ExpressionTypeExpression fnRef) {
-            throw new UnsupportedOperationException("to_number function is not supported");
+        protected Document applyImpl(List<Document> arguments, ExpressionTypeExpression fnRef) {
+            var argument = arguments.get(0);
+            if (argument == null) {
+                return null;
+            }
+            return switch (argument.type()) {
+                case STRING -> {
+                    try {
+                        yield Document.ofNumber(new BigDecimal(argument.asString()));
+                    } catch (NumberFormatException e) {
+                        yield null;
+                    }
+                }
+                case SHORT, BYTE, INTEGER, INT_ENUM, LONG, FLOAT, DOUBLE, BIG_DECIMAL, BIG_INTEGER ->
+                        Document.ofNumber(argument.asNumber());
+                default -> null;
+            };
         }
     },
     TYPE("type", 1) {
