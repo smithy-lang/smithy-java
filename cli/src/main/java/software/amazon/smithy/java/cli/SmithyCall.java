@@ -260,7 +260,6 @@ final class SmithyCall implements Callable<Integer> {
         if (auth != null) {
             switch (auth.authType.toLowerCase()) {
                 case "sigv4", "aws":
-                    LOGGER.fine("Configuring Sigv4 authentication");
                     if (auth.awsRegion == null) {
                         throw new IllegalArgumentException("SigV4 auth requires --aws-region to be set. Please provide the --aws-region option.");
                     }
@@ -270,7 +269,7 @@ final class SmithyCall implements Callable<Integer> {
                                     .map(ServiceTrait::getArnNamespace)
                                     .orElse(serviceInput.getNamespace().toLowerCase()));
 
-                    LOGGER.fine("Using service signing name detected in model: " + signingName);
+                    LOGGER.fine("Configuring SigV4 authentication with service signing name detected in model: " + signingName);
                     builder.putConfig(RegionSetting.REGION, auth.awsRegion)
                             .putSupportedAuthSchemes(new SigV4AuthScheme(signingName))
                             .authSchemeResolver(AuthSchemeResolver.DEFAULT)
