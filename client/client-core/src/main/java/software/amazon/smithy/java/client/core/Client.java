@@ -78,24 +78,17 @@ public abstract class Client {
     ) {
         ClientPipeline<?, ?> callPipeline = pipeline;
         IdentityResolvers callIdentityResolvers = identityResolvers;
-        ClientConfig callConfig = config;
         ClientInterceptor callInterceptor = interceptor;
 
-        // Apply the given override before potentially applying interceptor based overrides.
-        var needsRebuild = false;
+        // First apply overrides from interceptors.
+        ClientConfig callConfig = callInterceptor.modifyBeforeCall(new CallHook<>(operation, config, input));
+        // Overrides given per/operation take precedence over interceptors.
         if (overrideConfig != null) {
-            needsRebuild = true;
             callConfig = callConfig.withRequestOverride(overrideConfig);
-            callInterceptor = ClientInterceptor.chain(callConfig.interceptors());
         }
 
-        var updatedConfig = callInterceptor.modifyBeforeCall(new CallHook<>(operation, callConfig, input));
-        if (updatedConfig != callConfig) {
-            needsRebuild = true;
-            callConfig = updatedConfig;
-        }
-
-        if (needsRebuild) {
+        // Rebuild the pipeline, resolvers, etc if the config changed.
+        if (callConfig != config) {
             callPipeline = ClientPipeline.of(callConfig.protocol(), callConfig.transport());
             callInterceptor = ClientInterceptor.chain(callConfig.interceptors());
             callIdentityResolvers = IdentityResolvers.of(callConfig.identityResolvers());

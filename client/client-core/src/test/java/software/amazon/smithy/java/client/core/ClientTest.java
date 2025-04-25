@@ -156,7 +156,7 @@ public class ClientTest {
     }
 
     @Test
-    public void allowsInterceptorRequestOverridesOnOtherOverrides() throws URISyntaxException {
+    public void requestOverridesPerCallTakePrecedence() throws URISyntaxException {
         var queue = new MockQueue();
         queue.enqueue(HttpResponse.builder().statusCode(200).build());
         var id = "abc";
@@ -169,8 +169,9 @@ public class ClientTest {
                 .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
                     @Override
                     public ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
+                        // Note that the overrides given to the call itself will override interceptors.
                         var override = RequestOverrideConfig.builder()
-                                .putConfig(CallContext.APPLICATION_ID, id)
+                                .putConfig(CallContext.APPLICATION_ID, "foo")
                                 .build();
                         return hook.config().withRequestOverride(override);
                     }
@@ -190,7 +191,7 @@ public class ClientTest {
                 Document.ofObject(new HashMap<>()),
                 RequestOverrideConfig.builder()
                         .putConfig(CallContext.API_CALL_TIMEOUT, Duration.ofMinutes(2))
-                        .putConfig(CallContext.APPLICATION_ID, "foo") // this will be overridden in the interceptor
+                        .putConfig(CallContext.APPLICATION_ID, id) // this will be take precedence
                         .build());
     }
 }
