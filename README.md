@@ -43,7 +43,7 @@ To use the Smithy Java code generators with Gradle, first create a Smithy Gradle
 
 > [!NOTE]
 > You can use the `smithy init` [CLI](https://smithy.io/2.0/guides/smithy-cli/index.html) command to create a new
-> Smithy Gradle project. The command `smithy init quickstart-gradle`  will create a new basic Smithy Gradle project.
+> Smithy Gradle project. The command `smithy init --template quickstart-gradle`  will create a new basic Smithy Gradle project.
 
 Then apply the [`smithy-base`](https://smithy.io/2.0/guides/gradle-plugin/index.html#smithy-gradle-plugins) gradle plugin to 
 your project.
