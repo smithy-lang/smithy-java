@@ -66,6 +66,11 @@ final class EndpointImpl implements Endpoint {
         return Objects.hash(uri, authSchemes, properties);
     }
 
+    @Override
+    public String toString() {
+        return "Endpoint{uri=" + uri + ", authSchemes=" + authSchemes + ", properties=" + properties + '}';
+    }
+
     static final class Builder implements Endpoint.Builder {
 
         private URI uri;

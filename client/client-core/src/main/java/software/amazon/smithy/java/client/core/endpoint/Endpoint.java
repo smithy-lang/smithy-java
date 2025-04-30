@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.core.endpoint;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.java.context.Context;
 
@@ -15,6 +16,11 @@ import software.amazon.smithy.java.context.Context;
  * A resolved endpoint.
  */
 public interface Endpoint {
+    /**
+     * Assigns headers to an endpoint. These are typically HTTP headers.
+     */
+    Context.Key<Map<String, List<String>>> HEADERS = Context.key("Endpoint headers");
+
     /**
      * The endpoint URI.
      *
