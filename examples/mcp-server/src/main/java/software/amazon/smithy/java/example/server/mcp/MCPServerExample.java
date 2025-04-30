@@ -3,7 +3,7 @@ package software.amazon.smithy.java.example.server.mcp;
 import software.amazon.smithy.java.example.server.mcp.operations.GetCodingStatistics;
 import software.amazon.smithy.java.example.server.mcp.operations.GetEmployeeDetails;
 import software.amazon.smithy.java.example.server.mcp.service.EmployeeService;
-import software.amazon.smithy.java.server.mcp.MCPServer;
+import software.amazon.smithy.java.mcp.server.McpServer;
 
 public class MCPServerExample {
 
@@ -13,7 +13,7 @@ public class MCPServerExample {
                 .addGetEmployeeDetailsOperation(new GetEmployeeDetails())
                 .build();
 
-        var mcpServer = MCPServer.builder()
+        var mcpServer = McpServer.builder()
                 .stdio()
                 .name("smithy-mcp-server")
                 .addService(service)

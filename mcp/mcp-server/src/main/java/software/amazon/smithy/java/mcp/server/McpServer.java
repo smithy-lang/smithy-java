@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.server.mcp;
+package software.amazon.smithy.java.mcp.server;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -44,9 +44,9 @@ import software.amazon.smithy.model.traits.DocumentationTrait;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
-public final class MCPServer implements Server {
+public final class McpServer implements Server {
 
-    private static final InternalLogger LOG = InternalLogger.getLogger(MCPServer.class);
+    private static final InternalLogger LOG = InternalLogger.getLogger(McpServer.class);
 
     private static final JsonCodec CODEC = JsonCodec.builder()
             .settings(JsonSettings.builder()
@@ -60,7 +60,7 @@ public final class MCPServer implements Server {
     private final OutputStream os;
     private final String name;
 
-    MCPServer(MCPServerBuilder builder) {
+    McpServer(McpServerBuilder builder) {
         this.tools = createTools(builder.serviceList);
         this.is = builder.is;
         this.os = builder.os;
@@ -237,7 +237,7 @@ public final class MCPServer implements Server {
 
     }
 
-    public static MCPServerBuilder builder() {
-        return new MCPServerBuilder();
+    public static McpServerBuilder builder() {
+        return new McpServerBuilder();
     }
 }

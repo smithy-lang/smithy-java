@@ -34,7 +34,7 @@ import software.amazon.smithy.modelbundle.api.model.Bundle;
 import software.amazon.smithy.modelbundle.api.model.GenericArguments;
 import software.amazon.smithy.modelbundle.api.model.Model;
 
-final class AwsServiceBundler implements Bundler {
+public final class AwsServiceBundler implements Bundler {
     private static final ShapeId ENDPOINT_TESTS = ShapeId.from("smithy.rules#endpointTests");
 
     // visible for testing
@@ -62,6 +62,10 @@ final class AwsServiceBundler implements Bundler {
     AwsServiceBundler(String serviceName, ModelResolver resolver) {
         this.serviceName = serviceName;
         this.resolver = resolver;
+    }
+
+    public AwsServiceBundler(String serviceName) {
+        this(serviceName, GithubModelResolver.INSTANCE);
     }
 
     @Override
@@ -112,16 +116,17 @@ final class AwsServiceBundler implements Bundler {
     }
 
     private static String serializeModel(software.amazon.smithy.model.Model model) {
-        return ObjectNode.printJson(ModelSerializer.builder()
+        var output = ObjectNode.printJson(ModelSerializer.builder()
                 .build()
                 .serialize(model));
+        return output;
     }
 
     private static String loadModel(String path) {
         try (var reader = new BufferedReader(new InputStreamReader(
                 Objects.requireNonNull(AwsServiceBundler.class.getResourceAsStream(path)),
                 StandardCharsets.UTF_8))) {
-            return reader.lines().collect(Collectors.joining());
+            return reader.lines().collect(Collectors.joining("\n"));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

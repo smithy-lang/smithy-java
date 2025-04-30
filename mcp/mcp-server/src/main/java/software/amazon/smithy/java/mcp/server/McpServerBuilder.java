@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.server.mcp;
+package software.amazon.smithy.java.mcp.server;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -16,49 +16,54 @@ import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
-public final class MCPServerBuilder {
+public final class McpServerBuilder {
 
     InputStream is;
     OutputStream os;
     List<Service> serviceList = new ArrayList<>();
     String name;
 
-    MCPServerBuilder() {}
+    McpServerBuilder() {}
 
-    public MCPServerBuilder stdio() {
+    public McpServerBuilder stdio() {
         this.is = System.in;
         this.os = System.out;
         return this;
     }
 
-    public MCPServerBuilder input(InputStream is) {
+    public McpServerBuilder input(InputStream is) {
         this.is = is;
         return this;
     }
 
-    public MCPServerBuilder output(OutputStream os) {
+    public McpServerBuilder output(OutputStream os) {
         this.os = os;
         return this;
     }
 
-    public MCPServerBuilder name(String name) {
+    public McpServerBuilder name(String name) {
         this.name = name;
         return this;
     }
 
     public Server build() {
         validate();
-        return new MCPServer(this);
+        return new McpServer(this);
     }
 
-    public MCPServerBuilder addService(Service... service) {
+    public McpServerBuilder addService(Service... service) {
         serviceList.addAll(Arrays.asList(service));
+        return this;
+    }
+
+    public McpServerBuilder addServices(List<Service> services) {
+        serviceList.addAll(services);
         return this;
     }
 
     private void validate() {
         Objects.requireNonNull(is, "MCP server input stream is required");
-        Objects.requireNonNull(is, "MCP server output stream is required");
+        Objects.requireNonNull(os, "MCP server output stream is required");
         if (serviceList.isEmpty()) {
             throw new IllegalArgumentException("MCP server requires at least one service");
         }

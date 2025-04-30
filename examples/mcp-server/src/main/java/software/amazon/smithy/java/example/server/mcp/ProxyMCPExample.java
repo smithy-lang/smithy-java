@@ -1,13 +1,12 @@
 package software.amazon.smithy.java.example.server.mcp;
 
-import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
 import software.amazon.smithy.java.example.server.mcp.operations.GetCodingStatistics;
 import software.amazon.smithy.java.example.server.mcp.operations.GetEmployeeDetails;
 import software.amazon.smithy.java.example.server.mcp.service.EmployeeService;
+import software.amazon.smithy.java.mcp.server.McpServer;
 import software.amazon.smithy.java.server.ProxyService;
 import software.amazon.smithy.java.server.Server;
-import software.amazon.smithy.java.server.mcp.MCPServer;
 import software.amazon.smithy.model.Model;
 
 public class ProxyMCPExample {
@@ -39,7 +38,7 @@ public class ProxyMCPExample {
                 .proxyEndpoint("http://localhost:8080")
                 .build();
 
-        var mcpServer = MCPServer.builder()
+        var mcpServer = McpServer.builder()
                 .stdio()
                 .name("smithy-mcp-server")
                 .addService(mcpService)

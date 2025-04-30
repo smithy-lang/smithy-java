@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.server;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -22,9 +23,9 @@ public final class OperationFilters {
      * @return A {@link Predicate} that only includes the specified operations
      */
     public static Predicate<ApiOperation<? extends SerializableStruct, ? extends SerializableStruct>> allowList(
-            Set<String> operationNames
+            Collection<String> operationNames
     ) {
-        return new OperationFilters.OperationNameFilter(operationNames, null);
+        return new OperationFilters.OperationNameFilter(Set.copyOf(operationNames), null);
     }
 
     /**
@@ -33,10 +34,10 @@ public final class OperationFilters {
      * @param operationNames Set of operation names to exclude
      * @return A {@link Predicate} that excludes the specified operations
      */
-    static Predicate<ApiOperation<? extends SerializableStruct, ? extends SerializableStruct>> blockList(
-            Set<String> operationNames
+    public static Predicate<ApiOperation<? extends SerializableStruct, ? extends SerializableStruct>> blockList(
+            Collection<String> operationNames
     ) {
-        return new OperationNameFilter(null, operationNames);
+        return new OperationNameFilter(null, Set.copyOf(operationNames));
     }
 
     static final class OperationNameFilter implements Predicate<ApiOperation<?, ?>> {

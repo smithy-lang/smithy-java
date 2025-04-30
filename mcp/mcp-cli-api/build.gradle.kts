@@ -3,14 +3,18 @@ plugins {
     id("software.amazon.smithy.gradle.smithy-base")
 }
 
-description = "This module provides a schemas for MCP integration"
+description = "This module provides a apis for MCP CLI"
 
-extra["displayName"] = "Smithy :: Java :: MCP Schemas"
-extra["moduleName"] = "software.amazon.smithy.mcp.schemas"
+extra["displayName"] = "Smithy :: Java :: MCP CLI API"
+extra["moduleName"] = "software.amazon.smithy.mcp.cli.api"
 
 dependencies {
     api(project(":core"))
     api(libs.smithy.model)
+    api(libs.picocli)
+    api(project(":model-bundler:bundle-api"))
+    implementation(project(":codecs:json-codec"))
+    implementation(project(":logging"))
     smithyBuild(project(":codegen:plugins:types-codegen"))
 }
 
