@@ -7,6 +7,11 @@ plugins {
     alias(libs.plugins.jreleaser)
 }
 
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
 task("addGitHooks") {
     onlyIf("unix") {
         !Os.isFamily(Os.FAMILY_WINDOWS)

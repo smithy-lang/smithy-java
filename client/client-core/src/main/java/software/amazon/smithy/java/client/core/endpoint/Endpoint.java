@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.core.endpoint;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import software.amazon.smithy.java.context.Context;
 
@@ -15,6 +16,11 @@ import software.amazon.smithy.java.context.Context;
  * A resolved endpoint.
  */
 public interface Endpoint {
+    /**
+     * Assigns headers to an endpoint. These are typically HTTP headers.
+     */
+    Context.Key<Map<String, List<String>>> HEADERS = Context.key("Endpoint headers");
+
     /**
      * The endpoint URI.
      *
@@ -51,10 +57,13 @@ public interface Endpoint {
      *
      * @return the builder.
      */
+    @SuppressWarnings("unchecked")
     default Builder toBuilder() {
         var builder = new EndpointImpl.Builder();
         builder.uri(uri());
-        properties().forEach(k -> builder.properties.put(k, property(k)));
+        for (var e : properties()) {
+            builder.putProperty((Context.Key<Object>) e, property(e));
+        }
         for (EndpointAuthScheme authScheme : authSchemes()) {
             builder.addAuthScheme(authScheme);
         }
