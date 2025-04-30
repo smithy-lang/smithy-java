@@ -121,7 +121,7 @@ final class AwsServiceBundler implements Bundler {
         try (var reader = new BufferedReader(new InputStreamReader(
                 Objects.requireNonNull(AwsServiceBundler.class.getResourceAsStream(path)),
                 StandardCharsets.UTF_8))) {
-            return reader.lines().collect(Collectors.joining());
+            return reader.lines().collect(Collectors.joining("\n"));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

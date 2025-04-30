@@ -62,7 +62,7 @@ public final class ProxyService implements Service {
         var args = builder.bundle.getRequestArguments();
         var model = new ModelAssembler()
                 .addModel(builder.model)
-                .addModel(args.getModel().getValue())
+                .addUnparsedModel("args.smithy", args.getModel().getValue())
                 .assemble()
                 .unwrap();
         var template = model.expectShape(ShapeId.from(args.getIdentifier()))
