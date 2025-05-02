@@ -59,6 +59,9 @@ final class RulesCompiler {
     private boolean performOptimizations;
     private final Map<Expression, Integer> cse;
 
+    // Stack of bitfields that represent registers that were pushed to during a scope. Supports up to 64.
+    private final ArrayList<Long> scopedRegisterStack = new ArrayList<>();
+
     RulesCompiler(
             EndpointRuleSet rules,
             List<VmFunction> functions,
@@ -91,17 +94,24 @@ final class RulesCompiler {
         }
     }
 
-    RulesProgram.Register addRegister(String name, boolean required, Object defaultValue, String builtin) {
+    private RulesProgram.Register addRegister(String name, boolean required, Object defaultValue, String builtin) {
         var register = new RulesProgram.Register(name, required, defaultValue, builtin);
         if (registryIndex.containsKey(name)) {
             throw new RulesEvaluationError("Duplicate variable name found in rules: " + name);
         }
         registryIndex.put(name, registry.size());
         registry.add(register);
+
+        // Register scopes are tracking by flipping bits of a long. That means a max of 64 registers.
+        // No real rules definition would have more than 64 registers.
+        if (registry.size() > 64) {
+            throw new RulesEvaluationError("Too many registers added to rules engine");
+        }
+
         return register;
     }
 
-    int getOrCreateRegister(String name) {
+    private int getOrCreateRegister(String name) {
         var index = registryIndex.get(name);
         if (index == null) {
             addRegister(name, false, null, null);
@@ -110,7 +120,7 @@ final class RulesCompiler {
         return index;
     }
 
-    int getFunctionIndex(String name) {
+    private int getFunctionIndex(String name) {
         var index = usedFunctionIndex.get(name);
         if (index == null) {
             var fn = functions.get(name);
@@ -144,12 +154,28 @@ final class RulesCompiler {
     }
 
     private void compileRule(Rule rule) {
+        enterScope();
         if (rule instanceof TreeRule t) {
             compileTreeRule(t);
         } else if (rule instanceof EndpointRule e) {
             compileEndpointRule(e);
         } else if (rule instanceof ErrorRule e) {
             compileErrorRule(e);
+        }
+        exitScope();
+    }
+
+    private void enterScope() {
+        scopedRegisterStack.add(0L);
+    }
+
+    private void exitScope() {
+        var value = scopedRegisterStack.remove(scopedRegisterStack.size() - 1);
+        // Iterate over the bits that were set and ensure their registers pop the value set of the scope.
+        while (value != 0) {
+            int bitIndex = Long.numberOfTrailingZeros(value);
+            instructions.add(new Instruction.PopRegister(bitIndex));
+            value &= value - 1;
         }
     }
 
@@ -175,7 +201,11 @@ final class RulesCompiler {
         compileExpression(condition.getFunction());
         // Add an instruction to store the result as a register if the condition requests it.
         condition.getResult().ifPresent(result -> {
-            instructions.add(new Instruction.PushRegister(getOrCreateRegister(result.toString())));
+            var register = getOrCreateRegister(result.toString());
+            var position = scopedRegisterStack.size() - 1;
+            var current = scopedRegisterStack.get(position);
+            scopedRegisterStack.set(position, current | 1L << register);
+            instructions.add(new Instruction.PushRegister(register));
         });
         // Add the jump instruction after each condition to skip over more conditions or skip over the rule.
         instructions.add(jump);
