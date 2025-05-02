@@ -34,7 +34,7 @@ final class RulesCompiler {
     private final EndpointRuleSet rules;
 
     // The parsed opcodes and operands.
-    private final List<Instruction> instructions = new ArrayList<>();
+    private final List<Object> instructions = new ArrayList<>();
 
     // Parameters and captured variables.
     private final List<RulesProgram.Register> registry = new ArrayList<>();
@@ -134,6 +134,21 @@ final class RulesCompiler {
         return index;
     }
 
+    private void addInstruction(byte opcode) {
+        instructions.add(opcode);
+    }
+
+    private void addInstruction(byte opcode, Object param) {
+        instructions.add(opcode);
+        instructions.add(param);
+    }
+
+    private void addInstruction(byte opcode, Object param1, Object param2) {
+        instructions.add(opcode);
+        instructions.add(param1);
+        instructions.add(param2);
+    }
+
     RulesProgram compile() {
         // Compile common subexpression values up front.
         if (performOptimizations) {
@@ -141,7 +156,7 @@ final class RulesCompiler {
             int i = 0;
             for (var e : cse.keySet()) {
                 alwaysCompileExpression(e);
-                instructions.add(new Instruction.PushRegister(i++));
+                addInstruction(RulesProgram.PUSH_REGISTER, i++);
             }
             performOptimizations = true;
         }
@@ -174,7 +189,7 @@ final class RulesCompiler {
         // Iterate over the bits that were set and ensure their registers pop the value set of the scope.
         while (value != 0) {
             int bitIndex = Long.numberOfTrailingZeros(value);
-            instructions.add(new Instruction.PopRegister(bitIndex));
+            addInstruction(RulesProgram.POP_REGISTER, bitIndex);
             value &= value - 1;
         }
     }
@@ -186,18 +201,18 @@ final class RulesCompiler {
             compileRule(rule);
         }
         // Patch in the actual jump target for each condition so it skips over the rules.
-        jump.patchTarget(instructions.size());
+        jump.patchTarget(instructions);
     }
 
-    private Instruction.JumpIfFalsey compileConditions(Rule rule) {
-        var jump = new Instruction.JumpIfFalsey(-1);
+    private JumpIfFalsey compileConditions(Rule rule) {
+        var jump = new JumpIfFalsey();
         for (var condition : rule.getConditions()) {
             compileCondition(condition, jump);
         }
         return jump;
     }
 
-    private void compileCondition(Condition condition, Instruction.JumpIfFalsey jump) {
+    private void compileCondition(Condition condition, JumpIfFalsey jump) {
         compileExpression(condition.getFunction());
         // Add an instruction to store the result as a register if the condition requests it.
         condition.getResult().ifPresent(result -> {
@@ -205,17 +220,18 @@ final class RulesCompiler {
             var position = scopedRegisterStack.size() - 1;
             var current = scopedRegisterStack.get(position);
             scopedRegisterStack.set(position, current | 1L << register);
-            instructions.add(new Instruction.PushRegister(register));
+            addInstruction(RulesProgram.PUSH_REGISTER, register);
         });
         // Add the jump instruction after each condition to skip over more conditions or skip over the rule.
-        instructions.add(jump);
+        addInstruction(RulesProgram.JUMP_IF_FALSEY, -1);
+        jump.addPatch(instructions.size() - 1);
     }
 
     private void addLiteralOpcodes(Literal literal) {
         if (literal instanceof StringLiteral s) {
             var st = StringTemplate.from(s.value());
             if (st.expressionCount() == 0) {
-                instructions.add(new Instruction.Push(st.resolve()));
+                addInstruction(RulesProgram.PUSH, st.resolve());
             } else if (st.getTemplateOnly() != null) {
                 // No need to resolve a template if it's just plucking a single value.
                 compileExpression(st.getTemplateOnly());
@@ -227,23 +243,23 @@ final class RulesCompiler {
                         compileExpression(e);
                     }
                 }
-                instructions.add(new Instruction.ResolveTemplate(st));
+                addInstruction(RulesProgram.RESOLVE_TEMPLATE, st);
             }
         } else if (literal instanceof TupleLiteral t) {
             for (var e : t.members()) {
                 addLiteralOpcodes(e);
             }
-            instructions.add(new Instruction.CreateList(t.members().size()));
+            addInstruction(RulesProgram.CREATE_LIST, t.members().size());
         } else if (literal instanceof RecordLiteral r) {
             for (var e : r.members().entrySet()) {
-                instructions.add(new Instruction.Push(e.getKey().toString()));
+                addInstruction(RulesProgram.PUSH, e.getKey().toString());
                 addLiteralOpcodes(e.getValue());
             }
-            instructions.add(new Instruction.CreateMap(r.members().size()));
+            addInstruction(RulesProgram.CREATE_MAP, r.members().size());
         } else if (literal instanceof BooleanLiteral b) {
-            instructions.add(new Instruction.Push(b.value().getValue()));
+            addInstruction(RulesProgram.PUSH, b.value().getValue());
         } else if (literal instanceof IntegerLiteral i) {
-            instructions.add(new Instruction.Push(i.toNode().expectNumberNode().getValue()));
+            addInstruction(RulesProgram.PUSH, i.toNode().expectNumberNode().getValue());
         } else {
             throw new UnsupportedOperationException("Unexpected rules engine Literal type: " + literal);
         }
@@ -253,7 +269,7 @@ final class RulesCompiler {
         if (performOptimizations) {
             var register = cse.get(expression);
             if (register != null) {
-                instructions.add(new Instruction.LoadRegister(register));
+                addInstruction(RulesProgram.LOAD_REGISTER, register);
                 return;
             }
         }
@@ -272,28 +288,28 @@ final class RulesCompiler {
             @Override
             public Void visitRef(Reference reference) {
                 var index = getOrCreateRegister(reference.getName().toString());
-                instructions.add(new Instruction.LoadRegister(index));
+                addInstruction(RulesProgram.LOAD_REGISTER, index);
                 return null;
             }
 
             @Override
             public Void visitGetAttr(GetAttr getAttr) {
                 var attr = AttrExpression.from(getAttr);
-                instructions.add(new Instruction.GetAttr(attr));
+                addInstruction(RulesProgram.GET_ATTR, attr);
                 return null;
             }
 
             @Override
             public Void visitIsSet(Expression fn) {
                 compileExpression(fn);
-                instructions.add(new Instruction.Isset());
+                addInstruction(RulesProgram.ISSET);
                 return null;
             }
 
             @Override
             public Void visitNot(Expression not) {
                 compileExpression(not);
-                instructions.add(new Instruction.Not());
+                addInstruction(RulesProgram.NOT);
                 return null;
             }
 
@@ -306,16 +322,16 @@ final class RulesCompiler {
                 } else {
                     compileExpression(left);
                     compileExpression(right);
-                    instructions.add(new Instruction.Fn(getFunctionIndex("booleanEquals")));
+                    addInstruction(RulesProgram.FN, getFunctionIndex("booleanEquals"));
                 }
                 return null;
             }
 
             private void pushBooleanOptimization(BooleanLiteral b, Expression other) {
                 compileExpression(other);
-                instructions.add(new Instruction.IsTrue());
+                addInstruction(RulesProgram.IS_TRUE);
                 if (!b.value().getValue()) {
-                    instructions.add(new Instruction.Not());
+                    addInstruction(RulesProgram.NOT);
                 }
             }
 
@@ -323,7 +339,7 @@ final class RulesCompiler {
             public Void visitStringEquals(Expression left, Expression right) {
                 compileExpression(left);
                 compileExpression(right);
-                instructions.add(new Instruction.Fn(getFunctionIndex("stringEquals")));
+                addInstruction(RulesProgram.FN, getFunctionIndex("stringEquals"));
                 return null;
             }
 
@@ -344,7 +360,7 @@ final class RulesCompiler {
                 for (var arg : args) {
                     compileExpression(arg);
                 }
-                instructions.add(new Instruction.Fn(index));
+                addInstruction(RulesProgram.FN, index);
                 return null;
             }
         });
@@ -363,42 +379,42 @@ final class RulesCompiler {
                     compileExpression(h);
                 }
                 // Process the N header values that are on the stack.
-                instructions.add(new Instruction.CreateList(entry.getValue().size()));
+                addInstruction(RulesProgram.CREATE_LIST, entry.getValue().size());
                 // Push the header name.
-                instructions.add(new Instruction.Push(entry.getKey()));
+                addInstruction(RulesProgram.PUSH, entry.getKey());
             }
             // Combine the N headers that are on the stack in the form of String followed by List<String>.
-            instructions.add(new Instruction.CreateMap(e.getHeaders().size()));
+            addInstruction(RulesProgram.CREATE_MAP, e.getHeaders().size());
         }
 
         // Add property instructions.
         if (!e.getProperties().isEmpty()) {
             for (var entry : e.getProperties().entrySet()) {
-                instructions.add(new Instruction.Push(entry.getKey().toString()));
+                addInstruction(RulesProgram.PUSH, entry.getKey().toString());
                 compileExpression(entry.getValue());
             }
-            instructions.add(new Instruction.CreateMap(e.getProperties().size()));
+            addInstruction(RulesProgram.CREATE_MAP, e.getProperties().size());
         }
 
         // Compile the URL expression (could be a reference, template, etc). This must be the closest on the stack.
         compileExpression(e.getUrl());
 
         // Add the set endpoint instruction.
-        instructions.add(new Instruction.SetEndpoint(!e.getHeaders().isEmpty(), !e.getProperties().isEmpty()));
+        addInstruction(RulesProgram.SET_ENDPOINT, !e.getHeaders().isEmpty(), !e.getProperties().isEmpty());
         // Patch in the actual jump target for each condition so it skips over the endpoint rule.
-        jump.patchTarget(instructions.size());
+        jump.patchTarget(instructions);
     }
 
     private void compileErrorRule(ErrorRule rule) {
         var jump = compileConditions(rule);
         compileExpression(rule.getError()); // error message
-        instructions.add(new Instruction.SetError());
+        addInstruction(RulesProgram.SET_ERROR);
         // Patch in the actual jump target for each condition so it skips over the error rule.
-        jump.patchTarget(instructions.size());
+        jump.patchTarget(instructions);
     }
 
     RulesProgram buildProgram() {
-        var instructions = new Instruction[this.instructions.size()];
+        var instructions = new Object[this.instructions.size()];
         this.instructions.toArray(instructions);
         var registry = new RulesProgram.Register[this.registry.size()];
         this.registry.toArray(registry);
@@ -411,5 +427,19 @@ final class RulesCompiler {
                 fns,
                 functionIndex,
                 builtinProvider);
+    }
+
+    private static final class JumpIfFalsey {
+        final List<Integer> instructionPointers = new ArrayList<>();
+
+        void addPatch(int position) {
+            instructionPointers.add(position);
+        }
+
+        void patchTarget(List<Object> instructions) {
+            for (var position : instructionPointers) {
+                instructions.set(position, instructions.size());
+            }
+        }
     }
 }

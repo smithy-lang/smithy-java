@@ -19,8 +19,102 @@ import software.amazon.smithy.java.context.Context;
  * using {@code ToString}. A RulesProgram is created using a {@link RulesEngine}.
  */
 public final class RulesProgram {
+    /**
+     * Push a value onto the stack.
+     */
+    static final byte PUSH = 0;
 
-    final Instruction[] instructions;
+    /**
+     * Peeks the value at the top of the stack and pushes it onto the register stack of a register.
+     */
+    static final byte PUSH_REGISTER = 1;
+
+    /**
+     * Pop a register value off its register stack.
+     */
+    static final byte POP_REGISTER = 2;
+
+    /**
+     * Get the value of a register and push it onto the stack.
+     */
+    static final byte LOAD_REGISTER = 3;
+
+    /**
+     * Jumps to an opcode index if the top of the stack is null or false.
+     */
+    static final byte JUMP_IF_FALSEY = 4;
+
+    /**
+     * Pops a value off the stack and pushes true if it is falsey (null or false), or false if not.
+     *
+     * <p>This implements the "not" function as an opcode.
+     */
+    static final byte NOT = 5;
+
+    /**
+     * Pops a value off the stack and pushes true if it is set (that is, not null).
+     *
+     * <p>This implements the "isset" function as an opcode.
+     */
+    static final byte ISSET = 6;
+
+    /**
+     * Sets an error on the VM and exits.
+     *
+     * <p>Pops a single value that provides the error string to set.
+     */
+    static final byte SET_ERROR = 7;
+
+    /**
+     * Sets the endpoint result of the VM and exits.
+     *
+     * <p>Pops two values:
+     * <ol>
+     *     <li>The headers of the endpoint in the form of {@code Map<String, List<String>>}.</li>
+     *     <li>The endpoint URL as a String that is parsed into a URI.</li>
+     * </ol>
+     */
+    static final byte SET_ENDPOINT = 8;
+
+    /**
+     * Pops N values off the stack and pushes a list of those values onto the stack.
+     */
+    static final byte CREATE_LIST = 9;
+
+    /**
+     * Pops N*2 values off the stack (key then value), creates a map of those values, and pushes the map onto the
+     * stack. Each popped key must be a string.
+     */
+    static final byte CREATE_MAP = 10;
+
+    /**
+     * Resolves a template string.
+     *
+     * <p>The corresponding instruction has a StringTemplate that tells the VM how many values to pop off the stack.
+     * The popped values fill in values into the template. The resolved template value as a string is then pushed onto
+     * the stack.
+     */
+    static final byte RESOLVE_TEMPLATE = 11;
+
+    /**
+     * Calls a function.
+     *
+     * <p>The function pops zero or more values off the stack based on the VmFunction registered for the index,
+     * and then pushes the Object result onto the stack.
+     */
+    static final byte FN = 12;
+
+    /**
+     * Pops the top level value and applies a getAttr expression on it, pushing the result onto the stack.
+     */
+    static final byte GET_ATTR = 13;
+
+    /**
+     * Pops a value and pushes true if the value is boolean true, false if not.
+     */
+    static final byte IS_TRUE = 14;
+
+    final Object[] instructions;
     final Register[] registry;
     final Map<String, Integer> registryIndex;
     final VmFunction[] functions;
@@ -28,7 +122,7 @@ public final class RulesProgram {
     private final BiFunction<String, Context, Object> builtinProvider;
 
     RulesProgram(
-            Instruction[] instructions,
+            Object[] instructions,
             Register[] registry,
             Map<String, Integer> registryIndex,
             VmFunction[] functions,
@@ -59,6 +153,10 @@ public final class RulesProgram {
         return vm.evaluate();
     }
 
+    public String printDebug() {
+
+    }
+
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder();
@@ -73,7 +171,7 @@ public final class RulesProgram {
                 isFirst = false;
             }
             s.append("    ");
-            ins.serialize(s);
+            EndpointUtils.serializeObject(ins, s);
         }
         s.append("\n  ],\n");
 

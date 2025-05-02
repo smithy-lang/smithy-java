@@ -107,8 +107,7 @@ final class EndpointUtils {
             }
             sink.append('}');
         } else {
-            throw new UnsupportedOperationException(
-                    "Unsupported endpoint rules value type: " + value + " " + value.getClass());
+            sink.append(value);
         }
     }
 }

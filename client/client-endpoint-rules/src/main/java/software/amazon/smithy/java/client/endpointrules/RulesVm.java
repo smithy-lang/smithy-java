@@ -88,33 +88,31 @@ final class RulesVm {
     }
 
     private Endpoint run() {
-        for (var pointer = 0; pointer < program.instructions.length; pointer++) {
-            var instruction = program.instructions[pointer];
-            switch (instruction.opcode()) {
-                case PUSH -> stack.add(((Instruction.Push) instruction).value());
-                case LOAD_REGISTER -> {
-                    int regIndex = ((Instruction.LoadRegister) instruction).register();
+        var instructions = program.instructions;
+        for (var pointer = 0; pointer < instructions.length; pointer++) {
+            byte instruction = (byte) instructions[pointer];
+            switch (instruction) {
+                case RulesProgram.PUSH -> stack.add(instructions[++pointer]);
+                case RulesProgram.LOAD_REGISTER -> {
+                    int regIndex = (int) instructions[++pointer];
                     stack.add(program.registry[regIndex].get());
                 }
-                case PUSH_REGISTER -> {
-                    var pushRegister = (Instruction.PushRegister) instruction;
-                    program.registry[pushRegister.register()].push(peek());
+                case RulesProgram.PUSH_REGISTER -> {
+                    int regIndex = (int) instructions[++pointer];
+                    program.registry[regIndex].push(peek());
                 }
-                case POP_REGISTER -> {
-                    int regIndex = ((Instruction.PopRegister) instruction).register();
+                case RulesProgram.POP_REGISTER -> {
+                    int regIndex = (int) instructions[++pointer];
                     program.registry[regIndex].pop();
                 }
-                case JUMP -> {
-                    pointer = ((Instruction.Jump) instruction).target() - 1; // -1 because loop will increment
-                }
-                case JUMP_IF_FALSEY -> {
+                case RulesProgram.JUMP_IF_FALSEY -> {
+                    int target = (int) instructions[++pointer];
                     Object value = pop();
                     if (value == null || (value instanceof Boolean b && !b)) {
-                        int target = ((Instruction.JumpIfFalsey) instruction).target();
                         pointer = target - 1; // -1 because loop will increment
                     }
                 }
-                case NOT -> {
+                case RulesProgram.NOT -> {
                     Object value = pop();
                     if (value == null) {
                         stack.add(true);
@@ -124,7 +122,7 @@ final class RulesVm {
                         stack.add(false);
                     }
                 }
-                case ISSET -> {
+                case RulesProgram.ISSET -> {
                     Object value = pop();
                     if (value == null) {
                         stack.add(false);
@@ -134,10 +132,9 @@ final class RulesVm {
                         stack.add(true);
                     }
                 }
-                case IS_TRUE -> stack.add((pop() instanceof Boolean b) ? b : false);
-                case FN -> {
-                    var fnInst = (Instruction.Fn) instruction;
-                    int fIndex = fnInst.functionIndex();
+                case RulesProgram.IS_TRUE -> stack.add((pop() instanceof Boolean b) ? b : false);
+                case RulesProgram.FN -> {
+                    int fIndex = (int) instructions[++pointer];
                     var fn = program.functions[fIndex];
                     // Pop arguments from stack in reverse order.
                     Object[] args = new Object[fn.getOperandCount()];
@@ -146,27 +143,29 @@ final class RulesVm {
                     }
                     stack.add(fn.apply(args));
                 }
-                case SET_ERROR -> {
+                case RulesProgram.SET_ERROR -> {
                     var error = (String) pop();
                     throw new RulesEvaluationError(error);
                 }
-                case SET_ENDPOINT -> {
-                    return setEndpoint((Instruction.SetEndpoint) instruction);
+                case RulesProgram.SET_ENDPOINT -> {
+                    boolean hasHeaders = (boolean) instructions[++pointer];
+                    boolean hasProperties = (boolean) instructions[++pointer];
+                    return setEndpoint(hasProperties, hasHeaders);
                 }
-                case CREATE_MAP -> createMap((Instruction.CreateMap) instruction);
-                case CREATE_LIST -> {
-                    var ins = (Instruction.CreateList) instruction;
-                    List<Object> headers = new ArrayList<>(ins.listSize());
-                    for (var i = 0; i < ins.listSize(); i++) {
+                case RulesProgram.CREATE_MAP -> createMap((int) instructions[++pointer]);
+                case RulesProgram.CREATE_LIST -> {
+                    int size = (int) instructions[++pointer];
+                    List<Object> headers = new ArrayList<>(size);
+                    for (var i = 0; i < size; i++) {
                         headers.add(pop());
                     }
                     stack.add(headers);
                 }
-                case RESOLVE_TEMPLATE -> resolveTemplate((Instruction.ResolveTemplate) instruction);
-                case GET_ATTR -> {
-                    var getAttr = (Instruction.GetAttr) instruction;
+                case RulesProgram.RESOLVE_TEMPLATE -> resolveTemplate((StringTemplate) instructions[++pointer]);
+                case RulesProgram.GET_ATTR -> {
+                    AttrExpression getAttr = (AttrExpression) instructions[++pointer];
                     var target = pop();
-                    stack.add(getAttr.expression().apply(target));
+                    stack.add(getAttr.apply(target));
                 }
                 default -> {
                     throw new IllegalStateException("Unknown endpoint instruction: " + instruction);
@@ -177,12 +176,12 @@ final class RulesVm {
         throw new IllegalStateException("No endpoint returned from rules engine");
     }
 
-    private void createMap(Instruction.CreateMap ins) {
-        if (ins.mapSize() == 0) {
+    private void createMap(int size) {
+        if (size == 0) {
             stack.add(Collections.emptyMap());
         } else {
-            Map<String, Object> headers = new HashMap<>(ins.mapSize());
-            for (var i = 0; i < ins.mapSize(); i++) {
+            Map<String, Object> headers = new HashMap<>(size);
+            for (var i = 0; i < size; i++) {
                 var value = pop();
                 var key = pop();
                 if (key instanceof String s) {
@@ -197,10 +196,10 @@ final class RulesVm {
     }
 
     @SuppressWarnings("unchecked")
-    private Endpoint setEndpoint(Instruction.SetEndpoint setEndpoint) {
+    private Endpoint setEndpoint(boolean hasProperties, boolean hasHeaders) {
         var urlString = (String) pop();
-        var properties = (Map<String, Object>) (setEndpoint.hasProperties() ? pop() : Map.of());
-        var headers = (Map<String, List<String>>) (setEndpoint.hasHeaders() ? pop() : Map.of());
+        var properties = (Map<String, Object>) (hasProperties ? pop() : Map.of());
+        var headers = (Map<String, List<String>>) (hasHeaders ? pop() : Map.of());
         var builder = Endpoint.builder().uri(urlString);
         if (!headers.isEmpty()) {
             builder.putProperty(Endpoint.HEADERS, headers);
@@ -212,14 +211,14 @@ final class RulesVm {
         return builder.build();
     }
 
-    private void resolveTemplate(Instruction.ResolveTemplate ins) {
-        if (ins.template().expressionCount() == 0) {
-            stack.add(ins.template().resolve());
+    private void resolveTemplate(StringTemplate template) {
+        if (template.expressionCount() == 0) {
+            stack.add(template.resolve());
         }
-        String[] dynamicValues = new String[ins.template().expressionCount()];
-        for (var i = 0; i < ins.template().expressionCount(); i++) {
+        String[] dynamicValues = new String[template.expressionCount()];
+        for (var i = 0; i < template.expressionCount(); i++) {
             dynamicValues[i] = (String) pop();
         }
-        stack.add(ins.template().resolve(dynamicValues));
+        stack.add(template.resolve(dynamicValues));
     }
 }
