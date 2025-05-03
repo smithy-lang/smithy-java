@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.client.endpointrules;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,8 +16,11 @@ import software.amazon.smithy.java.context.Context;
 final class RulesVm {
 
     private final RulesProgram program;
-    private final List<Object> stack = new ArrayList<>();
+    private final RulesProgram.Register[] registers;
     private final BiFunction<String, Context, Object> builtinProvider;
+    private final byte[] instructions;
+    private Object[] stack = new Object[8];
+    private int stackPosition = 0;
 
     RulesVm(
             Context context,
@@ -27,21 +29,36 @@ final class RulesVm {
             BiFunction<String, Context, Object> builtinProvider
     ) {
         this.program = program;
+        this.instructions = program.instructions;
         this.builtinProvider = builtinProvider;
+
+        // Copy the registers to not continuously push to their stack.
+        registers = new RulesProgram.Register[program.registry.length];
+        for (var i = 0; i < program.registry.length; i++) {
+            registers[i] = program.registry[i].getCopy();
+        }
 
         for (var entry : parameters.entrySet()) {
             var index = program.registryIndex.get(entry.getKey());
             if (index != null) {
-                program.registry[index].push(entry.getValue());
+                registers[index].push(entry.getValue());
             }
         }
 
         // Validate required parameters, fill in defaults, and grab builtins.
-        for (var i = 0; i < program.registry.length; i++) {
-            var register = program.registry[i];
+        for (var i = 0; i < registers.length; i++) {
+            var register = registers[i];
             if (register.get() == null) {
                 initializeRegister(context, i, register);
             }
+        }
+    }
+
+    Endpoint evaluate() {
+        try {
+            return run();
+        } catch (ClassCastException e) {
+            throw new RulesEvaluationError("Unexpected value encountered while evaluating rules engine", e);
         }
     }
 
@@ -71,85 +88,95 @@ final class RulesVm {
         }
     }
 
-    Endpoint evaluate() {
-        try {
-            return run();
-        } catch (ClassCastException e) {
-            throw new RulesEvaluationError("Unexpected value encountered while evaluating rules engine", e);
+    private void push(Object value) {
+        if (stackPosition == stack.length) {
+            int newCapacity = stack.length + (stack.length >> 1);
+            Object[] newStack = new Object[newCapacity];
+            System.arraycopy(stack, 0, newStack, 0, stack.length);
+            stack = newStack;
         }
+        stack[stackPosition++] = value;
     }
 
     private Object pop() {
-        return stack.remove(stack.size() - 1);
+        return stack[--stackPosition]; // no need to clear out the memory since it's tied to lifetime of the VM.
     }
 
     private Object peek() {
-        return stack.get(stack.size() - 1);
+        return stack[stackPosition - 1];
+    }
+
+    // Reads the next two bytes in little-endian order.
+    private int readUnsignedShort(int position) {
+        return EndpointUtils.bytesToShort(instructions, position);
     }
 
     private Endpoint run() {
-        var instructions = program.instructions;
-        for (var pointer = 0; pointer < instructions.length; pointer++) {
-            // Reach the opcode. It can be stored in < 32767, so no need to handle for unsigned.
-            int opcode = instructions[pointer];
-            switch (opcode) {
-                case RulesProgram.PUSH -> {
-                    var register = instructions[++pointer] & 0xFFFF;
-                    stack.add(register);
+        var instructionSize = program.instructionSize;
+        for (var pointer = 0; pointer < instructionSize; pointer++) {
+            switch (instructions[pointer]) {
+                case RulesProgram.LOAD_CONST -> {
+                    int constant = instructions[++pointer] & 0xFF; // read unsigned byte
+                    push(program.constantPool[constant]);
+                }
+                case RulesProgram.LOAD_CONST_W -> {
+                    push(program.constantPool[readUnsignedShort(pointer + 1)]); // read unsigned short
+                    pointer += 2;
                 }
                 case RulesProgram.LOAD_REGISTER -> {
-                    int register = instructions[++pointer] & 0xFFFF;
-                    stack.add(program.registry[register].get());
+                    int register = instructions[++pointer] & 0xFF; // read unsigned byte
+                    push(registers[register].get());
                 }
                 case RulesProgram.PUSH_REGISTER -> {
-                    int register = instructions[++pointer] & 0xFFFF;
-                    program.registry[register].push(peek());
+                    int register = instructions[++pointer] & 0xFF; // read unsigned byte
+                    registers[register].push(peek());
                 }
                 case RulesProgram.POP_REGISTER -> {
-                    int register = instructions[++pointer] & 0xFFFF;
-                    program.registry[register].pop();
+                    int register = instructions[++pointer] & 0xFF; // read unsigned byte
+                    registers[register].pop();
                 }
                 case RulesProgram.JUMP_IF_FALSEY -> {
-                    int target = instructions[++pointer] & 0xFFFF;
                     Object value = pop();
-                    if (value == null || (value instanceof Boolean b && !b)) {
-                        pointer = target - 1; // -1 because loop will increment
+                    if (value == null || Boolean.FALSE.equals(value)) {
+                        pointer = readUnsignedShort(pointer + 1) - 1; // -1 because loop will increment
+                    } else {
+                        pointer += 2;
                     }
                 }
                 case RulesProgram.NOT -> {
                     Object value = pop();
-                    if (value == null) {
-                        stack.add(true);
-                    } else if (value instanceof Boolean b) {
-                        stack.add(!b);
-                    } else {
-                        stack.add(false);
-                    }
+                    push(!(value instanceof Boolean b && b));
                 }
                 case RulesProgram.ISSET -> {
                     Object value = pop();
-                    if (value == null) {
-                        stack.add(false);
-                    } else if (value instanceof Boolean b) {
-                        stack.add(b);
-                    } else {
-                        stack.add(true);
-                    }
+                    // Push true if it's set and not a boolean, or boolean true.
+                    push(value != null && (!(value instanceof Boolean) || (Boolean) value));
                 }
-                case RulesProgram.IS_TRUE -> stack.add((pop() instanceof Boolean b) ? b : false);
+                case RulesProgram.IS_TRUE -> push(pop() instanceof Boolean b && b);
                 case RulesProgram.FN -> {
-                    int fIndex = instructions[++pointer] & 0xFFFF;
+                    int fIndex = instructions[++pointer] & 0xFF; // read unsigned byte
                     var fn = program.functions[fIndex];
-                    // Pop arguments from stack in reverse order.
-                    Object[] args = new Object[fn.getOperandCount()];
-                    for (int i = fn.getOperandCount() - 1; i >= 0; i--) {
-                        args[i] = pop();
-                    }
-                    stack.add(fn.apply(args));
+                    Object result = switch (fn.getOperandCount()) {
+                        case 0 -> fn.apply0();
+                        case 1 -> fn.apply1(pop());
+                        case 2 -> {
+                            Object b = pop();
+                            Object a = pop();
+                            yield fn.apply2(a, b);
+                        }
+                        default -> {
+                            // Pop arguments from stack in reverse order.
+                            Object[] args = new Object[fn.getOperandCount()];
+                            for (int i = fn.getOperandCount() - 1; i >= 0; i--) {
+                                args[i] = pop();
+                            }
+                            yield fn.apply(args);
+                        }
+                    };
+                    push(result);
                 }
                 case RulesProgram.SET_ERROR -> {
-                    var error = (String) pop();
-                    throw new RulesEvaluationError(error);
+                    throw new RulesEvaluationError((String) pop());
                 }
                 case RulesProgram.SET_ENDPOINT -> {
                     short packed = instructions[++pointer];
@@ -157,27 +184,32 @@ final class RulesVm {
                     boolean hasProperties = (packed & 2) != 0;
                     return setEndpoint(hasProperties, hasHeaders);
                 }
-                case RulesProgram.CREATE_MAP -> createMap(instructions[++pointer] & 0xFFFF);
+                case RulesProgram.CREATE_MAP -> {
+                    int size = instructions[++pointer] & 0xFF; // read unsigned byte
+                    createMap(size);
+                }
                 case RulesProgram.CREATE_LIST -> {
-                    int size = instructions[++pointer] & 0xFFFF;
+                    int size = instructions[++pointer] & 0xFF; // read unsigned byte
                     List<Object> headers = new ArrayList<>(size);
                     for (var i = 0; i < size; i++) {
                         headers.add(pop());
                     }
-                    stack.add(headers);
+                    push(headers);
                 }
                 case RulesProgram.RESOLVE_TEMPLATE -> {
-                    var constant = instructions[++pointer] & 0xFFFF;
+                    var constant = readUnsignedShort(pointer + 1);
                     resolveTemplate((StringTemplate) program.constantPool[constant]);
+                    pointer += 2;
                 }
                 case RulesProgram.GET_ATTR -> {
-                    var constant = instructions[++pointer] & 0xFFFF;
+                    var constant = readUnsignedShort(pointer + 1);
                     AttrExpression getAttr = (AttrExpression) program.constantPool[constant];
                     var target = pop();
-                    stack.add(getAttr.apply(target));
+                    push(getAttr.apply(target));
+                    pointer += 2;
                 }
                 default -> {
-                    throw new IllegalStateException("Unknown endpoint instruction: " + opcode);
+                    throw new IllegalStateException("Unknown endpoint instruction: " + instructions[pointer]);
                 }
             }
         }
@@ -186,22 +218,13 @@ final class RulesVm {
     }
 
     private void createMap(int size) {
-        if (size == 0) {
-            stack.add(Collections.emptyMap());
-        } else {
-            Map<String, Object> headers = new HashMap<>(size);
-            for (var i = 0; i < size; i++) {
-                var value = pop();
-                var key = pop();
-                if (key instanceof String s) {
-                    headers.put(s, value);
-                } else {
-                    throw new RulesEvaluationError(
-                            "Rules engine map key expected to be string, but found " + key);
-                }
-            }
-            stack.add(headers);
+        Map<String, Object> headers = new HashMap<>(size);
+        for (var i = 0; i < size; i++) {
+            var value = pop();
+            var key = pop();
+            headers.put((String) key, value);
         }
+        push(headers);
     }
 
     @SuppressWarnings("unchecked")
@@ -222,12 +245,12 @@ final class RulesVm {
 
     private void resolveTemplate(StringTemplate template) {
         if (template.expressionCount() == 0) {
-            stack.add(template.resolve());
+            push(template.resolve());
         }
         String[] dynamicValues = new String[template.expressionCount()];
         for (var i = 0; i < template.expressionCount(); i++) {
             dynamicValues[i] = (String) pop();
         }
-        stack.add(template.resolve(dynamicValues));
+        push(template.resolve(dynamicValues));
     }
 }

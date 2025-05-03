@@ -23,7 +23,7 @@ final class CseOptimizer {
     // Counts how many times an expression is duplicated.
     private final Map<Expression, Double> conditions = new HashMap<>();
 
-    static Map<Expression, Short> apply(List<Rule> rules, int offset) {
+    static Map<Expression, Byte> apply(List<Rule> rules, int offset) {
         var cse = new CseOptimizer();
         for (var rule : rules) {
             cse.apply(1, rule);
@@ -51,14 +51,14 @@ final class CseOptimizer {
         conditions.put(f, conditions.getOrDefault(f, 0.0) + (1 / (depth * 0.5)));
     }
 
-    private Map<Expression, Short> getCse(int offset) {
+    private Map<Expression, Byte> getCse(int offset) {
         int index = offset;
 
         // Only keep duplicated expressions.
-        Map<Expression, Short> result = new HashMap<>();
+        Map<Expression, Byte> result = new HashMap<>();
         for (var e : conditions.entrySet()) {
             if (e.getValue() > 2) {
-                result.put(e.getKey(), (short) index++);
+                result.put(e.getKey(), (byte) index++);
             }
         }
 

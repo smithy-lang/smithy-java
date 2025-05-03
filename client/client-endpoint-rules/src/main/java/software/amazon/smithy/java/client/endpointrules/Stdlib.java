@@ -18,9 +18,7 @@ enum Stdlib implements VmFunction {
     // https://smithy.io/2.0/additional-specs/rules-engine/standard-library.html#stringequals-function
     STRING_EQUALS("stringEquals", 2) {
         @Override
-        public Object apply(Object... operands) {
-            String a = (String) operands[0];
-            String b = (String) operands[1];
+        public Object apply2(Object a, Object b) {
             return Objects.equals(a, b);
         }
     },
@@ -28,10 +26,8 @@ enum Stdlib implements VmFunction {
     // https://smithy.io/2.0/additional-specs/rules-engine/standard-library.html#booleanequals-function
     BOOLEAN_EQUALS("booleanEquals", 2) {
         @Override
-        public Object apply(Object... operands) {
-            Boolean a = (Boolean) operands[0];
-            Boolean b = (Boolean) operands[1];
-            return Objects.equals(a, b);
+        public Object apply2(Object a, Object b) {
+            return Objects.equals((Boolean) a, (Boolean) b);
         }
     },
 
@@ -62,7 +58,7 @@ enum Stdlib implements VmFunction {
     // https://smithy.io/2.0/additional-specs/rules-engine/standard-library.html#isvalidhostlabel-function
     IS_VALID_HOST_LABEL("isValidHostLabel", 1) {
         @Override
-        public Object apply(Object... operands) {
+        public Object apply1(Object arg) {
             // TODO: Implement this.
             //var input = (String) operands[0];
             throw new UnsupportedOperationException("isValidHostLabel is not yet implemented");
@@ -72,8 +68,8 @@ enum Stdlib implements VmFunction {
     // https://smithy.io/2.0/additional-specs/rules-engine/standard-library.html#parseurl-function
     PARSE_URL("parseURL", 1) {
         @Override
-        public Object apply(Object... operands) {
-            String input = (String) operands[0];
+        public Object apply1(Object arg) {
+            String input = (String) arg;
 
             try {
                 return new URI(input);
@@ -86,8 +82,8 @@ enum Stdlib implements VmFunction {
     // https://smithy.io/2.0/additional-specs/rules-engine/standard-library.html#uriencode-function
     URI_ENCODE("uriEncode", 1) {
         @Override
-        public Object apply(Object... operands) {
-            String input = (String) operands[0];
+        public Object apply1(Object arg) {
+            String input = (String) arg;
             StringBuilder encoded = new StringBuilder();
             for (int i = 0; i < input.length();) {
                 int codePoint = input.codePointAt(i);

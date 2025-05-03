@@ -44,7 +44,8 @@ public class VmBench {
                             "Endpoint",
                             "https://example.com",
                             "UseFIPS",
-                            false)));
+                            false)),
+            Map.entry("minimal-ruleset.json-1", Map.of("Region", "us-east-1")));
 
     @Param({
             "yes",
@@ -53,7 +54,8 @@ public class VmBench {
     private String optimize;
 
     @Param({
-            "example-complex-ruleset.json-1"
+            "example-complex-ruleset.json-1",
+            "minimal-ruleset.json-1"
     })
     private String testName;
 

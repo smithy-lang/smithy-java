@@ -92,9 +92,9 @@ final class StringTemplate {
         }
         StringTemplate that = (StringTemplate) o;
         return expressionCount == that.expressionCount
-               && Objects.equals(template, that.template)
-               && Objects.deepEquals(parts, that.parts)
-               && Objects.equals(templateOnly, that.templateOnly);
+                && Objects.equals(template, that.template)
+                && Objects.deepEquals(parts, that.parts)
+                && Objects.equals(templateOnly, that.templateOnly);
     }
 
     @Override

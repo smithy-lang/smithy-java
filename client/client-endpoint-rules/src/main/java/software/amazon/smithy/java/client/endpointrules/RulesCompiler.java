@@ -34,33 +34,34 @@ final class RulesCompiler {
 
     private final EndpointRuleSet rules;
 
-    private final Map<Object, Short> constantPool = new LinkedHashMap<>();
+    private final Map<Object, Integer> constantPool = new LinkedHashMap<>();
 
     // The parsed opcodes and operands.
-    private final List<Short> instructions = new ArrayList<>();
+    private byte[] instructions = new byte[64];
+    private int instructionSize;
 
     // Parameters and captured variables.
     private final List<RulesProgram.Register> registry = new ArrayList<>();
 
     // A map of variable name to stack index.
-    private final Map<String, Short> registryIndex = new HashMap<>();
+    private final Map<String, Byte> registryIndex = new HashMap<>();
 
     // An array of actually used functions.
     private final List<VmFunction> usedFunctions = new ArrayList<>();
 
     // Index of function name to the index in usedFunctions.
-    private final Map<String, Short> usedFunctionIndex = new HashMap<>();
+    private final Map<String, Byte> usedFunctionIndex = new HashMap<>();
 
     // The resolved VM functions (stdLib + given functions).
     private final Map<String, VmFunction> functions = new HashMap<>();
 
     // A map of function variable names to function index.
-    private final Map<String, Short> functionIndex = new HashMap<>();
+    private final Map<String, Byte> functionIndex = new HashMap<>();
 
     private final BiFunction<String, Context, Object> builtinProvider;
 
     private boolean performOptimizations;
-    private final Map<Expression, Short> cse;
+    private final Map<Expression, Byte> cse;
 
     // Stack of bitfields that represent registers that were pushed to during a scope. Supports up to 64.
     private final ArrayList<Long> scopedRegisterStack = new ArrayList<>();
@@ -102,7 +103,7 @@ final class RulesCompiler {
         if (registryIndex.containsKey(name)) {
             throw new RulesEvaluationError("Duplicate variable name found in rules: " + name);
         }
-        registryIndex.put(name, (short) registry.size());
+        registryIndex.put(name, (byte) registry.size());
         registry.add(register);
 
         // Register scopes are tracking by flipping bits of a long. That means a max of 64 registers.
@@ -114,51 +115,36 @@ final class RulesCompiler {
         return register;
     }
 
-    private short getConstant(Object value) {
-        Short index = constantPool.get(value);
+    private int getConstant(Object value) {
+        Integer index = constantPool.get(value);
         if (index == null) {
-            index = (short) (constantPool.size() - 1);
+            index = constantPool.size();
             constantPool.put(value, index);
         }
         return index;
     }
 
-    private short getOrCreateRegister(String name) {
-        Short index = registryIndex.get(name);
+    private byte getOrCreateRegister(String name) {
+        Byte index = registryIndex.get(name);
         if (index == null) {
             addRegister(name, false, null, null);
-            return (short) (registry.size() - 1);
+            return (byte) (registry.size() - 1);
         }
         return index;
     }
 
-    private short getFunctionIndex(String name) {
-        Short index = usedFunctionIndex.get(name);
+    private byte getFunctionIndex(String name) {
+        Byte index = usedFunctionIndex.get(name);
         if (index == null) {
             var fn = functions.get(name);
             if (fn == null) {
                 throw new RulesEvaluationError("Rules engine referenced unknown function: " + name);
             }
-            index = (short) usedFunctionIndex.size();
+            index = (byte) usedFunctionIndex.size();
             usedFunctionIndex.put(name, index);
             usedFunctions.add(fn);
         }
         return index;
-    }
-
-    private void addInstruction(short opcode) {
-        instructions.add(opcode);
-    }
-
-    private void addInstruction(short opcode, short param) {
-        instructions.add(opcode);
-        instructions.add(param);
-    }
-
-    private void addInstruction(short opcode, short param1, short param2) {
-        instructions.add(opcode);
-        instructions.add(param1);
-        instructions.add(param2);
     }
 
     RulesProgram compile() {
@@ -168,7 +154,7 @@ final class RulesCompiler {
             short i = 0;
             for (var e : cse.keySet()) {
                 alwaysCompileExpression(e);
-                addInstruction(RulesProgram.PUSH_REGISTER, i++);
+                add_PUSH_REGISTER((byte) i++);
             }
             performOptimizations = true;
         }
@@ -201,7 +187,7 @@ final class RulesCompiler {
         // Iterate over the bits that were set and ensure their registers pop the value set of the scope.
         while (value != 0) {
             int bitIndex = Long.numberOfTrailingZeros(value);
-            addInstruction(RulesProgram.POP_REGISTER, (short) bitIndex);
+            add_POP_REGISTER((byte) bitIndex);
             value &= value - 1;
         }
     }
@@ -213,7 +199,7 @@ final class RulesCompiler {
             compileRule(rule);
         }
         // Patch in the actual jump target for each condition so it skips over the rules.
-        jump.patchTarget(instructions);
+        jump.patchTarget(instructions, instructionSize);
     }
 
     private JumpIfFalsey compileConditions(Rule rule) {
@@ -232,18 +218,18 @@ final class RulesCompiler {
             var position = scopedRegisterStack.size() - 1;
             var current = scopedRegisterStack.get(position);
             scopedRegisterStack.set(position, current | 1L << register);
-            addInstruction(RulesProgram.PUSH_REGISTER, register);
+            add_PUSH_REGISTER(register);
         });
         // Add the jump instruction after each condition to skip over more conditions or skip over the rule.
-        addInstruction(RulesProgram.JUMP_IF_FALSEY, (short) -1);
-        jump.addPatch(instructions.size() - 1);
+        add_JUMP_IF_FALSEY(0);
+        jump.addPatch(instructionSize - 2);
     }
 
     private void addLiteralOpcodes(Literal literal) {
         if (literal instanceof StringLiteral s) {
             var st = StringTemplate.from(s.value());
             if (st.expressionCount() == 0) {
-                addInstruction(RulesProgram.PUSH, getConstant(st.resolve()));
+                add_LOAD_CONST(st.resolve());
             } else if (st.getTemplateOnly() != null) {
                 // No need to resolve a template if it's just plucking a single value.
                 compileExpression(st.getTemplateOnly());
@@ -255,23 +241,23 @@ final class RulesCompiler {
                         compileExpression(e);
                     }
                 }
-                addInstruction(RulesProgram.RESOLVE_TEMPLATE, getConstant(st));
+                add_RESOLVE_TEMPLATE(st);
             }
         } else if (literal instanceof TupleLiteral t) {
             for (var e : t.members()) {
                 addLiteralOpcodes(e);
             }
-            addInstruction(RulesProgram.CREATE_LIST, (short) t.members().size());
+            add_CREATE_LIST((short) t.members().size());
         } else if (literal instanceof RecordLiteral r) {
             for (var e : r.members().entrySet()) {
-                addInstruction(RulesProgram.PUSH, getConstant(e.getKey().toString()));
+                add_LOAD_CONST(e.getKey().toString());
                 addLiteralOpcodes(e.getValue());
             }
-            addInstruction(RulesProgram.CREATE_MAP, (short) r.members().size());
+            add_CREATE_MAP((short) r.members().size());
         } else if (literal instanceof BooleanLiteral b) {
-            addInstruction(RulesProgram.PUSH, getConstant(b.value().getValue()));
+            add_LOAD_CONST(b.value().getValue());
         } else if (literal instanceof IntegerLiteral i) {
-            addInstruction(RulesProgram.PUSH, getConstant(i.toNode().expectNumberNode().getValue()));
+            add_LOAD_CONST(i.toNode().expectNumberNode().getValue());
         } else {
             throw new UnsupportedOperationException("Unexpected rules engine Literal type: " + literal);
         }
@@ -281,7 +267,7 @@ final class RulesCompiler {
         if (performOptimizations) {
             var register = cse.get(expression);
             if (register != null) {
-                addInstruction(RulesProgram.LOAD_REGISTER, register);
+                add_LOAD_REGISTER(register);
                 return;
             }
         }
@@ -300,28 +286,27 @@ final class RulesCompiler {
             @Override
             public Void visitRef(Reference reference) {
                 var index = getOrCreateRegister(reference.getName().toString());
-                addInstruction(RulesProgram.LOAD_REGISTER, index);
+                add_LOAD_REGISTER(index);
                 return null;
             }
 
             @Override
             public Void visitGetAttr(GetAttr getAttr) {
-                var attr = AttrExpression.from(getAttr);
-                addInstruction(RulesProgram.GET_ATTR, getConstant(attr));
+                add_GET_ATTR(AttrExpression.from(getAttr));
                 return null;
             }
 
             @Override
             public Void visitIsSet(Expression fn) {
                 compileExpression(fn);
-                addInstruction(RulesProgram.ISSET);
+                add_ISSET();
                 return null;
             }
 
             @Override
             public Void visitNot(Expression not) {
                 compileExpression(not);
-                addInstruction(RulesProgram.NOT);
+                add_NOT();
                 return null;
             }
 
@@ -334,16 +319,16 @@ final class RulesCompiler {
                 } else {
                     compileExpression(left);
                     compileExpression(right);
-                    addInstruction(RulesProgram.FN, getFunctionIndex("booleanEquals"));
+                    add_FN(getFunctionIndex("booleanEquals"));
                 }
                 return null;
             }
 
             private void pushBooleanOptimization(BooleanLiteral b, Expression other) {
                 compileExpression(other);
-                addInstruction(RulesProgram.IS_TRUE);
+                add_IS_TRUE();
                 if (!b.value().getValue()) {
-                    addInstruction(RulesProgram.NOT);
+                    add_NOT();
                 }
             }
 
@@ -351,7 +336,7 @@ final class RulesCompiler {
             public Void visitStringEquals(Expression left, Expression right) {
                 compileExpression(left);
                 compileExpression(right);
-                addInstruction(RulesProgram.FN, getFunctionIndex("stringEquals"));
+                add_FN(getFunctionIndex("stringEquals"));
                 return null;
             }
 
@@ -372,7 +357,7 @@ final class RulesCompiler {
                 for (var arg : args) {
                     compileExpression(arg);
                 }
-                addInstruction(RulesProgram.FN, index);
+                add_FN(index);
                 return null;
             }
         });
@@ -391,53 +376,40 @@ final class RulesCompiler {
                     compileExpression(h);
                 }
                 // Process the N header values that are on the stack.
-                addInstruction(RulesProgram.CREATE_LIST, (short) entry.getValue().size());
+                add_CREATE_LIST((short) entry.getValue().size());
                 // Push the header name.
-                addInstruction(RulesProgram.PUSH, getConstant(entry.getKey()));
+                add_LOAD_CONST(entry.getKey());
             }
             // Combine the N headers that are on the stack in the form of String followed by List<String>.
-            addInstruction(RulesProgram.CREATE_MAP, (short) e.getHeaders().size());
+            add_CREATE_MAP((short) e.getHeaders().size());
         }
 
         // Add property instructions.
         if (!e.getProperties().isEmpty()) {
             for (var entry : e.getProperties().entrySet()) {
-                addInstruction(RulesProgram.PUSH, (short) getConstant(entry.getKey().toString()));
+                add_LOAD_CONST(entry.getKey().toString());
                 compileExpression(entry.getValue());
             }
-            addInstruction(RulesProgram.CREATE_MAP, (short) e.getProperties().size());
+            add_CREATE_MAP((short) e.getProperties().size());
         }
 
         // Compile the URL expression (could be a reference, template, etc). This must be the closest on the stack.
         compileExpression(e.getUrl());
-
         // Add the set endpoint instruction.
-        short packed = 0;
-        if (!e.getHeaders().isEmpty()) {
-            packed |= 1;
-        }
-        if (!e.getProperties().isEmpty()) {
-            packed |= 2;
-        }
-        addInstruction(RulesProgram.SET_ENDPOINT, packed);
+        add_SET_ENDPOINT(!e.getHeaders().isEmpty(), !e.getProperties().isEmpty());
         // Patch in the actual jump target for each condition so it skips over the endpoint rule.
-        jump.patchTarget(instructions);
+        jump.patchTarget(instructions, instructionSize);
     }
 
     private void compileErrorRule(ErrorRule rule) {
         var jump = compileConditions(rule);
         compileExpression(rule.getError()); // error message
-        addInstruction(RulesProgram.SET_ERROR);
+        add_SET_ERROR();
         // Patch in the actual jump target for each condition so it skips over the error rule.
-        jump.patchTarget(instructions);
+        jump.patchTarget(instructions, instructionSize);
     }
 
     RulesProgram buildProgram() {
-        var instructions = new short[this.instructions.size()];
-        for (var i = 0; i < this.instructions.size(); i++) {
-            instructions[i] = this.instructions.get(i);
-        }
-
         var registry = new RulesProgram.Register[this.registry.size()];
         this.registry.toArray(registry);
 
@@ -448,11 +420,11 @@ final class RulesCompiler {
         constantPool.keySet().toArray(constPool);
 
         return new RulesProgram(
-                instructions,
+                this.instructions,
+                instructionSize,
                 registry,
                 registryIndex,
                 fns,
-                functionIndex,
                 builtinProvider,
                 constPool);
     }
@@ -464,10 +436,110 @@ final class RulesCompiler {
             instructionPointers.add(position);
         }
 
-        void patchTarget(List<Short> instructions) {
+        void patchTarget(byte[] instructions, int instructionSize) {
+            byte low = (byte) (instructionSize & 0xFF);
+            byte high = (byte) ((instructionSize >> 8) & 0xFF);
             for (var position : instructionPointers) {
-                instructions.set(position, (short) instructions.size());
+                instructions[position] = low;
+                instructions[position + 1] = high;
             }
         }
+    }
+
+    private void add_LOAD_CONST(Object value) {
+        var constant = getConstant(value);
+        if (constant < 256) {
+            addInstruction(RulesProgram.LOAD_CONST);
+            addInstruction((byte) constant);
+        } else {
+            addInstruction(RulesProgram.LOAD_CONST, constant);
+        }
+    }
+
+    private void add_PUSH_REGISTER(byte register) {
+        addInstruction(RulesProgram.PUSH_REGISTER);
+        addInstruction(register);
+    }
+
+    private void add_POP_REGISTER(byte register) {
+        addInstruction(RulesProgram.POP_REGISTER);
+        addInstruction(register);
+    }
+
+    private void add_LOAD_REGISTER(byte register) {
+        addInstruction(RulesProgram.LOAD_REGISTER);
+        addInstruction(register);
+    }
+
+    private void add_JUMP_IF_FALSEY(int target) {
+        addInstruction(RulesProgram.JUMP_IF_FALSEY, target);
+    }
+
+    private void add_NOT() {
+        addInstruction(RulesProgram.NOT);
+    }
+
+    private void add_ISSET() {
+        addInstruction(RulesProgram.ISSET);
+    }
+
+    private void add_SET_ERROR() {
+        addInstruction(RulesProgram.SET_ERROR);
+    }
+
+    private void add_SET_ENDPOINT(boolean hasHeaders, boolean hasProperties) {
+        addInstruction(RulesProgram.SET_ENDPOINT);
+        byte packed = 0;
+        if (hasHeaders) {
+            packed |= 1;
+        }
+        if (hasProperties) {
+            packed |= 2;
+        }
+        addInstruction(packed);
+    }
+
+    private void add_CREATE_LIST(int length) {
+        addInstruction(RulesProgram.CREATE_LIST);
+        addInstruction((byte) length);
+    }
+
+    private void add_CREATE_MAP(int length) {
+        addInstruction(RulesProgram.CREATE_MAP);
+        addInstruction((byte) length);
+    }
+
+    private void add_RESOLVE_TEMPLATE(StringTemplate template) {
+        addInstruction(RulesProgram.RESOLVE_TEMPLATE, getConstant(template));
+    }
+
+    private void add_FN(byte functionIndex) {
+        addInstruction(RulesProgram.FN);
+        addInstruction(functionIndex);
+    }
+
+    private void add_GET_ATTR(AttrExpression expression) {
+        addInstruction(RulesProgram.GET_ATTR, getConstant(expression));
+    }
+
+    private void add_IS_TRUE() {
+        addInstruction(RulesProgram.IS_TRUE);
+    }
+
+    private void addInstruction(byte value) {
+        if (instructionSize >= instructions.length) {
+            // Double the size when needed.
+            byte[] newInstructions = new byte[instructions.length * 2];
+            System.arraycopy(instructions, 0, newInstructions, 0, instructions.length);
+            instructions = newInstructions;
+        }
+        instructions[instructionSize++] = value;
+    }
+
+    private void addInstruction(byte opcode, int value) {
+        addInstruction(opcode);
+        addInstruction((byte) 0);
+        addInstruction((byte) 0);
+        EndpointUtils.shortToTwoBytes(value, instructions, instructionSize - 2);
     }
 }

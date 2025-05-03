@@ -110,4 +110,17 @@ final class EndpointUtils {
             sink.append(value);
         }
     }
+
+    // Read little-endian unsigned short (2 bytes)
+    static int bytesToShort(byte[] instructions, int offset) {
+        int low = instructions[offset] & 0xFF;
+        int high = instructions[offset + 1] & 0xFF;
+        return (high << 8) | low;
+    }
+
+    // Write little-endian unsigned short (2 bytes)
+    static void shortToTwoBytes(int value, byte[] instructions, int offset) {
+        instructions[offset] = (byte) (value & 0xFF);
+        instructions[offset + 1] = (byte) ((value >> 8) & 0xFF);
+    }
 }

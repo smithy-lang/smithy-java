@@ -20,122 +20,130 @@ import software.amazon.smithy.java.context.Context;
  */
 public final class RulesProgram {
     /**
-     * Push a value onto the stack.
+     * Push a value onto the stack. Must be followed by one unsigned byte representing the constant pool index.
      */
-    static final byte PUSH = 0;
+    static final byte LOAD_CONST = 0;
 
     /**
-     * Peeks the value at the top of the stack and pushes it onto the register stack of a register.
+     * Push a value onto the stack. Must be followed by two bytes representing the (short) constant pool index.
      */
-    static final byte PUSH_REGISTER = 1;
+    static final byte LOAD_CONST_W = 1;
 
     /**
-     * Pop a register value off its register stack.
+     * Peeks the value at the top of the stack and pushes it onto the register stack of a register. Must be followed
+     * by the one byte register index.
      */
-    static final byte POP_REGISTER = 2;
+    static final byte PUSH_REGISTER = 2;
 
     /**
-     * Get the value of a register and push it onto the stack.
+     * Pop a register value off its register stack. Must be followed by the one byte register index.
      */
-    static final byte LOAD_REGISTER = 3;
+    static final byte POP_REGISTER = 3;
 
     /**
-     * Jumps to an opcode index if the top of the stack is null or false.
+     * Get the value of a register and push it onto the stack. Must be followed by the one byte register index.
      */
-    static final byte JUMP_IF_FALSEY = 4;
+    static final byte LOAD_REGISTER = 4;
+
+    /**
+     * Jumps to an opcode index if the top of the stack is null or false. Must be followed by two bytes representing
+     * a short index position of the bytecode address.
+     */
+    static final byte JUMP_IF_FALSEY = 5;
 
     /**
      * Pops a value off the stack and pushes true if it is falsey (null or false), or false if not.
      *
      * <p>This implements the "not" function as an opcode.
      */
-    static final byte NOT = 5;
+    static final byte NOT = 6;
 
     /**
      * Pops a value off the stack and pushes true if it is set (that is, not null).
      *
      * <p>This implements the "isset" function as an opcode.
      */
-    static final byte ISSET = 6;
+    static final byte ISSET = 7;
 
     /**
      * Sets an error on the VM and exits.
      *
      * <p>Pops a single value that provides the error string to set.
      */
-    static final byte SET_ERROR = 7;
+    static final byte SET_ERROR = 8;
 
     /**
-     * Sets the endpoint result of the VM and exits.
-     *
-     * <p>Pops two values:
-     * <ol>
-     *     <li>The headers of the endpoint in the form of {@code Map<String, List<String>>}.</li>
-     *     <li>The endpoint URL as a String that is parsed into a URI.</li>
-     * </ol>
+     * Sets the endpoint result of the VM and exits. Must be followed by a byte where the first bit of the byte is
+     * on if the endpoint has headers, and the second bit is on if the endpoint has properties.
      */
-    static final byte SET_ENDPOINT = 8;
+    static final byte SET_ENDPOINT = 9;
 
     /**
-     * Pops N values off the stack and pushes a list of those values onto the stack.
+     * Pops N values off the stack and pushes a list of those values onto the stack. Must be followed by an unsigned
+     * byte that defines the number of elements in the list.
      */
-    static final byte CREATE_LIST = 9;
+    static final byte CREATE_LIST = 10;
 
     /**
      * Pops N*2 values off the stack (key then value), creates a map of those values, and pushes the map onto the
-     * stack. Each popped key must be a string.
+     * stack. Each popped key must be a string. Must be followed by an unsigned byte that defines the
+     * number of entries in the map.
      */
-    static final byte CREATE_MAP = 10;
+    static final byte CREATE_MAP = 11;
 
     /**
-     * Resolves a template string.
+     * Resolves a template string. Must be followed by two bytes, a short, that represents the constant pool index
+     * that stores the StringTemplate.
      *
      * <p>The corresponding instruction has a StringTemplate that tells the VM how many values to pop off the stack.
      * The popped values fill in values into the template. The resolved template value as a string is then pushed onto
      * the stack.
      */
-    static final byte RESOLVE_TEMPLATE = 11;
+    static final byte RESOLVE_TEMPLATE = 12;
 
     /**
-     * Calls a function.
+     * Calls a function. Must be followed by a byte to provide the function index to call.
      *
      * <p>The function pops zero or more values off the stack based on the VmFunction registered for the index,
      * and then pushes the Object result onto the stack.
      */
-    static final byte FN = 12;
+    static final byte FN = 13;
 
     /**
      * Pops the top level value and applies a getAttr expression on it, pushing the result onto the stack.
+     *
+     * <p>Must be followed by two bytes, a short, that represents the constant pool index that stores the
+     * AttrExpression.
      */
-    static final byte GET_ATTR = 13;
+    static final byte GET_ATTR = 14;
 
     /**
      * Pops a value and pushes true if the value is boolean true, false if not.
      */
-    static final byte IS_TRUE = 14;
+    static final byte IS_TRUE = 15;
 
     final Object[] constantPool;
-    final short[] instructions;
+    final byte[] instructions;
+    final int instructionSize;
     final Register[] registry;
-    final Map<String, Short> registryIndex;
+    final Map<String, Byte> registryIndex;
     final VmFunction[] functions;
-    final Map<String, Short> functionIndex;
     private final BiFunction<String, Context, Object> builtinProvider;
 
     RulesProgram(
-            short[] instructions,
+            byte[] instructions,
+            int instructionSize,
             Register[] registry,
-            Map<String, Short> registryIndex,
+            Map<String, Byte> registryIndex,
             VmFunction[] functions,
-            Map<String, Short> functionIndex,
             BiFunction<String, Context, Object> builtinProvider,
             final Object[] constantPool
     ) {
         this.instructions = instructions;
+        this.instructionSize = instructionSize;
         this.registry = registry;
         this.registryIndex = registryIndex;
         this.functions = functions;
-        this.functionIndex = functionIndex;
         this.builtinProvider = builtinProvider;
         this.constantPool = constantPool;
     }
@@ -160,67 +168,121 @@ public final class RulesProgram {
     public String toString() {
         StringBuilder s = new StringBuilder();
 
-        // Write the instructions.
-        s.append("{\n  \"instructions\": [\n");
-        boolean isFirst = true;
-        for (var ins : instructions) {
-            if (!isFirst) {
-                s.append(",\n");
-            } else {
-                isFirst = false;
-            }
-            s.append("    ");
-            EndpointUtils.serializeObject(ins, s);
-        }
-        s.append("\n  ],\n");
-
-        // Write the required function names, in index order.
-        if (functions.length > 0) {
-            s.append("  \"functions\": [\n");
-            isFirst = true;
-            for (var f : functions) {
-                if (!isFirst) {
-                    s.append(",\n");
-                } else {
-                    isFirst = false;
-                }
-                s.append("    \"").append(f.getFunctionName()).append('"');
-            }
-            s.append("\n  ],\n");
-        }
-
         // Write the registry values in index order.
         if (registry.length > 0) {
-            s.append("  \"registry\": [\n");
-            isFirst = true;
+            s.append("Registers:\n");
+            int i = 0;
             for (var r : registry) {
-                if (!isFirst) {
-                    s.append(',').append('\n');
-                } else {
-                    isFirst = false;
-                }
-                s.append("    ");
+                s.append("  ").append(i++).append(": ");
                 r.serialize(s);
+                s.append("\n");
             }
-            s.append("\n  ]\n");
+            s.append("\n");
         }
 
         if (constantPool.length > 0) {
-            s.append("  \"constants\": [\n");
-            isFirst = true;
+            s.append("Constants:\n");
+            var i = 0;
             for (var c : constantPool) {
-                if (!isFirst) {
-                    s.append(',').append('\n');
-                } else {
-                    isFirst = false;
-                }
-                s.append("    ");
+                s.append("  ").append(i++).append(": ");
                 EndpointUtils.serializeObject(c, s);
+                s.append("\n");
             }
-            s.append("\n  ]\n");
+            s.append("\n");
         }
 
-        s.append('}');
+        // Write the required function names, in index order.
+        if (functions.length > 0) {
+            var i = 0;
+            s.append("Functions:\n");
+            for (var f : functions) {
+                s.append("  ").append(i++).append(": ").append(f.getFunctionName()).append("\n");
+            }
+            s.append("\n");
+        }
+
+        // Write the instructions.
+        s.append("Instructions:\n");
+        for (var i = 0; i < instructionSize; i++) {
+            s.append("  ");
+            s.append(String.format("%03d", i));
+            s.append(": ");
+
+            var skip = 0;
+            var name = switch (instructions[i]) {
+                case LOAD_CONST -> {
+                    skip = 1;
+                    yield "LOAD_CONST";
+                }
+                case LOAD_CONST_W -> {
+                    skip = 2;
+                    yield "LOAD_CONST_W";
+                }
+                case PUSH_REGISTER -> {
+                    skip = 1;
+                    yield "PUSH_REGISTER";
+                }
+                case POP_REGISTER -> {
+                    skip = 1;
+                    yield "POP_REGISTER";
+                }
+                case LOAD_REGISTER -> {
+                    skip = 1;
+                    yield "LOAD_REGISTER";
+                }
+                case JUMP_IF_FALSEY -> {
+                    skip = 2;
+                    yield "JUMP_IF_FALSEY";
+                }
+                case NOT -> "NOT";
+                case ISSET -> "ISSET";
+                case SET_ERROR -> "SET_ERROR";
+                case SET_ENDPOINT -> {
+                    skip = 1;
+                    yield "SET_ENDPOINT";
+                }
+                case CREATE_LIST -> {
+                    skip = 1;
+                    yield "CREATE_LIST";
+                }
+                case CREATE_MAP -> {
+                    skip = 1;
+                    yield "CREATE_MAP";
+                }
+                case RESOLVE_TEMPLATE -> {
+                    skip = 2;
+                    yield "RESOLVE_TEMPLATE";
+                }
+                case FN -> {
+                    skip = 1;
+                    yield "FN";
+                }
+                case GET_ATTR -> {
+                    skip = 2;
+                    yield "GET_ATTR";
+                }
+                case IS_TRUE -> "IS_TRUE";
+                default -> "?" + instructions[i];
+            };
+
+            switch (skip) {
+                case 0 -> s.append(name);
+                case 1 -> {
+                    s.append(String.format("%-16s  ", name));
+                    s.append(instructions[i + 1]);
+                    i++;
+                }
+                default -> {
+                    // it's a two-byte unsigned short.
+                    s.append(String.format("%-16s  ", name));
+                    s.append(EndpointUtils.bytesToShort(instructions, i + 1));
+                    i += 2;
+                }
+            }
+
+            s.append("\n");
+        }
+
         return s.toString();
     }
 
@@ -232,34 +294,38 @@ public final class RulesProgram {
         private Object value;
         private Deque<Object> stack;
 
-        public Register(String name, boolean required, Object defaultValue, String builtin) {
+        Register(String name, boolean required, Object defaultValue, String builtin) {
             this.name = name;
             this.required = required;
             this.defaultValue = defaultValue;
             this.builtin = builtin;
         }
 
-        public boolean isRequired() {
+        Register getCopy() {
+            return new Register(name, required, defaultValue, builtin);
+        }
+
+        boolean isRequired() {
             return required;
         }
 
-        public String getName() {
+        String getName() {
             return name;
         }
 
-        public Object getDefault() {
+        Object getDefault() {
             return defaultValue;
         }
 
-        public String getBuiltin() {
+        String getBuiltin() {
             return builtin;
         }
 
-        public Object get() {
+        Object get() {
             return value;
         }
 
-        public void push(Object value) {
+        void push(Object value) {
             // Only deal with stacks when there actually needs to be a stack.
             // Most rules don't end up actually needing the stack.
             if (this.value != null) {
@@ -271,9 +337,13 @@ public final class RulesProgram {
             this.value = value;
         }
 
-        public Object pop() {
-            stack.pop();
-            value = stack.peek();
+        Object pop() {
+            if (stack == null) {
+                value = null;
+            } else {
+                stack.pop();
+                value = stack.peek();
+            }
             return value;
         }
 
