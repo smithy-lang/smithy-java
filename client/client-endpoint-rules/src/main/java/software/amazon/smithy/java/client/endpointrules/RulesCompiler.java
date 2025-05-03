@@ -7,6 +7,7 @@ package software.amazon.smithy.java.client.endpointrules;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -33,31 +34,33 @@ final class RulesCompiler {
 
     private final EndpointRuleSet rules;
 
+    private final Map<Object, Short> constantPool = new LinkedHashMap<>();
+
     // The parsed opcodes and operands.
-    private final List<Object> instructions = new ArrayList<>();
+    private final List<Short> instructions = new ArrayList<>();
 
     // Parameters and captured variables.
     private final List<RulesProgram.Register> registry = new ArrayList<>();
 
     // A map of variable name to stack index.
-    private final Map<String, Integer> registryIndex = new HashMap<>();
+    private final Map<String, Short> registryIndex = new HashMap<>();
 
     // An array of actually used functions.
     private final List<VmFunction> usedFunctions = new ArrayList<>();
 
     // Index of function name to the index in usedFunctions.
-    private final Map<String, Integer> usedFunctionIndex = new HashMap<>();
+    private final Map<String, Short> usedFunctionIndex = new HashMap<>();
 
     // The resolved VM functions (stdLib + given functions).
     private final Map<String, VmFunction> functions = new HashMap<>();
 
     // A map of function variable names to function index.
-    private final Map<String, Integer> functionIndex = new HashMap<>();
+    private final Map<String, Short> functionIndex = new HashMap<>();
 
     private final BiFunction<String, Context, Object> builtinProvider;
 
     private boolean performOptimizations;
-    private final Map<Expression, Integer> cse;
+    private final Map<Expression, Short> cse;
 
     // Stack of bitfields that represent registers that were pushed to during a scope. Supports up to 64.
     private final ArrayList<Long> scopedRegisterStack = new ArrayList<>();
@@ -99,7 +102,7 @@ final class RulesCompiler {
         if (registryIndex.containsKey(name)) {
             throw new RulesEvaluationError("Duplicate variable name found in rules: " + name);
         }
-        registryIndex.put(name, registry.size());
+        registryIndex.put(name, (short) registry.size());
         registry.add(register);
 
         // Register scopes are tracking by flipping bits of a long. That means a max of 64 registers.
@@ -111,39 +114,48 @@ final class RulesCompiler {
         return register;
     }
 
-    private int getOrCreateRegister(String name) {
-        var index = registryIndex.get(name);
+    private short getConstant(Object value) {
+        Short index = constantPool.get(value);
         if (index == null) {
-            addRegister(name, false, null, null);
-            return registry.size() - 1;
+            index = (short) (constantPool.size() - 1);
+            constantPool.put(value, index);
         }
         return index;
     }
 
-    private int getFunctionIndex(String name) {
-        var index = usedFunctionIndex.get(name);
+    private short getOrCreateRegister(String name) {
+        Short index = registryIndex.get(name);
+        if (index == null) {
+            addRegister(name, false, null, null);
+            return (short) (registry.size() - 1);
+        }
+        return index;
+    }
+
+    private short getFunctionIndex(String name) {
+        Short index = usedFunctionIndex.get(name);
         if (index == null) {
             var fn = functions.get(name);
             if (fn == null) {
                 throw new RulesEvaluationError("Rules engine referenced unknown function: " + name);
             }
-            index = usedFunctionIndex.size();
+            index = (short) usedFunctionIndex.size();
             usedFunctionIndex.put(name, index);
             usedFunctions.add(fn);
         }
         return index;
     }
 
-    private void addInstruction(byte opcode) {
+    private void addInstruction(short opcode) {
         instructions.add(opcode);
     }
 
-    private void addInstruction(byte opcode, Object param) {
+    private void addInstruction(short opcode, short param) {
         instructions.add(opcode);
         instructions.add(param);
     }
 
-    private void addInstruction(byte opcode, Object param1, Object param2) {
+    private void addInstruction(short opcode, short param1, short param2) {
         instructions.add(opcode);
         instructions.add(param1);
         instructions.add(param2);
@@ -153,7 +165,7 @@ final class RulesCompiler {
         // Compile common subexpression values up front.
         if (performOptimizations) {
             performOptimizations = false;
-            int i = 0;
+            short i = 0;
             for (var e : cse.keySet()) {
                 alwaysCompileExpression(e);
                 addInstruction(RulesProgram.PUSH_REGISTER, i++);
@@ -189,7 +201,7 @@ final class RulesCompiler {
         // Iterate over the bits that were set and ensure their registers pop the value set of the scope.
         while (value != 0) {
             int bitIndex = Long.numberOfTrailingZeros(value);
-            addInstruction(RulesProgram.POP_REGISTER, bitIndex);
+            addInstruction(RulesProgram.POP_REGISTER, (short) bitIndex);
             value &= value - 1;
         }
     }
@@ -223,7 +235,7 @@ final class RulesCompiler {
             addInstruction(RulesProgram.PUSH_REGISTER, register);
         });
         // Add the jump instruction after each condition to skip over more conditions or skip over the rule.
-        addInstruction(RulesProgram.JUMP_IF_FALSEY, -1);
+        addInstruction(RulesProgram.JUMP_IF_FALSEY, (short) -1);
         jump.addPatch(instructions.size() - 1);
     }
 
@@ -231,7 +243,7 @@ final class RulesCompiler {
         if (literal instanceof StringLiteral s) {
             var st = StringTemplate.from(s.value());
             if (st.expressionCount() == 0) {
-                addInstruction(RulesProgram.PUSH, st.resolve());
+                addInstruction(RulesProgram.PUSH, getConstant(st.resolve()));
             } else if (st.getTemplateOnly() != null) {
                 // No need to resolve a template if it's just plucking a single value.
                 compileExpression(st.getTemplateOnly());
@@ -243,23 +255,23 @@ final class RulesCompiler {
                         compileExpression(e);
                     }
                 }
-                addInstruction(RulesProgram.RESOLVE_TEMPLATE, st);
+                addInstruction(RulesProgram.RESOLVE_TEMPLATE, getConstant(st));
             }
         } else if (literal instanceof TupleLiteral t) {
             for (var e : t.members()) {
                 addLiteralOpcodes(e);
             }
-            addInstruction(RulesProgram.CREATE_LIST, t.members().size());
+            addInstruction(RulesProgram.CREATE_LIST, (short) t.members().size());
         } else if (literal instanceof RecordLiteral r) {
             for (var e : r.members().entrySet()) {
-                addInstruction(RulesProgram.PUSH, e.getKey().toString());
+                addInstruction(RulesProgram.PUSH, getConstant(e.getKey().toString()));
                 addLiteralOpcodes(e.getValue());
             }
-            addInstruction(RulesProgram.CREATE_MAP, r.members().size());
+            addInstruction(RulesProgram.CREATE_MAP, (short) r.members().size());
         } else if (literal instanceof BooleanLiteral b) {
-            addInstruction(RulesProgram.PUSH, b.value().getValue());
+            addInstruction(RulesProgram.PUSH, getConstant(b.value().getValue()));
         } else if (literal instanceof IntegerLiteral i) {
-            addInstruction(RulesProgram.PUSH, i.toNode().expectNumberNode().getValue());
+            addInstruction(RulesProgram.PUSH, getConstant(i.toNode().expectNumberNode().getValue()));
         } else {
             throw new UnsupportedOperationException("Unexpected rules engine Literal type: " + literal);
         }
@@ -295,7 +307,7 @@ final class RulesCompiler {
             @Override
             public Void visitGetAttr(GetAttr getAttr) {
                 var attr = AttrExpression.from(getAttr);
-                addInstruction(RulesProgram.GET_ATTR, attr);
+                addInstruction(RulesProgram.GET_ATTR, getConstant(attr));
                 return null;
             }
 
@@ -379,28 +391,35 @@ final class RulesCompiler {
                     compileExpression(h);
                 }
                 // Process the N header values that are on the stack.
-                addInstruction(RulesProgram.CREATE_LIST, entry.getValue().size());
+                addInstruction(RulesProgram.CREATE_LIST, (short) entry.getValue().size());
                 // Push the header name.
-                addInstruction(RulesProgram.PUSH, entry.getKey());
+                addInstruction(RulesProgram.PUSH, getConstant(entry.getKey()));
             }
             // Combine the N headers that are on the stack in the form of String followed by List<String>.
-            addInstruction(RulesProgram.CREATE_MAP, e.getHeaders().size());
+            addInstruction(RulesProgram.CREATE_MAP, (short) e.getHeaders().size());
         }
 
         // Add property instructions.
         if (!e.getProperties().isEmpty()) {
             for (var entry : e.getProperties().entrySet()) {
-                addInstruction(RulesProgram.PUSH, entry.getKey().toString());
+                addInstruction(RulesProgram.PUSH, (short) getConstant(entry.getKey().toString()));
                 compileExpression(entry.getValue());
             }
-            addInstruction(RulesProgram.CREATE_MAP, e.getProperties().size());
+            addInstruction(RulesProgram.CREATE_MAP, (short) e.getProperties().size());
         }
 
         // Compile the URL expression (could be a reference, template, etc). This must be the closest on the stack.
         compileExpression(e.getUrl());
 
         // Add the set endpoint instruction.
-        addInstruction(RulesProgram.SET_ENDPOINT, !e.getHeaders().isEmpty(), !e.getProperties().isEmpty());
+        short packed = 0;
+        if (!e.getHeaders().isEmpty()) {
+            packed |= 1;
+        }
+        if (!e.getProperties().isEmpty()) {
+            packed |= 2;
+        }
+        addInstruction(RulesProgram.SET_ENDPOINT, packed);
         // Patch in the actual jump target for each condition so it skips over the endpoint rule.
         jump.patchTarget(instructions);
     }
@@ -414,19 +433,28 @@ final class RulesCompiler {
     }
 
     RulesProgram buildProgram() {
-        var instructions = new Object[this.instructions.size()];
-        this.instructions.toArray(instructions);
+        var instructions = new short[this.instructions.size()];
+        for (var i = 0; i < this.instructions.size(); i++) {
+            instructions[i] = this.instructions.get(i);
+        }
+
         var registry = new RulesProgram.Register[this.registry.size()];
         this.registry.toArray(registry);
+
         var fns = new VmFunction[usedFunctions.size()];
         usedFunctions.toArray(fns);
+
+        var constPool = new Object[this.constantPool.size()];
+        constantPool.keySet().toArray(constPool);
+
         return new RulesProgram(
                 instructions,
                 registry,
                 registryIndex,
                 fns,
                 functionIndex,
-                builtinProvider);
+                builtinProvider,
+                constPool);
     }
 
     private static final class JumpIfFalsey {
@@ -436,9 +464,9 @@ final class RulesCompiler {
             instructionPointers.add(position);
         }
 
-        void patchTarget(List<Object> instructions) {
+        void patchTarget(List<Short> instructions) {
             for (var position : instructionPointers) {
-                instructions.set(position, instructions.size());
+                instructions.set(position, (short) instructions.size());
             }
         }
     }

@@ -90,23 +90,27 @@ final class RulesVm {
     private Endpoint run() {
         var instructions = program.instructions;
         for (var pointer = 0; pointer < instructions.length; pointer++) {
-            byte instruction = (byte) instructions[pointer];
-            switch (instruction) {
-                case RulesProgram.PUSH -> stack.add(instructions[++pointer]);
+            // Reach the opcode. It can be stored in < 32767, so no need to handle for unsigned.
+            int opcode = instructions[pointer];
+            switch (opcode) {
+                case RulesProgram.PUSH -> {
+                    var register = instructions[++pointer] & 0xFFFF;
+                    stack.add(register);
+                }
                 case RulesProgram.LOAD_REGISTER -> {
-                    int regIndex = (int) instructions[++pointer];
-                    stack.add(program.registry[regIndex].get());
+                    int register = instructions[++pointer] & 0xFFFF;
+                    stack.add(program.registry[register].get());
                 }
                 case RulesProgram.PUSH_REGISTER -> {
-                    int regIndex = (int) instructions[++pointer];
-                    program.registry[regIndex].push(peek());
+                    int register = instructions[++pointer] & 0xFFFF;
+                    program.registry[register].push(peek());
                 }
                 case RulesProgram.POP_REGISTER -> {
-                    int regIndex = (int) instructions[++pointer];
-                    program.registry[regIndex].pop();
+                    int register = instructions[++pointer] & 0xFFFF;
+                    program.registry[register].pop();
                 }
                 case RulesProgram.JUMP_IF_FALSEY -> {
-                    int target = (int) instructions[++pointer];
+                    int target = instructions[++pointer] & 0xFFFF;
                     Object value = pop();
                     if (value == null || (value instanceof Boolean b && !b)) {
                         pointer = target - 1; // -1 because loop will increment
@@ -134,7 +138,7 @@ final class RulesVm {
                 }
                 case RulesProgram.IS_TRUE -> stack.add((pop() instanceof Boolean b) ? b : false);
                 case RulesProgram.FN -> {
-                    int fIndex = (int) instructions[++pointer];
+                    int fIndex = instructions[++pointer] & 0xFFFF;
                     var fn = program.functions[fIndex];
                     // Pop arguments from stack in reverse order.
                     Object[] args = new Object[fn.getOperandCount()];
@@ -148,27 +152,32 @@ final class RulesVm {
                     throw new RulesEvaluationError(error);
                 }
                 case RulesProgram.SET_ENDPOINT -> {
-                    boolean hasHeaders = (boolean) instructions[++pointer];
-                    boolean hasProperties = (boolean) instructions[++pointer];
+                    short packed = instructions[++pointer];
+                    boolean hasHeaders = (packed & 1) != 0;
+                    boolean hasProperties = (packed & 2) != 0;
                     return setEndpoint(hasProperties, hasHeaders);
                 }
-                case RulesProgram.CREATE_MAP -> createMap((int) instructions[++pointer]);
+                case RulesProgram.CREATE_MAP -> createMap(instructions[++pointer] & 0xFFFF);
                 case RulesProgram.CREATE_LIST -> {
-                    int size = (int) instructions[++pointer];
+                    int size = instructions[++pointer] & 0xFFFF;
                     List<Object> headers = new ArrayList<>(size);
                     for (var i = 0; i < size; i++) {
                         headers.add(pop());
                     }
                     stack.add(headers);
                 }
-                case RulesProgram.RESOLVE_TEMPLATE -> resolveTemplate((StringTemplate) instructions[++pointer]);
+                case RulesProgram.RESOLVE_TEMPLATE -> {
+                    var constant = instructions[++pointer] & 0xFFFF;
+                    resolveTemplate((StringTemplate) program.constantPool[constant]);
+                }
                 case RulesProgram.GET_ATTR -> {
-                    AttrExpression getAttr = (AttrExpression) instructions[++pointer];
+                    var constant = instructions[++pointer] & 0xFFFF;
+                    AttrExpression getAttr = (AttrExpression) program.constantPool[constant];
                     var target = pop();
                     stack.add(getAttr.apply(target));
                 }
                 default -> {
-                    throw new IllegalStateException("Unknown endpoint instruction: " + instruction);
+                    throw new IllegalStateException("Unknown endpoint instruction: " + opcode);
                 }
             }
         }

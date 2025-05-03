@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.client.endpointrules;
 
+import java.util.Arrays;
+import java.util.Objects;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Expression;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Template;
 
@@ -79,5 +81,24 @@ final class StringTemplate {
             }
             return new StringTemplate(template.toString(), parts, expressionCount, null);
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        } else if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        StringTemplate that = (StringTemplate) o;
+        return expressionCount == that.expressionCount
+               && Objects.equals(template, that.template)
+               && Objects.deepEquals(parts, that.parts)
+               && Objects.equals(templateOnly, that.templateOnly);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(template, Arrays.hashCode(parts), expressionCount, templateOnly);
     }
 }

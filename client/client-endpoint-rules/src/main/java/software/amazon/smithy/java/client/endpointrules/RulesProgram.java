@@ -114,20 +114,22 @@ public final class RulesProgram {
      */
     static final byte IS_TRUE = 14;
 
-    final Object[] instructions;
+    final Object[] constantPool;
+    final short[] instructions;
     final Register[] registry;
-    final Map<String, Integer> registryIndex;
+    final Map<String, Short> registryIndex;
     final VmFunction[] functions;
-    final Map<String, Integer> functionIndex;
+    final Map<String, Short> functionIndex;
     private final BiFunction<String, Context, Object> builtinProvider;
 
     RulesProgram(
-            Object[] instructions,
+            short[] instructions,
             Register[] registry,
-            Map<String, Integer> registryIndex,
+            Map<String, Short> registryIndex,
             VmFunction[] functions,
-            Map<String, Integer> functionIndex,
-            BiFunction<String, Context, Object> builtinProvider
+            Map<String, Short> functionIndex,
+            BiFunction<String, Context, Object> builtinProvider,
+            final Object[] constantPool
     ) {
         this.instructions = instructions;
         this.registry = registry;
@@ -135,6 +137,7 @@ public final class RulesProgram {
         this.functions = functions;
         this.functionIndex = functionIndex;
         this.builtinProvider = builtinProvider;
+        this.constantPool = constantPool;
     }
 
     /**
@@ -151,10 +154,6 @@ public final class RulesProgram {
         }
         var vm = new RulesVm(context, this, parameters, builtinProvider);
         return vm.evaluate();
-    }
-
-    public String printDebug() {
-
     }
 
     @Override
@@ -202,6 +201,21 @@ public final class RulesProgram {
                 }
                 s.append("    ");
                 r.serialize(s);
+            }
+            s.append("\n  ]\n");
+        }
+
+        if (constantPool.length > 0) {
+            s.append("  \"constants\": [\n");
+            isFirst = true;
+            for (var c : constantPool) {
+                if (!isFirst) {
+                    s.append(',').append('\n');
+                } else {
+                    isFirst = false;
+                }
+                s.append("    ");
+                EndpointUtils.serializeObject(c, s);
             }
             s.append("\n  ]\n");
         }

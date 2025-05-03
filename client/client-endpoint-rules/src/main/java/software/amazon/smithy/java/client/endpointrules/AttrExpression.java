@@ -9,9 +9,9 @@ import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.GetAttr;
 
-abstract sealed class AttrExpression {
+sealed interface AttrExpression {
 
-    abstract Object apply(Object o);
+    Object apply(Object o);
 
     static AttrExpression from(GetAttr getAttr) {
         var path = getAttr.getPath();
@@ -30,8 +30,8 @@ abstract sealed class AttrExpression {
         // Set the toString value on the final result.
         String str = getAttr.toString(); // in the form of something#path
         int position = str.lastIndexOf('#');
-        result.tostringValue = str.substring(position, str.length() - 1);
-        return result;
+        var tostringValue = str.substring(position, str.length() - 1);
+        return new ToString(tostringValue, result);
     }
 
     static AttrExpression from(GetAttr.Part part) {
@@ -57,9 +57,9 @@ abstract sealed class AttrExpression {
         for (var i = 2; i < values.length; i++) {
             result = new AndThen(result, parsePart(values[i]));
         }
+
         // Set the toString value on the final result.
-        result.tostringValue = value;
-        return result;
+        return new ToString(value, result);
     }
 
     static AttrExpression parsePart(String part) {
@@ -74,69 +74,45 @@ abstract sealed class AttrExpression {
         }
     }
 
-    static final class AndThen extends AttrExpression {
-        String tostringValue;
-        AttrExpression left;
-        AttrExpression right;
-
-        AndThen(AttrExpression left, AttrExpression right) {
-            this.left = left;
-            this.right = right;
+    record ToString(String original, AttrExpression delegate) implements AttrExpression {
+        @Override
+        public Object apply(Object o) {
+            return delegate.apply(o);
         }
 
         @Override
-        Object apply(Object o) {
+        public String toString() {
+            return original;
+        }
+    }
+
+    record AndThen(AttrExpression left, AttrExpression right) implements AttrExpression {
+        @Override
+        public Object apply(Object o) {
             var result = left.apply(o);
             if (result != null) {
                 result = right.apply(result);
             }
             return result;
         }
-
-        @Override
-        public String toString() {
-            return tostringValue;
-        }
     }
 
-    static final class GetKey extends AttrExpression {
-        private final String key;
-
-        GetKey(String key) {
-            this.key = key;
-        }
-
+    record GetKey(String key) implements AttrExpression {
         @Override
         @SuppressWarnings("rawtypes")
-        Object apply(Object o) {
+        public Object apply(Object o) {
             return o instanceof Map m ? m.get(key) : null;
         }
-
-        @Override
-        public String toString() {
-            return key;
-        }
     }
 
-    static final class GetIndex extends AttrExpression {
-        private final int index;
-
-        GetIndex(int index) {
-            this.index = index;
-        }
-
+    record GetIndex(int index) implements AttrExpression {
         @Override
         @SuppressWarnings("rawtypes")
-        Object apply(Object o) {
+        public Object apply(Object o) {
             if (o instanceof List l && l.size() >= index) {
                 return l.get(index);
             }
             return null;
-        }
-
-        @Override
-        public String toString() {
-            return "[" + index + "]";
         }
     }
 }
