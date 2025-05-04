@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.endpointrules;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.GetAttr;
@@ -101,7 +102,13 @@ sealed interface AttrExpression {
         @Override
         @SuppressWarnings("rawtypes")
         public Object apply(Object o) {
-            return o instanceof Map m ? m.get(key) : null;
+            if (o instanceof Map m) {
+                return m.get(key);
+            } else if (o instanceof URI u) {
+                return EndpointUtils.getUriProperty(u, key);
+            } else {
+                return null;
+            }
         }
     }
 

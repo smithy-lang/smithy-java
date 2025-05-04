@@ -19,7 +19,7 @@ enum Stdlib implements VmFunction {
     STRING_EQUALS("stringEquals", 2) {
         @Override
         public Object apply2(Object a, Object b) {
-            return Objects.equals(a, b);
+            return Objects.equals((String) a, (String) b);
         }
     },
 
@@ -70,7 +70,6 @@ enum Stdlib implements VmFunction {
         @Override
         public Object apply1(Object arg) {
             String input = (String) arg;
-
             try {
                 return new URI(input);
             } catch (URISyntaxException e) {

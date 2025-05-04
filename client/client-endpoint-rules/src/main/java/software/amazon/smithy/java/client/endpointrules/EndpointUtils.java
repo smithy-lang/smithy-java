@@ -66,22 +66,21 @@ final class EndpointUtils {
 
         if (value instanceof Map<?, ?> m) {
             for (var e : m.entrySet()) {
+                if (!(e.getKey() instanceof String)) {
+                    throw new UnsupportedOperationException("Endpoint parameter maps must use string keys. Found " + e);
+                }
                 verifyObject(e.getKey());
                 verifyObject(e.getValue());
             }
+            return m;
         }
 
-        throw new UnsupportedOperationException("Unsupported endpoint rules value type given: " + value);
+        throw new UnsupportedOperationException("Unsupported endpoint rules value given: " + value);
     }
 
     static void serializeObject(Object value, StringBuilder sink) {
         if (value instanceof String s) {
             sink.append('"').append(s.replace("\"", "\\\"")).append('"');
-        } else if (value instanceof Boolean || value instanceof Number) {
-            sink.append(value);
-        } else if (value instanceof StringTemplate || value instanceof URI) {
-            // Add quotes to the value and ensure inner quotes are escaped.
-            serializeObject(value.toString(), sink);
         } else if (value instanceof List<?> l) {
             sink.append('[');
             var first = true;
@@ -122,5 +121,58 @@ final class EndpointUtils {
     static void shortToTwoBytes(int value, byte[] instructions, int offset) {
         instructions[offset] = (byte) (value & 0xFF);
         instructions[offset + 1] = (byte) ((value >> 8) & 0xFF);
+    }
+
+    static Object getUriProperty(URI uri, String key) {
+        return switch (key) {
+            case "scheme" -> uri.getScheme();
+            case "path" -> uri.getRawPath();
+            case "normalizedPath" -> getUriNormalizedPath(uri);
+            case "authority" -> uri.getAuthority();
+            case "isIp" -> getUriIsIp(uri);
+            default -> null;
+        };
+    }
+
+    private static boolean getUriIsIp(URI uri) {
+        String host = uri.getHost();
+        if (host == null || host.length() < 2) {
+            return false;
+        }
+
+        // Simple check for IPv6 (enclosed in square brackets)
+        if (host.charAt(0) == '[' && host.charAt(host.length() - 1) == ']') {
+            return true;
+        }
+
+        // Simple IPv4 check: four dot-separated parts that are valid numbers
+        String[] dottedParts = host.split("\\.");
+        if (dottedParts.length != 4) {
+            return false;
+        }
+
+        try {
+            for (String dottedPart : dottedParts) {
+                int value = Integer.parseInt(dottedPart);
+                if (value < 0 || value > 255) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private static String getUriNormalizedPath(URI uri) {
+        var path = uri.getRawPath();
+        // The path segment of the URL. This value is guaranteed to start and end with a / character.
+        if (!path.startsWith("/")) {
+            path = '/' + path;
+        }
+        if (!path.endsWith("/")) {
+            path = path + '/';
+        }
+        return path;
     }
 }
