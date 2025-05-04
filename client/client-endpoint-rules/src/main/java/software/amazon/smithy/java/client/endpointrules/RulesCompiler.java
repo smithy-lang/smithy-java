@@ -298,8 +298,12 @@ final class RulesCompiler {
 
             @Override
             public Void visitIsSet(Expression fn) {
-                compileExpression(fn);
-                add_ISSET();
+                if (fn instanceof Reference ref) {
+                    add_TEST_REGISTER_ISSET(ref.getName().toString());
+                } else {
+                    compileExpression(fn);
+                    add_ISSET();
+                }
                 return null;
             }
 
@@ -325,10 +329,14 @@ final class RulesCompiler {
             }
 
             private void pushBooleanOptimization(BooleanLiteral b, Expression other) {
-                compileExpression(other);
-                add_IS_TRUE();
-                if (!b.value().getValue()) {
-                    add_NOT();
+                if (b.value().getValue() && other instanceof Reference ref) {
+                    add_TEST_REGISTER_IS_TRUE(ref.getName().toString());
+                } else {
+                    compileExpression(other);
+                    add_IS_TRUE();
+                    if (!b.value().getValue()) {
+                        add_NOT();
+                    }
                 }
             }
 
@@ -483,6 +491,11 @@ final class RulesCompiler {
         addInstruction(RulesProgram.ISSET);
     }
 
+    private void add_TEST_REGISTER_ISSET(String register) {
+        addInstruction(RulesProgram.TEST_REGISTER_ISSET);
+        addInstruction(getOrCreateRegister(register));
+    }
+
     private void add_SET_ERROR() {
         addInstruction(RulesProgram.SET_ERROR);
     }
@@ -524,6 +537,11 @@ final class RulesCompiler {
 
     private void add_IS_TRUE() {
         addInstruction(RulesProgram.IS_TRUE);
+    }
+
+    private void add_TEST_REGISTER_IS_TRUE(String register) {
+        addInstruction(RulesProgram.TEST_REGISTER_IS_TRUE);
+        addInstruction(getOrCreateRegister(register));
     }
 
     private void addInstruction(byte value) {

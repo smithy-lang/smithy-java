@@ -123,10 +123,6 @@ final class RulesVm {
                     push(program.constantPool[readUnsignedShort(pointer + 1)]); // read unsigned short
                     pointer += 2;
                 }
-                case RulesProgram.LOAD_REGISTER -> {
-                    int register = instructions[++pointer] & 0xFF; // read unsigned byte
-                    push(registers[register].get());
-                }
                 case RulesProgram.PUSH_REGISTER -> {
                     int register = instructions[++pointer] & 0xFF; // read unsigned byte
                     registers[register].push(peek());
@@ -134,6 +130,10 @@ final class RulesVm {
                 case RulesProgram.POP_REGISTER -> {
                     int register = instructions[++pointer] & 0xFF; // read unsigned byte
                     registers[register].pop();
+                }
+                case RulesProgram.LOAD_REGISTER -> {
+                    int register = instructions[++pointer] & 0xFF; // read unsigned byte
+                    push(registers[register].get());
                 }
                 case RulesProgram.JUMP_IF_FALSEY -> {
                     Object value = pop();
@@ -152,7 +152,37 @@ final class RulesVm {
                     // Push true if it's set and not a boolean, or boolean true.
                     push(value != null && (!(value instanceof Boolean) || (Boolean) value));
                 }
-                case RulesProgram.IS_TRUE -> push(pop() instanceof Boolean b && b);
+                case RulesProgram.TEST_REGISTER_ISSET -> {
+                    int register = instructions[++pointer] & 0xFF; // read unsigned byte
+                    var value = registers[register].get();
+                    push(value != null && (!(value instanceof Boolean) || (Boolean) value));
+                }
+                case RulesProgram.SET_ERROR -> {
+                    throw new RulesEvaluationError((String) pop());
+                }
+                case RulesProgram.SET_ENDPOINT -> {
+                    short packed = instructions[++pointer];
+                    boolean hasHeaders = (packed & 1) != 0;
+                    boolean hasProperties = (packed & 2) != 0;
+                    return setEndpoint(hasProperties, hasHeaders);
+                }
+                case RulesProgram.CREATE_LIST -> {
+                    int size = instructions[++pointer] & 0xFF; // read unsigned byte
+                    List<Object> headers = new ArrayList<>(size);
+                    for (var i = 0; i < size; i++) {
+                        headers.add(pop());
+                    }
+                    push(headers);
+                }
+                case RulesProgram.CREATE_MAP -> {
+                    int size = instructions[++pointer] & 0xFF; // read unsigned byte
+                    createMap(size);
+                }
+                case RulesProgram.RESOLVE_TEMPLATE -> {
+                    var constant = readUnsignedShort(pointer + 1);
+                    resolveTemplate((StringTemplate) program.constantPool[constant]);
+                    pointer += 2;
+                }
                 case RulesProgram.FN -> {
                     int fIndex = instructions[++pointer] & 0xFF; // read unsigned byte
                     var fn = program.functions[fIndex];
@@ -175,38 +205,17 @@ final class RulesVm {
                     };
                     push(result);
                 }
-                case RulesProgram.SET_ERROR -> {
-                    throw new RulesEvaluationError((String) pop());
-                }
-                case RulesProgram.SET_ENDPOINT -> {
-                    short packed = instructions[++pointer];
-                    boolean hasHeaders = (packed & 1) != 0;
-                    boolean hasProperties = (packed & 2) != 0;
-                    return setEndpoint(hasProperties, hasHeaders);
-                }
-                case RulesProgram.CREATE_MAP -> {
-                    int size = instructions[++pointer] & 0xFF; // read unsigned byte
-                    createMap(size);
-                }
-                case RulesProgram.CREATE_LIST -> {
-                    int size = instructions[++pointer] & 0xFF; // read unsigned byte
-                    List<Object> headers = new ArrayList<>(size);
-                    for (var i = 0; i < size; i++) {
-                        headers.add(pop());
-                    }
-                    push(headers);
-                }
-                case RulesProgram.RESOLVE_TEMPLATE -> {
-                    var constant = readUnsignedShort(pointer + 1);
-                    resolveTemplate((StringTemplate) program.constantPool[constant]);
-                    pointer += 2;
-                }
                 case RulesProgram.GET_ATTR -> {
                     var constant = readUnsignedShort(pointer + 1);
                     AttrExpression getAttr = (AttrExpression) program.constantPool[constant];
                     var target = pop();
                     push(getAttr.apply(target));
                     pointer += 2;
+                }
+                case RulesProgram.IS_TRUE -> push(pop() instanceof Boolean b && b);
+                case RulesProgram.TEST_REGISTER_IS_TRUE -> {
+                    int register = instructions[++pointer] & 0xFF; // read unsigned byte
+                    push(registers[register].get() instanceof Boolean b && b);
                 }
                 default -> {
                     throw new IllegalStateException("Unknown endpoint instruction: " + instructions[pointer]);
