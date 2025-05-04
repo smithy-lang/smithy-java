@@ -7,20 +7,36 @@ package software.amazon.smithy.java.client.endpointrules;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ServiceLoader;
 import java.util.function.BiFunction;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.rulesengine.language.EndpointRuleSet;
 
 /**
  * Compiles and loads a rules engine used to resolve endpoints based on Smithy's rules engine traits.
- *
- * TODO: Add service loader for extensions.
  */
 public final class RulesEngine {
+
+    static final List<RulesEngineExtension> EXTENSIONS = new ArrayList<>();
+    static {
+        for (var ext : ServiceLoader.load(RulesEngineExtension.class)) {
+            EXTENSIONS.add(ext);
+        }
+    }
 
     private final List<VmFunction> functions = new ArrayList<>();
     private final List<BiFunction<String, Context, Object>> builtinProviders = new ArrayList<>();
     private boolean performOptimizations = true;
+
+    RulesEngine() {
+        for (var ext : EXTENSIONS) {
+            functions.addAll(ext.getFunctions());
+            var fp = ext.getBuiltinProvider();
+            if (fp != null) {
+                builtinProviders.add(fp);
+            }
+        }
+    }
 
     /**
      * Register a function with the rules engine.
