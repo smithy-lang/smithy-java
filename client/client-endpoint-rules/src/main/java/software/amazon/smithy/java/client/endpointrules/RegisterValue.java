@@ -12,6 +12,7 @@ final class RegisterValue {
 
     final RegisterDefinition definition;
     private Object value;
+    private int position = -1;
     private Deque<Object> stack;
 
     RegisterValue(RegisterDefinition registerDefinition) {
@@ -23,24 +24,24 @@ final class RegisterValue {
     }
 
     void push(Object value) {
-        // Only deal with stacks when there actually needs to be a stack.
-        // Most rules don't end up actually needing the stack.
-        if (this.value != null) {
+        if (position++ > -1) {
             if (stack == null) {
                 stack = new ArrayDeque<>();
+                stack.push(this.value);
             }
-            stack.push(this.value);
+            stack.push(value);
         }
         this.value = value;
     }
 
-    Object pop() {
+    void pop() {
         if (stack == null) {
             value = null;
+            position = -1;
         } else {
             stack.pop();
             value = stack.peek();
+            position--;
         }
-        return value;
     }
 }

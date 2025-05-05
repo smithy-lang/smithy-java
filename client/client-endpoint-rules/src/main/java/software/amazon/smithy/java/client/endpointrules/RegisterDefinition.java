@@ -16,4 +16,8 @@ package software.amazon.smithy.java.client.endpointrules;
  * @param defaultValue An object value that contains a default value for input parameters.
  * @param builtin A string that defines the builtin that provides a default value for input parameters.
  */
-public record RegisterDefinition(String name, boolean required, Object defaultValue, String builtin) {}
+public record RegisterDefinition(String name, boolean required, Object defaultValue, String builtin) {
+    public RegisterDefinition(String name) {
+        this(name, false, null, null);
+    }
+}
