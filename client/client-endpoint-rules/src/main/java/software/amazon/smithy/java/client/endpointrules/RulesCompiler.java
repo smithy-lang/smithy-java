@@ -230,17 +230,12 @@ final class RulesCompiler {
             var st = StringTemplate.from(s.value());
             if (st.expressionCount() == 0) {
                 add_LOAD_CONST(st.resolve());
-            } else if (st.getTemplateOnly() != null) {
+            } else if (st.getSingularExpression() != null) {
                 // No need to resolve a template if it's just plucking a single value.
-                compileExpression(st.getTemplateOnly());
+                compileExpression(st.getSingularExpression());
             } else {
                 // String templates need to push their template placeholders in reverse order.
-                for (int i = st.getParts().length - 1; i >= 0; i--) {
-                    var part = st.getParts()[i];
-                    if (part instanceof Expression e) {
-                        compileExpression(e);
-                    }
-                }
+                st.forEachExpression(this::compileExpression);
                 add_RESOLVE_TEMPLATE(st);
             }
         } else if (literal instanceof TupleLiteral t) {
