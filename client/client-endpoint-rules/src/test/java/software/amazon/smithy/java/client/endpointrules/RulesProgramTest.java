@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,7 @@ public class RulesProgramTest {
                 RulesProgram.SET_ERROR
         };
 
-        return engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers);
+        return engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
     }
 
     @Test

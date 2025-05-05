@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.endpointrules;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -28,7 +29,7 @@ public final class RulesEngine {
         }
     }
 
-    private final List<VmFunction> functions = new ArrayList<>();
+    private final Map<String, VmFunction> functions = new LinkedHashMap<>();
     private final List<BiFunction<String, Context, Object>> builtinProviders = new ArrayList<>();
     private boolean performOptimizations = true;
 
@@ -36,12 +37,13 @@ public final class RulesEngine {
         // Always include the standard builtins, but after any explicitly given builtins.
         builtinProviders.add(Stdlib::standardBuiltins);
 
+        // Always include standard library functions.
+        for (var fn : Stdlib.values()) {
+            this.functions.put(fn.getFunctionName(), fn);
+        }
+
         for (var ext : EXTENSIONS) {
-            functions.addAll(ext.getFunctions());
-            var fp = ext.getBuiltinProvider();
-            if (fp != null) {
-                builtinProviders.add(fp);
-            }
+            addExtension(ext);
         }
     }
 
@@ -52,7 +54,7 @@ public final class RulesEngine {
      * @return the RulesEngine.
      */
     public RulesEngine addFunction(VmFunction fn) {
-        functions.add(fn);
+        functions.put(fn.getFunctionName(), fn);
         return this;
     }
 
@@ -66,7 +68,9 @@ public final class RulesEngine {
      * @return the RulesEngine.
      */
     public RulesEngine addBuiltinProvider(BiFunction<String, Context, Object> builtinProvider) {
-        this.builtinProviders.add(builtinProvider);
+        if (builtinProvider != null) {
+            this.builtinProviders.add(builtinProvider);
+        }
         return this;
     }
 
@@ -77,11 +81,10 @@ public final class RulesEngine {
      * @return the RulesEngine.
      */
     public RulesEngine addExtension(RulesEngineExtension extension) {
-        var provider = extension.getBuiltinProvider();
-        if (provider != null) {
-            builtinProviders.add(provider);
+        addBuiltinProvider(extension.getBuiltinProvider());
+        for (var f : extension.getFunctions()) {
+            addFunction(f);
         }
-        functions.addAll(extension.getFunctions());
         return this;
     }
 
@@ -129,21 +132,37 @@ public final class RulesEngine {
      * @param program Program instructions to load.
      * @param constantPool Array indexed constant pool.
      * @param registers Array indexed registers.
+     * @param functionNames Array of function names used by the program, in order.
      * @return the loaded RulesProgram.
      * @throws RulesEvaluationError if the program is invalid or cannot be loaded.
      */
     @SmithyUnstableApi
-    public RulesProgram fromPrecompiled(ByteBuffer program, Object[] constantPool, RegisterDefinition[] registers) {
+    public RulesProgram fromPrecompiled(
+            ByteBuffer program,
+            Object[] constantPool,
+            RegisterDefinition[] registers,
+            List<String> functionNames
+    ) {
         if (registers.length > 255) {
             throw new IndexOutOfBoundsException("The number of register must fit into a byte");
         }
+
+        // Create an index of register names to their register index array position.
         Map<String, Byte> registryIndex = new HashMap<>(registers.length);
         for (var i = 0; i < registers.length; i++) {
             registryIndex.put(registers[i].name(), (byte) i);
         }
 
-        var arrayFunctions = new VmFunction[functions.size()];
-        functions.toArray(arrayFunctions);
+        // Load the ordered list of functions and fail if any are missing.
+        var indexedFunctions = new VmFunction[functionNames.size()];
+        int i = 0;
+        for (var f : functionNames) {
+            var func = functions.get(f);
+            if (func == null) {
+                throw new UnsupportedOperationException("Rules engine program requires missing function: " + f);
+            }
+            indexedFunctions[i++] = func;
+        }
 
         return new RulesProgram(
                 program.array(),
@@ -151,7 +170,7 @@ public final class RulesEngine {
                 program.remaining(),
                 registers,
                 registryIndex,
-                arrayFunctions,
+                indexedFunctions,
                 createBuiltinProvider(),
                 constantPool);
     }

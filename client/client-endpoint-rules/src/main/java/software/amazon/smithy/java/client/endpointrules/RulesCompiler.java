@@ -53,10 +53,7 @@ final class RulesCompiler {
     private final Map<String, Byte> usedFunctionIndex = new HashMap<>();
 
     // The resolved VM functions (stdLib + given functions).
-    private final Map<String, VmFunction> functions = new HashMap<>();
-
-    // A map of function variable names to function index.
-    private final Map<String, Byte> functionIndex = new HashMap<>();
+    private final Map<String, VmFunction> functions;
 
     private final BiFunction<String, Context, Object> builtinProvider;
 
@@ -68,21 +65,14 @@ final class RulesCompiler {
 
     RulesCompiler(
             EndpointRuleSet rules,
-            List<VmFunction> functions,
+            Map<String, VmFunction> functions,
             BiFunction<String, Context, Object> builtinProvider,
             boolean performOptimizations
     ) {
         this.rules = rules;
         this.builtinProvider = builtinProvider;
         this.performOptimizations = performOptimizations;
-
-        for (var fn : Stdlib.values()) {
-            this.functions.put(fn.getFunctionName(), fn);
-        }
-
-        for (var fn : functions) {
-            this.functions.put(fn.getFunctionName(), fn);
-        }
+        this.functions = functions;
 
         // Optimize away common subexpressions. Do this up-front so we know they are the 0-N registers.
         cse = performOptimizations ? CseOptimizer.apply(rules.getRules(), 0) : Map.of();
