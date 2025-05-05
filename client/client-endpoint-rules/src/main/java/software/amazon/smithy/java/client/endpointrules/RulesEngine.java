@@ -7,11 +7,14 @@ package software.amazon.smithy.java.client.endpointrules;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.function.BiFunction;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.rulesengine.language.EndpointRuleSet;
+import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
  * Compiles and loads a rules engine used to resolve endpoints based on Smithy's rules engine traits.
@@ -30,6 +33,9 @@ public final class RulesEngine {
     private boolean performOptimizations = true;
 
     RulesEngine() {
+        // Always include the standard builtins, but after any explicitly given builtins.
+        builtinProviders.add(Stdlib::standardBuiltins);
+
         for (var ext : EXTENSIONS) {
             functions.addAll(ext.getFunctions());
             var fp = ext.getBuiltinProvider();
@@ -91,17 +97,16 @@ public final class RulesEngine {
         return this;
     }
 
-    /**
-     * Loads a pre-compiled {@link RulesProgram} that was serialized using {@link RulesProgram#toString()}.
-     *
-     * @param program Program instructions to load.
-     * @param constantPool Array indexed constant pool.
-     * @param registers Array indexed registers.
-     * @return the loaded RulesProgram.
-     * @throws RulesEvaluationError if the program is invalid or cannot be loaded.
-     */
-    public RulesProgram fromPrecompiled(ByteBuffer program, Object[] constantPool, RegisterDefinition[] registers) {
-        throw new UnsupportedOperationException("Not yet implemented");
+    private BiFunction<String, Context, Object> createBuiltinProvider() {
+        return (name, ctx) -> {
+            for (var provider : builtinProviders) {
+                var result = provider.apply(name, ctx);
+                if (result != null) {
+                    return result;
+                }
+            }
+            return null;
+        };
     }
 
     /**
@@ -111,18 +116,43 @@ public final class RulesEngine {
      * @return the compiled program.
      */
     public RulesProgram compile(EndpointRuleSet rules) {
-        // Always include the standard builtins, but after any explicitly given builtins.
-        builtinProviders.add(Stdlib::standardBuiltins);
-        // Create an aggregate builtin provider BiFunction.
-        BiFunction<String, Context, Object> builtinProvider = (name, ctx) -> {
-            for (var provider : builtinProviders) {
-                var result = provider.apply(name, ctx);
-                if (result != null) {
-                    return result;
-                }
-            }
-            return null;
-        };
-        return new RulesCompiler(rules, functions, builtinProvider, performOptimizations).compile();
+        return new RulesCompiler(rules, functions, createBuiltinProvider(), performOptimizations).compile();
+    }
+
+    /**
+     * Loads a pre-compiled {@link RulesProgram}.
+     *
+     * <p>Warning: this method does little to no validation of the given program, the constant pool, or registers.
+     * It is up to you to ensure that these values are all correctly provided or else the rule evaluator will fail
+     * during evaluation, or provide unpredictable results.
+     *
+     * @param program Program instructions to load.
+     * @param constantPool Array indexed constant pool.
+     * @param registers Array indexed registers.
+     * @return the loaded RulesProgram.
+     * @throws RulesEvaluationError if the program is invalid or cannot be loaded.
+     */
+    @SmithyUnstableApi
+    public RulesProgram fromPrecompiled(ByteBuffer program, Object[] constantPool, RegisterDefinition[] registers) {
+        if (registers.length > 255) {
+            throw new IndexOutOfBoundsException("The number of register must fit into a byte");
+        }
+        Map<String, Byte> registryIndex = new HashMap<>(registers.length);
+        for (var i = 0; i < registers.length; i++) {
+            registryIndex.put(registers[i].name(), (byte) i);
+        }
+
+        var arrayFunctions = new VmFunction[functions.size()];
+        functions.toArray(arrayFunctions);
+
+        return new RulesProgram(
+                program.array(),
+                program.arrayOffset() + program.position(),
+                program.remaining(),
+                registers,
+                registryIndex,
+                arrayFunctions,
+                createBuiltinProvider(),
+                constantPool);
     }
 }

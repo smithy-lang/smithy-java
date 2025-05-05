@@ -121,7 +121,7 @@ final class RulesVm {
 
     private Endpoint run() {
         var instructionSize = program.instructionSize;
-        for (var pointer = 0; pointer < instructionSize; pointer++) {
+        for (var pointer = program.instructionOffset; pointer < instructionSize; pointer++) {
             switch (instructions[pointer]) {
                 case RulesProgram.LOAD_CONST -> {
                     int constant = instructions[++pointer] & 0xFF; // read unsigned byte

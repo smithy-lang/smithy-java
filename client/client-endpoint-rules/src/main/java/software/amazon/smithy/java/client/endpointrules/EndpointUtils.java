@@ -78,38 +78,6 @@ final class EndpointUtils {
         throw new UnsupportedOperationException("Unsupported endpoint rules value given: " + value);
     }
 
-    static void serializeObject(Object value, StringBuilder sink) {
-        if (value instanceof String s) {
-            sink.append('"').append(s.replace("\"", "\\\"")).append('"');
-        } else if (value instanceof List<?> l) {
-            sink.append('[');
-            var first = true;
-            for (var v : l) {
-                if (!first) {
-                    sink.append(",");
-                }
-                serializeObject(v, sink);
-                first = false;
-            }
-            sink.append(']');
-        } else if (value instanceof Map<?, ?> m) {
-            sink.append('{');
-            var first = true;
-            for (var e : m.entrySet()) {
-                if (!first) {
-                    sink.append(',');
-                }
-                serializeObject(e.getKey(), sink);
-                sink.append(':');
-                serializeObject(e.getValue(), sink);
-                first = false;
-            }
-            sink.append('}');
-        } else {
-            sink.append(value);
-        }
-    }
-
     // Read little-endian unsigned short (2 bytes)
     static int bytesToShort(byte[] instructions, int offset) {
         int low = instructions[offset] & 0xFF;

@@ -14,44 +14,13 @@ import software.amazon.smithy.rulesengine.language.syntax.expressions.Template;
 
 /**
  * Similar to {@link Template}, but built around Object instead of {@link Value}.
+ *
+ * @param template The original template string.
+ * @param parts The template parts.
+ * @param expressionCount The number of expression in the template.
+ * @param singularExpression A non-null expression value if the template contains only an expression.
  */
-final class StringTemplate {
-
-    private final String template;
-    private final Object[] parts;
-    private final int expressionCount;
-    private final Expression singularExpression;
-
-    private StringTemplate(String template, Object[] parts, int expressionCount, Expression singularExpression) {
-        this.template = template;
-        this.parts = parts;
-        this.expressionCount = expressionCount;
-        this.singularExpression = singularExpression;
-    }
-
-    @Override
-    public String toString() {
-        return template.substring(1, template.length() - 1);
-    }
-
-    /**
-     * Get the number of expressions in the template (telling the VM how much to pop).
-     *
-     * @return the expression count.
-     */
-    int expressionCount() {
-        return expressionCount;
-    }
-
-    /**
-     * If the expression contains only an expression and no other text, returns the expression. Otherwise null.
-     *
-     * @return the expression-only or null if there are other parts.
-     */
-    Expression getSingularExpression() {
-        return singularExpression;
-    }
-
+record StringTemplate(String template, Object[] parts, int expressionCount, Expression singularExpression) {
     /**
      * Calls a consumer for every expression in the template.
      *

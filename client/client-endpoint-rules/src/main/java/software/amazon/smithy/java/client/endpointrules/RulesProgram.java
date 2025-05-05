@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.function.BiFunction;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
  * A compiled and ready to run rules engine program.
@@ -136,6 +137,7 @@ public final class RulesProgram {
 
     final Object[] constantPool;
     final byte[] instructions;
+    final int instructionOffset;
     final int instructionSize;
     final RegisterDefinition[] registerDefinitions;
     final Map<String, Byte> registryIndex;
@@ -144,6 +146,7 @@ public final class RulesProgram {
 
     RulesProgram(
             byte[] instructions,
+            int instructionOffset,
             int instructionSize,
             RegisterDefinition[] registerDefinitions,
             Map<String, Byte> registryIndex,
@@ -152,6 +155,7 @@ public final class RulesProgram {
             final Object[] constantPool
     ) {
         this.instructions = instructions;
+        this.instructionOffset = instructionOffset;
         this.instructionSize = instructionSize;
         this.functions = functions;
         this.builtinProvider = builtinProvider;
@@ -176,6 +180,26 @@ public final class RulesProgram {
         return vm.evaluate();
     }
 
+    /**
+     * Get the program's content pool.
+     *
+     * @return the constant pool. Do not modify.
+     */
+    @SmithyUnstableApi
+    public Object[] getConstantPool() {
+        return constantPool;
+    }
+
+    /**
+     * Get the program's registers.
+     *
+     * @return the registers. Do not modify.
+     */
+    @SmithyUnstableApi
+    public RegisterDefinition[] getRegisterDefinitions() {
+        return registerDefinitions;
+    }
+
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder();
@@ -196,9 +220,13 @@ public final class RulesProgram {
             s.append("Constants:\n");
             var i = 0;
             for (var c : constantPool) {
-                s.append("  ").append(i++).append(": ");
-                EndpointUtils.serializeObject(c, s);
-                s.append("\n");
+                s.append("  ")
+                        .append(i++)
+                        .append(": ")
+                        .append(c.getClass().getName())
+                        .append(": ")
+                        .append(c)
+                        .append("\n");
             }
             s.append("\n");
         }

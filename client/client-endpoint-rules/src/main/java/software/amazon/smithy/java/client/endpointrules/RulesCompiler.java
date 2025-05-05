@@ -230,9 +230,9 @@ final class RulesCompiler {
             var st = StringTemplate.from(s.value());
             if (st.expressionCount() == 0) {
                 add_LOAD_CONST(st.resolve());
-            } else if (st.getSingularExpression() != null) {
+            } else if (st.singularExpression() != null) {
                 // No need to resolve a template if it's just plucking a single value.
-                compileExpression(st.getSingularExpression());
+                compileExpression(st.singularExpression());
             } else {
                 // String templates need to push their template placeholders in reverse order.
                 st.forEachExpression(this::compileExpression);
@@ -424,6 +424,7 @@ final class RulesCompiler {
 
         return new RulesProgram(
                 this.instructions,
+                0,
                 instructionSize,
                 registry,
                 registryIndex,

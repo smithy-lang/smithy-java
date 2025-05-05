@@ -20,7 +20,7 @@ sealed interface AttrExpression {
         // Set the toString value on the final result.
         String str = getAttr.toString(); // in the form of something#path
         int position = str.lastIndexOf('#');
-        var tostringValue = str.substring(position, str.length() - 1);
+        var tostringValue = str.substring(position + 1);
 
         if (path.isEmpty()) {
             throw new UnsupportedOperationException("Invalid getAttr expression: requires at least one part");

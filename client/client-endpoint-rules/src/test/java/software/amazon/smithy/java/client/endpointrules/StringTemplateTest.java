@@ -27,8 +27,7 @@ public class StringTemplateTest {
         List<Object> calls = new ArrayList<>();
 
         assertThat(st.expressionCount(), is(1));
-        assertThat(st.getSingularExpression(), notNullValue());
-        assertThat(st.toString(), equalTo("{Region}"));
+        assertThat(st.singularExpression(), notNullValue());
         assertThat(st.resolve("test"), equalTo("test"));
 
         st.forEachExpression(calls::add);
@@ -54,8 +53,7 @@ public class StringTemplateTest {
         List<Object> calls = new ArrayList<>();
 
         assertThat(st.expressionCount(), is(2));
-        assertThat(st.getSingularExpression(), nullValue());
-        assertThat(st.toString(), equalTo("https://foo.{Region}.{Other}.com"));
+        assertThat(st.singularExpression(), nullValue());
         assertThat(st.resolve("abc", "def"), equalTo("https://foo.abc.def.com"));
 
         st.forEachExpression(calls::add);
