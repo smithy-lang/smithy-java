@@ -92,7 +92,7 @@ final class RulesCompiler {
 
         // Add parameters as registry values.
         for (var param : rules.getParameters()) {
-            var defaultValue = param.getDefault().map(EndpointUtils::convertValue).orElse(null);
+            var defaultValue = param.getDefault().map(EndpointUtils::convertInputParamValue).orElse(null);
             var builtinValue = param.getBuiltIn().orElse(null);
             addRegister(param.getName().toString(), param.isRequired(), defaultValue, builtinValue);
         }

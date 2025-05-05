@@ -12,10 +12,13 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.rulesengine.language.evaluation.value.Value;
+import software.amazon.smithy.rulesengine.language.syntax.Identifier;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Template;
 import software.amazon.smithy.utils.Pair;
 
@@ -89,5 +92,37 @@ public class EndpointUtilsTest {
         boolean actual = (boolean) EndpointUtils.getUriProperty(uri, "isIp");
 
         assertThat(expected, equalTo(actual));
+    }
+
+    @ParameterizedTest
+    @MethodSource("testConvertsValuesToObjectsProvider")
+    void testConvertsValuesToObjects(Value value, Object object) {
+        var converted = EndpointUtils.convertInputParamValue(value);
+
+        assertThat(converted,equalTo(object));
+    }
+
+    public static List<Arguments> testConvertsValuesToObjectsProvider() {
+        return List.of(
+            Arguments.of(Value.emptyValue(), null),
+            Arguments.of(Value.stringValue("hi"), "hi"),
+            Arguments.of(Value.booleanValue(true), true),
+            Arguments.of(Value.booleanValue(false), false),
+            Arguments.of(Value.integerValue(1), 1),
+            Arguments.of(Value.arrayValue(List.of(Value.integerValue(1))), List.of(1)),
+            Arguments.of(Value.recordValue(Map.of(Identifier.of("hi"), Value.integerValue(1))),
+                         Map.of("hi", 1))
+
+        );
+    }
+
+    @Test
+    public void getsUriParts() throws Exception {
+        var uri = new URI("http://localhost/foo/bar");
+
+        assertThat(EndpointUtils.getUriProperty(uri, "authority"), equalTo(uri.getAuthority()));
+        assertThat(EndpointUtils.getUriProperty(uri, "scheme"), equalTo(uri.getScheme()));
+        assertThat(EndpointUtils.getUriProperty(uri, "path"), equalTo("/foo/bar"));
+        assertThat(EndpointUtils.getUriProperty(uri, "normalizedPath"), equalTo("/foo/bar/"));
     }
 }

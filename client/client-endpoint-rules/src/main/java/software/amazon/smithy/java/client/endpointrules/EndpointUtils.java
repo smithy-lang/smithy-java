@@ -22,7 +22,7 @@ final class EndpointUtils {
 
     private EndpointUtils() {}
 
-    static Object convertValue(Value value) {
+    static Object convertInputParamValue(Value value) {
         if (value instanceof StringValue s) {
             return s.getValue();
         } else if (value instanceof IntegerValue i) {
@@ -30,7 +30,7 @@ final class EndpointUtils {
         } else if (value instanceof ArrayValue a) {
             var result = new ArrayList<>();
             for (var v : a.getValues()) {
-                result.add(convertValue(v));
+                result.add(convertInputParamValue(v));
             }
             return result;
         } else if (value instanceof EmptyValue) {
@@ -40,7 +40,7 @@ final class EndpointUtils {
         } else if (value instanceof RecordValue r) {
             var result = new HashMap<>();
             for (var e : r.getValue().entrySet()) {
-                result.put(e.getKey().getName().getValue(), convertValue(e.getValue()));
+                result.put(e.getKey().getName().getValue(), convertInputParamValue(e.getValue()));
             }
             return result;
         } else {
