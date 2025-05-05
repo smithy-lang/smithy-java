@@ -43,7 +43,6 @@ public class AttrExpressionTest {
                 Arguments.of("foo[2]", Map.of("foo", List.of("bar")), null),
                 Arguments.of("foo", null, null),
                 Arguments.of("foo[0]", mapWithNull, null),
-                Arguments.of("foo[0]", Map.of("foo", Map.of("bar", "baz")), null)
-        );
+                Arguments.of("foo[0]", Map.of("foo", Map.of("bar", "baz")), null));
     }
 }

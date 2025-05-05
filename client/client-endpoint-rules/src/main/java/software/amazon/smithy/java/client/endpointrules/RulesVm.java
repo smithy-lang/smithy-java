@@ -30,7 +30,7 @@ final class RulesVm {
     });
 
     private final RulesProgram program;
-    private final RulesProgram.Register[] registers;
+    private final RegisterValue[] registers;
     private final BiFunction<String, Context, Object> builtinProvider;
     private final byte[] instructions;
     private Object[] stack = new Object[8];
@@ -47,9 +47,9 @@ final class RulesVm {
         this.builtinProvider = builtinProvider;
 
         // Copy the registers to not continuously push to their stack.
-        registers = new RulesProgram.Register[program.registry.length];
-        for (var i = 0; i < program.registry.length; i++) {
-            registers[i] = program.registry[i].getCopy();
+        registers = new RegisterValue[program.registerDefinitions.length];
+        for (var i = 0; i < program.registerDefinitions.length; i++) {
+            registers[i] = new RegisterValue(program.registerDefinitions[i]);
         }
 
         for (var entry : parameters.entrySet()) {
@@ -76,29 +76,23 @@ final class RulesVm {
         }
     }
 
-    void initializeRegister(Context context, int i, RulesProgram.Register register) {
-        if (register.getDefault() != null) {
-            register.push(register.getDefault());
+    void initializeRegister(Context context, int i, RegisterValue register) {
+        var definition = register.definition;
+        if (definition.defaultValue() != null) {
+            register.push(definition.defaultValue());
             return;
         }
 
-        if (register.getBuiltin() != null) {
-            var builtinValue = builtinProvider.apply(register.getBuiltin(), context);
+        if (definition.builtin() != null) {
+            var builtinValue = builtinProvider.apply(definition.builtin(), context);
             if (builtinValue != null) {
                 register.push(builtinValue);
                 return;
             }
         }
 
-        if (register.isRequired()) {
-            String name = "?";
-            for (var entry : program.registryIndex.entrySet()) {
-                if (entry.getValue() == i) {
-                    name = entry.getKey();
-                    break;
-                }
-            }
-            throw new IllegalArgumentException("Required rules engine parameter missing: " + name);
+        if (definition.required()) {
+            throw new IllegalArgumentException("Required rules engine parameter missing: " + definition.name());
         }
     }
 

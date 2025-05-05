@@ -73,12 +73,12 @@ public class StdlibTest {
             "'sub.domain.example.com',true,true",
             "'192.168.1.1',true,true",
             // Invalid host labels with dots
-            "'.example.com',true,false",   // Starts with dot
-            "'example.com.',true,false",   // Ends with dot
-            "'example..com',true,false",   // Double dots
-            "'exam@ple.com',true,false",   // Invalid character
-            "'-.example.com',true,false",  // Segment starts with hyphen
-            "'example.c*m',true,false",    // Invalid character in segment
+            "'.example.com',true,false", // Starts with dot
+            "'example.com.',true,false", // Ends with dot
+            "'example..com',true,false", // Double dots
+            "'exam@ple.com',true,false", // Invalid character
+            "'-.example.com',true,false", // Segment starts with hyphen
+            "'example.c*m',true,false", // Invalid character in segment
             "'a-very-long-segment-that-is-exactly-64-characters-in-length-1234567.com',true,false" // Segment too long
     })
     public void testsForValidHostLabels(String input, boolean allowDots, boolean isValid) {

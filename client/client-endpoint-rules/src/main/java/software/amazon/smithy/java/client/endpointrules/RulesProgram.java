@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.client.endpointrules;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.Map;
 import java.util.function.BiFunction;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
@@ -139,7 +137,7 @@ public final class RulesProgram {
     final Object[] constantPool;
     final byte[] instructions;
     final int instructionSize;
-    final Register[] registry;
+    final RegisterDefinition[] registerDefinitions;
     final Map<String, Byte> registryIndex;
     final VmFunction[] functions;
     private final BiFunction<String, Context, Object> builtinProvider;
@@ -147,7 +145,7 @@ public final class RulesProgram {
     RulesProgram(
             byte[] instructions,
             int instructionSize,
-            Register[] registry,
+            RegisterDefinition[] registerDefinitions,
             Map<String, Byte> registryIndex,
             VmFunction[] functions,
             BiFunction<String, Context, Object> builtinProvider,
@@ -155,11 +153,11 @@ public final class RulesProgram {
     ) {
         this.instructions = instructions;
         this.instructionSize = instructionSize;
-        this.registry = registry;
-        this.registryIndex = registryIndex;
         this.functions = functions;
         this.builtinProvider = builtinProvider;
         this.constantPool = constantPool;
+        this.registryIndex = registryIndex;
+        this.registerDefinitions = registerDefinitions;
     }
 
     /**
@@ -183,12 +181,12 @@ public final class RulesProgram {
         StringBuilder s = new StringBuilder();
 
         // Write the registry values in index order.
-        if (registry.length > 0) {
+        if (registerDefinitions.length > 0) {
             s.append("Registers:\n");
             int i = 0;
-            for (var r : registry) {
+            for (var r : registerDefinitions) {
                 s.append("  ").append(i++).append(": ");
-                r.serialize(s);
+                s.append(r);
                 s.append("\n");
             }
             s.append("\n");
@@ -308,80 +306,4 @@ public final class RulesProgram {
         return s.toString();
     }
 
-    static final class Register {
-        private final String name;
-        private final boolean required;
-        private final Object defaultValue;
-        private final String builtin;
-        private Object value;
-        private Deque<Object> stack;
-
-        Register(String name, boolean required, Object defaultValue, String builtin) {
-            this.name = name;
-            this.required = required;
-            this.defaultValue = defaultValue;
-            this.builtin = builtin;
-        }
-
-        Register getCopy() {
-            return new Register(name, required, defaultValue, builtin);
-        }
-
-        boolean isRequired() {
-            return required;
-        }
-
-        String getName() {
-            return name;
-        }
-
-        Object getDefault() {
-            return defaultValue;
-        }
-
-        String getBuiltin() {
-            return builtin;
-        }
-
-        Object get() {
-            return value;
-        }
-
-        void push(Object value) {
-            // Only deal with stacks when there actually needs to be a stack.
-            // Most rules don't end up actually needing the stack.
-            if (this.value != null) {
-                if (stack == null) {
-                    stack = new ArrayDeque<>();
-                }
-                stack.push(this.value);
-            }
-            this.value = value;
-        }
-
-        Object pop() {
-            if (stack == null) {
-                value = null;
-            } else {
-                stack.pop();
-                value = stack.peek();
-            }
-            return value;
-        }
-
-        private void serialize(StringBuilder sink) {
-            sink.append("{\"name\":\"").append(name).append('"');
-            if (required) {
-                sink.append(",\"required\":true");
-            }
-            if (builtin != null) {
-                sink.append(",\"builtin\":\"").append(builtin).append('"');
-            }
-            if (defaultValue != null) {
-                sink.append(",\"default\":");
-                EndpointUtils.serializeObject(defaultValue, sink);
-            }
-            sink.append('}');
-        }
-    }
 }

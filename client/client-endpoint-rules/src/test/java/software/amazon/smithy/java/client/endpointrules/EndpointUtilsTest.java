@@ -52,8 +52,7 @@ public class EndpointUtilsTest {
                 Arguments.of(Pair.of("a", "b"), false),
                 Arguments.of(List.of(Pair.of("a", "b")), false),
                 Arguments.of(Map.of(1, 1), false),
-                Arguments.of(Map.of("a", Pair.of("a", "b")), false)
-        );
+                Arguments.of(Map.of("a", Pair.of("a", "b")), false));
     }
 
     @ParameterizedTest
@@ -99,19 +98,19 @@ public class EndpointUtilsTest {
     void testConvertsValuesToObjects(Value value, Object object) {
         var converted = EndpointUtils.convertInputParamValue(value);
 
-        assertThat(converted,equalTo(object));
+        assertThat(converted, equalTo(object));
     }
 
     public static List<Arguments> testConvertsValuesToObjectsProvider() {
         return List.of(
-            Arguments.of(Value.emptyValue(), null),
-            Arguments.of(Value.stringValue("hi"), "hi"),
-            Arguments.of(Value.booleanValue(true), true),
-            Arguments.of(Value.booleanValue(false), false),
-            Arguments.of(Value.integerValue(1), 1),
-            Arguments.of(Value.arrayValue(List.of(Value.integerValue(1))), List.of(1)),
-            Arguments.of(Value.recordValue(Map.of(Identifier.of("hi"), Value.integerValue(1))),
-                         Map.of("hi", 1))
+                Arguments.of(Value.emptyValue(), null),
+                Arguments.of(Value.stringValue("hi"), "hi"),
+                Arguments.of(Value.booleanValue(true), true),
+                Arguments.of(Value.booleanValue(false), false),
+                Arguments.of(Value.integerValue(1), 1),
+                Arguments.of(Value.arrayValue(List.of(Value.integerValue(1))), List.of(1)),
+                Arguments.of(Value.recordValue(Map.of(Identifier.of("hi"), Value.integerValue(1))),
+                        Map.of("hi", 1))
 
         );
     }

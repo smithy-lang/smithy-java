@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.client.endpointrules;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ServiceLoader;
@@ -94,10 +95,12 @@ public final class RulesEngine {
      * Loads a pre-compiled {@link RulesProgram} that was serialized using {@link RulesProgram#toString()}.
      *
      * @param program Program instructions to load.
+     * @param constantPool Array indexed constant pool.
+     * @param registers Array indexed registers.
      * @return the loaded RulesProgram.
      * @throws RulesEvaluationError if the program is invalid or cannot be loaded.
      */
-    public RulesProgram loadProgram(String program) {
+    public RulesProgram fromPrecompiled(ByteBuffer program, Object[] constantPool, RegisterDefinition[] registers) {
         throw new UnsupportedOperationException("Not yet implemented");
     }
 

@@ -41,7 +41,7 @@ final class RulesCompiler {
     private int instructionSize;
 
     // Parameters and captured variables.
-    private final List<RulesProgram.Register> registry = new ArrayList<>();
+    private final List<RegisterDefinition> registry = new ArrayList<>();
 
     // A map of variable name to stack index.
     private final Map<String, Byte> registryIndex = new HashMap<>();
@@ -98,8 +98,8 @@ final class RulesCompiler {
         }
     }
 
-    private RulesProgram.Register addRegister(String name, boolean required, Object defaultValue, String builtin) {
-        var register = new RulesProgram.Register(name, required, defaultValue, builtin);
+    private RegisterDefinition addRegister(String name, boolean required, Object defaultValue, String builtin) {
+        var register = new RegisterDefinition(name, required, defaultValue, builtin);
         if (registryIndex.containsKey(name)) {
             throw new RulesEvaluationError("Duplicate variable name found in rules: " + name);
         }
@@ -413,7 +413,7 @@ final class RulesCompiler {
     }
 
     RulesProgram buildProgram() {
-        var registry = new RulesProgram.Register[this.registry.size()];
+        var registry = new RegisterDefinition[this.registry.size()];
         this.registry.toArray(registry);
 
         var fns = new VmFunction[usedFunctions.size()];

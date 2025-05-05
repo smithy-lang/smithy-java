@@ -110,8 +110,8 @@ final class StringTemplate {
         } else {
             StringTemplate that = (StringTemplate) o;
             return expressionCount == that.expressionCount
-                   && Objects.equals(template, that.template)
-                   && Objects.deepEquals(parts, that.parts);
+                    && Objects.equals(template, that.template)
+                    && Objects.deepEquals(parts, that.parts);
         }
     }
 
