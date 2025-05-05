@@ -5,8 +5,11 @@
 
 package software.amazon.smithy.java.client.endpointrules;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -14,6 +17,17 @@ import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.context.Context;
 
 final class RulesVm {
+
+    private static final int MAX_CACHE_SIZE = 32;
+
+    private static final ThreadLocal<Map<String, URI>> URI_LRU_CACHE = ThreadLocal.withInitial(() -> {
+        return new LinkedHashMap<>(16, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, URI> eldest) {
+                return size() > MAX_CACHE_SIZE;
+            }
+        };
+    });
 
     private final RulesProgram program;
     private final RulesProgram.Register[] registers;
@@ -241,7 +255,7 @@ final class RulesVm {
         var urlString = (String) pop();
         var properties = (Map<String, Object>) (hasProperties ? pop() : Map.of());
         var headers = (Map<String, List<String>>) (hasHeaders ? pop() : Map.of());
-        var builder = Endpoint.builder().uri(urlString);
+        var builder = Endpoint.builder().uri(createUri(urlString));
         if (!headers.isEmpty()) {
             builder.putProperty(Endpoint.HEADERS, headers);
         }
@@ -250,6 +264,20 @@ final class RulesVm {
         }
         // TODO: Add auth schemes and figure out how to map properties there too.
         return builder.build();
+    }
+
+    public static URI createUri(String uriStr) {
+        var cache = URI_LRU_CACHE.get();
+        var uri = cache.get(uriStr);
+        if (uri == null) {
+            try {
+                uri = new URI(uriStr);
+            } catch (URISyntaxException e) {
+                throw new RulesEvaluationError("Error creating URI: " + e.getMessage(), e);
+            }
+            cache.put(uriStr, uri);
+        }
+        return uri;
     }
 
     private void resolveTemplate(StringTemplate template) {
