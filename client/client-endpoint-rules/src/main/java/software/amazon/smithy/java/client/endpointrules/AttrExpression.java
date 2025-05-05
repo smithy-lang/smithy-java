@@ -16,10 +16,16 @@ sealed interface AttrExpression {
 
     static AttrExpression from(GetAttr getAttr) {
         var path = getAttr.getPath();
+
+        // Set the toString value on the final result.
+        String str = getAttr.toString(); // in the form of something#path
+        int position = str.lastIndexOf('#');
+        var tostringValue = str.substring(position, str.length() - 1);
+
         if (path.isEmpty()) {
             throw new UnsupportedOperationException("Invalid getAttr expression: requires at least one part");
         } else if (path.size() == 1) {
-            return from(getAttr.getPath().get(0));
+            return new ToString(tostringValue, from(getAttr.getPath().get(0)));
         }
 
         // Parse the multi-level expression ("foo.bar.baz[9]").
@@ -28,14 +34,10 @@ sealed interface AttrExpression {
             result = new AndThen(result, from(path.get(i)));
         }
 
-        // Set the toString value on the final result.
-        String str = getAttr.toString(); // in the form of something#path
-        int position = str.lastIndexOf('#');
-        var tostringValue = str.substring(position, str.length() - 1);
         return new ToString(tostringValue, result);
     }
 
-    static AttrExpression from(GetAttr.Part part) {
+    private static AttrExpression from(GetAttr.Part part) {
         if (part instanceof GetAttr.Part.Key k) {
             return new GetKey(k.key().toString());
         } else if (part instanceof GetAttr.Part.Index i) {
@@ -50,7 +52,7 @@ sealed interface AttrExpression {
 
         // Parse a single-level expression ("foo" or "bar[0]").
         if (values.length == 1) {
-            return parsePart(value);
+            return new ToString(value, parsePart(value));
         }
 
         // Parse the multi-level expression ("foo.bar.baz[9]").
@@ -63,12 +65,12 @@ sealed interface AttrExpression {
         return new ToString(value, result);
     }
 
-    static AttrExpression parsePart(String part) {
+    private static AttrExpression parsePart(String part) {
         int position = part.indexOf('[');
         if (position == -1) {
             return new GetKey(part);
         } else {
-            String numberString = part.substring(position, part.length() - 1);
+            String numberString = part.substring(position + 1, part.length() - 1);
             int index = Integer.parseInt(numberString);
             String key = part.substring(0, position);
             return new AndThen(new GetKey(key), new GetIndex(index));
