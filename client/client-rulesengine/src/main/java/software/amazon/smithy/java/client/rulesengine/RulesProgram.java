@@ -76,13 +76,13 @@ public final class RulesProgram {
      *
      * <p>Pops a single value that provides the error string to set.
      */
-    static final byte SET_ERROR = 9;
+    static final byte RETURN_ERROR = 9;
 
     /**
      * Sets the endpoint result of the VM and exits. Must be followed by a byte where the first bit of the byte is
      * on if the endpoint has headers, and the second bit is on if the endpoint has properties.
      */
-    static final byte SET_ENDPOINT = 10;
+    static final byte RETURN_ENDPOINT = 10;
 
     /**
      * Pops N values off the stack and pushes a list of those values onto the stack. Must be followed by an unsigned
@@ -280,10 +280,10 @@ public final class RulesProgram {
                     skip = 1;
                     yield "TEST_REGISTER_SET";
                 }
-                case SET_ERROR -> "SET_ERROR";
-                case SET_ENDPOINT -> {
+                case RETURN_ERROR -> "RETURN_ERROR";
+                case RETURN_ENDPOINT -> {
                     skip = 1;
-                    yield "SET_ENDPOINT";
+                    yield "RETURN_ENDPOINT";
                 }
                 case CREATE_LIST -> {
                     skip = 1;

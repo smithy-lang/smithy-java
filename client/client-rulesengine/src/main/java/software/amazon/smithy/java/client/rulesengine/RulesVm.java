@@ -165,10 +165,10 @@ final class RulesVm {
                     var value = registers[register].get();
                     push(value != null && (!(value instanceof Boolean) || (Boolean) value));
                 }
-                case RulesProgram.SET_ERROR -> {
+                case RulesProgram.RETURN_ERROR -> {
                     throw new RulesEvaluationError((String) pop());
                 }
-                case RulesProgram.SET_ENDPOINT -> {
+                case RulesProgram.RETURN_ENDPOINT -> {
                     short packed = instructions[++pointer];
                     boolean hasHeaders = (packed & 1) != 0;
                     boolean hasProperties = (packed & 2) != 0;

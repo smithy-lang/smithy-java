@@ -389,7 +389,7 @@ final class RulesCompiler {
         // Compile the URL expression (could be a reference, template, etc). This must be the closest on the stack.
         compileExpression(e.getUrl());
         // Add the set endpoint instruction.
-        add_SET_ENDPOINT(!e.getHeaders().isEmpty(), !e.getProperties().isEmpty());
+        add_RETURN_ENDPOINT(!e.getHeaders().isEmpty(), !e.getProperties().isEmpty());
         // Patch in the actual jump target for each condition so it skips over the endpoint rule.
         jump.patchTarget(instructions, instructionSize);
     }
@@ -397,7 +397,7 @@ final class RulesCompiler {
     private void compileErrorRule(ErrorRule rule) {
         var jump = compileConditions(rule);
         compileExpression(rule.getError()); // error message
-        add_SET_ERROR();
+        add_RETURN_ERROR();
         // Patch in the actual jump target for each condition so it skips over the error rule.
         jump.patchTarget(instructions, instructionSize);
     }
@@ -482,12 +482,12 @@ final class RulesCompiler {
         addInstruction(getOrCreateRegister(register));
     }
 
-    private void add_SET_ERROR() {
-        addInstruction(RulesProgram.SET_ERROR);
+    private void add_RETURN_ERROR() {
+        addInstruction(RulesProgram.RETURN_ERROR);
     }
 
-    private void add_SET_ENDPOINT(boolean hasHeaders, boolean hasProperties) {
-        addInstruction(RulesProgram.SET_ENDPOINT);
+    private void add_RETURN_ENDPOINT(boolean hasHeaders, boolean hasProperties) {
+        addInstruction(RulesProgram.RETURN_ENDPOINT);
         byte packed = 0;
         if (hasHeaders) {
             packed |= 1;

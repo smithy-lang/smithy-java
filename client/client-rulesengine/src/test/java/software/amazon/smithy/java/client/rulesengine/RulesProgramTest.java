@@ -28,7 +28,7 @@ public class RulesProgramTest {
         assertThat(str, containsString("0: java.lang.String: Error!"));
         assertThat(str, containsString("0: RegisterDefinition[name=a"));
         assertThat(str, containsString("000: LOAD_CONST"));
-        assertThat(str, containsString("002: SET_ERROR"));
+        assertThat(str, containsString("002: RETURN_ERROR"));
     }
 
     private RulesProgram getErrorProgram() {
@@ -39,7 +39,7 @@ public class RulesProgramTest {
         var bytecode = new byte[] {
                 RulesProgram.LOAD_CONST,
                 0,
-                RulesProgram.SET_ERROR
+                RulesProgram.RETURN_ERROR
         };
 
         return engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());

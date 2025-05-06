@@ -52,7 +52,7 @@ public class RulesEngineTest {
                 0,
                 RulesProgram.FN,
                 0,
-                RulesProgram.SET_ERROR
+                RulesProgram.RETURN_ERROR
         };
 
         var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, functions);
@@ -74,7 +74,7 @@ public class RulesEngineTest {
                 0,
                 RulesProgram.FN,
                 0,
-                RulesProgram.SET_ERROR
+                RulesProgram.RETURN_ERROR
         };
 
         Assertions.assertThrows(UnsupportedOperationException.class,
@@ -86,7 +86,7 @@ public class RulesEngineTest {
         var engine = new RulesEngine();
         var constantPool = new Object[0];
         List<String> functions = List.of();
-        var bytecode = new byte[] {RulesProgram.SET_ERROR};
+        var bytecode = new byte[] {RulesProgram.RETURN_ERROR};
         var registers = new RegisterDefinition[257];
         for (var i = 0; i < 257; i++) {
             registers[i] = new RegisterDefinition("r" + i);
@@ -122,7 +122,7 @@ public class RulesEngineTest {
         var bytecode = new byte[] {
                 RulesProgram.LOAD_REGISTER,
                 0,
-                RulesProgram.SET_ERROR
+                RulesProgram.RETURN_ERROR
         };
 
         var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
