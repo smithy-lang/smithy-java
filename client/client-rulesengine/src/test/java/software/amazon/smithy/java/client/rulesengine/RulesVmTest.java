@@ -278,4 +278,135 @@ public class RulesVmTest {
 
         assertThat(result, equalTo(true));
     }
+
+    @Test
+    public void testsIfValueRegisterSet() {
+        var engine = new RulesEngine();
+        var constantPool = new Object[] {};
+        var registers = new RegisterDefinition[] {new RegisterDefinition("hi", false, "abc", null)};
+        var bytecode = new byte[] {RulesProgram.LOAD_REGISTER, 0, RulesProgram.ISSET, RulesProgram.RETURN_VALUE};
+        var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
+        var result = program.run(Context.create(), Map.of());
+
+        assertThat(result, equalTo(true));
+    }
+
+    @Test
+    public void testNotOpcode() {
+        var engine = new RulesEngine();
+        var constantPool = new Object[] {};
+        var registers = new RegisterDefinition[] {new RegisterDefinition("hi", false, false, null)};
+        var bytecode = new byte[] {RulesProgram.LOAD_REGISTER, 0, RulesProgram.NOT, RulesProgram.RETURN_VALUE};
+        var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
+        var result = program.run(Context.create(), Map.of());
+
+        assertThat(result, equalTo(true));
+    }
+
+    @Test
+    public void testTrueOpcodes() {
+        var engine = new RulesEngine();
+        var constantPool = new Object[] {};
+        var registers = new RegisterDefinition[] {
+                new RegisterDefinition("a", false, false, null),
+                new RegisterDefinition("b", false, true, null),
+                new RegisterDefinition("c", false, "foo", null),
+        };
+        var bytecode = new byte[] {
+                RulesProgram.LOAD_REGISTER,
+                0,
+                RulesProgram.IS_TRUE,
+                RulesProgram.LOAD_REGISTER,
+                1,
+                RulesProgram.IS_TRUE,
+                RulesProgram.LOAD_REGISTER,
+                2,
+                RulesProgram.IS_TRUE,
+                RulesProgram.TEST_REGISTER_IS_TRUE,
+                0,
+                RulesProgram.TEST_REGISTER_IS_TRUE,
+                1,
+                RulesProgram.TEST_REGISTER_IS_TRUE,
+                2,
+                RulesProgram.CREATE_LIST,
+                6,
+                RulesProgram.RETURN_VALUE};
+        var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
+        var result = program.run(Context.create(), Map.of());
+
+        assertThat(result, equalTo(List.of(false, true, false, false, true, false)));
+    }
+
+    @Test
+    public void callsFunctions() {
+        var engine = new RulesEngine();
+        engine.addFunction(new VmFunction() {
+            @Override
+            public int getOperandCount() {
+                return 0;
+            }
+
+            @Override
+            public String getFunctionName() {
+                return "gimme";
+            }
+
+            @Override
+            public Object apply0() {
+                return "gimme";
+            }
+        });
+
+        var constantPool = new Object[] {3, 8, false};
+        var registers = new RegisterDefinition[] {new RegisterDefinition("a", false, "hi there", null)};
+        var functions = List.of("stringEquals", "uriEncode", "substring", "gimme");
+        var bytecode = new byte[] {
+                RulesProgram.LOAD_REGISTER,
+                0,
+                RulesProgram.LOAD_REGISTER,
+                0,
+                RulesProgram.FN,
+                0, // "hi there" == "hi there" : true
+                RulesProgram.LOAD_REGISTER,
+                0,
+                RulesProgram.FN,
+                1, // uriEncode "hi there" : "hi%20there"
+                RulesProgram.LOAD_REGISTER,
+                0,
+                RulesProgram.LOAD_CONST,
+                0,
+                RulesProgram.LOAD_CONST,
+                1,
+                RulesProgram.LOAD_CONST,
+                2,
+                RulesProgram.FN,
+                2, // "hi_there" -> "there"
+                RulesProgram.FN,
+                3, // call gimme()
+                RulesProgram.CREATE_LIST,
+                4, // ["gimme", "there", "hi%20there", true]
+                RulesProgram.RETURN_VALUE};
+        var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, functions);
+        var result = program.run(Context.create(), Map.of());
+
+        assertThat(result, equalTo(List.of("gimme", "there", "hi%20there", true)));
+    }
+
+    @Test
+    public void appliesGetAttrOpcode() {
+        var engine = new RulesEngine();
+        var constantPool = new Object[] {AttrExpression.parse("foo")};
+        var registers = new RegisterDefinition[] {new RegisterDefinition("a", false, null, null)};
+        var bytecode = new byte[] {
+                RulesProgram.LOAD_REGISTER,
+                0,
+                RulesProgram.GET_ATTR,
+                0,
+                0,
+                RulesProgram.RETURN_VALUE};
+        var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
+        var result = program.run(Context.create(), Map.of("a", Map.of("foo", "hi")));
+
+        assertThat(result, equalTo("hi"));
+    }
 }
