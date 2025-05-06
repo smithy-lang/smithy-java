@@ -17,6 +17,7 @@ dependencies {
     implementation("software.amazon.smithy.java:aws-client-restjson:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-client-awsjson:$smithyJavaVersion")
     implementation("software.amazon.smithy.java:aws-service-bundle:$smithyJavaVersion")
+    implementation("software.amazon.smithy.java:bundle-api:$smithyJavaVersion")
 }
 
 // Add generated Java files to the main sourceSet

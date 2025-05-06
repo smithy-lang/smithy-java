@@ -19,8 +19,8 @@ import software.amazon.smithy.java.mcp.cli.model.ToolBundleConfig;
 import software.amazon.smithy.java.mcp.server.McpServer;
 import software.amazon.smithy.java.server.FilteredService;
 import software.amazon.smithy.java.server.OperationFilters;
-import software.amazon.smithy.java.server.ProxyService;
 import software.amazon.smithy.java.server.Service;
+import software.amazon.smithy.modelbundle.api.Bundles;
 
 /**
  * Command to start a Smithy MCP server exposing specified tool bundles.
@@ -63,8 +63,7 @@ public final class StartServer extends SmithyMcpCommand {
             switch (toolBundleConfig.type()) {
                 case smithyModeled -> {
                     SmithyModeledToolBundleConfig bundleConfig = toolBundleConfig.getValue();
-                    Service service =
-                            ProxyService.builder().bundle(convert(bundleConfig.getServiceDescriptor())).build();
+                    Service service = Bundles.getProxyService(convert(bundleConfig.getServiceDescriptor()));
                     if (bundleConfig.hasAllowListedTools() || bundleConfig.hasBlockListedTools()) {
                         var filter = OperationFilters.allowList(bundleConfig.getAllowListedTools())
                                 .and(OperationFilters.blockList(bundleConfig.getBlockListedTools()));

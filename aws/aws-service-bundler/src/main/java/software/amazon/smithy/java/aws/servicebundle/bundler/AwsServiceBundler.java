@@ -55,10 +55,6 @@ public final class AwsServiceBundler implements Bundler {
     private final ModelResolver resolver;
     private final String serviceName;
 
-    AwsServiceBundler(String... args) {
-        this(args[0].toLowerCase(Locale.ROOT), GithubModelResolver.INSTANCE);
-    }
-
     AwsServiceBundler(String serviceName, ModelResolver resolver) {
         this.serviceName = serviceName;
         this.resolver = resolver;

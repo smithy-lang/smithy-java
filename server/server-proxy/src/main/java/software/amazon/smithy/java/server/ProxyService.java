@@ -5,21 +5,29 @@
 
 package software.amazon.smithy.java.server;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
+import java.util.function.UnaryOperator;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
-import software.amazon.smithy.java.client.core.RequestOverrideConfig;
+import software.amazon.smithy.java.client.core.ClientProtocol;
+import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
+import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.ModeledException;
+import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
+import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DocumentException;
@@ -29,90 +37,40 @@ import software.amazon.smithy.java.dynamicschemas.SchemaConverter;
 import software.amazon.smithy.java.dynamicschemas.StructDocument;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
-import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
-import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.ToShapeId;
-import software.amazon.smithy.modelbundle.api.BundlePlugin;
-import software.amazon.smithy.modelbundle.api.PluginProviders;
-import software.amazon.smithy.modelbundle.api.model.Bundle;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
 public final class ProxyService implements Service {
-    private static final PluginProviders PLUGIN_PROVIDERS = PluginProviders.builder().build();
 
     private final DynamicClient dynamicClient;
     private final SchemaConverter schemaConverter;
     private final Map<String, Operation<StructDocument, StructDocument>> operations;
     private final TypeRegistry serviceErrorRegistry;
-    private final Model model;
     private final List<Operation<? extends SerializableStruct, ? extends SerializableStruct>> allOperations;
     private final Schema schema;
-    private final BundlePlugin plugin;
-
-    private static software.amazon.smithy.model.Model adapt(Builder builder) {
-        if (builder.bundle == null || builder.bundle.getRequestArguments() == null) {
-            return builder.model;
-        }
-
-        var args = builder.bundle.getRequestArguments();
-        var model = new ModelAssembler()
-                .addModel(builder.model)
-                .addUnparsedModel("args.smithy", args.getModel().getValue())
-                .assemble()
-                .unwrap();
-        var template = model.expectShape(ShapeId.from(args.getIdentifier()))
-                .asStructureShape()
-                .get();
-        var b = model.toBuilder();
-
-        // mix in the generic arg members
-        for (var op : model.getOperationShapes()) {
-            var input = model.expectShape(op.getInput().get(), StructureShape.class).toBuilder();
-            for (var member : template.members()) {
-                input.addMember(member.toBuilder()
-                        .id(ShapeId.from(input.getId().toString() + "$" + member.getMemberName()))
-                        .build());
-            }
-            b.addShape(input.build());
-        }
-
-        for (var service : model.getServiceShapes()) {
-            b.addShape(service.toBuilder()
-                    // trim the endpoint rules because they're huge and we don't need them
-                    .removeTrait(ShapeId.from("smithy.rules#endpointRuleSet"))
-                    .removeTrait(ShapeId.from("smithy.rules#endpointTests"))
-                    .build());
-        }
-
-        return b.build();
-    }
 
     private ProxyService(Builder builder) {
-        this.model = adapt(builder);
+        var model = builder.model;
         DynamicClient.Builder clientBuilder = DynamicClient.builder()
                 .service(builder.service)
-                .model(model);
-        if (builder.bundle != null) {
-            this.plugin = PLUGIN_PROVIDERS.getProvider(builder.bundle.getConfigType(), builder.bundle.getConfig());
-            clientBuilder.endpointResolver(EndpointResolver.staticEndpoint("http://placeholder"));
-        } else {
-            this.plugin = null;
-            // TODO: render this as a bundle
-            clientBuilder.endpointResolver(EndpointResolver.staticEndpoint(builder.proxyEndpoint));
-            if (builder.identityResolver != null) {
-                clientBuilder.addIdentityResolver(builder.identityResolver);
-            }
-            if (builder.authScheme != null) {
-                clientBuilder.authSchemeResolver(builder.authScheme);
-            }
-            if (builder.region != null) {
-                clientBuilder.putConfig(RegionSetting.REGION, builder.region);
-            }
+                .model(builder.model);
+        clientBuilder.endpointResolver(EndpointResolver.staticEndpoint(builder.proxyEndpoint));
+        if (builder.identityResolver != null) {
+            clientBuilder.addIdentityResolver(builder.identityResolver);
+        }
+        if (builder.authScheme != null) {
+            clientBuilder.authSchemeResolver(builder.authScheme);
+        }
+        if (builder.region != null) {
+            clientBuilder.putConfig(RegionSetting.REGION, builder.region);
+        }
+        if (builder.clientConfigurator != null) {
+            clientBuilder = (DynamicClient.Builder) builder.clientConfigurator.apply(clientBuilder);
         }
         this.dynamicClient = clientBuilder.build();
         this.schemaConverter = new SchemaConverter(model);
@@ -120,7 +78,7 @@ public final class ProxyService implements Service {
         var registryBuilder = TypeRegistry.builder();
         var service = model.expectShape(builder.service, ServiceShape.class);
         for (var e : service.getErrors()) {
-            registerError(e, builder.service, registryBuilder);
+            registerError(e, builder.service, registryBuilder, model);
         }
         this.serviceErrorRegistry = registryBuilder.build();
         this.allOperations = new ArrayList<>();
@@ -132,8 +90,7 @@ public final class ProxyService implements Service {
                             schemaConverter,
                             model,
                             operation,
-                            service,
-                            plugin);
+                            service);
             Operation<StructDocument,
                     StructDocument> serverOperation = Operation.of(operationName,
                             function,
@@ -142,7 +99,7 @@ public final class ProxyService implements Service {
                                     model,
                                     service,
                                     serviceErrorRegistry,
-                                    (e, rb) -> registerError(e, builder.service, rb)),
+                                    (e, rb) -> registerError(e, builder.service, rb, model)),
                             this);
             allOperations.add(serverOperation);
             operations.put(operationName, serverOperation);
@@ -150,7 +107,7 @@ public final class ProxyService implements Service {
         this.schema = schemaConverter.getSchema(service);
     }
 
-    private void registerError(ShapeId e, ShapeId serviceId, TypeRegistry.Builder registryBuilder) {
+    private void registerError(ShapeId e, ShapeId serviceId, TypeRegistry.Builder registryBuilder, Model model) {
         var error = model.expectShape(e);
         var errorSchema = schemaConverter.getSchema(error);
         registryBuilder.putType(e,
@@ -191,7 +148,7 @@ public final class ProxyService implements Service {
         private IdentityResolver<? extends Identity> identityResolver;
         private String proxyEndpoint;
         private AuthSchemeResolver authScheme;
-        private Bundle bundle;
+        private UnaryOperator<DynamicClient.Builder> clientConfigurator;
 
         private Builder() {}
 
@@ -253,16 +210,8 @@ public final class ProxyService implements Service {
             return this;
         }
 
-        public Builder bundle(Bundle bundle) {
-            this.bundle = bundle;
-            this.model = new ModelAssembler()
-                    .putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
-                    .addUnparsedModel("bundle.json", bundle.getModel().getValue())
-                    // synthetic members may cause certain validations to fail, but it's ok for this application
-                    .disableValidation()
-                    .assemble()
-                    .unwrap();
-            this.service = ShapeId.from(bundle.getServiceName());
+        public Builder clientConfigurator(UnaryOperator<DynamicClient.Builder> clientConfigurator) {
+            this.clientConfigurator = clientConfigurator;
             return this;
         }
     }
@@ -273,17 +222,11 @@ public final class ProxyService implements Service {
             SchemaConverter schemaConverter,
             Model model,
             OperationShape operationShape,
-            ServiceShape serviceShape,
-            BundlePlugin plugin) implements BiFunction<StructDocument, RequestContext, StructDocument> {
+            ServiceShape serviceShape) implements BiFunction<StructDocument, RequestContext, StructDocument> {
 
         @Override
         public StructDocument apply(StructDocument input, RequestContext requestContext) {
-            RequestOverrideConfig bundleSettings = null;
-            if (plugin != null) {
-                bundleSettings = plugin.buildOverride(input).build();
-            }
-            return createStructDocument(operationShape.getOutput().get(),
-                    dynamicClient.call(operation, input, bundleSettings));
+            return createStructDocument(operationShape.getOutput().get(), dynamicClient.call(operation, input));
         }
 
         private StructDocument createStructDocument(ToShapeId shape, Document value) {
@@ -295,4 +238,53 @@ public final class ProxyService implements Service {
         }
     }
 
+    private static class NoOpClientProtocol<I, O> implements ClientProtocol<I, O> {
+
+        private static final NoOpClientProtocol INSTANCE = new NoOpClientProtocol();
+
+        private NoOpClientProtocol() {
+
+        }
+
+        @Override
+        public ShapeId id() {
+            return null;
+        }
+
+        @Override
+        public Codec payloadCodec() {
+            return null;
+        }
+
+        @Override
+        public MessageExchange<I, O> messageExchange() {
+            return null;
+        }
+
+        @Override
+        public <I1 extends SerializableStruct, O1 extends SerializableStruct> I createRequest(
+                ApiOperation<I1, O1> operation,
+                I1 input,
+                Context context,
+                URI endpoint
+        ) {
+            return null;
+        }
+
+        @Override
+        public I setServiceEndpoint(I request, Endpoint endpoint) {
+            return null;
+        }
+
+        @Override
+        public <I1 extends SerializableStruct, O1 extends SerializableStruct> CompletableFuture<O1> deserializeResponse(
+                ApiOperation<I1, O1> operation,
+                Context context,
+                TypeRegistry errorRegistry,
+                I request,
+                O response
+        ) {
+            return null;
+        }
+    }
 }

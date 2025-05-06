@@ -17,6 +17,7 @@ dependencies {
     api(project(":client:client-auth-api"))
     api(project(":client:client-core"))
     api(project(":dynamic-schemas"))
+    api(project(":server:server-proxy"))
 }
 
 afterEvaluate {

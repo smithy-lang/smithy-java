@@ -13,12 +13,11 @@ dependencies {
     api(project(":core"))
     api(project(":context"))
     api(project(":framework-errors"))
-    api(project(":model-bundler:bundle-api"))
+    api(project(":client:dynamic-client"))
     implementation(libs.smithy.model)
     implementation(project(":io"))
     implementation(project(":logging"))
     implementation(project(":dynamic-schemas"))
-    implementation(project(":client:dynamic-client"))
     implementation(project(":client:client-core"))
     implementation(project(":aws:client:aws-client-http"))
 }

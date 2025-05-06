@@ -3,6 +3,7 @@ package software.amazon.smithy.java.example.server.mcp;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.server.ProxyService;
 import software.amazon.smithy.java.mcp.server.McpServer;
+import software.amazon.smithy.modelbundle.api.Bundles;
 import software.amazon.smithy.modelbundle.api.model.Bundle;
 
 import java.util.Objects;
@@ -10,13 +11,11 @@ import java.util.Objects;
 public final class BundleMCPServerExample {
     public static void main(String[] args) throws Exception {
         try {
+            var bundle = loadBundle("dynamodb.json");
             var mcpServer = McpServer.builder()
                 .stdio()
                 .name("smithy-mcp-server")
-                .addService(
-                    ProxyService.builder()
-                        .bundle(loadBundle("dynamodb.json"))
-                        .build())
+                .addService(Bundles.getProxyService(bundle))
                 .build();
 
             mcpServer.start();

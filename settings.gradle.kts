@@ -97,3 +97,6 @@ include(":mcp:mcp-cli-api")
 
 include(":model-bundler:bundle-api")
 include(":model-bundler:bundle-cli")
+
+include("coral-bundle-types")
+include("mcp:mcp-bundle-api")

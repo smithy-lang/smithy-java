@@ -16,7 +16,7 @@ public final class PluginProviders {
         this.providers = builder.providers;
     }
 
-    public BundlePlugin getProvider(String identifier, Document input) {
+    public BundlePlugin getPlugin(String identifier, Document input) {
         var provider = providers.get(identifier);
         if (provider == null) {
             throw new NullPointerException("no auth provider named " + identifier);
