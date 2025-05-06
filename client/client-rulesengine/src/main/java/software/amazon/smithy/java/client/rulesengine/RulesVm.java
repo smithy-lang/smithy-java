@@ -62,9 +62,10 @@ final class RulesVm {
         }
     }
 
-    Endpoint evaluate() {
+    @SuppressWarnings("unchecked")
+    <T> T evaluate() {
         try {
-            return run();
+            return (T) run();
         } catch (ClassCastException e) {
             throw createError("Unexpected value type encountered while evaluating rules engine", e);
         } catch (ArrayIndexOutOfBoundsException e) {
@@ -93,7 +94,7 @@ final class RulesVm {
         }
 
         if (definition.required()) {
-            throw new IllegalArgumentException("Required rules engine parameter missing: " + definition.name());
+            throw new RulesEvaluationError("Required rules engine parameter missing: " + definition.name());
         }
     }
 
@@ -120,7 +121,7 @@ final class RulesVm {
         return EndpointUtils.bytesToShort(instructions, position);
     }
 
-    private Endpoint run() {
+    private Object run() {
         var instructionSize = program.instructionSize;
         for (pointer = program.instructionOffset; pointer < instructionSize; pointer++) {
             switch (instructions[pointer]) {
@@ -177,11 +178,11 @@ final class RulesVm {
                 }
                 case RulesProgram.CREATE_LIST -> {
                     int size = instructions[++pointer] & 0xFF; // read unsigned byte
-                    List<Object> headers = new ArrayList<>(size);
+                    List<Object> list = new ArrayList<>(size);
                     for (var i = 0; i < size; i++) {
-                        headers.add(pop());
+                        list.add(pop());
                     }
-                    push(headers);
+                    push(list);
                 }
                 case RulesProgram.CREATE_MAP -> {
                     int size = instructions[++pointer] & 0xFF; // read unsigned byte
@@ -226,13 +227,16 @@ final class RulesVm {
                     int register = instructions[++pointer] & 0xFF; // read unsigned byte
                     push(registers[register].get() instanceof Boolean b && b);
                 }
+                case RulesProgram.RETURN_VALUE -> {
+                    return pop();
+                }
                 default -> {
-                    throw new IllegalStateException("Unknown endpoint instruction: " + instructions[pointer]);
+                    throw new RulesEvaluationError("Unknown rules engine instruction: " + instructions[pointer]);
                 }
             }
         }
 
-        throw new IllegalStateException("No endpoint returned from rules engine");
+        throw new RulesEvaluationError("No value returned from rules engine");
     }
 
     private void createMap(int size) {
@@ -278,11 +282,12 @@ final class RulesVm {
     private void resolveTemplate(StringTemplate template) {
         if (template.expressionCount() == 0) {
             push(template.resolve());
+        } else {
+            String[] dynamicValues = new String[template.expressionCount()];
+            for (var i = 0; i < template.expressionCount(); i++) {
+                dynamicValues[i] = (String) pop();
+            }
+            push(template.resolve(dynamicValues));
         }
-        String[] dynamicValues = new String[template.expressionCount()];
-        for (var i = 0; i < template.expressionCount(); i++) {
-            dynamicValues[i] = (String) pop();
-        }
-        push(template.resolve(dynamicValues));
     }
 }

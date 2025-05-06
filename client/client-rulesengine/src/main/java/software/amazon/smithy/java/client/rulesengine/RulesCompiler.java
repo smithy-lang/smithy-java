@@ -364,14 +364,14 @@ final class RulesCompiler {
         // Add endpoint header instructions.
         if (!e.getHeaders().isEmpty()) {
             for (var entry : e.getHeaders().entrySet()) {
+                // Push the header name first.
+                add_LOAD_CONST(entry.getKey());
                 // Push the instructions for creating the headers.
                 for (var h : entry.getValue()) {
                     compileExpression(h);
                 }
                 // Process the N header values that are on the stack.
                 add_CREATE_LIST((short) entry.getValue().size());
-                // Push the header name.
-                add_LOAD_CONST(entry.getKey());
             }
             // Combine the N headers that are on the stack in the form of String followed by List<String>.
             add_CREATE_MAP((short) e.getHeaders().size());

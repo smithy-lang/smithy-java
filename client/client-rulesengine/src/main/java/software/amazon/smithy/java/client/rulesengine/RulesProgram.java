@@ -79,8 +79,9 @@ public final class RulesProgram {
     static final byte RETURN_ERROR = 9;
 
     /**
-     * Sets the endpoint result of the VM and exits. Must be followed by a byte where the first bit of the byte is
-     * on if the endpoint has headers, and the second bit is on if the endpoint has properties.
+     * Sets the endpoint result of the VM and exits. Pops the top of the stack, expecting a string value. The opcode
+     * must be followed by a byte where the first bit of the byte is on if the endpoint has headers, and the second
+     * bit is on if the endpoint has properties.
      */
     static final byte RETURN_ENDPOINT = 10;
 
@@ -135,6 +136,12 @@ public final class RulesProgram {
      */
     static final byte TEST_REGISTER_IS_TRUE = 17;
 
+    /**
+     * Pops the value at the top of the stack and returns it from the VM. This can be used for testing purposes or
+     * for returning things other than endpoint values.
+     */
+    static final byte RETURN_VALUE = 18;
+
     final Object[] constantPool;
     final byte[] instructions;
     final int instructionOffset;
@@ -165,7 +172,7 @@ public final class RulesProgram {
     }
 
     /**
-     * Runs the rules engine program.
+     * Runs the rules engine program and resolves an endpoint.
      *
      * @param context Context used during evaluation.
      * @param parameters Rules engine parameters.
@@ -173,6 +180,18 @@ public final class RulesProgram {
      * @throws RulesEvaluationError if the program fails during evaluation.
      */
     public Endpoint resolveEndpoint(Context context, Map<String, Object> parameters) {
+        return run(context, parameters);
+    }
+
+    /**
+     * Runs the rules engine program.
+     *
+     * @param context Context used during evaluation.
+     * @param parameters Rules engine parameters.
+     * @return the rules engine result.
+     * @throws RulesEvaluationError if the program fails during evaluation.
+     */
+    public <T> T run(Context context, Map<String, Object> parameters) {
         for (var e : parameters.entrySet()) {
             EndpointUtils.verifyObject(e.getValue());
         }
@@ -310,13 +329,14 @@ public final class RulesProgram {
                     skip = 1;
                     yield "TEST_REGISTER_IS_TRUE";
                 }
+                case RETURN_VALUE -> "RETURN_VALUE";
                 default -> "?" + instructions[i];
             };
 
             switch (skip) {
                 case 0 -> s.append(name);
                 case 1 -> {
-                    s.append(String.format("%-16s  ", name));
+                    s.append(String.format("%-22s  ", name));
                     if (instructions.length > i + 1) {
                         s.append(instructions[i + 1]);
                     } else {
@@ -326,7 +346,7 @@ public final class RulesProgram {
                 }
                 default -> {
                     // it's a two-byte unsigned short.
-                    s.append(String.format("%-16s  ", name));
+                    s.append(String.format("%-22s  ", name));
                     if (instructions.length > i + 2) {
                         s.append(EndpointUtils.bytesToShort(instructions, i + 1));
                     } else {
