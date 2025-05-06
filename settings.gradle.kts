@@ -33,7 +33,7 @@ include(":client:client-rpcv2-cbor")
 include(":client:dynamic-client")
 include(":client:client-mock-plugin")
 include(":client:client-waiters")
-include(":client:client-endpoint-rules")
+include(":client:client-rulesengine")
 
 // Server
 include(":server:server-api")
