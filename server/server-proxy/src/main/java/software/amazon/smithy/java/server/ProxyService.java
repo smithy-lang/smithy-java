@@ -59,7 +59,6 @@ public final class ProxyService implements Service {
         DynamicClient.Builder clientBuilder = DynamicClient.builder()
                 .service(builder.service)
                 .model(builder.model);
-        clientBuilder.endpointResolver(EndpointResolver.staticEndpoint(builder.proxyEndpoint));
         if (builder.identityResolver != null) {
             clientBuilder.addIdentityResolver(builder.identityResolver);
         }
@@ -70,7 +69,9 @@ public final class ProxyService implements Service {
             clientBuilder.putConfig(RegionSetting.REGION, builder.region);
         }
         if (builder.clientConfigurator != null) {
-            clientBuilder = (DynamicClient.Builder) builder.clientConfigurator.apply(clientBuilder);
+            clientBuilder = builder.clientConfigurator.apply(clientBuilder);
+        } else {
+            clientBuilder.endpointResolver(EndpointResolver.staticEndpoint(builder.proxyEndpoint));
         }
         this.dynamicClient = clientBuilder.build();
         this.schemaConverter = new SchemaConverter(model);

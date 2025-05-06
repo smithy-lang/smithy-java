@@ -35,11 +35,13 @@ final class AwsServiceBundle implements BundlePlugin {
 
     @Override
     public <C extends Client, B extends Client.Builder<C, B>> B configureClient(B clientBuilder) {
-        clientBuilder.addInterceptor(new AwsServiceClientInterceptor(serviceMetadata));
+        clientBuilder.addInterceptor(new AwsServiceClientInterceptor(serviceMetadata, authScheme));
+        clientBuilder.endpointResolver(EndpointResolver.staticEndpoint("http://dummyurl.com"));
         return clientBuilder;
     }
 
-    private record AwsServiceClientInterceptor(AwsServiceMetadata serviceMetadata) implements ClientInterceptor {
+    private record AwsServiceClientInterceptor(AwsServiceMetadata serviceMetadata, AuthScheme authScheme)
+            implements ClientInterceptor {
 
         @Override
         public ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
@@ -60,6 +62,7 @@ final class AwsServiceBundle implements BundlePlugin {
                                 .endpointResolver(EndpointResolver.staticEndpoint(endpoint))
                                 .addIdentityResolver(identityResolver)
                                 .authSchemeResolver(StaticAuthSchemeResolver.getInstance())
+                                .putSupportedAuthSchemes(StaticAuthSchemeResolver.staticScheme(authScheme))
                                 .build());
             }
         }

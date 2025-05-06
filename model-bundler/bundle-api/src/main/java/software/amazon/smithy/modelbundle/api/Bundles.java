@@ -24,6 +24,7 @@ public class Bundles {
         return ProxyService.builder()
                 .model(model)
                 .clientConfigurator(plugin::configureClient)
+                .service(ShapeId.from(bundle.getServiceName()))
                 .build();
     }
 

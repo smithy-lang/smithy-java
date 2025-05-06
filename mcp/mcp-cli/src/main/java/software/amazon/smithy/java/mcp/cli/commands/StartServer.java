@@ -10,10 +10,7 @@ import java.util.List;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
-import software.amazon.smithy.java.mcp.cli.model.Bundle;
 import software.amazon.smithy.java.mcp.cli.model.Config;
-import software.amazon.smithy.java.mcp.cli.model.GenericArguments;
-import software.amazon.smithy.java.mcp.cli.model.Model;
 import software.amazon.smithy.java.mcp.cli.model.SmithyModeledToolBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.ToolBundleConfig;
 import software.amazon.smithy.java.mcp.server.McpServer;
@@ -63,7 +60,7 @@ public final class StartServer extends SmithyMcpCommand {
             switch (toolBundleConfig.type()) {
                 case smithyModeled -> {
                     SmithyModeledToolBundleConfig bundleConfig = toolBundleConfig.getValue();
-                    Service service = Bundles.getProxyService(convert(bundleConfig.getServiceDescriptor()));
+                    Service service = Bundles.getProxyService(bundleConfig.getServiceDescriptor());
                     if (bundleConfig.hasAllowListedTools() || bundleConfig.hasBlockListedTools()) {
                         var filter = OperationFilters.allowList(bundleConfig.getAllowListedTools())
                                 .and(OperationFilters.blockList(bundleConfig.getBlockListedTools()));
@@ -85,26 +82,26 @@ public final class StartServer extends SmithyMcpCommand {
     }
 
     //TODO remove these after external types Schema if fixed.
-    private static software.amazon.smithy.modelbundle.api.model.Bundle convert(Bundle bundle) {
-        return software.amazon.smithy.modelbundle.api.model.Bundle.builder()
-                .config(bundle.getConfig())
-                .configType(bundle.getConfigType())
-                .serviceName(bundle.getServiceName())
-                .model(convert(bundle.getModel()))
-                .requestArguments(convert(bundle.getRequestArguments()))
-                .build();
-    }
-
-    private static software.amazon.smithy.modelbundle.api.model.GenericArguments convert(
-            GenericArguments genericArguments
-    ) {
-        return software.amazon.smithy.modelbundle.api.model.GenericArguments.builder()
-                .model(convert(genericArguments.getModel()))
-                .identifier(genericArguments.getIdentifier())
-                .build();
-    }
-
-    private static software.amazon.smithy.modelbundle.api.model.Model convert(Model model) {
-        return software.amazon.smithy.modelbundle.api.model.Model.builder().smithyModel(model.getValue()).build();
-    }
+    //    private static software.amazon.smithy.modelbundle.api.model.Bundle convert(Bundle bundle) {
+    //        return software.amazon.smithy.modelbundle.api.model.Bundle.builder()
+    //                .config(bundle.getConfig())
+    //                .configType(bundle.getConfigType())
+    //                .serviceName(bundle.getServiceName())
+    //                .model(convert(bundle.getModel()))
+    //                .requestArguments(convert(bundle.getRequestArguments()))
+    //                .build();
+    //    }
+    //
+    //    private static software.amazon.smithy.modelbundle.api.model.GenericArguments convert(
+    //            GenericArguments genericArguments
+    //    ) {
+    //        return software.amazon.smithy.modelbundle.api.model.GenericArguments.builder()
+    //                .model(convert(genericArguments.getModel()))
+    //                .identifier(genericArguments.getIdentifier())
+    //                .build();
+    //    }
+    //
+    //    private static software.amazon.smithy.modelbundle.api.model.Model convert(Model model) {
+    //        return software.amazon.smithy.modelbundle.api.model.Model.builder().smithyModel(model.getValue()).build();
+    //    }
 }

@@ -124,4 +124,8 @@ public class ConfigUtils {
         var newConfig = existingConfig.toBuilder().toolBundles(existingToolBundles).build();
         updateConfig(newConfig);
     }
+
+    public static void main(String[] args) throws IOException {
+        System.out.println(loadOrCreateConfig());
+    }
 }
