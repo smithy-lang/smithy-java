@@ -35,6 +35,7 @@ final class RulesVm {
     private final byte[] instructions;
     private Object[] stack = new Object[8];
     private int stackPosition = 0;
+    private int pointer;
 
     RulesVm(
             Context context,
@@ -55,14 +56,8 @@ final class RulesVm {
             var provided = parameters.get(definition.name());
             if (provided != null) {
                 register.push(provided);
-            }
-        }
-
-        // Validate required parameters, fill in defaults, and grab builtins.
-        for (var i = 0; i < registers.length; i++) {
-            var register = registers[i];
-            if (register.get() == null) {
-                initializeRegister(context, i, register);
+            } else {
+                initializeRegister(context, register);
             }
         }
     }
@@ -71,11 +66,18 @@ final class RulesVm {
         try {
             return run();
         } catch (ClassCastException e) {
-            throw new RulesEvaluationError("Unexpected value encountered while evaluating rules engine", e);
+            throw createError("Unexpected value type encountered while evaluating rules engine", e);
+        } catch (ArrayIndexOutOfBoundsException e) {
+            throw createError("Malformed bytecode encountered while evaluating rules engine", e);
         }
     }
 
-    void initializeRegister(Context context, int i, RegisterValue register) {
+    private RulesEvaluationError createError(String message, RuntimeException e) {
+        var report = message + ". Encountered at address " + pointer + " of program:\n" + program;
+        throw new RulesEvaluationError(report, e);
+    }
+
+    void initializeRegister(Context context, RegisterValue register) {
         var definition = register.definition;
         if (definition.defaultValue() != null) {
             register.push(definition.defaultValue());
@@ -120,7 +122,7 @@ final class RulesVm {
 
     private Endpoint run() {
         var instructionSize = program.instructionSize;
-        for (var pointer = program.instructionOffset; pointer < instructionSize; pointer++) {
+        for (pointer = program.instructionOffset; pointer < instructionSize; pointer++) {
             switch (instructions[pointer]) {
                 case RulesProgram.LOAD_CONST -> {
                     int constant = instructions[++pointer] & 0xFF; // read unsigned byte

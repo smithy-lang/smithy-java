@@ -317,13 +317,21 @@ public final class RulesProgram {
                 case 0 -> s.append(name);
                 case 1 -> {
                     s.append(String.format("%-16s  ", name));
-                    s.append(instructions[i + 1]);
+                    if (instructions.length > i + 1) {
+                        s.append(instructions[i + 1]);
+                    } else {
+                        s.append("?");
+                    }
                     i++;
                 }
                 default -> {
                     // it's a two-byte unsigned short.
                     s.append(String.format("%-16s  ", name));
-                    s.append(EndpointUtils.bytesToShort(instructions, i + 1));
+                    if (instructions.length > i + 2) {
+                        s.append(EndpointUtils.bytesToShort(instructions, i + 1));
+                    } else {
+                        s.append("??");
+                    }
                     i += 2;
                 }
             }
