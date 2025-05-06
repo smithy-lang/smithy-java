@@ -22,6 +22,7 @@ import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.TopologicalIndex;
 import software.amazon.smithy.codegen.core.directed.Directive;
 import software.amazon.smithy.java.codegen.CodegenUtils;
+import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.PreludeSchemas;
 import software.amazon.smithy.model.loader.Prelude;
@@ -77,7 +78,9 @@ public final class SchemaFieldOrder {
                 shapeFieldName = toFullQualifiedSchemaName(shape);
             }
             boolean isShapeRecursive = CodegenUtils.recursiveShape(directive.model(), shape);
-            var shapeField = new SchemaField(shape, shapeFieldName, curClassName, isShapeRecursive);
+            boolean isExternal =
+                    symbolProvider.toSymbol(shape).getProperty(SymbolProperties.EXTERNAL_TYPE).orElse(false);
+            var shapeField = new SchemaField(shape, shapeFieldName, curClassName, isShapeRecursive, isExternal);
             curParition.add(shapeField);
             curFieldNames.add(shapeFieldName);
             if (isShapeRecursive) {
@@ -109,6 +112,8 @@ public final class SchemaFieldOrder {
         SchemaField schemaField = this.getSchemaField(shape.getId());
         if (schemaField == null) {
             return getSchemaType(writer, symbolProvider, shape);
+        } else if (schemaField.isExternal()) {
+            return writer.format("$L.$$SCHEMA", symbolProvider.toSymbol(shape));
         }
         return writer.format("$L.$L", schemaField.className(), schemaField.fieldName());
     }
@@ -140,5 +145,5 @@ public final class SchemaFieldOrder {
                 .toUpperCase(Locale.ENGLISH);
     }
 
-    record SchemaField(Shape shape, String fieldName, String className, boolean isRecursive) {}
+    record SchemaField(Shape shape, String fieldName, String className, boolean isRecursive, boolean isExternal) {}
 }

@@ -429,7 +429,7 @@ enum JMESPathFunction {
                     }
                 }
                 case SHORT, BYTE, INTEGER, INT_ENUM, LONG, FLOAT, DOUBLE, BIG_DECIMAL, BIG_INTEGER ->
-                        Document.ofNumber(argument.asNumber());
+                    Document.ofNumber(argument.asNumber());
                 default -> null;
             };
         }

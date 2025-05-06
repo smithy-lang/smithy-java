@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import static java.util.function.Predicate.not;
+
 import java.util.List;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.directed.ContextualDirective;
@@ -12,6 +14,7 @@ import software.amazon.smithy.codegen.core.directed.CustomizeDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.generators.SchemaFieldOrder.SchemaField;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SchemaBuilder;
@@ -70,7 +73,10 @@ public final class SchemasGenerator
                                         }
                                         """;
                         var recursiveShapes =
-                                shapeOrder.stream().filter(SchemaFieldOrder.SchemaField::isRecursive).toList();
+                                shapeOrder.stream()
+                                        .filter(SchemaField::isRecursive)
+                                        .filter(not(SchemaField::isExternal))
+                                        .toList();
                         var builders = recursiveShapes.stream()
                                 .map(s -> new SchemaBuilderGenerator(writer,
                                         s,
@@ -95,14 +101,14 @@ public final class SchemasGenerator
 
     private static final class StaticSchemaFieldsGenerator implements Runnable {
         private final JavaWriter writer;
-        private final List<SchemaFieldOrder.SchemaField> schemaFields;
+        private final List<SchemaField> schemaFields;
         private final CodeGenerationContext context;
         private final ContextualDirective<CodeGenerationContext, ?> directive;
         private boolean insideStaticBlock;
 
         private StaticSchemaFieldsGenerator(
                 ContextualDirective<CodeGenerationContext, ?> directive,
-                List<SchemaFieldOrder.SchemaField> schemaFields,
+                List<SchemaField> schemaFields,
                 JavaWriter writer
         ) {
             this.directive = directive;
@@ -115,7 +121,10 @@ public final class SchemasGenerator
         @Override
         public void run() {
             writer.pushState();
-            for (SchemaFieldOrder.SchemaField schemaField : schemaFields) {
+            for (SchemaField schemaField : schemaFields) {
+                if (schemaField.isExternal()) {
+                    continue;
+                }
                 if (schemaField.isRecursive() && !insideStaticBlock) {
                     insideStaticBlock = true;
                     writer.openBlock("\nstatic {");
@@ -142,14 +151,14 @@ public final class SchemasGenerator
         private static final class StaticSchemaFieldGenerator extends ShapeVisitor.Default<Void> {
 
             private final JavaWriter writer;
-            private final SchemaFieldOrder.SchemaField schemaField;
+            private final SchemaField schemaField;
             private final ContextualDirective<CodeGenerationContext, ?> directive;
             private final Model model;
             private final CodeGenerationContext context;
 
             private StaticSchemaFieldGenerator(
                     JavaWriter writer,
-                    SchemaFieldOrder.SchemaField schemaField,
+                    SchemaField schemaField,
                     ContextualDirective<CodeGenerationContext, ?> directive
             ) {
                 this.writer = writer;
@@ -362,11 +371,11 @@ public final class SchemasGenerator
         private final Shape shape;
         private final Model model;
         private final CodeGenerationContext context;
-        private final SchemaFieldOrder.SchemaField schemaField;
+        private final SchemaField schemaField;
 
         SchemaBuilderGenerator(
                 JavaWriter writer,
-                SchemaFieldOrder.SchemaField schemaField,
+                SchemaField schemaField,
                 Model model,
                 CodeGenerationContext context
         ) {
@@ -424,7 +433,7 @@ public final class SchemasGenerator
         }
     }
 
-    private record ResolverGenerator(JavaWriter writer, SchemaFieldOrder.SchemaField schemaField) implements Runnable {
+    private record ResolverGenerator(JavaWriter writer, SchemaField schemaField) implements Runnable {
 
         @Override
         public void run() {

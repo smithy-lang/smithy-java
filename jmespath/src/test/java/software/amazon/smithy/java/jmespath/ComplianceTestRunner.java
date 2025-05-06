@@ -168,16 +168,21 @@ class ComplianceTestRunner {
         } else if (isNumeric(expected) && isNumeric(actual)) {
             // Normalize all numbers to BigDecimal to make comparisons work.
             return new BigDecimal(expected.asNumber().toString())
-                           .compareTo(new BigDecimal(actual.asNumber().toString())) == 0;
+                    .compareTo(new BigDecimal(actual.asNumber().toString())) == 0;
         }
         return Objects.equals(expected, actual);
     }
 
     private static boolean isNumeric(Document doc) {
         var type = doc.type();
-        return type == ShapeType.BYTE || type == ShapeType.SHORT || type == ShapeType.INTEGER
-                || type == ShapeType.LONG || type == ShapeType.BIG_INTEGER || type == ShapeType.BIG_DECIMAL
-                || type == ShapeType.FLOAT || type == ShapeType.DOUBLE || type == ShapeType.INT_ENUM;
+        return type == ShapeType.BYTE || type == ShapeType.SHORT
+                || type == ShapeType.INTEGER
+                || type == ShapeType.LONG
+                || type == ShapeType.BIG_INTEGER
+                || type == ShapeType.BIG_DECIMAL
+                || type == ShapeType.FLOAT
+                || type == ShapeType.DOUBLE
+                || type == ShapeType.INT_ENUM;
     }
 
     private static final class NodeToDocumentConverter implements NodeVisitor<Document> {

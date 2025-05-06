@@ -2,6 +2,8 @@ $version: "2"
 
 namespace smithy.example
 
+use smithy.framework#ValidationException
+
 structure Human {
     children: HumanList
 
@@ -28,4 +30,8 @@ structure Parents {
 
 structure Address {
     city: String
+}
+
+structure HumanValidationException {
+    cause: ValidationException
 }

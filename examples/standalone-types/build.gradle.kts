@@ -9,6 +9,7 @@ dependencies {
 
     smithyBuild("software.amazon.smithy.java:plugins:$smithyJavaVersion")
     api("software.amazon.smithy.java:core:$smithyJavaVersion")
+    api("software.amazon.smithy.java:framework-errors:$smithyJavaVersion")
 
     testImplementation("org.hamcrest:hamcrest:3.0")
     testImplementation("org.junit.jupiter:junit-jupiter:5.12.2")

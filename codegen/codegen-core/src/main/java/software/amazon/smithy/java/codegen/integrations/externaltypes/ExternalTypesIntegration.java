@@ -31,9 +31,9 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 @SmithyInternalApi
 public final class ExternalTypesIntegration implements JavaCodegenIntegration {
     private static final String PROPERTY_FILE = "META-INF/smithy-java/type-mappings.properties";
-    private static final Map<ShapeId, Symbol> TYPE_MAPPINGS = getErrorMappings();
+    private static final Map<ShapeId, Symbol> TYPE_MAPPINGS = getTypeMappings();
 
-    private static Map<ShapeId, Symbol> getErrorMappings() {
+    private static Map<ShapeId, Symbol> getTypeMappings() {
         try {
             Map<ShapeId, Symbol> result = new HashMap<>();
             var classLoader = ExternalTypesIntegration.class.getClassLoader();
@@ -49,7 +49,7 @@ public final class ExternalTypesIntegration implements JavaCodegenIntegration {
                     var symbol = CodegenUtils.fromClass(shapeClass)
                             .toBuilder()
                             .putProperty(SymbolProperties.EXTERNAL_TYPE, true)
-                            .build();;
+                            .build();
                     var existing = result.put(shapeId, symbol);
                     if (existing != null) {
                         throw new CodegenException(
