@@ -20,7 +20,8 @@ enum Stdlib implements VmFunction {
     STRING_EQUALS("stringEquals", 2) {
         @Override
         public Object apply2(Object a, Object b) {
-            return Objects.equals((String) a, (String) b);
+            return Objects.equals(EndpointUtils.castFnArgument(a, String.class, "stringEquals", 1),
+                    EndpointUtils.castFnArgument(b, String.class, "stringEquals", 2));
         }
     },
 
@@ -28,7 +29,8 @@ enum Stdlib implements VmFunction {
     BOOLEAN_EQUALS("booleanEquals", 2) {
         @Override
         public Object apply2(Object a, Object b) {
-            return Objects.equals((Boolean) a, (Boolean) b);
+            return Objects.equals(EndpointUtils.castFnArgument(a, Boolean.class, "booleanEquals", 1),
+                    EndpointUtils.castFnArgument(b, Boolean.class, "booleanEquals", 2));
         }
     },
 
@@ -37,10 +39,10 @@ enum Stdlib implements VmFunction {
         @Override
         public Object apply(Object... operands) {
             // software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Substring.Definition.evaluate
-            String str = (String) operands[0];
-            int startIndex = (int) operands[1];
-            int stopIndex = (int) operands[2];
-            boolean reverse = (boolean) operands[3];
+            String str = EndpointUtils.castFnArgument(operands[0], String.class, "substring", 1);
+            int startIndex = EndpointUtils.castFnArgument(operands[1], Integer.class, "substring", 2);
+            int stopIndex = EndpointUtils.castFnArgument(operands[2], Integer.class, "substring", 3);
+            boolean reverse = EndpointUtils.castFnArgument(operands[3], Boolean.class, "substring", 4);
 
             for (int i = 0; i < str.length(); i++) {
                 if (!(str.charAt(i) <= 127)) {
@@ -52,7 +54,7 @@ enum Stdlib implements VmFunction {
                 return null;
             }
 
-            if (!reverse) {
+            if (!Boolean.TRUE.equals(reverse)) {
                 return str.substring(startIndex, stopIndex);
             } else {
                 int revStart = str.length() - stopIndex;
@@ -69,9 +71,9 @@ enum Stdlib implements VmFunction {
 
         @Override
         public Object apply2(Object arg1, Object arg2) {
-            var hostLabel = (String) arg1;
-            var allowDots = (Boolean) arg2;
-            if (allowDots == null || !allowDots) {
+            var hostLabel = EndpointUtils.castFnArgument(arg1, String.class, "isValidHostLabel", 1);
+            var allowDots = EndpointUtils.castFnArgument(arg2, Boolean.class, "isValidHostLabel", 2);
+            if (!Boolean.TRUE.equals(allowDots)) {
                 return HOST_LABEL_PATTERN.matcher(hostLabel).matches();
             } else {
                 // ensure that empty matches at the end are included
@@ -89,9 +91,8 @@ enum Stdlib implements VmFunction {
     PARSE_URL("parseURL", 1) {
         @Override
         public Object apply1(Object arg) {
-            String input = (String) arg;
             try {
-                return new URI(input);
+                return new URI(EndpointUtils.castFnArgument(arg, String.class, "parseURL", 1));
             } catch (URISyntaxException e) {
                 throw new RulesEvaluationError("Error parsing URI in endpoint rule parseURL method", e);
             }
@@ -102,7 +103,8 @@ enum Stdlib implements VmFunction {
     URI_ENCODE("uriEncode", 1) {
         @Override
         public Object apply1(Object arg) {
-            return URLEncoding.encodeUnreserved((String) arg, false);
+            var str = EndpointUtils.castFnArgument(arg, String.class, "uriEncode", 1);
+            return URLEncoding.encodeUnreserved(str, false);
         }
     };
 

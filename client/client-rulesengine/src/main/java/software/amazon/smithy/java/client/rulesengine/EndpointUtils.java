@@ -143,4 +143,16 @@ final class EndpointUtils {
         }
         return path;
     }
+
+    static <T> T castFnArgument(Object value, Class<T> type, String method, int position) {
+        try {
+            return type.cast(value);
+        } catch (ClassCastException e) {
+            throw new RulesEvaluationError(String.format("Expected %s argument %d to be %s, but given %s",
+                    method,
+                    position,
+                    type.getName(),
+                    value.getClass().getName()));
+        }
+    }
 }

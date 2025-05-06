@@ -22,7 +22,7 @@ public class StdlibTest {
         assertThat(Stdlib.STRING_EQUALS.apply2("a", "b"), is(false));
         assertThat(Stdlib.STRING_EQUALS.apply2(null, "b"), is(false));
 
-        Assertions.assertThrows(ClassCastException.class, () -> Stdlib.STRING_EQUALS.apply2("a", false));
+        Assertions.assertThrows(RulesEvaluationError.class, () -> Stdlib.STRING_EQUALS.apply2("a", false));
     }
 
     @Test
@@ -32,13 +32,13 @@ public class StdlibTest {
         assertThat(Stdlib.BOOLEAN_EQUALS.apply2(false, Boolean.FALSE), is(true));
         assertThat(Stdlib.BOOLEAN_EQUALS.apply2(false, false), is(true));
 
-        Assertions.assertThrows(ClassCastException.class, () -> Stdlib.BOOLEAN_EQUALS.apply2("a", false));
+        Assertions.assertThrows(RulesEvaluationError.class, () -> Stdlib.BOOLEAN_EQUALS.apply2("a", false));
     }
 
     @Test
     public void parseUrl() throws Exception {
         assertThat(Stdlib.PARSE_URL.apply1("http://foo.com"), equalTo(new URI("http://foo.com")));
-        Assertions.assertThrows(ClassCastException.class, () -> Stdlib.PARSE_URL.apply1(false));
+        Assertions.assertThrows(RulesEvaluationError.class, () -> Stdlib.PARSE_URL.apply1(false));
         Assertions.assertThrows(RulesEvaluationError.class, () -> Stdlib.PARSE_URL.apply1("\\"));
     }
 
