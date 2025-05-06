@@ -49,13 +49,12 @@ final class RulesVm {
         // Copy the registers to not continuously push to their stack.
         registers = new RegisterValue[program.registerDefinitions.length];
         for (var i = 0; i < program.registerDefinitions.length; i++) {
-            registers[i] = new RegisterValue(program.registerDefinitions[i]);
-        }
-
-        for (var entry : parameters.entrySet()) {
-            var index = program.registryIndex.get(entry.getKey());
-            if (index != null) {
-                registers[index].push(entry.getValue());
+            var definition = program.registerDefinitions[i];
+            var register = new RegisterValue(definition);
+            registers[i] = register;
+            var provided = parameters.get(definition.name());
+            if (provided != null) {
+                register.push(provided);
             }
         }
 
