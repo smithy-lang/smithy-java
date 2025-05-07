@@ -82,28 +82,4 @@ public final class StartServer extends SmithyMcpCommand {
             mcpServer.shutdown().join();
         }
     }
-
-    //TODO remove these after external types Schema if fixed.
-    //    private static software.amazon.smithy.modelbundle.api.model.Bundle convert(Bundle bundle) {
-    //        return software.amazon.smithy.modelbundle.api.model.Bundle.builder()
-    //                .config(bundle.getConfig())
-    //                .configType(bundle.getConfigType())
-    //                .serviceName(bundle.getServiceName())
-    //                .model(convert(bundle.getModel()))
-    //                .requestArguments(convert(bundle.getRequestArguments()))
-    //                .build();
-    //    }
-    //
-    //    private static software.amazon.smithy.modelbundle.api.model.GenericArguments convert(
-    //            GenericArguments genericArguments
-    //    ) {
-    //        return software.amazon.smithy.modelbundle.api.model.GenericArguments.builder()
-    //                .model(convert(genericArguments.getModel()))
-    //                .identifier(genericArguments.getIdentifier())
-    //                .build();
-    //    }
-    //
-    //    private static software.amazon.smithy.modelbundle.api.model.Model convert(Model model) {
-    //        return software.amazon.smithy.modelbundle.api.model.Model.builder().smithyModel(model.getValue()).build();
-    //    }
 }
