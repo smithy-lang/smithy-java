@@ -7,7 +7,7 @@ package software.amazon.smithy.java.mcp.cli;
 
 import software.amazon.smithy.java.mcp.cli.model.Config;
 
-public class EmptyDefaultConfigProvider implements DefaultConfigProvider {
+public final class EmptyDefaultConfigProvider implements DefaultConfigProvider {
 
     @Override
     public Config getConfig() {

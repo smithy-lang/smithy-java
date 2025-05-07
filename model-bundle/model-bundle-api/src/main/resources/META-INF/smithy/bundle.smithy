@@ -1,10 +1,6 @@
 $version: "2"
 
-namespace software.amazon.smithy.mcp.bundle.api
-
-union Bundle {
-    smithyBundle: SmithyBundle
-}
+namespace software.amazon.smithy.modelbundle.api
 
 structure SmithyBundle {
     /// unique identifier for the configuration type. used to resolve the appropriate Bundler.
@@ -26,16 +22,6 @@ structure SmithyBundle {
     /// model describing the generic arguments that must be present in every request. If this
     /// bundle does not require generic arguments, this field may be omitted.
     additionalInput: AdditionalInput
-}
-
-structure BundleMetadata {
-    @required
-    name: String
-
-    @required
-    description: String
-
-    version: String
 }
 
 string SmithyModel

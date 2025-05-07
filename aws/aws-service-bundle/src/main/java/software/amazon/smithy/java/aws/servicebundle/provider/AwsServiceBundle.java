@@ -21,8 +21,8 @@ import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.CallHook;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.mcp.bundle.api.BundlePlugin;
-import software.amazon.smithy.mcp.bundle.api.StaticAuthSchemeResolver;
+import software.amazon.smithy.modelbundle.api.BundlePlugin;
+import software.amazon.smithy.modelbundle.api.StaticAuthSchemeResolver;
 
 final class AwsServiceBundle implements BundlePlugin {
     private final AwsServiceMetadata serviceMetadata;
@@ -36,7 +36,7 @@ final class AwsServiceBundle implements BundlePlugin {
     @Override
     public <C extends Client, B extends Client.Builder<C, B>> B configureClient(B clientBuilder) {
         clientBuilder.addInterceptor(new AwsServiceClientInterceptor(serviceMetadata, authScheme));
-        clientBuilder.endpointResolver(EndpointResolver.staticEndpoint("http://dummyurl.com"));
+        clientBuilder.endpointResolver(EndpointResolver.staticEndpoint("http://localhost"));
         return clientBuilder;
     }
 
@@ -53,18 +53,17 @@ final class AwsServiceBundle implements BundlePlugin {
             var endpoint = URI.create(Objects.requireNonNull(serviceMetadata.getEndpoints().get(input.getAwsRegion()),
                     "no endpoint for region " + input.getAwsRegion()));
 
-            try (var sdkCredentialsProvider = ProfileCredentialsProvider.create(input.getAwsProfileName())) {
-                var identityResolver = new SdkCredentialsResolver(sdkCredentialsProvider);
+            var identityResolver =
+                    new SdkCredentialsResolver(ProfileCredentialsProvider.create(input.getAwsProfileName()));
 
-                return hook.config()
-                        .withRequestOverride(RequestOverrideConfig.builder()
-                                .putConfig(RegionSetting.REGION, input.getAwsRegion())
-                                .endpointResolver(EndpointResolver.staticEndpoint(endpoint))
-                                .addIdentityResolver(identityResolver)
-                                .authSchemeResolver(StaticAuthSchemeResolver.getInstance())
-                                .putSupportedAuthSchemes(StaticAuthSchemeResolver.staticScheme(authScheme))
-                                .build());
-            }
+            return hook.config()
+                    .withRequestOverride(RequestOverrideConfig.builder()
+                            .putConfig(RegionSetting.REGION, input.getAwsRegion())
+                            .endpointResolver(EndpointResolver.staticEndpoint(endpoint))
+                            .addIdentityResolver(identityResolver)
+                            .authSchemeResolver(StaticAuthSchemeResolver.getInstance())
+                            .putSupportedAuthSchemes(StaticAuthSchemeResolver.staticScheme(authScheme))
+                            .build());
         }
     }
 }

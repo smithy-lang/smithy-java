@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.mcp.cli;
 
-import java.nio.file.Path;
 import java.util.Set;
 import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.Location;
@@ -31,7 +30,9 @@ public abstract class AbstractAddBundle extends SmithyMcpCommand implements Conf
     }
 
     protected final Location getBundleFileLocation() {
-        return Location.builder().fileLocation(ConfigUtils.getBundleFileLocation(getToolBundleName()).toString()).build();
+        return Location.builder()
+                .fileLocation(ConfigUtils.getBundleFileLocation(getToolBundleName()).toString())
+                .build();
     }
 
     /**

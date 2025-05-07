@@ -18,7 +18,7 @@ import software.amazon.smithy.java.mcp.server.McpServer;
 import software.amazon.smithy.java.server.FilteredService;
 import software.amazon.smithy.java.server.OperationFilters;
 import software.amazon.smithy.java.server.Service;
-import software.amazon.smithy.mcp.bundle.api.Bundles;
+import software.amazon.smithy.mcp.bundle.api.McpBundles;
 
 /**
  * Command to start a Smithy MCP server exposing specified tool bundles.
@@ -62,7 +62,7 @@ public final class StartServer extends SmithyMcpCommand {
                 case smithyModeled -> {
                     SmithyModeledBundleConfig bundleConfig = toolBundleConfig.getValue();
                     Service service =
-                            Bundles.getService(ConfigUtils.getMcpBundle(bundleConfig.getName()));
+                            McpBundles.getService(ConfigUtils.getMcpBundle(bundleConfig.getName()));
                     if (bundleConfig.hasAllowListedTools() || bundleConfig.hasBlockListedTools()) {
                         var filter = OperationFilters.allowList(bundleConfig.getAllowListedTools())
                                 .and(OperationFilters.blockList(bundleConfig.getBlockListedTools()));

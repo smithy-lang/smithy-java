@@ -12,13 +12,12 @@ import java.io.InputStreamReader;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
-import software.amazon.smithy.mcp.bundle.api.model.SmithyBundle;
 
 public class AwsServiceBundlerTest {
     @Test
     public void accessAnalyzer() {
         var bundler = new AwsServiceBundler("accessanalyzer-2019-11-01.json", AwsServiceBundlerTest::getModel);
-        SmithyBundle bundle = bundler.bundle().getValue();
+        var bundle = bundler.bundle();
         var config = bundle.getConfig().asShape(AwsServiceMetadata.builder());
 
         assertEquals("access-analyzer", config.getSigv4SigningName());

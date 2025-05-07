@@ -11,9 +11,9 @@ import picocli.CommandLine.Option;
 import software.amazon.smithy.java.aws.servicebundle.bundler.AwsServiceBundler;
 import software.amazon.smithy.java.mcp.cli.AbstractAddBundle;
 import software.amazon.smithy.java.mcp.cli.CliBundle;
-import software.amazon.smithy.java.mcp.cli.model.Location;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
+import software.amazon.smithy.mcp.bundle.api.model.Bundle;
 
 @Command(name = "add-aws-bundle")
 public class AddAwsServiceBundle extends AbstractAddBundle {
@@ -42,7 +42,7 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
                         .bundleLocation(getBundleFileLocation())
                         .build())
                 .build();
-        return new CliBundle(bundle, bundleConfig);
+        return new CliBundle(Bundle.builder().smithyBundle(bundle).build(), bundleConfig);
     }
 
     @Override

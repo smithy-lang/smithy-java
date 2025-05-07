@@ -4,21 +4,21 @@ plugins {
     id("software.amazon.smithy.gradle.smithy-base")
 }
 
-description = "This module implements the mcp-bundler utility"
+description = "This module implements the model-bundle utility"
 
-extra["displayName"] = "Smithy :: Java :: MCP Bundler"
-extra["moduleName"] = "software.amazon.smithy.java.mcp.bundle.api"
+extra["displayName"] = "Smithy :: Java :: Model Bundle"
+extra["moduleName"] = "software.amazon.smithy.java.modelbundle.api"
 
 dependencies {
     smithyBuild(project(":codegen:plugins:types-codegen"))
 
     implementation(project(":core"))
     implementation(libs.smithy.model)
-    api(project(":server:server-api"))
-    api(project(":model-bundle:model-bundle-api"))
+    api(project(":client:client-auth-api"))
     api(project(":client:client-core"))
     api(project(":dynamic-schemas"))
-    implementation(project(":server:server-proxy"))
+    api(project(":server:server-api"))
+    api(project(":server:server-proxy"))
 }
 
 afterEvaluate {
@@ -43,9 +43,9 @@ tasks.named("compileJava") {
 
 // Needed because sources-jar needs to run after smithy-build is done
 tasks.sourcesJar {
-    mustRunAfter("compileJava")
+    mustRunAfter(tasks.compileJava)
 }
 
 tasks.processResources {
-    dependsOn("compileJava")
+    dependsOn(tasks.compileJava)
 }

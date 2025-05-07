@@ -95,3 +95,6 @@ include(":mcp:mcp-server")
 include(":mcp:mcp-cli")
 include(":mcp:mcp-cli-api")
 include(":mcp:mcp-bundle-api")
+
+include(":model-bundle")
+include(":model-bundle:model-bundle-api")

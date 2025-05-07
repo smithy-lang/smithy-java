@@ -3,7 +3,7 @@ package software.amazon.smithy.java.example.server.mcp;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.mcp.server.McpServer;
 import software.amazon.smithy.mcp.bundle.api.model.Bundle;
-import software.amazon.smithy.mcp.bundle.api.Bundles;
+import software.amazon.smithy.mcp.bundle.api.McpBundles;
 
 import java.util.Objects;
 
@@ -14,7 +14,7 @@ public final class BundleMCPServerExample {
             var mcpServer = McpServer.builder()
                 .stdio()
                 .name("smithy-mcp-server")
-                .addService(Bundles.getService(bundle.getValue()))
+                .addService(McpBundles.getService(bundle.getValue()))
                 .build();
 
             mcpServer.start();
