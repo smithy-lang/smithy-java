@@ -10,6 +10,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import software.amazon.smithy.model.node.ArrayNode;
+import software.amazon.smithy.model.node.BooleanNode;
+import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.rulesengine.language.evaluation.value.ArrayValue;
 import software.amazon.smithy.rulesengine.language.evaluation.value.BooleanValue;
 import software.amazon.smithy.rulesengine.language.evaluation.value.EmptyValue;
@@ -21,6 +25,23 @@ import software.amazon.smithy.rulesengine.language.evaluation.value.Value;
 final class EndpointUtils {
 
     private EndpointUtils() {}
+
+    // "The type of the value MUST be either a string, boolean or an array of string."
+    static Object convertNodeInput(Node value) {
+        if (value instanceof StringNode s) {
+            return s.getValue();
+        } else if (value instanceof BooleanNode b) {
+            return b.getValue();
+        } else if (value instanceof ArrayNode a) {
+            List<Object> result = new ArrayList<>(a.size());
+            for (var e : a.getElements()) {
+                result.add(convertNodeInput(e));
+            }
+            return result;
+        } else {
+            throw new RulesEvaluationError("Unsupported endpoint ruleset parameter: " + value);
+        }
+    }
 
     static Object convertInputParamValue(Value value) {
         if (value instanceof StringValue s) {
@@ -44,7 +65,7 @@ final class EndpointUtils {
             }
             return result;
         } else {
-            throw new IllegalArgumentException("Unsupported value type: " + value);
+            throw new RulesEvaluationError("Unsupported value type: " + value);
         }
     }
 

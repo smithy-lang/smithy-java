@@ -33,7 +33,7 @@ public final class RulesEngine {
     private final List<BiFunction<String, Context, Object>> builtinProviders = new ArrayList<>();
     private boolean performOptimizations = true;
 
-    RulesEngine() {
+    public RulesEngine() {
         // Always include the standard builtins, but after any explicitly given builtins.
         builtinProviders.add(Stdlib::standardBuiltins);
 

@@ -17,6 +17,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.rulesengine.language.evaluation.value.EndpointValue;
 import software.amazon.smithy.rulesengine.language.evaluation.value.Value;
 import software.amazon.smithy.rulesengine.language.syntax.Identifier;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Template;
@@ -116,6 +118,12 @@ public class EndpointUtilsTest {
     }
 
     @Test
+    public void throwsWhenValueUnsupported() {
+        Assertions.assertThrows(RulesEvaluationError.class,
+                () -> EndpointUtils.convertInputParamValue(EndpointValue.builder().url("https://foo").build()));
+    }
+
+    @Test
     public void getsUriParts() throws Exception {
         var uri = new URI("http://localhost/foo/bar");
 
@@ -123,5 +131,27 @@ public class EndpointUtilsTest {
         assertThat(EndpointUtils.getUriProperty(uri, "scheme"), equalTo(uri.getScheme()));
         assertThat(EndpointUtils.getUriProperty(uri, "path"), equalTo("/foo/bar"));
         assertThat(EndpointUtils.getUriProperty(uri, "normalizedPath"), equalTo("/foo/bar/"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("convertsNodeInputsProvider")
+    void convertsNodeInputs(Node value, Object object) {
+        var converted = EndpointUtils.convertNodeInput(value);
+
+        assertThat(converted, equalTo(object));
+    }
+
+    public static List<Arguments> convertsNodeInputsProvider() {
+        return List.of(
+                Arguments.of(Node.from("hi"), "hi"),
+                Arguments.of(Node.from("hi"), "hi"),
+                Arguments.of(Node.from(true), true),
+                Arguments.of(Node.from(false), false),
+                Arguments.of(Node.fromNodes(Node.from("aa")), List.of("aa")));
+    }
+
+    @Test
+    public void throwsOnUnsupportNodeInput() {
+        Assertions.assertThrows(RulesEvaluationError.class, () -> EndpointUtils.convertNodeInput(Node.from(1)));
     }
 }

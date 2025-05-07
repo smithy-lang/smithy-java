@@ -19,6 +19,16 @@ import software.amazon.smithy.utils.SmithyUnstableApi;
  */
 public final class RulesProgram {
     /**
+     * The version that a rules engine program was compiled with. The version of a program must be less than or equal
+     * to this version number. That is, older code can be run, but newer code cannot. The version is only incremented
+     * when things like new opcodes are added. This is a single byte that appears as the first byte in the rules
+     * engine bytecode.
+     *
+     * <p>TODO: Add the version to bytecode, skip it during evaluation, validate the version.
+     */
+    public static final byte VERSION = 1;
+
+    /**
      * Push a value onto the stack. Must be followed by one unsigned byte representing the constant pool index.
      */
     static final byte LOAD_CONST = 0;
