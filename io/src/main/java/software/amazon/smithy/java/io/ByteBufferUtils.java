@@ -7,8 +7,6 @@ package software.amazon.smithy.java.io;
 
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 public final class ByteBufferUtils {
@@ -33,15 +31,6 @@ public final class ByteBufferUtils {
         byte[] bytes = new byte[buffer.remaining()];
         buffer.asReadOnlyBuffer().get(bytes);
         return bytes;
-    }
-
-    public static String asString(ByteBuffer buffer) {
-        return asString(buffer, StandardCharsets.UTF_8);
-    }
-
-    public static String asString(ByteBuffer buffer, Charset charset) {
-        byte[] bytes = getBytes(buffer);
-        return new String(bytes, charset);
     }
 
     public static InputStream byteBufferInputStream(ByteBuffer buffer) {

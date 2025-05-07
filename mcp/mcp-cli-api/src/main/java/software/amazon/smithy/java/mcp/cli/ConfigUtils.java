@@ -99,10 +99,7 @@ public class ConfigUtils {
      * @throws IOException If there's an error writing to the file
      */
     public static void updateConfig(Config config) throws IOException {
-        var file = CONFIG_PATH.toFile();
-        try (var writer = new FileWriter(file, StandardCharsets.UTF_8)) {
-            writer.write(ByteBufferUtils.asString(JSON_CODEC.serialize(config)));
-        }
+        Files.write(CONFIG_PATH, toJson(config), StandardOpenOption.CREATE_NEW);
     }
 
     /**
