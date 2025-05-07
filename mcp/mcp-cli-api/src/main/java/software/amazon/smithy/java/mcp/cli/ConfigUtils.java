@@ -79,7 +79,7 @@ public class ConfigUtils {
 
         if (!CONFIG_PATH.toFile().exists()) {
             // Create an empty JSON object as the default config
-            Files.write(CONFIG_PATH, toJson(DEFAULT_CONFIG_PROVIDER.getConfig()), StandardOpenOption.CREATE_NEW);
+            Files.write(CONFIG_PATH, toJson(DEFAULT_CONFIG_PROVIDER.getConfig()), StandardOpenOption.CREATE);
         }
 
         return fromJson(Files.readAllBytes(CONFIG_PATH));
