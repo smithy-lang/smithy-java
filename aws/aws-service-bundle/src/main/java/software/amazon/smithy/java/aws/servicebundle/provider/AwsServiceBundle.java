@@ -21,8 +21,8 @@ import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.CallHook;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.modelbundle.api.BundlePlugin;
-import software.amazon.smithy.modelbundle.api.StaticAuthSchemeResolver;
+import software.amazon.smithy.mcp.bundle.api.BundlePlugin;
+import software.amazon.smithy.mcp.bundle.api.StaticAuthSchemeResolver;
 
 final class AwsServiceBundle implements BundlePlugin {
     private final AwsServiceMetadata serviceMetadata;

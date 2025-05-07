@@ -32,7 +32,7 @@ public abstract class SmithyMcpCommand implements Callable<Integer> {
             System.out.println("Invalid input : [" + e.getMessage() + "]");
             return 2;
         } catch (Exception e) {
-            LOG.error("Unexpected error", e);
+            e.printStackTrace(System.out);
             return 1;
         }
     }

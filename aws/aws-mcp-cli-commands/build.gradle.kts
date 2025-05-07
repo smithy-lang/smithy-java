@@ -8,7 +8,7 @@ extra["displayName"] = "Smithy :: Java :: AWS :: Service Bundler"
 extra["moduleName"] = "software.amazon.smithy.java.aws.mcp.cli.commands"
 
 dependencies {
-    implementation(project(":model-bundler:bundle-api"))
+    implementation(project(":mcp:mcp-bundle-api"))
     implementation(libs.smithy.model)
     implementation(libs.picocli)
     implementation(project(":aws:aws-mcp-types"))

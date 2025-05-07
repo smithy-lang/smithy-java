@@ -8,7 +8,7 @@ extra["displayName"] = "Smithy :: Java :: AWS :: Service Bundler"
 extra["moduleName"] = "software.amazon.smithy.java.aws.servicebundle.bundler"
 
 dependencies {
-    implementation(project(":model-bundler:bundle-api"))
+    implementation(project(":mcp:mcp-bundle-api"))
     implementation(libs.smithy.model)
     implementation(project(":aws:aws-mcp-types"))
     // we need to be able to resolve the sigv4 and protocol traits

@@ -1,0 +1,67 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package software.amazon.smithy.java.aws.mcp.cli.commands;
+
+import java.util.Set;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+import software.amazon.smithy.java.aws.servicebundle.bundler.AwsServiceBundler;
+import software.amazon.smithy.java.mcp.cli.AbstractAddBundle;
+import software.amazon.smithy.java.mcp.cli.CliBundle;
+import software.amazon.smithy.java.mcp.cli.model.Location;
+import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
+import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
+
+@Command(name = "add-aws-bundle")
+public class AddAwsServiceBundle extends AbstractAddBundle {
+
+    @Option(names = "--overwrite",
+            description = "Overwrite existing config",
+            defaultValue = "false")
+    protected boolean overwrite;
+
+    @Option(names = {"-n", "--name"}, description = "Name of the AWS Service.", required = true)
+    protected String awsServiceName;
+
+    @Option(names = {"-a", "--allowed-apis"}, description = "List of APIs to expose in the MCP server")
+    protected Set<String> allowedApis;
+
+    @Option(names = {"-b", "--blocked-apis"}, description = "List of APIs to hide in the MCP server")
+    protected Set<String> blockedApis;
+
+    @Override
+    protected CliBundle getNewToolConfig() {
+        var bundle = new AwsServiceBundler(awsServiceName).bundle();
+
+        var bundleConfig = McpBundleConfig.builder()
+                .smithyModeled(SmithyModeledBundleConfig.builder()
+                        .name(awsServiceName)
+                        .bundleLocation(Location.builder().fileLocation(getBundleFileLocation().toString()).build())
+                        .build())
+                .build();
+        return new CliBundle(bundle, bundleConfig);
+    }
+
+    @Override
+    protected String getToolBundleName() {
+        return awsServiceName;
+    }
+
+    @Override
+    protected boolean canOverwrite() {
+        return overwrite;
+    }
+
+    @Override
+    protected Set<String> allowedTools() {
+        return allowedApis;
+    }
+
+    @Override
+    protected Set<String> blockedTools() {
+        return blockedApis;
+    }
+}

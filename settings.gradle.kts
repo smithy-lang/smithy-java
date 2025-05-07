@@ -94,9 +94,7 @@ include(":mcp:mcp-schemas")
 include(":mcp:mcp-server")
 include(":mcp:mcp-cli")
 include(":mcp:mcp-cli-api")
-
-include(":model-bundler:bundle-api")
-include(":model-bundler:bundle-cli")
+include(":mcp:mcp-bundle-api")
 
 include("coral-bundle-types")
 include("mcp:mcp-bundle-api")

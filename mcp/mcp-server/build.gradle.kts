@@ -15,7 +15,7 @@ dependencies {
     implementation(project(":context"))
     implementation(project(":codecs:json-codec"))
     implementation(project(":mcp:mcp-schemas"))
-    implementation(project(":model-bundler:bundle-api"))
+    implementation(project(":mcp:mcp-bundle-api"))
 }
 
 spotbugs {

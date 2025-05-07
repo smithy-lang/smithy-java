@@ -5,17 +5,24 @@
 
 package software.amazon.smithy.java.mcp.cli;
 
+import static software.amazon.smithy.java.io.ByteBufferUtils.getBytes;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.ServiceLoader;
+import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.mcp.cli.model.Config;
-import software.amazon.smithy.java.mcp.cli.model.ToolBundleConfig;
+import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
+import software.amazon.smithy.mcp.bundle.api.model.Bundle;
 
 /**
  * Utility class for managing Smithy MCP configuration files.
@@ -28,15 +35,30 @@ public class ConfigUtils {
 
     private static final JsonCodec JSON_CODEC = JsonCodec.builder().build();
 
-    /**
-     * Gets the path to the config file.
-     *
-     * @return The path to the config file
-     */
-    private static Path getConfigPath() {
+    private static final Path CONFIG_DIR = resolveFromHomeDir(".config", "smithy-mcp");
+    private static final Path BUNDLE_DIR = CONFIG_DIR.resolve("bundles");
+    private static final Path CONFIG_PATH = CONFIG_DIR.resolve("config.json");
+
+    private static final DefaultConfigProvider DEFAULT_CONFIG_PROVIDER;
+
+    static {
+        try {
+            ensureDirectoryExists(CONFIG_DIR);
+            ensureDirectoryExists(BUNDLE_DIR);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        DEFAULT_CONFIG_PROVIDER = ServiceLoader.load(DefaultConfigProvider.class)
+                .stream()
+                .map(ServiceLoader.Provider::get)
+                .min(Comparator.comparing(DefaultConfigProvider::priority))
+                .orElse(new EmptyDefaultConfigProvider());
+    }
+
+    private static Path resolveFromHomeDir(String... paths) {
         String userHome = System.getProperty("user.home");
-        Path configDir = Paths.get(userHome, ".config", "smithy-mcp");
-        return configDir.resolve("config.json");
+        return Paths.get(userHome, paths);
     }
 
     /**
@@ -44,10 +66,9 @@ public class ConfigUtils {
      *
      * @throws IOException If there's an error creating directories
      */
-    private static void ensureConfigDirExists() throws IOException {
-        Path configDir = getConfigPath();
-        if (!Files.exists(configDir)) {
-            Files.createDirectories(configDir);
+    private static void ensureDirectoryExists(Path dir) throws IOException {
+        if (!Files.exists(dir)) {
+            Files.createDirectories(dir);
         }
     }
 
@@ -58,19 +79,17 @@ public class ConfigUtils {
      * @throws IOException If there's an error creating directories or the file
      */
     public static Config loadOrCreateConfig() throws IOException {
-        Path configFile = getConfigPath();
-        ensureConfigDirExists();
 
-        // Check if the config file exists, create it if it doesn't
-        var file = configFile.toFile();
-        if (!file.exists()) {
+        if (!CONFIG_PATH.toFile().exists()) {
             // Create an empty JSON object as the default config
-            try (var writer = new FileWriter(file, StandardCharsets.UTF_8)) {
-                writer.write("{}");
-            }
+            Files.write(CONFIG_PATH, toJson(DEFAULT_CONFIG_PROVIDER.getConfig()), StandardOpenOption.CREATE_NEW);
         }
 
-        return fromJson(Files.readAllBytes(configFile));
+        return fromJson(Files.readAllBytes(CONFIG_PATH));
+    }
+
+    static Path getBundleFileLocation(String bundleName) {
+        return BUNDLE_DIR.resolve(bundleName + ".json");
     }
 
     /**
@@ -80,10 +99,7 @@ public class ConfigUtils {
      * @throws IOException If there's an error writing to the file
      */
     public static void updateConfig(Config config) throws IOException {
-        Path configFile = getConfigPath();
-        ensureConfigDirExists();
-
-        var file = configFile.toFile();
+        var file = CONFIG_PATH.toFile();
         try (var writer = new FileWriter(file, StandardCharsets.UTF_8)) {
             writer.write(ByteBufferUtils.asString(JSON_CODEC.serialize(config)));
         }
@@ -95,29 +111,23 @@ public class ConfigUtils {
      * @param json The JSON data as a byte array
      * @return The deserialized Config object with defaults applied
      */
-    public static Config fromJson(byte[] json) {
-        return adjustDefaults(Config.builder().deserialize(JSON_CODEC.createDeserializer(json)).build());
+    private static Config fromJson(byte[] json) {
+        return Config.builder().deserialize(JSON_CODEC.createDeserializer(json)).build();
     }
 
-    /**
-     * Applies default values to a configuration if needed.
-     *
-     * @param config The configuration to adjust
-     * @return The configuration with defaults applied
-     */
-    private static Config adjustDefaults(Config config) {
-        return config;
+    private static byte[] toJson(SerializableStruct struct) {
+        return getBytes(JSON_CODEC.serialize(struct));
     }
 
     /**
      * Adds a new tool bundle configuration to an existing configuration and saves it.
      *
-     * @param existingConfig The existing configuration to update
-     * @param name The name under which to register the tool bundle
+     * @param existingConfig   The existing configuration to update
+     * @param name             The name under which to register the tool bundle
      * @param toolBundleConfig The tool bundle configuration to add
      * @throws IOException If there's an error writing the updated configuration
      */
-    public static void addToolConfig(Config existingConfig, String name, ToolBundleConfig toolBundleConfig)
+    private static void addMcpBundleConfig(Config existingConfig, String name, McpBundleConfig toolBundleConfig)
             throws IOException {
         var existingToolBundles = new HashMap<>(existingConfig.getToolBundles());
         existingToolBundles.put(name, toolBundleConfig);
@@ -125,7 +135,23 @@ public class ConfigUtils {
         updateConfig(newConfig);
     }
 
-    public static void main(String[] args) throws IOException {
-        System.out.println(loadOrCreateConfig());
+    public static Bundle getMcpBundle(String bundleName) {
+        try {
+            return Bundle.builder()
+                    .deserialize(JSON_CODEC.createDeserializer(Files.readAllBytes(getBundleFileLocation(bundleName))))
+                    .build();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void addMcpBundle(Config config, String toolBundleName, CliBundle mcpBundleConfig)
+            throws IOException {
+        var serializedBundle = toJson(mcpBundleConfig.mcpBundle());
+        Files.write(getBundleFileLocation(toolBundleName),
+                serializedBundle,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.CREATE);
+        addMcpBundleConfig(config, toolBundleName, mcpBundleConfig.mcpBundleConfig());
     }
 }

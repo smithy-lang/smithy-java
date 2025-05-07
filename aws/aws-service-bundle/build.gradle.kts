@@ -13,7 +13,7 @@ dependencies {
     api(project(":auth-api"))
     implementation(project(":aws:aws-sigv4"))
     implementation(project(":aws:client:aws-client-core"))
-    implementation(project(":model-bundler:bundle-api"))
+    implementation(project(":mcp:mcp-bundle-api"))
     implementation(project(":aws:sdkv2:aws-sdkv2-auth"))
     implementation(libs.aws.sdk.auth)
 }

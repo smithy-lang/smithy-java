@@ -3,15 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.modelbundle.api;
+package software.amazon.smithy.mcp.bundle.api;
 
 import software.amazon.smithy.java.server.ProxyService;
+import software.amazon.smithy.java.server.Service;
+import software.amazon.smithy.mcp.bundle.api.model.Bundle;
+import software.amazon.smithy.mcp.bundle.api.model.SmithyBundle;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.StructureShape;
-import software.amazon.smithy.modelbundle.api.model.Bundle;
-import software.amazon.smithy.modelbundle.api.model.Model.Type;
 
 public class Bundles {
 
@@ -19,27 +20,28 @@ public class Bundles {
 
     private Bundles() {}
 
-    public static ProxyService forSmithyBundle(Bundle bundle) {
-        if (bundle.getModel().type() != Type.smithyModel) {
+    public static Service getService(Bundle bundle) {
+        if (bundle.type() != Bundle.Type.smithyBundle) {
             throw new IllegalArgumentException("Bundle is not a smithy bundle");
         }
-        var model = getModel(bundle);
-        var plugin = PLUGIN_PROVIDERS.getPlugin(bundle.getConfigType(), bundle.getConfig());
+        SmithyBundle smithyBundle = bundle.getValue();
+        var model = getModel(smithyBundle);
+        var plugin = PLUGIN_PROVIDERS.getPlugin(smithyBundle.getConfigType(), smithyBundle.getConfig());
         return ProxyService.builder()
                 .model(model)
                 .clientConfigurator(plugin::configureClient)
-                .service(ShapeId.from(bundle.getServiceName()))
+                .service(ShapeId.from(smithyBundle.getServiceName()))
                 .build();
     }
 
-    private static Model getModel(Bundle bundle) {
+    private static Model getModel(SmithyBundle bundle) {
         var modelAssemble = new ModelAssembler().putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
-                .addUnparsedModel("bundle.json", bundle.getModel().getValue());
-        var args = bundle.getRequestArguments();
-        if (args != null) {
-            modelAssemble.addUnparsedModel("args.smithy", bundle.getRequestArguments().getModel().getValue());
+                .addUnparsedModel("bundle.json", bundle.getModel());
+        var additionalInput = bundle.getAdditionalInput();
+        if (additionalInput != null) {
+            modelAssemble.addUnparsedModel("additionalInput.smithy", additionalInput.getModel());
             var model = modelAssemble.assemble().unwrap();
-            var template = model.expectShape(ShapeId.from(args.getIdentifier())).asStructureShape().get();
+            var template = model.expectShape(ShapeId.from(additionalInput.getIdentifier())).asStructureShape().get();
             var b = model.toBuilder();
             // mix in the generic arg members
             for (var op : model.getOperationShapes()) {
@@ -62,9 +64,5 @@ public class Bundles {
             return b.build();
         }
         return modelAssemble.assemble().unwrap();
-    }
-
-    public static BundlePlugin getBundlePlugin(Bundle bundle) {
-        return PLUGIN_PROVIDERS.getPlugin(bundle.getConfigType(), bundle.getConfig());
     }
 }

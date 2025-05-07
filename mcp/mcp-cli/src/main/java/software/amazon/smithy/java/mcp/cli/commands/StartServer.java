@@ -9,15 +9,16 @@ import java.util.ArrayList;
 import java.util.List;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
+import software.amazon.smithy.java.mcp.cli.ConfigUtils;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
 import software.amazon.smithy.java.mcp.cli.model.Config;
-import software.amazon.smithy.java.mcp.cli.model.SmithyModeledToolBundleConfig;
-import software.amazon.smithy.java.mcp.cli.model.ToolBundleConfig;
+import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
+import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
 import software.amazon.smithy.java.mcp.server.McpServer;
 import software.amazon.smithy.java.server.FilteredService;
 import software.amazon.smithy.java.server.OperationFilters;
 import software.amazon.smithy.java.server.Service;
-import software.amazon.smithy.modelbundle.api.Bundles;
+import software.amazon.smithy.mcp.bundle.api.Bundles;
 
 /**
  * Command to start a Smithy MCP server exposing specified tool bundles.
@@ -47,7 +48,7 @@ public final class StartServer extends SmithyMcpCommand {
             throw new IllegalArgumentException(
                     "No Tool Bundles have been configured. Configure one using the configure-tool-bundle command.");
         }
-        List<ToolBundleConfig> toolBundleConfigs = new ArrayList<>(toolBundles.size());
+        List<McpBundleConfig> toolBundleConfigs = new ArrayList<>(toolBundles.size());
         for (var toolBundle : toolBundles) {
             var toolBundleConfig = config.getToolBundles().get(toolBundle);
             if (toolBundleConfig == null) {
@@ -59,8 +60,9 @@ public final class StartServer extends SmithyMcpCommand {
         for (var toolBundleConfig : toolBundleConfigs) {
             switch (toolBundleConfig.type()) {
                 case smithyModeled -> {
-                    SmithyModeledToolBundleConfig bundleConfig = toolBundleConfig.getValue();
-                    Service service = Bundles.getProxyService(bundleConfig.getServiceDescriptor());
+                    SmithyModeledBundleConfig bundleConfig = toolBundleConfig.getValue();
+                    Service service =
+                            Bundles.getService(ConfigUtils.getMcpBundle(bundleConfig.getName()));
                     if (bundleConfig.hasAllowListedTools() || bundleConfig.hasBlockListedTools()) {
                         var filter = OperationFilters.allowList(bundleConfig.getAllowListedTools())
                                 .and(OperationFilters.blockList(bundleConfig.getBlockListedTools()));

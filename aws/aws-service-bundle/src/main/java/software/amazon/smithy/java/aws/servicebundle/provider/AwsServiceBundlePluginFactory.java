@@ -7,8 +7,8 @@ package software.amazon.smithy.java.aws.servicebundle.provider;
 
 import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
 import software.amazon.smithy.java.core.serde.document.Document;
-import software.amazon.smithy.modelbundle.api.BundlePlugin;
-import software.amazon.smithy.modelbundle.api.BundlePluginFactory;
+import software.amazon.smithy.mcp.bundle.api.BundlePlugin;
+import software.amazon.smithy.mcp.bundle.api.BundlePluginFactory;
 
 public final class AwsServiceBundlePluginFactory implements BundlePluginFactory {
     public AwsServiceBundlePluginFactory() {

@@ -85,9 +85,7 @@ public final class JavaTypeCodegenPlugin implements SmithyBuildPlugin {
                             .filter(nested::contains)
                             .collect(Collectors.toSet()));
         }
-        System.out.println(nested);
         closure.removeAll(nested);
-        System.out.println(closure);
         if (closure.isEmpty()) {
             throw new CodegenException("Could not generate types. No shapes found in closure");
         }

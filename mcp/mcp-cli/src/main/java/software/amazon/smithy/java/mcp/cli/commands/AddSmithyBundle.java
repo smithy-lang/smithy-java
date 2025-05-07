@@ -8,8 +8,8 @@ package software.amazon.smithy.java.mcp.cli.commands;
 import java.util.Set;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import software.amazon.smithy.java.mcp.cli.AbstractAddToolBundle;
-import software.amazon.smithy.java.mcp.cli.model.ToolBundleConfig.SmithyModeledMember;
+import software.amazon.smithy.java.mcp.cli.AbstractAddBundle;
+import software.amazon.smithy.java.mcp.cli.CliBundle;
 
 /**
  * Command to add a Smithy tool bundle to the MCP configuration.
@@ -17,9 +17,9 @@ import software.amazon.smithy.java.mcp.cli.model.ToolBundleConfig.SmithyModeledM
  * This command allows users to add a new Smithy tool bundle to their MCP configuration.
  * Currently under development and hidden from the CLI help.
  */
-@Command(name = "add-smithy-tool-bundle", description = "Add a smithy tool bundle.", hidden = true)
+@Command(name = "add-smithy-bundle", description = "Add a smithy bundle.", hidden = true)
 //TODO implement and unhide
-public class AddSmithyToolBundle extends AbstractAddToolBundle<SmithyModeledMember> {
+public class AddSmithyBundle extends AbstractAddBundle {
 
     @CommandLine.Option(names = "--overwrite",
             description = "Overwrite existing config",
@@ -30,7 +30,7 @@ public class AddSmithyToolBundle extends AbstractAddToolBundle<SmithyModeledMemb
     protected String name;
 
     @Override
-    protected SmithyModeledMember getNewToolConfig() {
+    protected CliBundle getNewToolConfig() {
         throw new UnsupportedOperationException("Not implemented yet.");
     }
 

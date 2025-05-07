@@ -14,7 +14,9 @@ import picocli.CommandLine.Command;
  * the MCP CLI, such as adding tool bundles.
  */
 @Command(name = "configure", description = "Configure the Smithy MCP CLI", subcommands = {
-        AddSmithyToolBundle.class
+        AddSmithyBundle.class,
+        ListBundles.class,
+        AddBundle.class
 })
 public final class Configure {
 

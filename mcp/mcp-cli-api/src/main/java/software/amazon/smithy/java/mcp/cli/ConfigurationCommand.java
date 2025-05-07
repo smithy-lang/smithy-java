@@ -11,6 +11,6 @@ package software.amazon.smithy.java.mcp.cli;
  * This class extends SmithyMcpCommand to provide a common base for all commands
  * that modify the MCP configuration. Subclasses should implement the execute method.
  */
-public abstract class ConfigurationCommand extends SmithyMcpCommand {
+public interface ConfigurationCommand {
 
 }

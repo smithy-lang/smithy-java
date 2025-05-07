@@ -17,11 +17,14 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import software.amazon.smithy.aws.traits.auth.SigV4Trait;
 import software.amazon.smithy.awsmcp.model.AwsServiceMetadata;
 import software.amazon.smithy.awsmcp.model.PreRequest;
 import software.amazon.smithy.java.core.serde.document.Document;
+import software.amazon.smithy.mcp.bundle.api.Bundler;
+import software.amazon.smithy.mcp.bundle.api.model.AdditionalInput;
+import software.amazon.smithy.mcp.bundle.api.model.Bundle;
+import software.amazon.smithy.mcp.bundle.api.model.SmithyBundle;
 import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.node.BooleanNode;
 import software.amazon.smithy.model.node.Node;
@@ -29,16 +32,13 @@ import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ModelSerializer;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.EndpointTrait;
-import software.amazon.smithy.modelbundle.api.Bundler;
-import software.amazon.smithy.modelbundle.api.model.Bundle;
-import software.amazon.smithy.modelbundle.api.model.GenericArguments;
-import software.amazon.smithy.modelbundle.api.model.Model;
 
-public final class AwsServiceBundler implements Bundler {
+public final class AwsServiceBundler extends Bundler {
     private static final ShapeId ENDPOINT_TESTS = ShapeId.from("smithy.rules#endpointTests");
 
     // visible for testing
     static final Map<String, String> GH_URIS_BY_SERVICE = new HashMap<>();
+
     static {
         // line is in the form fooService/service/version/fooService.json
         try (var models = new BufferedReader(new InputStreamReader(
@@ -93,16 +93,14 @@ public final class AwsServiceBundler implements Bundler {
                 }
             }
             return Bundle.builder()
-                    .config(Document.of(bundle.build()))
-                    .configType("aws")
-                    .serviceName(model.getServiceShapes().iterator().next().getId().toString())
-                    .model(Model.builder()
-                            .smithyModel(serializeModel(model))
-                            .build())
-                    .requestArguments(GenericArguments.builder()
-                            .identifier(PreRequest.$ID.toString())
-                            .model(Model.builder()
-                                    .smithyModel(loadModel("/META-INF/smithy/bundle.smithy"))
+                    .smithyBundle(SmithyBundle.builder()
+                            .config(Document.of(bundle.build()))
+                            .configType("aws")
+                            .serviceName(model.getServiceShapes().iterator().next().getId().toString())
+                            .model(serializeModel(model))
+                            .additionalInput(AdditionalInput.builder()
+                                    .identifier(PreRequest.$ID.toString())
+                                    .model(loadModel("/META-INF/smithy/bundle.smithy"))
                                     .build())
                             .build())
                     .build();
@@ -112,20 +110,9 @@ public final class AwsServiceBundler implements Bundler {
     }
 
     private static String serializeModel(software.amazon.smithy.model.Model model) {
-        var output = ObjectNode.printJson(ModelSerializer.builder()
+        return ObjectNode.printJson(ModelSerializer.builder()
                 .build()
                 .serialize(model));
-        return output;
-    }
-
-    private static String loadModel(String path) {
-        try (var reader = new BufferedReader(new InputStreamReader(
-                Objects.requireNonNull(AwsServiceBundler.class.getResourceAsStream(path)),
-                StandardCharsets.UTF_8))) {
-            return reader.lines().collect(Collectors.joining("\n"));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
     Map<String, String> parseEndpoints(ObjectNode endpointTests) {

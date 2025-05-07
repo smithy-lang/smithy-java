@@ -2,19 +2,18 @@ $version: "2"
 
 namespace smithy.mcp.cli
 
-use software.amazon.smithy.modelbundle.api#Bundle
-
 structure Config {
-    toolBundles: ToolBundleConfigs
+    toolBundles: McpBundleConfigs
+    registries: Registries
 }
 
-map ToolBundleConfigs {
+map McpBundleConfigs {
     key: String
-    value: ToolBundleConfig
+    value: McpBundleConfig
 }
 
-union ToolBundleConfig {
-    smithyModeled: SmithyModeledToolBundleConfig
+union McpBundleConfig {
+    smithyModeled: SmithyModeledBundleConfig
     genericConfig: GenericToolBundleConfig
 }
 
@@ -25,39 +24,43 @@ structure CommonToolConfig {
     blockListedTools: ToolNames
 }
 
-structure SmithyModeledToolBundleConfig with [CommonToolConfig] {
-    bundlePlugins: BundlePlugins
+map Registries {
+    key: String
+    value: RegistryConfig
+}
 
-    allowListedTools: ToolNames
+union RegistryConfig {
+    javaRegistry: JavaRegistry
+}
 
-    blockListedTools: ToolNames
+structure JavaRegistry with [CommonRegistryConfig] {
+    jars: Locations
+}
 
-    serviceDescriptor: Bundle
+@mixin
+structure CommonRegistryConfig {
+    name: String
+}
 
-    // TODO separate this into another location and just reference it here.
+structure SmithyModeledBundleConfig with [CommonToolConfig] {
+    @required
+    bundleLocation: Location
+}
+
+list Locations {
+    member: Location
+}
+
+union Location {
+    fileLocation: String
 }
 
 structure GenericToolBundleConfig with [CommonToolConfig] {
     config: Document
 }
 
-list BundlePlugins {
-    member: BundlePlugin
-}
-
-structure BundlePlugin {
-    name: String
-    jars: FilePaths
-}
-
 list ToolNames {
     member: ToolName
 }
-
-list FilePaths {
-    member: FilePath
-}
-
-string FilePath
 
 string ToolName

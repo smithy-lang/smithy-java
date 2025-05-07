@@ -5,9 +5,9 @@
 
 package software.amazon.smithy.java.mcp.cli;
 
+import java.nio.file.Path;
 import java.util.Set;
 import software.amazon.smithy.java.mcp.cli.model.Config;
-import software.amazon.smithy.java.mcp.cli.model.ToolBundleConfig;
 
 /**
  * Abstract base class for CLI commands that add tool bundles to the Smithy MCP configuration.
@@ -15,9 +15,8 @@ import software.amazon.smithy.java.mcp.cli.model.ToolBundleConfig;
  * Subclasses must implement methods to provide tool bundle configuration details and specify
  * whether existing configurations can be overwritten.
  *
- * @param <T> The specific type of ToolBundleConfig to be added
  */
-public abstract class AbstractAddToolBundle<T extends ToolBundleConfig> extends ConfigurationCommand {
+public abstract class AbstractAddBundle extends SmithyMcpCommand implements ConfigurationCommand {
 
     @Override
     public final void execute(Config config) throws Exception {
@@ -26,8 +25,12 @@ public abstract class AbstractAddToolBundle<T extends ToolBundleConfig> extends 
                     + " already exists. Either choose a new name or pass --overwrite to overwrite the existing tool bundle");
         }
         var newConfig = getNewToolConfig();
-        ConfigUtils.addToolConfig(config, getToolBundleName(), newConfig);
+        ConfigUtils.addMcpBundle(config, getToolBundleName(), newConfig);
         System.out.println("Added tool bundle " + getToolBundleName());
+    }
+
+    protected final Path getBundleFileLocation() {
+        return ConfigUtils.getBundleFileLocation(getToolBundleName());
     }
 
     /**
@@ -35,7 +38,7 @@ public abstract class AbstractAddToolBundle<T extends ToolBundleConfig> extends 
      *
      * @return A new tool bundle configuration
      */
-    protected abstract T getNewToolConfig();
+    protected abstract CliBundle getNewToolConfig();
 
     /**
      * Returns the name under which this tool bundle will be registered.
