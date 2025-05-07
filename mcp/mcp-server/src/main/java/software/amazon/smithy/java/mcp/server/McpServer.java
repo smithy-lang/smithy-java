@@ -40,7 +40,6 @@ import software.amazon.smithy.java.mcp.model.Tools;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
-import software.amazon.smithy.model.traits.DocumentationTrait;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 
 @SmithyUnstableApi
@@ -51,6 +50,7 @@ public final class McpServer implements Server {
     private static final JsonCodec CODEC = JsonCodec.builder()
             .settings(JsonSettings.builder()
                     .serializeTypeInDocuments(false)
+                    .useJsonName(true)
                     .build())
             .build();
 
@@ -186,8 +186,7 @@ public final class McpServer implements Server {
                         .name(operationName)
                         .description(createDescription(serviceName,
                                 operationName,
-                                schema
-                                        .expectTrait(TraitKey.DOCUMENTATION_TRAIT)))
+                                schema))
                         .inputSchema(createInputSchema(operation.getApiOperation().inputSchema()))
                         .build();
                 tools.put(operation.name(), new Tool(toolInfo, operation));
@@ -204,22 +203,53 @@ public final class McpServer implements Server {
             if (member.hasTrait(TraitKey.REQUIRED_TRAIT)) {
                 requiredProperties.add(name);
             }
-            var details = PropertyDetails.builder()
-                    .typeMember(member.type().toString())
-                    .description(member.expectTrait(TraitKey.DOCUMENTATION_TRAIT).getValue())
-                    .build();
-            properties.put(name, details);
+            // adapt types to json-schema types
+            // https://json-schema.org/draft-07/schema#
+            var type = switch (member.type()) {
+                case BYTE, SHORT, INTEGER, INT_ENUM, LONG, FLOAT, DOUBLE -> "number";
+                case ENUM, BLOB -> "string";
+                case LIST, SET -> "array";
+                case TIMESTAMP -> resolveTimestampType(member.memberTarget());
+                case MAP, DOCUMENT, STRUCTURE, UNION -> "object";
+                case STRING, BIG_DECIMAL, BIG_INTEGER -> "string";
+                case BOOLEAN -> "boolean";
+                default -> throw new RuntimeException("unsupported type: " + member.type() + "on member " + member);
+            };
+            var details = PropertyDetails.builder().typeMember(type);
+            var documentation = member.getTrait(TraitKey.DOCUMENTATION_TRAIT);
+            if (documentation != null) {
+                details.description(documentation.getValue());
+            }
+            properties.put(name, details.build());
         }
         return ToolInputSchema.builder().properties(properties).required(requiredProperties).build();
+    }
+
+    private static String resolveTimestampType(Schema schema) {
+        var trait = schema.getTrait(TraitKey.TIMESTAMP_FORMAT_TRAIT);
+        if (trait == null) {
+            // default is epoch-seconds
+            return "number";
+        }
+        return switch (trait.getFormat()) {
+            case EPOCH_SECONDS -> "number";
+            case DATE_TIME, HTTP_DATE -> "string";
+            default -> throw new RuntimeException("unknown timestamp format: " + trait.getFormat());
+        };
     }
 
     private static String createDescription(
             String serviceName,
             String operationName,
-            DocumentationTrait documentationTrait
+            Schema schema
     ) {
-        return "This tool invokes %s API of %s .".formatted(operationName, serviceName) +
-                documentationTrait.getValue();
+        var documentationTrait = schema.getTrait(TraitKey.DOCUMENTATION_TRAIT);
+        if (documentationTrait != null) {
+            return "This tool invokes %s API of %s.".formatted(operationName, serviceName) +
+                    documentationTrait.getValue();
+        } else {
+            return "This tool invokes %s API of %s.".formatted(operationName, serviceName);
+        }
     }
 
     @Override

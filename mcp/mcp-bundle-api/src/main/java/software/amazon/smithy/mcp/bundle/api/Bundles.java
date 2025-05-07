@@ -13,6 +13,7 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.ModelAssembler;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.StructureShape;
+import software.amazon.smithy.model.traits.StreamingTrait;
 
 public class Bundles {
 
@@ -43,15 +44,50 @@ public class Bundles {
             var model = modelAssemble.assemble().unwrap();
             var template = model.expectShape(ShapeId.from(additionalInput.getIdentifier())).asStructureShape().get();
             var b = model.toBuilder();
+
             // mix in the generic arg members
             for (var op : model.getOperationShapes()) {
-                var input = model.expectShape(op.getInput().get(), StructureShape.class).toBuilder();
-                for (var member : template.members()) {
-                    input.addMember(member.toBuilder()
-                            .id(ShapeId.from(input.getId().toString() + "$" + member.getMemberName()))
-                            .build());
+                boolean skipOperation = false;
+                if (op.getOutput().isPresent()) {
+                    for (var member : model.expectShape(op.getOutputShape(), StructureShape.class).members()) {
+                        if (model.expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
+                            b.removeShape(op.toShapeId());
+                            skipOperation = true;
+                            break;
+                        }
+                    }
                 }
-                b.addShape(input.build());
+
+                if (skipOperation) {
+                    continue;
+                }
+
+                if (op.getInput().isEmpty()) {
+                    b.addShape(op.toBuilder()
+                            .input(template)
+                            .build());
+                } else {
+                    var shape = model.expectShape(op.getInputShape(), StructureShape.class);
+                    for (var member : shape.members()) {
+                        if (model.expectShape(member.getTarget()).hasTrait(StreamingTrait.class)) {
+                            b.removeShape(op.toShapeId());
+                            skipOperation = true;
+                            break;
+                        }
+                    }
+
+                    if (skipOperation) {
+                        continue;
+                    }
+
+                    var input = shape.toBuilder();
+                    for (var member : template.members()) {
+                        input.addMember(member.toBuilder()
+                                .id(ShapeId.from(input.getId().toString() + "$" + member.getMemberName()))
+                                .build());
+                    }
+                    b.addShape(input.build());
+                }
             }
 
             for (var service : model.getServiceShapes()) {

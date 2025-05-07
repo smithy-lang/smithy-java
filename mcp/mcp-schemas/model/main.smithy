@@ -117,6 +117,12 @@ structure ToolInputSchema {
     properties: PropertiesMap
 
     required: StringList
+
+    @required
+    additionalProperties: PrimitiveBoolean = false
+
+    @jsonName("$schema")
+    schema: String = "http://json-schema.org/draft-07/schema#"
 }
 
 map PropertiesMap {

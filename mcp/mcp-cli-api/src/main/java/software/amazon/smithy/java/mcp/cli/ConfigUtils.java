@@ -7,9 +7,7 @@ package software.amazon.smithy.java.mcp.cli;
 
 import static software.amazon.smithy.java.io.ByteBufferUtils.getBytes;
 
-import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -18,7 +16,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.ServiceLoader;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
-import software.amazon.smithy.java.io.ByteBufferUtils;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
