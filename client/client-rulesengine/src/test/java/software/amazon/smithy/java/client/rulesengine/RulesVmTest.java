@@ -417,7 +417,7 @@ public class RulesVmTest {
         var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, functions);
         var result = program.run(Context.create(), Map.of());
 
-        assertThat(result, equalTo(List.of("gimme", "there", "hi%20there", true)));
+        assertThat(result, equalTo(List.of(true, "hi%20there", "there", "gimme")));
     }
 
     @Test

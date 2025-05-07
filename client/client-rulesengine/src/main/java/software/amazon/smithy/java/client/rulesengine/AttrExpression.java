@@ -118,7 +118,7 @@ sealed interface AttrExpression {
         @Override
         @SuppressWarnings("rawtypes")
         public Object apply(Object o) {
-            if (o instanceof List l && l.size() >= index) {
+            if (o instanceof List l && l.size() > index) {
                 return l.get(index);
             }
             return null;

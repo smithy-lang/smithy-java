@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.rulesengine;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -182,6 +183,7 @@ final class RulesVm {
                     for (var i = 0; i < size; i++) {
                         list.add(pop());
                     }
+                    Collections.reverse(list);
                     push(list);
                 }
                 case RulesProgram.CREATE_MAP -> {

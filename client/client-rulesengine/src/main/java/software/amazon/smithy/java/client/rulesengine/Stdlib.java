@@ -65,7 +65,7 @@ enum Stdlib implements VmFunction {
     },
 
     // https://smithy.io/2.0/additional-specs/rules-engine/standard-library.html#isvalidhostlabel-function
-    IS_VALID_HOST_LABEL("isValidHostLabel", 1) {
+    IS_VALID_HOST_LABEL("isValidHostLabel", 2) {
         private static final Pattern HOST_LABEL_PATTERN =
                 Pattern.compile("^[a-zA-Z\\d][a-zA-Z\\d\\-]{0,62}$");
 
@@ -92,7 +92,13 @@ enum Stdlib implements VmFunction {
         @Override
         public Object apply1(Object arg) {
             try {
-                return new URI(EndpointUtils.castFnArgument(arg, String.class, "parseURL", 1));
+                var result = new URI(EndpointUtils.castFnArgument(arg, String.class, "parseURL", 1));
+                if (null != result.getRawQuery()) {
+                    // "If the URL given contains a query portion, the URL MUST be rejected and the function MUST
+                    // return an empty optional."
+                    return null;
+                }
+                return result;
             } catch (URISyntaxException e) {
                 throw new RulesEvaluationError("Error parsing URI in endpoint rule parseURL method", e);
             }

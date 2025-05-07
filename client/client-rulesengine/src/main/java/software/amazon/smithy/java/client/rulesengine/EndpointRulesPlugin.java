@@ -103,6 +103,15 @@ public final class EndpointRulesPlugin implements ClientPlugin {
         return createFromTraits(service.getTrait(EndpointRuleSetTrait.class).orElse(null), engine);
     }
 
+    /**
+     * Gets the endpoint rules program that was compiled, or null if no rules were found on the service.
+     *
+     * @return the rules program or null.
+     */
+    public RulesProgram getProgram() {
+        return program;
+    }
+
     private static EndpointRulesPlugin createFromTraits(EndpointRuleSetTrait ruleset, RulesEngine engine) {
         return ruleset == null
                 ? new EndpointRulesPlugin(null)

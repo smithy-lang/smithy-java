@@ -281,6 +281,7 @@ final class RulesCompiler {
 
             @Override
             public Void visitGetAttr(GetAttr getAttr) {
+                compileExpression(getAttr.getTarget());
                 add_GET_ATTR(AttrExpression.from(getAttr));
                 return null;
             }
@@ -343,8 +344,8 @@ final class RulesCompiler {
                 var f = usedFunctions.get(index);
                 // Detect if the runtime function differs from the defined trait function.
                 if (f.getOperandCount() != fn.getArguments().size()) {
-                    throw new RulesEvaluationError("Rules engine function " + fn.getId() + " accepts "
-                            + fn.getArguments().size() + " arguments in traits, but "
+                    throw new RulesEvaluationError("Rules engine function `" + fn.getId() + "` accepts "
+                            + fn.getArguments().size() + " arguments in Smithy traits, but "
                             + f.getOperandCount() + " in the registered VM function.");
                 }
                 // Should never happen, but just in case.
