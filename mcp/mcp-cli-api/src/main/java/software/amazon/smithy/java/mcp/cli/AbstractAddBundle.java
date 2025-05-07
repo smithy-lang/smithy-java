@@ -8,6 +8,7 @@ package software.amazon.smithy.java.mcp.cli;
 import java.nio.file.Path;
 import java.util.Set;
 import software.amazon.smithy.java.mcp.cli.model.Config;
+import software.amazon.smithy.java.mcp.cli.model.Location;
 
 /**
  * Abstract base class for CLI commands that add tool bundles to the Smithy MCP configuration.
@@ -29,8 +30,8 @@ public abstract class AbstractAddBundle extends SmithyMcpCommand implements Conf
         System.out.println("Added tool bundle " + getToolBundleName());
     }
 
-    protected final Path getBundleFileLocation() {
-        return ConfigUtils.getBundleFileLocation(getToolBundleName());
+    protected final Location getBundleFileLocation() {
+        return Location.builder().fileLocation(ConfigUtils.getBundleFileLocation(getToolBundleName()).toString()).build();
     }
 
     /**

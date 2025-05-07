@@ -39,7 +39,7 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
         var bundleConfig = McpBundleConfig.builder()
                 .smithyModeled(SmithyModeledBundleConfig.builder()
                         .name(awsServiceName)
-                        .bundleLocation(Location.builder().fileLocation(getBundleFileLocation().toString()).build())
+                        .bundleLocation(getBundleFileLocation())
                         .build())
                 .build();
         return new CliBundle(bundle, bundleConfig);
