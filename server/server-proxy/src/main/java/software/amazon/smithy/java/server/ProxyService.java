@@ -5,29 +5,21 @@
 
 package software.amazon.smithy.java.server;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 import software.amazon.smithy.java.auth.api.identity.Identity;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.aws.client.core.settings.RegionSetting;
-import software.amazon.smithy.java.client.core.ClientProtocol;
-import software.amazon.smithy.java.client.core.MessageExchange;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
-import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
-import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.error.ModeledException;
-import software.amazon.smithy.java.core.schema.ApiOperation;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
-import software.amazon.smithy.java.core.serde.Codec;
 import software.amazon.smithy.java.core.serde.TypeRegistry;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.dynamicclient.DocumentException;
@@ -239,53 +231,4 @@ public final class ProxyService implements Service {
         }
     }
 
-    private static class NoOpClientProtocol<I, O> implements ClientProtocol<I, O> {
-
-        private static final NoOpClientProtocol INSTANCE = new NoOpClientProtocol();
-
-        private NoOpClientProtocol() {
-
-        }
-
-        @Override
-        public ShapeId id() {
-            return null;
-        }
-
-        @Override
-        public Codec payloadCodec() {
-            return null;
-        }
-
-        @Override
-        public MessageExchange<I, O> messageExchange() {
-            return null;
-        }
-
-        @Override
-        public <I1 extends SerializableStruct, O1 extends SerializableStruct> I createRequest(
-                ApiOperation<I1, O1> operation,
-                I1 input,
-                Context context,
-                URI endpoint
-        ) {
-            return null;
-        }
-
-        @Override
-        public I setServiceEndpoint(I request, Endpoint endpoint) {
-            return null;
-        }
-
-        @Override
-        public <I1 extends SerializableStruct, O1 extends SerializableStruct> CompletableFuture<O1> deserializeResponse(
-                ApiOperation<I1, O1> operation,
-                Context context,
-                TypeRegistry errorRegistry,
-                I request,
-                O response
-        ) {
-            return null;
-        }
-    }
 }
