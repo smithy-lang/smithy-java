@@ -123,7 +123,7 @@ final class RulesVm {
 
     private Object run() {
         var instructionSize = program.instructionSize;
-        for (pointer = program.instructionOffset; pointer < instructionSize; pointer++) {
+        for (pointer = program.instructionOffset + 1; pointer < instructionSize; pointer++) {
             switch (instructions[pointer]) {
                 case RulesProgram.LOAD_CONST -> {
                     int constant = instructions[++pointer] & 0xFF; // read unsigned byte

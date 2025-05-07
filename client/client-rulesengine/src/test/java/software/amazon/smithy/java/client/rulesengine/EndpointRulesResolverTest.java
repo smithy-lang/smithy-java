@@ -38,6 +38,7 @@ public class EndpointRulesResolverTest {
                 .build();
 
         var bytecode = ByteBuffer.wrap(new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_CONST,
                 0,
                 RulesProgram.RETURN_ENDPOINT,
@@ -140,6 +141,7 @@ public class EndpointRulesResolverTest {
                 .build();
 
         var bytecode = ByteBuffer.wrap(new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_REGISTER, // load foo
                 0,
                 RulesProgram.RETURN_ENDPOINT,
@@ -164,7 +166,7 @@ public class EndpointRulesResolverTest {
                 .operation(getOperation(Map.of()))
                 .build();
 
-        var bytecode = ByteBuffer.wrap(new byte[] {});
+        var bytecode = ByteBuffer.wrap(new byte[] {RulesProgram.VERSION});
 
         var constantPool = new Object[] {"https://example.com"};
         var registers = new RegisterDefinition[] {new RegisterDefinition("foo", false, null, null)};

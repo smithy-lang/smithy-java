@@ -48,6 +48,7 @@ public class RulesEngineTest {
         });
 
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_CONST,
                 0,
                 RulesProgram.FN,
@@ -70,6 +71,7 @@ public class RulesEngineTest {
         var registers = new RegisterDefinition[0];
         var functions = List.of("hello");
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_CONST,
                 0,
                 RulesProgram.FN,
@@ -86,7 +88,7 @@ public class RulesEngineTest {
         var engine = new RulesEngine();
         var constantPool = new Object[0];
         List<String> functions = List.of();
-        var bytecode = new byte[] {RulesProgram.RETURN_ERROR};
+        var bytecode = new byte[] {RulesProgram.VERSION, RulesProgram.RETURN_ERROR};
         var registers = new RegisterDefinition[257];
         for (var i = 0; i < 257; i++) {
             registers[i] = new RegisterDefinition("r" + i);
@@ -120,6 +122,7 @@ public class RulesEngineTest {
         });
 
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_REGISTER,
                 0,
                 RulesProgram.RETURN_ERROR

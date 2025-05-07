@@ -74,6 +74,10 @@ final class RulesCompiler {
         this.performOptimizations = performOptimizations;
         this.functions = functions;
 
+        // Always add the version byte.
+        instructions[0] = RulesProgram.VERSION;
+        instructionSize++;
+
         // Optimize away common subexpressions. Do this up-front so we know they are the 0-N registers.
         cse = performOptimizations ? CseOptimizer.apply(rules.getRules(), 0) : Map.of();
         for (var i = 0; i < cse.size(); i++) {

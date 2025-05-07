@@ -24,7 +24,7 @@ public class RulesVmTest {
         var engine = new RulesEngine();
         var constantPool = new Object[] {1};
         var registers = new RegisterDefinition[0];
-        var bytecode = new byte[] {};
+        var bytecode = new byte[] {RulesProgram.VERSION};
         var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
         var e = Assertions.assertThrows(RulesEvaluationError.class,
                 () -> program.resolveEndpoint(Context.create(), Map.of()));
@@ -37,7 +37,7 @@ public class RulesVmTest {
         var engine = new RulesEngine();
         var constantPool = new Object[] {1};
         var registers = new RegisterDefinition[0];
-        var bytecode = new byte[] {120};
+        var bytecode = new byte[] {RulesProgram.VERSION, 120};
         var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
         var e = Assertions.assertThrows(RulesEvaluationError.class,
                 () -> program.resolveEndpoint(Context.create(), Map.of()));
@@ -52,6 +52,7 @@ public class RulesVmTest {
         var registers = new RegisterDefinition[0];
 
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_CONST,
                 0,
                 RulesProgram.RESOLVE_TEMPLATE,
@@ -64,7 +65,7 @@ public class RulesVmTest {
                 () -> program.resolveEndpoint(Context.create(), Map.of()));
 
         assertThat(e.getMessage(), containsString("Unexpected value type"));
-        assertThat(e.getMessage(), containsString("at address 2"));
+        assertThat(e.getMessage(), containsString("at address 3"));
     }
 
     @Test
@@ -74,6 +75,7 @@ public class RulesVmTest {
         var registers = new RegisterDefinition[0];
 
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_CONST,
                 0,
                 RulesProgram.RESOLVE_TEMPLATE // missing following byte
@@ -91,7 +93,7 @@ public class RulesVmTest {
         var engine = new RulesEngine();
         var constantPool = new Object[] {1};
         var registers = new RegisterDefinition[1];
-        var bytecode = new byte[] {};
+        var bytecode = new byte[] {RulesProgram.VERSION};
         registers[0] = new RegisterDefinition("foo", true, null, null);
         var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
         var e = Assertions.assertThrows(RulesEvaluationError.class,
@@ -106,6 +108,7 @@ public class RulesVmTest {
         var constantPool = new Object[] {1};
         var registers = new RegisterDefinition[1];
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_REGISTER,
                 0,
                 RulesProgram.RETURN_ENDPOINT,
@@ -124,6 +127,7 @@ public class RulesVmTest {
         var constantPool = new Object[] {1};
         var registers = new RegisterDefinition[1];
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_REGISTER,
                 0,
                 RulesProgram.LOAD_REGISTER,
@@ -160,6 +164,7 @@ public class RulesVmTest {
         var constantPool = new Object[] {"https://localhost", "http://localhost"};
         var registers = new RegisterDefinition[1];
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_CONST,
                 0,
                 RulesProgram.PUSH_REGISTER, // https://localhost, https://foo.com
@@ -188,6 +193,7 @@ public class RulesVmTest {
         var constantPool = new Object[] {StringTemplate.from(Template.fromString("https://{foo}.bar"))};
         var registers = new RegisterDefinition[1];
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_REGISTER, // 1 byte register
                 0,
                 RulesProgram.RESOLVE_TEMPLATE, // 2 byte constant
@@ -209,6 +215,7 @@ public class RulesVmTest {
         var constantPool = new Object[] {StringTemplate.from(Template.fromString("https://hi.bar"))};
         var registers = new RegisterDefinition[0];
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.RESOLVE_TEMPLATE, // 2 byte constant
                 0,
                 0,
@@ -227,6 +234,7 @@ public class RulesVmTest {
         var constantPool = new Object[] {StringTemplate.from(Template.fromString("!??!!\\"))};
         var registers = new RegisterDefinition[0];
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.RESOLVE_TEMPLATE, // 2 byte constant
                 0,
                 0,
@@ -246,6 +254,7 @@ public class RulesVmTest {
         var constantPool = new Object[] {StringTemplate.from(Template.fromString("https://hi.bar")), "abc", "def"};
         var registers = new RegisterDefinition[0];
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_CONST, // push map key "abc"
                 1,
                 RulesProgram.LOAD_CONST, // push list value 0, "def"
@@ -272,7 +281,12 @@ public class RulesVmTest {
         var engine = new RulesEngine();
         var constantPool = new Object[] {};
         var registers = new RegisterDefinition[] {new RegisterDefinition("hi", false, "abc", null)};
-        var bytecode = new byte[] {RulesProgram.TEST_REGISTER_ISSET, 0, RulesProgram.RETURN_VALUE};
+        var bytecode = new byte[] {
+                RulesProgram.VERSION,
+                RulesProgram.TEST_REGISTER_ISSET,
+                0,
+                RulesProgram.RETURN_VALUE
+        };
         var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
         var result = program.run(Context.create(), Map.of());
 
@@ -284,7 +298,13 @@ public class RulesVmTest {
         var engine = new RulesEngine();
         var constantPool = new Object[] {};
         var registers = new RegisterDefinition[] {new RegisterDefinition("hi", false, "abc", null)};
-        var bytecode = new byte[] {RulesProgram.LOAD_REGISTER, 0, RulesProgram.ISSET, RulesProgram.RETURN_VALUE};
+        var bytecode = new byte[] {
+                RulesProgram.VERSION,
+                RulesProgram.LOAD_REGISTER,
+                0,
+                RulesProgram.ISSET,
+                RulesProgram.RETURN_VALUE
+        };
         var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
         var result = program.run(Context.create(), Map.of());
 
@@ -296,7 +316,13 @@ public class RulesVmTest {
         var engine = new RulesEngine();
         var constantPool = new Object[] {};
         var registers = new RegisterDefinition[] {new RegisterDefinition("hi", false, false, null)};
-        var bytecode = new byte[] {RulesProgram.LOAD_REGISTER, 0, RulesProgram.NOT, RulesProgram.RETURN_VALUE};
+        var bytecode = new byte[] {
+                RulesProgram.VERSION,
+                RulesProgram.LOAD_REGISTER,
+                0,
+                RulesProgram.NOT,
+                RulesProgram.RETURN_VALUE
+        };
         var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
         var result = program.run(Context.create(), Map.of());
 
@@ -313,6 +339,7 @@ public class RulesVmTest {
                 new RegisterDefinition("c", false, "foo", null),
         };
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_REGISTER,
                 0,
                 RulesProgram.IS_TRUE,
@@ -361,6 +388,7 @@ public class RulesVmTest {
         var registers = new RegisterDefinition[] {new RegisterDefinition("a", false, "hi there", null)};
         var functions = List.of("stringEquals", "uriEncode", "substring", "gimme");
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_REGISTER,
                 0,
                 RulesProgram.LOAD_REGISTER,
@@ -398,6 +426,7 @@ public class RulesVmTest {
         var constantPool = new Object[] {AttrExpression.parse("foo")};
         var registers = new RegisterDefinition[] {new RegisterDefinition("a", false, null, null)};
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_REGISTER,
                 0,
                 RulesProgram.GET_ATTR,

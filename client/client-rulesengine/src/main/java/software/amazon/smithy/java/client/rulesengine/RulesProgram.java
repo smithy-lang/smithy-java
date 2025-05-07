@@ -22,11 +22,9 @@ public final class RulesProgram {
      * The version that a rules engine program was compiled with. The version of a program must be less than or equal
      * to this version number. That is, older code can be run, but newer code cannot. The version is only incremented
      * when things like new opcodes are added. This is a single byte that appears as the first byte in the rules
-     * engine bytecode.
-     *
-     * <p>TODO: Add the version to bytecode, skip it during evaluation, validate the version.
+     * engine bytecode. The version is a negative number to prevent accidentally treating another opcode as the version.
      */
-    public static final byte VERSION = 1;
+    public static final byte VERSION = -1;
 
     /**
      * Push a value onto the stack. Must be followed by one unsigned byte representing the constant pool index.
@@ -179,6 +177,23 @@ public final class RulesProgram {
         this.constantPool = constantPool;
         this.registryIndex = registryIndex;
         this.registerDefinitions = registerDefinitions;
+
+        if (instructionSize < 1) {
+            throw new IllegalArgumentException("Invalid rules engine bytecode");
+        }
+
+        var versionByte = instructions[instructionOffset];
+        if (versionByte >= 0) {
+            throw new IllegalArgumentException("Invalid rules engine bytecode. Missing version byte.");
+        }
+
+        if (versionByte < VERSION) {
+            throw new IllegalArgumentException(String.format(
+                    "Unsupported rules engine bytecode version %d. Up to version %d is supported. Perhaps you need "
+                            + "to update the client-rulesengine package.",
+                    -versionByte,
+                    -VERSION));
+        }
     }
 
     /**
@@ -271,8 +286,8 @@ public final class RulesProgram {
         }
 
         // Write the instructions.
-        s.append("Instructions:\n");
-        for (var i = 0; i < instructionSize; i++) {
+        s.append("Instructions: (version=").append(-instructions[instructionOffset]).append(")\n");
+        for (var i = instructionOffset + 1; i < instructionSize; i++) {
             s.append("  ");
             s.append(String.format("%03d", i));
             s.append(": ");

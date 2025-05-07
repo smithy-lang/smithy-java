@@ -18,6 +18,30 @@ import software.amazon.smithy.java.context.Context;
 
 public class RulesProgramTest {
     @Test
+    public void failsWhenMissingVersion() {
+        var engine = new RulesEngine();
+        var constantPool = new Object[] {"Error!"};
+        var registers = new RegisterDefinition[] {new RegisterDefinition("a")};
+        var bytecode = new byte[] {RulesProgram.RETURN_ERROR};
+
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of()));
+    }
+
+    @Test
+    public void failsWhenVersionIsTooBig() {
+        var engine = new RulesEngine();
+        var constantPool = new Object[] {"Error!"};
+        var registers = new RegisterDefinition[] {new RegisterDefinition("a")};
+        var bytecode = new byte[] {-127}; // assume we will never have this many versions.
+
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of()));
+    }
+
+    @Test
     public void convertsProgramsToStrings() {
         var program = getErrorProgram();
         var str = program.toString();
@@ -27,8 +51,8 @@ public class RulesProgramTest {
         assertThat(str, containsString("Instructions:"));
         assertThat(str, containsString("0: java.lang.String: Error!"));
         assertThat(str, containsString("0: RegisterDefinition[name=a"));
-        assertThat(str, containsString("000: LOAD_CONST"));
-        assertThat(str, containsString("002: RETURN_ERROR"));
+        assertThat(str, containsString("001: LOAD_CONST"));
+        assertThat(str, containsString("003: RETURN_ERROR"));
     }
 
     private RulesProgram getErrorProgram() {
@@ -37,6 +61,7 @@ public class RulesProgramTest {
         var registers = new RegisterDefinition[] {new RegisterDefinition("a")};
 
         var bytecode = new byte[] {
+                RulesProgram.VERSION,
                 RulesProgram.LOAD_CONST,
                 0,
                 RulesProgram.RETURN_ERROR
