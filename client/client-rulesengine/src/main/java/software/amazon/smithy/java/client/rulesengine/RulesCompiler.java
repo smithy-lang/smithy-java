@@ -5,7 +5,9 @@
 
 package software.amazon.smithy.java.client.rulesengine;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,8 +45,10 @@ final class RulesCompiler {
     // Parameters and captured variables.
     private final List<RegisterDefinition> registry = new ArrayList<>();
 
+    private final Map<String, Byte> parameterIndex = new HashMap<>();
+
     // A map of variable name to stack index.
-    private final Map<String, Byte> registryIndex = new HashMap<>();
+    private final Map<String, List<Byte>> registryIndex = new HashMap<>();
 
     // An array of actually used functions.
     private final List<RulesFunction> usedFunctions = new ArrayList<>();
@@ -60,8 +64,10 @@ final class RulesCompiler {
     private boolean performOptimizations;
     private final Map<Expression, Byte> cse;
 
-    // Stack of bitfields that represent registers that were pushed to during a scope. Supports up to 64.
-    private final ArrayList<Long> scopedRegisterStack = new ArrayList<>();
+    // Stack of available and reusable registers.
+    private final ArrayList<Map<Byte, String>> scopedRegisterStack = new ArrayList<>();
+    private final Deque<Byte> availableRegisters = new ArrayDeque<>();
+    private int temporaryRegisters = 0;
 
     RulesCompiler(
             EndpointRuleSet rules,
@@ -88,16 +94,19 @@ final class RulesCompiler {
         for (var param : rules.getParameters()) {
             var defaultValue = param.getDefault().map(EndpointUtils::convertInputParamValue).orElse(null);
             var builtinValue = param.getBuiltIn().orElse(null);
-            addRegister(param.getName().toString(), param.isRequired(), defaultValue, builtinValue);
+            var index = addRegister(param.getName().toString(), param.isRequired(), defaultValue, builtinValue);
+            parameterIndex.put(param.getName().toString(), index);
         }
     }
 
-    private RegisterDefinition addRegister(String name, boolean required, Object defaultValue, String builtin) {
+    private byte addRegister(String name, boolean required, Object defaultValue, String builtin) {
         var register = new RegisterDefinition(name, required, defaultValue, builtin);
         if (registryIndex.containsKey(name)) {
             throw new RulesEvaluationError("Duplicate variable name found in rules: " + name);
         }
-        registryIndex.put(name, (byte) registry.size());
+        List<Byte> stack = new ArrayList<>();
+        stack.add((byte) registry.size());
+        registryIndex.put(name, stack);
         registry.add(register);
 
         // Register scopes are tracking by flipping bits of a long. That means a max of 64 registers.
@@ -106,7 +115,7 @@ final class RulesCompiler {
             throw new RulesEvaluationError("Too many registers added to rules engine");
         }
 
-        return register;
+        return (byte) (registry.size() - 1);
     }
 
     private int getConstant(Object value) {
@@ -118,13 +127,29 @@ final class RulesCompiler {
         return index;
     }
 
-    private byte getOrCreateRegister(String name) {
-        Byte index = registryIndex.get(name);
-        if (index == null) {
-            addRegister(name, false, null, null);
-            return (byte) (registry.size() - 1);
+    // Gets a register that _has_ to exist by name.
+    private byte getRegister(String name) {
+        List<Byte> indices = registryIndex.get(name);
+        return indices.get(indices.size() - 1);
+    }
+
+    // Used to assign registers in a stack-like manner. Not used to initialize registers.
+    private byte assignRegister(String name) {
+        var indices = registryIndex.get(name);
+        var index = getTempRegister();
+        if (indices == null) {
+            indices = new ArrayList<>();
+            registryIndex.put(name, indices);
         }
+        indices.add(index);
         return index;
+    }
+
+    // Gets the next available temporary register or creates one.
+    private byte getTempRegister() {
+        return !availableRegisters.isEmpty()
+                ? availableRegisters.pop()
+                : addRegister("r" + temporaryRegisters++, false, null, null);
     }
 
     private byte getFunctionIndex(String name) {
@@ -148,7 +173,7 @@ final class RulesCompiler {
             short i = 0;
             for (var e : cse.keySet()) {
                 alwaysCompileExpression(e);
-                add_PUSH_REGISTER((byte) i++);
+                add_SET_REGISTER((byte) i++);
             }
             performOptimizations = true;
         }
@@ -173,16 +198,16 @@ final class RulesCompiler {
     }
 
     private void enterScope() {
-        scopedRegisterStack.add(0L);
+        scopedRegisterStack.add(new HashMap<>());
     }
 
     private void exitScope() {
         var value = scopedRegisterStack.remove(scopedRegisterStack.size() - 1);
-        // Iterate over the bits that were set and ensure their registers pop the value set of the scope.
-        while (value != 0) {
-            int bitIndex = Long.numberOfTrailingZeros(value);
-            add_POP_REGISTER((byte) bitIndex);
-            value &= value - 1;
+        // Free up assigned temp registers.
+        for (var entry : value.entrySet()) {
+            var indices = registryIndex.get(entry.getValue());
+            indices.remove(indices.size() - 1);
+            availableRegisters.add(entry.getKey());
         }
     }
 
@@ -208,11 +233,12 @@ final class RulesCompiler {
         compileExpression(condition.getFunction());
         // Add an instruction to store the result as a register if the condition requests it.
         condition.getResult().ifPresent(result -> {
-            var register = getOrCreateRegister(result.toString());
+            var varName = result.toString();
+            var register = assignRegister(varName);
             var position = scopedRegisterStack.size() - 1;
             var current = scopedRegisterStack.get(position);
-            scopedRegisterStack.set(position, current | 1L << register);
-            add_PUSH_REGISTER(register);
+            scopedRegisterStack.get(scopedRegisterStack.size() - 1).put(register, varName);
+            add_SET_REGISTER(register);
         });
         // Add the jump instruction after each condition to skip over more conditions or skip over the rule.
         add_JUMP_IF_FALSEY(0);
@@ -274,7 +300,7 @@ final class RulesCompiler {
 
             @Override
             public Void visitRef(Reference reference) {
-                var index = getOrCreateRegister(reference.getName().toString());
+                var index = getRegister(reference.getName().toString());
                 add_LOAD_REGISTER(index);
                 return null;
             }
@@ -422,7 +448,7 @@ final class RulesCompiler {
                 0,
                 instructionSize,
                 registry,
-                registryIndex,
+                parameterIndex,
                 fns,
                 builtinProvider,
                 constPool);
@@ -455,13 +481,8 @@ final class RulesCompiler {
         }
     }
 
-    private void add_PUSH_REGISTER(byte register) {
-        addInstruction(RulesProgram.PUSH_REGISTER);
-        addInstruction(register);
-    }
-
-    private void add_POP_REGISTER(byte register) {
-        addInstruction(RulesProgram.POP_REGISTER);
+    private void add_SET_REGISTER(byte register) {
+        addInstruction(RulesProgram.SET_REGISTER);
         addInstruction(register);
     }
 
@@ -484,7 +505,7 @@ final class RulesCompiler {
 
     private void add_TEST_REGISTER_ISSET(String register) {
         addInstruction(RulesProgram.TEST_REGISTER_ISSET);
-        addInstruction(getOrCreateRegister(register));
+        addInstruction(getRegister(register));
     }
 
     private void add_RETURN_ERROR() {
@@ -532,7 +553,7 @@ final class RulesCompiler {
 
     private void add_TEST_REGISTER_IS_TRUE(String register) {
         addInstruction(RulesProgram.TEST_REGISTER_IS_TRUE);
-        addInstruction(getOrCreateRegister(register));
+        addInstruction(getRegister(register));
     }
 
     private void addInstruction(byte value) {

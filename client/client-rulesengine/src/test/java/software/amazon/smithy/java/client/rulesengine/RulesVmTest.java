@@ -159,35 +159,6 @@ public class RulesVmTest {
     }
 
     @Test
-    public void canPushAndPopRegisters() {
-        var engine = new RulesEngine();
-        var constantPool = new Object[] {"https://localhost", "http://localhost"};
-        var registers = new RegisterDefinition[1];
-        var bytecode = new byte[] {
-                RulesProgram.VERSION,
-                RulesProgram.LOAD_CONST,
-                0,
-                RulesProgram.PUSH_REGISTER, // https://localhost, https://foo.com
-                0,
-                RulesProgram.LOAD_CONST,
-                1,
-                RulesProgram.PUSH_REGISTER, // http://localhost, https://localhost, https://foo.com
-                0,
-                RulesProgram.POP_REGISTER, // https://localhost, https://foo.com
-                0,
-                RulesProgram.LOAD_REGISTER,
-                0,
-                RulesProgram.RETURN_ENDPOINT,
-                0
-        };
-        registers[0] = new RegisterDefinition("foo", false, null, null);
-        var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
-        var endpoint = program.resolveEndpoint(Context.create(), Map.of("foo", "https://foo.com"));
-
-        assertThat(endpoint.toString(), containsString("https://localhost"));
-    }
-
-    @Test
     public void resolvesTemplates() {
         var engine = new RulesEngine();
         var constantPool = new Object[] {StringTemplate.from(Template.fromString("https://{foo}.bar"))};

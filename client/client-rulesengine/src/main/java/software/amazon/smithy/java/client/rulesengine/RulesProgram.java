@@ -40,71 +40,66 @@ public final class RulesProgram {
      * Peeks the value at the top of the stack and pushes it onto the register stack of a register. Must be followed
      * by the one byte register index.
      */
-    static final byte PUSH_REGISTER = 2;
-
-    /**
-     * Pop a register value off its register stack. Must be followed by the one byte register index.
-     */
-    static final byte POP_REGISTER = 3;
+    static final byte SET_REGISTER = 2;
 
     /**
      * Get the value of a register and push it onto the stack. Must be followed by the one byte register index.
      */
-    static final byte LOAD_REGISTER = 4;
+    static final byte LOAD_REGISTER = 3;
 
     /**
      * Jumps to an opcode index if the top of the stack is null or false. Must be followed by two bytes representing
      * a short index position of the bytecode address.
      */
-    static final byte JUMP_IF_FALSEY = 5;
+    static final byte JUMP_IF_FALSEY = 4;
 
     /**
      * Pops a value off the stack and pushes true if it is falsey (null or false), or false if not.
      *
      * <p>This implements the "not" function as an opcode.
      */
-    static final byte NOT = 6;
+    static final byte NOT = 5;
 
     /**
      * Pops a value off the stack and pushes true if it is set (that is, not null).
      *
      * <p>This implements the "isset" function as an opcode.
      */
-    static final byte ISSET = 7;
+    static final byte ISSET = 6;
 
     /**
      * Checks if a register is set to something that is boolean true or a non null value.
      *
      * <p>Must be followed by an unsigned byte that represents the register to check.
      */
-    static final byte TEST_REGISTER_ISSET = 8;
+    static final byte TEST_REGISTER_ISSET = 7;
 
     /**
      * Sets an error on the VM and exits.
      *
      * <p>Pops a single value that provides the error string to set.
      */
-    static final byte RETURN_ERROR = 9;
+    static final byte RETURN_ERROR = 8;
 
     /**
      * Sets the endpoint result of the VM and exits. Pops the top of the stack, expecting a string value. The opcode
      * must be followed by a byte where the first bit of the byte is on if the endpoint has headers, and the second
      * bit is on if the endpoint has properties.
      */
-    static final byte RETURN_ENDPOINT = 10;
+    static final byte RETURN_ENDPOINT = 9;
 
     /**
      * Pops N values off the stack and pushes a list of those values onto the stack. Must be followed by an unsigned
      * byte that defines the number of elements in the list.
      */
-    static final byte CREATE_LIST = 11;
+    static final byte CREATE_LIST = 10;
 
     /**
      * Pops N*2 values off the stack (key then value), creates a map of those values, and pushes the map onto the
      * stack. Each popped key must be a string. Must be followed by an unsigned byte that defines the
      * number of entries in the map.
      */
-    static final byte CREATE_MAP = 12;
+    static final byte CREATE_MAP = 11;
 
     /**
      * Resolves a template string. Must be followed by two bytes, a short, that represents the constant pool index
@@ -114,7 +109,7 @@ public final class RulesProgram {
      * The popped values fill in values into the template. The resolved template value as a string is then pushed onto
      * the stack.
      */
-    static final byte RESOLVE_TEMPLATE = 13;
+    static final byte RESOLVE_TEMPLATE = 12;
 
     /**
      * Calls a function. Must be followed by a byte to provide the function index to call.
@@ -122,7 +117,7 @@ public final class RulesProgram {
      * <p>The function pops zero or more values off the stack based on the RulesFunction registered for the index,
      * and then pushes the Object result onto the stack.
      */
-    static final byte FN = 14;
+    static final byte FN = 13;
 
     /**
      * Pops the top level value and applies a getAttr expression on it, pushing the result onto the stack.
@@ -130,25 +125,25 @@ public final class RulesProgram {
      * <p>Must be followed by two bytes, a short, that represents the constant pool index that stores the
      * AttrExpression.
      */
-    static final byte GET_ATTR = 15;
+    static final byte GET_ATTR = 14;
 
     /**
      * Pops a value and pushes true if the value is boolean true, false if not.
      */
-    static final byte IS_TRUE = 16;
+    static final byte IS_TRUE = 15;
 
     /**
      * Checks if a register is boolean true and pushes the result onto the stack.
      *
      * <p>Must be followed by a byte that represents the register to check.
      */
-    static final byte TEST_REGISTER_IS_TRUE = 17;
+    static final byte TEST_REGISTER_IS_TRUE = 16;
 
     /**
      * Pops the value at the top of the stack and returns it from the VM. This can be used for testing purposes or
      * for returning things other than endpoint values.
      */
-    static final byte RETURN_VALUE = 18;
+    static final byte RETURN_VALUE = 17;
 
     final Object[] constantPool;
     final byte[] instructions;
@@ -304,13 +299,9 @@ public final class RulesProgram {
                     skip = 2;
                     yield "LOAD_CONST_W";
                 }
-                case PUSH_REGISTER -> {
+                case SET_REGISTER -> {
                     skip = 1;
-                    yield "PUSH_REGISTER";
-                }
-                case POP_REGISTER -> {
-                    skip = 1;
-                    yield "POP_REGISTER";
+                    yield "SET_REGISTER";
                 }
                 case LOAD_REGISTER -> {
                     skip = 1;

@@ -31,7 +31,7 @@ final class RulesVm {
     });
 
     private final RulesProgram program;
-    private final RegisterValue[] registers;
+    private final Object[] registers;
     private final BiFunction<String, Context, Object> builtinProvider;
     private final byte[] instructions;
     private Object[] stack = new Object[8];
@@ -49,16 +49,14 @@ final class RulesVm {
         this.builtinProvider = builtinProvider;
 
         // Copy the registers to not continuously push to their stack.
-        registers = new RegisterValue[program.registerDefinitions.length];
+        registers = new Object[program.registerDefinitions.length];
         for (var i = 0; i < program.registerDefinitions.length; i++) {
             var definition = program.registerDefinitions[i];
-            var register = new RegisterValue(definition);
-            registers[i] = register;
             var provided = parameters.get(definition.name());
             if (provided != null) {
-                register.push(provided);
+                registers[i] = provided;
             } else {
-                initializeRegister(context, register);
+                initializeRegister(context, i, definition);
             }
         }
     }
@@ -79,17 +77,16 @@ final class RulesVm {
         throw new RulesEvaluationError(report, e);
     }
 
-    void initializeRegister(Context context, RegisterValue register) {
-        var definition = register.definition;
+    void initializeRegister(Context context, int index, RegisterDefinition definition) {
         if (definition.defaultValue() != null) {
-            register.push(definition.defaultValue());
+            registers[index] = definition.defaultValue();
             return;
         }
 
         if (definition.builtin() != null) {
             var builtinValue = builtinProvider.apply(definition.builtin(), context);
             if (builtinValue != null) {
-                register.push(builtinValue);
+                registers[index] = builtinValue;
                 return;
             }
         }
@@ -134,17 +131,13 @@ final class RulesVm {
                     push(program.constantPool[readUnsignedShort(pointer + 1)]); // read unsigned short
                     pointer += 2;
                 }
-                case RulesProgram.PUSH_REGISTER -> {
+                case RulesProgram.SET_REGISTER -> {
                     int register = instructions[++pointer] & 0xFF; // read unsigned byte
-                    registers[register].push(peek());
-                }
-                case RulesProgram.POP_REGISTER -> {
-                    int register = instructions[++pointer] & 0xFF; // read unsigned byte
-                    registers[register].pop();
+                    registers[register] = peek();
                 }
                 case RulesProgram.LOAD_REGISTER -> {
                     int register = instructions[++pointer] & 0xFF; // read unsigned byte
-                    push(registers[register].get());
+                    push(registers[register]);
                 }
                 case RulesProgram.JUMP_IF_FALSEY -> {
                     Object value = pop();
@@ -165,7 +158,7 @@ final class RulesVm {
                 }
                 case RulesProgram.TEST_REGISTER_ISSET -> {
                     int register = instructions[++pointer] & 0xFF; // read unsigned byte
-                    var value = registers[register].get();
+                    var value = registers[register];
                     push(value != null && (!(value instanceof Boolean) || (Boolean) value));
                 }
                 case RulesProgram.RETURN_ERROR -> {
@@ -227,7 +220,7 @@ final class RulesVm {
                 case RulesProgram.IS_TRUE -> push(pop() instanceof Boolean b && b);
                 case RulesProgram.TEST_REGISTER_IS_TRUE -> {
                     int register = instructions[++pointer] & 0xFF; // read unsigned byte
-                    push(registers[register].get() instanceof Boolean b && b);
+                    push(registers[register] instanceof Boolean b && b);
                 }
                 case RulesProgram.RETURN_VALUE -> {
                     return pop();
