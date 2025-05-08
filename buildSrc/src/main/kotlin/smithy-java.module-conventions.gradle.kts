@@ -36,6 +36,10 @@ tasks.withType<Javadoc>() {
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:-html", "-quiet")
 }
 
+tasks.withType<Jar> {
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+}
+
 //tasks.withType<JavaCompile> {
 //    options.compilerArgs = listOf("-Xlint:unchecked")
 //}
@@ -49,7 +53,6 @@ afterEvaluate {
         manifest {
             attributes(mapOf("Automatic-Module-Name" to moduleName))
         }
-        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     }
 }
 

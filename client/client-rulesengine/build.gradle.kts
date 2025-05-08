@@ -20,4 +20,5 @@ jmh {
     fork = 1
     // profilers.add("async:output=flamegraph")
     // profilers.add("gc")
+    duplicateClassesStrategy = DuplicatesStrategy.WARN
 }
