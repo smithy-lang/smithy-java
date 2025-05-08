@@ -236,8 +236,7 @@ final class RulesCompiler {
             var varName = result.toString();
             var register = assignRegister(varName);
             var position = scopedRegisterStack.size() - 1;
-            var current = scopedRegisterStack.get(position);
-            scopedRegisterStack.get(scopedRegisterStack.size() - 1).put(register, varName);
+            scopedRegisterStack.get(position).put(register, varName);
             add_SET_REGISTER(register);
         });
         // Add the jump instruction after each condition to skip over more conditions or skip over the rule.
