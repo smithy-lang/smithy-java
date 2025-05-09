@@ -9,8 +9,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 
-import java.nio.ByteBuffer;
-import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -20,25 +18,42 @@ public class RulesProgramTest {
     @Test
     public void failsWhenMissingVersion() {
         var engine = new RulesEngine();
-        var constantPool = new Object[] {"Error!"};
-        var registers = new RegisterDefinition[] {new RegisterDefinition("a")};
-        var bytecode = new byte[] {RulesProgram.RETURN_ERROR};
-
         Assertions.assertThrows(
                 IllegalArgumentException.class,
-                () -> engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of()));
+                () -> engine.precompiledBuilder()
+                        .bytecode(RulesProgram.RETURN_ERROR, (byte) 0, (byte) 0)
+                        .build());
     }
 
     @Test
     public void failsWhenVersionIsTooBig() {
         var engine = new RulesEngine();
-        var constantPool = new Object[] {"Error!"};
-        var registers = new RegisterDefinition[] {new RegisterDefinition("a")};
-        var bytecode = new byte[] {-127}; // assume we will never have this many versions.
 
         Assertions.assertThrows(
                 IllegalArgumentException.class,
-                () -> engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of()));
+                () -> engine.precompiledBuilder()
+                        .bytecode((byte) -127, (byte) 0, (byte) 0)
+                        .build());
+    }
+
+    @Test
+    public void failsWhenNotEnoughBytes() {
+        var engine = new RulesEngine();
+
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> engine.precompiledBuilder().bytecode((byte) -1).build());
+    }
+
+    @Test
+    public void failsWhenMissingParams() {
+        var engine = new RulesEngine();
+
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> engine.precompiledBuilder()
+                        .bytecode(RulesProgram.VERSION, (byte) 1, (byte) 0)
+                        .build());
     }
 
     @Test
@@ -50,24 +65,25 @@ public class RulesProgramTest {
         assertThat(str, containsString("Registers:"));
         assertThat(str, containsString("Instructions:"));
         assertThat(str, containsString("0: String: Error!"));
-        assertThat(str, containsString("0: RegisterDefinition[name=a"));
-        assertThat(str, containsString("001: LOAD_CONST"));
-        assertThat(str, containsString("003: RETURN_ERROR"));
+        assertThat(str, containsString("0: ParamDefinition[name=a"));
+        assertThat(str, containsString("003: LOAD_CONST"));
+        assertThat(str, containsString("005: RETURN_ERROR"));
     }
 
     private RulesProgram getErrorProgram() {
         var engine = new RulesEngine();
-        var constantPool = new Object[] {"Error!"};
-        var registers = new RegisterDefinition[] {new RegisterDefinition("a")};
 
-        var bytecode = new byte[] {
-                RulesProgram.VERSION,
-                RulesProgram.LOAD_CONST,
-                0,
-                RulesProgram.RETURN_ERROR
-        };
-
-        return engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
+        return engine.precompiledBuilder()
+                .bytecode(
+                        RulesProgram.VERSION,
+                        (byte) 1, // params
+                        (byte) 0, // registers
+                        RulesProgram.LOAD_CONST,
+                        (byte) 0,
+                        RulesProgram.RETURN_ERROR)
+                .constantPool("Error!")
+                .parameters(new ParamDefinition("a"))
+                .build();
     }
 
     @Test
@@ -75,7 +91,7 @@ public class RulesProgramTest {
         var program = getErrorProgram();
 
         assertThat(program.getConstantPool().length, is(1));
-        assertThat(program.getRegisterDefinitions().length, is(1));
+        assertThat(program.getParamDefinitions().size(), is(1));
     }
 
     @Test

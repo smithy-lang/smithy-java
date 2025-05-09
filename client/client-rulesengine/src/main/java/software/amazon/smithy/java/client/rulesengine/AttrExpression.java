@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.GetAttr;
 
+/**
+ * Implements the getAttr function by extracting paths from objects.
+ */
 sealed interface AttrExpression {
 
     Object apply(Object o);
@@ -47,6 +50,12 @@ sealed interface AttrExpression {
         }
     }
 
+    /**
+     * Creates an AttrExpression from a string. Generally used when loading from pre-compiled programs.
+     *
+     * @param value Value to parse.
+     * @return the expression.
+     */
     static AttrExpression parse(String value) {
         var values = value.split("\\.");
 

@@ -16,6 +16,9 @@ import software.amazon.smithy.java.client.core.endpoint.EndpointResolverParams;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.model.shapes.ShapeId;
 
+/**
+ * Endpoint resolver that uses the endpoint rules engine.
+ */
 final class EndpointRulesResolver implements EndpointResolver {
 
     private final RulesProgram program;

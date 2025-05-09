@@ -19,8 +19,10 @@ import software.amazon.smithy.java.context.Context;
 
 final class RulesVm {
 
+    // Make number of URIs to cache in the thread-local cache.
     private static final int MAX_CACHE_SIZE = 32;
 
+    // Caches up to 32 previously parsed URIs in a thread-local LRU cache.
     private static final ThreadLocal<Map<String, URI>> URI_LRU_CACHE = ThreadLocal.withInitial(() -> {
         return new LinkedHashMap<>(16, 0.75f, true) {
             @Override
@@ -36,7 +38,7 @@ final class RulesVm {
     private final byte[] instructions;
     private Object[] stack = new Object[8];
     private int stackPosition = 0;
-    private int pointer;
+    private int pc;
 
     RulesVm(
             Context context,
@@ -73,11 +75,11 @@ final class RulesVm {
     }
 
     private RulesEvaluationError createError(String message, RuntimeException e) {
-        var report = message + ". Encountered at address " + pointer + " of program:\n" + program;
+        var report = message + ". Encountered at address " + pc + " of program:\n" + program;
         throw new RulesEvaluationError(report, e);
     }
 
-    void initializeRegister(Context context, int index, RegisterDefinition definition) {
+    void initializeRegister(Context context, int index, ParamDefinition definition) {
         if (definition.defaultValue() != null) {
             registers[index] = definition.defaultValue();
             return;
@@ -121,30 +123,31 @@ final class RulesVm {
 
     private Object run() {
         var instructionSize = program.instructionSize;
-        for (pointer = program.instructionOffset + 1; pointer < instructionSize; pointer++) {
-            switch (instructions[pointer]) {
+        // Skip version, params, and register bytes.
+        for (pc = program.instructionOffset + 3; pc < instructionSize; pc++) {
+            switch (instructions[pc]) {
                 case RulesProgram.LOAD_CONST -> {
-                    int constant = instructions[++pointer] & 0xFF; // read unsigned byte
+                    int constant = instructions[++pc] & 0xFF; // read unsigned byte
                     push(program.constantPool[constant]);
                 }
                 case RulesProgram.LOAD_CONST_W -> {
-                    push(program.constantPool[readUnsignedShort(pointer + 1)]); // read unsigned short
-                    pointer += 2;
+                    push(program.constantPool[readUnsignedShort(pc + 1)]); // read unsigned short
+                    pc += 2;
                 }
                 case RulesProgram.SET_REGISTER -> {
-                    int register = instructions[++pointer] & 0xFF; // read unsigned byte
+                    int register = instructions[++pc] & 0xFF; // read unsigned byte
                     registers[register] = peek();
                 }
                 case RulesProgram.LOAD_REGISTER -> {
-                    int register = instructions[++pointer] & 0xFF; // read unsigned byte
+                    int register = instructions[++pc] & 0xFF; // read unsigned byte
                     push(registers[register]);
                 }
                 case RulesProgram.JUMP_IF_FALSEY -> {
                     Object value = pop();
                     if (value == null || Boolean.FALSE.equals(value)) {
-                        pointer = readUnsignedShort(pointer + 1) - 1; // -1 because loop will increment
+                        pc = readUnsignedShort(pc + 1) - 1; // -1 because loop will increment
                     } else {
-                        pointer += 2;
+                        pc += 2;
                     }
                 }
                 case RulesProgram.NOT -> {
@@ -157,7 +160,7 @@ final class RulesVm {
                     push(value != null && (!(value instanceof Boolean) || (Boolean) value));
                 }
                 case RulesProgram.TEST_REGISTER_ISSET -> {
-                    int register = instructions[++pointer] & 0xFF; // read unsigned byte
+                    int register = instructions[++pc] & 0xFF; // read unsigned byte
                     var value = registers[register];
                     push(value != null && (!(value instanceof Boolean) || (Boolean) value));
                 }
@@ -165,13 +168,13 @@ final class RulesVm {
                     throw new RulesEvaluationError((String) pop());
                 }
                 case RulesProgram.RETURN_ENDPOINT -> {
-                    short packed = instructions[++pointer];
+                    short packed = instructions[++pc];
                     boolean hasHeaders = (packed & 1) != 0;
                     boolean hasProperties = (packed & 2) != 0;
                     return setEndpoint(hasProperties, hasHeaders);
                 }
                 case RulesProgram.CREATE_LIST -> {
-                    int size = instructions[++pointer] & 0xFF; // read unsigned byte
+                    int size = instructions[++pc] & 0xFF; // read unsigned byte
                     List<Object> list = new ArrayList<>(size);
                     for (var i = 0; i < size; i++) {
                         list.add(pop());
@@ -180,16 +183,16 @@ final class RulesVm {
                     push(list);
                 }
                 case RulesProgram.CREATE_MAP -> {
-                    int size = instructions[++pointer] & 0xFF; // read unsigned byte
+                    int size = instructions[++pc] & 0xFF; // read unsigned byte
                     createMap(size);
                 }
                 case RulesProgram.RESOLVE_TEMPLATE -> {
-                    var constant = readUnsignedShort(pointer + 1);
+                    var constant = readUnsignedShort(pc + 1);
                     resolveTemplate((StringTemplate) program.constantPool[constant]);
-                    pointer += 2;
+                    pc += 2;
                 }
                 case RulesProgram.FN -> {
-                    int fIndex = instructions[++pointer] & 0xFF; // read unsigned byte
+                    int fIndex = instructions[++pc] & 0xFF; // read unsigned byte
                     var fn = program.functions[fIndex];
                     Object result = switch (fn.getOperandCount()) {
                         case 0 -> fn.apply0();
@@ -211,22 +214,22 @@ final class RulesVm {
                     push(result);
                 }
                 case RulesProgram.GET_ATTR -> {
-                    var constant = readUnsignedShort(pointer + 1);
+                    var constant = readUnsignedShort(pc + 1);
                     AttrExpression getAttr = (AttrExpression) program.constantPool[constant];
                     var target = pop();
                     push(getAttr.apply(target));
-                    pointer += 2;
+                    pc += 2;
                 }
                 case RulesProgram.IS_TRUE -> push(pop() instanceof Boolean b && b);
                 case RulesProgram.TEST_REGISTER_IS_TRUE -> {
-                    int register = instructions[++pointer] & 0xFF; // read unsigned byte
+                    int register = instructions[++pc] & 0xFF; // read unsigned byte
                     push(registers[register] instanceof Boolean b && b);
                 }
                 case RulesProgram.RETURN_VALUE -> {
                     return pop();
                 }
                 default -> {
-                    throw new RulesEvaluationError("Unknown rules engine instruction: " + instructions[pointer]);
+                    throw new RulesEvaluationError("Unknown rules engine instruction: " + instructions[pc]);
                 }
             }
         }
@@ -250,12 +253,15 @@ final class RulesVm {
         var properties = (Map<String, Object>) (hasProperties ? pop() : Map.of());
         var headers = (Map<String, List<String>>) (hasHeaders ? pop() : Map.of());
         var builder = Endpoint.builder().uri(createUri(urlString));
+
         if (!headers.isEmpty()) {
             builder.putProperty(Endpoint.HEADERS, headers);
         }
+
         for (var _e : properties.entrySet()) {
             // TODO: map properties to endpoint properties.
         }
+
         // TODO: Add auth schemes and figure out how to map properties there too.
         return builder.build();
     }

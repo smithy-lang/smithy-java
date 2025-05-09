@@ -20,9 +20,6 @@ public class RulesEngineTest {
     public void canProvideFunctionsWhenLoadingRules() {
         var helloReturnValue = "hi!";
         var engine = new RulesEngine();
-        var constantPool = new Object[] {helloReturnValue};
-        var registers = new RegisterDefinition[0];
-        var functions = List.of("hello");
 
         engine.addExtension(new RulesExtension() {
             @Override
@@ -49,6 +46,8 @@ public class RulesEngineTest {
 
         var bytecode = new byte[] {
                 RulesProgram.VERSION,
+                0, // params
+                0, // registers
                 RulesProgram.LOAD_CONST,
                 0,
                 RulesProgram.FN,
@@ -56,7 +55,12 @@ public class RulesEngineTest {
                 RulesProgram.RETURN_ERROR
         };
 
-        var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, functions);
+        var program = engine.precompiledBuilder()
+                .bytecode(ByteBuffer.wrap(bytecode))
+                .constantPool(helloReturnValue)
+                .functionNames("hello")
+                .build();
+
         var e = Assertions.assertThrows(RulesEvaluationError.class,
                 () -> program.resolveEndpoint(Context.create(), Map.of()));
 
@@ -67,11 +71,10 @@ public class RulesEngineTest {
     public void failsEarlyWhenFunctionIsMissing() {
         var helloReturnValue = "hi!";
         var engine = new RulesEngine();
-        var constantPool = new Object[] {helloReturnValue};
-        var registers = new RegisterDefinition[0];
-        var functions = List.of("hello");
         var bytecode = new byte[] {
                 RulesProgram.VERSION,
+                0, // params
+                0, // registers
                 RulesProgram.LOAD_CONST,
                 0,
                 RulesProgram.FN,
@@ -80,22 +83,26 @@ public class RulesEngineTest {
         };
 
         Assertions.assertThrows(UnsupportedOperationException.class,
-                () -> engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, functions));
+                () -> engine.precompiledBuilder()
+                        .bytecode(bytecode)
+                        .constantPool(helloReturnValue)
+                        .functionNames("hello")
+                        .build());
     }
 
     @Test
     public void failsEarlyWhenTooManyRegisters() {
         var engine = new RulesEngine();
-        var constantPool = new Object[0];
-        List<String> functions = List.of();
-        var bytecode = new byte[] {RulesProgram.VERSION, RulesProgram.RETURN_ERROR};
-        var registers = new RegisterDefinition[257];
+        var params = new ParamDefinition[257];
         for (var i = 0; i < 257; i++) {
-            registers[i] = new RegisterDefinition("r" + i);
+            params[i] = new ParamDefinition("r" + i);
         }
 
-        Assertions.assertThrows(IndexOutOfBoundsException.class,
-                () -> engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, functions));
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> engine.precompiledBuilder()
+                        .bytecode(RulesProgram.VERSION, (byte) 255, (byte) 0)
+                        .parameters(params)
+                        .build());
     }
 
     @Test
@@ -103,13 +110,6 @@ public class RulesEngineTest {
         var helloReturnValue = "hi!";
         var engine = new RulesEngine();
         var constantPool = new Object[] {helloReturnValue};
-        var registers = new RegisterDefinition[2];
-        registers[0] = new RegisterDefinition("foo", false, null, "customTest");
-
-        // This register will try to fill in a default from a builtin named "unknown", but one doesn't exist so it
-        // is initialized to null. It's not required, so this is allowed to be null. It's like if a built-in is unable
-        // to optionally find your AWS::Auth::AccountId ID.
-        registers[1] = new RegisterDefinition("bar", false, null, "unknown");
 
         // Add a built-in provider that just gets ignored.
         engine.addBuiltinProvider((name, ctx) -> null);
@@ -123,12 +123,24 @@ public class RulesEngineTest {
 
         var bytecode = new byte[] {
                 RulesProgram.VERSION,
+                2, // params
+                0, // registers
                 RulesProgram.LOAD_REGISTER,
                 0,
                 RulesProgram.RETURN_ERROR
         };
 
-        var program = engine.fromPrecompiled(ByteBuffer.wrap(bytecode), constantPool, registers, List.of());
+        var program = engine.precompiledBuilder()
+                .bytecode(bytecode)
+                .constantPool(constantPool)
+                .parameters(
+                        new ParamDefinition("foo", false, null, "customTest"),
+                        // This register will try to fill in a default from a builtin named "unknown", but one doesn't
+                        // exist so it is initialized to null. It's not required, so this is allowed to be null. It's
+                        // like if a built-in is unable to optionally find your AWS::Auth::AccountId ID.
+                        new ParamDefinition("bar", false, null, "unknown"))
+                .build();
+
         var e = Assertions.assertThrows(RulesEvaluationError.class,
                 () -> program.resolveEndpoint(Context.create(), Map.of()));
 

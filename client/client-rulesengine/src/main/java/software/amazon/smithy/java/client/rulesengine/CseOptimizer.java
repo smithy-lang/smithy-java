@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.rulesengine;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Expression;
@@ -20,15 +21,18 @@ import software.amazon.smithy.rulesengine.language.syntax.rule.TreeRule;
  */
 final class CseOptimizer {
 
+    // The score required to make a condition an eliminated CSE.
+    private static final int MINIMUM_SCORE = 5;
+
     // Counts how many times an expression is duplicated.
     private final Map<Expression, Double> conditions = new HashMap<>();
 
-    static Map<Expression, Byte> apply(List<Rule> rules, int offset) {
+    static Map<Expression, Byte> apply(List<Rule> rules) {
         var cse = new CseOptimizer();
         for (var rule : rules) {
             cse.apply(1, rule);
         }
-        return cse.getCse(offset);
+        return cse.getCse();
     }
 
     private void apply(int depth, Rule rule) {
@@ -51,14 +55,12 @@ final class CseOptimizer {
         conditions.put(f, conditions.getOrDefault(f, 0.0) + (1 / (depth * 0.5)));
     }
 
-    private Map<Expression, Byte> getCse(int offset) {
-        int index = offset;
-
-        // Only keep duplicated expressions.
-        Map<Expression, Byte> result = new HashMap<>();
+    private Map<Expression, Byte> getCse() {
+        // Only keep duplicated expressions that have a pretty high score.
+        Map<Expression, Byte> result = new LinkedHashMap<>();
         for (var e : conditions.entrySet()) {
-            if (e.getValue() > 2) {
-                result.put(e.getKey(), (byte) index++);
+            if (e.getValue() > MINIMUM_SCORE) {
+                result.put(e.getKey(), (byte) 0);
             }
         }
 

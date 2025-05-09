@@ -37,18 +37,19 @@ final class RulesCompiler {
     private final EndpointRuleSet rules;
 
     private final Map<Object, Integer> constantPool = new LinkedHashMap<>();
+    private final BiFunction<String, Context, Object> builtinProvider;
+    private final Map<Expression, Byte> cse;
+    private boolean performOptimizations;
 
     // The parsed opcodes and operands.
     private byte[] instructions = new byte[64];
     private int instructionSize;
 
     // Parameters and captured variables.
-    private final List<RegisterDefinition> registry = new ArrayList<>();
-
-    private final Map<String, Byte> parameterIndex = new HashMap<>();
+    private final List<ParamDefinition> registry = new ArrayList<>();
 
     // A map of variable name to stack index.
-    private final Map<String, List<Byte>> registryIndex = new HashMap<>();
+    private final Map<String, Deque<Byte>> registryIndex = new HashMap<>();
 
     // An array of actually used functions.
     private final List<RulesFunction> usedFunctions = new ArrayList<>();
@@ -58,11 +59,6 @@ final class RulesCompiler {
 
     // The resolved VM functions (stdLib + given functions).
     private final Map<String, RulesFunction> functions;
-
-    private final BiFunction<String, Context, Object> builtinProvider;
-
-    private boolean performOptimizations;
-    private final Map<Expression, Byte> cse;
 
     // Stack of available and reusable registers.
     private final ArrayList<Map<Byte, String>> scopedRegisterStack = new ArrayList<>();
@@ -80,32 +76,28 @@ final class RulesCompiler {
         this.performOptimizations = performOptimizations;
         this.functions = functions;
 
-        // Always add the version byte.
+        // Byte 1 is the version byte.
         instructions[0] = RulesProgram.VERSION;
-        instructionSize++;
-
-        // Optimize away common subexpressions. Do this up-front so we know they are the 0-N registers.
-        cse = performOptimizations ? CseOptimizer.apply(rules.getRules(), 0) : Map.of();
-        for (var i = 0; i < cse.size(); i++) {
-            addRegister(i + "-cse", false, null, null);
-        }
+        // Byte 2 the number of parameters. Byte 3 is the number of temporary registers. Both filled in at the end.
+        instructionSize = 3; // start from here
 
         // Add parameters as registry values.
         for (var param : rules.getParameters()) {
             var defaultValue = param.getDefault().map(EndpointUtils::convertInputParamValue).orElse(null);
             var builtinValue = param.getBuiltIn().orElse(null);
-            var index = addRegister(param.getName().toString(), param.isRequired(), defaultValue, builtinValue);
-            parameterIndex.put(param.getName().toString(), index);
+            addRegister(param.getName().toString(), param.isRequired(), defaultValue, builtinValue);
         }
+
+        cse = performOptimizations ? CseOptimizer.apply(rules.getRules()) : Map.of();
     }
 
     private byte addRegister(String name, boolean required, Object defaultValue, String builtin) {
-        var register = new RegisterDefinition(name, required, defaultValue, builtin);
+        var register = new ParamDefinition(name, required, defaultValue, builtin);
         if (registryIndex.containsKey(name)) {
             throw new RulesEvaluationError("Duplicate variable name found in rules: " + name);
         }
-        List<Byte> stack = new ArrayList<>();
-        stack.add((byte) registry.size());
+        Deque<Byte> stack = new ArrayDeque<>();
+        stack.push((byte) registry.size());
         registryIndex.put(name, stack);
         registry.add(register);
 
@@ -129,8 +121,7 @@ final class RulesCompiler {
 
     // Gets a register that _has_ to exist by name.
     private byte getRegister(String name) {
-        List<Byte> indices = registryIndex.get(name);
-        return indices.get(indices.size() - 1);
+        return registryIndex.get(name).peek();
     }
 
     // Used to assign registers in a stack-like manner. Not used to initialize registers.
@@ -138,7 +129,7 @@ final class RulesCompiler {
         var indices = registryIndex.get(name);
         var index = getTempRegister();
         if (indices == null) {
-            indices = new ArrayList<>();
+            indices = new ArrayDeque<>();
             registryIndex.put(name, indices);
         }
         indices.add(index);
@@ -170,10 +161,11 @@ final class RulesCompiler {
         // Compile common subexpression values up front.
         if (performOptimizations) {
             performOptimizations = false;
-            short i = 0;
-            for (var e : cse.keySet()) {
-                alwaysCompileExpression(e);
-                add_SET_REGISTER((byte) i++);
+            for (var e : cse.entrySet()) {
+                alwaysCompileExpression(e.getKey());
+                var register = getTempRegister();
+                e.setValue(register);
+                add_SET_REGISTER(register);
             }
             performOptimizations = true;
         }
@@ -206,7 +198,7 @@ final class RulesCompiler {
         // Free up assigned temp registers.
         for (var entry : value.entrySet()) {
             var indices = registryIndex.get(entry.getValue());
-            indices.remove(indices.size() - 1);
+            indices.pop();
             availableRegisters.add(entry.getKey());
         }
     }
@@ -433,21 +425,18 @@ final class RulesCompiler {
     }
 
     RulesProgram buildProgram() {
-        var registry = new RegisterDefinition[this.registry.size()];
-        this.registry.toArray(registry);
-
+        // Fill in the register and temporary register sizes.
+        instructions[1] = (byte) (this.registry.size() - temporaryRegisters);
+        instructions[2] = (byte) temporaryRegisters;
         var fns = new RulesFunction[usedFunctions.size()];
         usedFunctions.toArray(fns);
-
         var constPool = new Object[this.constantPool.size()];
         constantPool.keySet().toArray(constPool);
-
         return new RulesProgram(
                 this.instructions,
                 0,
                 instructionSize,
                 registry,
-                parameterIndex,
                 fns,
                 builtinProvider,
                 constPool);

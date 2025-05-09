@@ -9,7 +9,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
@@ -37,18 +36,17 @@ public class EndpointRulesResolverTest {
                 .operation(getOperation(Map.of()))
                 .build();
 
-        var bytecode = ByteBuffer.wrap(new byte[] {
-                RulesProgram.VERSION,
-                RulesProgram.LOAD_CONST,
-                0,
-                RulesProgram.RETURN_ENDPOINT,
-                0
-        });
-        var constantPool = new Object[] {"https://example.com"};
-        var registers = new RegisterDefinition[] {};
-        List<String> functions = List.of();
-
-        var program = new RulesEngine().fromPrecompiled(bytecode, constantPool, registers, functions);
+        var program = new RulesEngine().precompiledBuilder()
+                .bytecode(
+                        RulesProgram.VERSION,
+                        (byte) 0,
+                        (byte) 0,
+                        RulesProgram.LOAD_CONST,
+                        (byte) 0,
+                        RulesProgram.RETURN_ENDPOINT,
+                        (byte) 0)
+                .constantPool("https://example.com")
+                .build();
         var resolver = new EndpointRulesResolver(program);
         var result = resolver.resolveEndpoint(params).join();
 
@@ -140,19 +138,18 @@ public class EndpointRulesResolverTest {
                 .operation(op)
                 .build();
 
-        var bytecode = ByteBuffer.wrap(new byte[] {
-                RulesProgram.VERSION,
-                RulesProgram.LOAD_REGISTER, // load foo
-                0,
-                RulesProgram.RETURN_ENDPOINT,
-                0
-        });
-
-        var constantPool = new Object[] {"https://example.com"};
-        var registers = new RegisterDefinition[] {new RegisterDefinition("foo", false, null, null)};
-        List<String> functions = List.of();
-
-        var program = new RulesEngine().fromPrecompiled(bytecode, constantPool, registers, functions);
+        var program = new RulesEngine().precompiledBuilder()
+                .bytecode(
+                        RulesProgram.VERSION,
+                        (byte) 1,
+                        (byte) 0,
+                        RulesProgram.LOAD_REGISTER, // load foo
+                        (byte) 0,
+                        RulesProgram.RETURN_ENDPOINT,
+                        (byte) 0)
+                .constantPool("https://example.com")
+                .parameters(new ParamDefinition("foo", false, null, null))
+                .build();
         var resolver = new EndpointRulesResolver(program);
         var result = resolver.resolveEndpoint(params).join();
 
@@ -166,13 +163,14 @@ public class EndpointRulesResolverTest {
                 .operation(getOperation(Map.of()))
                 .build();
 
-        var bytecode = ByteBuffer.wrap(new byte[] {RulesProgram.VERSION});
-
-        var constantPool = new Object[] {"https://example.com"};
-        var registers = new RegisterDefinition[] {new RegisterDefinition("foo", false, null, null)};
-        List<String> functions = List.of();
-
-        var program = new RulesEngine().fromPrecompiled(bytecode, constantPool, registers, functions);
+        var program = new RulesEngine().precompiledBuilder()
+                .bytecode(
+                        RulesProgram.VERSION,
+                        (byte) 1,
+                        (byte) 0)
+                .constantPool("https://example.com")
+                .parameters(new ParamDefinition("foo", false, null, null))
+                .build();
         var resolver = new EndpointRulesResolver(program);
         var result = resolver.resolveEndpoint(params);
 

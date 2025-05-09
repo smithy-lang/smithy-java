@@ -7,10 +7,11 @@ package software.amazon.smithy.java.client.rulesengine;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.function.BiFunction;
 import software.amazon.smithy.java.context.Context;
@@ -123,55 +124,80 @@ public final class RulesEngine {
     }
 
     /**
-     * Loads a pre-compiled {@link RulesProgram}.
+     * Creates a builder used to create a pre-compiled {@link RulesProgram}.
      *
      * <p>Warning: this method does little to no validation of the given program, the constant pool, or registers.
      * It is up to you to ensure that these values are all correctly provided or else the rule evaluator will fail
      * during evaluation, or provide unpredictable results.
      *
-     * @param program Program instructions to load.
-     * @param constantPool Array indexed constant pool.
-     * @param registers Array indexed registers.
-     * @param functionNames Array of function names used by the program, in order.
-     * @return the loaded RulesProgram.
-     * @throws RulesEvaluationError if the program is invalid or cannot be loaded.
+     * @return the builder.
      */
     @SmithyUnstableApi
-    public RulesProgram fromPrecompiled(
-            ByteBuffer program,
-            Object[] constantPool,
-            RegisterDefinition[] registers,
-            List<String> functionNames
-    ) {
-        if (registers.length > 255) {
-            throw new IndexOutOfBoundsException("The number of register must fit into a byte");
+    public PrecompiledBuilder precompiledBuilder() {
+        return new PrecompiledBuilder();
+    }
+
+    @SmithyUnstableApi
+    public final class PrecompiledBuilder {
+        private ByteBuffer bytecode;
+        private Object[] constantPool;
+        private List<ParamDefinition> parameters = List.of();
+        private String[] functionNames;
+
+        public PrecompiledBuilder bytecode(ByteBuffer bytecode) {
+            this.bytecode = bytecode;
+            return this;
         }
 
-        // Create an index of register names to their register index array position.
-        Map<String, Byte> registryIndex = new HashMap<>(registers.length);
-        for (var i = 0; i < registers.length; i++) {
-            registryIndex.put(registers[i].name(), (byte) i);
+        public PrecompiledBuilder bytecode(byte... bytes) {
+            return bytecode(ByteBuffer.wrap(bytes));
         }
 
-        // Load the ordered list of functions and fail if any are missing.
-        var indexedFunctions = new RulesFunction[functionNames.size()];
-        int i = 0;
-        for (var f : functionNames) {
-            var func = functions.get(f);
-            if (func == null) {
-                throw new UnsupportedOperationException("Rules engine program requires missing function: " + f);
+        public PrecompiledBuilder constantPool(Object... constantPool) {
+            this.constantPool = constantPool;
+            return this;
+        }
+
+        public PrecompiledBuilder parameters(ParamDefinition... paramDefinitions) {
+            this.parameters = Arrays.asList(paramDefinitions);
+            return this;
+        }
+
+        public PrecompiledBuilder functionNames(String... functionNames) {
+            this.functionNames = functionNames;
+            return this;
+        }
+
+        public RulesProgram build() {
+            Objects.requireNonNull(bytecode, "Missing bytecode for program");
+            if (constantPool == null) {
+                constantPool = new Object[0];
             }
-            indexedFunctions[i++] = func;
-        }
 
-        return new RulesProgram(
-                program.array(),
-                program.arrayOffset() + program.position(),
-                program.remaining(),
-                registers,
-                registryIndex,
-                indexedFunctions,
-                createBuiltinProvider(),
-                constantPool);
+            RulesFunction[] indexedFunctions;
+            if (functionNames == null) {
+                indexedFunctions = new RulesFunction[0];
+            } else {
+                // Load the ordered list of functions and fail if any are missing.
+                indexedFunctions = new RulesFunction[functionNames.length];
+                int i = 0;
+                for (var f : functionNames) {
+                    var func = functions.get(f);
+                    if (func == null) {
+                        throw new UnsupportedOperationException("Rules engine program requires missing function: " + f);
+                    }
+                    indexedFunctions[i++] = func;
+                }
+            }
+
+            return new RulesProgram(
+                    bytecode.array(),
+                    bytecode.arrayOffset() + bytecode.position(),
+                    bytecode.remaining(),
+                    parameters,
+                    indexedFunctions,
+                    createBuiltinProvider(),
+                    constantPool);
+        }
     }
 }

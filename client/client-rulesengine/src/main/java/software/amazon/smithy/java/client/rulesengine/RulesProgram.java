@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.client.rulesengine;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
@@ -149,17 +151,16 @@ public final class RulesProgram {
     final byte[] instructions;
     final int instructionOffset;
     final int instructionSize;
-    final RegisterDefinition[] registerDefinitions;
-    final Map<String, Byte> registryIndex;
+    final ParamDefinition[] registerDefinitions;
     final RulesFunction[] functions;
     private final BiFunction<String, Context, Object> builtinProvider;
+    private final int paramCount; // number of provided params.
 
     RulesProgram(
             byte[] instructions,
             int instructionOffset,
             int instructionSize,
-            RegisterDefinition[] registerDefinitions,
-            Map<String, Byte> registryIndex,
+            List<ParamDefinition> params,
             RulesFunction[] functions,
             BiFunction<String, Context, Object> builtinProvider,
             final Object[] constantPool
@@ -170,24 +171,41 @@ public final class RulesProgram {
         this.functions = functions;
         this.builtinProvider = builtinProvider;
         this.constantPool = constantPool;
-        this.registryIndex = registryIndex;
-        this.registerDefinitions = registerDefinitions;
 
-        if (instructionSize < 1) {
-            throw new IllegalArgumentException("Invalid rules engine bytecode");
+        if (instructionSize < 3) {
+            throw new IllegalArgumentException("Invalid rules engine bytecode: too short");
         }
 
         var versionByte = instructions[instructionOffset];
         if (versionByte >= 0) {
-            throw new IllegalArgumentException("Invalid rules engine bytecode. Missing version byte.");
+            throw new IllegalArgumentException("Invalid rules engine bytecode: missing version byte.");
         }
 
         if (versionByte < VERSION) {
             throw new IllegalArgumentException(String.format(
-                    "Unsupported rules engine bytecode version %d. Up to version %d is supported. Perhaps you need "
-                            + "to update the client-rulesengine package.",
+                    "Invalid rules engine bytecode: unsupported bytecode version %d. Up to version %d is supported."
+                            + "Perhaps you need to update the client-rulesengine package.",
                     -versionByte,
                     -VERSION));
+        }
+
+        paramCount = instructions[instructionOffset + 1] & 0xFF;
+        var syntheticParamCount = instructions[instructionOffset + 2] & 0xFF;
+        var totalParams = paramCount + syntheticParamCount;
+        registerDefinitions = new ParamDefinition[totalParams];
+
+        if (params.size() == paramCount) {
+            // Given just params and not registers too.
+            params.toArray(registerDefinitions);
+            for (var i = 0; i < syntheticParamCount; i++) {
+                registerDefinitions[paramCount + i] = new ParamDefinition("r" + i);
+            }
+        } else if (params.size() == totalParams) {
+            // Given exactly the required number of parameters. Assume it was given the params and registers.
+            params.toArray(registerDefinitions);
+        } else {
+            throw new IllegalArgumentException("Invalid rules engine bytecode: bytecode requires " + paramCount
+                    + " parameters, but provided " + params.size());
         }
     }
 
@@ -230,13 +248,17 @@ public final class RulesProgram {
     }
 
     /**
-     * Get the program's registers.
+     * Get the program's parameters.
      *
-     * @return the registers. Do not modify.
+     * @return the parameters.
      */
     @SmithyUnstableApi
-    public RegisterDefinition[] getRegisterDefinitions() {
-        return registerDefinitions;
+    public List<ParamDefinition> getParamDefinitions() {
+        List<ParamDefinition> result = new ArrayList<>();
+        for (var i = 0; i < paramCount; i++) {
+            result.add(registerDefinitions[i]);
+        }
+        return result;
     }
 
     @Override
@@ -284,7 +306,8 @@ public final class RulesProgram {
 
         // Write the instructions.
         s.append("Instructions: (version=").append(-instructions[instructionOffset]).append(")\n");
-        for (var i = instructionOffset + 1; i < instructionSize; i++) {
+        // Skip version, param count, synthetic param count bytes.
+        for (var i = instructionOffset + 3; i < instructionSize; i++) {
             s.append("  ");
             s.append(String.format("%03d", i));
             s.append(": ");
@@ -379,5 +402,4 @@ public final class RulesProgram {
 
         return s.toString();
     }
-
 }
