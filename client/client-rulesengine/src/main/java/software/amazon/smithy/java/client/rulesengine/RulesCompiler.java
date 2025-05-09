@@ -34,6 +34,7 @@ import software.amazon.smithy.rulesengine.language.syntax.rule.TreeRule;
 
 final class RulesCompiler {
 
+    private final List<RulesExtension> extensions;
     private final EndpointRuleSet rules;
 
     private final Map<Object, Integer> constantPool = new LinkedHashMap<>();
@@ -66,11 +67,13 @@ final class RulesCompiler {
     private int temporaryRegisters = 0;
 
     RulesCompiler(
+            List<RulesExtension> extensions,
             EndpointRuleSet rules,
             Map<String, RulesFunction> functions,
             BiFunction<String, Context, Object> builtinProvider,
             boolean performOptimizations
     ) {
+        this.extensions = extensions;
         this.rules = rules;
         this.builtinProvider = builtinProvider;
         this.performOptimizations = performOptimizations;
@@ -433,6 +436,7 @@ final class RulesCompiler {
         var constPool = new Object[this.constantPool.size()];
         constantPool.keySet().toArray(constPool);
         return new RulesProgram(
+                extensions,
                 this.instructions,
                 0,
                 instructionSize,

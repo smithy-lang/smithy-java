@@ -32,6 +32,7 @@ final class RulesVm {
         };
     });
 
+    private final Context context;
     private final RulesProgram program;
     private final Object[] registers;
     private final BiFunction<String, Context, Object> builtinProvider;
@@ -46,6 +47,7 @@ final class RulesVm {
             Map<String, Object> parameters,
             BiFunction<String, Context, Object> builtinProvider
     ) {
+        this.context = context;
         this.program = program;
         this.instructions = program.instructions;
         this.builtinProvider = builtinProvider;
@@ -258,11 +260,10 @@ final class RulesVm {
             builder.putProperty(Endpoint.HEADERS, headers);
         }
 
-        for (var _e : properties.entrySet()) {
-            // TODO: map properties to endpoint properties.
+        for (var extension : program.extensions) {
+            extension.extractEndpointProperties(builder, context, properties, headers);
         }
 
-        // TODO: Add auth schemes and figure out how to map properties there too.
         return builder.build();
     }
 

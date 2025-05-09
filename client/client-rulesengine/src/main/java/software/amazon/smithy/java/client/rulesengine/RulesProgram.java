@@ -147,6 +147,7 @@ public final class RulesProgram {
      */
     static final byte RETURN_VALUE = 17;
 
+    final List<RulesExtension> extensions;
     final Object[] constantPool;
     final byte[] instructions;
     final int instructionOffset;
@@ -157,14 +158,16 @@ public final class RulesProgram {
     private final int paramCount; // number of provided params.
 
     RulesProgram(
+            List<RulesExtension> extensions,
             byte[] instructions,
             int instructionOffset,
             int instructionSize,
             List<ParamDefinition> params,
             RulesFunction[] functions,
             BiFunction<String, Context, Object> builtinProvider,
-            final Object[] constantPool
+            Object[] constantPool
     ) {
+        this.extensions = extensions;
         this.instructions = instructions;
         this.instructionOffset = instructionOffset;
         this.instructionSize = instructionSize;

@@ -30,6 +30,7 @@ public final class RulesEngine {
         }
     }
 
+    private final List<RulesExtension> extensions = new ArrayList<>();
     private final Map<String, RulesFunction> functions = new LinkedHashMap<>();
     private final List<BiFunction<String, Context, Object>> builtinProviders = new ArrayList<>();
     private boolean performOptimizations = true;
@@ -82,6 +83,7 @@ public final class RulesEngine {
      * @return the RulesEngine.
      */
     public RulesEngine addExtension(RulesExtension extension) {
+        extensions.add(extension);
         addBuiltinProvider(extension.getBuiltinProvider());
         for (var f : extension.getFunctions()) {
             addFunction(f);
@@ -120,7 +122,7 @@ public final class RulesEngine {
      * @return the compiled program.
      */
     public RulesProgram compile(EndpointRuleSet rules) {
-        return new RulesCompiler(rules, functions, createBuiltinProvider(), performOptimizations).compile();
+        return new RulesCompiler(extensions, rules, functions, createBuiltinProvider(), performOptimizations).compile();
     }
 
     /**
@@ -191,6 +193,7 @@ public final class RulesEngine {
             }
 
             return new RulesProgram(
+                    extensions,
                     bytecode.array(),
                     bytecode.arrayOffset() + bytecode.position(),
                     bytecode.remaining(),
