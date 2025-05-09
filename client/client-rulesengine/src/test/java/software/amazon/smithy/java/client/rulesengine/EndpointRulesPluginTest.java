@@ -11,6 +11,8 @@ import static org.hamcrest.Matchers.not;
 
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.ClientContext;
+import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.core.schema.ApiService;
 import software.amazon.smithy.java.core.schema.Schema;
@@ -43,6 +45,19 @@ public class EndpointRulesPluginTest {
         plugin.configureClient(builder);
 
         assertThat(builder.endpointResolver(), not(instanceOf(EndpointRulesResolver.class)));
+    }
+
+    @Test
+    public void modifiesResolverIfCustomEndpointSet() {
+        var contents = IoUtils.readUtf8Resource(getClass(), "example-complex-ruleset.json");
+        var program = new RulesEngine().compile(EndpointRuleSet.fromNode(Node.parse(contents)));
+        var plugin = EndpointRulesPlugin.from(program);
+        var builder = ClientConfig.builder()
+                .endpointResolver(EndpointResolver.staticHost("foo.com"))
+                .putConfig(ClientContext.CUSTOM_ENDPOINT, Endpoint.builder().uri("https://example.com").build());
+        plugin.configureClient(builder);
+
+        assertThat(builder.endpointResolver(), instanceOf(EndpointRulesResolver.class));
     }
 
     @Test

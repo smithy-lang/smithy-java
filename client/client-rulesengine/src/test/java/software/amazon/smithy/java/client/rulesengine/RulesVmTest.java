@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.java.client.core.endpoint.Endpoint;
+import software.amazon.smithy.java.client.core.endpoint.EndpointContext;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Template;
 
@@ -269,7 +269,7 @@ public class RulesVmTest {
         var endpoint = program.resolveEndpoint(Context.create(), Map.of());
 
         assertThat(endpoint.toString(), containsString("https://hi.bar"));
-        assertThat(endpoint.property(Endpoint.HEADERS), equalTo(Map.of("abc", List.of("def"))));
+        assertThat(endpoint.property(EndpointContext.HEADERS), equalTo(Map.of("abc", List.of("def"))));
     }
 
     @Test

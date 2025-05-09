@@ -7,6 +7,7 @@ package software.amazon.smithy.java.client.rulesengine;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 
 import java.net.URI;
@@ -14,6 +15,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import software.amazon.smithy.java.client.core.ClientContext;
+import software.amazon.smithy.java.client.core.endpoint.Endpoint;
+import software.amazon.smithy.java.context.Context;
 
 public class StdlibTest {
     @Test
@@ -83,5 +87,16 @@ public class StdlibTest {
     })
     public void testsForValidHostLabels(String input, boolean allowDots, boolean isValid) {
         assertThat(input, Stdlib.IS_VALID_HOST_LABEL.apply2(input, allowDots), is(isValid));
+    }
+
+    @Test
+    public void resolvesSdkEndpointBuiltins() {
+        var ctx = Context.create();
+        var endpoint = Endpoint.builder().uri("https://foo.com").build();
+        ctx.put(ClientContext.CUSTOM_ENDPOINT, endpoint);
+        var result = Stdlib.standardBuiltins("SDK::Endpoint", ctx);
+
+        assertThat(result, instanceOf(String.class));
+        assertThat(result, equalTo(endpoint.uri().toString()));
     }
 }
