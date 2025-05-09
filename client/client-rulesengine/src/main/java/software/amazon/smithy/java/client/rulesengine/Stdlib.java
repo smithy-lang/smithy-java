@@ -8,6 +8,7 @@ package software.amazon.smithy.java.client.rulesengine;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Objects;
+import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsValidHostLabel;
@@ -105,7 +106,10 @@ enum Stdlib implements RulesFunction {
 
     static Object standardBuiltins(String name, Context context) {
         if (name.equals("SDK::Endpoint")) {
-            // TODO: grab statically set endpoint via a config key.
+            var result = context.get(ClientContext.CUSTOM_ENDPOINT);
+            if (result != null) {
+                return result.uri().toString();
+            }
         }
         return null;
     }

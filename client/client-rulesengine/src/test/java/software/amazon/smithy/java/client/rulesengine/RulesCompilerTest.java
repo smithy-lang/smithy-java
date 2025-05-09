@@ -19,7 +19,7 @@ import java.util.Objects;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import software.amazon.smithy.java.client.core.endpoint.Endpoint;
+import software.amazon.smithy.java.client.core.endpoint.EndpointContext;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
@@ -53,7 +53,7 @@ public class RulesCompilerTest {
             expected.getEndpoint().ifPresent(expectedEndpoint -> {
                 var result = plugin.getProgram().resolveEndpoint(ctx, input);
                 assertThat(result.uri().toString(), equalTo(expectedEndpoint.getUrl()));
-                var actualHeaders = result.property(Endpoint.HEADERS);
+                var actualHeaders = result.property(EndpointContext.HEADERS);
                 if (expectedEndpoint.getHeaders().isEmpty()) {
                     assertThat(actualHeaders, nullValue());
                 } else {

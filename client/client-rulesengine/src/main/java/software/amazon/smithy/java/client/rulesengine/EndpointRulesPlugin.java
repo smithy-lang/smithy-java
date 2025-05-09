@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.rulesengine;
 
 import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.core.schema.TraitKey;
 import software.amazon.smithy.rulesengine.traits.ContextParamTrait;
@@ -69,8 +70,9 @@ public final class EndpointRulesPlugin implements ClientPlugin {
 
     @Override
     public void configureClient(ClientConfig.Builder config) {
-        // Only modify the endpoint resolver if it isn't set already and if a program was provided.
-        if (config.endpointResolver() == null) {
+        // Only modify the endpoint resolver if it isn't set already or if CUSTOM_ENDPOINT is set,
+        // and if a program was provided.
+        if (config.endpointResolver() == null || config.context().get(ClientContext.CUSTOM_ENDPOINT) != null) {
             if (program != null) {
                 applyResolver(program, config);
             } else if (config.service() != null) {

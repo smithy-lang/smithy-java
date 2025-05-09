@@ -44,7 +44,6 @@ final class EndpointRulesResolver implements EndpointResolver {
         var staticParams = getStaticParams(operation);
         // TODO: Grab input from RulesEnginePlugin.OPERATION_CONTEXT_PARAMS_TRAIT
         // TODO: Grab input from RulesEnginePlugin.CONTEXT_PARAM_TRAIT
-        // TODO: We need some way to provide the SDK::Endpoint builtin.
         return new HashMap<>(staticParams);
     }
 

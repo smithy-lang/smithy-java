@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
+import software.amazon.smithy.java.client.core.endpoint.EndpointContext;
 import software.amazon.smithy.java.context.Context;
 
 final class RulesVm {
@@ -257,7 +258,7 @@ final class RulesVm {
         var builder = Endpoint.builder().uri(createUri(urlString));
 
         if (!headers.isEmpty()) {
-            builder.putProperty(Endpoint.HEADERS, headers);
+            builder.putProperty(EndpointContext.HEADERS, headers);
         }
 
         for (var extension : program.extensions) {
