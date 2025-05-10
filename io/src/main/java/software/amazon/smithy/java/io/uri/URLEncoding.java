@@ -43,7 +43,7 @@ public class URLEncoding {
                             sink.append(c);
                         }
                         case '2' -> {
-                            if (i < result.length() - 1 && result.charAt(i + 2) == 'F' && ignoreSlashes) {
+                            if (ignoreSlashes && i < result.length() - 1 && result.charAt(i + 2) == 'F') {
                                 sink.append('/');
                                 i += 2;
                                 break;
