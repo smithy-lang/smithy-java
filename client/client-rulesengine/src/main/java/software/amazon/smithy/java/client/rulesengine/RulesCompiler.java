@@ -243,7 +243,7 @@ final class RulesCompiler {
         if (literal instanceof StringLiteral s) {
             var st = StringTemplate.from(s.value());
             if (st.expressionCount() == 0) {
-                add_LOAD_CONST(st.resolve());
+                add_LOAD_CONST(st.resolve(0, null));
             } else if (st.singularExpression() != null) {
                 // No need to resolve a template if it's just plucking a single value.
                 compileExpression(st.singularExpression());

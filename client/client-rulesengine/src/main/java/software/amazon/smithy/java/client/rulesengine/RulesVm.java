@@ -7,8 +7,7 @@ package software.amazon.smithy.java.client.rulesengine;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +31,13 @@ final class RulesVm {
             }
         };
     });
+
+    // Minimum size for temp arrays when it's lazily allocated.
+    private static final int MIN_TEMP_ARRAY_SIZE = 8;
+
+    // Temp array used during evaluation.
+    private Object[] tempArray;
+    private int tempArraySize = 0;
 
     private final Context context;
     private final RulesProgram program;
@@ -126,15 +132,19 @@ final class RulesVm {
 
     private Object run() {
         var instructionSize = program.instructionSize;
+        var constantPool = program.constantPool;
+        var instructions = this.instructions;
+        var registers = this.registers;
+
         // Skip version, params, and register bytes.
         for (pc = program.instructionOffset + 3; pc < instructionSize; pc++) {
             switch (instructions[pc]) {
                 case RulesProgram.LOAD_CONST -> {
                     int constant = instructions[++pc] & 0xFF; // read unsigned byte
-                    push(program.constantPool[constant]);
+                    push(constantPool[constant]);
                 }
                 case RulesProgram.LOAD_CONST_W -> {
-                    push(program.constantPool[readUnsignedShort(pc + 1)]); // read unsigned short
+                    push(constantPool[readUnsignedShort(pc + 1)]); // read unsigned short
                     pc += 2;
                 }
                 case RulesProgram.SET_REGISTER -> {
@@ -153,19 +163,16 @@ final class RulesVm {
                         pc += 2;
                     }
                 }
-                case RulesProgram.NOT -> {
-                    Object value = pop();
-                    push(!(value instanceof Boolean b && b));
-                }
+                case RulesProgram.NOT -> push(!Boolean.TRUE.equals(pop()));
                 case RulesProgram.ISSET -> {
                     Object value = pop();
                     // Push true if it's set and not a boolean, or boolean true.
-                    push(value != null && (!(value instanceof Boolean) || (Boolean) value));
+                    push(value != null && !Boolean.FALSE.equals(value));
                 }
                 case RulesProgram.TEST_REGISTER_ISSET -> {
                     int register = instructions[++pc] & 0xFF; // read unsigned byte
                     var value = registers[register];
-                    push(value != null && (!(value instanceof Boolean) || (Boolean) value));
+                    push(value != null && !Boolean.FALSE.equals(value));
                 }
                 case RulesProgram.RETURN_ERROR -> {
                     throw new RulesEvaluationError((String) pop());
@@ -178,12 +185,11 @@ final class RulesVm {
                 }
                 case RulesProgram.CREATE_LIST -> {
                     int size = instructions[++pc] & 0xFF; // read unsigned byte
-                    List<Object> list = new ArrayList<>(size);
-                    for (var i = 0; i < size; i++) {
-                        list.add(pop());
+                    var values = new Object[size];
+                    for (var i = size - 1; i >= 0; i--) {
+                        values[i] = pop();
                     }
-                    Collections.reverse(list);
-                    push(list);
+                    push(Arrays.asList(values));
                 }
                 case RulesProgram.CREATE_MAP -> {
                     int size = instructions[++pc] & 0xFF; // read unsigned byte
@@ -191,13 +197,12 @@ final class RulesVm {
                 }
                 case RulesProgram.RESOLVE_TEMPLATE -> {
                     var constant = readUnsignedShort(pc + 1);
-                    resolveTemplate((StringTemplate) program.constantPool[constant]);
+                    resolveTemplate((StringTemplate) constantPool[constant]);
                     pc += 2;
                 }
                 case RulesProgram.FN -> {
-                    int fIndex = instructions[++pc] & 0xFF; // read unsigned byte
-                    var fn = program.functions[fIndex];
-                    Object result = switch (fn.getOperandCount()) {
+                    var fn = program.functions[instructions[++pc] & 0xFF]; // read unsigned byte
+                    push(switch (fn.getOperandCount()) {
                         case 0 -> fn.apply0();
                         case 1 -> fn.apply1(pop());
                         case 2 -> {
@@ -207,18 +212,17 @@ final class RulesVm {
                         }
                         default -> {
                             // Pop arguments from stack in reverse order.
-                            Object[] args = new Object[fn.getOperandCount()];
+                            var temp = getTempArray(fn.getOperandCount());
                             for (int i = fn.getOperandCount() - 1; i >= 0; i--) {
-                                args[i] = pop();
+                                temp[i] = pop();
                             }
-                            yield fn.apply(args);
+                            yield fn.apply(temp);
                         }
-                    };
-                    push(result);
+                    });
                 }
                 case RulesProgram.GET_ATTR -> {
                     var constant = readUnsignedShort(pc + 1);
-                    AttrExpression getAttr = (AttrExpression) program.constantPool[constant];
+                    AttrExpression getAttr = (AttrExpression) constantPool[constant];
                     var target = pop();
                     push(getAttr.apply(target));
                     pc += 2;
@@ -284,13 +288,25 @@ final class RulesVm {
 
     private void resolveTemplate(StringTemplate template) {
         if (template.expressionCount() == 0) {
-            push(template.resolve());
+            push(template.resolve(0, tempArray));
         } else {
-            String[] dynamicValues = new String[template.expressionCount()];
+            var temp = getTempArray(template.expressionCount());
             for (var i = 0; i < template.expressionCount(); i++) {
-                dynamicValues[i] = (String) pop();
+                temp[i] = pop();
             }
-            push(template.resolve(dynamicValues));
+            push(template.resolve(template.expressionCount(), temp));
         }
+    }
+
+    private Object[] getTempArray(int requiredSize) {
+        var size = Math.max(MIN_TEMP_ARRAY_SIZE, requiredSize);
+        if (tempArraySize < size) {
+            tempArray = new Object[size];
+            tempArraySize = size;
+        } else {
+            // Clear out any previously set values.
+            Arrays.fill(tempArray, null);
+        }
+        return tempArray;
     }
 }

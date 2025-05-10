@@ -35,11 +35,10 @@ record StringTemplate(String template, Object[] parts, int expressionCount, Expr
         }
     }
 
-    String resolve(String... strings) {
-        if (strings.length != expressionCount()) {
-            String given = String.join(", ", strings);
+    String resolve(int arraySize, Object[] strings) {
+        if (arraySize != expressionCount()) {
             throw new RulesEvaluationError("Missing template parameters for a string template `"
-                    + template + "`. Given: [" + given + ']');
+                    + template + "`. Given: [" + Arrays.asList(strings) + ']');
         }
         StringBuilder result = new StringBuilder();
         int paramIndex = 0;

@@ -28,7 +28,7 @@ public class StringTemplateTest {
 
         assertThat(st.expressionCount(), is(1));
         assertThat(st.singularExpression(), notNullValue());
-        assertThat(st.resolve("test"), equalTo("test"));
+        assertThat(st.resolve(1, new Object[] {"test"}), equalTo("test"));
 
         st.forEachExpression(calls::add);
         assertThat(calls, hasSize(1));
@@ -54,7 +54,7 @@ public class StringTemplateTest {
 
         assertThat(st.expressionCount(), is(2));
         assertThat(st.singularExpression(), nullValue());
-        assertThat(st.resolve("abc", "def"), equalTo("https://foo.abc.def.com"));
+        assertThat(st.resolve(2, new Object[] {"abc", "def"}), equalTo("https://foo.abc.def.com"));
 
         st.forEachExpression(calls::add);
         assertThat(calls, hasSize(2));
@@ -65,6 +65,6 @@ public class StringTemplateTest {
         var template = Template.fromString("https://foo.{Region}.{Other}.com");
         var st = StringTemplate.from(template);
 
-        Assertions.assertThrows(RulesEvaluationError.class, () -> st.resolve("foo"));
+        Assertions.assertThrows(RulesEvaluationError.class, () -> st.resolve(1, new Object[] {"foo"}));
     }
 }
