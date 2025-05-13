@@ -6,7 +6,7 @@ use software.amazon.smithy.modelbundle.api#SmithyBundle
 
 union Bundle {
     smithyBundle: SmithyMcpBundle
-    codeRepoBundle: CodeRepoBundle
+    genericBundle: GenericBundle
 }
 
 structure SmithyMcpBundle with [CommonBundleConfig] {
@@ -27,8 +27,13 @@ structure BundleMetadata {
     version: String
 }
 
-structure CodeRepoBundle with [CommonBundleConfig] {
-    /// The URL of this MCP server's code repository
-    @required
-    codeRepoUrl: String
+structure GenericBundle with [CommonBundleConfig] {
+    binary: Blob
+    install: String
+    command: String
+    args: StringList
+}
+
+list StringList {
+    member: String
 }
