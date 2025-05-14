@@ -70,7 +70,19 @@ public final class ClientConfig {
         this.transport = builder.transport;
         ClientPipeline.validateProtocolAndTransport(protocol, transport);
 
-        this.endpointResolver = Objects.requireNonNull(builder.endpointResolver, "endpointResolver is null");
+        // Use an explicitly given resolver if one was set.
+        if (builder.endpointResolver != null) {
+            this.endpointResolver = builder.endpointResolver;
+        } else {
+            // Use a custom endpoint and static endpoint resolver if a custom endpoint was given.
+            // Things like the Smithy rules engine based resolver look for this property to know if a custom endpoint
+            // was provided in this manner.
+            var customEndpoint = builder.context.get(ClientContext.CUSTOM_ENDPOINT);
+            if (customEndpoint == null) {
+                throw new NullPointerException("Both endpointResolver and ClientContext.CUSTOM_ENDPOINT are not set");
+            }
+            this.endpointResolver = EndpointResolver.staticEndpoint(customEndpoint);
+        }
 
         this.interceptors = List.copyOf(builder.interceptors);
 

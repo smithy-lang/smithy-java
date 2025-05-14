@@ -8,6 +8,11 @@ plugins {
     idea
 }
 
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
 tasks.register<Copy>("addGitHooks") {
     onlyIf("unix") {
         !Os.isFamily(Os.FAMILY_WINDOWS)

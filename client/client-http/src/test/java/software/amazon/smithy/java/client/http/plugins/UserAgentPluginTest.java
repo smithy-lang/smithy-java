@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.client.core.CallContext;
+import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.client.core.FeatureId;
 import software.amazon.smithy.java.client.core.interceptors.RequestHook;
 import software.amazon.smithy.java.context.Context;
@@ -49,7 +50,7 @@ public class UserAgentPluginTest {
     public void addsApplicationId() throws Exception {
         UserAgentPlugin.UserAgentInterceptor interceptor = new UserAgentPlugin.UserAgentInterceptor();
         var context = Context.create();
-        context.put(CallContext.APPLICATION_ID, "hello there");
+        context.put(ClientContext.APPLICATION_ID, "hello there");
         var req = HttpRequest.builder().uri(new URI("/")).method("GET").build();
         var foo = new Foo();
         var updated = interceptor.modifyBeforeSigning(new RequestHook<>(createOperation(), context, foo, req));
