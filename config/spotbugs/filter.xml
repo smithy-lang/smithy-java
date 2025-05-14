@@ -76,4 +76,9 @@
         </Class>
     </Match>
 
+    <Match>
+        <Class name="software.amazon.smithy.java.client.rulesengine.RulesVm" />
+        <Bug pattern="RC_REF_COMPARISON_BAD_PRACTICE_BOOLEAN" />
+    </Match>
+
 </FindBugsFilter>

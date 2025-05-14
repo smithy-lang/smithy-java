@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import software.amazon.smithy.java.client.core.CallContext;
 import software.amazon.smithy.java.client.core.ClientConfig;
+import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.client.core.ClientPlugin;
 import software.amazon.smithy.java.client.core.ClientTransport;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
@@ -109,7 +110,7 @@ public final class UserAgentPlugin implements ClientPlugin {
         }
 
         private static String resolveAppId(Context context) {
-            var appId = context.get(CallContext.APPLICATION_ID);
+            var appId = context.get(ClientContext.APPLICATION_ID);
             if (appId == null) {
                 appId = System.getenv(SYSTEM_APP_ID);
             }
