@@ -7,6 +7,14 @@ plugins {
     signing
 }
 
+interface PublishingConfigExtension {
+    var customComponent: SoftwareComponent?
+}
+
+val extension = project.extensions.create<PublishingConfigExtension>("configurePublishing").apply {
+    customComponent = null
+}
+
 /*
  * Staging repository
  * ====================================================
@@ -24,8 +32,7 @@ publishing {
     publications {
         afterEvaluate {
             create<MavenPublication>("mavenJava") {
-                from(components["java"])
-
+                from(extension.customComponent ?: components["java"])
                 val displayName: String by extra
                 pom {
                     name.set(displayName)
