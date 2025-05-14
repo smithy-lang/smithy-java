@@ -18,7 +18,9 @@ import java.util.ServiceLoader;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.mcp.cli.model.Config;
+import software.amazon.smithy.java.mcp.cli.model.Location;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
+import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
 import software.amazon.smithy.mcp.bundle.api.model.Bundle;
 
 /**
@@ -53,7 +55,7 @@ public class ConfigUtils {
                 .orElse(new EmptyDefaultConfigProvider());
     }
 
-    private static Path resolveFromHomeDir(String... paths) {
+    public static Path resolveFromHomeDir(String... paths) {
         String userHome = System.getProperty("user.home");
         return Paths.get(userHome, paths);
     }
@@ -85,7 +87,7 @@ public class ConfigUtils {
         return fromJson(Files.readAllBytes(CONFIG_PATH));
     }
 
-    static Path getBundleFileLocation(String bundleName) {
+    public static Path getBundleFileLocation(String bundleName) {
         return BUNDLE_DIR.resolve(bundleName + ".json");
     }
 
@@ -139,13 +141,27 @@ public class ConfigUtils {
         }
     }
 
-    public static void addMcpBundle(Config config, String toolBundleName, CliBundle mcpBundleConfig)
+    private static void addMcpBundle(Config config, String toolBundleName, CliBundle mcpBundleConfig)
             throws IOException {
         var serializedBundle = toJson(mcpBundleConfig.mcpBundle());
         Files.write(getBundleFileLocation(toolBundleName),
                 serializedBundle,
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.CREATE);
-        addMcpBundleConfig(config, toolBundleName, mcpBundleConfig.mcpBundleConfig());
+    }
+
+    public static McpBundleConfig addMcpBundle(Config config, String toolBundleName, Bundle bundle)
+            throws IOException {
+        var mcpBundleConfig = McpBundleConfig.builder()
+                .smithyModeled(SmithyModeledBundleConfig.builder()
+                        .name(toolBundleName)
+                        .bundleLocation(Location.builder()
+                                .fileLocation(ConfigUtils.getBundleFileLocation(toolBundleName).toString())
+                                .build())
+                        .build())
+                .build();
+        addMcpBundle(config, toolBundleName, new CliBundle(bundle, mcpBundleConfig));
+        addMcpBundleConfig(config, toolBundleName, mcpBundleConfig);
+        return mcpBundleConfig;
     }
 }

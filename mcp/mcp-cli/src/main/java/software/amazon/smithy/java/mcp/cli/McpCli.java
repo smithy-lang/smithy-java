@@ -10,6 +10,8 @@ import java.util.ServiceLoader;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import software.amazon.smithy.java.mcp.cli.commands.Configure;
+import software.amazon.smithy.java.mcp.cli.commands.InstallBundle;
+import software.amazon.smithy.java.mcp.cli.commands.ListBundles;
 import software.amazon.smithy.java.mcp.cli.commands.StartServer;
 
 /**
@@ -28,6 +30,8 @@ public class McpCli {
         discoverConfigurationCommands().forEach(configureCommand::addSubcommand);
         var commandLine = new CommandLine(new McpCli())
                 .addSubcommand(new StartServer())
+                .addSubcommand(new ListBundles())
+                .addSubcommand(new InstallBundle())
                 .addSubcommand(configureCommand);
         commandLine.execute(args);
     }

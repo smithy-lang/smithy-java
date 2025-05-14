@@ -11,8 +11,10 @@ import java.util.List;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import software.amazon.smithy.java.mcp.cli.ConfigUtils;
+import software.amazon.smithy.java.mcp.cli.RegistryUtils;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
 import software.amazon.smithy.java.mcp.cli.model.Config;
+import software.amazon.smithy.java.mcp.cli.model.Location;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
 import software.amazon.smithy.java.mcp.server.McpServer;
@@ -44,12 +46,7 @@ public final class StartServer extends SmithyMcpCommand {
      * @throws IllegalArgumentException If no tool bundles are configured or requested bundles not found
      */
     @Override
-    public void execute(Config config) {
-        if (!config.hasToolBundles()) {
-            throw new IllegalArgumentException(
-                    "No Tool Bundles have been configured. Configure one using the configure-tool-bundle command.");
-        }
-
+    public void execute(Config config) throws IOException {
         // By default, load all available tools
         if (toolBundles == null || toolBundles.isEmpty()) {
             try {
@@ -64,10 +61,24 @@ public final class StartServer extends SmithyMcpCommand {
         }
 
         List<McpBundleConfig> toolBundleConfigs = new ArrayList<>(toolBundles.size());
+
         for (var toolBundle : toolBundles) {
             var toolBundleConfig = config.getToolBundles().get(toolBundle);
             if (toolBundleConfig == null) {
-                throw new IllegalArgumentException("Can't find a configured tool bundle for '" + toolBundle + "'.");
+                var bundle = RegistryUtils.getRegistry().getMcpBundle(toolBundle);
+                if (bundle == null) {
+                    throw new IllegalArgumentException("Can't find a configured tool bundle for '" + toolBundle + "'.");
+                } else {
+                    toolBundleConfig = McpBundleConfig.builder()
+                            .smithyModeled(SmithyModeledBundleConfig.builder()
+                                    .name(toolBundle)
+                                    .bundleLocation(Location.builder()
+                                            .fileLocation(ConfigUtils.getBundleFileLocation(toolBundle).toString())
+                                            .build())
+                                    .build())
+                            .build();
+                    ConfigUtils.addMcpBundle(config, toolBundle, bundle);
+                }
             }
             toolBundleConfigs.add(toolBundleConfig);
         }
