@@ -12,7 +12,7 @@ dependencies {
     api(project(":http:http-api"))
     implementation(project(":logging"))
 
-    testImplementation(project(":codecs:json-codec"))
+    testImplementation(project(":codecs:json-codec", configuration = "shadow"))
     testImplementation(project(":aws:client:aws-client-awsjson"))
     testImplementation(project(":client:dynamic-client"))
 }

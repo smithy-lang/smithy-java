@@ -18,7 +18,7 @@ dependencies {
     implementation(project(":client:client-rpcv2-cbor"))
 
     implementation(project(":client:dynamic-client"))
-    implementation(project(":codecs:json-codec"))
+    implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(project(":client:client-http"))
     implementation(project(":aws:client:aws-client-core"))
     implementation(project(":aws:aws-sigv4"))

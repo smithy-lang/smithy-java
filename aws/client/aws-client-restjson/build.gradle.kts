@@ -11,7 +11,7 @@ extra["moduleName"] = "software.amazon.smithy.java.aws.client.restjson"
 dependencies {
     api(project(":client:client-http-binding"))
     api(project(":client:client-http"))
-    api(project(":codecs:json-codec"))
+    api(project(":codecs:json-codec", configuration = "shadow"))
     api(project(":aws:aws-event-streams"))
     api(libs.smithy.aws.traits)
 

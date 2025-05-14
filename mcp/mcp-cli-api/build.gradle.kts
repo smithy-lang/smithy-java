@@ -13,7 +13,7 @@ dependencies {
     api(libs.smithy.model)
     api(libs.picocli)
     api(project(":mcp:mcp-bundle-api"))
-    implementation(project(":codecs:json-codec"))
+    implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(project(":logging"))
     smithyBuild(project(":codegen:plugins:types-codegen"))
 }

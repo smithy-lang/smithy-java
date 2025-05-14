@@ -13,7 +13,7 @@ dependencies {
     implementation(project(":server:server-core"))
     implementation(project(":logging"))
     implementation(project(":context"))
-    implementation(project(":codecs:json-codec"))
+    implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(project(":mcp:mcp-schemas"))
     implementation(project(":mcp:mcp-bundle-api"))
 }

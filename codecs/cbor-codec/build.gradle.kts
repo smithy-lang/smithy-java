@@ -11,5 +11,5 @@ extra["moduleName"] = "software.amazon.smithy.java.cbor"
 dependencies {
     api(project(":core"))
     testFixturesImplementation(libs.assertj.core)
-    testImplementation(project(":codecs:json-codec"))
+    testImplementation(project(":codecs:json-codec", configuration = "shadow"))
 }

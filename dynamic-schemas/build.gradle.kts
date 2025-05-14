@@ -10,5 +10,5 @@ extra["moduleName"] = "software.amazon.smithy.java.dynamicschemas"
 dependencies {
     api(project(":core"))
 
-    testImplementation(project(":codecs:json-codec"))
+    testImplementation(project(":codecs:json-codec", configuration = "shadow"))
 }

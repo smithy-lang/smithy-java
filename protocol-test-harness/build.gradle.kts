@@ -20,7 +20,7 @@ dependencies {
     implementation(project(":server:server-api"))
     implementation(project(":server:server-core"))
     implementation(project(":client:client-http"))
-    implementation(project(":codecs:json-codec"))
+    implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(libs.assertj.core)
 
     api(platform(libs.junit.bom))

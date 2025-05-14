@@ -17,7 +17,7 @@ dependencies {
     implementation(project(":logging"))
     implementation(project(":mcp:mcp-server"))
     implementation(project(":server:server-proxy"))
-    implementation(project(":codecs:json-codec"))
+    implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(libs.picocli)
     api(project(":mcp:mcp-cli-api"))
     implementation(libs.smithy.utils)

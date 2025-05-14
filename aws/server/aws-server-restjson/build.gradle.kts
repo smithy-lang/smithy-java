@@ -15,7 +15,7 @@ dependencies {
     implementation(project(":server:server-core"))
     implementation(project(":context"))
     implementation(project(":core"))
-    implementation(project(":codecs:json-codec"))
+    implementation(project(":codecs:json-codec", configuration = "shadow"))
     implementation(project(":http:http-binding"))
 
     itImplementation(project(":server:server-api"))

@@ -13,5 +13,5 @@ dependencies {
     api(project(":http:http-binding"))
     implementation(project(":logging"))
 
-    testImplementation(project(":codecs:json-codec"))
+    testImplementation(project(":codecs:json-codec", configuration = "shadow"))
 }
