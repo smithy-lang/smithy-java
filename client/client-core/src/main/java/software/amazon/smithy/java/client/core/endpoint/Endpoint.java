@@ -51,10 +51,13 @@ public interface Endpoint {
      *
      * @return the builder.
      */
+    @SuppressWarnings("unchecked")
     default Builder toBuilder() {
         var builder = new EndpointImpl.Builder();
         builder.uri(uri());
-        properties().forEach(k -> builder.properties.put(k, property(k)));
+        for (var e : properties()) {
+            builder.putProperty((Context.Key<Object>) e, property(e));
+        }
         for (EndpointAuthScheme authScheme : authSchemes()) {
             builder.addAuthScheme(authScheme);
         }

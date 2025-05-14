@@ -138,14 +138,14 @@ public class ClientTest {
                     @Override
                     public ClientConfig modifyBeforeCall(CallHook<?, ?> hook) {
                         var override = RequestOverrideConfig.builder()
-                                .putConfig(CallContext.APPLICATION_ID, id)
+                                .putConfig(ClientContext.APPLICATION_ID, id)
                                 .build();
                         return hook.config().withRequestOverride(override);
                     }
 
                     @Override
                     public void readBeforeExecution(InputHook<?, ?> hook) {
-                        assertThat(hook.context().get(CallContext.APPLICATION_ID), equalTo(id));
+                        assertThat(hook.context().get(ClientContext.APPLICATION_ID), equalTo(id));
                     }
                 }))
                 .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
@@ -173,15 +173,15 @@ public class ClientTest {
                         assertThat(hook.config().context().get(CallContext.APPLICATION_ID), equalTo(id));
                         // Note that the overrides given to the call itself will override interceptors.
                         var override = RequestOverrideConfig.builder()
-                                .putConfig(CallContext.APPLICATION_ID, "foo")
+                                .putConfig(ClientContext.APPLICATION_ID, "foo")
                                 .build();
                         return hook.config().withRequestOverride(override);
                     }
 
                     @Override
                     public void readBeforeExecution(InputHook<?, ?> hook) {
-                        assertThat(hook.context().get(CallContext.APPLICATION_ID), equalTo(id));
-                        assertThat(hook.context().get(CallContext.API_CALL_TIMEOUT), equalTo(Duration.ofMinutes(2)));
+                        assertThat(hook.context().get(ClientContext.APPLICATION_ID), equalTo(id));
+                        assertThat(hook.context().get(ClientContext.API_CALL_TIMEOUT), equalTo(Duration.ofMinutes(2)));
                     }
                 }))
                 .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
@@ -192,8 +192,32 @@ public class ClientTest {
         c.call("GetSprocket",
                 Document.ofObject(new HashMap<>()),
                 RequestOverrideConfig.builder()
-                        .putConfig(CallContext.API_CALL_TIMEOUT, Duration.ofMinutes(2))
-                        .putConfig(CallContext.APPLICATION_ID, id) // this will be take precedence
+                        .putConfig(ClientContext.API_CALL_TIMEOUT, Duration.ofMinutes(2))
+                        .putConfig(ClientContext.APPLICATION_ID, id) // this will be take precedence
                         .build());
+    }
+
+    @Test
+    public void setsCustomEndpoint() {
+        var queue = new MockQueue();
+        queue.enqueue(HttpResponse.builder().statusCode(200).build());
+
+        DynamicClient c = DynamicClient.builder()
+                .model(MODEL)
+                .service(SERVICE)
+                .protocol(new RestJsonClientProtocol(SERVICE))
+                .addPlugin(MockPlugin.builder().addQueue(queue).build())
+                .addPlugin(config -> config.addInterceptor(new ClientInterceptor() {
+                    @Override
+                    public void readBeforeExecution(InputHook<?, ?> hook) {
+                        assertThat(hook.context().get(ClientContext.CUSTOM_ENDPOINT).uri().toString(),
+                                equalTo("https://example.com"));
+                    }
+                }))
+                .endpoint("https://example.com")
+                .authSchemeResolver(AuthSchemeResolver.NO_AUTH)
+                .build();
+
+        c.call("GetSprocket");
     }
 }
