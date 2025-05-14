@@ -64,6 +64,8 @@ final class ClientCall<I extends SerializableStruct, O extends SerializableStruc
         supportedAuthSchemes = builder.supportedAuthSchemes.stream()
                 .collect(Collectors.toMap(AuthScheme::schemeId, Function.identity(), (key1, key2) -> key1));
 
+        context.put(CallContext.ENDPOINT_RESOLVER, endpointResolver);
+
         // Retries
         retryStrategy = Objects.requireNonNull(builder.retryStrategy, "retryStrategy is null");
         retryScope = Objects.requireNonNullElse(builder.retryScope, "");
