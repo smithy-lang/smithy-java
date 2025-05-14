@@ -13,6 +13,7 @@ import software.amazon.smithy.java.auth.api.identity.IdentityResolver;
 import software.amazon.smithy.java.auth.api.identity.IdentityResolvers;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthScheme;
 import software.amazon.smithy.java.client.core.auth.scheme.AuthSchemeResolver;
+import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
 import software.amazon.smithy.java.client.core.interceptors.CallHook;
 import software.amazon.smithy.java.client.core.interceptors.ClientInterceptor;
@@ -221,6 +222,34 @@ public abstract class Client {
         @SuppressWarnings("unchecked")
         public B endpointResolver(EndpointResolver endpointResolver) {
             this.configBuilder.endpointResolver(endpointResolver);
+            return (B) this;
+        }
+
+        /**
+         * Set a custom endpoint for the client to use.
+         *
+         * <p>Note that things like "hostLabel" traits may still cause the endpoint to change. For a completely
+         * static endpoint that never changes, use {@link EndpointResolver#staticHost}.
+         *
+         * @param customEndpoint Endpoint to use with the client.
+         * @return the builder.
+         */
+        @SuppressWarnings("unchecked")
+        public B endpoint(Endpoint customEndpoint) {
+            putConfig(ClientContext.CUSTOM_ENDPOINT, customEndpoint);
+            return (B) this;
+        }
+
+        /**
+         * Set a custom endpoint for the client to use.
+         *
+         * @param customEndpoint Endpoint to use with the client.
+         * @return the builder.
+         * @see #endpoint(Endpoint)
+         */
+        @SuppressWarnings("unchecked")
+        public B endpoint(String customEndpoint) {
+            putConfig(ClientContext.CUSTOM_ENDPOINT, Endpoint.builder().uri(customEndpoint).build());
             return (B) this;
         }
 

@@ -31,6 +31,8 @@ smithy-validation-model = { module = "software.amazon.smithy:smithy-validation-m
 smithy-jmespath = { module = "software.amazon.smithy:smithy-jmespath", version.ref = "smithy" }
 smithy-waiters = { module = "software.amazon.smithy:smithy-waiters", version.ref = "smithy" }
 smithy-utils = { module = "software.amazon.smithy:smithy-utils", version.ref = "smithy" }
+smithy-rules = { module = "software.amazon.smithy:smithy-rules-engine", version.ref = "smithy" }
+smithy-aws-endpoints = { module = "software.amazon.smithy:smithy-aws-endpoints", version.ref = "smithy" }
 
 # AWS SDK for Java V2 adapters.
 aws-sdk-retries-spi = {module = "software.amazon.awssdk:retries-spi", version.ref = "aws-sdk"}

@@ -49,7 +49,6 @@ afterEvaluate {
         manifest {
             attributes(mapOf("Automatic-Module-Name" to moduleName))
         }
-        duplicatesStrategy = DuplicatesStrategy.FAIL
     }
 }
 
