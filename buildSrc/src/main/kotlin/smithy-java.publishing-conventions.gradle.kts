@@ -7,13 +7,6 @@ plugins {
     signing
 }
 
-interface PublishingConfigExtension {
-    var customComponent: SoftwareComponent?
-}
-
-val extension = project.extensions.create<PublishingConfigExtension>("configurePublishing").apply {
-    customComponent = null
-}
 
 /*
  * Staging repository
@@ -32,7 +25,13 @@ publishing {
     publications {
         afterEvaluate {
             create<MavenPublication>("mavenJava") {
-                from(extension.customComponent ?: components["java"])
+
+                if (components.names.contains("shadow")) { // Use the shadow component if its exists
+                    from(components["shadow"])
+                } else { // Otherwise, use the standard java component
+                    from(components["java"])
+                }
+
                 val displayName: String by extra
                 pom {
                     name.set(displayName)
