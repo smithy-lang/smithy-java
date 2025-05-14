@@ -64,6 +64,10 @@ public interface TypeRegistry {
      */
     @SuppressWarnings("unchecked")
     default <T extends SerializableStruct> ShapeBuilder<T> createBuilder(ShapeId shapeId, Class<T> type) {
+        if (shapeId == null) {
+            return null;
+        }
+
         var builder = createBuilder(shapeId);
         if (builder == null) {
             return null;
@@ -78,26 +82,67 @@ public interface TypeRegistry {
     }
 
     /**
-     * Deserializes a document into a shape from the registry.
+     * Create a builder from a document using the document's discriminator.
+     *
+     * @param document Document to create a builder for from the registry.
+     * @return the created builder or null if one wasn't found.
+     */
+    default ShapeBuilder<SerializableStruct> createBuilder(Document document) {
+        return createBuilder(document.discriminator(), SerializableStruct.class);
+    }
+
+    /**
+     * Deserializes a document into a shape from the registry and uses error-correction to fill in zero-values when
+     * a required member is missing.
      *
      * @param document Document to deserialize.
      * @return the deserialized shape.
-     * @throws DiscriminatorException if the document has no discriminator.
+     * @throws DiscriminatorException if the document has a discriminator that cannot be parsed.
      * @throws UnsupportedOperationException if the document doesn't match a registered shape.
+     * @see #deserializeStrict(Document) to deserialize without error-correction (for authoritative consumers).
      */
     default SerializableStruct deserialize(Document document) {
-        var shapeId = document.discriminator();
-        var builder = createBuilder(shapeId, SerializableStruct.class);
+        var builder = createBuilder(document);
         if (builder == null) {
-            throw new UnsupportedOperationException(
-                    "Cannot find a registered shape to deserialize document: "
-                            + shapeId);
+            throw new UnsupportedOperationException("No shape registered for document discriminator: "
+                    + document.discriminator());
         }
         return document.asShape(builder);
     }
 
     /**
+     * Deserializes a document into a shape from the registry and throws when a required member is missing.
+     *
+     * <p>This method is generally reserved for authoritative document consumers (e.g., servers). Clients and other
+     * non-authoritative consumers should generally use {@link #deserialize(Document)}.
+     *
+     * <p>Note: whether this throws or not relies on the builder used to create the document. Code-generated builders
+     * will throw when a required member is missing. Builders implemented in other ways need to enforce that required
+     * members are present in order for this method to actually enforce required members are provided.
+     *
+     * @param document Document to deserialize.
+     * @return the deserialized shape.
+     * @throws DiscriminatorException if the document has a discriminator that cannot be parsed.
+     * @throws UnsupportedOperationException if the document doesn't match a registered shape.
+     * @see #deserialize(Document) to deserialize with error-correction (for non-authoritative consumers).
+     */
+    default SerializableStruct deserializeStrict(Document document) {
+        var builder = createBuilder(document);
+        if (builder == null) {
+            throw new UnsupportedOperationException("No shape registered for document discriminator: "
+                    + document.discriminator());
+        }
+        document.deserializeInto(builder);
+        return builder.build();
+    }
+
+    /**
      * Compose multiple type registries together.
+     *
+     * <p>Note that any special logic a type registry may have added to {@link TypeRegistry#deserialize(Document)} or
+     * {@link TypeRegistry#deserializeStrict(Document)} is not composed in the resulting registry. The default
+     * implementation of these methods is used; however, this still allows for composing the logic used to match a
+     * document to a builder via {@link #createBuilder(Document)}.
      *
      * @param first First type registry to check.
      * @param second Subsequent type registry to check.
@@ -120,19 +165,19 @@ public interface TypeRegistry {
             @Override
             public Class<? extends SerializableStruct> getShapeClass(ShapeId shapeId) {
                 var result = first.getShapeClass(shapeId);
-                if (result != null) {
-                    return result;
-                }
-                return second.getShapeClass(shapeId);
+                return result != null ? result : second.getShapeClass(shapeId);
             }
 
             @Override
             public ShapeBuilder<?> createBuilder(ShapeId shapeId) {
                 var result = first.createBuilder(shapeId);
-                if (result != null) {
-                    return result;
-                }
-                return second.createBuilder(shapeId);
+                return result != null ? result : second.createBuilder(shapeId);
+            }
+
+            @Override
+            public ShapeBuilder<SerializableStruct> createBuilder(Document document) {
+                var result = first.createBuilder(document);
+                return result != null ? result : second.createBuilder(document);
             }
 
             @Override

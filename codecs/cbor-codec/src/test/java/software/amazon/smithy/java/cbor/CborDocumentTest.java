@@ -35,7 +35,6 @@ import software.amazon.smithy.java.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.document.DiscriminatorException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.json.JsonSettings;
@@ -401,11 +400,11 @@ public class CborDocumentTest {
     }
 
     @Test
-    public void throwsWhenGettingDisciminatorOfWrongType() {
+    public void returnsNullWhenGettingDisciminatorOfWrongType() {
         var de = toCbor("\"hi\"");
-        var json = de.readDocument();
+        var cbor = de.readDocument();
 
-        Assertions.assertThrows(DiscriminatorException.class, json::discriminator);
+        assertThat(cbor.discriminator(), nullValue());
     }
 
     @Test

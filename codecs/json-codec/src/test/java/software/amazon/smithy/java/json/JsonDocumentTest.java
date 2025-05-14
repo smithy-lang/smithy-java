@@ -40,7 +40,6 @@ import software.amazon.smithy.java.core.serde.SerializationException;
 import software.amazon.smithy.java.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.core.serde.TimestampFormatter;
-import software.amazon.smithy.java.core.serde.document.DiscriminatorException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
@@ -470,12 +469,12 @@ public class JsonDocumentTest {
     }
 
     @Test
-    public void throwsWhenGettingDisciminatorOfWrongType() {
+    public void returnsNullWhenGettingDisciminatorOfWrongType() {
         var codec = JsonCodec.builder().build();
         var de = codec.createDeserializer("\"hi\"".getBytes(StandardCharsets.UTF_8));
         var json = de.readDocument();
 
-        Assertions.assertThrows(DiscriminatorException.class, json::discriminator);
+        assertThat(json.discriminator(), nullValue());
     }
 
     @Test

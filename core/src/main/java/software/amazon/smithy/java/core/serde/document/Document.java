@@ -86,17 +86,32 @@ public interface Document extends SerializableShape {
     ShapeType type();
 
     /**
+     * Attempts to find and parse a shape ID from the document in the document's discriminator field and throws a
+     * {@link DiscriminatorException} if no discriminator is found.
+     *
+     * @return the non-null, parsed shape ID.
+     * @throws DiscriminatorException if the document doesn't have a valid discriminator.
+     * @see #discriminator()
+     */
+    default ShapeId expectDiscriminator() {
+        var result = discriminator();
+        if (result != null) {
+            return result;
+        }
+        throw new DiscriminatorException(type() + " document has no discriminator");
+    }
+
+    /**
      * Attempts to find and parse a shape ID from the document in the document's discriminator field.
      *
      * <p>Typed documents must return the shape ID of the enclosed shape. When possible, document implementations
      * should account for protocol-specific differences in how a discriminator is serialized. For example, a JSON codec
      * should override this method, check __type, and parse a shape ID when this is called.
      *
-     * @return the non-null, parsed shape ID.
-     * @throws DiscriminatorException if the document doesn't have a valid discriminator.
+     * @return the parsed shape ID, or null if not found.
      */
     default ShapeId discriminator() {
-        throw new DiscriminatorException(type() + " document has no discriminator");
+        return null;
     }
 
     /**

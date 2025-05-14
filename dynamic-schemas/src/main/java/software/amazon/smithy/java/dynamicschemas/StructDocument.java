@@ -13,7 +13,6 @@ import java.util.Set;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.core.serde.document.DiscriminatorException;
 import software.amazon.smithy.java.core.serde.document.Document;
 import software.amazon.smithy.java.core.serde.document.DocumentUtils;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -163,11 +162,7 @@ public final class StructDocument implements Document, SerializableStruct {
 
     @Override
     public ShapeId discriminator() {
-        if (schema.type() == ShapeType.STRUCTURE) {
-            return schema.id();
-        } else {
-            throw new DiscriminatorException(type() + " document has no discriminator");
-        }
+        return schema.type() == ShapeType.STRUCTURE ? schema.id() : null;
     }
 
     @Override

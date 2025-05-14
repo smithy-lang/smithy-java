@@ -79,7 +79,7 @@ public class StructDocumentTest {
         var sd = StructDocument.of(schema, document, ShapeId.from("smithy.example#S"));
 
         assertThat(sd.type(), is(ShapeType.STRUCTURE));
-        assertThat(sd.discriminator().toString(), equalTo("foo#Bar"));
+        assertThat(sd.expectDiscriminator().toString(), equalTo("foo#Bar"));
         assertThat(sd.size(), equalTo(1));
     }
 
@@ -91,7 +91,7 @@ public class StructDocumentTest {
         var document = Document.ofObject(Map.of("foo", "bar"));
         var sd = StructDocument.of(schema, document, ShapeId.from("smithy.example#S"));
 
-        Assertions.assertThrows(DiscriminatorException.class, sd::discriminator);
+        Assertions.assertThrows(DiscriminatorException.class, sd::expectDiscriminator);
     }
 
     @Test

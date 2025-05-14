@@ -29,12 +29,12 @@ public class DocumentDeserializer implements ShapeDeserializer {
      *
      * @param text Discriminator value to parse.
      * @param defaultNamespace The default namespace to use if one is not in {@code text}. Use null for no default.
-     * @return the parsed shape ID discriminator.
-     * @throws DiscriminatorException if a discriminator cannot be parsed.
+     * @return the parsed shape ID discriminator, or null if not found.
+     * @throws DiscriminatorException if a discriminator is found, but cannot be parsed.
      */
     public static ShapeId parseDiscriminator(String text, String defaultNamespace) {
         if (text == null) {
-            throw new DiscriminatorException("Unable to find a document discriminator");
+            return null;
         }
 
         try {

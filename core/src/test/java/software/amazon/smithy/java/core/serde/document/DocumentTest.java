@@ -512,14 +512,21 @@ public class DocumentTest {
     public void returnsNullForNonStructures() {
         var document = Document.of("Hi");
 
-        Assertions.assertThrows(DiscriminatorException.class, document::discriminator);
+        assertThat(document.discriminator(), nullValue());
+    }
+
+    @Test
+    public void throwsForMissingDiscriminatorWhenExpected() {
+        var document = Document.of("Hi");
+
+        Assertions.assertThrows(DiscriminatorException.class, document::expectDiscriminator);
     }
 
     @Test
     public void returnsNullForMapsMissingType() {
         var document = Document.of(Map.of("hi", Document.of("bye")));
 
-        Assertions.assertThrows(DiscriminatorException.class, document::discriminator);
+        assertThat(document.discriminator(), nullValue());
     }
 
     @Test

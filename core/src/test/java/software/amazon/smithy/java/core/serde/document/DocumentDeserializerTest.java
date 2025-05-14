@@ -9,6 +9,7 @@ import static java.nio.ByteBuffer.wrap;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -61,12 +62,8 @@ public class DocumentDeserializerTest {
     }
 
     @Test
-    public void discriminatorThrowsWithNiceMessageWhenTextIsNull() {
-        var e = Assertions.assertThrows(
-                DiscriminatorException.class,
-                () -> DocumentDeserializer.parseDiscriminator(null, null));
-
-        assertThat(e.getMessage(), equalTo("Unable to find a document discriminator"));
+    public void discriminatorReturnsNullWhenMissing() {
+        assertThat(DocumentDeserializer.parseDiscriminator(null, "foo"), is(nullValue()));
     }
 
     @Test
