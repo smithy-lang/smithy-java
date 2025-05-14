@@ -85,7 +85,7 @@ public class ConfigUtils {
         return fromJson(Files.readAllBytes(CONFIG_PATH));
     }
 
-    static Path getBundleFileLocation(String bundleName) {
+    public static Path getBundleFileLocation(String bundleName) {
         return BUNDLE_DIR.resolve(bundleName + ".json");
     }
 

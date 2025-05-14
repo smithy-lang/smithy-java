@@ -32,7 +32,8 @@ public final class ModelBundles {
 
     private static Model getModel(SmithyBundle bundle) {
         var modelAssemble = new ModelAssembler().putProperty(ModelAssembler.ALLOW_UNKNOWN_TRAITS, true)
-                .addUnparsedModel("bundle.json", bundle.getModel());
+                .addUnparsedModel("bundle.json", bundle.getModel())
+                .disableValidation();
         var additionalInput = bundle.getAdditionalInput();
         Model model;
         StructureShape additionalInputShape = null;

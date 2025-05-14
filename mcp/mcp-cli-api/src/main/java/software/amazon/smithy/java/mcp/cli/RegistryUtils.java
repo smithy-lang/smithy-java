@@ -13,6 +13,8 @@ import java.util.stream.Collectors;
 
 public class RegistryUtils {
 
+    private RegistryUtils() {}
+
     private static final Map<String, Registry> JAVA_REGISTRIES;
 
     static {

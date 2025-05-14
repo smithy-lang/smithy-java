@@ -1,3 +1,5 @@
+
+
 plugins {
     id("smithy-java.module-conventions")
     alias(libs.plugins.shadow)
@@ -10,7 +12,28 @@ extra["moduleName"] = "software.amazon.smithy.java.json"
 
 dependencies {
     api(project(":core"))
-    implementation(libs.jackson.core)
+    compileOnly(libs.jackson.core)
+    testRuntimeOnly(libs.jackson.core)
+}
+
+tasks.shadowJar {
+    configurations = listOf(project.configurations.compileClasspath.get())
+    dependencies {
+        include(
+            dependency(
+                libs.jackson.core
+                    .get()
+                    .toString(),
+            ),
+        )
+        relocate("com.fasterxml.jackson.core", "software.amazon.smithy.java.internal.com.fasterxml.jackson.core")
+    }
+    archiveClassifier.set("")
+    mergeServiceFiles()
+}
+
+artifacts {
+    archives(tasks.shadowJar)
 }
 
 tasks {
