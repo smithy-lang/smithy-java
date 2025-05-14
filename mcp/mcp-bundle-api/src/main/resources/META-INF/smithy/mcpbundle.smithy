@@ -28,12 +28,17 @@ structure BundleMetadata {
 }
 
 structure GenericBundle with [CommonBundleConfig] {
-    binary: Blob
+    artifact: GenericArtifact
     install: String
     command: String
-    args: StringList
+    args: ArgList
 }
 
-list StringList {
+list ArgList {
     member: String
+}
+
+union GenericArtifact {
+    artifactId: String
+    empty: Unit
 }
