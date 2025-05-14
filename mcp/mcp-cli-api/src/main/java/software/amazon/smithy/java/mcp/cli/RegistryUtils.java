@@ -13,6 +13,8 @@ import java.util.stream.Collectors;
 
 public class RegistryUtils {
 
+    private RegistryUtils() {}
+
     private static final Map<String, Registry> JAVA_REGISTRIES;
 
     static {
@@ -23,9 +25,16 @@ public class RegistryUtils {
     }
 
     public static Registry getRegistry(String name) {
+        if (name == null) {
+            return getRegistry();
+        }
         if (JAVA_REGISTRIES.containsKey(name)) {
             return JAVA_REGISTRIES.get(name);
         }
         throw new IllegalStateException("No such registry: " + name);
+    }
+
+    public static Registry getRegistry() {
+        return JAVA_REGISTRIES.values().iterator().next();
     }
 }

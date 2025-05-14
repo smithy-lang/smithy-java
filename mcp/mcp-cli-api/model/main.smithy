@@ -4,7 +4,9 @@ namespace smithy.mcp.cli
 
 structure Config {
     toolBundles: McpBundleConfigs
+    defaultRegistry: String
     registries: Registries
+    clientConfigs: ClientConfigs
 }
 
 map McpBundleConfigs {
@@ -59,8 +61,35 @@ structure GenericToolBundleConfig with [CommonToolConfig] {
     config: Document
 }
 
+structure ClientConfig {
+    name: String
+    filePath: String
+}
+
 list ToolNames {
     member: ToolName
 }
 
+list ClientConfigs {
+    member: ClientConfig
+}
+
 string ToolName
+
+structure McpServersClientConfig {
+    mcpServers: McpServerConfigs
+}
+
+map McpServerConfigs {
+    key: String
+    value: McpServerConfig
+}
+
+structure McpServerConfig {
+    command: String
+    args: ArgsList
+}
+
+list ArgsList {
+    member: String
+}
