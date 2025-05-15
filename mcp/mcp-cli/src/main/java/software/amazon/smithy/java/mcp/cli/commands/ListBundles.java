@@ -17,25 +17,23 @@ public class ListBundles extends SmithyMcpCommand {
 
     @Option(names = {"-r", "--registry"},
             description = "Name of the registry to list the bundles from. If not provided will list tools across all registries.")
-    String registry;
+    String registryName;
 
     @Override
     protected void execute(Config config) {
-        if (registry != null && !config.getRegistries().containsKey(registry)) {
-            throw new IllegalArgumentException("The registry '" + registry + "' does not exist.");
+        if (registryName != null && !config.getRegistries().containsKey(registryName)) {
+            throw new IllegalArgumentException("The registry '" + registryName + "' does not exist.");
         }
-        if (registry == null) {
-            registry = "aws-mcp-registry";
-        }
-        RegistryUtils.getRegistry(registry)
+
+        var registry = registryName != null ? RegistryUtils.getRegistry(registryName) : RegistryUtils.getRegistry();
+        registry
                 .listMcpBundles()
                 .forEach(bundle -> {
                     StringBuilder builder = new StringBuilder(bundle.getName());
-                    if (bundle.getVersion() != null) {
-                        builder.append("\n").append("Version: ").append(bundle.getVersion());
-                    }
                     if (bundle.getDescription() != null) {
                         builder.append("\n").append("Description: ").append(bundle.getDescription());
+                    } else {
+                        builder.append("\n").append("MCP for ").append(bundle.getName());
                     }
                     System.out.println(builder);
                 });

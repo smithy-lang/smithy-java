@@ -25,7 +25,7 @@ public abstract class AbstractAddBundle extends SmithyMcpCommand implements Conf
                     + " already exists. Either choose a new name or pass --overwrite to overwrite the existing tool bundle");
         }
         var newConfig = getNewToolConfig();
-        ConfigUtils.addMcpBundle(config, getToolBundleName(), newConfig);
+        ConfigUtils.addMcpBundle(config, getToolBundleName(), newConfig.mcpBundle());
         System.out.println("Added tool bundle " + getToolBundleName());
     }
 

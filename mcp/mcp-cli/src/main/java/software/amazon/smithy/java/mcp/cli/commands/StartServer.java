@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
-import software.amazon.smithy.java.mcp.cli.CliBundle;
 import software.amazon.smithy.java.mcp.cli.ConfigUtils;
 import software.amazon.smithy.java.mcp.cli.RegistryUtils;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
@@ -66,7 +65,7 @@ public final class StartServer extends SmithyMcpCommand {
         for (var toolBundle : toolBundles) {
             var toolBundleConfig = config.getToolBundles().get(toolBundle);
             if (toolBundleConfig == null) {
-                var bundle = RegistryUtils.getRegistry("aws-mcp-registry").getMcpBundle(toolBundle);
+                var bundle = RegistryUtils.getRegistry().getMcpBundle(toolBundle);
                 if (bundle == null) {
                     throw new IllegalArgumentException("Can't find a configured tool bundle for '" + toolBundle + "'.");
                 } else {
@@ -78,7 +77,7 @@ public final class StartServer extends SmithyMcpCommand {
                                             .build())
                                     .build())
                             .build();
-                    ConfigUtils.addMcpBundle(config, toolBundle, new CliBundle(bundle, toolBundleConfig));
+                    ConfigUtils.addMcpBundle(config, toolBundle, bundle);
                 }
             }
             toolBundleConfigs.add(toolBundleConfig);

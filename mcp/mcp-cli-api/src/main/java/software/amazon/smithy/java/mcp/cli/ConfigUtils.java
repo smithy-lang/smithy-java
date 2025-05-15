@@ -18,7 +18,9 @@ import java.util.ServiceLoader;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
 import software.amazon.smithy.java.json.JsonCodec;
 import software.amazon.smithy.java.mcp.cli.model.Config;
+import software.amazon.smithy.java.mcp.cli.model.Location;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
+import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
 import software.amazon.smithy.mcp.bundle.api.model.Bundle;
 
 /**
@@ -146,6 +148,19 @@ public class ConfigUtils {
                 serializedBundle,
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.CREATE);
-        addMcpBundleConfig(config, toolBundleName, mcpBundleConfig.mcpBundleConfig());
+    }
+
+    public static McpBundleConfig addMcpBundle(Config config, String toolBundleName, Bundle bundle)
+            throws IOException {
+        var mcpBundleConfig = McpBundleConfig.builder()
+                .smithyModeled(SmithyModeledBundleConfig.builder()
+                        .name(toolBundleName)
+                        .bundleLocation(Location.builder()
+                                .fileLocation(ConfigUtils.getBundleFileLocation(toolBundleName).toString())
+                                .build())
+                        .build())
+                .build();
+        addMcpBundle(config, toolBundleName, new CliBundle(bundle, mcpBundleConfig));
+        return mcpBundleConfig;
     }
 }
