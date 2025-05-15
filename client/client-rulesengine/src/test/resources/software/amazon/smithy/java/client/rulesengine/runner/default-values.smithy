@@ -24,13 +24,6 @@ use smithy.rules#staticContextParams
             required: true
             default: "baz"
         },
-        endpoint: {
-            type: "string",
-            builtIn: "SDK::Endpoint",
-            required: true,
-            default: "asdf"
-            documentation: "docs"
-        },
         stringArrayParam: {
             type: "stringArray",
             required: true,
@@ -87,15 +80,10 @@ use smithy.rules#staticContextParams
     "version": "1.0",
     "testCases": [
         {
+            "documentation": "a b"
             "params": {
                 "bar": "a b",
             }
-            "operationInputs": [{
-                "operationName": "GetThing",
-                "builtInParams": {
-                    "SDK::Endpoint": "https://custom.example.com"
-                }
-            }],
             "expect": {
                 "endpoint": {
                     "url": "https://example.com/baz"
@@ -103,16 +91,11 @@ use smithy.rules#staticContextParams
             }
         },
         {
+            "documentation": "BIG"
             "params": {
                 "bar": "a b",
                 "baz": "BIG"
             }
-            "operationInputs": [{
-                "operationName": "GetThing",
-                "builtInParams": {
-                    "SDK::Endpoint": "https://custom.example.com"
-                }
-            }],
             "expect": {
                 "endpoint": {
                     "url": "https://example.com/BIG"
