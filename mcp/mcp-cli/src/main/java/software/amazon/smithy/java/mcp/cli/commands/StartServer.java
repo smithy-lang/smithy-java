@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.mcp.cli.commands;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import picocli.CommandLine.Command;
@@ -48,6 +49,20 @@ public final class StartServer extends SmithyMcpCommand {
             throw new IllegalArgumentException(
                     "No Tool Bundles have been configured. Configure one using the configure-tool-bundle command.");
         }
+
+        // By default, load all available tools
+        if (toolBundles == null || toolBundles.isEmpty()) {
+            try {
+                toolBundles = new ArrayList<>(ConfigUtils.loadOrCreateConfig().getToolBundles().keySet());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        if (toolBundles.isEmpty()) {
+            throw new IllegalArgumentException("No bundles installed");
+        }
+
         List<McpBundleConfig> toolBundleConfigs = new ArrayList<>(toolBundles.size());
         for (var toolBundle : toolBundles) {
             var toolBundleConfig = config.getToolBundles().get(toolBundle);
