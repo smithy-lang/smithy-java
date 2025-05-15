@@ -102,12 +102,12 @@ public class EndpointRulesResolverTest {
 
             @Override
             public Schema inputSchema() {
-                return null;
+                return Schema.structureBuilder(ShapeId.from("smithy.example#FooInput")).build();
             }
 
             @Override
             public Schema outputSchema() {
-                return null;
+                return Schema.structureBuilder(ShapeId.from("smithy.example#FooOutput")).build();
             }
 
             @Override
