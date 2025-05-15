@@ -75,3 +75,21 @@ list ClientConfigs {
 }
 
 string ToolName
+
+structure McpServersClientConfig {
+    mcpServers: McpServerConfigs
+}
+
+map McpServerConfigs {
+    key: String
+    value: McpServerConfig
+}
+
+structure McpServerConfig {
+    command: String
+    args: ArgsList
+}
+
+list ArgsList {
+    member: String
+}

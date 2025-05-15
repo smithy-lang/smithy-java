@@ -55,7 +55,7 @@ public class ConfigUtils {
                 .orElse(new EmptyDefaultConfigProvider());
     }
 
-    private static Path resolveFromHomeDir(String... paths) {
+    public static Path resolveFromHomeDir(String... paths) {
         String userHome = System.getProperty("user.home");
         return Paths.get(userHome, paths);
     }
@@ -141,7 +141,7 @@ public class ConfigUtils {
         }
     }
 
-    public static void addMcpBundle(Config config, String toolBundleName, CliBundle mcpBundleConfig)
+    private static void addMcpBundle(Config config, String toolBundleName, CliBundle mcpBundleConfig)
             throws IOException {
         var serializedBundle = toJson(mcpBundleConfig.mcpBundle());
         Files.write(getBundleFileLocation(toolBundleName),
@@ -161,6 +161,7 @@ public class ConfigUtils {
                         .build())
                 .build();
         addMcpBundle(config, toolBundleName, new CliBundle(bundle, mcpBundleConfig));
+        addMcpBundleConfig(config, toolBundleName, mcpBundleConfig);
         return mcpBundleConfig;
     }
 }

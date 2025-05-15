@@ -44,6 +44,7 @@ public final class JsonSettings {
     private final String defaultNamespace;
     private final JsonSerdeProvider provider;
     private final boolean serializeTypeInDocuments;
+    private final boolean enablePrettyPrinting;
 
     private JsonSettings(Builder builder) {
         this.timestampResolver = builder.useTimestampFormat
@@ -56,6 +57,7 @@ public final class JsonSettings {
         this.defaultNamespace = builder.defaultNamespace;
         this.provider = builder.provider;
         this.serializeTypeInDocuments = builder.serializeTypeInDocuments;
+        this.enablePrettyPrinting = builder.enablePrettyPrinting;
     }
 
     /**
@@ -113,6 +115,10 @@ public final class JsonSettings {
         return serializeTypeInDocuments;
     }
 
+    public boolean isPrettyPrintingEnabled() {
+        return enablePrettyPrinting;
+    }
+
     JsonSerdeProvider provider() {
         return provider;
     }
@@ -128,6 +134,7 @@ public final class JsonSettings {
             builder.useJsonName(true);
         }
         builder.serializeTypeInDocuments(serializeTypeInDocuments);
+        builder.enablePrettyPrinting(enablePrettyPrinting);
     }
 
     /**
@@ -152,6 +159,7 @@ public final class JsonSettings {
         private String defaultNamespace;
         private JsonSerdeProvider provider = PROVIDER;
         private boolean serializeTypeInDocuments = true;
+        private boolean enablePrettyPrinting;
 
         private Builder() {}
 
@@ -248,6 +256,11 @@ public final class JsonSettings {
          */
         Builder overrideSerdeProvider(JsonSerdeProvider provider) {
             this.provider = Objects.requireNonNull(provider);
+            return this;
+        }
+
+        public Builder enablePrettyPrinting(boolean enablePrettyPrinting) {
+            this.enablePrettyPrinting = enablePrettyPrinting;
             return this;
         }
     }
