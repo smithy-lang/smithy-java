@@ -136,7 +136,7 @@ public class EndpointUtilsTest {
     @ParameterizedTest
     @MethodSource("convertsNodeInputsProvider")
     void convertsNodeInputs(Node value, Object object) {
-        var converted = EndpointUtils.convertNodeInput(value);
+        var converted = EndpointUtils.convertNode(value);
 
         assertThat(converted, equalTo(object));
     }
@@ -152,6 +152,6 @@ public class EndpointUtilsTest {
 
     @Test
     public void throwsOnUnsupportNodeInput() {
-        Assertions.assertThrows(RulesEvaluationError.class, () -> EndpointUtils.convertNodeInput(Node.from(1)));
+        Assertions.assertThrows(RulesEvaluationError.class, () -> EndpointUtils.convertNode(Node.from(1)));
     }
 }
