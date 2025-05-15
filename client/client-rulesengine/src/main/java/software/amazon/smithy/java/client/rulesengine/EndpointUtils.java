@@ -13,6 +13,8 @@ import java.util.Map;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.BooleanNode;
 import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.model.node.NumberNode;
+import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.rulesengine.language.evaluation.value.ArrayValue;
 import software.amazon.smithy.rulesengine.language.evaluation.value.BooleanValue;
@@ -28,7 +30,7 @@ final class EndpointUtils {
     private EndpointUtils() {}
 
     // "The type of the value MUST be either a string, boolean or an array of string."
-    static Object convertNodeInput(Node value) {
+    static Object convertNode(Node value, boolean allowAllTypes) {
         if (value instanceof StringNode s) {
             return s.getValue();
         } else if (value instanceof BooleanNode b) {
@@ -36,12 +38,30 @@ final class EndpointUtils {
         } else if (value instanceof ArrayNode a) {
             List<Object> result = new ArrayList<>(a.size());
             for (var e : a.getElements()) {
-                result.add(convertNodeInput(e));
+                result.add(convertNode(e, allowAllTypes));
             }
             return result;
-        } else {
-            throw new RulesEvaluationError("Unsupported endpoint ruleset parameter: " + value);
+        } else if (allowAllTypes) {
+            if (value instanceof NumberNode n) {
+                return n.getValue();
+            } else if (value instanceof ObjectNode o) {
+                var result = new HashMap<String, Object>(o.size());
+                for (var e : o.getStringMap().entrySet()) {
+                    result.put(e.getKey(), convertNode(e.getValue(), allowAllTypes));
+                }
+                return result;
+            } else if (value.isNullNode()) {
+                return null;
+            } else {
+                throw new RulesEvaluationError("Unsupported endpoint ruleset parameter type: " + value);
+            }
         }
+
+        throw new RulesEvaluationError("Unsupported endpoint ruleset parameter: " + value);
+    }
+
+    static Object convertNode(Node value) {
+        return convertNode(value, false);
     }
 
     static Object convertInputParamValue(Value value) {
