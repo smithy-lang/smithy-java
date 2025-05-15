@@ -134,7 +134,6 @@ structure PropertyDetails {
     @required
     type: String
 
-    @required
     description: String
 }
 
