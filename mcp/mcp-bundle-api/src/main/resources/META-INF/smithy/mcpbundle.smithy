@@ -39,6 +39,5 @@ list ArgList {
 }
 
 union GenericArtifact {
-    artifactId: String
     empty: Unit
 }
