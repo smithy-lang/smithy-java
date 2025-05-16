@@ -151,6 +151,18 @@ public final class JsonCodec implements Codec {
             settingsBuilder.serializeTypeInDocuments(serializeTypeInDocuments);
             return this;
         }
+        
+        /**
+         * Whether to format the JSON output with pretty printing (indentation and line breaks).
+         * Default is false.
+         *
+         * @param prettyPrint true to enable pretty printing
+         * @return the builder
+         */
+        public Builder prettyPrint(boolean prettyPrint) {
+            settingsBuilder.prettyPrint(prettyPrint);
+            return this;
+        }
 
         /**
          * Uses a custom JSON serde provider.
