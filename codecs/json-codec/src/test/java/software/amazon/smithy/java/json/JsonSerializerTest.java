@@ -254,6 +254,41 @@ public class JsonSerializerTest {
             assertThat(result, equalTo("{\"__type\":\"smithy.example#Nested\"}"));
         }
     }
+    
+    @Test
+    public void testPrettyPrinting() throws Exception {
+        try (var codec = JsonCodec.builder().prettyPrint(true).build(); var output = new ByteArrayOutputStream()) {
+            try (var serializer = codec.createSerializer(output)) {
+                serializer.writeStruct(
+                        JsonTestData.BIRD,
+                        new SerializableStruct() {
+                            @Override
+                            public Schema schema() {
+                                return JsonTestData.BIRD;
+                            }
+
+                            @Override
+                            public void serializeMembers(ShapeSerializer ser) {
+                                ser.writeString(schema().member("name"), "Toucan");
+                                ser.writeString(schema().member("color"), "red");
+                            }
+
+                            @Override
+                            public <T> T getMemberValue(Schema member) {
+                                return null;
+                            }
+                        });
+            }
+            var result = output.toString(StandardCharsets.UTF_8);
+            // Expected format with Jackson's default pretty printer
+            String expectedFormat = """
+                {
+                  "name" : "Toucan",
+                  "color" : "red"
+                }""";
+            assertThat(result, equalTo(expectedFormat));
+        }
+    }
 
     private static final class NestedStruct implements SerializableStruct {
         @Override

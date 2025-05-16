@@ -44,6 +44,7 @@ public final class JsonSettings {
     private final String defaultNamespace;
     private final JsonSerdeProvider provider;
     private final boolean serializeTypeInDocuments;
+    private final boolean prettyPrint;
 
     private JsonSettings(Builder builder) {
         this.timestampResolver = builder.useTimestampFormat
@@ -56,6 +57,7 @@ public final class JsonSettings {
         this.defaultNamespace = builder.defaultNamespace;
         this.provider = builder.provider;
         this.serializeTypeInDocuments = builder.serializeTypeInDocuments;
+        this.prettyPrint = builder.prettyPrint;
     }
 
     /**
@@ -113,6 +115,15 @@ public final class JsonSettings {
         return serializeTypeInDocuments;
     }
 
+    /**
+     * Whether to format the JSON output with pretty printing (indentation and line breaks).
+     *
+     * @return true if pretty printing is enabled
+     */
+    public boolean prettyPrint() {
+        return prettyPrint;
+    }
+
     JsonSerdeProvider provider() {
         return provider;
     }
@@ -128,6 +139,7 @@ public final class JsonSettings {
             builder.useJsonName(true);
         }
         builder.serializeTypeInDocuments(serializeTypeInDocuments);
+        builder.prettyPrint(prettyPrint);
     }
 
     /**
@@ -152,6 +164,7 @@ public final class JsonSettings {
         private String defaultNamespace;
         private JsonSerdeProvider provider = PROVIDER;
         private boolean serializeTypeInDocuments = true;
+        private boolean prettyPrint = false;
 
         private Builder() {}
 
@@ -237,6 +250,18 @@ public final class JsonSettings {
          */
         public Builder serializeTypeInDocuments(boolean serializeTypeInDocuments) {
             this.serializeTypeInDocuments = serializeTypeInDocuments;
+            return this;
+        }
+
+        /**
+         * Whether to format the JSON output with pretty printing (indentation and line breaks).
+         * Default is false.
+         *
+         * @param prettyPrint true to enable pretty printing
+         * @return the builder
+         */
+        public Builder prettyPrint(boolean prettyPrint) {
+            this.prettyPrint = prettyPrint;
             return this;
         }
 

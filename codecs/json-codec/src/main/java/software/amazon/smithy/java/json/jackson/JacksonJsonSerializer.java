@@ -36,6 +36,9 @@ final class JacksonJsonSerializer implements ShapeSerializer {
             JsonSettings settings
     ) {
         this.generator = generator;
+        if (settings.prettyPrint()) {
+            generator.useDefaultPrettyPrinter();
+        }
         this.settings = settings;
     }
 
