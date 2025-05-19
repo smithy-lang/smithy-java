@@ -11,4 +11,8 @@ dependencies {
     api(project(":aws:client:aws-client-core"))
     api(project(":client:client-rulesengine"))
     api(libs.smithy.aws.endpoints)
+
+    testImplementation(libs.smithy.aws.traits)
+    testImplementation(project(":aws:client:aws-client-restxml"))
+    testImplementation(project(":client:dynamic-client"))
 }
