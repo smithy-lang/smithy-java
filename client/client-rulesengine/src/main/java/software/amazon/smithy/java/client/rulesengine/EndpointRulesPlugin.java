@@ -5,10 +5,13 @@
 
 package software.amazon.smithy.java.client.rulesengine;
 
+import java.util.Map;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.client.core.ClientPlugin;
+import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.core.schema.TraitKey;
+import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.rulesengine.traits.ContextParamTrait;
 import software.amazon.smithy.rulesengine.traits.EndpointRuleSetTrait;
 import software.amazon.smithy.rulesengine.traits.OperationContextParamsTrait;
@@ -18,6 +21,11 @@ import software.amazon.smithy.rulesengine.traits.StaticContextParamsTrait;
  * Attempts to resolve endpoints using smithy.rules#endpointRuleSet or a {@link RulesProgram} compiled from this trait.
  */
 public final class EndpointRulesPlugin implements ClientPlugin {
+
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(EndpointRulesPlugin.class);
+
+    public static final Context.Key<Map<String, Object>> ADDITIONAL_ENDPOINT_PARAMS = Context.key(
+            "Additional endpoint parameters to pass to the rules engine");
 
     public static final TraitKey<StaticContextParamsTrait> STATIC_CONTEXT_PARAMS_TRAIT =
             TraitKey.get(StaticContextParamsTrait.class);
@@ -30,7 +38,7 @@ public final class EndpointRulesPlugin implements ClientPlugin {
     public static final TraitKey<EndpointRuleSetTrait> ENDPOINT_RULESET_TRAIT =
             TraitKey.get(EndpointRuleSetTrait.class);
 
-    private final RulesProgram program;
+    private RulesProgram program;
 
     private EndpointRulesPlugin(RulesProgram program) {
         this.program = program;
@@ -72,19 +80,31 @@ public final class EndpointRulesPlugin implements ClientPlugin {
     public void configureClient(ClientConfig.Builder config) {
         // Only modify the endpoint resolver if it isn't set already or if CUSTOM_ENDPOINT is set,
         // and if a program was provided.
-        if (config.endpointResolver() == null || config.context().get(ClientContext.CUSTOM_ENDPOINT) != null) {
-            if (program != null) {
-                applyResolver(program, config);
-            } else if (config.service() != null) {
+        boolean usePlugin = false;
+        if (config.endpointResolver() == null) {
+            usePlugin = true;
+            LOGGER.debug("Trying to use EndpointRulesPlugin resolver because endpointResolver is null");
+        } else if (config.context().get(ClientContext.CUSTOM_ENDPOINT) != null) {
+            usePlugin = true;
+            LOGGER.debug("Trying to use EndpointRulesPlugin resolver because CUSTOM_ENDPOINT is set");
+        }
+
+        if (usePlugin) {
+            if (program == null && config.service() != null) {
                 var ruleset = config.service().schema().getTrait(ENDPOINT_RULESET_TRAIT);
                 if (ruleset != null) {
-                    applyResolver(new RulesEngine().compile(ruleset.getEndpointRuleSet()), config);
+                    LOGGER.debug("Found endpoint rules traits on service: {}", config.service());
+                    program = new RulesEngine().compile(ruleset.getEndpointRuleSet());
                 }
+            }
+            if (program != null) {
+                applyResolver(program, config);
             }
         }
     }
 
     private void applyResolver(RulesProgram applyProgram, ClientConfig.Builder config) {
         config.endpointResolver(new EndpointRulesResolver(applyProgram));
+        LOGGER.debug("Applying EndpointRulesResolver to client: {}", config.service());
     }
 }
