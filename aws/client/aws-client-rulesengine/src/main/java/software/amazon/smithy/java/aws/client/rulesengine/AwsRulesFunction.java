@@ -92,13 +92,13 @@ enum AwsRulesFunction implements RulesFunction {
                 return null;
             }
             return Map.of(
-                    ParseArn.PARTITION,
+                    ParseArn.PARTITION.toString(),
                     awsArn.getPartition(),
-                    ParseArn.SERVICE,
+                    ParseArn.SERVICE.toString(),
                     awsArn.getService(),
-                    ParseArn.REGION,
+                    ParseArn.REGION.toString(),
                     awsArn.getRegion(),
-                    ParseArn.ACCOUNT_ID,
+                    ParseArn.ACCOUNT_ID.toString(),
                     awsArn.getAccountId(),
                     "resourceId", // TODO: make this one public too in Smithy
                     awsArn.getResource());

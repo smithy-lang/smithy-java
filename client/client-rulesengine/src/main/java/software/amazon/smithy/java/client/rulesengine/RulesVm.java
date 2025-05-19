@@ -17,8 +17,11 @@ import java.util.function.BiFunction;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointContext;
 import software.amazon.smithy.java.context.Context;
+import software.amazon.smithy.java.logging.InternalLogger;
 
 final class RulesVm {
+
+    private static final InternalLogger LOGGER = InternalLogger.getLogger(RulesVm.class);
 
     // Make number of URIs to cache in the thread-local cache.
     private static final int MAX_CACHE_SIZE = 32;
@@ -153,24 +156,22 @@ final class RulesVm {
                 case RulesProgram.LOAD_REGISTER -> push(registers[instructions[++pc] & 0xFF]); // read unsigned byte
                 case RulesProgram.JUMP_IF_FALSEY -> {
                     Object value = pop();
-                    if (value == null || Boolean.FALSE.equals(value)) {
+                    if (value == null || value == Boolean.FALSE) {
+                        if (LOGGER.isDebugEnabled()) {
+                            LOGGER.debug("VM jumping from {} to {}", pc, readUnsignedShort(pc + 1));
+                            LOGGER.debug("    - Stack ({}): {}", stackPosition, Arrays.toString(stack));
+                            LOGGER.debug("    - Registers: {}", Arrays.toString(registers));
+                        }
                         pc = readUnsignedShort(pc + 1) - 1; // -1 because loop will increment
                     } else {
                         pc += 2;
                     }
                 }
-                case RulesProgram.NOT -> push(pop() != Boolean.TRUE);
-                case RulesProgram.ISSET -> {
-                    Object value = pop();
-                    // Push true if it's set and not a boolean, or boolean true.
-                    push(value != null && !Boolean.FALSE.equals(value));
-                }
-                case RulesProgram.TEST_REGISTER_ISSET -> {
-                    var value = registers[instructions[++pc] & 0xFF]; // read unsigned byte
-                    push(value != null && !Boolean.FALSE.equals(value));
-                }
+                case RulesProgram.NOT -> push(pop() == Boolean.FALSE);
+                case RulesProgram.ISSET -> push(pop() != null);
+                case RulesProgram.TEST_REGISTER_ISSET -> push(registers[instructions[++pc] & 0xFF] != null);
                 case RulesProgram.RETURN_ERROR -> {
-                    throw new RulesEvaluationError((String) pop());
+                    throw new RulesEvaluationError((String) pop(), pc);
                 }
                 case RulesProgram.RETURN_ENDPOINT -> {
                     return setEndpoint(instructions[++pc]);
@@ -209,10 +210,7 @@ final class RulesVm {
                     pc += 2;
                 }
                 case RulesProgram.IS_TRUE -> push(pop() == Boolean.TRUE);
-                case RulesProgram.TEST_REGISTER_IS_TRUE -> {
-                    int register = instructions[++pc] & 0xFF; // read unsigned byte
-                    push(registers[register] == Boolean.TRUE);
-                }
+                case RulesProgram.TEST_REGISTER_IS_TRUE -> push(registers[instructions[++pc] & 0xFF] == Boolean.TRUE);
                 case RulesProgram.RETURN_VALUE -> {
                     return pop();
                 }

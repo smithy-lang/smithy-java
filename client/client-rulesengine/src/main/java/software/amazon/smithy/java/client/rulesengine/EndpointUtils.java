@@ -25,12 +25,12 @@ import software.amazon.smithy.rulesengine.language.evaluation.value.StringValue;
 import software.amazon.smithy.rulesengine.language.evaluation.value.Value;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.ParseUrl;
 
-final class EndpointUtils {
+public final class EndpointUtils {
 
     private EndpointUtils() {}
 
     // "The type of the value MUST be either a string, boolean or an array of string."
-    static Object convertNode(Node value, boolean allowAllTypes) {
+    public static Object convertNode(Node value, boolean allowAllTypes) {
         if (value instanceof StringNode s) {
             return s.getValue();
         } else if (value instanceof BooleanNode b) {
@@ -60,7 +60,7 @@ final class EndpointUtils {
         throw new RulesEvaluationError("Unsupported endpoint ruleset parameter: " + value);
     }
 
-    static Object convertNode(Node value) {
+    public static Object convertNode(Node value) {
         return convertNode(value, false);
     }
 

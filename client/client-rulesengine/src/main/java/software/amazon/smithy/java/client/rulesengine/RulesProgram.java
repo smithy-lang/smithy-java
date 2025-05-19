@@ -264,6 +264,10 @@ public final class RulesProgram {
         return result;
     }
 
+    private enum Show {
+        CONST, FN, REGISTER
+    }
+
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder();
@@ -309,6 +313,7 @@ public final class RulesProgram {
 
         // Write the instructions.
         s.append("Instructions: (version=").append(-instructions[instructionOffset]).append(")\n");
+
         // Skip version, param count, synthetic param count bytes.
         for (var i = instructionOffset + 3; i < instructionSize; i++) {
             s.append("  ");
@@ -316,21 +321,26 @@ public final class RulesProgram {
             s.append(": ");
 
             var skip = 0;
+            Show show = null;
             var name = switch (instructions[i]) {
                 case LOAD_CONST -> {
                     skip = 1;
+                    show = Show.CONST;
                     yield "LOAD_CONST";
                 }
                 case LOAD_CONST_W -> {
                     skip = 2;
+                    show = Show.CONST;
                     yield "LOAD_CONST_W";
                 }
                 case SET_REGISTER -> {
                     skip = 1;
+                    show = Show.REGISTER;
                     yield "SET_REGISTER";
                 }
                 case LOAD_REGISTER -> {
                     skip = 1;
+                    show = Show.REGISTER;
                     yield "LOAD_REGISTER";
                 }
                 case JUMP_IF_FALSEY -> {
@@ -341,6 +351,7 @@ public final class RulesProgram {
                 case ISSET -> "ISSET";
                 case TEST_REGISTER_ISSET -> {
                     skip = 1;
+                    show = Show.REGISTER;
                     yield "TEST_REGISTER_SET";
                 }
                 case RETURN_ERROR -> "RETURN_ERROR";
@@ -358,45 +369,54 @@ public final class RulesProgram {
                 }
                 case RESOLVE_TEMPLATE -> {
                     skip = 2;
+                    show = Show.CONST;
                     yield "RESOLVE_TEMPLATE";
                 }
                 case FN -> {
                     skip = 1;
+                    show = Show.FN;
                     yield "FN";
                 }
                 case GET_ATTR -> {
                     skip = 2;
+                    show = Show.CONST;
                     yield "GET_ATTR";
                 }
                 case IS_TRUE -> "IS_TRUE";
                 case TEST_REGISTER_IS_TRUE -> {
                     skip = 1;
+                    show = Show.REGISTER;
                     yield "TEST_REGISTER_IS_TRUE";
                 }
                 case RETURN_VALUE -> "RETURN_VALUE";
                 default -> "?" + instructions[i];
             };
 
-            switch (skip) {
-                case 0 -> s.append(name);
-                case 1 -> {
-                    s.append(String.format("%-22s  ", name));
-                    if (instructions.length > i + 1) {
-                        s.append(instructions[i + 1]);
-                    } else {
-                        s.append("?");
+            appendName(s, name);
+
+            int positionToShow = -1;
+            if (skip == 1) {
+                positionToShow = appendByte(s, i);
+                i++;
+            } else if (skip == 2) {
+                positionToShow = appendShort(s, i);
+                i += 2;
+            }
+
+            if (positionToShow > -1 && show != null) {
+                switch (show) {
+                    case CONST -> {
+                        s.append("  ");
+                        s.append(constantPool[positionToShow]);
                     }
-                    i++;
-                }
-                default -> {
-                    // it's a two-byte unsigned short.
-                    s.append(String.format("%-22s  ", name));
-                    if (instructions.length > i + 2) {
-                        s.append(EndpointUtils.bytesToShort(instructions, i + 1));
-                    } else {
-                        s.append("??");
+                    case FN -> {
+                        s.append("  ");
+                        s.append(functions[positionToShow].getFunctionName());
                     }
-                    i += 2;
+                    case REGISTER -> {
+                        s.append("  ");
+                        s.append(registerDefinitions[positionToShow].name());
+                    }
                 }
             }
 
@@ -404,5 +424,32 @@ public final class RulesProgram {
         }
 
         return s.toString();
+    }
+
+    private void appendName(StringBuilder s, String name) {
+        s.append(String.format("%-22s  ", name));
+    }
+
+    private int appendByte(StringBuilder s, int i) {
+        int result = -1;
+        if (instructions.length > i + 1) {
+            result = instructions[i + 1] & 0xFF;
+            s.append(String.format("%-8d  ", result));
+        } else {
+            s.append("      ??");
+        }
+        return result;
+    }
+
+    private int appendShort(StringBuilder s, int i) {
+        var result = -1;
+        // it's a two-byte unsigned short.
+        if (instructions.length > i + 2) {
+            result = EndpointUtils.bytesToShort(instructions, i + 1);
+            s.append(String.format("%-8d  ", result));
+        } else {
+            s.append("      ??");
+        }
+        return result;
     }
 }
