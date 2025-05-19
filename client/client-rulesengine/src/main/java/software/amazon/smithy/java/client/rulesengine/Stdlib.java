@@ -42,8 +42,8 @@ enum Stdlib implements RulesFunction {
         public Object apply(Object... operands) {
             // software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Substring.Definition.evaluate
             String str = EndpointUtils.castFnArgument(operands[0], String.class, "substring", 1);
-            int startIndex = EndpointUtils.castFnArgument(operands[1], Integer.class, "substring", 2);
-            int stopIndex = EndpointUtils.castFnArgument(operands[2], Integer.class, "substring", 3);
+            int startIndex = EndpointUtils.castFnArgument(operands[1], Number.class, "substring", 2).intValue();
+            int stopIndex = EndpointUtils.castFnArgument(operands[2], Number.class, "substring", 3).intValue();
             boolean reverse = EndpointUtils.castFnArgument(operands[3], Boolean.class, "substring", 4);
             return Substring.getSubstring(str, startIndex, stopIndex, reverse);
         }
