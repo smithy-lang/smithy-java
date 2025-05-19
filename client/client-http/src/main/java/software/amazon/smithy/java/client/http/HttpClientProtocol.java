@@ -54,7 +54,7 @@ public abstract class HttpClientProtocol implements ClientProtocol<HttpRequest, 
         // If a path is set on the service endpoint, concatenate it with the path of the request.
         if (uri.getRawPath() != null && !uri.getRawPath().isEmpty()) {
             builder.path(uri.getRawPath());
-            builder.concatPath(request.uri().getPath());
+            builder.concatPath(request.uri().getRawPath());
         }
 
         var requestBuilder = request.toBuilder();
