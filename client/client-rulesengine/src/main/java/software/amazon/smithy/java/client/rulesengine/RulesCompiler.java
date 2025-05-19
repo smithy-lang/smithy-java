@@ -91,7 +91,9 @@ final class RulesCompiler {
             addRegister(param.getName().toString(), param.isRequired(), defaultValue, builtinValue);
         }
 
-        cse = performOptimizations ? CseOptimizer.apply(rules.getRules()) : Map.of();
+        //        cse = performOptimizations ? CseOptimizer.apply(rules.getRules()) : Map.of();
+        performOptimizations = false;
+        cse = Map.of();
     }
 
     private byte addRegister(String name, boolean required, Object defaultValue, String builtin) {
@@ -106,7 +108,7 @@ final class RulesCompiler {
 
         // Register scopes are tracking by flipping bits of a long. That means a max of 64 registers.
         // No real rules definition would have more than 64 registers.
-        if (registry.size() > 64) {
+        if (registry.size() > 255) {
             throw new RulesEvaluationError("Too many registers added to rules engine");
         }
 
