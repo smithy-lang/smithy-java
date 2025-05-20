@@ -151,7 +151,7 @@ public final class JsonCodec implements Codec {
             settingsBuilder.serializeTypeInDocuments(serializeTypeInDocuments);
             return this;
         }
-        
+
         /**
          * Whether to format the JSON output with pretty printing (indentation and line breaks).
          * Default is false.

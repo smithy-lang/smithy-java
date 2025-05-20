@@ -254,7 +254,7 @@ public class JsonSerializerTest {
             assertThat(result, equalTo("{\"__type\":\"smithy.example#Nested\"}"));
         }
     }
-    
+
     @Test
     public void testPrettyPrinting() throws Exception {
         try (var codec = JsonCodec.builder().prettyPrint(true).build(); var output = new ByteArrayOutputStream()) {
@@ -282,10 +282,10 @@ public class JsonSerializerTest {
             var result = output.toString(StandardCharsets.UTF_8);
             // Expected format with Jackson's default pretty printer
             String expectedFormat = """
-                {
-                  "name" : "Toucan",
-                  "color" : "red"
-                }""";
+                    {
+                      "name" : "Toucan",
+                      "color" : "red"
+                    }""";
             assertThat(result, equalTo(expectedFormat));
         }
     }

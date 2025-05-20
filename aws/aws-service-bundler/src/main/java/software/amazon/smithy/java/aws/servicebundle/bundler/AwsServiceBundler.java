@@ -195,7 +195,7 @@ public final class AwsServiceBundler extends ModelBundler {
         @Override
         public String getModel(String serviceName) throws Exception {
             return CLIENT.send(HttpRequest.newBuilder()
-                    .uri(URI.create("https://raw.githubusercontent.com/aws/api-models-aws/refs/heads/main/"
+                    .uri(URI.create("https://raw.githubusercontent.com/aws/api-models-aws/refs/heads/main/models/"
                             + Objects.requireNonNull(GH_URIS_BY_SERVICE.get(serviceName),
                                     "No known service name " + serviceName)))
                     .build(), HttpResponse.BodyHandlers.ofString())
