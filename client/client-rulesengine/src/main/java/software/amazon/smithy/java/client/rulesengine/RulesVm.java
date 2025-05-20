@@ -13,11 +13,13 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.BiFunction;
 import software.amazon.smithy.java.client.core.endpoint.Endpoint;
 import software.amazon.smithy.java.client.core.endpoint.EndpointContext;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.logging.InternalLogger;
+import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Substring;
 
 final class RulesVm {
 
@@ -51,6 +53,7 @@ final class RulesVm {
     private Object[] stack = new Object[8];
     private int stackPosition = 0;
     private int pc;
+    private final boolean debugLoggingEnabled = LOGGER.isDebugEnabled();
 
     RulesVm(
             Context context,
@@ -84,11 +87,13 @@ final class RulesVm {
             throw createError("Unexpected value type encountered while evaluating rules engine", e);
         } catch (ArrayIndexOutOfBoundsException e) {
             throw createError("Malformed bytecode encountered while evaluating rules engine", e);
+        } catch (NullPointerException e) {
+            throw createError("Rules engine encountered an unexpected null value", e);
         }
     }
 
     private RulesEvaluationError createError(String message, RuntimeException e) {
-        var report = message + ". Encountered at address " + pc + " of program:\n" + program;
+        var report = message + ". Encountered at address " + pc + " of program";
         throw new RulesEvaluationError(report, e);
     }
 
@@ -125,94 +130,171 @@ final class RulesVm {
         stack = newStack;
     }
 
-    private Object pop() {
-        return stack[--stackPosition]; // no need to clear out the memory since it's tied to lifetime of the VM.
-    }
-
-    private Object peek() {
-        return stack[stackPosition - 1];
-    }
-
-    // Reads the next two bytes in little-endian order.
-    private int readUnsignedShort(int position) {
-        return EndpointUtils.bytesToShort(instructions, position);
-    }
-
+    /*
+     * Implementation notes:
+     * 1. Read an unsigned short into an int from two bytes:
+     *    ((instructions[pc + 2] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF)
+     * 2. Read an unsigned byte into an int from a byte:
+     *    X & 0xFF. For example instructions[++pc] & 0xFF.
+     * 3. The program counter, pc, is often incremented using "++" while reading it.
+     * 4. Avoid auto-boxing booleans and instead use `b ? Boolean.TRUE : Boolean.FALSE`. This eliminates the implicit
+     *    call to Boolean.valueOf.
+     */
+    @SuppressWarnings("unchecked")
     private Object run() {
-        var instructionSize = program.instructionSize;
-        var constantPool = program.constantPool;
-        var instructions = this.instructions;
-        var registers = this.registers;
+        final var instructionSize = program.instructionSize;
+        final var constantPool = program.constantPool;
+        final var instructions = this.instructions;
+        final var registers = this.registers;
 
         // Skip version, params, and register bytes.
         for (pc = program.instructionOffset + 3; pc < instructionSize; pc++) {
             switch (instructions[pc]) {
-                case RulesProgram.LOAD_CONST -> push(constantPool[instructions[++pc] & 0xFF]); // read unsigned byte
+                case RulesProgram.LOAD_CONST -> {
+                    push(constantPool[instructions[++pc] & 0xFF]); // read unsigned byte
+                }
                 case RulesProgram.LOAD_CONST_W -> {
-                    push(constantPool[readUnsignedShort(pc + 1)]); // read unsigned short
+                    // Read a two-byte unsigned short.
+                    final int constIdx = ((instructions[pc + 2] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    push(constantPool[constIdx]);
                     pc += 2;
                 }
-                case RulesProgram.SET_REGISTER -> registers[instructions[++pc] & 0xFF] = peek(); // read unsigned byte
-                case RulesProgram.LOAD_REGISTER -> push(registers[instructions[++pc] & 0xFF]); // read unsigned byte
+                case RulesProgram.SET_REGISTER -> {
+                    registers[instructions[++pc] & 0xFF] = stack[stackPosition - 1];
+                }
+                case RulesProgram.LOAD_REGISTER -> {
+                    push(registers[instructions[++pc] & 0xFF]); // read unsigned byte
+                }
                 case RulesProgram.JUMP_IF_FALSEY -> {
-                    Object value = pop();
+                    final Object value = stack[--stackPosition];
                     if (value == null || value == Boolean.FALSE) {
-                        if (LOGGER.isDebugEnabled()) {
-                            LOGGER.debug("VM jumping from {} to {}", pc, readUnsignedShort(pc + 1));
-                            LOGGER.debug("    - Stack ({}): {}", stackPosition, Arrays.toString(stack));
-                            LOGGER.debug("    - Registers: {}", Arrays.toString(registers));
+                        // Read a two-byte unsigned short.
+                        final int jumpTarget = ((instructions[pc + 2] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                        pc = jumpTarget - 1;
+                        if (debugLoggingEnabled) {
+                            logDebugJump(jumpTarget);
                         }
-                        pc = readUnsignedShort(pc + 1) - 1; // -1 because loop will increment
                     } else {
                         pc += 2;
                     }
                 }
-                case RulesProgram.NOT -> push(pop() == Boolean.FALSE);
-                case RulesProgram.ISSET -> push(pop() != null);
-                case RulesProgram.TEST_REGISTER_ISSET -> push(registers[instructions[++pc] & 0xFF] != null);
+                case RulesProgram.NOT -> {
+                    push(stack[--stackPosition] == Boolean.FALSE ? Boolean.TRUE : Boolean.FALSE);
+                }
+                case RulesProgram.ISSET -> {
+                    push(stack[--stackPosition] != null ? Boolean.TRUE : Boolean.FALSE);
+                }
+                case RulesProgram.TEST_REGISTER_ISSET -> {
+                    push(registers[instructions[++pc] & 0xFF] != null ? Boolean.TRUE : Boolean.FALSE);
+                }
                 case RulesProgram.RETURN_ERROR -> {
-                    throw new RulesEvaluationError((String) pop(), pc);
+                    throw new RulesEvaluationError((String) stack[--stackPosition], pc);
                 }
                 case RulesProgram.RETURN_ENDPOINT -> {
-                    return setEndpoint(instructions[++pc]);
+                    final var packed = instructions[++pc];
+                    final boolean hasHeaders = (packed & 1) != 0;
+                    final boolean hasProperties = (packed & 2) != 0;
+                    final var urlString = (String) stack[--stackPosition];
+                    final var properties = (Map<String, Object>) (hasProperties ? stack[--stackPosition] : Map.of());
+                    final var headers = (Map<String, List<String>>) (hasHeaders ? stack[--stackPosition] : Map.of());
+                    final var builder = Endpoint.builder().uri(createUri(urlString));
+                    if (!headers.isEmpty()) {
+                        builder.putProperty(EndpointContext.HEADERS, headers);
+                    }
+                    for (var extension : program.extensions) {
+                        extension.extractEndpointProperties(builder, context, properties, headers);
+                    }
+                    return builder.build();
                 }
-                case RulesProgram.CREATE_LIST -> createList(instructions[++pc] & 0xFF); // read unsigned byte
-                case RulesProgram.CREATE_MAP -> createMap(instructions[++pc] & 0xFF); // read unsigned byte
+                case RulesProgram.CREATE_LIST -> {
+                    final var size = instructions[++pc] & 0xFF;
+                    push(switch (size) {
+                        case 0 -> List.of();
+                        case 1 -> Collections.singletonList(stack[--stackPosition]);
+                        default -> {
+                            var values = new Object[size];
+                            for (var i = size - 1; i >= 0; i--) {
+                                values[i] = stack[--stackPosition];
+                            }
+                            yield Arrays.asList(values);
+                        }
+                    });
+                }
+                case RulesProgram.CREATE_MAP -> {
+                    final var size = instructions[++pc] & 0xFF;
+                    push(switch (size) {
+                        case 0 -> Map.of();
+                        case 1 -> Map.of((String) stack[--stackPosition], stack[--stackPosition]);
+                        default -> {
+                            Map<String, Object> map = new HashMap<>((int) (size / 0.75f) + 1); // Avoid rehashing
+                            for (var i = 0; i < size; i++) {
+                                map.put((String) stack[--stackPosition], stack[--stackPosition]);
+                            }
+                            yield map;
+                        }
+                    });
+                }
                 case RulesProgram.RESOLVE_TEMPLATE -> {
-                    resolveTemplate((StringTemplate) constantPool[readUnsignedShort(pc + 1)]);
+                    // Read a two-byte unsigned short.
+                    final int constIdx = ((instructions[pc + 2] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    final var template = (StringTemplate) constantPool[constIdx];
+                    final var expressionCount = template.expressionCount();
+                    final var temp = getTempArray(expressionCount);
+                    for (var i = 0; i < expressionCount; i++) {
+                        temp[i] = stack[--stackPosition];
+                    }
+                    push(template.resolve(expressionCount, temp));
                     pc += 2;
                 }
                 case RulesProgram.FN -> {
-                    var fn = program.functions[instructions[++pc] & 0xFF]; // read unsigned byte
+                    final var fn = program.functions[instructions[++pc] & 0xFF]; // read unsigned byte
                     push(switch (fn.getOperandCount()) {
                         case 0 -> fn.apply0();
-                        case 1 -> fn.apply1(pop());
+                        case 1 -> fn.apply1(stack[--stackPosition]);
                         case 2 -> {
-                            Object b = pop();
-                            Object a = pop();
+                            Object b = stack[--stackPosition];
+                            Object a = stack[--stackPosition];
                             yield fn.apply2(a, b);
                         }
                         default -> {
                             // Pop arguments from stack in reverse order.
                             var temp = getTempArray(fn.getOperandCount());
                             for (int i = fn.getOperandCount() - 1; i >= 0; i--) {
-                                temp[i] = pop();
+                                temp[i] = stack[--stackPosition];
                             }
                             yield fn.apply(temp);
                         }
                     });
                 }
                 case RulesProgram.GET_ATTR -> {
-                    var constant = readUnsignedShort(pc + 1);
-                    AttrExpression getAttr = (AttrExpression) constantPool[constant];
-                    var target = pop();
+                    // Read a two-byte unsigned short.
+                    final int constIdx = ((instructions[pc + 2] & 0xFF) << 8) | (instructions[pc + 1] & 0xFF);
+                    AttrExpression getAttr = (AttrExpression) program.constantPool[constIdx];
+                    final var target = stack[--stackPosition];
                     push(getAttr.apply(target));
                     pc += 2;
                 }
-                case RulesProgram.IS_TRUE -> push(pop() == Boolean.TRUE);
-                case RulesProgram.TEST_REGISTER_IS_TRUE -> push(registers[instructions[++pc] & 0xFF] == Boolean.TRUE);
+                case RulesProgram.IS_TRUE -> {
+                    push(stack[--stackPosition] == Boolean.TRUE ? Boolean.TRUE : Boolean.FALSE);
+                }
+                case RulesProgram.TEST_REGISTER_IS_TRUE -> {
+                    push(registers[instructions[++pc] & 0xFF] == Boolean.TRUE ? Boolean.TRUE : Boolean.FALSE);
+                }
+                case RulesProgram.TEST_REGISTER_IS_FALSE -> {
+                    push(registers[instructions[++pc] & 0xFF] == Boolean.FALSE ? Boolean.TRUE : Boolean.FALSE);
+                }
                 case RulesProgram.RETURN_VALUE -> {
-                    return pop();
+                    return stack[--stackPosition];
+                }
+                case RulesProgram.EQUALS -> {
+                    push(Objects.equals(stack[--stackPosition], stack[--stackPosition]));
+                }
+                case RulesProgram.SUBSTRING -> {
+                    final var string = (String) stack[--stackPosition];
+                    final var start = instructions[++pc] & 0xFF;
+                    final var end = instructions[++pc] & 0xFF;
+                    final var reverse = (instructions[++pc] & 0xFF) != 0 ? Boolean.TRUE : Boolean.FALSE;
+                    push(Substring.getSubstring(string, start, end, reverse));
                 }
                 default -> {
                     throw new RulesEvaluationError("Unknown rules engine instruction: " + instructions[pc]);
@@ -223,63 +305,10 @@ final class RulesVm {
         throw new RulesEvaluationError("No value returned from rules engine");
     }
 
-    private void createMap(int size) {
-        push(switch (size) {
-            case 0 -> Map.of();
-            case 1 -> Map.of((String) pop(), pop());
-            case 2 -> Map.of((String) pop(), pop(), (String) pop(), pop());
-            case 3 -> Map.of((String) pop(), pop(), (String) pop(), pop(), (String) pop(), pop());
-            default -> {
-                Map<String, Object> map = new HashMap<>((int) (size / 0.75f) + 1); // Avoid rehashing
-                for (var i = 0; i < size; i++) {
-                    map.put((String) pop(), pop());
-                }
-                yield map;
-            }
-        });
-    }
-
-    private void createList(int size) {
-        push(switch (size) {
-            case 0 -> List.of();
-            case 1 -> Collections.singletonList(pop());
-            default -> {
-                var values = new Object[size];
-                for (var i = size - 1; i >= 0; i--) {
-                    values[i] = pop();
-                }
-                yield Arrays.asList(values);
-            }
-        });
-    }
-
-    private void resolveTemplate(StringTemplate template) {
-        var expressionCount = template.expressionCount();
-        var temp = getTempArray(expressionCount);
-        for (var i = 0; i < expressionCount; i++) {
-            temp[i] = pop();
-        }
-        push(template.resolve(expressionCount, temp));
-    }
-
-    @SuppressWarnings("unchecked")
-    private Endpoint setEndpoint(byte packed) {
-        boolean hasHeaders = (packed & 1) != 0;
-        boolean hasProperties = (packed & 2) != 0;
-        var urlString = (String) pop();
-        var properties = (Map<String, Object>) (hasProperties ? pop() : Map.of());
-        var headers = (Map<String, List<String>>) (hasHeaders ? pop() : Map.of());
-        var builder = Endpoint.builder().uri(createUri(urlString));
-
-        if (!headers.isEmpty()) {
-            builder.putProperty(EndpointContext.HEADERS, headers);
-        }
-
-        for (var extension : program.extensions) {
-            extension.extractEndpointProperties(builder, context, properties, headers);
-        }
-
-        return builder.build();
+    private void logDebugJump(int jumpTarget) {
+        LOGGER.debug("VM jumping from {} to {}", pc, jumpTarget);
+        LOGGER.debug("    - Stack ({}): {}", stackPosition, Arrays.toString(stack));
+        LOGGER.debug("    - Registers: {}", Arrays.toString(registers));
     }
 
     public static URI createUri(String uriStr) {

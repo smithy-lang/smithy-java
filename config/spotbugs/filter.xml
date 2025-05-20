@@ -81,4 +81,10 @@
         <Bug pattern="RC_REF_COMPARISON_BAD_PRACTICE_BOOLEAN" />
     </Match>
 
+    <Match>
+        <Class name="software.amazon.smithy.java.client.rulesengine.RulesVm" />
+        <Method name="evaluate" />
+        <Bug pattern="DCN_NULLPOINTER_EXCEPTION" />
+    </Match>
+
 </FindBugsFilter>
