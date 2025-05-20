@@ -187,6 +187,9 @@ final class RulesVm {
                 case RulesProgram.TEST_REGISTER_ISSET -> {
                     push(registers[instructions[++pc] & 0xFF] != null ? Boolean.TRUE : Boolean.FALSE);
                 }
+                case RulesProgram.TEST_REGISTER_NOT_SET -> {
+                    push(registers[instructions[++pc] & 0xFF] == null ? Boolean.TRUE : Boolean.FALSE);
+                }
                 case RulesProgram.RETURN_ERROR -> {
                     throw new RulesEvaluationError((String) stack[--stackPosition], pc);
                 }
