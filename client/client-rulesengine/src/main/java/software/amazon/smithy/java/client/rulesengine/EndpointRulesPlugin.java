@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.client.rulesengine;
 
 import java.util.Map;
+import java.util.Objects;
 import software.amazon.smithy.java.client.core.ClientConfig;
 import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.client.core.ClientPlugin;
@@ -39,9 +40,11 @@ public final class EndpointRulesPlugin implements ClientPlugin {
             TraitKey.get(EndpointRuleSetTrait.class);
 
     private RulesProgram program;
+    private final RulesEngine engine;
 
-    private EndpointRulesPlugin(RulesProgram program) {
+    private EndpointRulesPlugin(RulesProgram program, RulesEngine engine) {
         this.program = program;
+        this.engine = engine;
     }
 
     /**
@@ -53,7 +56,8 @@ public final class EndpointRulesPlugin implements ClientPlugin {
      * @return the rules engine plugin.
      */
     public static EndpointRulesPlugin from(RulesProgram program) {
-        return new EndpointRulesPlugin(program);
+        Objects.requireNonNull(program, "RulesProgram must not be null");
+        return new EndpointRulesPlugin(program, null);
     }
 
     /**
@@ -64,7 +68,19 @@ public final class EndpointRulesPlugin implements ClientPlugin {
      * @return the plugin.
      */
     public static EndpointRulesPlugin create() {
-        return new EndpointRulesPlugin(null);
+        return create(new RulesEngine());
+    }
+
+    /**
+     * Creates an EndpointRulesPlugin that waits to create a program until configuring the client. It looks for the
+     * relevant Smithy traits, and if found, compiles them and sets up a resolver. If the traits can't be found, the
+     * resolver is not updated. If a resolver is already set, it is not changed.
+     *
+     * @param engine RulesEngine to use when creating programs.
+     * @return the plugin.
+     */
+    public static EndpointRulesPlugin create(RulesEngine engine) {
+        return new EndpointRulesPlugin(null, engine);
     }
 
     /**
@@ -94,7 +110,7 @@ public final class EndpointRulesPlugin implements ClientPlugin {
                 var ruleset = config.service().schema().getTrait(ENDPOINT_RULESET_TRAIT);
                 if (ruleset != null) {
                     LOGGER.debug("Found endpoint rules traits on service: {}", config.service());
-                    program = new RulesEngine().compile(ruleset.getEndpointRuleSet());
+                    program = engine.compile(ruleset.getEndpointRuleSet());
                 }
             }
             if (program != null) {

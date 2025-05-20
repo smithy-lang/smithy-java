@@ -61,15 +61,6 @@ public class EndpointRulesPluginTest {
     }
 
     @Test
-    public void onlyModifiesResolverIfProgramFound() {
-        var plugin = EndpointRulesPlugin.from((RulesProgram) null);
-        var builder = ClientConfig.builder();
-        plugin.configureClient(builder);
-
-        assertThat(builder.endpointResolver(), not(instanceOf(EndpointRulesResolver.class)));
-    }
-
-    @Test
     public void loadsRulesFromServiceSchemaTraits() {
         var model = Model.assembler()
                 .addImport(getClass().getResource("minimal-ruleset.smithy"))
