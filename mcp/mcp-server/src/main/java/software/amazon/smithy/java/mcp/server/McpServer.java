@@ -181,16 +181,15 @@ public final class McpServer implements Server {
             var serviceName = service.schema().id().getName();
             for (var operation : service.getAllOperations()) {
                 var operationName = operation.name();
-                var toolName = serviceName + "_" + operationName;
                 Schema schema = operation.getApiOperation().schema();
                 var toolInfo = ToolInfo.builder()
-                        .name(toolName)
+                        .name(operationName)
                         .description(createDescription(serviceName,
                                 operationName,
                                 schema))
                         .inputSchema(createInputSchema(operation.getApiOperation().inputSchema()))
                         .build();
-                tools.put(toolName, new Tool(toolInfo, operation));
+                tools.put(operation.name(), new Tool(toolInfo, operation));
             }
         }
         return tools;
