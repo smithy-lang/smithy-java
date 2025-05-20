@@ -12,10 +12,9 @@ import software.amazon.smithy.java.client.core.ClientContext;
 import software.amazon.smithy.java.context.Context;
 import software.amazon.smithy.java.io.uri.URLEncoding;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsValidHostLabel;
-import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Substring;
 
 /**
- * Implements stdlib functions of the rules engine that weren't promoted to opcodes (GetAttr, isset, not).
+ * Implements stdlib functions of the rules engine that weren't promoted to opcodes (GetAttr, isset, not, substring).
  */
 enum Stdlib implements RulesFunction {
     // https://smithy.io/2.0/additional-specs/rules-engine/standard-library.html#stringequals-function
@@ -36,19 +35,6 @@ enum Stdlib implements RulesFunction {
         }
     },
 
-    // https://smithy.io/2.0/additional-specs/rules-engine/standard-library.html#substring-function
-    SUBSTRING("substring", 4) {
-        @Override
-        public Object apply(Object... operands) {
-            // software.amazon.smithy.rulesengine.language.syntax.expressions.functions.Substring.Definition.evaluate
-            String str = EndpointUtils.castFnArgument(operands[0], String.class, "substring", 1);
-            int startIndex = EndpointUtils.castFnArgument(operands[1], Number.class, "substring", 2).intValue();
-            int stopIndex = EndpointUtils.castFnArgument(operands[2], Number.class, "substring", 3).intValue();
-            boolean reverse = EndpointUtils.castFnArgument(operands[3], Boolean.class, "substring", 4);
-            return Substring.getSubstring(str, startIndex, stopIndex, reverse);
-        }
-    },
-
     // https://smithy.io/2.0/additional-specs/rules-engine/standard-library.html#isvalidhostlabel-function
     IS_VALID_HOST_LABEL("isValidHostLabel", 2) {
         @Override
@@ -63,6 +49,10 @@ enum Stdlib implements RulesFunction {
     PARSE_URL("parseURL", 1) {
         @Override
         public Object apply1(Object arg) {
+            if (arg == null) {
+                return null;
+            }
+
             try {
                 var result = new URI(EndpointUtils.castFnArgument(arg, String.class, "parseURL", 1));
                 if (null != result.getRawQuery()) {

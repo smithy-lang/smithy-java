@@ -406,30 +406,20 @@ public class RulesVmTest {
                 0,
                 RulesProgram.FN,
                 1, // uriEncode "hi there" : "hi%20there"
-                RulesProgram.LOAD_REGISTER,
-                0,
-                RulesProgram.LOAD_CONST,
-                0,
-                RulesProgram.LOAD_CONST,
-                1,
-                RulesProgram.LOAD_CONST,
-                2,
                 RulesProgram.FN,
-                2, // "hi_there" -> "there"
-                RulesProgram.FN,
-                3, // call gimme()
+                2, // call gimme()
                 RulesProgram.CREATE_LIST,
-                4, // ["gimme", "there", "hi%20there", true]
+                3, // ["gimme", "hi%20there", true]
                 RulesProgram.RETURN_VALUE};
         var program = engine.precompiledBuilder()
                 .bytecode(bytecode)
                 .constantPool(3, 8, false)
                 .parameters(new ParamDefinition("a", false, "hi there", null))
-                .functionNames("stringEquals", "uriEncode", "substring", "gimme")
+                .functionNames("stringEquals", "uriEncode", "gimme")
                 .build();
         var result = program.run(Context.create(), Map.of());
 
-        assertThat(result, equalTo(List.of(true, "hi%20there", "there", "gimme")));
+        assertThat(result, equalTo(List.of(true, "hi%20there", "gimme")));
     }
 
     @Test

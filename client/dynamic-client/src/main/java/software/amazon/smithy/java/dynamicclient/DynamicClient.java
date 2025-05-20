@@ -183,6 +183,16 @@ public final class DynamicClient extends Client {
     }
 
     /**
+     * Get an ApiOperation by name.
+     *
+     * @param name Name of the operation to get.
+     * @return the operation.
+     */
+    public ApiOperation<StructDocument, StructDocument> getOperation(String name) {
+        return getApiOperation(name);
+    }
+
+    /**
      * Create a {@link SerializableStruct} from a schema and document.
      *
      * @param shape Shape to mimic by the struct. The shape ID must be found in the model.

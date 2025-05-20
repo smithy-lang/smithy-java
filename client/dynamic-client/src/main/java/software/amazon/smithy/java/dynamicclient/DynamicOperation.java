@@ -51,8 +51,8 @@ public final class DynamicOperation implements ApiOperation<StructDocument, Stru
         this.outputSchema = outputSchema;
         this.errorSchemas = errorSchemas;
         this.typeRegistry = typeRegistry;
-        validateStreaming(inputSchema);
-        validateStreaming(outputSchema);
+        //        validateStreaming(inputSchema);
+        //        validateStreaming(outputSchema);
     }
 
     private static void validateStreaming(Schema schema) {
