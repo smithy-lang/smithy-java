@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import software.amazon.smithy.java.aws.servicebundle.bundler.AwsServiceBundler;
-import software.amazon.smithy.java.mcp.cli.Registry;
+import software.amazon.smithy.mcp.bundle.api.Registry;
 import software.amazon.smithy.mcp.bundle.api.model.Bundle;
 import software.amazon.smithy.mcp.bundle.api.model.BundleMetadata;
 import software.amazon.smithy.mcp.bundle.api.model.SmithyMcpBundle;
@@ -27,7 +27,7 @@ public class AwsMcpRegistry implements Registry {
                 StandardCharsets.UTF_8))) {
             this.availableMcpBundles = models.lines()
                     .map(line -> line.substring(0, line.indexOf("/")).toLowerCase(Locale.ROOT))
-                    .map(s -> BundleMetadata.builder().name(s).build())
+                    .map(s -> BundleMetadata.builder().name(s).description("AWS MCP server for " + s).build())
                     .toList();
         } catch (Exception e) {
             throw new RuntimeException(e);

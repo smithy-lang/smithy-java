@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.mcp.cli;
+package software.amazon.smithy.mcp.bundle.api;
 
 import java.util.List;
 import software.amazon.smithy.mcp.bundle.api.model.Bundle;

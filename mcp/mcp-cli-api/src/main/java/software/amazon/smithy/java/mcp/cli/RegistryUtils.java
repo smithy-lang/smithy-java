@@ -10,6 +10,7 @@ import java.util.ServiceLoader;
 import java.util.ServiceLoader.Provider;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import software.amazon.smithy.mcp.bundle.api.Registry;
 
 public class RegistryUtils {
 

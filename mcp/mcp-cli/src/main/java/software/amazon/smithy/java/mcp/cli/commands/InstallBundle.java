@@ -61,8 +61,8 @@ public class InstallBundle extends SmithyMcpCommand {
             return;
         }
         for (var clientConfigs : config.getClientConfigs()) {
-            var filePath = clientConfigs.getFilePath();
-            var currentConfig = Files.readAllBytes(Path.of(filePath));
+            var filePath = Path.of(clientConfigs.getFilePath());
+            var currentConfig = Files.readAllBytes(filePath);
             McpServersClientConfig currentMcpConfig;
             if (currentConfig.length == 0) {
                 currentMcpConfig = McpServersClientConfig.builder().build();
@@ -75,7 +75,7 @@ public class InstallBundle extends SmithyMcpCommand {
             var map = new LinkedHashMap<>(currentMcpConfig.getMcpServers());
             map.put(name, newConfig);
             var newMcpConfig = McpServersClientConfig.builder().mcpServers(map).build();
-            Files.write(Path.of(filePath),
+            Files.write(filePath,
                     ByteBufferUtils.getBytes(JSON_CODEC.serialize(newMcpConfig)),
                     StandardOpenOption.TRUNCATE_EXISTING);
         }
