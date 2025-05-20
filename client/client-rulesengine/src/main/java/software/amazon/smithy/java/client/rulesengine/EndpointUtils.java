@@ -122,9 +122,7 @@ public final class EndpointUtils {
 
     // Read little-endian unsigned short (2 bytes)
     static int bytesToShort(byte[] instructions, int offset) {
-        int low = instructions[offset] & 0xFF;
-        int high = instructions[offset + 1] & 0xFF;
-        return (high << 8) | low;
+        return ((instructions[offset + 1] & 0xFF) << 8) | (instructions[offset] & 0xFF);
     }
 
     // Write little-endian unsigned short (2 bytes)

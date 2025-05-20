@@ -1,5 +1,6 @@
 plugins {
     id("smithy-java.module-conventions")
+    id("me.champeau.jmh") version "0.7.3"
 }
 
 description = "This module provides AWS-Specific client rules engine functionality"
@@ -15,4 +16,26 @@ dependencies {
     testImplementation(libs.smithy.aws.traits)
     testImplementation(project(":aws:client:aws-client-restxml"))
     testImplementation(project(":client:dynamic-client"))
+}
+
+// Share the S3 model between JMH and tests.
+sourceSets {
+    val sharedResources = "src/shared-resources"
+
+    named("test") {
+        resources.srcDir(sharedResources)
+    }
+
+    named("jmh") {
+        resources.srcDir(sharedResources)
+    }
+}
+
+jmh {
+    warmupIterations = 2
+    iterations = 5
+    fork = 1
+     profilers.add("async:output=flamegraph")
+    // profilers.add("gc")
+    duplicateClassesStrategy = DuplicatesStrategy.WARN
 }

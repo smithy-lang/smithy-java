@@ -39,8 +39,6 @@ final class RulesCompiler {
 
     private final Map<Object, Integer> constantPool = new LinkedHashMap<>();
     private final BiFunction<String, Context, Object> builtinProvider;
-    private final Map<Expression, Byte> cse;
-    private boolean performOptimizations;
 
     // The parsed opcodes and operands.
     private byte[] instructions = new byte[64];
@@ -76,7 +74,6 @@ final class RulesCompiler {
         this.extensions = extensions;
         this.rules = rules;
         this.builtinProvider = builtinProvider;
-        this.performOptimizations = performOptimizations;
         this.functions = functions;
 
         // Byte 1 is the version byte.
@@ -90,10 +87,6 @@ final class RulesCompiler {
             var builtinValue = param.getBuiltIn().orElse(null);
             addRegister(param.getName().toString(), param.isRequired(), defaultValue, builtinValue);
         }
-
-        //        cse = performOptimizations ? CseOptimizer.apply(rules.getRules()) : Map.of();
-        performOptimizations = false;
-        cse = Map.of();
     }
 
     private byte addRegister(String name, boolean required, Object defaultValue, String builtin) {
@@ -163,18 +156,6 @@ final class RulesCompiler {
     }
 
     RulesProgram compile() {
-        // Compile common subexpression values up front.
-        if (performOptimizations) {
-            performOptimizations = false;
-            for (var e : cse.entrySet()) {
-                alwaysCompileExpression(e.getKey());
-                var register = getTempRegister();
-                e.setValue(register);
-                add_SET_REGISTER(register);
-            }
-            performOptimizations = true;
-        }
-
         for (var rule : rules.getRules()) {
             compileRule(rule);
         }
@@ -275,14 +256,6 @@ final class RulesCompiler {
     }
 
     private void compileExpression(Expression expression) {
-        if (performOptimizations) {
-            var register = cse.get(expression);
-            if (register != null) {
-                add_LOAD_REGISTER(register);
-                return;
-            }
-        }
-
         alwaysCompileExpression(expression);
     }
 
@@ -341,12 +314,17 @@ final class RulesCompiler {
             }
 
             private void pushBooleanOptimization(BooleanLiteral b, Expression other) {
-                if (b.value().getValue() && other instanceof Reference ref) {
-                    add_TEST_REGISTER_IS_TRUE(ref.getName().toString());
+                var value = b.value().getValue();
+                if (other instanceof Reference ref) {
+                    if (value) {
+                        add_TEST_REGISTER_IS_TRUE(ref.getName().toString());
+                    } else {
+                        add_TEST_REGISTER_IS_FALSE(ref.getName().toString());
+                    }
                 } else {
                     compileExpression(other);
                     add_IS_TRUE();
-                    if (!b.value().getValue()) {
+                    if (!value) {
                         add_NOT();
                     }
                 }
@@ -356,14 +334,21 @@ final class RulesCompiler {
             public Void visitStringEquals(Expression left, Expression right) {
                 compileExpression(left);
                 compileExpression(right);
-                add_FN(getFunctionIndex("stringEquals"));
+                add_EQUALS();
                 return null;
             }
 
             @Override
             public Void visitLibraryFunction(FunctionDefinition fn, List<Expression> args) {
+                if (fn.getId().equals("substring")) {
+                    compileExpression(args.get(0)); // string
+                    add_SUBSTRING(args);
+                    return null;
+                }
+
                 var index = getFunctionIndex(fn.getId());
                 var f = usedFunctions.get(index);
+
                 // Detect if the runtime function differs from the defined trait function.
                 if (f.getOperandCount() != fn.getArguments().size()) {
                     throw new RulesEvaluationError("Rules engine function `" + fn.getId() + "` accepts "
@@ -548,6 +533,22 @@ final class RulesCompiler {
     private void add_TEST_REGISTER_IS_TRUE(String register) {
         addInstruction(RulesProgram.TEST_REGISTER_IS_TRUE);
         addInstruction(getRegister(register));
+    }
+
+    private void add_TEST_REGISTER_IS_FALSE(String register) {
+        addInstruction(RulesProgram.TEST_REGISTER_IS_FALSE);
+        addInstruction(getRegister(register));
+    }
+
+    private void add_EQUALS() {
+        addInstruction(RulesProgram.EQUALS);
+    }
+
+    private void add_SUBSTRING(List<Expression> args) {
+        addInstruction(RulesProgram.SUBSTRING);
+        addInstruction(args.get(1).toNode().expectNumberNode().getValue().byteValue());
+        addInstruction(args.get(2).toNode().expectNumberNode().getValue().byteValue());
+        addInstruction(args.get(3).toNode().expectBooleanNode().getValue() ? (byte) 1 : (byte) 0);
     }
 
     private void addInstruction(byte value) {

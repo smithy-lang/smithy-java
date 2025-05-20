@@ -142,10 +142,31 @@ public final class RulesProgram {
     static final byte TEST_REGISTER_IS_TRUE = 16;
 
     /**
+     * Checks if a register is boolean false and pushes the result onto the stack.
+     *
+     * <p>Must be followed by a byte that represents the register to check.
+     */
+    static final byte TEST_REGISTER_IS_FALSE = 17;
+
+    /**
      * Pops the value at the top of the stack and returns it from the VM. This can be used for testing purposes or
      * for returning things other than endpoint values.
      */
-    static final byte RETURN_VALUE = 17;
+    static final byte RETURN_VALUE = 18;
+
+    /**
+     * Pops the top two values off the stack and performs Objects.equals on them, pushing the result onto the stack.
+     */
+    static final byte EQUALS = 19;
+
+    /**
+     * Pops the top value off the stack, expecting a string, and extracts a substring of it, pushing the result onto
+     * the stack.
+     *
+     * <p>Must be followed by three bytes: the start position in the string, the end position in the string, and
+     * a byte set to 1 if the substring is "reversed" (from the end) or not.
+     */
+    static final byte SUBSTRING = 20;
 
     final List<RulesExtension> extensions;
     final Object[] constantPool;
@@ -316,114 +337,146 @@ public final class RulesProgram {
 
         // Skip version, param count, synthetic param count bytes.
         for (var i = instructionOffset + 3; i < instructionSize; i++) {
-            s.append("  ");
-            s.append(String.format("%03d", i));
-            s.append(": ");
-
-            var skip = 0;
-            Show show = null;
-            var name = switch (instructions[i]) {
-                case LOAD_CONST -> {
-                    skip = 1;
-                    show = Show.CONST;
-                    yield "LOAD_CONST";
-                }
-                case LOAD_CONST_W -> {
-                    skip = 2;
-                    show = Show.CONST;
-                    yield "LOAD_CONST_W";
-                }
-                case SET_REGISTER -> {
-                    skip = 1;
-                    show = Show.REGISTER;
-                    yield "SET_REGISTER";
-                }
-                case LOAD_REGISTER -> {
-                    skip = 1;
-                    show = Show.REGISTER;
-                    yield "LOAD_REGISTER";
-                }
-                case JUMP_IF_FALSEY -> {
-                    skip = 2;
-                    yield "JUMP_IF_FALSEY";
-                }
-                case NOT -> "NOT";
-                case ISSET -> "ISSET";
-                case TEST_REGISTER_ISSET -> {
-                    skip = 1;
-                    show = Show.REGISTER;
-                    yield "TEST_REGISTER_SET";
-                }
-                case RETURN_ERROR -> "RETURN_ERROR";
-                case RETURN_ENDPOINT -> {
-                    skip = 1;
-                    yield "RETURN_ENDPOINT";
-                }
-                case CREATE_LIST -> {
-                    skip = 1;
-                    yield "CREATE_LIST";
-                }
-                case CREATE_MAP -> {
-                    skip = 1;
-                    yield "CREATE_MAP";
-                }
-                case RESOLVE_TEMPLATE -> {
-                    skip = 2;
-                    show = Show.CONST;
-                    yield "RESOLVE_TEMPLATE";
-                }
-                case FN -> {
-                    skip = 1;
-                    show = Show.FN;
-                    yield "FN";
-                }
-                case GET_ATTR -> {
-                    skip = 2;
-                    show = Show.CONST;
-                    yield "GET_ATTR";
-                }
-                case IS_TRUE -> "IS_TRUE";
-                case TEST_REGISTER_IS_TRUE -> {
-                    skip = 1;
-                    show = Show.REGISTER;
-                    yield "TEST_REGISTER_IS_TRUE";
-                }
-                case RETURN_VALUE -> "RETURN_VALUE";
-                default -> "?" + instructions[i];
-            };
-
-            appendName(s, name);
-
-            int positionToShow = -1;
-            if (skip == 1) {
-                positionToShow = appendByte(s, i);
-                i++;
-            } else if (skip == 2) {
-                positionToShow = appendShort(s, i);
-                i += 2;
-            }
-
-            if (positionToShow > -1 && show != null) {
-                switch (show) {
-                    case CONST -> {
-                        s.append("  ");
-                        s.append(constantPool[positionToShow]);
-                    }
-                    case FN -> {
-                        s.append("  ");
-                        s.append(functions[positionToShow].getFunctionName());
-                    }
-                    case REGISTER -> {
-                        s.append("  ");
-                        s.append(registerDefinitions[positionToShow].name());
-                    }
-                }
-            }
-
-            s.append("\n");
+            i = writeInstruction(s, i);
         }
 
         return s.toString();
+    }
+
+    /**
+     * Allows dumping out a specific instruction at the given bytecode position.
+     *
+     * @param pc Bytecode instruction position.
+     * @return the instruction as a debug string.
+     */
+    public String writeInstruction(int pc) {
+        StringBuilder s = new StringBuilder();
+        writeInstruction(s, pc);
+        return s.toString();
+    }
+
+    private int writeInstruction(StringBuilder s, int pc) {
+        s.append("  ");
+        s.append(String.format("%03d", pc));
+        s.append(": ");
+
+        var skip = 0;
+        Show show = null;
+        var name = switch (instructions[pc]) {
+            case LOAD_CONST -> {
+                skip = 1;
+                show = Show.CONST;
+                yield "LOAD_CONST";
+            }
+            case LOAD_CONST_W -> {
+                skip = 2;
+                show = Show.CONST;
+                yield "LOAD_CONST_W";
+            }
+            case SET_REGISTER -> {
+                skip = 1;
+                show = Show.REGISTER;
+                yield "SET_REGISTER";
+            }
+            case LOAD_REGISTER -> {
+                skip = 1;
+                show = Show.REGISTER;
+                yield "LOAD_REGISTER";
+            }
+            case JUMP_IF_FALSEY -> {
+                skip = 2;
+                yield "JUMP_IF_FALSEY";
+            }
+            case NOT -> "NOT";
+            case ISSET -> "ISSET";
+            case TEST_REGISTER_ISSET -> {
+                skip = 1;
+                show = Show.REGISTER;
+                yield "TEST_REGISTER_SET";
+            }
+            case RETURN_ERROR -> "RETURN_ERROR";
+            case RETURN_ENDPOINT -> {
+                skip = 1;
+                yield "RETURN_ENDPOINT";
+            }
+            case CREATE_LIST -> {
+                skip = 1;
+                yield "CREATE_LIST";
+            }
+            case CREATE_MAP -> {
+                skip = 1;
+                yield "CREATE_MAP";
+            }
+            case RESOLVE_TEMPLATE -> {
+                skip = 2;
+                show = Show.CONST;
+                yield "RESOLVE_TEMPLATE";
+            }
+            case FN -> {
+                skip = 1;
+                show = Show.FN;
+                yield "FN";
+            }
+            case GET_ATTR -> {
+                skip = 2;
+                show = Show.CONST;
+                yield "GET_ATTR";
+            }
+            case IS_TRUE -> "IS_TRUE";
+            case TEST_REGISTER_IS_TRUE -> {
+                skip = 1;
+                show = Show.REGISTER;
+                yield "TEST_REGISTER_IS_TRUE";
+            }
+            case TEST_REGISTER_IS_FALSE -> {
+                skip = 1;
+                show = Show.REGISTER;
+                yield "TEST_REGISTER_IS_FALSE";
+            }
+            case RETURN_VALUE -> "RETURN_VALUE";
+            case EQUALS -> "EQUALS";
+            case SUBSTRING -> {
+                skip = 3;
+                yield "SUBSTRING";
+            }
+            default -> "?" + instructions[pc];
+        };
+
+        appendName(s, name);
+
+        int positionToShow = -1;
+        if (skip == 1) {
+            positionToShow = appendByte(s, pc);
+            pc++;
+        } else if (skip == 2) {
+            positionToShow = appendShort(s, pc);
+            pc += 2;
+        } else if (skip == 3) {
+            appendByte(s, pc);
+            appendByte(s, pc + 1);
+            appendByte(s, pc + 2);
+            pc += 3;
+        }
+
+        if (positionToShow > -1 && show != null) {
+            switch (show) {
+                case CONST -> {
+                    s.append("  ");
+                    s.append(constantPool[positionToShow]);
+                }
+                case FN -> {
+                    s.append("  ");
+                    s.append(functions[positionToShow].getFunctionName());
+                }
+                case REGISTER -> {
+                    s.append("  ");
+                    s.append(registerDefinitions[positionToShow].name());
+                }
+            }
+        }
+
+        s.append("\n");
+        return pc;
     }
 
     private void appendName(StringBuilder s, String name) {

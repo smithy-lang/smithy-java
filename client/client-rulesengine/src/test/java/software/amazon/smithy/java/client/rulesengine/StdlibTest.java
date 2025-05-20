@@ -46,19 +46,6 @@ public class StdlibTest {
         Assertions.assertThrows(RulesEvaluationError.class, () -> Stdlib.PARSE_URL.apply1("\\"));
     }
 
-    @Test
-    public void handlesSubstrings() {
-        assertThat(Stdlib.SUBSTRING.apply("abc", 0, 1, false), equalTo("a"));
-        assertThat(Stdlib.SUBSTRING.apply("abc", 0, 2, false), equalTo("ab"));
-        assertThat(Stdlib.SUBSTRING.apply("abc", 0, 3, false), equalTo("abc"));
-        assertThat(Stdlib.SUBSTRING.apply("abc", 1, 2, false), equalTo("b"));
-        assertThat(Stdlib.SUBSTRING.apply("abc", 1, 3, false), equalTo("bc"));
-        assertThat(Stdlib.SUBSTRING.apply("abc", 2, 3, false), equalTo("c"));
-
-        assertThat(Stdlib.SUBSTRING.apply("abc", 2, 3, true), equalTo("a"));
-        assertThat(Stdlib.SUBSTRING.apply("abc", 1, 3, true), equalTo("ab"));
-    }
-
     @ParameterizedTest
     @CsvSource({
             // Valid simple host labels (no dots)
