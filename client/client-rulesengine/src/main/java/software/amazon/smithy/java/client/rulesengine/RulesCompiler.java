@@ -20,6 +20,7 @@ import software.amazon.smithy.rulesengine.language.syntax.expressions.Expression
 import software.amazon.smithy.rulesengine.language.syntax.expressions.Reference;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.FunctionDefinition;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.GetAttr;
+import software.amazon.smithy.rulesengine.language.syntax.expressions.functions.IsSet;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.literal.BooleanLiteral;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.literal.IntegerLiteral;
 import software.amazon.smithy.rulesengine.language.syntax.expressions.literal.Literal;
@@ -294,8 +295,13 @@ final class RulesCompiler {
 
             @Override
             public Void visitNot(Expression not) {
-                compileExpression(not);
-                add_NOT();
+                if (not instanceof IsSet isset && isset.getArguments().get(0) instanceof Reference ref) {
+                    add_TEST_REGISTER_NOT_SET(ref.getName().toString());
+                    return null;
+                } else {
+                    compileExpression(not);
+                    add_NOT();
+                }
                 return null;
             }
 
@@ -484,6 +490,11 @@ final class RulesCompiler {
 
     private void add_TEST_REGISTER_ISSET(String register) {
         addInstruction(RulesProgram.TEST_REGISTER_ISSET);
+        addInstruction(getRegister(register));
+    }
+
+    private void add_TEST_REGISTER_NOT_SET(String register) {
+        addInstruction(RulesProgram.TEST_REGISTER_NOT_SET);
         addInstruction(getRegister(register));
     }
 

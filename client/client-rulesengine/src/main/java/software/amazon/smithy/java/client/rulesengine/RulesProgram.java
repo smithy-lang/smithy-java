@@ -70,38 +70,45 @@ public final class RulesProgram {
     static final byte ISSET = 6;
 
     /**
-     * Checks if a register is set to something that is boolean true or a non null value.
+     * Checks if a register is set to a non-null value.
      *
      * <p>Must be followed by an unsigned byte that represents the register to check.
      */
     static final byte TEST_REGISTER_ISSET = 7;
 
     /**
+     * Checks if a register is not set or set to a null value.
+     *
+     * <p>Must be followed by an unsigned byte that represents the register to check.
+     */
+    static final byte TEST_REGISTER_NOT_SET = 8;
+
+    /**
      * Sets an error on the VM and exits.
      *
      * <p>Pops a single value that provides the error string to set.
      */
-    static final byte RETURN_ERROR = 8;
+    static final byte RETURN_ERROR = 9;
 
     /**
      * Sets the endpoint result of the VM and exits. Pops the top of the stack, expecting a string value. The opcode
      * must be followed by a byte where the first bit of the byte is on if the endpoint has headers, and the second
      * bit is on if the endpoint has properties.
      */
-    static final byte RETURN_ENDPOINT = 9;
+    static final byte RETURN_ENDPOINT = 10;
 
     /**
      * Pops N values off the stack and pushes a list of those values onto the stack. Must be followed by an unsigned
      * byte that defines the number of elements in the list.
      */
-    static final byte CREATE_LIST = 10;
+    static final byte CREATE_LIST = 11;
 
     /**
      * Pops N*2 values off the stack (key then value), creates a map of those values, and pushes the map onto the
      * stack. Each popped key must be a string. Must be followed by an unsigned byte that defines the
      * number of entries in the map.
      */
-    static final byte CREATE_MAP = 11;
+    static final byte CREATE_MAP = 12;
 
     /**
      * Resolves a template string. Must be followed by two bytes, a short, that represents the constant pool index
@@ -111,7 +118,7 @@ public final class RulesProgram {
      * The popped values fill in values into the template. The resolved template value as a string is then pushed onto
      * the stack.
      */
-    static final byte RESOLVE_TEMPLATE = 12;
+    static final byte RESOLVE_TEMPLATE = 13;
 
     /**
      * Calls a function. Must be followed by a byte to provide the function index to call.
@@ -119,7 +126,7 @@ public final class RulesProgram {
      * <p>The function pops zero or more values off the stack based on the RulesFunction registered for the index,
      * and then pushes the Object result onto the stack.
      */
-    static final byte FN = 13;
+    static final byte FN = 14;
 
     /**
      * Pops the top level value and applies a getAttr expression on it, pushing the result onto the stack.
@@ -127,37 +134,37 @@ public final class RulesProgram {
      * <p>Must be followed by two bytes, a short, that represents the constant pool index that stores the
      * AttrExpression.
      */
-    static final byte GET_ATTR = 14;
+    static final byte GET_ATTR = 15;
 
     /**
      * Pops a value and pushes true if the value is boolean true, false if not.
      */
-    static final byte IS_TRUE = 15;
+    static final byte IS_TRUE = 16;
 
     /**
      * Checks if a register is boolean true and pushes the result onto the stack.
      *
      * <p>Must be followed by a byte that represents the register to check.
      */
-    static final byte TEST_REGISTER_IS_TRUE = 16;
+    static final byte TEST_REGISTER_IS_TRUE = 17;
 
     /**
      * Checks if a register is boolean false and pushes the result onto the stack.
      *
      * <p>Must be followed by a byte that represents the register to check.
      */
-    static final byte TEST_REGISTER_IS_FALSE = 17;
+    static final byte TEST_REGISTER_IS_FALSE = 18;
 
     /**
      * Pops the value at the top of the stack and returns it from the VM. This can be used for testing purposes or
      * for returning things other than endpoint values.
      */
-    static final byte RETURN_VALUE = 18;
+    static final byte RETURN_VALUE = 19;
 
     /**
      * Pops the top two values off the stack and performs Objects.equals on them, pushing the result onto the stack.
      */
-    static final byte EQUALS = 19;
+    static final byte EQUALS = 20;
 
     /**
      * Pops the top value off the stack, expecting a string, and extracts a substring of it, pushing the result onto
@@ -166,7 +173,7 @@ public final class RulesProgram {
      * <p>Must be followed by three bytes: the start position in the string, the end position in the string, and
      * a byte set to 1 if the substring is "reversed" (from the end) or not.
      */
-    static final byte SUBSTRING = 20;
+    static final byte SUBSTRING = 21;
 
     final List<RulesExtension> extensions;
     final Object[] constantPool;
@@ -392,7 +399,12 @@ public final class RulesProgram {
             case TEST_REGISTER_ISSET -> {
                 skip = 1;
                 show = Show.REGISTER;
-                yield "TEST_REGISTER_SET";
+                yield "TEST_REGISTER_ISSET";
+            }
+            case TEST_REGISTER_NOT_SET -> {
+                skip = 1;
+                show = Show.REGISTER;
+                yield "TEST_REGISTER_NOT_SET";
             }
             case RETURN_ERROR -> "RETURN_ERROR";
             case RETURN_ENDPOINT -> {
