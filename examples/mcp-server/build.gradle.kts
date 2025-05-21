@@ -60,3 +60,7 @@ tasks.assemble {
     dependsOn(tasks.shadowJar)
 }
 
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+}
+

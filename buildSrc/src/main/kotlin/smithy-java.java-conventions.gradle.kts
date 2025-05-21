@@ -19,12 +19,13 @@ val Project.libs get() = the<org.gradle.accessors.dm.LibrariesForLibs>()
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
 tasks.withType<JavaCompile>() {
     options.encoding = "UTF-8"
+    options.release.set(17)
 }
 
 tasks.withType<Javadoc>() {

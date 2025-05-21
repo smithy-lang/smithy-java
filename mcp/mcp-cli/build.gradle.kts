@@ -54,8 +54,8 @@ tasks.processResources {
     dependsOn(generateVersionFile)
 }
 
-java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+tasks.withType<JavaCompile> {
+    options.release.set(21)
 }
 
 tasks.shadowJar {
