@@ -59,12 +59,14 @@ public final class McpServer implements Server {
     private final InputStream is;
     private final OutputStream os;
     private final String name;
+    private final List<McpServerProxy> proxies;
 
     McpServer(McpServerBuilder builder) {
         this.tools = createTools(builder.serviceList);
         this.is = builder.is;
         this.os = builder.os;
         this.name = builder.name;
+        this.proxies = new ArrayList<>(builder.proxyList);
         this.listener = new Thread(() -> {
             try {
                 this.listen();
@@ -82,14 +84,14 @@ public final class McpServer implements Server {
             var line = scan.nextLine();
             try {
                 var jsonRequest = CODEC.deserializeShape(line, JsonRpcRequest.builder());
-                handleRequest(jsonRequest);
+                handleRequest(jsonRequest, line);
             } catch (Exception e) {
                 LOG.error("Error decoding request", e);
             }
         }
     }
 
-    private void handleRequest(JsonRpcRequest req) {
+    private void handleRequest(JsonRpcRequest req, String rawRequest) {
         try {
             switch (req.getMethod()) {
                 case "initialize" -> writeResponse(req.getId(),
@@ -107,17 +109,52 @@ public final class McpServer implements Server {
                 case "tools/call" -> {
                     var operationName = req.getParams().getMember("name").asString();
                     var tool = tools.get(operationName);
-                    var operation = tool.operation();
-                    var input = req.getParams()
-                            .getMember("arguments")
-                            .asShape(operation.getApiOperation().inputBuilder());
-                    var output = operation.function().apply(input, null);
-                    var result = CallToolResult.builder()
-                            .content(List.of(TextContent.builder()
-                                    .text(CODEC.serializeToString((SerializableShape) output))
-                                    .build()))
-                            .build();
-                    writeResponse(req.getId(), result);
+
+                    // Check if this tool should be dispatched to a proxy
+                    if (tool.proxy() != null) {
+                        // Forward the request to the proxy
+                        JsonRpcRequest proxyRequest = JsonRpcRequest.builder()
+                                .id(req.getId())
+                                .method(req.getMethod())
+                                .params(req.getParams())
+                                .jsonrpc(req.getJsonrpc())
+                                .build();
+
+                        // Get response asynchronously
+                        tool.proxy().rpc(proxyRequest).thenAccept(response -> {
+                            // Pass through the response directly
+                            synchronized (this) {
+                                try {
+                                    String serializedResponse = CODEC.serializeToString(response);
+                                    os.write(serializedResponse.getBytes(StandardCharsets.UTF_8));
+                                    os.write('\n');
+                                    os.flush();
+                                } catch (Exception e) {
+                                    LOG.error("Error writing proxy response", e);
+                                }
+                            }
+                        }).exceptionally(ex -> {
+                            LOG.error("Error from proxy RPC", ex);
+                            internalError(req, new RuntimeException("Proxy error: " + ex.getMessage(), ex));
+                            return null;
+                        });
+
+                        // Don't send a response here as it will be sent when the future completes
+                        return;
+                    } else {
+                        // Handle locally
+                        var operation = tool.operation();
+                        var input = req.getParams()
+                                .getMember("arguments")
+                                .asShape(operation.getApiOperation().inputBuilder());
+                        var output = operation.function().apply(input, null);
+                        var result = CallToolResult.builder()
+                                .content(List.of(TextContent.builder()
+                                        .text(CODEC.serializeToString((SerializableShape) output))
+                                        .build()))
+                                .build();
+                        writeResponse(req.getId(), result);
+                    }
                 }
                 default -> {
                     //For now don't do anything
@@ -129,11 +166,14 @@ public final class McpServer implements Server {
     }
 
     private void writeResponse(int id, SerializableStruct value) {
-        var response = JsonRpcResponse.builder()
+        writeResponse(JsonRpcResponse.builder()
                 .id(id)
                 .result(Document.of(value))
                 .jsonrpc("2.0")
-                .build();
+                .build());
+    }
+
+    private void writeResponse(JsonRpcResponse response) {
         synchronized (this) {
             try {
                 os.write(CODEC.serializeToString(response).getBytes(StandardCharsets.UTF_8));
@@ -254,17 +294,54 @@ public final class McpServer implements Server {
 
     @Override
     public void start() {
+        // Start all proxies first
+        for (McpServerProxy proxy : proxies) {
+            proxy.start();
+            proxy.initialize(this::writeResponse);
+
+            // Get the tools from this proxy
+            try {
+                List<ToolInfo> proxyTools = proxy.listTools();
+
+                // Add each tool to our tool map
+                for (var toolInfo : proxyTools) {
+                    tools.put(toolInfo.getName(), new Tool(toolInfo, proxy));
+                }
+            } catch (Exception e) {
+                LOG.error("Failed to fetch tools from proxy", e);
+            }
+        }
+
+        // Start the listener thread
         listener.start();
     }
 
     @Override
     public CompletableFuture<Void> shutdown() {
-        //TODO Do we need to better handle this?
-        return CompletableFuture.completedFuture(null);
+        List<CompletableFuture<Void>> shutdownFutures = new ArrayList<>();
+
+        // Shutdown all proxies
+        for (McpServerProxy proxy : proxies) {
+            shutdownFutures.add(proxy.shutdown());
+        }
+
+        // Wait for all to complete
+        if (shutdownFutures.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        } else {
+            return CompletableFuture.allOf(shutdownFutures.toArray(new CompletableFuture[0]));
+        }
     }
 
-    private record Tool(ToolInfo toolInfo, Operation operation) {
+    private record Tool(ToolInfo toolInfo, Operation operation, McpServerProxy proxy) {
 
+        Tool(ToolInfo toolInfo, Operation operation) {
+            this(toolInfo, operation, null);
+        }
+
+        Tool(ToolInfo toolInfo, McpServerProxy proxy) {
+            this(toolInfo, null, proxy);
+        }
     }
 
     public static McpServerBuilder builder() {

@@ -21,6 +21,7 @@ public final class McpServerBuilder {
     InputStream is;
     OutputStream os;
     List<Service> serviceList = new ArrayList<>();
+    List<McpServerProxy> proxyList = new ArrayList<>();
     String name;
 
     McpServerBuilder() {}
@@ -61,11 +62,16 @@ public final class McpServerBuilder {
         return this;
     }
 
+    public McpServerBuilder addMcpService(McpServerProxy proxy) {
+        proxyList.add(proxy);
+        return this;
+    }
+
     private void validate() {
         Objects.requireNonNull(is, "MCP server input stream is required");
         Objects.requireNonNull(os, "MCP server output stream is required");
-        if (serviceList.isEmpty()) {
-            throw new IllegalArgumentException("MCP server requires at least one service");
+        if (serviceList.isEmpty() && proxyList.isEmpty()) {
+            throw new IllegalArgumentException("MCP server requires at least one service or proxy");
         }
     }
 }

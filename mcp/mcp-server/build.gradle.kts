@@ -18,6 +18,10 @@ dependencies {
     implementation(project(":mcp:mcp-bundle-api"))
 }
 
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+}
+
 spotbugs {
     ignoreFailures = true
 }

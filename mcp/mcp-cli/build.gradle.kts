@@ -54,6 +54,10 @@ tasks.processResources {
     dependsOn(generateVersionFile)
 }
 
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+}
+
 tasks.shadowJar {
     mergeServiceFiles()
     transform(AppendingTransformer::class.java) {
