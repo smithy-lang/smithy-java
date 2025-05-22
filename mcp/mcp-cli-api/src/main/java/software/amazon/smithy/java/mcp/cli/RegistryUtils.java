@@ -26,16 +26,9 @@ public class RegistryUtils {
     }
 
     public static Registry getRegistry(String name) {
-        if (name == null) {
-            return getRegistry();
-        }
         if (JAVA_REGISTRIES.containsKey(name)) {
             return JAVA_REGISTRIES.get(name);
         }
         throw new IllegalStateException("No such registry: " + name);
-    }
-
-    public static Registry getRegistry() {
-        return JAVA_REGISTRIES.values().iterator().next();
     }
 }

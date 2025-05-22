@@ -12,7 +12,6 @@ import software.amazon.smithy.java.aws.servicebundle.bundler.AwsServiceBundler;
 import software.amazon.smithy.java.mcp.cli.AbstractAddBundle;
 import software.amazon.smithy.java.mcp.cli.CliBundle;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
-import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
 import software.amazon.smithy.mcp.bundle.api.model.Bundle;
 import software.amazon.smithy.mcp.bundle.api.model.BundleMetadata;
 import software.amazon.smithy.mcp.bundle.api.model.SmithyMcpBundle;
@@ -39,10 +38,8 @@ public class AddAwsServiceBundle extends AbstractAddBundle {
         var bundle = new AwsServiceBundler(awsServiceName).bundle();
 
         var bundleConfig = McpBundleConfig.builder()
-                .smithyModeled(SmithyModeledBundleConfig.builder()
-                        .name(awsServiceName)
-                        .bundleLocation(getBundleFileLocation())
-                        .build())
+                .name(awsServiceName)
+                .bundleLocation(getBundleFileLocation())
                 .build();
         return new CliBundle(
                 Bundle.builder()

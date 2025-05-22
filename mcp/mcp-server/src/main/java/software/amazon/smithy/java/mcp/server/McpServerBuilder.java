@@ -62,8 +62,13 @@ public final class McpServerBuilder {
         return this;
     }
 
-    public McpServerBuilder addMcpService(McpServerProxy proxy) {
-        proxyList.add(proxy);
+    public McpServerBuilder addMcpService(McpServerProxy... proxy) {
+        proxyList.addAll(Arrays.asList(proxy));
+        return this;
+    }
+
+    public McpServerBuilder addMcpService(List<McpServerProxy> proxies) {
+        proxyList.addAll(proxies);
         return this;
     }
 

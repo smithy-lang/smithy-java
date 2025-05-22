@@ -14,16 +14,16 @@ map McpBundleConfigs {
     value: McpBundleConfig
 }
 
-union McpBundleConfig {
-    smithyModeled: SmithyModeledBundleConfig
-    genericConfig: GenericToolBundleConfig
-}
-
-@mixin
-structure CommonToolConfig {
+structure McpBundleConfig {
+    @required
     name: String
+
     allowListedTools: ToolNames
+
     blockListedTools: ToolNames
+
+    @required
+    bundleLocation: Location
 }
 
 map Registries {
@@ -44,21 +44,12 @@ structure CommonRegistryConfig {
     name: String
 }
 
-structure SmithyModeledBundleConfig with [CommonToolConfig] {
-    @required
-    bundleLocation: Location
-}
-
 list Locations {
     member: Location
 }
 
 union Location {
     fileLocation: String
-}
-
-structure GenericToolBundleConfig with [CommonToolConfig] {
-    config: Document
 }
 
 structure ClientConfig {

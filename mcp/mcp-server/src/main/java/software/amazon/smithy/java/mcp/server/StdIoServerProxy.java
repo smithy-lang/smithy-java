@@ -24,8 +24,8 @@ import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.model.JsonRpcRequest;
 import software.amazon.smithy.java.mcp.model.JsonRpcResponse;
 
-public final class StdioProxy extends McpServerProxy {
-    private static final InternalLogger LOG = InternalLogger.getLogger(StdioProxy.class);
+public final class StdIoServerProxy extends McpServerProxy {
+    private static final InternalLogger LOG = InternalLogger.getLogger(StdIoServerProxy.class);
     private static final JsonCodec JSON_CODEC = JsonCodec.builder().build();
 
     private final ProcessBuilder processBuilder;
@@ -37,7 +37,7 @@ public final class StdioProxy extends McpServerProxy {
     private final Map<Integer, CompletableFuture<JsonRpcResponse>> pendingRequests = new ConcurrentHashMap<>();
     private volatile boolean running = false;
 
-    private StdioProxy(Builder builder) {
+    private StdIoServerProxy(Builder builder) {
         processBuilder = new ProcessBuilder();
         processBuilder.command().add(builder.command);
 
@@ -73,11 +73,11 @@ public final class StdioProxy extends McpServerProxy {
             return this;
         }
 
-        public StdioProxy build() {
+        public StdIoServerProxy build() {
             if (command == null || command.isEmpty()) {
                 throw new IllegalArgumentException("Command must be provided");
             }
-            return new StdioProxy(this);
+            return new StdIoServerProxy(this);
         }
     }
 

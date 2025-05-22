@@ -25,7 +25,8 @@ public class ListBundles extends SmithyMcpCommand {
             throw new IllegalArgumentException("The registry '" + registryName + "' does not exist.");
         }
 
-        var registry = registryName != null ? RegistryUtils.getRegistry(registryName) : RegistryUtils.getRegistry();
+        var registry = registryName != null ? RegistryUtils.getRegistry(registryName)
+                : RegistryUtils.getRegistry(config.getDefaultRegistry());
         registry
                 .listMcpBundles()
                 .forEach(bundle -> {

@@ -53,6 +53,9 @@ public class InstallBundle extends SmithyMcpCommand {
         if (registry != null && !config.getRegistries().containsKey(registry)) {
             throw new IllegalArgumentException("The registry '" + registry + "' does not exist.");
         }
+        if (registry == null) {
+            registry = config.getDefaultRegistry();
+        }
         var bundle = RegistryUtils.getRegistry(registry).getMcpBundle(name);
         ConfigUtils.addMcpBundle(config, name, bundle);
         var newConfig = McpServerConfig.builder().command("mcp-registry").args(List.of("start-server", name)).build();

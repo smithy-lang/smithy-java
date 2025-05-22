@@ -11,17 +11,18 @@ import java.util.List;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import software.amazon.smithy.java.mcp.cli.ConfigUtils;
+import software.amazon.smithy.java.mcp.cli.ProcessStdIoProxy;
 import software.amazon.smithy.java.mcp.cli.RegistryUtils;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
 import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.Location;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
-import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
 import software.amazon.smithy.java.mcp.server.McpServer;
 import software.amazon.smithy.java.server.FilteredService;
 import software.amazon.smithy.java.server.OperationFilters;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.mcp.bundle.api.McpBundles;
+import software.amazon.smithy.mcp.bundle.api.model.GenericBundle;
 
 /**
  * Command to start a Smithy MCP server exposing specified tool bundles.
@@ -65,16 +66,14 @@ public final class StartServer extends SmithyMcpCommand {
         for (var toolBundle : toolBundles) {
             var toolBundleConfig = config.getToolBundles().get(toolBundle);
             if (toolBundleConfig == null) {
-                var bundle = RegistryUtils.getRegistry().getMcpBundle(toolBundle);
+                var bundle = RegistryUtils.getRegistry(config.getDefaultRegistry()).getMcpBundle(toolBundle);
                 if (bundle == null) {
                     throw new IllegalArgumentException("Can't find a configured tool bundle for '" + toolBundle + "'.");
                 } else {
                     toolBundleConfig = McpBundleConfig.builder()
-                            .smithyModeled(SmithyModeledBundleConfig.builder()
-                                    .name(toolBundle)
-                                    .bundleLocation(Location.builder()
-                                            .fileLocation(ConfigUtils.getBundleFileLocation(toolBundle).toString())
-                                            .build())
+                            .name(toolBundle)
+                            .bundleLocation(Location.builder()
+                                    .fileLocation(ConfigUtils.getBundleFileLocation(toolBundle).toString())
                                     .build())
                             .build();
                     ConfigUtils.addMcpBundle(config, toolBundle, bundle);
@@ -83,24 +82,52 @@ public final class StartServer extends SmithyMcpCommand {
             toolBundleConfigs.add(toolBundleConfig);
         }
         var services = new ArrayList<Service>();
+        GenericBundle genericBundle = null;
         for (var toolBundleConfig : toolBundleConfigs) {
-            switch (toolBundleConfig.type()) {
-                case smithyModeled -> {
-                    SmithyModeledBundleConfig bundleConfig = toolBundleConfig.getValue();
+            if (genericBundle != null) {
+                throw new IllegalArgumentException("Multiple generic tool bundles are not supported right now.");
+            }
+            var bundle = ConfigUtils.getMcpBundle(toolBundleConfig.getName());
+            switch (bundle.type()) {
+                case smithyBundle -> {
                     Service service =
-                            McpBundles.getService(ConfigUtils.getMcpBundle(bundleConfig.getName()));
-                    if (bundleConfig.hasAllowListedTools() || bundleConfig.hasBlockListedTools()) {
-                        var filter = OperationFilters.allowList(bundleConfig.getAllowListedTools())
-                                .and(OperationFilters.blockList(bundleConfig.getBlockListedTools()));
+                            McpBundles.getService(bundle);
+                    if (toolBundleConfig.hasAllowListedTools() || toolBundleConfig.hasBlockListedTools()) {
+                        var filter = OperationFilters.allowList(toolBundleConfig.getAllowListedTools())
+                                .and(OperationFilters.blockList(toolBundleConfig.getBlockListedTools()));
                         service = new FilteredService(service, filter);
                     }
                     services.add(service);
                 }
+                case genericBundle -> {
+                    if (!services.isEmpty()) {
+                        throw new IllegalArgumentException(
+                                "Multiple tool bundles with a generic bundle are not supported right now.");
+                    }
+                    genericBundle = bundle.getValue();
+                }
                 default ->
-                    throw new IllegalArgumentException("Unknown tool bundle type '" + toolBundleConfig.type() + "'.");
+                    throw new IllegalArgumentException("Unknown tool bundle type '" + bundle.type() + "'.");
             }
         }
-        var mcpServer = McpServer.builder().stdio().addServices(services).name("smithy-mcp-server").build();
+        if (genericBundle != null) {
+            var proxy = ProcessStdIoProxy.builder()
+                    .arguments(genericBundle.getArgs())
+                    .command(genericBundle.getCommand())
+                    .build();
+            proxy.start();
+            try {
+                Thread.currentThread().join();
+            } catch (InterruptedException e) {
+                proxy.shutdown().join();
+            }
+            return;
+        }
+        var mcpServer = McpServer.builder()
+                .stdio()
+                .addServices(services)
+                .name("smithy-mcp-server")
+                .build();
         mcpServer.start();
         try {
             Thread.currentThread().join();

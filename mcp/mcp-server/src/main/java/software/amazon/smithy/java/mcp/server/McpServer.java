@@ -112,28 +112,9 @@ public final class McpServer implements Server {
 
                     // Check if this tool should be dispatched to a proxy
                     if (tool.proxy() != null) {
-                        // Forward the request to the proxy
-                        JsonRpcRequest proxyRequest = JsonRpcRequest.builder()
-                                .id(req.getId())
-                                .method(req.getMethod())
-                                .params(req.getParams())
-                                .jsonrpc(req.getJsonrpc())
-                                .build();
-
                         // Get response asynchronously
-                        tool.proxy().rpc(proxyRequest).thenAccept(response -> {
-                            // Pass through the response directly
-                            synchronized (this) {
-                                try {
-                                    String serializedResponse = CODEC.serializeToString(response);
-                                    os.write(serializedResponse.getBytes(StandardCharsets.UTF_8));
-                                    os.write('\n');
-                                    os.flush();
-                                } catch (Exception e) {
-                                    LOG.error("Error writing proxy response", e);
-                                }
-                            }
-                        }).exceptionally(ex -> {
+                        // Pass through the response directly
+                        tool.proxy().rpc(req).thenAccept(this::writeResponse).exceptionally(ex -> {
                             LOG.error("Error from proxy RPC", ex);
                             internalError(req, new RuntimeException("Proxy error: " + ex.getMessage(), ex));
                             return null;
