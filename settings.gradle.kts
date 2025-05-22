@@ -1,3 +1,11 @@
+//This ensures composite builds also have the repositories configured.
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 rootProject.name = "smithy-java"
 
 // Common modules

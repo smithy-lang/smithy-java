@@ -1,4 +1,10 @@
-
+//This ensures composite builds also have the repositories configured.
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
 // Ensure version library is available to buildSrc plugins
 dependencyResolutionManagement {
     versionCatalogs {
