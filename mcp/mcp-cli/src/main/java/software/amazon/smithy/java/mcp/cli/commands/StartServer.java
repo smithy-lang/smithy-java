@@ -13,7 +13,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import software.amazon.smithy.java.mcp.cli.ConfigUtils;
-import software.amazon.smithy.java.mcp.cli.RegistryUtils;
+import software.amazon.smithy.java.mcp.cli.ExecutionContext;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
 import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.Location;
@@ -33,6 +33,7 @@ import software.amazon.smithy.java.server.OperationFilters;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.mcp.bundle.api.McpBundles;
+import software.amazon.smithy.mcp.bundle.api.Registry;
 import software.amazon.smithy.mcp.bundle.api.model.BundleMetadata;
 
 /**
@@ -59,30 +60,30 @@ public final class StartServer extends SmithyMcpCommand {
      * Loads the requested tool bundles from configuration, creates appropriate services,
      * and starts the MCP server.
      *
-     * @param config The MCP configuration
+     * @param context {@link ExecutionContext}
      * @throws IllegalArgumentException If no tool bundles are configured or requested bundles not found
      */
     @Override
-    public void execute(Config config) throws IOException {
+    public void execute(ExecutionContext context) throws IOException {
+
+        var config = context.config();
         // By default, load all available tools
         if (toolBundles == null || toolBundles.isEmpty()) {
-            try {
-                toolBundles = new ArrayList<>(ConfigUtils.loadOrCreateConfig().getToolBundles().keySet());
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            toolBundles = new ArrayList<>(config.getToolBundles().keySet());
         }
 
         if (toolBundles.isEmpty() && !registryServer) {
             throw new IllegalStateException("No bundles installed");
         }
 
+        var registry = context.registry();
+
         List<McpBundleConfig> toolBundleConfigs = new ArrayList<>(toolBundles.size());
 
         for (var toolBundle : toolBundles) {
             var toolBundleConfig = config.getToolBundles().get(toolBundle);
             if (toolBundleConfig == null) {
-                var bundle = RegistryUtils.getRegistry().getMcpBundle(toolBundle);
+                var bundle = registry.getMcpBundle(toolBundle);
                 if (bundle == null) {
                     throw new IllegalArgumentException("Can't find a configured tool bundle for '" + toolBundle + "'.");
                 } else {
@@ -107,8 +108,8 @@ public final class StartServer extends SmithyMcpCommand {
 
         if (registryServer) {
             services.add(McpRegistry.builder()
-                    .addInstallServerOperation(new InstallOp())
-                    .addListServersOperation(new ListOp())
+                    .addInstallServerOperation(new InstallOp(registry))
+                    .addListServersOperation(new ListOp(registry))
                     .build());
         }
 
@@ -141,9 +142,16 @@ public final class StartServer extends SmithyMcpCommand {
     }
 
     private static final class ListOp implements ListServersOperation {
+
+        private final Registry registry;
+
+        private ListOp(Registry registry) {
+            this.registry = registry;
+        }
+
         @Override
         public ListServersOutput listServers(ListServersInput input, RequestContext context) {
-            var servers = RegistryUtils.getRegistry()
+            var servers = registry
                     .listMcpBundles()
                     .stream()
                     .unordered()
@@ -159,12 +167,20 @@ public final class StartServer extends SmithyMcpCommand {
     }
 
     private final class InstallOp implements InstallServerOperation {
+
+        private final Registry registry;
+
+        private InstallOp(Registry registry) {
+            this.registry = registry;
+        }
+
+
         @Override
         public InstallServerOutput installServer(InstallServerInput input, RequestContext context) {
             try {
                 var config = ConfigUtils.loadOrCreateConfig();
                 if (!config.getToolBundles().containsKey(input.getServerName())) {
-                    var bundle = RegistryUtils.getRegistry().getMcpBundle(input.getServerName());
+                    var bundle = registry.getMcpBundle(input.getServerName());
                     if (bundle == null) {
                         throw new IllegalArgumentException(
                                 "Can't find a configured tool bundle for '" + input.getServerName() + "'.");

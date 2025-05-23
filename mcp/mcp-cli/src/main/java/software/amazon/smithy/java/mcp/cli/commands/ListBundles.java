@@ -8,9 +8,12 @@ package software.amazon.smithy.java.mcp.cli.commands;
 import static picocli.CommandLine.Command;
 
 import picocli.CommandLine.Option;
+import software.amazon.smithy.java.mcp.cli.ExecutionContext;
 import software.amazon.smithy.java.mcp.cli.RegistryUtils;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
 import software.amazon.smithy.java.mcp.cli.model.Config;
+
+import java.util.Objects;
 
 @Command(name = "list", description = "List all the MCP Bundles available in the Registry")
 public class ListBundles extends SmithyMcpCommand {
@@ -20,12 +23,8 @@ public class ListBundles extends SmithyMcpCommand {
     String registryName;
 
     @Override
-    protected void execute(Config config) {
-        if (registryName != null && !config.getRegistries().containsKey(registryName)) {
-            throw new IllegalArgumentException("The registry '" + registryName + "' does not exist.");
-        }
-
-        var registry = registryName != null ? RegistryUtils.getRegistry(registryName) : RegistryUtils.getRegistry();
+    protected void execute(ExecutionContext context) {
+        var registry = context.registry();
         registry
                 .listMcpBundles()
                 .forEach(bundle -> {
@@ -38,5 +37,10 @@ public class ListBundles extends SmithyMcpCommand {
                     System.out.println(builder);
                 });
 
+    }
+
+    @Override
+    protected String registryToUse(Config config) {
+        return registryName;
     }
 }

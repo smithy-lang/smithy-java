@@ -19,7 +19,8 @@ import software.amazon.smithy.java.mcp.cli.model.Location;
 public abstract class AbstractAddBundle extends SmithyMcpCommand implements ConfigurationCommand {
 
     @Override
-    public final void execute(Config config) throws Exception {
+    public final void execute(ExecutionContext context) throws Exception {
+        var config = context.config();
         if (!canOverwrite() && config.getToolBundles().containsKey(getToolBundleName())) {
             throw new IllegalArgumentException("Tool bundle " + getToolBundleName()
                     + " already exists. Either choose a new name or pass --overwrite to overwrite the existing tool bundle");
