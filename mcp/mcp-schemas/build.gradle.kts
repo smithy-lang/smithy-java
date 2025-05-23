@@ -11,7 +11,9 @@ extra["moduleName"] = "software.amazon.smithy.mcp.schemas"
 dependencies {
     api(project(":core"))
     api(libs.smithy.model)
+    api(project(":server:server-api"))
     smithyBuild(project(":codegen:plugins:types-codegen"))
+    smithyBuild(project(":codegen:plugins:server-codegen"))
 }
 
 sourceSets {
@@ -24,14 +26,17 @@ sourceSets {
 
 afterEvaluate {
     val typePath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-type-codegen")
+    val serverPath = smithy.getPluginProjectionPath(smithy.sourceProjection.get(), "java-server-codegen")
     sourceSets {
         main {
             java {
                 srcDir(typePath)
+                srcDir(serverPath)
                 include("software/**")
             }
             resources {
                 srcDir(typePath)
+                srcDir(serverPath)
                 include("META-INF/**")
             }
         }

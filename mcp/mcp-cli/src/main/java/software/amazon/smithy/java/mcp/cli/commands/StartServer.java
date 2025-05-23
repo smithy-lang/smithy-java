@@ -8,7 +8,9 @@ package software.amazon.smithy.java.mcp.cli.commands;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import software.amazon.smithy.java.mcp.cli.ConfigUtils;
 import software.amazon.smithy.java.mcp.cli.RegistryUtils;
@@ -17,11 +19,21 @@ import software.amazon.smithy.java.mcp.cli.model.Config;
 import software.amazon.smithy.java.mcp.cli.model.Location;
 import software.amazon.smithy.java.mcp.cli.model.McpBundleConfig;
 import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
+import software.amazon.smithy.java.mcp.registry.model.InstallServerInput;
+import software.amazon.smithy.java.mcp.registry.model.InstallServerOutput;
+import software.amazon.smithy.java.mcp.registry.model.ListServersInput;
+import software.amazon.smithy.java.mcp.registry.model.ListServersOutput;
+import software.amazon.smithy.java.mcp.registry.model.ServerEntry;
+import software.amazon.smithy.java.mcp.registry.service.InstallServerOperation;
+import software.amazon.smithy.java.mcp.registry.service.ListServersOperation;
+import software.amazon.smithy.java.mcp.registry.service.McpRegistry;
 import software.amazon.smithy.java.mcp.server.McpServer;
 import software.amazon.smithy.java.server.FilteredService;
 import software.amazon.smithy.java.server.OperationFilters;
+import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.mcp.bundle.api.McpBundles;
+import software.amazon.smithy.mcp.bundle.api.model.BundleMetadata;
 
 /**
  * Command to start a Smithy MCP server exposing specified tool bundles.
@@ -35,6 +47,11 @@ public final class StartServer extends SmithyMcpCommand {
 
     @Parameters(paramLabel = "TOOL_BUNDLES", description = "Name(s) of the Tool Bundles to expose in this MCP Server.")
     List<String> toolBundles;
+
+    @Option(names = "registry-server", description = "Serve the registry as an MCP server")
+    boolean registryServer;
+
+    private volatile McpServer mcpServer;
 
     /**
      * Executes the start-server command.
@@ -56,8 +73,8 @@ public final class StartServer extends SmithyMcpCommand {
             }
         }
 
-        if (toolBundles.isEmpty()) {
-            throw new IllegalArgumentException("No bundles installed");
+        if (toolBundles.isEmpty() && !registryServer) {
+            throw new IllegalStateException("No bundles installed");
         }
 
         List<McpBundleConfig> toolBundleConfigs = new ArrayList<>(toolBundles.size());
@@ -82,30 +99,85 @@ public final class StartServer extends SmithyMcpCommand {
             }
             toolBundleConfigs.add(toolBundleConfig);
         }
+
         var services = new ArrayList<Service>();
         for (var toolBundleConfig : toolBundleConfigs) {
-            switch (toolBundleConfig.type()) {
-                case smithyModeled -> {
-                    SmithyModeledBundleConfig bundleConfig = toolBundleConfig.getValue();
-                    Service service =
-                            McpBundles.getService(ConfigUtils.getMcpBundle(bundleConfig.getName()));
-                    if (bundleConfig.hasAllowListedTools() || bundleConfig.hasBlockListedTools()) {
-                        var filter = OperationFilters.allowList(bundleConfig.getAllowListedTools())
-                                .and(OperationFilters.blockList(bundleConfig.getBlockListedTools()));
-                        service = new FilteredService(service, filter);
-                    }
-                    services.add(service);
-                }
-                default ->
-                    throw new IllegalArgumentException("Unknown tool bundle type '" + toolBundleConfig.type() + "'.");
-            }
+            services.add(bundleToService(toolBundleConfig));
         }
-        var mcpServer = McpServer.builder().stdio().addServices(services).name("smithy-mcp-server").build();
+
+        if (registryServer) {
+            services.add(McpRegistry.builder()
+                    .addInstallServerOperation(new InstallOp())
+                    .addListServersOperation(new ListOp())
+                    .build());
+        }
+
+        this.mcpServer =
+                (McpServer) McpServer.builder().stdio().addServices(services).name("smithy-mcp-server").build();
         mcpServer.start();
         try {
             Thread.currentThread().join();
         } catch (InterruptedException e) {
             mcpServer.shutdown().join();
+        }
+    }
+
+    private static Service bundleToService(McpBundleConfig toolBundleConfig) {
+        switch (toolBundleConfig.type()) {
+            case smithyModeled -> {
+                SmithyModeledBundleConfig bundleConfig = toolBundleConfig.getValue();
+                Service service =
+                        McpBundles.getService(ConfigUtils.getMcpBundle(bundleConfig.getName()));
+                if (bundleConfig.hasAllowListedTools() || bundleConfig.hasBlockListedTools()) {
+                    var filter = OperationFilters.allowList(bundleConfig.getAllowListedTools())
+                            .and(OperationFilters.blockList(bundleConfig.getBlockListedTools()));
+                    service = new FilteredService(service, filter);
+                }
+                return service;
+            }
+            default ->
+                throw new IllegalArgumentException("Unknown tool bundle type '" + toolBundleConfig.type() + "'.");
+        }
+    }
+
+    private static final class ListOp implements ListServersOperation {
+        @Override
+        public ListServersOutput listServers(ListServersInput input, RequestContext context) {
+            var servers = RegistryUtils.getRegistry()
+                    .listMcpBundles()
+                    .stream()
+                    .unordered()
+                    .collect(Collectors.toMap(
+                            BundleMetadata::getName,
+                            bundle -> ServerEntry.builder()
+                                    .description(bundle.getDescription())
+                                    .build()));
+            return ListServersOutput.builder()
+                    .servers(servers)
+                    .build();
+        }
+    }
+
+    private final class InstallOp implements InstallServerOperation {
+        @Override
+        public InstallServerOutput installServer(InstallServerInput input, RequestContext context) {
+            try {
+                var config = ConfigUtils.loadOrCreateConfig();
+                if (!config.getToolBundles().containsKey(input.getServerName())) {
+                    var bundle = RegistryUtils.getRegistry().getMcpBundle(input.getServerName());
+                    if (bundle == null) {
+                        throw new IllegalArgumentException(
+                                "Can't find a configured tool bundle for '" + input.getServerName() + "'.");
+                    } else {
+                        var mcpBundleConfig = ConfigUtils.addMcpBundle(config, input.getServerName(), bundle);
+                        mcpServer.addNewService(bundleToService(mcpBundleConfig));
+                    }
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+            return InstallServerOutput.builder().build();
         }
     }
 }

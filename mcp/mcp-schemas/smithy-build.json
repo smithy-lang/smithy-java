@@ -4,6 +4,11 @@
     "java-type-codegen": {
       "namespace": "software.amazon.smithy.java.mcp",
       "headerFile": "license.txt"
+    },
+    "java-server-codegen": {
+      "service": "smithy.mcp.registry#McpRegistry",
+      "namespace": "software.amazon.smithy.java.mcp.registry",
+      "headerFile": "license.txt"
     }
   }
 }

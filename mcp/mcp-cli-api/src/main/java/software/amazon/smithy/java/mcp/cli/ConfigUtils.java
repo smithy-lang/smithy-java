@@ -148,6 +148,7 @@ public class ConfigUtils {
                 serializedBundle,
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.CREATE);
+        addMcpBundleConfig(config, toolBundleName, mcpBundleConfig.mcpBundleConfig());
     }
 
     public static McpBundleConfig addMcpBundle(Config config, String toolBundleName, Bundle bundle)

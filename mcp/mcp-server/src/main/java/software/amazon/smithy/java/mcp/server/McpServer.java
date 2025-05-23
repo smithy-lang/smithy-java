@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.smithy.java.core.schema.Schema;
 import software.amazon.smithy.java.core.schema.SerializableShape;
 import software.amazon.smithy.java.core.schema.SerializableStruct;
@@ -97,7 +98,7 @@ public final class McpServer implements Server {
                 case "initialize" -> writeResponse(req.getId(),
                         InitializeResult.builder()
                                 .capabilities(Capabilities.builder()
-                                        .tools(Tools.builder().listChanged(false).build())
+                                        .tools(Tools.builder().listChanged(true).build())
                                         .build())
                                 .serverInfo(ServerInfo.builder()
                                         .name(name)
@@ -165,6 +166,22 @@ public final class McpServer implements Server {
         }
     }
 
+    private static final byte[] TOOLS_CHANGED = """
+            {"jsonrpc":"2.0","method":"notifications/tools/list_changed"}
+            """.getBytes(StandardCharsets.UTF_8); // newline is important here
+
+    public void addNewService(Service service) {
+        try {
+            synchronized (os) {
+                tools.putAll(createTools(List.of(service)));
+                os.write(TOOLS_CHANGED);
+                os.flush();
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to flush tools changed notification");
+        }
+    }
+
     private void writeResponse(int id, SerializableStruct value) {
         writeResponse(JsonRpcResponse.builder()
                 .id(id)
@@ -174,7 +191,7 @@ public final class McpServer implements Server {
     }
 
     private void writeResponse(JsonRpcResponse response) {
-        synchronized (this) {
+        synchronized (os) {
             try {
                 os.write(CODEC.serializeToString(response).getBytes(StandardCharsets.UTF_8));
                 os.write('\n');
@@ -205,7 +222,7 @@ public final class McpServer implements Server {
                 .error(error)
                 .jsonrpc("2.0")
                 .build();
-        synchronized (this) {
+        synchronized (os) {
             try {
                 os.write(CODEC.serializeToString(response).getBytes(StandardCharsets.UTF_8));
                 os.write('\n');
@@ -216,7 +233,7 @@ public final class McpServer implements Server {
     }
 
     private static Map<String, Tool> createTools(List<Service> serviceList) {
-        var tools = new HashMap<String, Tool>();
+        var tools = new ConcurrentHashMap<String, Tool>();
         for (Service service : serviceList) {
             var serviceName = service.schema().id().getName();
             for (var operation : service.getAllOperations()) {
