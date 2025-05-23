@@ -5,14 +5,12 @@
 
 package software.amazon.smithy.java.mcp.cli.commands;
 
-import picocli.CommandLine;
+import static picocli.CommandLine.Command;
+
 import picocli.CommandLine.Option;
 import software.amazon.smithy.java.mcp.cli.RegistryUtils;
 import software.amazon.smithy.java.mcp.cli.SmithyMcpCommand;
 import software.amazon.smithy.java.mcp.cli.model.Config;
-import software.amazon.smithy.java.mcp.cli.model.SmithyModeledBundleConfig;
-
-import static picocli.CommandLine.Command;
 
 @Command(name = "list", description = "List all the MCP Bundles available in the Registry")
 public class ListBundles extends SmithyMcpCommand {
@@ -31,8 +29,9 @@ public class ListBundles extends SmithyMcpCommand {
         registry
                 .listMcpBundles()
                 .forEach(bundle -> {
-                    System.out.println(commandSpec().commandLine().getColorScheme()
-                        .string("@|bold " + bundle.getName() + "|@"));
+                    System.out.println(commandSpec().commandLine()
+                            .getColorScheme()
+                            .string("@|bold " + bundle.getName() + "|@"));
                     var description = bundle.getDescription();
                     if (description == null) {
                         description = "MCP server for " + bundle.getName();
