@@ -48,7 +48,7 @@ public final class StartServer extends SmithyMcpCommand {
     @Parameters(paramLabel = "TOOL_BUNDLES", description = "Name(s) of the Tool Bundles to expose in this MCP Server.")
     List<String> toolBundles;
 
-    @Option(names = "registry-server", description = "Serve the registry as an MCP server")
+    @Option(names = "--registry-server", description = "Serve the registry as an MCP server")
     boolean registryServer;
 
     private volatile McpServer mcpServer;
