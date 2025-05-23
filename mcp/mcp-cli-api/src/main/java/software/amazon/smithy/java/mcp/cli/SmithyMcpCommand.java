@@ -8,6 +8,8 @@ package software.amazon.smithy.java.mcp.cli;
 import static software.amazon.smithy.java.mcp.cli.ConfigUtils.loadOrCreateConfig;
 
 import java.util.concurrent.Callable;
+
+import picocli.CommandLine;
 import software.amazon.smithy.java.logging.InternalLogger;
 import software.amazon.smithy.java.mcp.cli.model.Config;
 
@@ -19,6 +21,9 @@ import software.amazon.smithy.java.mcp.cli.model.Config;
  * and providing appropriate error handling.
  */
 public abstract class SmithyMcpCommand implements Callable<Integer> {
+
+    @CommandLine.Spec
+    CommandLine.Model.CommandSpec commandSpec;
 
     InternalLogger LOG = InternalLogger.getLogger(SmithyMcpCommand.class);
 
@@ -46,4 +51,8 @@ public abstract class SmithyMcpCommand implements Callable<Integer> {
      * @throws Exception If an error occurs during execution
      */
     protected abstract void execute(Config config) throws Exception;
+
+    protected final CommandLine.Model.CommandSpec commandSpec() {
+        return commandSpec;
+    }
 }
