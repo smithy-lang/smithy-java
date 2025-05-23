@@ -28,11 +28,11 @@ public final class ProcessIoProxy {
     private final InputStream inputStream;
     private final OutputStream outputStream;
     private final OutputStream errorStream;
-    private Process process;
-    private Thread inputThread;
-    private Thread outputThread;
-    private Thread errorThread;
-    private AtomicBoolean running = new AtomicBoolean(false);
+    private volatile Process process;
+    private volatile Thread inputThread;
+    private volatile Thread outputThread;
+    private volatile Thread errorThread;
+    private final AtomicBoolean running = new AtomicBoolean(false);
 
     private ProcessIoProxy(Builder builder) {
         processBuilder = new ProcessBuilder();
@@ -57,13 +57,13 @@ public final class ProcessIoProxy {
     /**
      * Builder for creating ProcessStdIoProxy instances.
      */
-    public static class Builder {
+    public static final class Builder {
         private String command;
         private List<String> arguments;
         private Map<String, String> environmentVariables;
-        private InputStream inputStream;
-        private OutputStream outputStream;
-        private OutputStream errorStream;
+        private InputStream inputStream = System.in;
+        private OutputStream outputStream = System.out;
+        private OutputStream errorStream = System.err;
 
         /**
          * Sets the command to execute.
@@ -191,12 +191,11 @@ public final class ProcessIoProxy {
      * @throws RuntimeException If there is an error starting the process
      */
     public synchronized void start() {
-        if (process != null && process.isAlive()) {
+        if (running.compareAndSet(false, true)) {
             return;
         }
         try {
             process = processBuilder.start();
-            running.getAndSet(true);
 
             // Thread to forward input to process
             inputThread = createForwardingThread(
@@ -229,6 +228,7 @@ public final class ProcessIoProxy {
                     running);
 
         } catch (IOException e) {
+            running.set(false);
             throw new RuntimeException("Failed to start process: " + e.getMessage(), e);
         }
     }
@@ -243,10 +243,6 @@ public final class ProcessIoProxy {
             synchronized (this) {
                 if (process != null && process.isAlive()) {
                     try {
-                        // Interrupt the threads
-                        interruptThread(inputThread);
-                        interruptThread(outputThread);
-                        interruptThread(errorThread);
 
                         // Destroy the process
                         process.destroy();
@@ -256,6 +252,12 @@ public final class ProcessIoProxy {
                             // Force kill if it doesn't terminate gracefully
                             process.destroyForcibly();
                         }
+
+                        // Interrupt the threads
+                        interruptThread(inputThread);
+                        interruptThread(outputThread);
+                        interruptThread(errorThread);
+
                     } catch (InterruptedException e) {
                         LOG.error("Error shutting down process", e);
                         Thread.currentThread().interrupt();
