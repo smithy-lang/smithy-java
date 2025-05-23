@@ -30,7 +30,7 @@ public abstract class SmithyMcpCommand implements Callable<Integer> {
     public final Integer call() throws Exception {
         try {
             var config = loadOrCreateConfig();
-            execute(config);
+            execute(new ExecutionContext(config, RegistryUtils.getRegistry(registryToUse(config), config)));
             return 0;
         } catch (IllegalArgumentException e) {
             System.out.println("Invalid input : [" + e.getMessage() + "]");
@@ -46,11 +46,15 @@ public abstract class SmithyMcpCommand implements Callable<Integer> {
      * <p>
      * Subclasses must implement this method to provide command-specific functionality.
      *
-     * @param config The MCP configuration
+     * @param context {@link ExecutionContext}
      * @throws Exception If an error occurs during execution
      */
-    protected abstract void execute(Config config) throws Exception;
+    protected abstract void execute(ExecutionContext context) throws Exception;
 
+    protected String registryToUse(Config config) {
+        return config.getDefaultRegistry();
+    }
+  
     protected final CommandLine.Model.CommandSpec commandSpec() {
         return commandSpec;
     }
